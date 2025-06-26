@@ -11,5 +11,9 @@
 
 ## Tools
 
-- github: @memory/tools/github.md
+- github (`gh`): @memory/tools/github.md
+- graphite (`gt`): @memory/tools/graphite.md
 
+## Languages
+
+- shell: @memory/languages/shell.md

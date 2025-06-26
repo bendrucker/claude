@@ -21,4 +21,5 @@
 
 ## Languages
 
-- shell: @memory/languages/shell.md
+- Shell: @memory/languages/shell.md
+- TypeScript: @memory/languages/typescript.md

@@ -20,6 +20,12 @@
 - When executing any build command to check for compilation errors, output to `/dev/null` to avoid creating a binary.
 - When generating any temporary files, use `mktemp -t` to create a temporary file, setting the proper prefix and extension in the template. Do not store temporary files in the working directory.
 
+## Tasks
+
+Guidelines for common tasks you will need to perform:
+
+* Pull Request (PR): @memory/tasks/pull-request.md
+
 ## Tools
 
 - GitHub (`gh`): @memory/tools/github.md

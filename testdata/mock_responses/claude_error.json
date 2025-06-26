@@ -1,0 +1,9 @@
+{
+  "status": "error",
+  "summary": "Could not complete evaluation due to system error.",
+  "issues": [],
+  "metadata": {
+    "filesEvaluated": 0,
+    "evaluationTime": "2024-01-20T10:30:00Z"
+  }
+}

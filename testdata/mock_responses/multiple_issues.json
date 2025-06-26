@@ -1,0 +1,32 @@
+{
+  "status": "violations", 
+  "summary": "Found 3 issues across 2 configuration files.",
+  "issues": [
+    {
+      "file": ".claude/settings.json",
+      "line": 3,
+      "type": "syntax", 
+      "severity": "error",
+      "message": "Missing comma after property",
+      "suggestion": "Add a comma after the property value"
+    },
+    {
+      "file": ".claude/memory/tools/github.md",
+      "line": 15,
+      "type": "reference",
+      "severity": "warning", 
+      "message": "Reference to @memory/tools/nonexistent.md not found",
+      "suggestion": "Create the referenced file or fix the path"
+    },
+    {
+      "file": ".claude/CLAUDE.md",
+      "type": "style",
+      "severity": "info",
+      "message": "Consider using more consistent formatting for tool references"
+    }
+  ],
+  "metadata": {
+    "filesEvaluated": 8,
+    "evaluationTime": "2024-01-20T10:30:00Z"
+  }
+}

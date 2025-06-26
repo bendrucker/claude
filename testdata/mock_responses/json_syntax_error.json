@@ -1,0 +1,18 @@
+{
+  "status": "violations",
+  "summary": "Found 1 syntax error in configuration files.",
+  "issues": [
+    {
+      "file": ".claude/settings.json",
+      "line": 3,
+      "type": "syntax",
+      "severity": "error",
+      "message": "Missing comma after \"includeCoAuthoredBy\": false",
+      "suggestion": "Add a comma after the property value"
+    }
+  ],
+  "metadata": {
+    "filesEvaluated": 3,
+    "evaluationTime": "2024-01-20T10:30:00Z"
+  }
+}

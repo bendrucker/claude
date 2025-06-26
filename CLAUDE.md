@@ -9,3 +9,7 @@ This repository is my shared, open-source configuration for Claude Code, an AI c
 - `.claude/CLAUDE.md`: User memory file for Claude sessions
 - `.claude/commands/`: Custom user commands directory
 - `install.sh`: Setup script that creates symlinks from `.claude/` to `~/.claude`
+
+## Workflow
+
+- When creating new files or directories in `.claude/`, run `./install.sh` to update the symlinks in `~/.claude`.

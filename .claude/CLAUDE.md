@@ -14,10 +14,15 @@
 - Avoid creating or adding to catch-all packages/modules like `utils` or similar. Provide meaningful names for packages and keep them well-scoped, but not overly small.
 - Break code into multiple files where appropriate first before splitting across directories.
 
+## Workflow
+
+- When executing any build command to check for compilation errors, output to `/dev/null` to avoid creating a binary.
+- When generating any temporary files, use `mktemp -t` to create a temporary file, setting the proper prefix and extension in the template. Do not store temporary files in the working directory.
+
 ## Tools
 
-- github (`gh`): @memory/tools/github.md
-- graphite (`gt`): @memory/tools/graphite.md
+- GitHub (`gh`): @memory/tools/github.md
+- Graphite (`gt`): @memory/tools/graphite.md
 
 ## Languages
 

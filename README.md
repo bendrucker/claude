@@ -1,2 +1,3 @@
 # claude
-Configuration and commands for Claude
+
+> Configuration and commands for Claude

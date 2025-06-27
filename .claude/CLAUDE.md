@@ -29,6 +29,7 @@ Guidelines for common tasks you will need to perform:
 
 ## Tools
 
+- Bash (`bash`): @memory/tools/bash.md
 - GitHub (`gh`): @memory/tools/github.md
 - Graphite (`gt`): @memory/tools/graphite.md
 

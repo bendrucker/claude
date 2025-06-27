@@ -6,6 +6,39 @@
       "headers": {
         "Authorization": "Bearer ${GITHUB_TOKEN}"
       }
+    },
+    "godoc": {
+      "command": "go",
+      "args": [
+        "run",
+        "github.com/mrjoshuak/godoc-mcp@3296b67"
+      ]
+    },
+    "terraform": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "hashicorp/terraform-mcp-server:0.1.0"
+      ]
+    },
+    "aws-docs": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "--interactive",
+        "--env",
+        "FASTMCP_LOG_LEVEL=ERROR",
+        "--env",
+        "AWS_DOCUMENTATION_PARTITION=aws",
+        "mcp/aws-documentation:latest"
+      ]
+    },
+    "package-registry": {
+      "command": "npx",
+      "args": ["-y", "package-registry-mcp"]
     }
   }
 }

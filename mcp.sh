@@ -35,6 +35,12 @@ jq -r '.mcpServers | keys[]' "$MCP_CONFIG" | while read -r server_name; do
         exit 1
     fi
 
+    if [ ${#missing_vars[@]} -gt 0 ]; then
+        echo "Error: Missing required environment variables for '$server_name':"
+        printf '  %s\n' "${missing_vars[@]}"
+        exit 1
+    fi
+
     # Use envsubst to interpolate variables for this server
     server_config=$(echo "$server_json" | envsubst)
 
@@ -56,6 +62,7 @@ jq -r '.mcpServers | keys[]' "$MCP_CONFIG" | while read -r server_name; do
 
         # Add args if they exist
         if echo "$server_config" | jq -e '.args' > /dev/null; then
+            cmd_args+=("--")
             while IFS= read -r arg; do
                 cmd_args+=("$arg")
             done < <(echo "$server_config" | jq -r '.args[]')

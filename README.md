@@ -31,3 +31,7 @@ The install script automatically calls an [MCP script](./mcp.sh) to set up [MCP]
 ## Usage
 
 Once installed, Claude Code will automatically use these configurations in any project.
+
+## License
+
+MIT © [Ben Drucker](http://bendrucker.me)

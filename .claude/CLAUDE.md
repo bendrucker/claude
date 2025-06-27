@@ -6,6 +6,7 @@
 - Minimize unnecessary explanations unless requested.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
 - Do not line-wrap at a specific column unless editing a project file where the surrounding text is wrapped. Use natural line breaks.
+- Include a trailing newline in all new files. Do not include one if an existing file does not have one.
 - Prefer meaningful anchor text over raw URLs.
 - Use bullet points for lists, checklists if I ask for tasks.
 - Do not use code comments to explain code to me or to reference my prompts. Use them to clarify code that is not self-explanatory.

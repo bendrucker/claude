@@ -1,67 +1,11 @@
 #!/usr/bin/env node
 
 import { cli, command } from 'cleye';
-import pino from 'pino';
 import { Evaluator } from './eval/evaluator';
 import { ClaudeClient } from './claude/client';
 import { EvalStatus } from './eval/result';
 import { EvalOptions } from './eval/types';
-
-// Global debug flag - set by CLI, used by other modules
-export let debugEnabled = false;
-
-// Logger instance
-export const logger = pino({
-  level: 'info',
-  transport: debugEnabled ? {
-    target: 'pino-pretty',
-    options: {
-      colorize: false,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname'
-    }
-  } : undefined
-});
-
-export function log(level: string, type: string, message: string, data?: Record<string, unknown>) {
-  const logData: Record<string, unknown> = {
-    type,
-    ...(data && { ...data })
-  };
-  
-  if (debugEnabled) {
-    // In debug mode, all logs go to stderr as NDJSON
-    switch (level) {
-      case 'debug':
-        logger.debug(logData, message);
-        break;
-      case 'info':
-        logger.info(logData, message);
-        break;
-      case 'error':
-        logger.error(logData, message);
-        break;
-      default:
-        logger.info(logData, message);
-    }
-  } else if (level === 'error') {
-    // Non-debug mode: only errors to stderr
-    logger.error(logData, message);
-  } else if (level === 'info' && !debugEnabled) {
-    // Non-debug mode: info messages as human readable to stdout
-    console.log(message);
-  }
-}
-
-export function debug(type: string, message: string, data?: Record<string, unknown>) {
-  if (debugEnabled) {
-    const logData: Record<string, unknown> = {
-      type,
-      ...(data && { ...data })
-    };
-    logger.debug(logData, message);
-  }
-}
+import * as log from './log';
 
 // Define subcommands
 const runCommand = command({
@@ -119,8 +63,7 @@ const argv = cli({
 async function main() {
   // Enable debug logging if requested
   if ('debug' in argv.flags && argv.flags.debug) {
-    debugEnabled = true;
-    logger.level = 'debug';
+    log.setDebugEnabled(true);
   }
 
   const client = new ClaudeClient();
@@ -129,8 +72,8 @@ async function main() {
   if (argv.command === 'list-models') {
     try {
       const models = await client.getAvailableModels();
-      if (debugEnabled) {
-        log('info', 'models', 'Available models', { models });
+      if ('debug' in argv.flags && argv.flags.debug) {
+        log.info('Available models', { type: 'models', models });
       } else {
         console.log('Available Claude models:');
         for (const model of models) {
@@ -139,7 +82,7 @@ async function main() {
       }
       process.exit(0);
     } catch (error) {
-      log('error', 'models', 'Failed to list models', { error: String(error) });
+      log.error('Failed to list models', { type: 'models', error: String(error) });
       process.exit(1);
     }
   } else if (argv.command === 'run') {
@@ -154,8 +97,9 @@ async function main() {
     const result = await evaluator.run(options);
 
     // All output as NDJSON when debug enabled, otherwise human readable
-    if (debugEnabled) {
-      log('info', 'result', 'Evaluation completed', {
+    if ('debug' in argv.flags && argv.flags.debug) {
+      log.info('Evaluation completed', {
+        type: 'result',
         status: result.status,
         issues: result.response?.issues?.length || 0,
         summary: result.response?.summary
@@ -163,11 +107,12 @@ async function main() {
       
       if (result.response?.issues) {
         for (const issue of result.response.issues) {
-          log('info', 'issue', issue.message, {
+          log.info(issue.message, {
+            type: 'issue',
             file: issue.file,
             line: issue.line,
             severity: issue.severity,
-            type: issue.type,
+            issueType: issue.type,
             suggestion: issue.suggestion
           });
         }
@@ -200,8 +145,8 @@ async function main() {
     // CLI is responsible for exit code translation
     const exitCode = translateStatusToExitCode(result.status);
 
-    if (debugEnabled) {
-      log('debug', 'exit', 'Process exiting', { status: result.status, exitCode });
+    if ('debug' in argv.flags && argv.flags.debug) {
+      log.info('Process exiting', { type: 'exit', status: result.status, exitCode });
     } else if ('verbose' in argv.flags && argv.flags.verbose) {
       console.error(`Status: ${result.status}, Exit Code: ${exitCode}`);
     }

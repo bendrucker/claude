@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { ClaudeResult, EvalStatus } from '../eval/result';
 import { ClaudeEvalResponse } from './types';
 import { ClaudeClientInterface } from './interface';
-import { debug, log, debugEnabled } from '../cli';
+import * as log from '../log';
 
 interface AnthropicModel {
   id: string;
@@ -56,10 +56,10 @@ export class ClaudeClient implements ClaudeClientInterface {
       }));
       
       ClaudeClient.modelCache = models;
-      debug('models-fetched', 'Available models retrieved', { count: models.length });
+      log.debug('Available models retrieved', { type: 'models-fetched', count: models.length });
       return models;
     } catch (error) {
-      debug('models-error', 'Failed to fetch models', { error: String(error) });
+      log.debug('Failed to fetch models', { type: 'models-error', error: String(error) });
       // Fallback to hardcoded models
       const fallbackModels = [
         { id: 'claude-sonnet-4-20250514', display_name: 'Claude 3.5 Sonnet', created_at: '2024-01-01', type: 'model' },
@@ -93,7 +93,7 @@ export class ClaudeClient implements ClaudeClientInterface {
     if (familyModels.length === 0) return undefined;
 
     const latest = familyModels.sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-    debug('model-resolved', 'Resolved model family', { family, resolved: latest.id });
+    log.debug('Resolved model family', { type: 'model-resolved', family, resolved: latest.id });
     return latest.id;
   }
 
@@ -102,7 +102,7 @@ export class ClaudeClient implements ClaudeClientInterface {
       const messages: string[] = [];
       const modelName = await this.getModelName(model);
 
-      debug('claude-query', 'Starting evaluation', { maxTurns: 3, model: modelName });
+      log.debug('Starting evaluation', { type: 'claude-query', maxTurns: 3, model: modelName });
 
       const options: QueryOptions = { maxTurns: 3 };
       if (modelName) {
@@ -113,7 +113,7 @@ export class ClaudeClient implements ClaudeClientInterface {
         prompt,
         options
       })) {
-        debug('claude-message', 'Received message', { message });
+        log.debug('Received message', { type: 'claude-message', message });
 
         // Extract content from assistant messages
         if (message.type === 'assistant' && message.message.content) {
@@ -125,7 +125,7 @@ export class ClaudeClient implements ClaudeClientInterface {
             : message.message.content;
 
 
-          if (!this.looksLikeJson(content) && !debugEnabled) {
+          if (!this.looksLikeJson(content) && !log.debugEnabled) {
             process.stdout.write(content);
           }
           messages.push(content);
@@ -135,11 +135,12 @@ export class ClaudeClient implements ClaudeClientInterface {
         if (message.type === 'result') {
           if (message.subtype === 'success') {
             const content = message.result;
-            debug('claude-result', 'Success result', { content });
+            log.debug('Success result', { type: 'claude-result', content });
             messages.length = 0;
             messages.push(content);
           } else {
-            log('error', 'claude-result', 'Query failed', { 
+            log.error('Query failed', { 
+              type: 'claude-result',
               subtype: message.subtype,
               turns: message.num_turns, 
               is_error: message.is_error 
@@ -157,7 +158,7 @@ export class ClaudeClient implements ClaudeClientInterface {
         response
       };
     } catch (error) {
-      log('error', 'claude-evaluation', 'Evaluation failed', { error: String(error) });
+      log.error('Evaluation failed', { type: 'claude-evaluation', error: String(error) });
       throw new Error(`Claude evaluation failed: ${error}`);
     }
   }
@@ -165,7 +166,7 @@ export class ClaudeClient implements ClaudeClientInterface {
   private parseJsonResponse(content: string): ClaudeEvalResponse {
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      debug('claude-parse', 'No JSON object found', { content });
+      log.debug('No JSON object found', { type: 'claude-parse', content });
       throw new Error('No JSON response found in Claude output');
     }
 
@@ -173,7 +174,7 @@ export class ClaudeClient implements ClaudeClientInterface {
       const parsed = JSON.parse(jsonMatch[0]);
       return this.validateResponse(parsed);
     } catch (error) {
-      debug('claude-parse', 'JSON parse failed', { error: String(error), json: jsonMatch[0] });
+      log.debug('JSON parse failed', { type: 'claude-parse', error: String(error), json: jsonMatch[0] });
       throw new Error(`Invalid JSON response: ${error}`);
     }
   }

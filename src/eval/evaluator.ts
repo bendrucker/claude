@@ -3,7 +3,7 @@ import { PromptBuilder } from '../prompt/builder';
 import { ClaudeClientInterface } from '../claude/interface';
 import { EvalOptions, EvalContext } from './types';
 import { EvalResult, EvalStatus } from './result';
-import { debug, log } from '../cli';
+import * as log from '../log';
 
 export class Evaluator {
   constructor(
@@ -14,10 +14,11 @@ export class Evaluator {
   
   async run(options: EvalOptions): Promise<EvalResult> {
     try {
-      debug('evaluator', 'Starting evaluation', { options });
+      log.debug('Starting evaluation', { type: 'evaluator', options });
       const context = await this.buildContext(options);
       
-      debug('evaluator-context', 'Built context', { 
+      log.debug('Built context', { 
+        type: 'evaluator-context',
         mode: context.mode, 
         fileCount: context.files.length,
         files: context.files 
@@ -29,17 +30,18 @@ export class Evaluator {
       }
       
       if (context.files.length === 0) {
-        log('info', 'evaluator', 'No files to evaluate');
+        log.info('No files to evaluate', { type: 'evaluator' });
         return {
           status: EvalStatus.NoFiles,
           context
         };
       }
       
-      debug('evaluator-prompt', 'Sending prompt to Claude', { prompt: context.prompt });
+      log.debug('Sending prompt to Claude', { type: 'evaluator-prompt', prompt: context.prompt });
       const claudeResult = await this.claude.evaluate(context.prompt, options.model);
       
-      debug('evaluator-result', 'Received Claude result', { 
+      log.debug('Received Claude result', { 
+        type: 'evaluator-result',
         status: claudeResult.status,
         hasResponse: !!claudeResult.response 
       });
@@ -51,7 +53,7 @@ export class Evaluator {
         response: claudeResult.response
       };
     } catch (error) {
-      log('error', 'evaluator', 'Evaluation failed', { error: String(error) });
+      log.error('Evaluation failed', { type: 'evaluator', error: String(error) });
       const context = await this.buildContext(options).catch(() => ({
         mode: options.mode,
         files: [],

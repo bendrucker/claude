@@ -65,6 +65,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Run install
+        run: ./install.sh
+
       - name: Validate JSON files
         run: |
           for file in .claude/*.json; do

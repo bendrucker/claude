@@ -39,6 +39,10 @@
     "package-registry": {
       "command": "npx",
       "args": ["-y", "package-registry-mcp"]
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
     }
   }
 }

@@ -39,5 +39,5 @@ jq -r '.mcpServers | keys[]' "$MCP_CONFIG" | while read -r server_name; do
     server_config=$(echo "$server_json" | envsubst)
 
     echo "Adding MCP server: $server_name"
-    echo "$server_config" | claude mcp add-json "$server_name"
+    claude mcp add-json "$server_name" "$server_config"
 done

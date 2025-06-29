@@ -6,12 +6,7 @@
     ],
     "deny": [
       "WebFetch(domain:github.com)                                                                │",
-      "WebFetch(domain:raw.githubusercontent.com)                                                 │",
-      "Bash(ls:*)",
-      "Bash(cat:*)",
-      "Bash(grep:*)",
-      "Bash(find:*)",
-      "Bash(rg:*)"
+      "WebFetch(domain:raw.githubusercontent.com)                                                 │"
     ]
   }
 }

@@ -24,17 +24,12 @@
       ]
     },
     "aws-docs": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "--interactive",
-        "--env",
-        "FASTMCP_LOG_LEVEL=ERROR",
-        "--env",
-        "AWS_DOCUMENTATION_PARTITION=aws",
-        "mcp/aws-documentation:latest"
-      ]
+      "command": "uvx",
+      "args": ["awslabs.aws-documentation-mcp-server@latest"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "AWS_DOCUMENTATION_PARTITION": "aws"
+      }
     },
     "package-registry": {
       "command": "npx",

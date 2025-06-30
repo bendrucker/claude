@@ -10,9 +10,6 @@
   "go": {
     "godoc": {
       "module": "github.com/mrjoshuak/godoc-mcp"
-    },
-    "language-server": {
-      "module": "github.com/isaacphi/mcp-language-server"
     }
   },
   "docker": {

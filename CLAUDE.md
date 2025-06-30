@@ -13,3 +13,7 @@ This repository is my shared, open-source configuration for Claude Code, an AI c
 ## Workflow
 
 - When creating new files or directories in `.claude/`, run `./install.sh` to update the symlinks in `~/.claude`.
+
+## MCP Installation
+
+- @mcps/README.md - Instructions for adding and configuring new MCP servers

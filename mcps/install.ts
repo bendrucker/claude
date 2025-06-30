@@ -66,6 +66,7 @@ class McpInstaller {
   private mcpsConfig: string;
   private composeFile: string;
   private configs: McpConfigs;
+  private dockerComposeEnvs: Record<string, Record<string, string>> = {};
   private existingMcpServers: Record<string, McpServerConfig> | null = null;
 
   constructor() {
@@ -99,8 +100,8 @@ class McpInstaller {
       args: ['--prefix', __dirname, '--no-install', config.binary || config.package],
       env: config.env || {}
     }),
-    docker: async (config: DockerConfig): Promise<McpServerConfig> => {
-      const composeEnv = await this.getDockerComposeEnv(config.service);
+    docker: (config: DockerConfig): McpServerConfig => {
+      const composeEnv = this.dockerComposeEnvs[config.service] || {};
       const mergedEnv = { ...composeEnv, ...config.env };
 
       return {
@@ -129,6 +130,9 @@ class McpInstaller {
         throw new Error(`Invalid MCP type '${type}'. Valid types: ${validTypes.join(', ')}`);
       }
     }
+
+    // Pre-load Docker Compose environments
+    await this.loadDockerComposeEnvs();
   }
 
   // Utility methods
@@ -136,57 +140,64 @@ class McpInstaller {
     return (await execa('envsubst', { input: text })).stdout;
   }
 
-  private async getDockerComposeEnv(service: string): Promise<Record<string, string>> {
+  private async loadDockerComposeEnvs(): Promise<void> {
+    if (!this.configs.docker) return;
+
     try {
-      // Get service config as JSON
+      // Load docker-compose config once
       const { stdout: configJson } = await execa('docker-compose', ['--file', this.composeFile, 'config', '--format', 'json']);
-      const config = JSON.parse(configJson);
+      const composeConfig = JSON.parse(configJson);
 
-      // Check if service exists
-      if (!config.services || !config.services[service]) {
-        return {};
+      // Extract environment for each service
+      for (const serviceName of Object.keys(this.configs.docker)) {
+        this.dockerComposeEnvs[serviceName] = this.extractServiceEnv(composeConfig, serviceName);
       }
-
-      const serviceConfig = config.services[service];
-      const environment = serviceConfig.environment;
-
-      if (!environment) {
-        return {};
-      }
-
-      if (Array.isArray(environment)) {
-        const env: Record<string, string> = {};
-        for (const item of environment) {
-          if (typeof item === 'string') {
-            if (item.includes('=')) {
-              const [key, ...valueParts] = item.split('=');
-              env[key] = valueParts.join('=');
-            } else {
-              // Just a key, get value from process.env
-              env[item] = process.env[item] || '';
-            }
-          }
-        }
-        return env;
-      } else if (typeof environment === 'object') {
-        return environment;
-      }
-
-      return {};
     } catch {
-      return {};
+      // If docker-compose config fails, set empty envs for all services
+      for (const serviceName of Object.keys(this.configs.docker)) {
+        this.dockerComposeEnvs[serviceName] = {};
+      }
     }
   }
 
-  private async generateMcpConfig(type: string, config: HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig): Promise<McpServerConfig> {
+  private extractServiceEnv(composeConfig: any, serviceName: string): Record<string, string> {
+    if (!composeConfig.services || !composeConfig.services[serviceName]) {
+      return {};
+    }
+
+    const serviceConfig = composeConfig.services[serviceName];
+    const environment = serviceConfig.environment;
+
+    if (!environment) {
+      return {};
+    }
+
+    if (Array.isArray(environment)) {
+      const env: Record<string, string> = {};
+      for (const item of environment) {
+        if (typeof item === 'string') {
+          if (item.includes('=')) {
+            const [key, ...valueParts] = item.split('=');
+            env[key] = valueParts.join('=');
+          } else {
+            // Just a key, get value from process.env
+            env[item] = process.env[item] || '';
+          }
+        }
+      }
+      return env;
+    } else if (typeof environment === 'object') {
+      return environment;
+    }
+
+    return {};
+  }
+
+
+  private generateMcpConfig(type: string, config: HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig): McpServerConfig {
     const generator = this.configGenerators[type as keyof typeof this.configGenerators];
     if (!generator) {
       throw new Error(`Unknown MCP type: ${type}`);
-    }
-
-    // Handle docker as special case since it's async
-    if (type === 'docker') {
-      return await generator(config as DockerConfig);
     }
 
     return generator(config as any);
@@ -204,7 +215,7 @@ class McpInstaller {
   }
 
   private async processConfig(type: string, config: HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig): Promise<McpServerConfig> {
-    const generated = await this.generateMcpConfig(type, config);
+    const generated = this.generateMcpConfig(type, config);
 
     if (type === 'http') {
       // For HTTP, substitute variables in headers rather than adding env
@@ -244,37 +255,6 @@ class McpInstaller {
   }
 
 
-  private async getExistingMcps(): Promise<Set<string>> {
-    await this.loadExistingMcpServers();
-    return new Set(Object.keys(this.existingMcpServers || {}));
-  }
-
-  private async loadExistingMcpServers(): Promise<void> {
-    if (this.existingMcpServers !== null) return; // Already loaded
-
-    const claudeConfigPath = join(homedir(), '.claude.json');
-    console.time(TIMER_LOAD_CONFIG);
-
-    try {
-      const content = await readFile(claudeConfigPath, 'utf-8');
-      const config = JSON.parse(content) as ClaudeDesktopConfig;
-      this.existingMcpServers = config.mcpServers || {};
-      console.timeEnd(TIMER_LOAD_CONFIG);
-    } catch {
-      this.existingMcpServers = {};
-      console.timeEnd(TIMER_LOAD_CONFIG);
-    }
-  }
-
-  private async getMcpConfig(name: string): Promise<McpServerConfig | null> {
-    await this.loadExistingMcpServers();
-    return this.existingMcpServers?.[name] || null;
-  }
-
-  private configsEqual(renderedConfig: McpServerConfig, liveConfig: McpServerConfig | null): boolean {
-    if (!liveConfig) return false;
-    return JSON.stringify(renderedConfig) === JSON.stringify(liveConfig);
-  }
 
   async install(): Promise<void> {
     const claudeConfigPath = join(homedir(), '.claude.json');
@@ -298,7 +278,7 @@ class McpInstaller {
       if (!typeConfigs) continue;
 
       for (const [name, config] of Object.entries(typeConfigs)) {
-        const generated = await this.generateMcpConfig(type, config as HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig);
+        const generated = this.generateMcpConfig(type, config as HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig);
 
         // Check for missing environment variables for all types
         const configJson = JSON.stringify(generated);

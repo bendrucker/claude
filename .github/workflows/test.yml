@@ -43,6 +43,8 @@ jobs:
         run: npm ci
 
       - name: Run install script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./install.sh
 
 

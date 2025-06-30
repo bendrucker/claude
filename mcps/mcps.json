@@ -1,0 +1,39 @@
+{
+  "http": {
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_TOKEN}"
+      }
+    }
+  },
+  "go": {
+    "godoc": {
+      "module": "github.com/mrjoshuak/godoc-mcp"
+    }
+  },
+  "docker": {
+    "terraform": {
+      "service": "terraform"
+    }
+  },
+  "uvx": {
+    "aws-docs": {
+      "package": "awslabs.aws-documentation-mcp-server",
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "AWS_DOCUMENTATION_PARTITION": "aws"
+      }
+    }
+  },
+  "npm": {
+    "package-registry": {
+      "package": "package-registry-mcp",
+      "binary": "package-registry-mcp"
+    },
+    "puppeteer": {
+      "package": "@modelcontextprotocol/server-puppeteer",
+      "binary": "mcp-server-puppeteer"
+    }
+  }
+}

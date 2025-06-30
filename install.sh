@@ -46,7 +46,7 @@ for item in "$SOURCE_DIR"/*; do
 done
 
 echo "Installing MCP configuration..."
-./mcp.sh
+npx tsx ./mcps/install.ts
 echo "✓ MCP configuration installed successfully"
 
 echo "✓ Claude configuration installed successfully"

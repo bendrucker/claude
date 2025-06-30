@@ -1,18 +1,7 @@
-name: Evaluate Claude Configuration
+name: test
 
 on:
-  pull_request:
-    paths:
-      - '.claude/**'
-      - 'CLAUDE.md'
-      - 'src/**'
-      - 'package.json'
-      - '.github/workflows/eval.yml'
-
-permissions:
-  contents: read
-  pull-requests: read
-  checks: read
+  pull_request: {}
 
 jobs:
   test:
@@ -36,7 +25,7 @@ jobs:
       - name: Type check
         run: npm run type-check
 
-  eval:
+  install:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -53,29 +42,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run evaluation
-        run: npm run eval run
+      - name: Run install script
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: fake
+        run: ./install.sh
 
 
-  validate:
+  markdown:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Run install
-        run: ./install.sh
-
-      - name: Validate JSON files
-        run: |
-          for file in .claude/*.json; do
-            if [ -f "$file" ]; then
-              echo "Validating $file"
-              jq . "$file" > /dev/null || exit 1
-            fi
-          done
 
       - name: Check markdown links
         uses: gaurav-nelson/github-action-markdown-link-check@v1

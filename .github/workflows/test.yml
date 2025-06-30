@@ -44,7 +44,7 @@ jobs:
 
       - name: Run install script
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: fake
         run: ./install.sh
 
 

@@ -17,7 +17,7 @@
     "execa": "^8.0.1",
     "pino": "^9.7.0",
     "simple-git": "^3.28.0",
-    "yargs": "^17.7.2"
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.4",

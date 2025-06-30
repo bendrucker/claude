@@ -1,0 +1,15 @@
+{
+  "name": "@bendrucker/claude-mcp-servers",
+  "private": true,
+  "dependencies": {
+    "@modelcontextprotocol/server-puppeteer": "2025.5.12",
+    "package-registry-mcp": "1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.7",
+    "@types/yargs": "^17.0.33",
+    "execa": "^8.0.1",
+    "tsx": "^4.20.3",
+    "yargs": "^18.0.0"
+  }
+}

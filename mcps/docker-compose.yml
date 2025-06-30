@@ -1,0 +1,4 @@
+services:
+  terraform:
+    image: hashicorp/terraform-mcp-server@sha256:9b01dbb948b9362575b9fb7d70fac1739365eeae5d7b264db809f4b11b5da6c3
+    stdin_open: true

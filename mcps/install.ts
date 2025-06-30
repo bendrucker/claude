@@ -35,6 +35,8 @@ interface DockerConfig extends EnvConfig {
   service: string;
 }
 
+type AnyMcpConfig = HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig;
+
 interface McpConfigs {
   http?: { [name: string]: HttpConfig };
   go?: { [name: string]: GoConfig };
@@ -194,7 +196,7 @@ class McpInstaller {
   }
 
 
-  private generateMcpConfig(type: string, config: HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig): McpServerConfig {
+  private generateMcpConfig(type: string, config: AnyMcpConfig): McpServerConfig {
     const generator = this.configGenerators[type as keyof typeof this.configGenerators];
     if (!generator) {
       throw new Error(`Unknown MCP type: ${type}`);
@@ -214,24 +216,19 @@ class McpInstaller {
     }
   }
 
-  private async processConfig(type: string, config: HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig): Promise<McpServerConfig> {
+  private async processConfig(type: string, config: AnyMcpConfig): Promise<McpServerConfig> {
     const generated = this.generateMcpConfig(type, config);
+    const configJson = JSON.stringify(generated);
 
-    if (type === 'http') {
-      // For HTTP, substitute variables in headers rather than adding env
-      const configJson = JSON.stringify(generated);
-
-      // Check for missing environment variables in HTTP configs too
-      const missingVars = await this.checkMissingEnvVars(configJson);
-      if (missingVars.length > 0) {
-        throw new Error(`Missing required environment variables for HTTP config: ${missingVars.join(', ')}`);
-      }
-
-      const interpolated = await this.envsubst(configJson);
-      return JSON.parse(interpolated) as McpServerConfig;
+    // Check for missing environment variables for all types
+    const missingVars = await this.checkMissingEnvVars(configJson);
+    if (missingVars.length > 0) {
+      throw new Error(`Missing required environment variables for ${type} config: ${missingVars.join(', ')}`);
     }
 
-    return generated;
+    // Perform envsubst on all server types
+    const interpolated = await this.envsubst(configJson);
+    return JSON.parse(interpolated) as McpServerConfig;
   }
 
   async printConfig(): Promise<void> {
@@ -242,7 +239,7 @@ class McpInstaller {
 
       for (const [name, config] of Object.entries(typeConfigs)) {
         try {
-          mcpServers[name] = await this.processConfig(type, config as HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig);
+          mcpServers[name] = await this.processConfig(type, config as AnyMcpConfig);
         } catch (error) {
           console.error(`Error processing '${name}':`, error instanceof Error ? error.message : error);
           process.exit(1);
@@ -278,7 +275,7 @@ class McpInstaller {
       if (!typeConfigs) continue;
 
       for (const [name, config] of Object.entries(typeConfigs)) {
-        const generated = this.generateMcpConfig(type, config as HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig);
+        const generated = this.generateMcpConfig(type, config as AnyMcpConfig);
 
         // Check for missing environment variables for all types
         const configJson = JSON.stringify(generated);
@@ -290,7 +287,7 @@ class McpInstaller {
         }
 
         try {
-          newMcpServers[name] = await this.processConfig(type, config as HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig);
+          newMcpServers[name] = await this.processConfig(type, config as AnyMcpConfig);
           console.log(`Configured MCP server: ${name}`);
         } catch (error) {
           console.error(`Failed to process MCP server '${name}':`, error);

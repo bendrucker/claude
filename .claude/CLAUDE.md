@@ -41,3 +41,7 @@ Guidelines for common tasks you will need to perform:
 
 - Shell: @memory/languages/shell.md
 - TypeScript: @memory/languages/typescript.md
+
+## Personal Details
+
+- Standard username: `@bendrucker`. Refer to any actions performed by this user as "you."

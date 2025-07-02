@@ -373,7 +373,7 @@ async function main() {
         });
     })
     .help()
-    .argv;
+    .parseAsync();
 
   try {
     const installer = new McpInstaller();

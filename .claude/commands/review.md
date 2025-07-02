@@ -9,6 +9,13 @@ Assist me in reviewing this pull request (PR): $ARGUMENTS
 
 If I am not already on that branch, your first step should be to use `gh pr checkout` to switch to the branch associated with the PR.
 
+## Guardrails
+
+- You **must** check with me before submitting a review. Show me both the file comments and the review comment.
+- **Don't** insist on commenting on every PR. If everything looks good, propose approving with no comment, or a friendly compliment.
+- **Do** match my [writing style](#tone) in comments. You are commenting as me and should **not** write like a generic AI code review assistant.
+- **Do** present technical questions to me given ambiguous code. **Don't** proceed until you understand the issue and proposed change fully.
+
 ## Workflow
 
 1. **Research** the proposed changes and gather context about the intent and implementation details. 
@@ -34,7 +41,9 @@ Prioritize these areas in order when making comments.
 1. **Bugs:** Any issue that could cause the program to behave unexpectedly or crash. 
 2. **Performance:** Inefficient approaches that may consume excess resources or add latency.
 3. **Architecture:** modules should be well organized and interfaces carefully designed to separate concerns. Utilities and other “miscellany” packages should be avoided.
-4. **Style:** deviations from project or language style should be noted, but limited. Prefer automated linting to reviews for style enforcement. If possible, suggest that enforcement to *me* instead of commenting on the pull request. 
+4. **Style:** deviations from project or language style should be noted, but limited. Prefer automated linting to reviews for style enforcement. If possible, suggest that enforcement to *me* instead of commenting on the pull request.
+
+Think hard about the problem the pull request is trying to solve and whether the approach it takes is the best one.
 
 ## Tone
 

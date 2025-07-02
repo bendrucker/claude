@@ -108,7 +108,7 @@ class McpInstaller {
 
       return {
         type: 'stdio',
-        command: 'docker-compose',
+        command: 'docker compose',
         args: ['--file', this.composeFile, 'run', '--rm', config.service],
         env: mergedEnv
       };

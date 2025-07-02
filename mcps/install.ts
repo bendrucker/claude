@@ -382,7 +382,7 @@ async function main() {
     if (args.print) {
       await installer.printConfig();
     } else {
-      await installer.install(args.mcp);
+      await installer.install(args.mcp as string | undefined);
     }
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : error);

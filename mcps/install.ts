@@ -251,9 +251,29 @@ class McpInstaller {
     console.log(JSON.stringify(desktopConfig, null, 2));
   }
 
+  private findMcpByName(name: string): { type: string; config: AnyMcpConfig } | null {
+    for (const [type, typeConfigs] of Object.entries(this.configs)) {
+      if (!typeConfigs) continue;
+      
+      if (typeConfigs[name]) {
+        return { type, config: typeConfigs[name] as AnyMcpConfig };
+      }
+    }
+    return null;
+  }
+
+  private listAvailableMcps(): string[] {
+    const mcpNames: string[] = [];
+    for (const [type, typeConfigs] of Object.entries(this.configs)) {
+      if (!typeConfigs) continue;
+      mcpNames.push(...Object.keys(typeConfigs));
+    }
+    return mcpNames.sort();
+  }
 
 
-  async install(): Promise<void> {
+
+  async install(targetMcp?: string): Promise<void> {
     const claudeConfigPath = join(homedir(), '.claude.json');
 
     // Load existing config
@@ -268,36 +288,68 @@ class McpInstaller {
       console.timeEnd(TIMER_LOAD_CONFIG);
     }
 
-    // Process all configs
-    const newMcpServers: Record<string, McpServerConfig> = {};
+    // If targetMcp is specified, find and install only that MCP
+    if (targetMcp) {
+      const foundMcp = this.findMcpByName(targetMcp);
+      if (!foundMcp) {
+        console.error(`Error: MCP '${targetMcp}' not found.`);
+        console.error('Available MCPs:');
+        this.listAvailableMcps().forEach(name => console.error(`  ${name}`));
+        process.exit(1);
+      }
 
-    for (const [type, typeConfigs] of Object.entries(this.configs)) {
-      if (!typeConfigs) continue;
+      const { type, config } = foundMcp;
+      const generated = this.generateMcpConfig(type, config);
 
-      for (const [name, config] of Object.entries(typeConfigs)) {
-        const generated = this.generateMcpConfig(type, config as AnyMcpConfig);
+      // Check for missing environment variables
+      const configJson = JSON.stringify(generated);
+      const missingVars = await this.checkMissingEnvVars(configJson);
+      if (missingVars.length > 0) {
+        console.error(`Error: Missing required environment variables for '${targetMcp}':`);
+        missingVars.forEach(varName => console.error(`  ${varName}`));
+        process.exit(1);
+      }
 
-        // Check for missing environment variables for all types
-        const configJson = JSON.stringify(generated);
-        const missingVars = await this.checkMissingEnvVars(configJson);
-        if (missingVars.length > 0) {
-          console.error(`Error: Missing required environment variables for '${name}':`);
-          missingVars.forEach(varName => console.error(`  ${varName}`));
-          process.exit(1);
-        }
+      try {
+        const processedConfig = await this.processConfig(type, config);
+        claudeConfig.mcpServers[targetMcp] = processedConfig;
+        console.log(`Configured MCP server: ${targetMcp}`);
+      } catch (error) {
+        console.error(`Failed to process MCP server '${targetMcp}':`, error);
+        process.exit(1);
+      }
+    } else {
+      // Process all configs (existing behavior)
+      const newMcpServers: Record<string, McpServerConfig> = {};
 
-        try {
-          newMcpServers[name] = await this.processConfig(type, config as AnyMcpConfig);
-          console.log(`Configured MCP server: ${name}`);
-        } catch (error) {
-          console.error(`Failed to process MCP server '${name}':`, error);
-          process.exit(1);
+      for (const [type, typeConfigs] of Object.entries(this.configs)) {
+        if (!typeConfigs) continue;
+
+        for (const [name, config] of Object.entries(typeConfigs)) {
+          const generated = this.generateMcpConfig(type, config as AnyMcpConfig);
+
+          // Check for missing environment variables for all types
+          const configJson = JSON.stringify(generated);
+          const missingVars = await this.checkMissingEnvVars(configJson);
+          if (missingVars.length > 0) {
+            console.error(`Error: Missing required environment variables for '${name}':`);
+            missingVars.forEach(varName => console.error(`  ${varName}`));
+            process.exit(1);
+          }
+
+          try {
+            newMcpServers[name] = await this.processConfig(type, config as AnyMcpConfig);
+            console.log(`Configured MCP server: ${name}`);
+          } catch (error) {
+            console.error(`Failed to process MCP server '${name}':`, error);
+            process.exit(1);
+          }
         }
       }
-    }
 
-    // Update the config with new mcpServers
-    claudeConfig.mcpServers = newMcpServers;
+      // Update the config with new mcpServers
+      claudeConfig.mcpServers = newMcpServers;
+    }
 
     // Write back to file
     console.time(TIMER_WRITE_CONFIG);
@@ -308,13 +360,20 @@ class McpInstaller {
 
 async function main() {
   const args = await yargs(hideBin(process.argv))
-    .option('print', {
-      type: 'boolean',
-      description: 'Print MCP configuration as JSON (compatible with Claude Desktop)',
-      default: false
+    .command('$0 [mcp]', 'Install MCP servers', (yargs) => {
+      return yargs
+        .positional('mcp', {
+          describe: 'Name of specific MCP to install (installs all if not specified)',
+          type: 'string'
+        })
+        .option('print', {
+          type: 'boolean',
+          description: 'Print MCP configuration as JSON (compatible with Claude Desktop)',
+          default: false
+        });
     })
     .help()
-    .argv;
+    .parseAsync();
 
   try {
     const installer = new McpInstaller();
@@ -323,7 +382,7 @@ async function main() {
     if (args.print) {
       await installer.printConfig();
     } else {
-      await installer.install();
+      await installer.install(args.mcp as string | undefined);
     }
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : error);

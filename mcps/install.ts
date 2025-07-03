@@ -108,8 +108,8 @@ class McpInstaller {
 
       return {
         type: 'stdio',
-        command: 'docker compose',
-        args: ['--file', this.composeFile, 'run', '--rm', config.service],
+        command: 'docker',
+        args: ['compose', '--file', this.composeFile, 'run',  '--rm', config.service],
         env: mergedEnv
       };
     }
@@ -147,7 +147,7 @@ class McpInstaller {
 
     try {
       // Load docker-compose config once
-      const { stdout: configJson } = await execa('docker-compose', ['--file', this.composeFile, 'config', '--format', 'json']);
+      const { stdout: configJson } = await execa('docker', ['compose', '--file', this.composeFile, 'config', '--format', 'json']);
       const composeConfig = JSON.parse(configJson);
 
       // Extract environment for each service

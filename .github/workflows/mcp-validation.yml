@@ -1,0 +1,56 @@
+name: MCP Configuration Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mcps/**'
+      - '.github/workflows/mcp-validation.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mcps/**'
+      - '.github/workflows/mcp-validation.yml'
+
+jobs:
+  validate-mcps:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv (for uvx)
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install MCP dependencies
+        working-directory: mcps
+        run: |
+          # Install npm packages for MCP testing
+          npm install
+
+      - name: Run MCP validation tests
+        run: npm test -- mcps/validation.test.ts
+        env:
+          CI: true

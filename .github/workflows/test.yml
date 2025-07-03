@@ -6,6 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: mcps
@@ -53,6 +54,36 @@ jobs:
       - name: Run install script
         run: ./install.sh
 
+  tools:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcps
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mcps/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install uv and uvx
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Verify uvx is available
+          $HOME/.cargo/bin/uvx --version || echo "uvx not found, using uv tool run"
+
+      - name: Run tools command
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run tools -- --exclude github
 
   markdown:
     runs-on: ubuntu-latest

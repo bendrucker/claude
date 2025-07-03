@@ -2,11 +2,12 @@
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "WebFetch(domain:docs.anthropic.com)"
     ],
-    "deny": [
-      "WebFetch(domain:github.com)                                                                │",
-      "WebFetch(domain:raw.githubusercontent.com)                                                 │"
-    ]
+    "deny": []
   }
 }

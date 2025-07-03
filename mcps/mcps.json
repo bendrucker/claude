@@ -7,11 +7,6 @@
       }
     }
   },
-  "go": {
-    "godoc": {
-      "module": "github.com/mrjoshuak/godoc-mcp"
-    }
-  },
   "docker": {
     "terraform": {
       "service": "terraform"

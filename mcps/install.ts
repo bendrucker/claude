@@ -358,6 +358,23 @@ class McpInstaller {
   }
 }
 
+export async function install(argv: { mcp?: string; print?: boolean }): Promise<void> {
+  try {
+    const installer = new McpInstaller();
+    await installer.init();
+
+    if (argv.print) {
+      await installer.printConfig();
+    } else {
+      await installer.install(argv.mcp);
+    }
+  } catch (error) {
+    console.error('Error:', error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
+
+// Keep backward compatibility for direct execution
 async function main() {
   const args = await yargs(hideBin(process.argv))
     .command('$0 [mcp]', 'Install MCP servers', (yargs) => {
@@ -375,19 +392,7 @@ async function main() {
     .help()
     .parseAsync();
 
-  try {
-    const installer = new McpInstaller();
-    await installer.init();
-
-    if (args.print) {
-      await installer.printConfig();
-    } else {
-      await installer.install(args.mcp as string | undefined);
-    }
-  } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : error);
-    process.exit(1);
-  }
+  await install({ mcp: args.mcp as string | undefined, print: args.print as boolean });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

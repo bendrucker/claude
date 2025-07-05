@@ -1,6 +1,11 @@
 {
   "name": "@bendrucker/claude-mcp-servers",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "echo 'No tests yet'",
+    "type-check": "tsc --noEmit"
+  },
   "dependencies": {
     "@modelcontextprotocol/server-puppeteer": "2025.5.12",
     "package-registry-mcp": "1.1.0"

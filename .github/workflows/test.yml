@@ -81,8 +81,6 @@ jobs:
           $HOME/.cargo/bin/uvx --version || echo "uvx not found, using uv tool run"
 
       - name: Run tools command
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: npm run tools -- --exclude github
 
   markdown:

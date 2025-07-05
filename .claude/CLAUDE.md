@@ -23,7 +23,7 @@ Adhere to these guidelines when performing your work.
 - Look for a project `CLAUDE.md` file with instructions on how to operate in the current project.
 - If the project does not have `CLAUDE.md`, fall back on `README.md` for high level project information.
 - When executing any build command to check for compilation errors, output to `/dev/null` to avoid creating a binary.
-- When generating any temporary files, use `mktemp -t` to create a temporary file, setting the proper prefix and extension in the template. Do not store temporary files in the working directory.
+- You may store temporary files in any project directory under `tmp/`. `~/.gitignore` ignored this directory.
 
 ## Tasks
 

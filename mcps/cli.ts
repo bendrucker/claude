@@ -23,6 +23,24 @@ async function main() {
         await install(argv);
       }
     )
+    .command('tools [name]', 'List available tools from MCP servers',
+      (yargs) => {
+        return yargs
+          .positional('name', {
+            describe: 'Name of specific MCP to query (queries all if not specified)',
+            type: 'string'
+          })
+          .option('exclude', {
+            describe: 'MCP server to exclude (can be specified multiple times)',
+            type: 'string',
+            array: true
+          });
+      },
+      async (argv) => {
+        const { tools } = await import('./tools.js');
+        await tools(argv);
+      }
+    )
     .demandCommand(1, 'You need to specify a command')
     .strict()
     .help()

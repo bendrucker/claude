@@ -2,8 +2,12 @@
   "name": "@bendrucker/claude-mcp-servers",
   "private": true,
   "type": "module",
+  "bin": {
+    "@mcps": "./cli.ts"
+  },
   "scripts": {
     "test": "echo 'No tests yet'",
+    "mcp-install": "tsx cli.ts install",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

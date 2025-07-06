@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MCP Configuration Schema",
+  "description": "Configuration schema for MCP (Model Context Protocol) servers",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Schema reference for IDE support"
+    }
+  },
+  "patternProperties": {
+    "^[a-z0-9-]+$": {
+      "$ref": "#/definitions/server"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "server": {
+      "type": "object",
+      "required": ["runner", "targets"],
+      "properties": {
+        "runner": {
+          "type": "object",
+          "description": "Runner configuration for the server",
+          "oneOf": [
+            { "$ref": "runners/http.json" },
+            { "$ref": "runners/docker.json" },
+            { "$ref": "runners/uvx.json" },
+            { "$ref": "runners/npm.json" },
+            { "$ref": "runners/binary.json" },
+            { "$ref": "runners/go.json" }
+          ]
+        },
+        "targets": {
+          "$ref": "#/definitions/targets"
+        }
+      },
+      "additionalProperties": false
+    },
+    "targets": {
+      "type": "object",
+      "required": ["scope"],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["user", "project"],
+          "description": "Scope where the server should be installed"
+        },
+        "labels": {
+          "type": "object",
+          "description": "Labels for targeting specific project types",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scope": { "const": "project" }
+            }
+          },
+          "then": {
+            "required": ["labels"]
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

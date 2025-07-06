@@ -70,8 +70,23 @@ jobs:
           cache: 'npm'
           cache-dependency-path: mcps/package-lock.json
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: mcps/go.mod
+          cache-dependency-path: mcps/go.sum
+
+      - name: Install Go tools
+        run: go install golang.org/x/tools/gopls@latest
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Install TypeScript language server
+        run: npm install -g typescript-language-server typescript
+
+      - name: Validate configuration
+        run: npx tsx cli.ts validate
 
       - name: Install uv and uvx
         run: |

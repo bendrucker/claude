@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { Tools } from './lib/discovery.js';
-import type { Configs, AnyConfig } from './lib/config.js';
+import type { Configs } from './lib/config.js';
 import { createServerConfig } from './lib/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -18,12 +18,9 @@ export async function tools(argv: { name?: string; exclude?: string[] }): Promis
     
     // Convert configs to ServerConfig format
     const serverConfigs: Record<string, any> = {};
-    for (const [type, typeConfigs] of Object.entries(configs)) {
-      if (!typeConfigs || typeof typeConfigs !== 'object') continue;
-      
-      for (const [name, config] of Object.entries(typeConfigs)) {
-        serverConfigs[name] = createServerConfig(type, config as AnyConfig);
-      }
+    for (const [name, server] of Object.entries(configs)) {
+      if (!server || !server.runner) continue;
+      serverConfigs[name] = createServerConfig(server.runner);
     }
     
     // Create discovery with processed configs

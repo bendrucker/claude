@@ -1,34 +1,96 @@
 {
-  "http": {
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/",
-      "headers": {
-        "Authorization": "Bearer ${GITHUB_TOKEN}"
+  "$schema": "./schema/mcps.json",
+  "github": {
+    "runner": {
+      "http": {
+        "url": "https://api.githubcopilot.com/mcp/",
+        "headers": {
+          "Authorization": "Bearer ${GITHUB_TOKEN}"
+        }
       }
-    }
-  },
-  "docker": {
-    "terraform": {
-      "service": "terraform"
-    }
-  },
-  "uvx": {
-    "aws-docs": {
-      "package": "awslabs.aws-documentation-mcp-server",
-      "env": {
-        "FASTMCP_LOG_LEVEL": "ERROR",
-        "AWS_DOCUMENTATION_PARTITION": "aws"
-      }
-    }
-  },
-  "npm": {
-    "package-registry": {
-      "package": "package-registry-mcp",
-      "binary": "package-registry-mcp"
     },
-    "puppeteer": {
-      "package": "@modelcontextprotocol/server-puppeteer",
-      "binary": "mcp-server-puppeteer"
+    "targets": {
+      "scope": "user"
+    }
+  },
+  "terraform": {
+    "runner": {
+      "docker": {
+        "service": "terraform"
+      }
+    },
+    "targets": {
+      "scope": "project",
+      "labels": {
+        "language": ["terraform"]
+      }
+    }
+  },
+  "aws-docs": {
+    "runner": {
+      "uvx": {
+        "package": "awslabs.aws-documentation-mcp-server",
+        "env": {
+          "FASTMCP_LOG_LEVEL": "ERROR",
+          "AWS_DOCUMENTATION_PARTITION": "aws"
+        }
+      }
+    },
+    "targets": {
+      "scope": "user"
+    }
+  },
+  "package-registry": {
+    "runner": {
+      "npm": {
+        "package": "package-registry-mcp",
+        "binary": "package-registry-mcp"
+      }
+    },
+    "targets": {
+      "scope": "user"
+    }
+  },
+  "puppeteer": {
+    "runner": {
+      "npm": {
+        "package": "@modelcontextprotocol/server-puppeteer",
+        "binary": "mcp-server-puppeteer"
+      }
+    },
+    "targets": {
+      "scope": "project",
+      "labels": {
+        "type": ["frontend", "e2e-testing"]
+      }
+    }
+  },
+  "language-server-go": {
+    "runner": {
+      "go": {
+        "module": "github.com/isaacphi/mcp-language-server",
+        "args": ["--workspace", ".", "--lsp", "gopls"]
+      }
+    },
+    "targets": {
+      "scope": "project",
+      "labels": {
+        "language": ["go"]
+      }
+    }
+  },
+  "language-server-typescript": {
+    "runner": {
+      "go": {
+        "module": "github.com/isaacphi/mcp-language-server",
+        "args": ["--workspace", ".", "--lsp", "typescript-language-server", "--", "--stdio"]
+      }
+    },
+    "targets": {
+      "scope": "project",
+      "labels": {
+        "language": ["typescript", "javascript"]
+      }
     }
   }
 }

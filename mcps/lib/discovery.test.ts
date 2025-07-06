@@ -26,12 +26,12 @@ test('Tools should discover tools from stdio MCP server', async () => {
 
   const tools = new Tools(serverConfigs);
   const servers = tools.getServers();
-  
+
   assert.strictEqual(servers.length, 1);
   assert.strictEqual(servers[0].name, 'fake-stdio-server');
-  
+
   const results = await tools.queryServersParallel(servers);
-  
+
   assert.strictEqual(results.length, 1);
   const result = results[0];
   assert.strictEqual(result.name, 'fake-stdio-server');
@@ -49,7 +49,7 @@ test('Tools should discover tools from HTTP MCP server', async (t: TestContext) 
 
   t.after(async () => {
     httpServer.kill('SIGTERM');
-    
+
     // Wait for process to exit
     try {
       await once(httpServer, 'exit');
@@ -68,10 +68,10 @@ test('Tools should discover tools from HTTP MCP server', async (t: TestContext) 
 
   const tools = new Tools(serverConfigs);
   const servers = tools.getServers();
-  
+
   assert.strictEqual(servers.length, 1);
   assert.strictEqual(servers[0].name, 'fake-http-server');
-  
+
   // Wait for server to be ready and test tools discovery with retry
   const results = await pRetry(
     async () => {
@@ -83,7 +83,7 @@ test('Tools should discover tools from HTTP MCP server', async (t: TestContext) 
     },
     RETRY_OPTIONS
   );
-  
+
   assert.strictEqual(results.length, 1);
   const result = results[0];
   assert.strictEqual(result.name, 'fake-http-server');
@@ -103,12 +103,12 @@ test('Tools should handle HTTP server failures', async () => {
 
   const tools = new Tools(serverConfigs);
   const servers = tools.getServers();
-  
+
   assert.strictEqual(servers.length, 1);
   assert.strictEqual(servers[0].name, 'nonexistent-http-server');
-  
+
   const results = await tools.queryServersParallel(servers);
-  
+
   assert.strictEqual(results.length, 1);
   const result = results[0];
   assert.strictEqual(result.name, 'nonexistent-http-server');

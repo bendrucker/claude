@@ -16,7 +16,7 @@ export interface ToolResult {
   output?: string;
 }
 
-const DEFAULT_TIMEOUT = 10000;
+const DEFAULT_TIMEOUT = process.env.CI ? 60000 : 10000;
 const CLIENT_INFO = {
   name: 'mcps-tools-discovery',
   version: '1.0.0'

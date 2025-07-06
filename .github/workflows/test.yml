@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate configuration
+        run: npx tsx cli.ts validate
+
       - name: Install uv and uvx
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh

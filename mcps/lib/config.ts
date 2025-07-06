@@ -12,6 +12,11 @@ export interface HttpConfig {
   headers?: Record<string, string>;
 }
 
+export interface BinaryConfig extends EnvConfig {
+  command: string;
+  args?: string[];
+}
+
 export interface GoConfig extends EnvConfig {
   module: string;
 }
@@ -29,7 +34,47 @@ export interface DockerConfig extends EnvConfig {
   service: string;
 }
 
-export type AnyConfig = HttpConfig | GoConfig | UvxConfig | NpmConfig | DockerConfig;
+export interface HttpRunner {
+  http: HttpConfig;
+}
+
+export interface BinaryRunner {
+  binary: BinaryConfig;
+}
+
+export interface GoRunner {
+  go: GoConfig;
+}
+
+export interface UvxRunner {
+  uvx: UvxConfig;
+}
+
+export interface NpmRunner {
+  npm: NpmConfig;
+}
+
+export interface DockerRunner {
+  docker: DockerConfig;
+}
+
+export type Runner = HttpRunner | BinaryRunner | GoRunner | UvxRunner | NpmRunner | DockerRunner;
+
+export interface TargetLabels {
+  language?: string[];
+  type?: string[];
+}
+
+export interface Targets {
+  scope: 'user' | 'project';
+  labels?: TargetLabels;
+}
+
+export interface McpServer {
+  runner: Runner;
+  targets: Targets;
+}
+
 
 export interface ServerConfig {
   type: 'stdio' | 'http' | 'sse';
@@ -42,71 +87,92 @@ export interface ServerConfig {
 }
 
 export interface Configs {
-  http?: { [name: string]: HttpConfig };
-  go?: { [name: string]: GoConfig };
-  uvx?: { [name: string]: UvxConfig };
-  npm?: { [name: string]: NpmConfig };
-  docker?: { [name: string]: DockerConfig };
+  [name: string]: McpServer;
 }
 
 export interface ClaudeDesktopConfig {
   mcpServers: Record<string, ServerConfig>;
 }
 
-export function createServerConfig(
-  type: string, 
-  config: AnyConfig,
+// Pre-process runner by merging Docker Compose environment if needed
+export function preprocessRunner(
+  runner: Runner,
   dockerComposeEnvs: Record<string, Record<string, string>> = {}
-): ServerConfig {
+): Runner {
+  if ('docker' in runner) {
+    const composeEnv = dockerComposeEnvs[runner.docker.service] || {};
+    const mergedEnv = { ...composeEnv, ...runner.docker.env };
+    return {
+      docker: {
+        ...runner.docker,
+        env: mergedEnv
+      }
+    };
+  }
+  return runner;
+}
+
+export function createServerConfig(runner: Runner): ServerConfig {
   const baseDir = join(__dirname, '..');
   
-  switch (type) {
-    case 'http':
-      const httpConfig = config as HttpConfig;
-      return {
-        type: 'http',
-        url: httpConfig.url,
-        ...(httpConfig.headers && { headers: httpConfig.headers })
-      };
-    case 'go':
-      const goConfig = config as GoConfig;
-      return {
-        type: 'stdio',
-        command: 'go',
-        args: ['-C', baseDir, 'tool', goConfig.module],
-        env: goConfig.env || {},
-        cwd: baseDir
-      };
-    case 'uvx':
-      const uvxConfig = config as UvxConfig;
-      return {
-        type: 'stdio',
-        command: 'uvx',
-        args: ['--directory', baseDir, uvxConfig.package],
-        env: uvxConfig.env || {},
-        cwd: baseDir
-      };
-    case 'npm':
-      const npmConfig = config as NpmConfig;
-      return {
-        type: 'stdio',
-        command: 'npx',
-        args: ['--prefix', baseDir, '--no-install', npmConfig.binary || npmConfig.package],
-        env: npmConfig.env || {},
-        cwd: baseDir
-      };
-    case 'docker':
-      const dockerConfig = config as DockerConfig;
-      const composeEnv = dockerComposeEnvs[dockerConfig.service] || {};
-      const mergedEnv = { ...composeEnv, ...dockerConfig.env };
-      return {
-        type: 'stdio',
-        command: 'docker',
-        args: ['compose', '--file', join(baseDir, 'docker-compose.yml'), 'run', '--rm', dockerConfig.service],
-        env: mergedEnv,
-        cwd: baseDir
-      };
-    default:
-      throw new Error(`Unknown MCP type: ${type}`);
+  if ('http' in runner) {
+    return {
+      type: 'http',
+      url: runner.http.url,
+      ...(runner.http.headers && { headers: runner.http.headers })
+    };
   }
+  
+  if ('binary' in runner) {
+    return {
+      type: 'stdio',
+      command: runner.binary.command,
+      args: runner.binary.args,
+      env: runner.binary.env || {},
+      cwd: baseDir
+    };
+  }
+  
+  if ('go' in runner) {
+    return {
+      type: 'stdio',
+      command: 'go',
+      args: ['-C', baseDir, 'tool', runner.go.module],
+      env: runner.go.env || {},
+      cwd: baseDir
+    };
+  }
+  
+  if ('uvx' in runner) {
+    return {
+      type: 'stdio',
+      command: 'uvx',
+      args: ['--directory', baseDir, runner.uvx.package],
+      env: runner.uvx.env || {},
+      cwd: baseDir
+    };
+  }
+  
+  if ('npm' in runner) {
+    return {
+      type: 'stdio',
+      command: 'npx',
+      args: ['--prefix', baseDir, '--no-install', runner.npm.binary || runner.npm.package],
+      env: runner.npm.env || {},
+      cwd: baseDir
+    };
+  }
+  
+  if ('docker' in runner) {
+    return {
+      type: 'stdio',
+      command: 'docker',
+      args: ['compose', '--file', join(baseDir, 'docker-compose.yml'), 'run', '--rm', runner.docker.service],
+      env: runner.docker.env || {},
+      cwd: baseDir
+    };
+  }
+  
+  throw new Error('Unknown runner type');
 }
+

@@ -41,6 +41,13 @@ async function main() {
         await tools(argv);
       }
     )
+    .command('validate', 'Validate MCP configuration against JSON schema',
+      () => {},
+      async () => {
+        const { validate } = await import('./validate.js');
+        await validate();
+      }
+    )
     .demandCommand(1, 'You need to specify a command')
     .strict()
     .help()

@@ -74,6 +74,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: mcps/go.mod
+          cache-dependency-path: mcps/go.sum
 
       - name: Install Go tools
         run: go install golang.org/x/tools/gopls@latest

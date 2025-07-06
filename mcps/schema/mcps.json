@@ -28,7 +28,8 @@
             { "$ref": "runners/docker.json" },
             { "$ref": "runners/uvx.json" },
             { "$ref": "runners/npm.json" },
-            { "$ref": "runners/binary.json" }
+            { "$ref": "runners/binary.json" },
+            { "$ref": "runners/go.json" }
           ]
         },
         "targets": {

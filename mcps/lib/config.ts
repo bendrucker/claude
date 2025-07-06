@@ -19,6 +19,7 @@ export interface BinaryConfig extends EnvConfig {
 
 export interface GoConfig extends EnvConfig {
   module: string;
+  args?: string[];
 }
 
 export interface UvxConfig extends EnvConfig {
@@ -137,7 +138,7 @@ export function createServerConfig(runner: Runner): ServerConfig {
     return {
       type: 'stdio',
       command: 'go',
-      args: ['-C', baseDir, 'tool', runner.go.module],
+      args: ['-C', baseDir, 'tool', runner.go.module].concat(runner.go.args || []),
       env: runner.go.env || {},
       cwd: baseDir
     };

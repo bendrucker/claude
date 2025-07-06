@@ -67,15 +67,9 @@
   },
   "language-server-go": {
     "runner": {
-      "binary": {
-        "command": "mcp-language-server",
-        "args": ["--workspace", ".", "--lsp", "gopls"],
-        "env": {
-          "PATH": "/Users/ben/src/go/bin:/Users/ben/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin",
-          "GOPATH": "/Users/ben/src/go",
-          "GOCACHE": "/Users/ben/Library/Caches/go-build",
-          "GOMODCACHE": "/Users/ben/src/go/pkg/mod"
-        }
+      "go": {
+        "module": "github.com/isaacphi/mcp-language-server",
+        "args": ["--workspace", ".", "--lsp", "gopls"]
       }
     },
     "targets": {
@@ -87,12 +81,9 @@
   },
   "language-server-typescript": {
     "runner": {
-      "binary": {
-        "command": "mcp-language-server",
-        "args": ["--workspace", ".", "--lsp", "typescript-language-server", "--", "--stdio"],
-        "env": {
-          "PATH": "${PATH}"
-        }
+      "go": {
+        "module": "github.com/isaacphi/mcp-language-server",
+        "args": ["--workspace", ".", "--lsp", "typescript-language-server", "--", "--stdio"]
       }
     },
     "targets": {

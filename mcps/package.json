@@ -12,7 +12,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.14.0",
+    "@modelcontextprotocol/sdk": "^1.15.0",
     "@modelcontextprotocol/server-puppeteer": "2025.5.12",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",

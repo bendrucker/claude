@@ -1,9 +1,0 @@
-{
-  "status": "success",
-  "summary": "All configuration files are properly formatted and contain no issues.",
-  "issues": [],
-  "metadata": {
-    "filesEvaluated": 5,
-    "evaluationTime": "2024-01-20T10:30:00Z"
-  }
-}

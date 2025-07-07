@@ -45,7 +45,10 @@ class Installer {
     this.configs = JSON.parse(configData);
 
     // Validate configuration structure
-    for (const [name, server] of Object.entries(this.configs)) {
+    if (!this.configs.servers) {
+      throw new Error('Invalid MCP configuration: missing servers object');
+    }
+    for (const [name, server] of Object.entries(this.configs.servers)) {
       if (!server || !server.runner || !server.targets) {
         throw new Error(`Invalid MCP configuration for '${name}': missing runner or targets`);
       }
@@ -62,7 +65,7 @@ class Installer {
 
   private async loadDockerComposeEnvs(): Promise<void> {
     const dockerServices = new Set<string>();
-    for (const server of Object.values(this.configs)) {
+    for (const server of Object.values(this.configs.servers)) {
       if (server.runner && 'docker' in server.runner) {
         dockerServices.add(server.runner.docker.service);
       }
@@ -155,7 +158,7 @@ class Installer {
   async printConfig(): Promise<void> {
     const mcpServers: Record<string, ServerConfig> = {};
 
-    for (const [name, server] of Object.entries(this.configs)) {
+    for (const [name, server] of Object.entries(this.configs.servers)) {
       if (!server || !server.runner) continue;
 
       try {
@@ -171,12 +174,12 @@ class Installer {
   }
 
   private findByName(name: string): Runner | null {
-    const server = this.configs[name];
+    const server = this.configs.servers[name];
     return server?.runner || null;
   }
 
   private listAvailable(): string[] {
-    return Object.keys(this.configs).sort();
+    return Object.keys(this.configs.servers).sort();
   }
 
 
@@ -229,7 +232,7 @@ class Installer {
       // Process all configs (existing behavior)
       const newServers: Record<string, ServerConfig> = {};
 
-      for (const [name, server] of Object.entries(this.configs)) {
+      for (const [name, server] of Object.entries(this.configs.servers)) {
         if (!server || !server.runner) continue;
 
         const generated = this.generateConfig(server.runner);

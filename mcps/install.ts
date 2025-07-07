@@ -30,7 +30,7 @@ class Installer {
   constructor() {
     this.configPath = join(__dirname, 'mcps.json');
     this.composeFile = join(__dirname, 'docker-compose.yml');
-    this.configs = {};
+    this.configs = { servers: {} };
   }
 
 

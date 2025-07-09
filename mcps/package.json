@@ -12,7 +12,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.14.0",
+    "@modelcontextprotocol/sdk": "^1.15.0",
     "@playwright/mcp": "0.0.29",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
@@ -22,7 +22,7 @@
   "devDependencies": {
     "@types/node": "^24.0.10",
     "@types/yargs": "^17.0.33",
-    "execa": "^8.0.1",
+    "execa": "^9.6.0",
     "p-retry": "^6.2.1",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",

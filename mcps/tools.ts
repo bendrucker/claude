@@ -18,7 +18,7 @@ export async function tools(argv: { name?: string; exclude?: string[] }): Promis
     
     // Convert configs to ServerConfig format
     const serverConfigs: Record<string, any> = {};
-    for (const [name, server] of Object.entries(configs)) {
+    for (const [name, server] of Object.entries(configs.servers)) {
       if (!server || !server.runner) continue;
       serverConfigs[name] = createServerConfig(server.runner);
     }

@@ -88,7 +88,7 @@ export interface ServerConfig {
 }
 
 export interface Configs {
-  [name: string]: McpServer;
+  servers: Record<string, McpServer>;
 }
 
 export interface ClaudeDesktopConfig {

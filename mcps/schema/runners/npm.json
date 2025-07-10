@@ -7,7 +7,7 @@
   "properties": {
     "npm": {
       "type": "object",
-      "required": ["package"],
+      "required": ["package", "binary"],
       "properties": {
         "package": {
           "type": "string",

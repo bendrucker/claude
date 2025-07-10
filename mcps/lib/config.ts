@@ -28,7 +28,7 @@ export interface UvxConfig extends EnvConfig {
 
 export interface NpmConfig extends EnvConfig {
   package: string;
-  binary?: string;
+  binary: string;
 }
 
 export interface DockerConfig extends EnvConfig {
@@ -157,8 +157,8 @@ export function createServerConfig(runner: Runner): ServerConfig {
   if ('npm' in runner) {
     return {
       type: 'stdio',
-      command: 'npx',
-      args: ['--prefix', baseDir, '--no-install', runner.npm.binary || runner.npm.package],
+      command: 'npm',
+      args: ['exec', '--prefix', baseDir, '--', runner.npm.binary],
       env: runner.npm.env || {},
       cwd: baseDir
     };

@@ -56,9 +56,6 @@ jobs:
 
   tools:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mcps
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -81,12 +78,14 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: mcps
 
       - name: Install TypeScript language server
         run: npm install -g typescript-language-server typescript
 
       - name: Validate configuration
         run: npx tsx cli.ts validate
+        working-directory: mcps
 
       - name: Install uv and uvx
         run: |
@@ -95,8 +94,8 @@ jobs:
           # Verify uvx is available
           $HOME/.cargo/bin/uvx --version || echo "uvx not found, using uv tool run"
 
-      - name: Run tools command
-        run: npm run tools -- --exclude github
+      - name: Run tools command from parent directory
+        run: npm run --prefix mcps tools -- --exclude github
 
   markdown:
     runs-on: ubuntu-latest

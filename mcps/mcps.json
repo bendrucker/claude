@@ -83,7 +83,8 @@
     "playwright": {
       "runner": {
         "npm": {
-          "package": "@playwright/mcp"
+          "package": "@playwright/mcp",
+          "binary": "mcp-server-playwright"
         }
       },
       "targets": {

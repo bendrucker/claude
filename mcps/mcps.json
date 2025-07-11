@@ -94,11 +94,10 @@
         }
       }
     },
-    "markdownify": {
+    "markitdown": {
       "runner": {
-        "npm": {
-          "package": "mcp-markdownify-server",
-          "binary": "mcp-markdownify-server"
+        "uvx": {
+          "package": "markitdown-mcp"
         }
       },
       "targets": {

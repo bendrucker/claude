@@ -3,15 +3,21 @@
   "title": "MCP Configuration Schema",
   "description": "Configuration schema for MCP (Model Context Protocol) servers",
   "type": "object",
+  "required": ["servers"],
   "properties": {
     "$schema": {
       "type": "string",
       "description": "Schema reference for IDE support"
-    }
-  },
-  "patternProperties": {
-    "^[a-z0-9-]+$": {
-      "$ref": "#/definitions/server"
+    },
+    "servers": {
+      "type": "object",
+      "description": "MCP server configurations",
+      "patternProperties": {
+        "^[a-z0-9-]+$": {
+          "$ref": "#/definitions/server"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

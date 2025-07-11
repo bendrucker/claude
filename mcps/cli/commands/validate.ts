@@ -1,14 +1,19 @@
-import { readFile, access } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+import { loadDir } from '../lib/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export async function validate(): Promise<void> {
+interface ValidateArgs {
+  directory: string;
+}
+
+export async function validate(argv: ValidateArgs): Promise<void> {
   try {
-    const schemaDir = join(__dirname, 'schema');
+    const schemaDir = join(__dirname, '..', 'schema');
     
     const ajv = new Ajv({ 
       allErrors: true, 
@@ -23,15 +28,11 @@ export async function validate(): Promise<void> {
 
     // Load the main schema
     const schemaPath = join(schemaDir, 'mcps.json');
-    await access(schemaPath);
     const schemaData = await readFile(schemaPath, 'utf-8');
     const schema = JSON.parse(schemaData);
 
     // Load the config
-    const configPath = join(__dirname, 'mcps.json');
-    await access(configPath);
-    const configData = await readFile(configPath, 'utf-8');
-    const config = JSON.parse(configData);
+    const config = await loadDir(argv.directory);
 
     // Compile and validate
     const validate = await ajv.compileAsync(schema);
@@ -53,7 +54,7 @@ export async function validate(): Promise<void> {
       console.log('✓ Configuration is valid');
     }
   } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : error);
+    console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }

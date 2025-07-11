@@ -1,0 +1,30 @@
+{
+  "name": "@bendrucker/claude-mcp-cli",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "mcp": "./bin/mcp.js"
+  },
+  "scripts": {
+    "test": "node --import tsx --test lib/*.test.ts",
+    "tools": "mcp tools ..",
+    "mcp-install": "mcp install ..",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "chalk": "^5.3.0",
+    "execa": "^9.6.0",
+    "p-retry": "^6.2.1",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "@types/yargs": "^17.0.33",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "typescript-language-server": "^4.3.4"
+  }
+}

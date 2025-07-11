@@ -4,26 +4,35 @@ This directory contains configuration and tooling for managing Model Context Pro
 
 ## CLI Commands
 
-The main interface is `cli.ts`:
+The main interface is in `cli/` directory. First install it globally:
+
+```bash
+cd mcps/cli && npm link
+```
+
+The CLI takes a directory path containing `mcps.json` as its first argument:
 
 ```bash
 # Install all configured MCP servers to ~/.claude.json
-./cli.ts install
+mcp install ./mcps
 
 # Install a specific MCP server
-./cli.ts install <name>
+mcp install ./mcps <name>
 
 # Print MCP configuration as JSON (for debugging)
-./cli.ts install --print
+mcp install ./mcps --print
 
 # List available tools from MCP servers
-./cli.ts tools [name]
+mcp tools ./mcps
+
+# List tools from a specific server
+mcp tools ./mcps --server terraform
 
 # Exclude specific servers when listing tools
-./cli.ts tools --exclude terraform --exclude playwright
+mcp tools ./mcps --exclude terraform --exclude playwright
 
 # Validate mcps.json against schema
-./cli.ts validate
+mcp validate ./mcps
 ```
 
 ## Configuration Structure
@@ -72,9 +81,10 @@ MCP versions are pinned in manifest files:
 
 ## Implementation Details
 
-- `install.ts`: Main installer that writes to `~/.claude.json`
-- `lib/config.ts`: Configuration types and utilities
-- `lib/discovery.ts`: Auto-discovery of project labels
+- `cli/`: CLI tools for managing MCP servers
+- `cli/install.ts`: Main installer that writes to `~/.claude.json`
+- `cli/lib/config.ts`: Configuration types and utilities
+- `cli/lib/discovery.ts`: Auto-discovery of project labels
 - `schema/`: JSON schemas for validation
 - `docker-compose.yml`: Docker service definitions
 
@@ -82,6 +92,6 @@ MCP versions are pinned in manifest files:
 
 1. Edit `mcps.json` to add/modify servers
 2. Update version in relevant manifest file
-3. Run `./cli.ts validate` to check configuration
-4. Run `./cli.ts install` to apply changes
+3. Run `mcp validate mcps` to check configuration
+4. Run `mcp install mcps` to apply changes
 5. Restart Claude Code to load new servers

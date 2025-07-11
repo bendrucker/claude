@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 
-import { readFile, writeFile, access } from 'fs/promises';
-import { join, dirname } from 'path';
+import { readFile, writeFile } from 'fs/promises';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { execa } from 'execa';
 import { homedir } from 'os';
@@ -12,8 +12,9 @@ import {
   ClaudeDesktopConfig,
   Runner,
   createServerConfig,
-  preprocessRunner
-} from './lib/config.js';
+  preprocessRunner,
+  loadDir
+} from '../lib/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,32 +23,24 @@ const TIMER_LOAD_CONFIG = 'Load ~/.claude.json';
 const TIMER_WRITE_CONFIG = 'Write ~/.claude.json';
 
 class Installer {
+  private directory: string;
   private configPath: string;
   private composeFile: string;
   private configs: Configs;
   private dockerComposeEnvs: Record<string, Record<string, string>> = {};
 
-  constructor() {
-    this.configPath = join(__dirname, 'mcps.json');
-    this.composeFile = join(__dirname, 'docker-compose.yml');
+  constructor(directory: string) {
+    this.directory = resolve(directory);
+    this.configPath = join(this.directory, 'mcps.json');
+    this.composeFile = join(this.directory, 'docker-compose.yml');
     this.configs = { servers: {} };
   }
 
 
   async init(): Promise<void> {
-    try {
-      await access(this.configPath);
-    } catch {
-      throw new Error(`${this.configPath} not found`);
-    }
-
-    const configData = await readFile(this.configPath, 'utf-8');
-    this.configs = JSON.parse(configData);
-
+    this.configs = await loadDir(this.directory);
+    
     // Validate configuration structure
-    if (!this.configs.servers) {
-      throw new Error('Invalid MCP configuration: missing servers object');
-    }
     for (const [name, server] of Object.entries(this.configs.servers)) {
       if (!server || !server.runner || !server.targets) {
         throw new Error(`Invalid MCP configuration for '${name}': missing runner or targets`);
@@ -126,7 +119,7 @@ class Installer {
 
   private generateConfig(runner: Runner): ServerConfig {
     const processedRunner = preprocessRunner(runner, this.dockerComposeEnvs);
-    return createServerConfig(processedRunner);
+    return createServerConfig(processedRunner, this.directory);
   }
 
   private async checkMissingEnvVars(configJson: string): Promise<string[]> {
@@ -266,9 +259,15 @@ class Installer {
   }
 }
 
-export async function install(argv: { mcp?: string; print?: boolean }): Promise<void> {
+interface InstallArgs {
+  directory: string;
+  mcp?: string;
+  print?: boolean;
+}
+
+export async function install(argv: InstallArgs): Promise<void> {
   try {
-    const installer = new Installer();
+    const installer = new Installer(argv.directory);
     await installer.init();
 
     if (argv.print) {
@@ -277,7 +276,7 @@ export async function install(argv: { mcp?: string; print?: boolean }): Promise<
       await installer.install(argv.mcp);
     }
   } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : error);
+    console.error('Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }

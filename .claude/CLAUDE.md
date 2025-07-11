@@ -20,11 +20,9 @@ Adhere to these guidelines when performing your work.
 
 ## Workflow
 
-- Look for a project `CLAUDE.md` file with instructions on how to operate in the current project.
-- If the project does not have `CLAUDE.md`, fall back on `README.md` for high level project information.
-- When executing any build command to check for compilation errors, output to `/dev/null` to avoid creating a binary.
-- You may store temporary files in any project directory under `tmp/`. `~/.gitignore` ignored this directory.
-- You can interact with my macOS pasteboard (clipboard) using the `pbcopy` and `pbpaste` commands
+- When executing build commands, output to `/dev/null` to avoid creating binaries.
+- Store temporary files in `tmp/` directory.
+- Use `pbcopy` and `pbpaste` for clipboard interaction.
 
 ## Tasks
 

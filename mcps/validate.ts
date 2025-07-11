@@ -35,7 +35,7 @@ export async function validate(): Promise<void> {
 
     // Compile and validate
     const validate = await ajv.compileAsync(schema);
-    const valid = validate(config.servers);
+    const valid = validate(config);
 
     if (!valid) {
       console.error('Validation failed:');

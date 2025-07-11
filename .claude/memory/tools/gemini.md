@@ -4,7 +4,6 @@ Use `gemini --prompt` to leverage Google Gemini's large context window when anal
 
 ## Syntax
 
-Use `@` to include files/directories:
 - `@src/file.py` - single file
 - `@src/ @tests/` - multiple directories  
 - `@./` - current directory and subdirectories
@@ -15,12 +14,5 @@ Use `@` to include files/directories:
 - Analyzing entire codebases or large directories
 - Files totaling more than 100KB
 - Verifying implementations across the entire codebase
-- Understanding project-wide patterns or architecture
 
-## Examples
-
-```bash
-gemini --prompt "@src/ Summarize the architecture of this codebase"
-gemini --prompt "@src/ @tests/ Has authentication been implemented? Show relevant files"
-gemini --all-files --prompt "Analyze the project structure and dependencies"
-```
+Example: `gemini --prompt "@src/ Summarize the architecture of this codebase"`

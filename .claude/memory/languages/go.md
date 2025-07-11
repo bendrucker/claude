@@ -4,15 +4,9 @@
 
 ## Tests
 
-Write table-style tests.
+Write table-style tests:
 
 ```go
-package mypackage_test
-
-import (
-  "testing"
-)
-
 func TestMyFunction(t *testing.T) {
   for _, tc := range []struct {
     name     string
@@ -31,9 +25,7 @@ func TestMyFunction(t *testing.T) {
     },
   } {
     t.Run(tc.name, func(t *testing.T) {
-      result := MyFunction(tc.input)
-      
-      if result != tc.expected {
+      if result := MyFunction(tc.input); result != tc.expected {
         t.Errorf("expected %s, got %s", tc.expected, result)
       }
     })
@@ -41,7 +33,5 @@ func TestMyFunction(t *testing.T) {
 }
 ```
 
-### Rules
-
-- A `name` field should be included in test cases to describe the test. Go will automatically format this with underscores to a valid test name so use space delimited words and Go will handle it.
-- The `name` of a test **shall not** be passed to any function except `t.Run` or in the message part of `Errorf`. Test names should **never** be used to control test behavior.
+- Include a `name` field in test cases. Use space-delimited words.
+- Never use test names to control test behavior.

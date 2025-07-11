@@ -1,6 +1,6 @@
 ---
 description: Review a GitHub pull request
-allowed-tools: Bash(gh issue:*), Bash(gh pr:*), mcp__github__get_issue, mcp__github__get_issue_comments, mcp__github__search_issues, mcp__github__search_code, mcp__github__create_pending_pull_request_review, mcp__github__add_pull_request_review_comment_to_pending_review, mcp__github__submit_pending_pull_request_review, mcp__github__get_pull_request, mcp__github__get_pull_request_files, mcp__github__get_pull_request_diff, mcp__github__get_pull_request_comments, mcp__github__get_pull_request_reviews
+allowed-tools: Bash(gh pr list), Bash(gh pr view), Bash(gh pr checkout), mcp__github__get_issue, mcp__github__get_issue_comments, mcp__github__search_issues, mcp__github__search_code, mcp__github__get_pull_request, mcp__github__get_pull_request_files, mcp__github__get_pull_request_diff, mcp__github__get_pull_request_comments, mcp__github__get_pull_request_reviews, mcp__github__get_pull_request_status, mcp__github__list_workflow_runs, mcp__github__get_workflow_run, mcp__github__list_workflow_jobs, mcp__github__get_job_logs
 ---
 
 # Review Pull Request

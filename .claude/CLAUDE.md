@@ -38,6 +38,7 @@ Guidelines for common tasks you will need to perform:
 - Git (`git`): @memory/tools/git.md
 - GitHub (`gh`): @memory/tools/github.md
 - Graphite (`gt`): @memory/tools/graphite.md
+- Gemini CLI (`gemini`): @memory/tools/gemini.md
 
 ## Languages
 

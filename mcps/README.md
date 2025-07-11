@@ -4,18 +4,24 @@ Manages [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers
 
 ## Quick Start
 
+First, install the CLI globally:
+```bash
+cd mcps/cli && npm link
+```
+
+Then use the commands:
 ```bash
 # Install all MCP servers
-./cli.ts install
+mcp install mcps
 
 # Install specific server
-./cli.ts install github
+mcp install mcps github
 
 # List available tools
-./cli.ts tools
+mcp tools mcps
 
 # Validate configuration
-./cli.ts validate
+mcp validate mcps
 ```
 
 ## Configuration
@@ -33,8 +39,8 @@ Environment variables are substituted using shell syntax (`$VAR` or `${VAR}`).
    - `package.json` for npm/npx servers
    - `requirements.txt` for Python/uvx servers
    - `go.mod` for Go servers
-3. Run `./cli.ts validate` to check schema
-4. Run `./cli.ts install` to update `~/.claude.json`
+3. Run `mcp validate mcps` to check schema
+4. Run `mcp install mcps` to update `~/.claude.json`
 
 ## Runners
 

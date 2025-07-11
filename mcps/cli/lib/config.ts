@@ -1,5 +1,6 @@
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { readFile } from 'fs/promises';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -28,7 +29,7 @@ export interface UvxConfig extends EnvConfig {
 
 export interface NpmConfig extends EnvConfig {
   package: string;
-  binary: string;
+  binary?: string;
 }
 
 export interface DockerConfig extends EnvConfig {
@@ -113,8 +114,7 @@ export function preprocessRunner(
   return runner;
 }
 
-export function createServerConfig(runner: Runner): ServerConfig {
-  const baseDir = join(__dirname, '..');
+export function createServerConfig(runner: Runner, directory: string): ServerConfig {
   
   if ('http' in runner) {
     return {
@@ -130,7 +130,7 @@ export function createServerConfig(runner: Runner): ServerConfig {
       command: runner.binary.command,
       args: runner.binary.args,
       env: runner.binary.env || {},
-      cwd: baseDir
+      cwd: directory
     };
   }
   
@@ -138,9 +138,9 @@ export function createServerConfig(runner: Runner): ServerConfig {
     return {
       type: 'stdio',
       command: 'go',
-      args: ['-C', baseDir, 'tool', runner.go.module].concat(runner.go.args || []),
+      args: ['-C', directory, 'tool', runner.go.module].concat(runner.go.args || []),
       env: runner.go.env || {},
-      cwd: baseDir
+      cwd: directory
     };
   }
   
@@ -148,19 +148,19 @@ export function createServerConfig(runner: Runner): ServerConfig {
     return {
       type: 'stdio',
       command: 'uvx',
-      args: ['--directory', baseDir, runner.uvx.package],
+      args: ['--directory', directory, runner.uvx.package],
       env: runner.uvx.env || {},
-      cwd: baseDir
+      cwd: directory
     };
   }
   
   if ('npm' in runner) {
     return {
       type: 'stdio',
-      command: 'npm',
-      args: ['exec', '--prefix', baseDir, '--', runner.npm.binary],
+      command: 'npx',
+      args: ['--prefix', directory, runner.npm.binary || runner.npm.package],
       env: runner.npm.env || {},
-      cwd: baseDir
+      cwd: directory
     };
   }
   
@@ -168,12 +168,31 @@ export function createServerConfig(runner: Runner): ServerConfig {
     return {
       type: 'stdio',
       command: 'docker',
-      args: ['compose', '--file', join(baseDir, 'docker-compose.yml'), 'run', '--rm', runner.docker.service],
+      args: ['compose', '--file', join(directory, 'docker-compose.yml'), 'run', '--rm', runner.docker.service],
       env: runner.docker.env || {},
-      cwd: baseDir
+      cwd: directory
     };
   }
   
   throw new Error('Unknown runner type');
+}
+
+export async function loadDir(directory: string): Promise<Configs> {
+  const configPath = join(directory, 'mcps.json');
+  try {
+    const configData = await readFile(configPath, 'utf-8');
+    const config = JSON.parse(configData);
+    
+    if (!config.servers) {
+      throw new Error('Invalid MCP configuration: missing servers object');
+    }
+    
+    return config;
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+      throw new Error(`Directory '${directory}' does not contain required mcps.json file`);
+    }
+    throw error;
+  }
 }
 

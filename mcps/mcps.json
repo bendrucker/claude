@@ -44,8 +44,7 @@
     "package-registry": {
       "runner": {
         "npm": {
-          "package": "package-registry-mcp",
-          "binary": "package-registry-mcp"
+          "package": "package-registry-mcp"
         }
       },
       "targets": {
@@ -83,8 +82,7 @@
     "playwright": {
       "runner": {
         "npm": {
-          "package": "@playwright/mcp",
-          "binary": "mcp-server-playwright"
+          "package": "@playwright/mcp"
         }
       },
       "targets": {

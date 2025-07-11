@@ -93,6 +93,17 @@
           "type": ["frontend", "e2e-testing"]
         }
       }
+    },
+    "markdownify": {
+      "runner": {
+        "npm": {
+          "package": "mcp-markdownify-server",
+          "binary": "mcp-markdownify-server"
+        }
+      },
+      "targets": {
+        "scope": "user"
+      }
     }
   }
 }

@@ -13,11 +13,20 @@ cd mcps/cli && npm link
 The CLI takes a directory path containing `mcps.json` as its first argument:
 
 ```bash
-# Install all configured MCP servers to ~/.claude.json
+# Install all configured MCP servers to both Claude Code and Claude Desktop
 mcp install ./mcps
 
-# Install a specific MCP server
+# Install to Claude Code only
+mcp install ./mcps --app claude-code
+
+# Install to Claude Desktop only
+mcp install ./mcps --app claude-desktop
+
+# Install a specific MCP server to both apps
 mcp install ./mcps <name>
+
+# Install a specific MCP server to Claude Code only
+mcp install ./mcps <name> --app claude-code
 
 # Print MCP configuration as JSON (for debugging)
 mcp install ./mcps --print
@@ -79,10 +88,19 @@ MCP versions are pinned in manifest files:
 - `requirements.txt`: Python/uvx servers  
 - `go.mod` + `go.sum`: Go servers
 
+## Target Applications
+
+The CLI supports installing MCP servers to multiple applications:
+
+- **Claude Code**: `~/.claude.json`
+- **Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+By default, MCPs are installed to both applications. Use the `--app` flag to target specific applications.
+
 ## Implementation Details
 
 - `cli/`: CLI tools for managing MCP servers
-- `cli/install.ts`: Main installer that writes to `~/.claude.json`
+- `cli/install.ts`: Main installer that writes to app config files
 - `cli/lib/config.ts`: Configuration types and utilities
 - `cli/lib/discovery.ts`: Auto-discovery of project labels
 - `schema/`: JSON schemas for validation
@@ -93,5 +111,5 @@ MCP versions are pinned in manifest files:
 1. Edit `mcps.json` to add/modify servers
 2. Update version in relevant manifest file
 3. Run `mcp validate mcps` to check configuration
-4. Run `mcp install mcps` to apply changes
-5. Restart Claude Code to load new servers
+4. Run `mcp install mcps` to apply changes (installs to both apps by default)
+5. Restart Claude Code and/or Claude Desktop to load new servers

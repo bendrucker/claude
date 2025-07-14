@@ -1,6 +1,6 @@
 # MCP Servers
 
-Manages [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers for Claude Code.
+Manages [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers for Claude Code and Claude Desktop.
 
 ## Quick Start
 
@@ -11,10 +11,13 @@ cd mcps/cli && npm link
 
 Then use the commands:
 ```bash
-# Install all MCP servers
+# Install all MCP servers to both Claude Code and Claude Desktop
 mcp install mcps
 
-# Install specific server
+# Install to Claude Code only
+mcp install mcps --app claude-code
+
+# Install specific server to both apps
 mcp install mcps github
 
 # List available tools
@@ -40,7 +43,7 @@ Environment variables are substituted using shell syntax (`$VAR` or `${VAR}`).
    - `requirements.txt` for Python/uvx servers
    - `go.mod` for Go servers
 3. Run `mcp validate mcps` to check schema
-4. Run `mcp install mcps` to update `~/.claude.json`
+4. Run `mcp install mcps` to update both app configurations
 
 ## Runners
 

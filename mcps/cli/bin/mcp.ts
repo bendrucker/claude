@@ -5,6 +5,7 @@ interface InstallArgs {
   directory: string;
   mcp?: string;
   print?: boolean;
+  app: string[];
 }
 
 interface ToolsArgs {
@@ -34,6 +35,12 @@ async function main() {
             type: 'boolean',
             description: 'Print MCP configuration as JSON (compatible with Claude Desktop)',
             default: false
+          })
+          .option('app', {
+            type: 'string',
+            description: 'Target application (claude-code, claude-desktop)',
+            array: true,
+            default: ['claude-code', 'claude-desktop']
           });
       },
       async (argv) => {

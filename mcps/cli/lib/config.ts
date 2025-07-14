@@ -25,6 +25,7 @@ export interface GoConfig extends EnvConfig {
 
 export interface UvxConfig extends EnvConfig {
   package: string;
+  binary?: string;
 }
 
 export interface NpmConfig extends EnvConfig {
@@ -145,10 +146,16 @@ export function createServerConfig(runner: Runner, directory: string): ServerCon
   }
   
   if ('uvx' in runner) {
+    const args = ['--directory', directory];
+    if (runner.uvx.binary) {
+      args.push('--from', runner.uvx.package, runner.uvx.binary);
+    } else {
+      args.push(runner.uvx.package);
+    }
     return {
       type: 'stdio',
       command: 'uvx',
-      args: ['--directory', directory, runner.uvx.package],
+      args,
       env: runner.uvx.env || {},
       cwd: directory
     };

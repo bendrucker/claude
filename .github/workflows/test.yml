@@ -88,7 +88,7 @@ jobs:
         working-directory: mcps/cli
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: Run tools command from parent directory
         run: ./mcps/cli/bin/mcp.js tools mcps --exclude github

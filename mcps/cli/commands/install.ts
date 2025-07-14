@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { execa } from 'execa';
@@ -21,6 +21,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Timer constants
 const TIMER_LOAD_CONFIG = 'Load ~/.claude.json';
 const TIMER_WRITE_CONFIG = 'Write ~/.claude.json';
+
+// Helper functions
+function getConfigPath(app: string): string {
+  switch (app) {
+    case 'claude-code':
+      return join(homedir(), '.claude.json');
+    case 'claude-desktop':
+      return join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+    default:
+      throw new Error(`Unsupported app: ${app}`);
+  }
+}
+
+function validateApps(apps: string[]): void {
+  const validApps = ['claude-code', 'claude-desktop'];
+  for (const app of apps) {
+    if (!validApps.includes(app)) {
+      throw new Error(`Unsupported app: ${app}. Valid apps: ${validApps.join(', ')}`);
+    }
+  }
+}
 
 class Installer {
   private directory: string;
@@ -177,22 +198,12 @@ class Installer {
 
 
 
-  async install(targetMcp?: string): Promise<void> {
-    const claudeConfigPath = join(homedir(), '.claude.json');
+  async install(targetMcp?: string, apps: string[] = ['claude-code', 'claude-desktop']): Promise<void> {
+    validateApps(apps);
 
-    // Load existing config
-    console.time(TIMER_LOAD_CONFIG);
-    let claudeConfig: ClaudeDesktopConfig;
-    try {
-      const content = await readFile(claudeConfigPath, 'utf-8');
-      claudeConfig = JSON.parse(content);
-      console.timeEnd(TIMER_LOAD_CONFIG);
-    } catch {
-      claudeConfig = { mcpServers: {} };
-      console.timeEnd(TIMER_LOAD_CONFIG);
-    }
+    // Process all configs once
+    const mcpServers: Record<string, ServerConfig> = {};
 
-    // If targetMcp is specified, find and install only that MCP
     if (targetMcp) {
       const runner = this.findByName(targetMcp);
       if (!runner) {
@@ -202,60 +213,64 @@ class Installer {
         process.exit(1);
       }
 
-      const generated = this.generateConfig(runner);
-
-      // Check for missing environment variables
-      const configJson = JSON.stringify(generated);
-      const missingVars = await this.checkMissingEnvVars(configJson);
-      if (missingVars.length > 0) {
-        console.error(`Error: Missing required environment variables for '${targetMcp}':`);
-        missingVars.forEach(varName => console.error(`  ${varName}`));
-        process.exit(1);
-      }
-
       try {
-        const processedConfig = await this.processConfig(targetMcp, runner);
-        claudeConfig.mcpServers[targetMcp] = processedConfig;
+        mcpServers[targetMcp] = await this.processConfig(targetMcp, runner);
         console.log(`Configured MCP server: ${targetMcp}`);
       } catch (error) {
         console.error(`Failed to process MCP server '${targetMcp}':`, error);
         process.exit(1);
       }
     } else {
-      // Process all configs (existing behavior)
-      const newServers: Record<string, ServerConfig> = {};
-
+      // Process all configs
       for (const [name, server] of Object.entries(this.configs.servers)) {
         if (!server || !server.runner) continue;
 
-        const generated = this.generateConfig(server.runner);
-
-        // Check for missing environment variables for all types
-        const configJson = JSON.stringify(generated);
-        const missingVars = await this.checkMissingEnvVars(configJson);
-        if (missingVars.length > 0) {
-          console.error(`Error: Missing required environment variables for '${name}':`);
-          missingVars.forEach(varName => console.error(`  ${varName}`));
-          process.exit(1);
-        }
-
         try {
-          newServers[name] = await this.processConfig(name, server.runner);
+          mcpServers[name] = await this.processConfig(name, server.runner);
           console.log(`Configured MCP server: ${name}`);
         } catch (error) {
           console.error(`Failed to process MCP server '${name}':`, error);
           process.exit(1);
         }
       }
+    }
 
-      // Update the config with new servers
-      claudeConfig.mcpServers = newServers;
+    // Write to each target app
+    for (const app of apps) {
+      await this.writeAppConfig(app, mcpServers, targetMcp);
+    }
+  }
+
+  private async writeAppConfig(app: string, mcpServers: Record<string, ServerConfig>, targetMcp?: string): Promise<void> {
+    const configPath = getConfigPath(app);
+
+    // Ensure directory exists
+    await mkdir(dirname(configPath), { recursive: true });
+
+    // Load existing config
+    console.time(`Load ${app} config`);
+    let config: ClaudeDesktopConfig;
+    try {
+      const content = await readFile(configPath, 'utf-8');
+      config = JSON.parse(content);
+      console.timeEnd(`Load ${app} config`);
+    } catch {
+      config = { mcpServers: {} };
+      console.timeEnd(`Load ${app} config`);
+    }
+
+    // Update config with new servers
+    if (targetMcp) {
+      config.mcpServers[targetMcp] = mcpServers[targetMcp];
+    } else {
+      config.mcpServers = mcpServers;
     }
 
     // Write back to file
-    console.time(TIMER_WRITE_CONFIG);
-    await writeFile(claudeConfigPath, JSON.stringify(claudeConfig, null, 2));
-    console.timeEnd(TIMER_WRITE_CONFIG);
+    console.time(`Write ${app} config`);
+    await writeFile(configPath, JSON.stringify(config, null, 2));
+    console.timeEnd(`Write ${app} config`);
+    console.log(`Updated ${app} configuration`);
   }
 }
 
@@ -263,6 +278,7 @@ interface InstallArgs {
   directory: string;
   mcp?: string;
   print?: boolean;
+  app: string[];
 }
 
 export async function install(argv: InstallArgs): Promise<void> {
@@ -273,7 +289,7 @@ export async function install(argv: InstallArgs): Promise<void> {
     if (argv.print) {
       await installer.printConfig();
     } else {
-      await installer.install(argv.mcp);
+      await installer.install(argv.mcp, argv.app);
     }
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));

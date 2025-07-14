@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: fake
+      THINGS_AUTH_TOKEN: fake
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

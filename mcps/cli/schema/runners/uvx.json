@@ -15,7 +15,7 @@
         },
         "binary": {
           "type": "string",
-          "description": "Override binary name to execute (uses --from flag)"
+          "description": "Override binary name to execute"
         },
         "env": {
           "type": "object",

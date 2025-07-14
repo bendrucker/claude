@@ -13,6 +13,10 @@
           "type": "string",
           "description": "Python package name"
         },
+        "binary": {
+          "type": "string",
+          "description": "Override binary name to execute"
+        },
         "env": {
           "type": "object",
           "description": "Environment variables",

@@ -55,7 +55,7 @@ MCP servers are defined in `mcps.json`:
 Each runner type has specific configuration:
 
 - **npm**: `{ "package": "pkg-name", "binary": "bin-name" }`
-- **uvx**: `{ "package": "pkg-name", "env": {...} }`
+- **uvx**: `{ "package": "pkg-name", "binary": "bin-name", "env": {...} }`
 - **docker**: `{ "service": "service-name" }`
 - **go**: `{ "module": "module-path", "args": [...] }`
 - **binary**: `{ "path": "/path/to/bin", "args": [...] }`

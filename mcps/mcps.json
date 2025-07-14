@@ -101,6 +101,20 @@
       "targets": {
         "scope": "user"
       }
+    },
+    "things": {
+      "runner": {
+        "uvx": {
+          "package": "git+https://github.com/bendrucker/things-fastmcp.git@ben",
+          "binary": "things3-enhanced-mcp",
+          "env": {
+            "THINGS_AUTH_TOKEN": "${THINGS_AUTH_TOKEN}"
+          }
+        }
+      },
+      "targets": {
+        "scope": "user"
+      }
     }
   }
 }

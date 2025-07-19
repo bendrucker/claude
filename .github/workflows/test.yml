@@ -94,6 +94,19 @@ jobs:
       - name: Run tools command from parent directory
         run: ./mcps/cli/bin/mcp.js tools mcps --exclude github
 
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Test hooks
+        run: ./test.sh
+        working-directory: .claude/hooks
+
   markdown:
     runs-on: ubuntu-latest
     steps:

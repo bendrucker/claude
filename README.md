@@ -29,6 +29,7 @@ MCP versions are specified in the relevant package manifest file for their runti
     - `tools/` - Tool usage instructions
     - `languages/` - Language-specific conventions
   - `commands/` - [Personal commands](https://docs.anthropic.com/en/docs/claude-code/slash-commands#personal-commands)
+  - `hooks/` - [Hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) for customizing Claude Code behavior
 
 ## Usage
 

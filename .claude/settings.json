@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project hooks hooks/notification.py"
+            "command": "cd ~/.claude/hooks && uv run notification.py"
           }
         ]
       }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project hooks hooks/pre_tool_use.py"
+            "command": "cd ~/.claude/hooks && uv run pre_tool_use.py"
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project hooks hooks/post_tool_use.py"
+            "command": "cd ~/.claude/hooks && uv run post_tool_use.py"
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project hooks hooks/stop.py"
+            "command": "cd ~/.claude/hooks && uv run stop.py"
           }
         ]
       }
@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project hooks hooks/subagent_stop.py"
+            "command": "cd ~/.claude/hooks && uv run subagent_stop.py"
           }
         ]
       }
@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project hooks hooks/pre_compact.py"
+            "command": "cd ~/.claude/hooks && uv run pre_compact.py"
           }
         ]
       }

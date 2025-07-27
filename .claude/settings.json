@@ -14,5 +14,17 @@
     ],
     "deny": []
   },
-  "hooks": {}
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$(tail -c1 \"$FILE\")\" ] && echo >> \"$FILE\" || true"
+          }
+        ]
+      }
+    ]
+  }
 }

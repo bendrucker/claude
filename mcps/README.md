@@ -40,7 +40,7 @@ Environment variables are substituted using shell syntax (`$VAR` or `${VAR}`).
 1. Add server definition to `mcps.json`
 2. Update version in appropriate manifest:
    - `package.json` for npm/npx servers
-   - `requirements.txt` for Python/uvx servers
+   - `pyproject.toml` for Python/uvx servers
    - `go.mod` for Go servers
 3. Run `mcp validate mcps` to check schema
 4. Run `mcp install mcps` to update both app configurations

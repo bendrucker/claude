@@ -85,7 +85,7 @@ The installer supports shell-style substitution:
 
 MCP versions are pinned in manifest files:
 - `package.json` + `package-lock.json`: npm/npx servers
-- `requirements.txt`: Python/uvx servers  
+- `pyproject.toml`: Python/uvx servers  
 - `go.mod` + `go.sum`: Go servers
 
 ## Target Applications

@@ -103,10 +103,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Claude
-        uses: anthropics/claude-code-base-action@beta
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code@latest
 
       - name: Install ShellSpec
         run: curl -fsSL https://git.io/shellspec | sh -s -- --yes 0.28.1

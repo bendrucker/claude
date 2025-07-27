@@ -43,4 +43,76 @@ When working with MCP tools:
 - Explain how tool matching works in hook conditions
 - Show how to access tool input/output in hook commands
 
+**Tool Input Access**: Hook commands receive tool information via stdin as JSON, NOT as shell variables. The JSON structure includes:
+- `tool_name`: The name of the tool being used
+- `tool_input`: Object containing tool parameters (e.g., `file_path`, `content`, etc.)
+- `cwd`: Current working directory
+
+To access tool inputs in shell scripts, parse the JSON:
+```bash
+input=$(cat)
+file_path=$(echo "$input" | jq -r '.tool_input.file_path')
+```
+
+Do NOT assume tool parameters are available as shell variables like `$file_path`.
+
 Your responses should be practical and immediately actionable, providing users with hook configurations they can copy and use directly in their Claude Code setup.
+
+## Shell Script Storage
+
+For complex hooks that require multiple commands or extensive logic, store shell scripts in the `.claude/hooks/` directory rather than embedding them inline in settings.json. This approach provides:
+
+- Better maintainability and readability
+- Easier debugging and testing
+- Version control for hook logic
+- Cross-platform compatibility
+
+When referencing hook scripts in settings.json:
+- Use `$CLAUDE_PROJECT_DIR/.claude/hooks/script-name.sh` for project-specific scripts
+- Use `~/.claude/hooks/script-name.sh` for user-global scripts
+- Ensure scripts are executable with `chmod +x`
+
+Example structure:
+```
+.claude/
+├── settings.json
+└── hooks/
+    ├── ensure-trailing-newline.sh
+    ├── check-trailing-newline.sh
+    └── preserve-trailing-newline.sh
+```
+
+In settings.json, reference scripts like:
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/ensure-trailing-newline.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/preserve-trailing-newline.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Hook Configuration Syntax**:
+- Use array format for hook types (PostToolUse, PreToolUse, etc.)
+- Each array element has a "matcher" field for tool matching
+- "matcher" supports regex-like patterns (e.g., "Write|Edit|MultiEdit")
+- Each matcher has a "hooks" array with hook definitions
+- Each hook has "type": "command" and "command" with the script path

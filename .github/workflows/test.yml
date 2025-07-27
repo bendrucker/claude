@@ -97,6 +97,18 @@ jobs:
       - name: Run tools command from parent directory
         run: ./mcps/cli/bin/mcp.js tools mcps --exclude github
 
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ShellSpec
+        run: curl -fsSL https://git.io/shellspec | sh
+
+      - name: Run hook tests
+        run: .claude/hooks/test.sh
+
   markdown:
     runs-on: ubuntu-latest
     steps:

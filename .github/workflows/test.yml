@@ -132,7 +132,8 @@ jobs:
           GITHUB_TOKEN: fake
 
       - name: Run hook tests
-        run: .claude/hooks/test.sh
+        run: shellspec
+        working-directory: .claude/hooks
 
   markdown:
     runs-on: ubuntu-latest

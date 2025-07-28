@@ -184,7 +184,7 @@ Describe "newline hooks"
     End
   End
 
-  Describe "Edit tool integration test"
+  Describe "Edit tool integration test" integration
     It "preserves trailing newline when editing file"
       test_file="output/integration_test.txt"
       echo "original content" > "$test_file"

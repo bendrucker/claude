@@ -1,3 +1,5 @@
 --pattern "**/spec.sh"
 --default-path .
 --shell bash
+--jobs 3
+--format documentation

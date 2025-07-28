@@ -10,10 +10,16 @@ hooks/
 ├── .shellspec          # ShellSpec configuration
 ├── test.sh            # Run all hook tests
 ├── state.sh           # General state management utility
-└── <hook-name>/        # Individual hook directories
-    ├── <script>.sh     # Hook scripts
+└── <topic>/            # Topic-based directories (e.g., newline, github)
+    ├── <action>.sh     # Hook scripts named by action (e.g., fetch.sh, check.sh)
     └── spec.sh         # ShellSpec tests
 ```
+
+### Hook Naming Convention
+
+- Group hooks by topic/domain (e.g., `newline/`, `github/`)
+- Name scripts by their specific action with `.sh` extension
+- Use descriptive names that indicate the hook's purpose
 
 ## Current Hooks
 
@@ -80,9 +86,17 @@ When developing new hook tests:
 
 1. Create `<hook>/spec.sh` with ShellSpec format
 2. Include helper functions inline (no shared spec_helper)
-3. Use `claude --allowedTools` to grant necessary permissions
-4. Test with `shellspec spec.sh:LINE_NUMBER` for fast iteration (e.g., `shellspec spec.sh:18`)
-5. Verify all tests pass with `shellspec spec.sh`
+3. **NEVER run hooks directly** - always use `claude --print` to test hooks
+4. Use `claude --allowedTools` to grant necessary permissions
+5. Test with `shellspec spec.sh:LINE_NUMBER` for fast iteration (e.g., `shellspec spec.sh:18`)
+6. Verify all tests pass with `shellspec spec.sh`
+
+**Example test pattern**:
+```bash
+When run sh -c "claude --allowedTools 'WebFetch' --print \"Fetch https://github.com/owner/repo\" 2>&1"
+The output should include "deny"
+The output should include "gh api repos/{owner}/{repo}/readme"
+```
 
 **Current Status**: All tests pass successfully. The test framework uses ShellSpec with parallel execution (`--jobs 3`) and proper IAM permission syntax.
 
@@ -95,12 +109,14 @@ When developing new hook tests:
 
 ## Adding New Hooks
 
-1. Create directory: `mkdir hooks/<hook-name>`
-2. Add hook scripts (PreToolUse, PostToolUse, etc.)
+1. Create directory: `mkdir hooks/<topic>`
+2. Add hook scripts named by action (e.g., `fetch.sh`, `check.sh`)
 3. Update `settings.json` to reference new hooks
-4. Create `<hook-name>/spec.sh` with tests
-5. Run `./install.sh` to update symlinks
-6. Test with `./test.sh`
+4. Create `<topic>/spec.sh` with ShellSpec tests
+5. Test with `./test.sh` or `shellspec <topic>/spec.sh`
+6. No need to run `./install.sh` - the `.claude/` directory is already symlinked
+
+**Important**: Always write and run ShellSpec tests for new hooks. Never test hooks manually.
 
 ## State Management
 

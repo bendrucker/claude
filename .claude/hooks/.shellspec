@@ -1,0 +1,3 @@
+--pattern "**/spec.sh"
+--default-path .
+--shell bash

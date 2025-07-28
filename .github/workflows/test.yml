@@ -111,6 +111,11 @@ jobs:
       - name: Install ShellSpec
         run: curl -fsSL https://git.io/shellspec | sh -s -- --yes 0.28.1
 
+      - name: Setup Claude configuration
+        run: ./install.sh
+        env:
+          GITHUB_TOKEN: fake
+
       - name: Run hook tests
         run: .claude/hooks/test.sh
 

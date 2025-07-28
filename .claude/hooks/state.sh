@@ -29,7 +29,7 @@ case "$command" in
         fi
         ;;
     "set")
-        if [ -z "$value" ]; then
+        if [ $# -lt 4 ]; then
             echo "Usage: $0 set <type> <key> <value>" >&2
             exit 1
         fi

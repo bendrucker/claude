@@ -1,86 +1,48 @@
 #!/bin/bash
 
 Describe "newline hooks"
-  # Test helpers
-  has_trailing_newline() {
-    echo "DEBUG: Checking file: $1" >&2
-    echo "DEBUG: File exists: $([ -f "$1" ] && echo yes || echo no)" >&2
-    echo "DEBUG: File not empty: $([ -s "$1" ] && echo yes || echo no)" >&2
-    if [ -f "$1" ] && [ -s "$1" ]; then
-      tail_result=$(tail -c1 "$1" | wc -l)
-      echo "DEBUG: tail -c1 | wc -l result: '$tail_result'" >&2
-      [ "$tail_result" -eq 1 ]
-    else
-      false
-    fi
+  # Helper function to check if a file has a trailing newline
+  file_has_trailing_newline() {
+    [ -f "$1" ] && [ -s "$1" ] && [ "$(tail -c1 "$1" | wc -l)" -eq 1 ]
   }
 
-  has_no_trailing_newline() {
+  # Helper function to check if a file has no trailing newline
+  file_has_no_trailing_newline() {
     [ -f "$1" ] && [ -s "$1" ] && [ "$(tail -c1 "$1" | wc -l)" -eq 0 ]
   }
 
-  is_empty_file() {
-    [ -f "$1" ] && [ ! -s "$1" ]
-  }
+  # Setup and cleanup output directory
+  BeforeAll 'mkdir -p output && rm -rf output/* 2>/dev/null || true'
+  AfterAll 'rm -rf output/* 2>/dev/null || true'
 
   Describe "Write tool"
     It "adds trailing newline to files"
-      test_dir=$(mktemp -d)
-      test_file="$test_dir/test.txt"
+      # Use absolute path to avoid scoping issues
+      test_file="$PWD/output/test_write.txt"
       
-      # Write the file and verify hook adds newline
-      When run sh -c "claude --allowedTools 'Read,Write' --print \"Write 'test content' to $test_file\" >/dev/null 2>&1 && [ -f \"$test_file\" ] && [ \$(tail -c1 \"$test_file\" | wc -l) -eq 1 ]"
+      # Run Claude and verify file creation with trailing newline
+      When run sh -c "claude --allowedTools 'Read,Write' --print \"Write 'test content' to $test_file\" >/dev/null 2>&1 && test -f '$test_file' && [ \$(tail -c1 '$test_file' | wc -l) -eq 1 ]"
       The status should be success
-      
-      # Cleanup
-      rm -rf "$test_dir"
     End
-
   End
 
   Describe "Edit tool with existing newline"
-    setup_edit_test() {
-      EDIT_TEST_FILE=$(mktemp)
-      echo "original content" > "$EDIT_TEST_FILE"
-    }
-    
-    cleanup_edit_test() {
-      [ -f "$EDIT_TEST_FILE" ] && rm -f "$EDIT_TEST_FILE"
-    }
-    
-    Before 'setup_edit_test'
-    After 'cleanup_edit_test'
-    
     It "preserves trailing newline when editing"
-      # Verify setup
-      The file "$EDIT_TEST_FILE" should satisfy has_trailing_newline
+      test_file="$PWD/output/test_edit_with_newline.txt"
       
-      When run claude --debug --allowedTools "Read,Edit" --print "Edit $EDIT_TEST_FILE and replace 'original content' with 'original content\\nappended text'"
-      The status should be success  
-      The file "$EDIT_TEST_FILE" should satisfy has_trailing_newline
+      # Create file with trailing newline, edit it, and verify newline is preserved
+      When run sh -c "echo 'original content' > '$test_file' && claude --allowedTools 'Read,Edit' --print \"Edit $test_file and replace 'original content' with 'original content\\nappended text'\" >/dev/null 2>&1 && [ \$(tail -c1 '$test_file' | wc -l) -eq 1 ]"
+      The status should be success
     End
   End
 
   Describe "Edit tool without existing newline"
-    setup_edit_no_newline_test() {
-      EDIT_NO_NEWLINE_TEST_FILE=$(mktemp)
-      echo -n "original content" > "$EDIT_NO_NEWLINE_TEST_FILE"
-    }
-    
-    cleanup_edit_no_newline_test() {
-      [ -f "$EDIT_NO_NEWLINE_TEST_FILE" ] && rm -f "$EDIT_NO_NEWLINE_TEST_FILE"
-    }
-    
-    Before 'setup_edit_no_newline_test'
-    After 'cleanup_edit_no_newline_test'
-    
     It "preserves no-newline state when editing"
-      # Verify setup
-      The file "$EDIT_NO_NEWLINE_TEST_FILE" should satisfy has_no_trailing_newline
+      test_file="$PWD/output/test_edit_no_newline.txt"
       
-      When run claude --debug --allowedTools "Read,Edit" --print "Edit $EDIT_NO_NEWLINE_TEST_FILE and replace 'original content' with 'original content appended'"
+      # Create file without trailing newline, edit it, and verify no-newline state is preserved
+      When run sh -c "echo -n 'original content' > '$test_file' && claude --allowedTools 'Read,Edit' --print \"Edit $test_file and replace 'original content' with 'original content appended'\" >/dev/null 2>&1 && [ \$(tail -c1 '$test_file' | wc -l) -eq 0 ]"
       The status should be success
-      The file "$EDIT_NO_NEWLINE_TEST_FILE" should satisfy has_no_trailing_newline
     End
   End
 End

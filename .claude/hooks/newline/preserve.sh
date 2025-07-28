@@ -28,4 +28,19 @@ if [ "$had_newline" = "1" ]; then
         # File doesn't end with newline, add one
         echo >> "$file_path"
     fi
+# If original file had no trailing newline, ensure it still has none
+elif [ "$had_newline" = "" ]; then
+    # Check if file is empty or doesn't exist
+    if [ ! -s "$file_path" ]; then
+        exit 0
+    fi
+    
+    # Check if file ends with newline and remove it
+    if [ "$(tail -c1 "$file_path" | wc -l)" -eq 1 ]; then
+        # File ends with newline, remove it
+        perl -i -pe 'chomp if eof' "$file_path"
+    fi
 fi
+
+# Clean up state file
+"$state_script" delete newline "$file_path"

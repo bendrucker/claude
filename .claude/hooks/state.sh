@@ -2,8 +2,9 @@
 
 # Manage state files for Claude Code hooks
 # Usage: 
-#   get-state-file.sh get <type> <key>
-#   get-state-file.sh set <type> <key> <value>
+#   state.sh get <type> <key>
+#   state.sh set <type> <key> <value>
+#   state.sh delete <type> <key>
 
 command="$1"
 type="$2"
@@ -11,7 +12,7 @@ key="$3"
 value="$4"
 
 if [ -z "$command" ] || [ -z "$type" ] || [ -z "$key" ]; then
-    echo "Usage: $0 get|set <type> <key> [value]" >&2
+    echo "Usage: $0 get|set|delete <type> <key> [value]" >&2
     exit 1
 fi
 
@@ -34,6 +35,11 @@ case "$command" in
             exit 1
         fi
         echo "$value" > "$state_file"
+        ;;
+    "delete")
+        if [ -f "$state_file" ]; then
+            rm "$state_file"
+        fi
         ;;
     *)
         echo "Unknown command: $command" >&2

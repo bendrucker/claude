@@ -38,7 +38,7 @@ Describe "newline hooks"
 
   Describe "Edit tool without existing newline"
     It "preserves no-newline state when editing"
-      test_file="$PWD/output/test_edit_no_newline.txt"
+      test_file="output/test_edit_no_newline.txt"
       
       # Create file without trailing newline, edit it, and verify no-newline state is preserved
       When run sh -c "echo -n 'original content' > '$test_file' && claude --allowedTools 'Read,Edit' --print \"Edit $test_file and replace 'original content' with 'original content appended'\" >/dev/null 2>&1 && [ \$(tail -c1 '$test_file' | wc -l) -eq 0 ]"

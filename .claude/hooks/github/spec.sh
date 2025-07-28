@@ -23,7 +23,7 @@ Describe 'GitHub fetch hook'
     [ "$1" = "$(echo "${has_exact_reason}" | jq -r '.hookSpecificOutput.permissionDecisionReason')" ]
   }
 
-  Context 'Unit tests - hook logic'
+  Context 'Unit tests - hook logic' unit
     Context 'when URL is not GitHub'
       It 'allows non-GitHub URLs'
         When run run_hook "https://example.com"
@@ -106,7 +106,7 @@ Describe 'GitHub fetch hook'
     End
   End
 
-  Context 'Integration test - full Claude session'
+  Context 'Integration test - full Claude session' integration
     It 'blocks GitHub repo fetch and shows hook feedback'
       When run sh -c "claude --allowedTools 'WebFetch' --print 'Fetch https://github.com/bendrucker/deployments and show me the hook feedback without running any commands' 2>&1"
       The output should include "gh api repos/{owner}/{repo}/readme"

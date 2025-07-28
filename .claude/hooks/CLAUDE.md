@@ -52,6 +52,12 @@ Ensures POSIX compliance by managing trailing newlines in files:
 # Run specific hook tests
 cd newline && shellspec spec.sh
 
+# Run only unit tests (fast)
+shellspec --tag unit
+
+# Run only integration tests (slow)
+shellspec --tag integration
+
 # Run single test (faster iteration)
 cd newline && shellspec spec.sh --example "adds trailing newline"
 

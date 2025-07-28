@@ -86,16 +86,44 @@ When developing new hook tests:
 
 1. Create `<hook>/spec.sh` with ShellSpec format
 2. Include helper functions inline (no shared spec_helper)
-3. **NEVER run hooks directly** - always use `claude --print` to test hooks
-4. Use `claude --allowedTools` to grant necessary permissions
-5. Test with `shellspec spec.sh:LINE_NUMBER` for fast iteration (e.g., `shellspec spec.sh:18`)
-6. Verify all tests pass with `shellspec spec.sh`
+3. **Write comprehensive unit tests** that test hooks directly without invoking Claude
+4. **Include at least one integration test** using `claude --print` for the positive case
+5. Use `claude --allowedTools` to grant necessary permissions for integration tests
+6. Test with `shellspec spec.sh:LINE_NUMBER` for fast iteration (e.g., `shellspec spec.sh:18`)
+7. Verify all tests pass with `shellspec spec.sh`
 
-**Example test pattern**:
+**Testing Strategy**:
+- **Unit tests**: Test hook scripts directly by piping JSON input and checking outputs/side effects
+- **Integration tests**: Use `claude --print` to test end-to-end behavior with actual Claude invocation
+- **Coverage**: Aim for full unit test coverage of all code paths and edge cases
+- **Performance**: Unit tests are fast, use one integration test for the main positive case
+
+**Example unit test pattern**:
 ```bash
-When run sh -c "claude --allowedTools 'WebFetch' --print \"Fetch https://github.com/owner/repo\" 2>&1"
-The output should include "deny"
-The output should include "gh api repos/{owner}/{repo}/readme"
+# Test hook script directly with JSON input and custom matcher
+input=$(jq -n --arg file_path "$abs_path" '{tool_input: {file_path: $file_path}}')
+When run sh -c "echo '$input' | ./newline/ensure.sh"
+The status should be success
+The path "$abs_path" should satisfy assert_has_trailing_newline
+```
+
+**Custom file matchers**:
+```bash
+# Custom matcher functions use variable pattern
+assert_has_trailing_newline() {
+  file_path=${assert_has_trailing_newline:?}
+  test -f "$file_path" && test -s "$file_path" && test "$(tail -c1 "$file_path" | wc -l)" -eq 1
+}
+
+# Use with The path syntax (not The file)
+The path "$abs_path" should satisfy assert_has_trailing_newline
+```
+
+**Example integration test pattern**:
+```bash
+# Test full Claude invocation (use sparingly)
+When run sh -c "claude --allowedTools 'Read,Edit' --print \"Edit $test_file...\" >/dev/null 2>&1"
+The status should be success
 ```
 
 **Current Status**: All tests pass successfully. The test framework uses ShellSpec with parallel execution (`--jobs 3`) and proper IAM permission syntax.

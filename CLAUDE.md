@@ -17,7 +17,7 @@ This repository is my shared, open-source configuration for Claude Code, an AI c
 
 ## Workflow
 
-- When creating new files or directories in `.claude/`, run `./install.sh` to update the symlinks in `~/.claude`.
+- The `.claude/` directory is symlinked to `~/.claude/`. New files and directories created in `.claude/` are immediately available - no need to run `./install.sh` unless the symlink itself needs to be recreated.
 
 ## Settings Configuration
 

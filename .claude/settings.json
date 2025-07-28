@@ -44,6 +44,15 @@
             "command": "~/.claude/hooks/newline/check.sh"
           }
         ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/github/fetch.sh"
+          }
+        ]
       }
     ]
   }

@@ -105,6 +105,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install tsx
+        run: npm install -g tsx
+
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@latest
 

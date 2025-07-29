@@ -1,5 +1,5 @@
 {
-  "$schema": "./schema/mcps.json",
+  "$schema": "./cli/schema/mcps.json",
   "servers": {
     "github": {
       "runner": {

@@ -2,6 +2,7 @@
   "env": {
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "true"
   },
+  "model": "sonnet",
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
@@ -37,7 +38,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|MultiEdit", 
+        "matcher": "Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",

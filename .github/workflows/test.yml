@@ -97,6 +97,19 @@ jobs:
       - name: Run tools command from parent directory
         run: ./mcps/cli/bin/mcp.js tools mcps --exclude github
 
+      - name: Test npm binary configuration
+        run: |
+          # cd to unrelated directory to test path resolution
+          cd "$TMPDIR"
+          
+          # Install the playwright package to test binary resolution
+          npm install @playwright/mcp
+          
+          # Test that the actual command works (should start and wait for stdin)
+          timeout 2s npx --prefix . mcp-server-playwright || [ $? -eq 124 ]
+          
+          echo "✓ npm binary configuration test passed"
+
   hooks:
     runs-on: ubuntu-latest
     env:

@@ -1,8 +1,8 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "true"
   },
-  "model": "sonnet",
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
@@ -15,6 +15,7 @@
     ],
     "deny": []
   },
+  "model": "sonnet",
   "hooks": {
     "PostToolUse": [
       {

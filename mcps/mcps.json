@@ -1,5 +1,5 @@
 {
-  "$schema": "./schema/mcps.json",
+  "$schema": "./cli/schema/mcps.json",
   "servers": {
     "github": {
       "runner": {
@@ -51,34 +51,6 @@
         "scope": "user"
       }
     },
-    "language-server-go": {
-      "runner": {
-        "go": {
-          "module": "github.com/isaacphi/mcp-language-server",
-          "args": ["--workspace", ".", "--lsp", "gopls"]
-        }
-      },
-      "targets": {
-        "scope": "project",
-        "labels": {
-          "language": ["go"]
-        }
-      }
-    },
-    "language-server-typescript": {
-      "runner": {
-        "go": {
-          "module": "github.com/isaacphi/mcp-language-server",
-          "args": ["--workspace", ".", "--lsp", "typescript-language-server", "--", "--stdio"]
-        }
-      },
-      "targets": {
-        "scope": "project",
-        "labels": {
-          "language": ["typescript", "javascript"]
-        }
-      }
-    },
     "playwright": {
       "runner": {
         "npm": {
@@ -96,20 +68,6 @@
       "runner": {
         "uvx": {
           "package": "markitdown-mcp"
-        }
-      },
-      "targets": {
-        "scope": "user"
-      }
-    },
-    "things": {
-      "runner": {
-        "uvx": {
-          "package": "git+https://github.com/bendrucker/things-fastmcp.git@ben",
-          "binary": "things3-enhanced-mcp",
-          "env": {
-            "THINGS_AUTH_TOKEN": "${THINGS_AUTH_TOKEN}"
-          }
         }
       },
       "targets": {

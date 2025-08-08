@@ -37,7 +37,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: fake
-      THINGS_AUTH_TOKEN: fake
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -96,6 +95,43 @@ jobs:
 
       - name: Run tools command from parent directory
         run: ./mcps/cli/bin/mcp.js tools mcps --exclude github
+
+  hooks:
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mcps/cli/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: mcps/cli
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code@latest
+
+      - name: Install ShellSpec
+        run: curl -fsSL https://git.io/shellspec | sh -s -- --yes 0.28.1
+
+      - name: Setup Claude configuration
+        run: ./install.sh
+        env:
+          GITHUB_TOKEN: fake
+
+      - name: Run hook tests
+        run: shellspec
+        working-directory: .claude/hooks
 
   markdown:
     runs-on: ubuntu-latest

@@ -43,6 +43,7 @@ Guidelines for common tasks you will need to perform:
 - Shell: @memory/languages/shell.md
 - TypeScript: @memory/languages/typescript.md
 - Go: @memory/languages/go.md
+- JSON: @memory/languages/json.md
 
 ## Personal Details
 

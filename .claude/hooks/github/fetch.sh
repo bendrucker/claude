@@ -30,35 +30,23 @@ output_json() {
 if [[ "$url" =~ github\.com/([^/]+)/([^/]+) ]]; then
   # Repository root - get README
   if [[ "$url" =~ ^https://github\.com/[^/]+/[^/]+/?$ ]]; then
-    output_json "deny" "Use: gh api repos/{owner}/{repo}/readme | jq -r .content | base64 --decode"
+    output_json "deny" "Use: gh repo view [<repository>]"
     exit 0
   fi
 
-  # File content
-  if [[ "$url" =~ /blob/([^/]+)/(.+)$ ]]; then
-    ref="${BASH_REMATCH[1]}"
-    path="${BASH_REMATCH[2]}"
-    output_json "deny" "Use: gh api 'repos/{owner}/{repo}/contents/$path?ref=$ref' | jq -r .content | base64 --decode"
-    exit 0
-  fi
-
-  # Directory listing
-  if [[ "$url" =~ /tree/([^/]+)/?(.*)$ ]]; then
-    ref="${BASH_REMATCH[1]}"
-    path="${BASH_REMATCH[2]}"
-    endpoint="repos/{owner}/{repo}/contents${path:+/$path}?ref=$ref"
-    output_json "deny" "Use: gh api '$endpoint' | jq -r '.[] | \"\(.type): \(.name)\"'"
+  # Files/directories
+  if [[ "$url" =~ /blob/([^/]+)/(.+)$ ]] || [[ "$url" =~ /tree/([^/]+)/?(.*)$ ]]; then
+    output_json "deny" "Use: mcp__github__get_file_contents"
     exit 0
   fi
 
   # Issue/PR - gh automatically detects repo context
   if [[ "$url" =~ /(issues|pull)/([0-9]+)$ ]]; then
     type="${BASH_REMATCH[1]}"
-    number="${BASH_REMATCH[2]}"
     if [[ "$type" == "issues" ]]; then
-      output_json "deny" "Use: gh issue view $number"
+      output_json "deny" "Use: mcp__github__get_issue"
     else
-      output_json "deny" "Use: gh pr view $number"
+      output_json "deny" "Use: mcp__github__get_pull_request"
     fi
     exit 0
   fi

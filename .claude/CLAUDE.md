@@ -7,11 +7,11 @@ Adhere to these guidelines when performing your work.
 - Prefer concise, direct responses.
 - Minimize unnecessary explanations unless requested.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
-- Do not line-wrap at a specific column unless editing a project file where the surrounding text is wrapped. Use natural line breaks.
-- Include a trailing newline in all new files. Do not include one if an existing file does not have one.
+- Use natural line breaks unless the surrounding code is wrapped at a specific column.
+- Include a trailing newline in all new files.
 - Prefer meaningful anchor text over raw URLs.
 - Use bullet points for lists, checklists if I ask for tasks.
-- Do not use code comments to explain code to me or to reference my prompts. Use them to clarify code that is not self-explanatory.
+- Use code comments ONLY to clarify code that is not self-explanatory to OTHER readers. If you need to explain the code, do so in a separate message before editing.
 
 ## Organization
 

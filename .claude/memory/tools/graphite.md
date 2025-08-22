@@ -2,7 +2,7 @@
 
 CLI tool for managing stacked pull requests on GitHub. Always use `--no-interactive` flag.
 
-Workflow: Work towards a checkpoint, then commit to a new branch. **Do not** create empty branches.
+Workflow: Work towards a logical milestone, then `gt create` to create a new stack entry.
 
 Commands:
 - `gt add`: Stage files

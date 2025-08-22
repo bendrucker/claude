@@ -1,0 +1,15 @@
+{
+  "name": "@bendrucker/claude",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint:commands": "remark .claude/commands/*.md"
+  },
+  "devDependencies": {
+    "remark": "^15.0.1",
+    "remark-cli": "^12.0.1",
+    "remark-frontmatter": "^5.0.0",
+    "remark-lint": "^10.0.1",
+    "remark-lint-frontmatter-schema": "^3.15.4"
+  }
+}

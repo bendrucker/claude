@@ -37,7 +37,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: fake
-      THINGS_AUTH_TOKEN: fake
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -138,7 +137,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      THINGS_AUTH_TOKEN: fake
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -184,3 +182,21 @@ jobs:
           use-quiet-mode: 'yes'
           folder-path: '.claude/'
           file-path: './CLAUDE.md'
+
+  commands:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate command frontmatter
+        run: npm run lint:commands

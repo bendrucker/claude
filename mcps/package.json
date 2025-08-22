@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.16.0",
-    "@playwright/mcp": "^0.0.31",
+    "@modelcontextprotocol/sdk": "^1.17.3",
+    "@playwright/mcp": "0.0.34",
     "package-registry-mcp": "1.1.0"
   }
 }

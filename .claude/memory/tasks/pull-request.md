@@ -10,9 +10,23 @@ Use these guidelines when creating GitHub pull requests:
 
 ### Body
 
-- Start with 1-3 sentences summarizing the change
-- Use `##` sections for larger PRs:
-  - `## Issue`: Root cause analysis, link existing issues
-  - `## Changes`: High-level description
-  - `## Testing`: Manual/automated testing summary
-  - `## References`: Bulleted list of links or related issues/PRs, use `Closes #<issue>` if applicable
+- Start with 1-3 sentences summarizing the change. Go straight into the description, without a preceding header.
+- Use `##` sections for larger PRs. Include one or more of the following sections as appropriate. Sections can have multiple subsections if subgroups are present.
+
+  - `## Issue`: Root cause analysis, link existing issues. Use this for bug fixes, which should include a related issue.
+  - `## Changes`: High-level bulleted description of changes made.
+    - Emphasize API and interface changes first.
+      - Example: Adds `POST /users` endpoint to create users
+      - Example: Updates `User.create` to accept `email` parameter.
+      - Example: Handles `404` errors in `GET /users/{id}`.
+    - Avoid listing files. Summarize the user impact of changes.
+    - Include refactoring or cleanup changes as separate bullet points.
+      - Example: Refactors `UserService` to use dependency injection.
+      - Example: Extracts repeated user getter logic into `UserRepository`.
+  - `## Testing`: Exclude if not applicable
+    - Include a very high level summary of any tests added or modified.
+    - Include, if applicable, new testing patterns or significant coverage changes.
+    - Include, if applicable, a checklist of manual test steps as `###`.
+  - `## References`: Exclude if not applicable
+    - Bulleted list of links or related issues/PRs
+    - Use `Closes #<issue>` if the PR closes an issue

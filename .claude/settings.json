@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "true"
   },
@@ -14,6 +15,7 @@
     ],
     "deny": []
   },
+  "model": "opusplan",
   "hooks": {
     "PostToolUse": [
       {
@@ -37,7 +39,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|MultiEdit", 
+        "matcher": "Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",

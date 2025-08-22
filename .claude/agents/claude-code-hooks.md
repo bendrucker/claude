@@ -54,8 +54,6 @@ input=$(cat)
 file_path=$(echo "$input" | jq -r '.tool_input.file_path')
 ```
 
-Do NOT assume tool parameters are available as shell variables like `$file_path`.
-
 Your responses should be practical and immediately actionable, providing users with hook configurations they can copy and use directly in their Claude Code setup.
 
 ## Shell Script Storage

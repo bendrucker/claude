@@ -12,7 +12,7 @@ allowed-tools: Bash(gh:*), mcp__github
 ## Task
 
 - Create a pull request from my staged changes and any recent commits to the current branch if not on a default branch.
-- **Do not** commit any unstaged changes.
+- Exclude all unstaged changes.
 - If I am on a default branch, create a branch first, named based on the subject/type of my changes.
   - Example: fix/add-timeout-to-request
   - Example: aws-provider-v6

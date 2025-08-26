@@ -116,7 +116,7 @@ export function preprocessRunner(
 }
 
 export function createServerConfig(runner: Runner, directory: string): ServerConfig {
-  
+
   if ('http' in runner) {
     return {
       type: 'http',
@@ -124,7 +124,7 @@ export function createServerConfig(runner: Runner, directory: string): ServerCon
       ...(runner.http.headers && { headers: runner.http.headers })
     };
   }
-  
+
   if ('binary' in runner) {
     return {
       type: 'stdio',
@@ -134,7 +134,7 @@ export function createServerConfig(runner: Runner, directory: string): ServerCon
       cwd: directory
     };
   }
-  
+
   if ('go' in runner) {
     return {
       type: 'stdio',
@@ -144,7 +144,7 @@ export function createServerConfig(runner: Runner, directory: string): ServerCon
       cwd: directory
     };
   }
-  
+
   if ('uvx' in runner) {
     const args = ['--directory', directory];
     if (runner.uvx.binary) {
@@ -160,17 +160,19 @@ export function createServerConfig(runner: Runner, directory: string): ServerCon
       cwd: directory
     };
   }
-  
+
   if ('npm' in runner) {
     return {
       type: 'stdio',
       command: 'npx',
-      args: ['--prefix', directory, runner.npm.binary || runner.npm.package],
+      args: runner.npm.binary
+        ? ['--prefix', directory, '--package', runner.npm.package, '--', runner.npm.binary]
+        : ['--prefix', directory, runner.npm.package],
       env: runner.npm.env || {},
       cwd: directory
     };
   }
-  
+
   if ('docker' in runner) {
     return {
       type: 'stdio',
@@ -180,7 +182,7 @@ export function createServerConfig(runner: Runner, directory: string): ServerCon
       cwd: directory
     };
   }
-  
+
   throw new Error('Unknown runner type');
 }
 
@@ -189,11 +191,11 @@ export async function loadDir(directory: string): Promise<Configs> {
   try {
     const configData = await readFile(configPath, 'utf-8');
     const config = JSON.parse(configData);
-    
+
     if (!config.servers) {
       throw new Error('Invalid MCP configuration: missing servers object');
     }
-    
+
     return config;
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {

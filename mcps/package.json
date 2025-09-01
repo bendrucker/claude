@@ -4,7 +4,7 @@
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.3",
-    "@playwright/mcp": "0.0.34",
+    "@playwright/mcp": "0.0.36",
     "package-registry-mcp": "1.1.0"
   }
 }

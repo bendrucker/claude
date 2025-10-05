@@ -45,9 +45,4 @@ for item in "$SOURCE_DIR"/*; do
     fi
 done
 
-echo "Installing MCP configuration..."
-(cd mcps/cli && npm link > /dev/null 2>&1)
-mcp install mcps
-echo "✓ MCP configuration installed successfully"
-
 echo "✓ Claude configuration installed successfully"

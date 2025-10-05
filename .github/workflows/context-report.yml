@@ -1,0 +1,47 @@
+name: Context Usage Report
+
+on:
+  push:
+    paths:
+      - '.claude/**'
+      - '.github/workflows/context-report.yml'
+  pull_request:
+    paths:
+      - '.claude/**'
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Claude Code CLI
+        run: |
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Set up Claude configuration
+        run: |
+          mkdir -p ~/.claude
+          cp -r .claude/* ~/.claude/
+
+      - name: Generate context report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Run context check and generate report
+          ./scripts/context.sh check > tmp/context.json
+          ./scripts/context.sh report tmp/context.json > tmp/context-report.md
+
+      - name: Post to job summary
+        run: |
+          cat tmp/context-report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: context-report
+          path: |
+            tmp/context.json
+            tmp/context-report.md

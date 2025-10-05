@@ -11,10 +11,6 @@ This repository is my shared, open-source configuration for Claude Code, an AI c
 - `.claude/settings.json`: User settings for Claude Code
 - `install.sh`: Setup script that creates symlinks from `.claude/` to `~/.claude`
 
-## MCP Servers
-
-- @mcps/CLAUDE.md: Managing Model Context Protocol servers
-
 ## Workflow
 
 - The `.claude/` directory is symlinked to `~/.claude/`. New files and directories created in `.claude/` are immediately available - no need to run `./install.sh` unless the symlink itself needs to be recreated.

@@ -49,43 +49,43 @@ Describe 'GitHub fetch hook'
     End
 
     Context 'when fetching file content'
-      It 'denies and suggests get_file_contents for file content'
+      It 'denies and suggests gh api for file content'
         When run run_hook "https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: mcp__github__get_file_contents"
+        The output should satisfy has_exact_reason "Use: gh api to fetch file contents"
       End
     End
 
     Context 'when fetching directory listing'
-      It 'denies and suggests get_file_contents for directory'
+      It 'denies and suggests gh api for directory'
         When run run_hook "https://github.com/owner/repo/tree/main/src"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: mcp__github__get_file_contents"
+        The output should satisfy has_exact_reason "Use: gh api to fetch file contents"
       End
 
       It 'handles root directory tree'
         When run run_hook "https://github.com/owner/repo/tree/main"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: mcp__github__get_file_contents"
+        The output should satisfy has_exact_reason "Use: gh api to fetch file contents"
       End
     End
 
     Context 'when fetching issues or PRs'
-      It 'denies and suggests get_issue tool'
+      It 'denies and suggests gh issue view'
         When run run_hook "https://github.com/owner/repo/issues/123"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: mcp__github__get_issue"
+        The output should satisfy has_exact_reason "Use: gh issue view 123"
       End
 
-      It 'denies and suggests get_pull_request tool'
+      It 'denies and suggests gh pr view'
         When run run_hook "https://github.com/owner/repo/pull/456"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: mcp__github__get_pull_request"
+        The output should satisfy has_exact_reason "Use: gh pr view 456"
       End
     End
 

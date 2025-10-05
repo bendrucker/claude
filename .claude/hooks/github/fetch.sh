@@ -36,22 +36,23 @@ if [[ "$url" =~ github\.com/([^/]+)/([^/]+) ]]; then
 
   # Files/directories
   if [[ "$url" =~ /blob/([^/]+)/(.+)$ ]] || [[ "$url" =~ /tree/([^/]+)/?(.*)$ ]]; then
-    output_json "deny" "Use: mcp__github__get_file_contents"
+    output_json "deny" "Use: gh api to fetch file contents"
     exit 0
   fi
 
   # Issue/PR - gh automatically detects repo context
   if [[ "$url" =~ /(issues|pull)/([0-9]+)$ ]]; then
     type="${BASH_REMATCH[1]}"
+    number="${BASH_REMATCH[2]}"
     if [[ "$type" == "issues" ]]; then
-      output_json "deny" "Use: mcp__github__get_issue"
+      output_json "deny" "Use: gh issue view $number"
     else
-      output_json "deny" "Use: mcp__github__get_pull_request"
+      output_json "deny" "Use: gh pr view $number"
     fi
     exit 0
   fi
 fi
 
 # Unknown GitHub URL pattern - ask user
-output_json "ask" "Unknown GitHub URL pattern. Consider using gh CLI or GitHub MCP tools."
+output_json "ask" "Unknown GitHub URL pattern. Consider using gh CLI."
 exit 0

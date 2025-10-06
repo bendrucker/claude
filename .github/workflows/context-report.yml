@@ -18,20 +18,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Claude Code CLI
-        run: |
-          npm install -g @anthropic-ai/claude-code
+        run: npm install -g @anthropic-ai/claude-code
 
-      - name: Set up Claude configuration
-        run: |
-          mkdir -p ~/.claude
-          cp -r .claude/* ~/.claude/
+      - name: Setup Claude configuration
+        run: ./install.sh
 
       - name: Generate context report
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           mkdir -p tmp
-          ./scripts/context.sh check > tmp/context.json
+          cd "$GITHUB_WORKSPACE"
+          claude --print '/context' --output-format json --verbose | tee tmp/claude-output.json
+          ./scripts/context.sh check tmp/claude-output.json > tmp/context.json
           ./scripts/context.sh report tmp/context.json > tmp/context-report.md
 
       - name: Post to job summary

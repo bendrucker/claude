@@ -30,7 +30,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # Run context check and generate report
+          mkdir -p tmp
           ./scripts/context.sh check > tmp/context.json
           ./scripts/context.sh report tmp/context.json > tmp/context-report.md
 

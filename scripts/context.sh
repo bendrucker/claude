@@ -118,7 +118,6 @@ check() {
     --argjson mcp_tools "$(extract_component "MCP tools")" \
     --argjson custom_agents "$(extract_component "Custom agents")" \
     --argjson memory_files "$(extract_component "Memory files")" \
-    --argjson messages "$(extract_component "Messages")" \
     --argjson free_space "$(extract_component "Free space")" \
     '{
       model: $model,
@@ -134,7 +133,6 @@ check() {
         mcp_tools: $mcp_tools,
         custom_agents: $custom_agents,
         memory_files: $memory_files,
-        messages: $messages,
         free_space: $free_space
       } | with_entries(select(.value != null))
     }'

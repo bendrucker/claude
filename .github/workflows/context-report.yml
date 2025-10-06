@@ -28,10 +28,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           mkdir -p tmp
-          cd "$GITHUB_WORKSPACE"
-          claude --print '/context' --output-format json --verbose | tee tmp/claude-output.json
-          ./scripts/context.sh check tmp/claude-output.json > tmp/context.json
-          ./scripts/context.sh report tmp/context.json > tmp/context-report.md
+          claude --print '/context' --output-format json --verbose | ./scripts/context.sh check | tee tmp/context.json | ./scripts/context.sh report > tmp/context-report.md
 
       - name: Post to job summary
         run: |

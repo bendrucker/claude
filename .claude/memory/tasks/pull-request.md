@@ -19,14 +19,14 @@ Use these guidelines when creating GitHub pull requests:
       - Example: Adds `POST /users` endpoint to create users
       - Example: Updates `User.create` to accept `email` parameter.
       - Example: Handles `404` errors in `GET /users/{id}`.
-    - Avoid listing files. Summarize the user impact of changes.
+    - Do not list modified files by path, line number, etc. Summarize the user impact of changes, do not narrate the code.
     - Include refactoring or cleanup changes as separate bullet points.
       - Example: Refactors `UserService` to use dependency injection.
       - Example: Extracts repeated user getter logic into `UserRepository`.
-  - `## Testing`: Exclude if not applicable
-    - Include a very high level summary of any tests added or modified.
-    - Include, if applicable, new testing patterns or significant coverage changes.
-    - Include, if applicable, a checklist of manual test steps as `###`.
-  - `## References`: Exclude if not applicable
+  - `## Testing`: Only include if tests were added/modified or if we discussed manual testing steps. Do not repeat obvious statements (❌ "existing tests pass" ❌) or meta-information (❌ "3 unit tests" ❌). Do include, where applicable:
+    - High level summary of any tests added or modified.
+    - Nw testing patterns or significant coverage changes.
+    - Checklist of manual test steps as `###`.
+  - `## References`: ONLY include if there are relevant links or related issues/PRs.
     - Bulleted list of links or related issues/PRs
     - Use `Closes #<issue>` if the PR closes an issue

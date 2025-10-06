@@ -54,8 +54,11 @@ check() {
     cat > "$tmpfile"
 
     # Check if stdin was JSON output from claude --output-format json
-    if jq -e '.messages' "$tmpfile" >/dev/null 2>&1; then
-      # Extract text from JSON response
+    if jq -e '.[1].message.content' "$tmpfile" >/dev/null 2>&1; then
+      # Extract text from <local-command-stdout> in message content
+      output=$(jq -r '.[1].message.content' "$tmpfile" | awk '/<local-command-stdout>/{flag=1;next}/<\/local-command-stdout>/{flag=0}flag')
+    elif jq -e '.messages' "$tmpfile" >/dev/null 2>&1; then
+      # Fallback: older JSON format
       output=$(jq -r '.messages[] | select(.role == "assistant") | .content[]? | select(.type == "text") | .text' "$tmpfile")
     else
       # Plain text
@@ -72,8 +75,8 @@ check() {
       exit 1
     fi
 
-    # Extract text from JSON response
-    output=$(jq -r '.messages[] | select(.role == "assistant") | .content[]? | select(.type == "text") | .text' "$tmpfile")
+    # Extract text from <local-command-stdout> in message content
+    output=$(jq -r '.[1].message.content' "$tmpfile" | awk '/<local-command-stdout>/{flag=1;next}/<\/local-command-stdout>/{flag=0}flag')
   fi
 
   # Extract model and token info from first line after "Context Usage"
@@ -88,13 +91,13 @@ check() {
   fi
 
   # Extract component breakdowns
-  # Example: "• System prompt: 3.1k tokens (1.5%)" or "• Messages: 8 tokens (0.0%)"
+  # Example: "⛁ System prompt: 3.1k tokens (1.5%)" or "⛁ Messages: 8 tokens (0.0%)"
   extract_component() {
     local component="$1"
     local tokens percentage
     # Match either "123k" or "123" for tokens
-    tokens=$(echo "$output" | grep -i "• $component:" | grep -oE '[0-9.]+k?[[:space:]]tokens' | head -1 | sed 's/ tokens//')
-    percentage=$(echo "$output" | grep -i "• $component:" | grep -oE '[0-9.]+%' | head -1 | tr -d '%')
+    tokens=$(echo "$output" | grep -i "$component:" | grep -oE '[0-9.]+k?[[:space:]]tokens' | head -1 | sed 's/ tokens//')
+    percentage=$(echo "$output" | grep -i "$component:" | grep -oE '[0-9.]+%' | head -1 | tr -d '%')
 
     if [ -n "$tokens" ]; then
       echo "{\"tokens\": \"$tokens\", \"percentage\": ${percentage:-0}}"

@@ -25,7 +25,7 @@ jobs:
 
       - name: Generate context report
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           mkdir -p tmp
           claude --print '/context' --output-format json --verbose | ./scripts/context.sh check | tee tmp/context.json | ./scripts/context.sh report > tmp/context-report.md

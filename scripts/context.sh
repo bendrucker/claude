@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Context usage measurement and reporting for Claude Code
@@ -10,26 +10,23 @@ Usage: $0 <command> [options]
 
 Commands:
   check [file]  Parse /context output and return JSON
-                Reads from file, stdin, or runs /context interactively
+                Reads from file or stdin
   report [file] Generate GitHub Flavored Markdown table from JSON
                 Reads JSON from file or stdin
 
 Examples:
-  # Interactive (will prompt you to paste /context output)
-  $0 check
+  # From stdin
+  claude --print '/context' --output-format json --verbose | $0 check > tmp/context.json
 
   # From file
   $0 check tmp/context-output.txt > tmp/context.json
-
-  # From stdin
-  claude --print --verbose '/context' | $0 check > tmp/context.json
 
   # Generate report
   $0 check | $0 report
   $0 report tmp/context.json
 
   # Combined
-  $0 check tmp/context-output.txt | $0 report
+  claude --print '/context' --output-format json --verbose | $0 check | $0 report
 EOF
   exit 1
 }
@@ -47,36 +44,16 @@ check() {
       exit 1
     fi
     output=$(cat "$input_file")
-  elif [ ! -t 0 ]; then
-    # From stdin (not a terminal)
+  else
     tmpfile=$(mktemp)
     trap "rm -f $tmpfile" EXIT
     cat > "$tmpfile"
 
-    # Check if stdin was JSON output from claude --output-format json
     if jq -e '.[1].message.content' "$tmpfile" >/dev/null 2>&1; then
-      # Extract text from <local-command-stdout> in message content
       output=$(jq -r '.[1].message.content' "$tmpfile" | awk '/<local-command-stdout>/{flag=1;next}/<\/local-command-stdout>/{flag=0}flag')
-    elif jq -e '.messages' "$tmpfile" >/dev/null 2>&1; then
-      # Fallback: older JSON format
-      output=$(jq -r '.messages[] | select(.role == "assistant") | .content[]? | select(.type == "text") | .text' "$tmpfile")
     else
-      # Plain text
       output=$(cat "$tmpfile")
     fi
-  else
-    # Run claude command directly
-    tmpfile=$(mktemp)
-    trap "rm -f $tmpfile" EXIT
-
-    if ! timeout 30 claude --print '/context' --output-format json --verbose 2>/dev/null > "$tmpfile"; then
-      echo "Error: Failed to run 'claude --print /context'" >&2
-      echo "Try providing the output as a file or via stdin" >&2
-      exit 1
-    fi
-
-    # Extract text from <local-command-stdout> in message content
-    output=$(jq -r '.[1].message.content' "$tmpfile" | awk '/<local-command-stdout>/{flag=1;next}/<\/local-command-stdout>/{flag=0}flag')
   fi
 
   # Extract model and token info from first line after "Context Usage"

@@ -73,7 +73,8 @@ check() {
   local components_json
   components_json=$(echo "$output" | grep -E ':[[:space:]]+[0-9.]+k?[[:space:]]tokens[[:space:]]+\([0-9.]+%\)' | awk -F': ' '{
     name = $1
-    gsub(/^.*[⛁⛶⛝][[:space:]]+/, "", name)
+    # Strip leading non-letter characters and whitespace (handles ⛁⛶⛝•_ etc)
+    gsub(/^[^A-Za-z]+/, "", name)
     tokens = $2
     gsub(/ tokens.*/, "", tokens)
     percentage = $2

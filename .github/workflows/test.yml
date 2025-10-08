@@ -58,3 +58,33 @@ jobs:
 
       - name: Validate command frontmatter
         run: npm run lint:commands
+
+  context:
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code@latest
+
+      - name: Setup Claude configuration
+        run: ./install.sh
+
+      - name: Generate context report
+        run: |
+          mkdir -p tmp
+          claude --print '/context' --output-format json --verbose | ./scripts/context.sh check | tee tmp/context.json | ./scripts/context.sh report > tmp/context-report.md
+
+      - name: Post to job summary
+        run: cat tmp/context-report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: context-report
+          path: |
+            tmp/context.json
+            tmp/context-report.md

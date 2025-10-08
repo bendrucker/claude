@@ -76,15 +76,8 @@ jobs:
       - name: Generate context report
         run: |
           mkdir -p tmp
-          claude --print '/context' --output-format json --verbose | ./scripts/context.sh check | tee tmp/context.json | ./scripts/context.sh report > tmp/context-report.md
-
-      - name: Post to job summary
-        run: cat tmp/context-report.md >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: context-report
-          path: |
-            tmp/context.json
-            tmp/context-report.md
+          echo '## Claude Code Context Usage' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          claude --print '/context' --output-format json --verbose | jq -r '.[1].message.content' | awk '/<local-command-stdout>/{flag=1;next}/<\/local-command-stdout>/{flag=0}flag' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

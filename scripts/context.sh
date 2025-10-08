@@ -67,21 +67,24 @@ check() {
     percentage=$(echo "$output" | grep -oE '\([0-9.]+%\)' | head -1 | tr -d '()%')
   fi
 
-  # Extract component breakdowns
-  # Example: "⛁ System prompt: 3.1k tokens (1.5%)" or "⛁ Messages: 8 tokens (0.0%)"
-  extract_component() {
-    local component="$1"
-    local tokens percentage
-    # Match either "123k" or "123" for tokens
-    tokens=$(echo "$output" | grep -i "$component:" | grep -oE '[0-9.]+k?[[:space:]]tokens' | head -1 | sed 's/ tokens//')
-    percentage=$(echo "$output" | grep -i "$component:" | grep -oE '[0-9.]+%' | head -1 | tr -d '%')
-
-    if [ -n "$tokens" ]; then
-      echo "{\"tokens\": \"$tokens\", \"percentage\": ${percentage:-0}}"
-    else
-      echo "null"
-    fi
-  }
+  # Extract all component breakdowns dynamically
+  # Finds all lines matching pattern: "Component name: XXX tokens (YY%)"
+  # Excludes "Messages" as it represents the /context command itself
+  local components_json
+  components_json=$(echo "$output" | grep -E ':[[:space:]]+[0-9.]+k?[[:space:]]tokens[[:space:]]+\([0-9.]+%\)' | awk -F': ' '{
+    name = $1
+    gsub(/^.*[⛁⛶⛝][[:space:]]+/, "", name)
+    tokens = $2
+    gsub(/ tokens.*/, "", tokens)
+    percentage = $2
+    gsub(/.*\(/, "", percentage)
+    gsub(/%\).*/, "", percentage)
+    if (name != "Messages") {
+      key = tolower(name)
+      gsub(/ /, "_", key)
+      printf "{\"key\":\"%s\",\"name\":\"%s\",\"tokens\":\"%s\",\"percentage\":%s}\n", key, name, tokens, percentage
+    }
+  }' | jq -s 'map({(.key): {tokens: .tokens, percentage: .percentage}}) | add // {}')
 
   # Build JSON using jq to ensure valid output
   jq -n \
@@ -89,13 +92,7 @@ check() {
     --arg total_used "${total_used:-0}" \
     --arg total_capacity "${total_capacity:-0}" \
     --arg percentage "${percentage:-0}" \
-    --argjson system_prompt "$(extract_component "System prompt")" \
-    --argjson system_tools "$(extract_component "System tools")" \
-    --argjson reserved "$(extract_component "Reserved")" \
-    --argjson mcp_tools "$(extract_component "MCP tools")" \
-    --argjson custom_agents "$(extract_component "Custom agents")" \
-    --argjson memory_files "$(extract_component "Memory files")" \
-    --argjson free_space "$(extract_component "Free space")" \
+    --argjson components "$components_json" \
     '{
       model: $model,
       total: {
@@ -103,15 +100,7 @@ check() {
         capacity: $total_capacity,
         percentage: ($percentage | tonumber)
       },
-      components: {
-        system_prompt: $system_prompt,
-        system_tools: $system_tools,
-        reserved: $reserved,
-        mcp_tools: $mcp_tools,
-        custom_agents: $custom_agents,
-        memory_files: $memory_files,
-        free_space: $free_space
-      } | with_entries(select(.value != null))
+      components: $components
     }'
 }
 

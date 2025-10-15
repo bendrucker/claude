@@ -15,6 +15,7 @@
     ],
     "deny": []
   },
+  "model": "sonnet[1m]",
   "hooks": {
     "PostToolUse": [
       {
@@ -54,7 +55,17 @@
             "command": "~/.claude/hooks/github/fetch.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__github__(create|update)_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pull-request/instructions.sh"
+          }
+        ]
       }
     ]
-  }
+  },
+  "alwaysThinkingEnabled": false
 }

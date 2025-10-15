@@ -34,7 +34,8 @@ fi
 [[ ! -f "$transcript_path" ]] && exit 0
 
 # Read guidelines file
-guidelines_file="$HOME/.claude/memory/tasks/pull-request.md"
+script_dir="$(dirname "$0")"
+guidelines_file="$script_dir/../../memory/tasks/pull-request.md"
 [[ ! -f "$guidelines_file" ]] && exit 0
 
 # Get the first line of guidelines as a marker

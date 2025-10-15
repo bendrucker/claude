@@ -15,7 +15,7 @@
     ],
     "deny": []
   },
-  "model": "sonnet[1m]",
+  "model": "opusplan",
   "hooks": {
     "PostToolUse": [
       {

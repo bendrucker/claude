@@ -12,6 +12,17 @@ description: Python coding standards, best practices, type hints, and testing pa
 - Run scripts with `uv run <script>`.
 - Add dependencies with `uv add <package>`.
 
+## Documentation
+
+When users ask about Python standard library modules, use `WebFetch` to get the latest official documentation from `docs.python.org`.
+
+Example:
+- For `asyncio`: `https://docs.python.org/3/library/asyncio.html`
+- For `typing`: `https://docs.python.org/3/library/typing.html`
+- For `pathlib`: `https://docs.python.org/3/library/pathlib.html`
+
+Pattern: `https://docs.python.org/3/library/<module>.html`
+
 ## Type Hints
 
 - **Always** use type hints for function signatures, class attributes, and variables where the type is not immediately obvious.

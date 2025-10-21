@@ -1,3 +1,7 @@
+---
+name: json
+description: JSON processing and handling best practices using jq. Use when working with JSON data, parsing JSON files, generating JSON output, or processing JSON from APIs.
+---
 # JSON
 
 - ALWAYS use `jq` for producing JSON output to ensure validity.

@@ -1,3 +1,7 @@
+---
+name: go
+description: Go language coding standards, best practices, and testing patterns. Use when writing or reviewing Go code, implementing tests, or discussing Go language features.
+---
 # Go
 
 - Use the latest Go language features within the version given in `go.mod`.

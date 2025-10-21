@@ -1,10 +1,10 @@
 ---
 name: pull-request
-description: GitHub pull request formatting guidelines. Use when creating or updating pull requests, writing PR descriptions, or formatting PR titles and bodies.
+description: Code review request formatting guidelines for GitHub pull requests, GitLab merge requests, and Gerrit change requests. Use when creating or updating pull requests, merge requests, change requests, or writing PR/MR descriptions and titles.
 ---
-# Pull Request Guidelines
+# Code Review Request Guidelines
 
-Use these guidelines when creating GitHub pull requests:
+Use these guidelines when creating pull requests (GitHub), merge requests (GitLab), or change requests (Gerrit):
 
 ### Title
 
@@ -15,7 +15,7 @@ Use these guidelines when creating GitHub pull requests:
 ### Body
 
 - Start with 1-3 sentences summarizing the change. Go straight into the description, without a preceding header.
-- Use `##` sections for larger PRs. Include one or more of the following sections as appropriate. Sections can have multiple subsections if subgroups are present.
+- Use `##` sections for larger changes. Include one or more of the following sections as appropriate. Sections can have multiple subsections if subgroups are present.
 
   - `## Issue`: Root cause analysis, link existing issues. Use this for bug fixes, which should include a related issue.
   - `## Changes`: High-level bulleted description of changes made.
@@ -31,6 +31,6 @@ Use these guidelines when creating GitHub pull requests:
     - High level summary of any tests added or modified.
     - Nw testing patterns or significant coverage changes.
     - Checklist of manual test steps as `###`.
-  - `## References`: ONLY include if there are relevant links or related issues/PRs.
-    - Bulleted list of links or related issues/PRs
-    - Use `Closes #<issue>` if the PR closes an issue
+  - `## References`: ONLY include if there are relevant links or related issues.
+    - Bulleted list of links or related issues and code reviews
+    - Use `Closes #<issue>` if the change closes an issue

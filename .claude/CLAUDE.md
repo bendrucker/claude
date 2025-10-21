@@ -24,12 +24,6 @@ Adhere to these guidelines when performing your work.
 - Store temporary files in `tmp/` directory.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
 
-## Tasks
-
-Guidelines for common tasks you will need to perform:
-
-* Pull Request (PR): @memory/tasks/pull-request.md
-
 ## Tools
 
 - Bash (`bash`): @memory/tools/bash.md

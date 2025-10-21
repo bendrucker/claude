@@ -18,5 +18,4 @@ allowed-tools: Bash(gh:*), mcp__github
   - Example: aws-provider-v6
   - Example: refactor-user-service
 - Commit first if there are no staged changes. Follow the same format for the commit message as for the pull request title.
-- Follow instructions in @../memory/tasks/pull-request.md.
 - When you're done, after summarizing the pull request URL, checkout the default branch.

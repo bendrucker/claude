@@ -10,7 +10,7 @@ description: Python coding standards, best practices, type hints, and testing pa
 
 - Use `uv` for dependency management and package execution instead of virtual environments.
 - Run scripts with `uv run <script>`.
-- Install dependencies with `uv pip install`.
+- Add dependencies with `uv add <package>`.
 
 ## Type Hints
 
@@ -59,7 +59,4 @@ def test_uppercase(input_value: str, expected: str) -> None:
 ## Code Style
 
 - Follow PEP 8 conventions.
-- Use descriptive variable and function names.
-- Prefer explicit over implicit.
 - Use f-strings for string formatting.
-- Use context managers (`with` statements) for resource management.

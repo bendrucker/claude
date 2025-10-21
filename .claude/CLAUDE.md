@@ -32,13 +32,6 @@ Adhere to these guidelines when performing your work.
 - Graphite (`gt`): @memory/tools/graphite.md
 - Gemini CLI (`gemini`): @memory/tools/gemini.md
 
-## Languages
-
-- Shell: @memory/languages/shell.md
-- TypeScript: @memory/languages/typescript.md
-- Go: @memory/languages/go.md
-- JSON: @memory/languages/json.md
-
 ## Personal Details
 
 - Standard username: `@bendrucker`. Refer to any actions performed by this user as "you."

@@ -6,18 +6,17 @@ allowed-tools: Bash(gh:*), mcp__github
 ---
 # Pull Request
 
-## Guidelines
+Use these guidelines when creating or updating pull requests (PRs), merge requests (MRs), or change requests (CRs):
 
-Use these guidelines when creating pull requests (PRs), merge requests (MRs), or change requests (CRs):
-
-### Title
+## Title
 
 - Use `$subject: $summary` format (e.g., `fix: add timeout to request`)
 - Keep under 50 characters, max 100
 - Use imperative mood, lowercase except proper nouns
 
-### Body
+## Body
 
+- Use strategy in `context.md` to obtain context about the change if the conversation does not provide enough information.
 - Start with 1-3 sentences summarizing the change. Go straight into the description, without a preceding header.
 - Use `##` sections for larger changes. Include one or more of the following sections as appropriate. Sections can have multiple subsections if subgroups are present.
 
@@ -38,3 +37,7 @@ Use these guidelines when creating pull requests (PRs), merge requests (MRs), or
   - `## References`: ONLY include if there are relevant links or related issues.
     - Bulleted list of links or related issues and code reviews
     - Use `Closes #<issue>` if the change closes an issue
+
+## Workflow
+
+See [`workflow.md`](./workflow.md) for instructions on how to create a new pull request.

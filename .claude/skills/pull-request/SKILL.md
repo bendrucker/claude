@@ -1,11 +1,14 @@
 ---
 name: pull-request
 description: |
-  Formatting and content guidelines for GitHub pull requests and equivalents (GitLab: merge request, Gerrit: change request). MUST be used anytime you are creating or updating a pull request's body (description) and title.
+  Create a GitHub pull request (PR) with proper formatting and content guidelines. Use when creating or updating pull requests/PRs (or GitLab merge requests/MRs, Gerrit change requests/CRs).
+allowed-tools: Bash(gh:*), mcp__github
 ---
-# Pull Request Guidelines
+# Pull Request
 
-Use these guidelines when creating pull requests (GitHub), merge requests (GitLab), or change requests (Gerrit):
+## Guidelines
+
+Use these guidelines when creating pull requests (PRs), merge requests (MRs), or change requests (CRs):
 
 ### Title
 

@@ -1,105 +1,135 @@
 ---
 name: claude-skills
-description: Guide for creating, structuring, and troubleshooting Claude Code Skills. Use this skill whenever creating new skills, converting content to skills, or modifying existing skills to ensure proper structure and best practices.
+description: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows. Use when creating new skills, converting memory files to skills, debugging skill activation, or understanding skill architecture and best practices.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, WebFetch(domain:docs.claude.com)]
 ---
 
 # Claude Code Skills Development
 
-This skill provides guidance and reference documentation for developing Claude Code Skills.
+Reference documentation for developing effective Claude Code Skills. The context window is a public good - only include information Claude doesn't already possess.
 
-## Reference Documentation
+## Core Principles
 
-Complete official documentation: [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills.md)
+**Conciseness**: Keep `SKILL.md` under 500 lines. Use progressive disclosure - split detailed content into separate files loaded on-demand.
 
-## Quick Reference
+**Appropriate Freedom**: Match specificity to task fragility:
+- Text instructions for flexible tasks
+- Pseudocode for moderate variation
+- Specific scripts for error-prone operations
 
-### Skill Structure
+**Cross-Model Testing**: Validate skills across Haiku, Sonnet, and Opus for effectiveness.
+
+## Skill Structure
 
 ```yaml
 ---
 name: skill-name
-description: What it does and when Claude should use it
+description: Third-person capability description with trigger terms
 allowed-tools: [Optional tool restrictions]
 ---
 
-# Skill content in markdown
+# Overview and navigation (SKILL.md stays minimal)
 ```
 
 ### Storage Locations
 
-- **Personal Skills**: `~/.claude/skills/`
-- **Project Skills**: `.claude/skills/` (shared via git)
-- **Plugin Skills**: bundled with installed plugins
+- **Personal**: `~/.claude/skills/`
+- **Project**: `.claude/skills/` (shared via git)
+- **Plugin**: Bundled with installed plugins
 
-### Critical: The Description Field
+### Description Best Practices
 
-The description determines when Claude activates the skill. Include:
+Write in third person to avoid system prompt conflicts:
+
+✓ "Analyzing spreadsheets and generating reports from Excel files. Use when working with XLSX files, data analysis, or report generation."
+
+✗ "I can help you analyze spreadsheets..."
+
+Include:
 - What the skill does
-- Specific trigger phrases
-- Use cases and context
+- Specific trigger terms
+- Key use cases
 
-## Workflow for Creating Skills
+## Information Architecture
 
-When helping users create new skills:
+**Progressive Disclosure Pattern**:
+```
+skill-name/
+├── SKILL.md (overview, navigation only)
+├── REFERENCE.md (detailed info, loaded as needed)
+├── EXAMPLES.md (usage examples)
+└── scripts/ (executable utilities)
+```
 
-1. **Understand the purpose**
-   - What capability does this skill provide?
-   - When should it activate?
-   - What are the trigger phrases?
+**File References**: Keep one level deep from `SKILL.md`. Avoid nested references that cause partial reads.
 
-2. **Draft the description**
-   - Be specific and include triggers
-   - Mention use cases explicitly
-   - Example: "Generate PDF reports from markdown files. Use when creating PDFs, generating reports, or converting markdown to PDF format."
+**Table of Contents**: Include in reference files exceeding 100 lines.
 
-3. **Determine tool restrictions** (optional)
-   - Does this skill need write access?
-   - Should it be read-only? (`[Read, Grep, Glob]`)
-   - Does it need shell access?
+## Content Guidelines
 
-4. **Create the structure**
-   - `mkdir -p ~/.claude/skills/skill-name` or `.claude/skills/skill-name`
-   - Create `SKILL.md` with frontmatter
-   - Add supporting files if needed (scripts, templates, docs)
+**Consistent Terminology**: Choose one term per concept. Always "API endpoint," not mixing with "URL" or "path."
 
-5. **Write documentation**
-   - Clear usage instructions
-   - Prerequisites
-   - Examples
-   - Troubleshooting if applicable
+**Examples Over Description**: Provide input/output pairs showing desired style and detail level.
 
-6. **Test activation**
-   - Use trigger phrases from description
-   - Verify Claude activates it correctly
-   - Test edge cases
+**Workflows with Checklists**: For complex tasks, provide copyable checklists Claude can track:
+```
+Step 1: Analyze form (run analyze_form.py)
+Step 2: Create mapping structure
+Step 3: Apply transformations
+```
+
+**Avoid Time-Sensitive Info**: Use "Old Patterns" sections for deprecated methods rather than time-based conditionals.
+
+## Development Workflow
+
+1. **Create Representative Tests**: Define three test scenarios before extensive documentation
+
+2. **Measure Baseline**: Test performance without skill to identify improvement areas
+
+3. **Iterative Development**: Use one Claude instance to create/refine skill content while testing with another on real tasks
+
+4. **Observe Navigation**: Monitor how Claude uses the skill - unexpected file access indicates structure issues
+
+5. **Refine Based on Behavior**: Adjust based on observed gaps and patterns
+
+## Executable Code Best Practices
+
+**Error Handling**: Handle conditions explicitly rather than failing and requiring intervention.
+
+**Justified Constants**: Document why parameters exist:
+```python
+# Three retries balances reliability vs speed
+# Most failures resolve by second retry
+MAX_RETRIES = 3
+```
+
+**Deterministic vs Reference**: Clarify intent:
+- "Run analyze_form.py" (execute)
+- "See analyze_form.py" (read as reference)
+
+**MCP Tool Names**: Use fully qualified format: `ServerName:tool_name`
+
+**Package Dependencies**: List required packages and verify availability.
 
 ## Common Patterns
 
-### Read-Only Skills
-
-For reference documentation or code analysis:
+### Read-Only Reference Skills
 
 ```yaml
 allowed-tools: [Read, Grep, Glob]
 ```
 
-### Script-Based Skills
+For documentation and code analysis.
 
-For skills that execute scripts:
+### Script-Based Skills
 
 ```yaml
 allowed-tools: [Read, Bash, Write]
 ```
 
-Then reference scripts in the skill content:
-```bash
-./scripts/deploy.sh
-```
+Reference scripts with forward slashes: `scripts/helper.py`
 
 ### Template-Based Skills
-
-For generating files from templates:
 
 ```yaml
 allowed-tools: [Read, Write, Edit]
@@ -107,18 +137,27 @@ allowed-tools: [Read, Write, Edit]
 
 Store templates in `templates/` directory.
 
+## Anti-Patterns to Avoid
+
+- Windows-style paths (use forward slashes everywhere)
+- Too many options (provide one default with escape hatches)
+- Vague descriptions ("Helps with documents")
+- Deeply nested references
+- Scripts that punt errors to Claude
+- Time-based conditionals
+
 ## Troubleshooting
 
 ### Skill Not Activating
 
-1. Check description specificity
-2. Verify YAML syntax (no tabs, proper `---` delimiters)
+1. Verify description includes specific trigger terms
+2. Check YAML syntax (no tabs, proper `---` delimiters)
 3. Confirm file location
 4. Test with explicit trigger phrases
 
 ### YAML Errors
 
-- No tabs, only spaces
+- Use spaces, never tabs
 - Quote strings with special characters
 - Proper `---` delimiters
 
@@ -128,10 +167,23 @@ Store templates in `templates/` directory.
 - Verify paths exist
 - Use `~` for home directory in personal skills
 
-## Best Practices
+## Final Checklist
 
-1. **Keep skills focused** - One capability per skill
-2. **Write discoverable descriptions** - Include specific triggers
-3. **Test thoroughly** - Verify activation works
-4. **Document well** - Clear usage instructions
-5. **Version changes** - Track modifications over time
+Before deploying a skill:
+
+✓ Third-person description with specific trigger terms
+✓ `SKILL.md` under 500 lines
+✓ One-level-deep file references
+✓ Consistent terminology throughout
+✓ Concrete examples provided
+✓ Progressive disclosure structure
+✓ Clear workflows with steps
+✓ Scripts with explicit error handling
+✓ All package dependencies listed
+✓ Tested across Haiku/Sonnet/Opus
+✓ Real-world scenario validation
+
+## Additional Resources
+
+- [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills.md)
+- [Agent Skills Best Practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices.md)

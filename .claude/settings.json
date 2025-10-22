@@ -15,7 +15,6 @@
     ],
     "deny": []
   },
-  "model": "opusplan",
   "hooks": {
     "PostToolUse": [
       {

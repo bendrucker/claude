@@ -1,7 +1,5 @@
 # Claude
 
-Adhere to these guidelines when performing your work. 
-
 ## Style
 
 - Prefer concise, direct responses.
@@ -20,17 +18,10 @@ Adhere to these guidelines when performing your work.
 
 ## Workflow
 
+- The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.
 - When executing build commands, output to `/dev/null` to avoid creating binaries.
 - Store temporary files in `tmp/` directory.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
-
-## Tools
-
-- Bash (`bash`): @memory/tools/bash.md
-- Git (`git`): @memory/tools/git.md
-- GitHub (`gh`): @memory/tools/github.md
-- Graphite (`gt`): @memory/tools/graphite.md
-- Gemini CLI (`gemini`): @memory/tools/gemini.md
 
 ## Personal Details
 

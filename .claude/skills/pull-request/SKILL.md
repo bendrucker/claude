@@ -1,8 +1,9 @@
 ---
 name: pull-request
-description: Code review request formatting guidelines for GitHub pull requests, GitLab merge requests, and Gerrit change requests. Use when creating or updating pull requests, merge requests, change requests, or writing PR/MR descriptions and titles.
+description: |
+  Formatting and content guidelines for GitHub pull requests and equivalents (GitLab: merge request, Gerrit: change request). MUST be used anytime you are creating or updating a pull request's body (description) and title.
 ---
-# Code Review Request Guidelines
+# Pull Request Guidelines
 
 Use these guidelines when creating pull requests (GitHub), merge requests (GitLab), or change requests (Gerrit):
 

@@ -150,14 +150,13 @@ for (const issue of issues.nodes) {
 }
 ```
 
-## Schema Exploration
-
-The API supports introspection. Use GraphQL tools or the Linear API reference to explore available types, fields, and mutations:
-
-https://linear.app/developers/api
-
 ## Reference
 
-- [Linear GraphQL Documentation](https://linear.app/developers/graphql.md)
-- [Linear API Reference](https://linear.app/developers/api)
+- [Linear GraphQL Documentation](https://linear.app/developers/graphql)
 - [Linear SDK](https://github.com/linear/linear/tree/master/packages/sdk)
+
+Use GraphQL introspection to discover the API schema:
+
+```bash
+LINEAR_API_KEY=lin_api_xxx npx tsx scripts/query.ts "{ __schema { types { name description } } }"
+```

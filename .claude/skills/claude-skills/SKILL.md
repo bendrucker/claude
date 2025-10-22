@@ -1,6 +1,6 @@
 ---
 name: claude-skills
-description: Reference documentation for developing Claude Code Skills. Use when creating new skills, debugging skill activation, or understanding skill architecture and best practices.
+description: Guide for creating, structuring, and troubleshooting Claude Code Skills. Use this skill whenever creating new skills, converting content to skills, or modifying existing skills to ensure proper structure and best practices.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, WebFetch(domain:docs.claude.com)]
 ---
 

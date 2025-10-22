@@ -4,6 +4,11 @@ Complete documentation for Things 3 automation via AppleScript and JavaScript fo
 
 **Source**: Things3.sdef (AppleScript dictionary from Things.app)
 
+**Extract sdef**:
+```bash
+sdef /Applications/Things3.app > Things3.sdef
+```
+
 ## Table of Contents
 
 1. [Application Object](#application-object)

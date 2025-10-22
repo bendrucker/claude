@@ -2,6 +2,8 @@
 
 Complete documentation for Things 3 automation via AppleScript and JavaScript for Automation (JXA).
 
+**Source**: Things3.sdef (AppleScript dictionary from Things.app)
+
 ## Table of Contents
 
 1. [Application Object](#application-object)

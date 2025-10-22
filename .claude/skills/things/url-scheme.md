@@ -2,6 +2,8 @@
 
 Complete documentation for Things 3 automation via URL schemes.
 
+**Source**: [Things URL Scheme](https://culturedcode.com/things/support/articles/2803573/)
+
 ## Table of Contents
 
 1. [URL Scheme Commands](#url-scheme-commands)

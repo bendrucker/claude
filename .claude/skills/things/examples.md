@@ -230,60 +230,27 @@ if (project) {
 
 ## Updating Todos
 
+**Prerequisite**: `AUTH_TOKEN=$(security find-generic-password -a "$USER" -s "things-auth-token" -w)` (see `@1password.md` for setup)
+
 ### Append Notes
 
 ```bash
-# First get the todo ID
 todo_id=$(osascript -l JavaScript -e '
 const app = Application("Things3");
-const today = app.lists.byId("TMTodayListSource");
-const todo = today.toDos().whose({name: "Call dentist"})[0];
+const todo = app.lists.byId("TMTodayListSource").toDos().whose({name: "Call dentist"})[0];
 todo ? todo.id() : "";
 ')
-
-# Then update with auth token
-auth_token="YOUR_AUTH_TOKEN"
-open "things:///update?id=$todo_id&auth-token=$auth_token&append-notes=Appointment%20at%202pm"
+open "things:///update?id=$todo_id&auth-token=$AUTH_TOKEN&append-notes=Appointment%20at%202pm"
 ```
 
-### Add Tags
+### Add Tags / Move / Reschedule / Complete
 
 ```bash
-todo_id="ABC-123"
-auth_token="YOUR_AUTH_TOKEN"
-open "things:///update?id=$todo_id&auth-token=$auth_token&add-tags=Urgent,Important"
-```
-
-### Move to Different Project
-
-```bash
-todo_id="ABC-123"
-auth_token="YOUR_AUTH_TOKEN"
-open "things:///update?id=$todo_id&auth-token=$auth_token&list=New%20Project"
-```
-
-### Reschedule Todo
-
-```bash
-todo_id="ABC-123"
-auth_token="YOUR_AUTH_TOKEN"
-open "things:///update?id=$todo_id&auth-token=$auth_token&when=tomorrow"
-```
-
-### Mark Complete
-
-```bash
-todo_id="ABC-123"
-auth_token="YOUR_AUTH_TOKEN"
-open "things:///update?id=$todo_id&auth-token=$auth_token&completed=true"
-```
-
-### Add Checklist Items
-
-```bash
-todo_id="ABC-123"
-auth_token="YOUR_AUTH_TOKEN"
-open "things:///update?id=$todo_id&auth-token=$auth_token&append-checklist-items=New%20item%201%0aNew%20item%202"
+open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&add-tags=Urgent,Important"
+open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&list=New%20Project"
+open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&when=tomorrow"
+open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&completed=true"
+open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&append-checklist-items=Item%201%0aItem%202"
 ```
 
 ## Navigation
@@ -381,20 +348,14 @@ open "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 ### Bulk Tag All Inbox Items
 
 ```bash
-auth_token="YOUR_AUTH_TOKEN"
-
-# Get all inbox todo IDs
 todo_ids=$(osascript -l JavaScript -e '
 const app = Application("Things3");
-const inbox = app.lists.byId("TMInboxListSource");
-const ids = inbox.toDos().map(todo => todo.id());
-JSON.stringify(ids);
+JSON.stringify(app.lists.byId("TMInboxListSource").toDos().map(t => t.id()));
 ' | jq -r '.[]')
 
-# Tag each one
 for todo_id in $todo_ids; do
-  open "things:///update?id=$todo_id&auth-token=$auth_token&add-tags=Needs%20Review"
-  sleep 0.1  # Rate limiting
+  open "things:///update?id=$todo_id&auth-token=$AUTH_TOKEN&add-tags=Needs%20Review"
+  sleep 0.1
 done
 ```
 

@@ -13,6 +13,10 @@ Interact with Things 3, the user's personal task manager for Mac.
 - **Read operations**: Use JXA (JavaScript for Automation) via `osascript -l JavaScript`
 - **Write operations**: Use `things://` URL schemes (`things:///add`, `things:///json`)
 - **Updates**: Require auth token from Things > Settings > General
+  - **Auth token**: Store in keychain for automated access: `security find-generic-password -a "$USER" -s "things-auth-token" -w`
+  - **Initial setup**: Get token from 1Password and store in keychain (one-time, see `@1password.md`)
+  - **Background processes**: Keychain access works without prompts for launchd agents and automation
+  - See `@1password.md` for setup and authentication guide
 - **URL encoding**: Always URL-encode parameters (spaces → `%20`, newlines → `%0a`)
 
 ## Common Operations
@@ -66,7 +70,8 @@ JSON.stringify(todos, null, 2);
 ### Update a Todo
 
 ```bash
-open "things:///update?id=ABC-123&auth-token=YOUR_TOKEN&append-notes=More%20info"
+AUTH_TOKEN=$(security find-generic-password -a "$USER" -s "things-auth-token" -w)
+open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&append-notes=More%20info"
 ```
 
 ### Navigate to List
@@ -81,6 +86,7 @@ open "things:///show?id=today"
 
 - Complete URL scheme reference: `@url-scheme.md`
 - JXA object model and properties: `@jxa.md`
+- 1Password authentication setup: `@1password.md`
 - Usage examples: `@examples.md`
 
 ## Quick Reference

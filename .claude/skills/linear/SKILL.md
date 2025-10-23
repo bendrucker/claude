@@ -11,6 +11,14 @@ allowed-tools:
 
 Tools and workflows for managing issues, projects, and teams in Linear.
 
+## Tool Selection
+
+Choose the right tool for the task:
+
+1. **MCP tools** - Use for simple operations (create/update/query single issues, basic filters)
+2. **SDK scripts** - Use for complex operations (loops, bulk updates, conditional logic, data transformations)
+3. **GraphQL API** - Fallback for operations not supported by MCP or SDK
+
 ## Conventions
 
 ### Issue Status
@@ -62,9 +70,19 @@ await linear.create_issue({
 })
 ```
 
+## SDK Automation Scripts
+
+**Use only when MCP tools are insufficient.** For complex operations involving loops, mapping, or bulk updates, write TypeScript scripts using `@linear/sdk`. See `sdk.md` for:
+
+- Complete script patterns and templates
+- Common automation examples (bulk updates, filtering, reporting)
+- Tool selection criteria
+
+Scripts provide full type hints and are easier to debug than raw GraphQL for multi-step operations.
+
 ## GraphQL API
 
-For advanced queries not supported by the MCP, see `api.md` for documentation on using the Linear GraphQL API directly.
+**Fallback only.** Use when operations aren't supported by MCP or SDK. See `api.md` for documentation on using the Linear GraphQL API directly.
 
 ### Ad-Hoc Queries
 

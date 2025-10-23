@@ -10,6 +10,22 @@
 
 import { LinearClient } from '@linear/sdk';
 
+interface GraphQLErrorResponse {
+  errors: Array<{
+    message: string;
+    locations?: Array<{ line: number; column: number }>;
+    path?: Array<string | number>;
+  }>;
+}
+
+function hasGraphQLErrors(error: unknown): error is Error & GraphQLErrorResponse {
+  return (
+    error instanceof Error &&
+    'errors' in error &&
+    Array.isArray((error as Record<string, unknown>).errors)
+  );
+}
+
 async function main() {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -52,15 +68,12 @@ async function main() {
   } catch (error) {
     console.error('Error executing query:');
 
-    if (error instanceof Error) {
+    if (hasGraphQLErrors(error)) {
       console.error(error.message);
-
-      // Linear SDK errors may include GraphQL errors
-      const graphqlError = error as any;
-      if (graphqlError.errors) {
-        console.error('\nGraphQL Errors:');
-        console.error(JSON.stringify(graphqlError.errors, null, 2));
-      }
+      console.error('\nGraphQL Errors:');
+      console.error(JSON.stringify(error.errors, null, 2));
+    } else if (error instanceof Error) {
+      console.error(error.message);
     } else {
       console.error(error);
     }

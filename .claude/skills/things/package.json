@@ -1,0 +1,21 @@
+{
+  "name": "things",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "types:generate": "sdef-to-dts /Applications/Things3.app --output src/Things3.d.ts",
+    "build": "esbuild src/example.ts --bundle --platform=neutral --format=iife --log-level=error > /dev/null"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@jxa/global-type": "^1.4.0",
+    "@jxa/run": "^1.4.0",
+    "@jxa/sdef-to-dts": "^1.4.0",
+    "@types/node": "^24.9.1",
+    "esbuild": "^0.25.11"
+  }
+}

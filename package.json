@@ -2,6 +2,9 @@
   "name": "@bendrucker/claude",
   "private": true,
   "type": "module",
+  "workspaces": [
+    ".claude/skills/*"
+  ],
   "scripts": {
     "build": "tsc --noEmit",
     "lint:commands": "remark .claude/commands/*.md"

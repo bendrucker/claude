@@ -11,15 +11,16 @@ sdef /Applications/Things3.app > Things3.sdef
 
 ## Table of Contents
 
-1. [Application Object](#application-object)
-2. [List Object](#list-object)
-3. [To Do Object](#to-do-object)
-4. [Project Object](#project-object)
-5. [Area Object](#area-object)
-6. [Tag Object](#tag-object)
-7. [Contact Object](#contact-object)
-8. [Status Enumeration](#status-enumeration)
-9. [Common Patterns](#common-patterns)
+- [Application Object](#application-object)
+- [List Object](#list-object)
+- [To Do Object](#to-do-object)
+- [Project Object](#project-object)
+- [Area Object](#area-object)
+- [Tag Object](#tag-object)
+- [Contact Object](#contact-object)
+- [Status Enumeration](#status-enumeration)
+- [Common Patterns](#common-patterns)
+- [Detecting Repeating Tasks](#detecting-repeating-tasks)
 
 ---
 
@@ -573,3 +574,133 @@ JSON.stringify({
   todos: openTodos
 }, null, 2);
 ```
+
+---
+
+## Detecting Repeating Tasks
+
+Things does not expose repeating task configuration through JXA. However, repeating task instances can be reliably detected using a simple heuristic.
+
+### Detection Rule
+
+**A task is a repeating instance if `creationDate` is at midnight local time (00:00:00 in the local timezone).**
+
+When Things auto-generates a task from a repeating template, it sets the `creationDate` to midnight on the day the task is created. This is the reliable indicator that distinguishes repeating instances from manually created tasks, which have creation timestamps reflecting the actual time they were created.
+
+### How Repeating Tasks Work
+
+When a repeating task generates a new instance:
+1. Things creates a new todo with the same name as the template
+2. The new instance has `creationDate` set to midnight (00:00:00) in local time
+3. Manually created tasks have `creationDate` timestamps with non-zero hours/minutes/seconds
+4. The original template remains elsewhere with `activationDate: null`
+
+**Example:**
+```javascript
+const app = Application("Things3");
+const today = app.lists.byId("TMTodayListSource");
+
+// Check if a task is a repeating instance
+const todo = today.toDos()[0];
+const props = todo.properties();
+
+const isRepeatingInstance = props.creationDate &&
+  props.creationDate.getHours() === 0 &&
+  props.creationDate.getMinutes() === 0 &&
+  props.creationDate.getSeconds() === 0;
+
+if (isRepeatingInstance) {
+  console.log(`${props.name} is a repeating task instance`);
+}
+```
+
+### Finding Repeating Templates
+
+Templates are todos with `activationDate: null`:
+
+```javascript
+const app = Application("Things3");
+
+// Get all repeating templates
+const templates = app.toDos()
+  .filter(todo => {
+    const props = todo.properties();
+    return props.activationDate === null && props.status === "open";
+  })
+  .map(todo => {
+    const props = todo.properties();
+    return {
+      id: props.id,
+      name: props.name,
+      creationDate: props.creationDate
+    };
+  });
+
+JSON.stringify(templates, null, 2);
+```
+
+### Matching Instances to Templates
+
+To confirm a task is repeating, find its template:
+
+```javascript
+const app = Application("Things3");
+
+function findRepeatingTemplate(taskName) {
+  return app.toDos()
+    .filter(todo => {
+      const props = todo.properties();
+      return props.name === taskName &&
+             props.activationDate === null &&
+             props.status === "open";
+    })[0];
+}
+
+// Check if today's task is repeating
+const today = app.lists.byId("TMTodayListSource");
+const task = today.toDos()[0];
+const taskProps = task.properties();
+
+const template = findRepeatingTemplate(taskProps.name);
+
+if (template) {
+  console.log(`${taskProps.name} is a repeating task`);
+  console.log(`Template ID: ${template.id()}`);
+}
+```
+
+### Filtering Out Repeating Tasks
+
+Exclude repeating instances from processing:
+
+```javascript
+const app = Application("Things3");
+const today = app.lists.byId("TMTodayListSource");
+
+const nonRepeatingTasks = today.toDos()
+  .filter(todo => {
+    const props = todo.properties();
+
+    // Keep tasks with missing dates
+    if (!props.creationDate) return true;
+
+    // Filter out repeating instances (created at midnight)
+    return props.creationDate.getHours() !== 0 ||
+           props.creationDate.getMinutes() !== 0 ||
+           props.creationDate.getSeconds() !== 0;
+  })
+  .map(todo => ({
+    id: todo.id(),
+    name: todo.name()
+  }));
+
+JSON.stringify(nonRepeatingTasks, null, 2);
+```
+
+### Key Insights
+
+- **Repeating instance**: `creationDate` is at midnight (00:00:00 local time)
+- **Manual task**: `creationDate` has non-zero hours/minutes/seconds
+- **Template Signature**: `activationDate: null` (templates are not scheduled)
+- **No Direct Link**: Things doesn't expose template-to-instance relationships via JXA
+- **Name Matching**: Templates and instances share the same `name`

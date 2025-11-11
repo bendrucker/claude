@@ -30,10 +30,18 @@ Use these guidelines when creating or updating pull requests (PRs), merge reques
     - Include refactoring or cleanup changes as separate bullet points.
       - Example: Refactors `UserService` to use dependency injection.
       - Example: Extracts repeated user getter logic into `UserRepository`.
-  - `## Testing`: Only include if tests were added/modified or if we discussed manual testing steps. Do not repeat obvious statements (❌ "existing tests pass" ❌) or meta-information (❌ "3 unit tests" ❌). Do include, where applicable:
-    - High level summary of any tests added or modified.
-    - Nw testing patterns or significant coverage changes.
-    - Checklist of manual test steps as `###`.
+  - `## Testing`: Only include if tests were added/modified or if manual testing was performed. Omit this section entirely if no testing discussion occurred.
+    - Focus on qualitative insights about test coverage and approach, not quantity or CI status.
+    - Good examples:
+      - ✓ "Tests cover error handling for malformed JSON responses"
+      - ✓ "Added integration tests that verify the full request/response cycle"
+      - ✓ "Extended existing auth tests to cover the new OAuth flow"
+      - ✓ "Manually verified behavior with screen reader on iOS Safari"
+    - Bad examples (avoid these):
+      - ✗ "All tests passed" (CI status already shows this)
+      - ✗ "Added 5 unit tests" (quantity is unimportant)
+      - ✗ "Tests work correctly" (too vague)
+    - Include manual testing steps as `###` checklist only if they were actually performed or discussed.
   - `## References`: ONLY include if there are relevant links or related issues.
     - Bulleted list of links or related issues and code reviews
     - Use `Closes #<issue>` if the change closes an issue

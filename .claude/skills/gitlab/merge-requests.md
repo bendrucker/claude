@@ -7,6 +7,7 @@ Everything for working with GitLab merge requests via `glab mr`.
 | GitHub (`gh pr`) | GitLab (`glab mr`) | Notes |
 |------------------|-------------------|-------|
 | `gh pr create` | `glab mr create` | Use `--fill` to auto-fill from commits |
+| `gh pr edit` | `glab mr update` | Update MR title, description, labels, etc. |
 | `gh pr list` | `glab mr list` | List merge requests |
 | `gh pr view <number>` | `glab mr view <id>` | View MR details |
 | `gh pr checkout <number>` | `glab mr checkout <id>` | Checkout MR branch |
@@ -64,6 +65,42 @@ glab mr create --reviewer "@user1,@user2" --fill
 glab mr create --fill --yes
 ```
 
+## Updating Merge Requests
+
+```bash
+# Update title and description
+glab mr update 123 \
+  --title "New title" \
+  --description "New description"
+
+# Update with commit info (like create --fill)
+glab mr update 123 --fill --yes
+
+# Mark as ready (remove draft status)
+glab mr update 123 --ready
+
+# Mark as draft
+glab mr update 123 --draft
+
+# Add/remove assignees
+glab mr update 123 --assignee "@user1,@user2"
+
+# Add/remove reviewers
+glab mr update 123 --reviewer "@user1"
+
+# Add labels
+glab mr update 123 --label "bugfix,urgent"
+
+# Toggle remove source branch on merge
+glab mr update 123 --remove-source-branch
+
+# Toggle squash commits on merge
+glab mr update 123 --squash-before-merge
+
+# Update current branch's MR
+glab mr update --ready
+```
+
 ## Viewing and Managing
 
 ```bash
@@ -114,6 +151,15 @@ glab mr merge 123
 
 # Merge and remove source branch
 glab mr merge 123 --remove-source-branch
+
+# Enable auto-merge (merges when pipeline passes)
+glab mr merge 123 --auto-merge
+
+# Merge with custom commit message
+glab mr merge 123 --message "Custom merge commit message"
+
+# Rebase and merge
+glab mr merge 123 --rebase
 
 # Close without merging
 glab mr close 123

@@ -7,7 +7,7 @@ Using GitLab REST and GraphQL APIs via `glab api`.
 | GitHub (`gh api`) | GitLab (`glab api`) | Notes |
 |-------------------|---------------------|-------|
 | `gh api <endpoint>` | `glab api <endpoint>` | Make REST API requests |
-| N/A | `glab api graphql` | GraphQL API (first-class support) |
+| `gh api graphql` | `glab api graphql` | GraphQL API support |
 
 ## REST API
 

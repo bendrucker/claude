@@ -29,8 +29,10 @@ glab issue list --assignee=@me
 
 ## Reference Files
 
-- **commands.md**: Complete `gh` → `glab` command mappings
-- **workflows.md**: Common workflows with examples
+- **merge-requests.md**: Working with merge requests (`glab mr`)
+- **issues.md**: Managing issues (`glab issue`)
+- **ci.md**: CI/CD pipelines and jobs (`glab ci`)
+- **api.md**: REST and GraphQL API access (`glab api`)
 
 ## Key Rules
 

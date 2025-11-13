@@ -22,15 +22,13 @@ glab auth login
 git push -u origin feature-branch
 glab mr create --fill
 
-# List and view
+# List merge requests
 glab mr list
-glab issue list --assignee=@me
 ```
 
 ## Reference Files
 
 - **merge-requests.md**: Working with merge requests (`glab mr`)
-- **issues.md**: Managing issues (`glab issue`)
 - **ci.md**: CI/CD pipelines and jobs (`glab ci`)
 - **api.md**: REST and GraphQL API access (`glab api`)
 

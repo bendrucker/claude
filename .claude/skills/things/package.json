@@ -15,7 +15,7 @@
     "@jxa/global-type": "^1.4.0",
     "@jxa/run": "^1.4.0",
     "@jxa/sdef-to-dts": "^1.4.0",
-    "@types/node": "^24.9.1",
+    "@types/node": "^24.10.0",
     "esbuild": "^0.25.11"
   }
 }

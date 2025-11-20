@@ -22,6 +22,7 @@ Use these guidelines when creating or updating pull requests (PRs), merge reques
 
 - Use strategy in `context.md` to obtain context about the change if the conversation does not provide enough information.
 - Start with 1-3 sentences summarizing the change. Go straight into the description, without a preceding header.
+- **Wrap all code identifiers with backticks**: function names, method names, class names, variable names, file paths, HTTP endpoints, status codes, parameters, etc.
 - Use `##` sections for larger changes. Include one or more of the following sections as appropriate. Sections can have multiple subsections if subgroups are present.
 
   - `## Issue`: Root cause analysis, link existing issues. Use this for bug fixes, which should include a related issue.

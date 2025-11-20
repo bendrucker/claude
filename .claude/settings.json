@@ -38,6 +38,15 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/go/check.sh"
+          }
+        ]
+      },
+      {
         "matcher": "Edit|MultiEdit",
         "hooks": [
           {

@@ -11,8 +11,10 @@ Use these guidelines when creating or updating pull requests (PRs), merge reques
 ## Title
 
 - Check recent commits (`git log --oneline -20`) to determine the repo's commit style:
-  - If most commits use conventional commit prefixes (feat:, fix:, etc.), use `$type: $summary` format (e.g., `fix: add timeout to request`)
-  - Otherwise, use subject-oriented format without prefix (e.g., `add timeout to request`)
+  - **subject** (default): `${subject}: ${summary}` where subject is optional (e.g., `api: add timeout to request` or `add timeout to request`)
+  - **conventional**: `${type}: ${summary}` where type is required (e.g., `fix: add timeout to request`)
+  - Use conventional style if most commits use conventional commit prefixes (feat:, fix:, etc.)
+  - Otherwise, use subject-oriented format
 - Keep under 50 characters, max 100
 - Use imperative mood, lowercase except proper nouns
 

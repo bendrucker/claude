@@ -20,7 +20,7 @@ Describe 'Go generated file hook'
       test_file=$(mktemp)
       echo "some content" > "$test_file"
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh"
+      When run sh -c "echo '$input' | ./go/check.sh"
       The status should be success
       rm -f "$test_file"
     End
@@ -35,7 +35,7 @@ func main() {
 }
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh"
+      When run sh -c "echo '$input' | ./go/check.sh"
       The status should be success
       rm -f "$test_file"
     End
@@ -43,7 +43,7 @@ EOF
     It 'allows non-existent Go files' Tag unit
       test_file="/tmp/nonexistent-$(uuidgen).go"
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh"
+      When run sh -c "echo '$input' | ./go/check.sh"
       The status should be success
     End
 
@@ -59,7 +59,7 @@ func main() {
 }
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh 2>&1"
+      When run sh -c "echo '$input' | ./go/check.sh 2>&1"
       The status should be failure
       The output should include "Cannot modify generated Go file"
       The output should include "Update the generator code instead"
@@ -78,7 +78,7 @@ func main() {
 }
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh"
+      When run sh -c "echo '$input' | ./go/check.sh"
       The status should be success
       rm -f "$test_file"
     End
@@ -94,7 +94,7 @@ package pb
 type Test struct {}
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh 2>&1"
+      When run sh -c "echo '$input' | ./go/check.sh 2>&1"
       The status should be failure
       The output should include "Cannot modify generated Go file"
       rm -f "$test_file"
@@ -108,14 +108,14 @@ EOF
 
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh"
+      When run sh -c "echo '$input' | ./go/check.sh"
       The status should be success
       rm -f "$test_file"
     End
 
     It 'handles empty input gracefully' Tag unit
       input='{}'
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh"
+      When run sh -c "echo '$input' | ./go/check.sh"
       The status should be success
     End
 
@@ -128,7 +128,7 @@ EOF
 package main
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | /home/user/claude/.claude/hooks/go/check.sh 2>&1"
+      When run sh -c "echo '$input' | ./go/check.sh 2>&1"
       The status should be failure
       rm -f "$test_file"
     End

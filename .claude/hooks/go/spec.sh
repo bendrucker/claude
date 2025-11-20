@@ -130,6 +130,7 @@ EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
       When run sh -c "echo '$input' | ./go/check.sh 2>&1"
       The status should be failure
+      The output should include "Cannot modify generated Go file"
       rm -f "$test_file"
     End
   End

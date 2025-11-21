@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Claude Code Skill Schema",
+  "description": "Schema for Claude Code skill YAML frontmatter - https://docs.claude.com/en/docs/claude-code/skills",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the skill"
+    },
+    "description": {
+      "type": "string",
+      "description": "Third-person capability description with trigger terms"
+    },
+    "allowed-tools": {
+      "type": ["string", "array"],
+      "items": {
+        "type": "string"
+      },
+      "description": "List of tools the skill can use"
+    }
+  },
+  "required": ["name", "description"],
+  "additionalProperties": false
+}

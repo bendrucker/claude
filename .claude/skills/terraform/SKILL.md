@@ -12,15 +12,15 @@ description: Working with Terraform configuration, CLI, modules, and providers. 
 terraform version
 ```
 
-Assume modern Terraform (1.x). Key features by version:
-- **1.0+**: Stability guarantees, no breaking changes within 1.x
-- **1.3+**: Optional object attributes, `terraform test` command
-- **1.5+**: `import` blocks (preferred over CLI import), `check` blocks
-- **1.6+**: Test mocking, config-driven `remove` blocks
-- **1.7+**: Enhanced `removed` block support, improved variable validation
-- **1.8+**: Provider functions
+Assume Terraform 1.12+ (current: 1.14). All standard features are available:
+- Optional object attributes with defaults
+- Built-in testing with `terraform test`
+- `import` blocks for importing resources
+- `check` blocks for runtime validation
+- `removed` blocks for lifecycle management
+- Provider functions
 
-If the project uses Terraform < 1.0, note the version and adjust recommendations accordingly, but optimize guidance for 1.x features.
+If the project uses Terraform < 1.12, note the version and check feature availability.
 
 ## Core Principles
 
@@ -59,7 +59,7 @@ terraform apply     # Apply changes
 
 **State management**:
 - Never edit state files manually
-- Use `import` blocks (1.5+) to import existing resources
+- Use `import` blocks to import existing resources
 - Use `terraform state` commands for state manipulation
 
 **Security**:

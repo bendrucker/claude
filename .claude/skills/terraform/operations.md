@@ -89,7 +89,7 @@ module "vpc" {
 
 **Never edit state files manually**. Use `terraform state` commands or import blocks.
 
-**Import existing resources** using `import` blocks (Terraform 1.5+, preferred):
+**Import existing resources** using `import` blocks (preferred):
 ```hcl
 import {
   to = aws_instance.web
@@ -113,7 +113,6 @@ terraform import aws_instance.web i-1234567890abcdef0
 
 **Removing resources from management**:
 ```hcl
-# Terraform 1.7+
 removed {
   from = aws_instance.old
 
@@ -125,7 +124,7 @@ removed {
 
 ## Testing
 
-**Built-in testing** (Terraform 1.6+):
+**Built-in testing**:
 ```hcl
 # tests/main.tftest.hcl
 run "validate_instance_type" {
@@ -143,7 +142,7 @@ Run tests with:
 terraform test
 ```
 
-**Test with mocks** (Terraform 1.6+):
+**Test with mocks**:
 ```hcl
 run "test_with_mock" {
   command = plan
@@ -237,7 +236,7 @@ checkov -d .
 terrascan scan
 ```
 
-**Check blocks** (Terraform 1.5+) for runtime validation:
+**Check blocks** for runtime validation:
 ```hcl
 check "health_check" {
   data "http" "example" {

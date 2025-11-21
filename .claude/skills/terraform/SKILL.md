@@ -59,8 +59,10 @@ terraform apply     # Apply changes
 
 **State management**:
 - Never edit state files manually
+- Never use `terraform state` commands - prefer declarative approaches
 - Use `import` blocks to import existing resources
-- Use `terraform state` commands for state manipulation
+- Use `removed` blocks to remove resources from state
+- Refactor configuration files instead of moving resources in state
 
 **Security**:
 - Never commit secrets to git

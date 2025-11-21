@@ -24,7 +24,7 @@ terraform apply tfplan
 # View current state
 terraform show
 
-# List resources in state
+# List resources in state (read-only, safe)
 terraform state list
 ```
 
@@ -87,9 +87,11 @@ module "vpc" {
 
 ## State Management
 
-**Never edit state files manually**. Use `terraform state` commands or import blocks.
+**CRITICAL**: Never edit state files manually. Never use `terraform state` commands. Always prefer declarative approaches through configuration changes.
 
-**Import existing resources** using `import` blocks (preferred):
+### Import Existing Resources
+
+Use `import` blocks:
 ```hcl
 import {
   to = aws_instance.web
@@ -99,19 +101,9 @@ import {
 
 Run `terraform plan` to generate the configuration, then `terraform apply` to complete the import.
 
-**State manipulation commands**:
-```bash
-# Move resource to different address
-terraform state mv aws_instance.old aws_instance.new
+### Remove Resources from State
 
-# Remove resource from state (keeps actual infrastructure)
-terraform state rm aws_instance.old
-
-# CLI import (legacy, use import blocks instead)
-terraform import aws_instance.web i-1234567890abcdef0
-```
-
-**Removing resources from management**:
+Use `removed` blocks to stop managing resources without destroying them:
 ```hcl
 removed {
   from = aws_instance.old
@@ -121,6 +113,36 @@ removed {
   }
 }
 ```
+
+### Refactor Resources
+
+**Don't use `terraform state mv`**. Instead, refactor declaratively:
+
+**Option 1: Use `moved` blocks** (preferred):
+```hcl
+moved {
+  from = aws_instance.old
+  to   = aws_instance.new
+}
+
+resource "aws_instance" "new" {
+  # Same configuration as before
+}
+```
+
+**Option 2: Remove and re-import**:
+1. Add `removed` block for old resource
+2. Add `import` block for new resource address
+3. Apply changes
+
+### Legacy State Commands
+
+**Avoid these commands** - they bypass Terraform's declarative model and can cause issues:
+- `terraform state mv` - use `moved` blocks instead
+- `terraform state rm` - use `removed` blocks instead
+- `terraform import` - use `import` blocks instead
+
+Only use state commands as an absolute last resort when declarative approaches are impossible.
 
 ## Testing
 
@@ -164,10 +186,10 @@ run "test_with_mock" {
 ## Troubleshooting
 
 **State lock errors**:
-```bash
-# Force unlock (use cautiously, ensure no other operations running)
-terraform force-unlock LOCK_ID
-```
+- Wait for lock to expire naturally (usually 15 minutes)
+- Investigate why the lock exists (check for running operations)
+- Only use `terraform force-unlock` as a last resort if you're certain no operations are running
+- Never force unlock if you're unsure - data corruption can occur
 
 **Provider version conflicts**:
 ```bash

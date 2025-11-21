@@ -63,8 +63,6 @@ skill-name/
 
 **File References**: Keep one level deep from `SKILL.md`. Avoid nested references that cause partial reads.
 
-**Table of Contents**: Include in reference files exceeding 100 lines.
-
 ## Content Guidelines
 
 **Consistent Terminology**: Choose one term per concept. Always "API endpoint," not mixing with "URL" or "path."

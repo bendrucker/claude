@@ -66,5 +66,12 @@
       }
     ]
   },
+  "enabledPlugins": {
+    "pr-review-toolkit@claude-code-plugins": true
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
   "alwaysThinkingEnabled": true
 }

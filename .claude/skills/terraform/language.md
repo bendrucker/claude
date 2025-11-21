@@ -4,7 +4,8 @@ Detailed patterns and best practices for writing Terraform configuration.
 
 ## Variables and Outputs
 
-**Declare types explicitly**:
+### Declare Types Explicitly
+
 ```hcl
 variable "instance_count" {
   description = "Number of instances to create"
@@ -19,7 +20,8 @@ variable "tags" {
 }
 ```
 
-**Use validation when appropriate**:
+### Use Validation
+
 ```hcl
 variable "environment" {
   type        = string
@@ -41,7 +43,8 @@ variable "cidr_block" {
 }
 ```
 
-**Mark sensitive values**:
+### Mark Sensitive Values
+
 ```hcl
 output "database_password" {
   value     = aws_db_instance.main.password
@@ -51,14 +54,18 @@ output "database_password" {
 
 ## Dependencies and Ordering
 
-**Prefer implicit dependencies** (referencing attributes):
+### Prefer Implicit Dependencies
+
+Referencing attributes:
 ```hcl
 resource "aws_instance" "web" {
   subnet_id = aws_subnet.public.id  # Implicit dependency
 }
 ```
 
-**Use `depends_on` only when necessary** (no attribute reference available):
+### Use depends_on When Necessary
+
+Only when no attribute reference is available:
 ```hcl
 resource "aws_instance" "web" {
   # ...
@@ -68,7 +75,8 @@ resource "aws_instance" "web" {
 
 ## Iteration Patterns
 
-**Use `for_each` for creating multiple similar resources**:
+### Use for_each for Resource Sets
+
 ```hcl
 resource "aws_instance" "server" {
   for_each = toset(["web", "api", "worker"])
@@ -80,7 +88,8 @@ resource "aws_instance" "server" {
 }
 ```
 
-**Use `count` only for conditional resource creation**:
+### Use count for Conditional Creation
+
 ```hcl
 resource "aws_instance" "bastion" {
   count = var.enable_bastion ? 1 : 0
@@ -88,7 +97,8 @@ resource "aws_instance" "bastion" {
 }
 ```
 
-**Dynamic blocks for repeating nested blocks**:
+### Dynamic Blocks for Nested Blocks
+
 ```hcl
 resource "aws_security_group" "main" {
   name = "main"
@@ -151,7 +161,8 @@ resource "aws_instance" "web" {
 
 ## Resource Meta-Arguments
 
-**Lifecycle rules**:
+### Lifecycle Rules
+
 ```hcl
 resource "aws_instance" "web" {
   # ...
@@ -164,7 +175,9 @@ resource "aws_instance" "web" {
 }
 ```
 
-**Provider aliases** (multiple regions/accounts):
+### Provider Aliases
+
+For multiple regions or accounts:
 ```hcl
 provider "aws" {
   region = "us-east-1"
@@ -183,14 +196,16 @@ resource "aws_instance" "web" {
 
 ## Common Patterns
 
-**Conditional expressions**:
+### Conditional Expressions
+
 ```hcl
 resource "aws_instance" "web" {
   instance_type = var.environment == "prod" ? "t3.large" : "t3.micro"
 }
 ```
 
-**Null values and optional attributes**:
+### Optional Attributes
+
 ```hcl
 variable "config" {
   type = object({
@@ -201,7 +216,8 @@ variable "config" {
 }
 ```
 
-**Type conversions**:
+### Type Conversions
+
 ```hcl
 locals {
   # String to number

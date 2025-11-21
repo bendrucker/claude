@@ -24,12 +24,15 @@ If the project uses Terraform < 1.12, note the version and check feature availab
 
 ## Core Principles
 
-**Always format before committing**:
+### Formatting
+
+Always format before committing:
 ```bash
 terraform fmt -recursive
 ```
 
-**File organization**:
+### File Organization
+
 ```
 main.tf           # Primary resources
 variables.tf      # Input variable declarations
@@ -40,7 +43,8 @@ terraform.tfvars  # Variable values (gitignored if sensitive)
 
 For larger modules, split by logical component: `compute.tf`, `networking.tf`, `security.tf`, `data.tf`, `locals.tf`.
 
-**Style**:
+### Style
+
 - Use 2-space indentation (enforced by `fmt`)
 - Use snake_case for all identifiers
 - Quote string values; leave boolean/number values unquoted
@@ -49,28 +53,32 @@ For larger modules, split by logical component: `compute.tf`, `networking.tf`, `
 - Always declare variable types explicitly
 - Mark sensitive outputs with `sensitive = true`
 
-**Working with Terraform**:
+### Working with Terraform
+
 - Work declaratively through configuration files (`.tf` files)
 - Never execute write operations (`apply`, `destroy`, `import`, `state mv`, etc.)
 - Provide commands as output for the user to run
 - Read-only commands (`plan`, `validate`, `fmt`, `state list`, `show`) are safe to run
 - When refactoring, use `moved` blocks instead of state manipulation
 
-**State management**:
+### State Management
+
 - Never edit state files manually
 - Never use `terraform state` write commands
 - Use `import` blocks to import existing resources
 - Use `removed` blocks to remove resources from state
 - Use `moved` blocks to refactor resource addresses
 
-**Security**:
+### Security
+
 - Never commit secrets to git
 - Use variable validation for input constraints
 - Scan configurations with `tfsec`, `checkov`, or `terrascan`
 
 ## Declarative Patterns
 
-**Import existing resources**:
+### Import Existing Resources
+
 ```hcl
 import {
   to = aws_instance.web
@@ -78,7 +86,9 @@ import {
 }
 ```
 
-**Remove resources from state** (without destroying):
+### Remove Resources from State
+
+Without destroying infrastructure:
 ```hcl
 removed {
   from = aws_instance.old
@@ -88,7 +98,8 @@ removed {
 }
 ```
 
-**Refactor resource addresses**:
+### Refactor Resource Addresses
+
 ```hcl
 moved {
   from = aws_instance.old
@@ -99,5 +110,6 @@ moved {
 ## Detailed References
 
 - **Language Patterns**: See `language.md` for HCL configuration patterns, variables, iteration, data sources, and locals
+- **State**: See `state.md` for read-only state inspection and remote state data sources
 - **Documentation**: See `docs.md` for navigating official Terraform documentation
 - **Registry**: See `registry.md` for finding and using providers/modules

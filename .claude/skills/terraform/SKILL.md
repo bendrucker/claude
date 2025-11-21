@@ -6,22 +6,21 @@ description: Working with Terraform configuration, CLI, modules, and providers. 
 
 ## Version-Specific Guidance
 
-**CRITICAL**: Before providing any language syntax or CLI advice, run `terraform version` to determine the project's Terraform version. Terraform evolves rapidly and features/syntax vary significantly across versions.
+**CRITICAL**: Before providing any language syntax or CLI advice, run `terraform version` to determine the project's Terraform version.
 
 ```bash
 terraform version
 ```
 
-Tailor all recommendations to match the detected version:
-- **< 0.12**: Legacy syntax (no `for_each`, different interpolation)
-- **0.12-0.14**: Modern HCL2 syntax introduced
-- **0.15+**: Module dependency lock file, sensitive output handling
-- **1.0+**: Stability guarantees, no breaking changes in 1.x
+Assume modern Terraform (1.x). Key features by version:
+- **1.0+**: Stability guarantees, no breaking changes within 1.x
 - **1.3+**: Optional object attributes, `terraform test` command
-- **1.5+**: `import` blocks, `check` blocks
-- **1.6+**: Test mocking, config-driven remove
-- **1.7+**: Removed block support, input variable validation improvements
+- **1.5+**: `import` blocks (preferred over CLI import), `check` blocks
+- **1.6+**: Test mocking, config-driven `remove` blocks
+- **1.7+**: Enhanced `removed` block support, improved variable validation
 - **1.8+**: Provider functions
+
+If the project uses Terraform < 1.0, note the version and adjust recommendations accordingly, but optimize guidance for 1.x features.
 
 ## Configuration Language (HCL)
 
@@ -77,7 +76,7 @@ variable "tags" {
 }
 ```
 
-**Use validation when appropriate** (Terraform 0.13+):
+**Use validation when appropriate**:
 ```hcl
 variable "environment" {
   type        = string
@@ -278,8 +277,19 @@ module "vpc" {
 
 ## State Management
 
-**Never edit state files manually**. Use `terraform state` commands:
+**Never edit state files manually**. Use `terraform state` commands or import blocks.
 
+**Import existing resources** using `import` blocks (Terraform 1.5+, preferred):
+```hcl
+import {
+  to = aws_instance.web
+  id = "i-1234567890abcdef0"
+}
+```
+
+Run `terraform plan` to generate the configuration, then `terraform apply` to complete the import.
+
+**State manipulation commands**:
 ```bash
 # Move resource to different address
 terraform state mv aws_instance.old aws_instance.new
@@ -287,16 +297,8 @@ terraform state mv aws_instance.old aws_instance.new
 # Remove resource from state (keeps actual infrastructure)
 terraform state rm aws_instance.old
 
-# Import existing resource
+# CLI import (legacy, use import blocks instead)
 terraform import aws_instance.web i-1234567890abcdef0
-```
-
-**For Terraform 1.5+, use `import` blocks** (preferred):
-```hcl
-import {
-  to = aws_instance.web
-  id = "i-1234567890abcdef0"
-}
 ```
 
 ## Troubleshooting
@@ -335,7 +337,7 @@ TF_LOG=DEBUG TF_LOG_PATH=./terraform.log terraform apply
 
 ## Testing
 
-**Terraform 1.6+ built-in testing**:
+**Built-in testing** (Terraform 1.6+):
 ```hcl
 # tests/main.tftest.hcl
 run "validate_instance_type" {
@@ -348,10 +350,15 @@ run "validate_instance_type" {
 }
 ```
 
-**Integration testing approaches**:
-- **Terratest** (Go-based): Comprehensive, great for AWS/Azure/GCP
+Run tests with:
+```bash
+terraform test
+```
+
+**Alternative testing approaches**:
+- **Terratest** (Go-based): Comprehensive integration testing for cloud providers
 - **kitchen-terraform** (Ruby-based): Test Kitchen integration
-- **terraform test** (built-in): Simpler, less setup overhead
+- **terraform test** (built-in): Recommended for most use cases
 
 ## Security Considerations
 

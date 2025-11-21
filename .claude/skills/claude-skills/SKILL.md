@@ -152,6 +152,7 @@ Store templates in `templates/` directory.
 2. Check YAML syntax (no tabs, proper `---` delimiters)
 3. Confirm file location
 4. Test with explicit trigger phrases
+5. For syntax or feature questions, use Task tool with `subagent_type='claude-code-guide'`
 
 ### YAML Errors
 

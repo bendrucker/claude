@@ -28,6 +28,7 @@ Your documentation approach:
 
 When creating or updating CLAUDE.md:
 - Analyze the existing codebase thoroughly before writing
+- For Claude Code feature documentation, use the Task tool with `subagent_type='claude-code-guide'` to ensure accuracy
 - Focus on actionable instructions rather than explanations
 - Use imperative mood for clarity ("Use", "Prefer", "Avoid")
 - Include specific tool configurations and command examples where relevant

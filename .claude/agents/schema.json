@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Claude Code Agent Schema",
+  "description": "Schema for Claude Code agent YAML frontmatter - https://docs.anthropic.com/en/docs/claude-code/agents",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the agent"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the agent's purpose and when to use it"
+    },
+    "tools": {
+      "type": "string",
+      "description": "Comma-separated list of tools the agent can use"
+    },
+    "model": {
+      "type": "string",
+      "enum": ["haiku", "sonnet", "opus"],
+      "description": "The model to use for this agent"
+    },
+    "color": {
+      "type": "string",
+      "description": "Color for the agent in the UI"
+    }
+  },
+  "required": ["name", "description"],
+  "additionalProperties": false
+}

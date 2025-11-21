@@ -49,29 +49,55 @@ For larger modules, split by logical component: `compute.tf`, `networking.tf`, `
 - Always declare variable types explicitly
 - Mark sensitive outputs with `sensitive = true`
 
-**Workflow**:
-```bash
-terraform init      # Initialize providers/modules
-terraform validate  # Check syntax
-terraform plan      # Preview changes
-terraform apply     # Apply changes
-```
+**Working with Terraform**:
+- Work declaratively through configuration files (`.tf` files)
+- Never execute write operations (`apply`, `destroy`, `import`, `state mv`, etc.)
+- Provide commands as output for the user to run
+- Read-only commands (`plan`, `validate`, `fmt`, `state list`, `show`) are safe to run
+- When refactoring, use `moved` blocks instead of state manipulation
 
 **State management**:
 - Never edit state files manually
-- Never use `terraform state` commands - prefer declarative approaches
+- Never use `terraform state` write commands
 - Use `import` blocks to import existing resources
 - Use `removed` blocks to remove resources from state
-- Refactor configuration files instead of moving resources in state
+- Use `moved` blocks to refactor resource addresses
 
 **Security**:
 - Never commit secrets to git
 - Use variable validation for input constraints
 - Scan configurations with `tfsec`, `checkov`, or `terrascan`
 
+## Declarative Patterns
+
+**Import existing resources**:
+```hcl
+import {
+  to = aws_instance.web
+  id = "i-1234567890abcdef0"
+}
+```
+
+**Remove resources from state** (without destroying):
+```hcl
+removed {
+  from = aws_instance.old
+  lifecycle {
+    destroy = false
+  }
+}
+```
+
+**Refactor resource addresses**:
+```hcl
+moved {
+  from = aws_instance.old
+  to   = aws_instance.new
+}
+```
+
 ## Detailed References
 
 - **Language Patterns**: See `language.md` for HCL configuration patterns, variables, iteration, data sources, and locals
-- **Operations**: See `operations.md` for CLI workflows, modules, state management, testing, and troubleshooting
 - **Documentation**: See `docs.md` for navigating official Terraform documentation
 - **Registry**: See `registry.md` for finding and using providers/modules

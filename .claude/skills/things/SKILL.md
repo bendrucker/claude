@@ -1,5 +1,5 @@
 ---
-name: things
+name: Things
 description: Interacting with Things 3 task manager for Mac. Use when working with the user's personal todos, tasks, projects, areas, tags, or task lists (inbox, today, upcoming, etc.). Supports creating, reading, updating, and navigating tasks.
 allowed-tools: [Bash(osascript:*), Bash(open:*), Read]
 ---

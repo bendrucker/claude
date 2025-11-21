@@ -10,6 +10,9 @@ const remarkConfig = {
 				schemas: {
 					'.claude/commands/schema.json': [
 						'.claude/commands/*.md'
+					],
+					'.claude/skills/schema.json': [
+						'.claude/skills/*/SKILL.md'
 					]
 				}
 			}

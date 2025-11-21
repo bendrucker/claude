@@ -1,5 +1,5 @@
 ---
-name: gitlab
+name: GitLab
 description: GitLab workflow best practices and glab CLI usage. Use when working with GitLab repositories, merge requests, issues, pipelines, or GitLab API interactions.
 ---
 # GitLab

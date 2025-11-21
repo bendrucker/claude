@@ -1,5 +1,5 @@
 ---
-name: terraform
+name: Terraform
 description: Working with Terraform configuration, CLI, modules, and providers. Use when writing or reviewing HCL configuration, managing infrastructure as code, debugging Terraform plans/applies, or working with Terraform-related tools.
 ---
 # Terraform

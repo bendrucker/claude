@@ -1,5 +1,5 @@
 ---
-name: typescript
+name: TypeScript
 description: TypeScript coding standards and best practices. Use when writing or reviewing TypeScript code, working with type definitions, or discussing TypeScript patterns.
 ---
 # TypeScript

@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "build": "tsc --noEmit",
+    "lint": "npm run lint:commands && npm run lint:skills",
     "lint:commands": "remark .claude/commands/*.md",
     "lint:skills": "remark .claude/skills/*/SKILL.md"
   },

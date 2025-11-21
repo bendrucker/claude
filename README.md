@@ -17,13 +17,13 @@ The [install](./install.sh) script symlinks each file in the `.claude` directory
 ## Structure
 
 - `.claude/` - User configuration directory
-  - `CLAUDE.md` - [User memory](https://docs.anthropic.com/en/docs/claude-code/memory#memory-best-practices). Index for `memory/`, where each file represents a specific topic.
+  - `CLAUDE.md` - [User memory](https://docs.anthropic.com/en/docs/claude-code/memory#memory-best-practices)
   - `memory/` - Organized guidelines by category
-    - `tasks/` - Common task templates
-    - `tools/` - Tool usage instructions
-    - `languages/` - Language-specific conventions
-  - `commands/` - [Personal commands](https://docs.anthropic.com/en/docs/claude-code/slash-commands#personal-commands)
-  - `hooks/` - [Hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) for customizing Claude Code behavior
+  - `commands/` - [Slash commands](https://docs.anthropic.com/en/docs/claude-code/slash-commands#personal-commands) for common workflows
+  - `skills/` - [Skills](https://docs.anthropic.com/en/docs/claude-code/skills) for language conventions, tools, and workflows
+  - `agents/` - Custom subagents for specialized tasks
+  - `hooks/` - [Hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) for customizing behavior
+  - `settings.json` - Permissions and configuration
 
 ## Usage
 

@@ -1,5 +1,5 @@
 ---
-name: pull-request
+name: Pull Request
 description: |
   Create a GitHub pull request (PR) with proper formatting and content guidelines. Use when creating or updating pull requests/PRs (or GitLab merge requests/MRs, Gerrit change requests/CRs).
 allowed-tools: Bash(gh:*), mcp__github

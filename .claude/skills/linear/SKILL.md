@@ -1,5 +1,5 @@
 ---
-name: linear
+name: Linear
 description: Managing Linear issues, projects, and teams. Use when working with Linear tasks, creating issues, updating status, querying projects, or managing team workflows.
 allowed-tools:
   - mcp__linear

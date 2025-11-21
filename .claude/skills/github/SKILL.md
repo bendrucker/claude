@@ -1,5 +1,5 @@
 ---
-name: github
+name: GitHub
 description: GitHub workflow best practices and tool selection. Use when working with GitHub repositories, pull requests, issues, or GitHub API interactions.
 ---
 # GitHub

@@ -1,5 +1,5 @@
 ---
-name: go
+name: Go
 description: Go language coding standards, best practices, and testing patterns. Use when writing or reviewing Go code, implementing tests, or discussing Go language features.
 ---
 # Go

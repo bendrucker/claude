@@ -51,6 +51,14 @@ Use these guidelines when creating or updating pull requests (PRs), merge reques
     - Bulleted list of links or related issues and code reviews
     - Use `Closes #<issue>` if the change closes an issue
 
+## Issue Handling
+
+When an issue is referenced in a pull request:
+
+- **ONLY reference the issue** in the pull request body/description using issue numbers (e.g., `Closes #123`, `Fixes #456`, `Related to #789`)
+- **NEVER modify the issue directly** - do not add comments, labels, milestones, assignees, or make any other changes to the issue itself
+- The only interaction with issues should be linking them in the PR description to establish the relationship
+
 ## Workflow
 
 See [`workflow.md`](./workflow.md) for instructions on how to create a new pull request.

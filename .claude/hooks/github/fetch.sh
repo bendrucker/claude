@@ -51,6 +51,20 @@ if [[ "$url" =~ github\.com/([^/]+)/([^/]+) ]]; then
     fi
     exit 0
   fi
+
+  # Actions job logs
+  if [[ "$url" =~ /actions/runs/([0-9]+)/job/([0-9]+)$ ]]; then
+    job_id="${BASH_REMATCH[2]}"
+    output_json "deny" "Use: gh run view --job $job_id --log"
+    exit 0
+  fi
+
+  # Actions workflow run
+  if [[ "$url" =~ /actions/runs/([0-9]+)$ ]]; then
+    run_id="${BASH_REMATCH[1]}"
+    output_json "deny" "Use: gh run view $run_id"
+    exit 0
+  fi
 fi
 
 # Unknown GitHub URL pattern - ask user

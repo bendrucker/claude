@@ -45,7 +45,7 @@ jobs:
           folder-path: '.claude/'
           file-path: './CLAUDE.md'
 
-  commands:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -60,8 +60,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate command frontmatter
-        run: npm run lint:commands
+      - name: Validate frontmatter
+        run: npm run lint
 
   typescript:
     runs-on: ubuntu-latest

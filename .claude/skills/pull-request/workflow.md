@@ -10,4 +10,3 @@ When creating a pull request:
 3. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard).
 4. Push the branch to remote.
 5. Create the pull request.
-6. When done, after summarizing the pull request URL, checkout the default branch.

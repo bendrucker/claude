@@ -89,6 +89,22 @@ Describe 'GitHub fetch hook'
       End
     End
 
+    Context 'when fetching Actions workflow runs'
+      It 'denies and suggests gh run view for workflow run'
+        When run run_hook "https://github.com/owner/repo/actions/runs/12345"
+        The status should be success
+        The output should satisfy has_decision "deny"
+        The output should satisfy has_exact_reason "Use: gh run view 12345"
+      End
+
+      It 'denies and suggests gh run view with job flag for specific job'
+        When run run_hook "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490"
+        The status should be success
+        The output should satisfy has_decision "deny"
+        The output should satisfy has_exact_reason "Use: gh run view --job 57098829490 --log"
+      End
+    End
+
     Context 'when encountering unknown GitHub URL'
       It 'asks user for guidance'
         When run run_hook "https://github.com/explore"

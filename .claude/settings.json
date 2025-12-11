@@ -11,7 +11,19 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:modelcontextprotocol.io)",
       "WebFetch(domain:docs.anthropic.com)",
-      "Bash(man:*)"
+      "Bash(man:*)",
+      "WebFetch(domain:proxy.golang.org)",
+      "WebFetch(domain:sum.golang.org)",
+      "WebFetch(domain:api.github.com)",
+      "Edit(/tmp/**)",
+      "Edit(.git/config)",
+      "Edit(.git/config.lock)",
+      "Edit(~/.npm/**)",
+      "Edit(~/.terraform.d/plugin-cache/**)",
+      "Edit(~/.cache/uv/**)",
+      "Edit(~/Library/Caches/go-build/**)",
+      "Edit(~/src/go/pkg/mod/**)",
+      "Edit(~/src/go/pkg/sumdb/**)"
     ],
     "deny": []
   },
@@ -71,7 +83,17 @@
   },
   "sandbox": {
     "enabled": true,
-    "autoAllowBashIfSandboxed": true
+    "autoAllowBashIfSandboxed": true,
+    "excludedCommands": [
+      "code",
+      "git",
+      "docker"
+    ],
+    "network": {
+      "allowUnixSockets": [
+        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+      ]
+    }
   },
   "alwaysThinkingEnabled": true
 }

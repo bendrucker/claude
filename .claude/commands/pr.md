@@ -7,7 +7,7 @@ allowed-tools: Bash(git:*), Bash(gh:*), Bash(glab:*), Task
 
 Create a pull request for the current branch, running the push and PR creation in the background so I can continue working. Works with GitHub and GitLab (load the `gitlab` skill for GitLab repositories).
 
-## Phase 1: Capture State (Synchronous)
+## Capture State (Synchronous)
 
 Before spawning any background agent, capture the current git state:
 
@@ -19,7 +19,7 @@ git status --porcelain         # Check for uncommitted changes
 gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'  # Base branch
 ```
 
-## Phase 2: Handle Uncommitted Changes (Synchronous)
+## Handle Uncommitted Changes (Synchronous)
 
 If `git status --porcelain` shows uncommitted changes:
 
@@ -29,7 +29,7 @@ If `git status --porcelain` shows uncommitted changes:
 
 **Do not background until all changes are committed.** The commit is the fork point.
 
-## Phase 3: Spawn Background Agent
+## Spawn Background Agent
 
 Use the Task tool with `run_in_background: true` and `subagent_type: "general-purpose"`.
 
@@ -58,7 +58,7 @@ Create a pull request with the following pre-captured state:
 - Follow the pull-request skill for title and body formatting
 ```
 
-## Phase 4: Return Immediately
+## Return Immediately
 
 After spawning the background agent, inform me that:
 - The PR is being created in the background

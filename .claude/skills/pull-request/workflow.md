@@ -9,4 +9,7 @@ When creating a pull request:
 2. Stage changes if not already staged.
 3. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard).
 4. Push the branch to remote.
-5. Create the pull request.
+5. Create the pull request:
+   - Write the PR body to a temp file first (e.g., `tmp/pr-body.md`)
+   - Use `gh pr create --title "..." --body-file tmp/pr-body.md`
+   - This avoids escaping issues with heredocs in shell commands

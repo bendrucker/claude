@@ -1,7 +1,8 @@
 ---
 name: review-pr
-description: Review a GitHub pull request. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes.
-allowed-tools: Bash(gh pr:*), mcp__github__get_issue, mcp__github__get_issue_comments, mcp__github__search_issues, mcp__github__search_code, mcp__github__get_pull_request, mcp__github__get_pull_request_files, mcp__github__get_pull_request_diff, mcp__github__get_pull_request_comments, mcp__github__get_pull_request_reviews, mcp__github__get_pull_request_status, mcp__github__list_workflow_runs, mcp__github__get_workflow_run, mcp__github__list_workflow_jobs, mcp__github__get_job_logs
+description: |
+  Review a pull request or merge request. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes. Supports GitHub and GitLab.
+allowed-tools: Bash(gh:*), mcp__github
 ---
 
 # Review Pull Request
@@ -27,3 +28,7 @@ If not on the branch, first run `gh pr checkout` to switch.
 6. **Submit** - Approve / Comment / Request Changes based on severity
 
 See [tone.md](tone.md) for comment style guidelines.
+
+## Service Support
+
+This skill assumes GitHub. For GitLab merge requests, load the `gitlab` skill.

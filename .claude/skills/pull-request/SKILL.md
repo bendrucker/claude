@@ -6,59 +6,34 @@ allowed-tools: Bash(gh:*), mcp__github
 ---
 # Pull Request
 
-Use these guidelines when creating or updating pull requests (PRs), merge requests (MRs), or change requests (CRs):
+Guidelines for creating or updating pull requests (PRs), merge requests (MRs), or change requests (CRs).
 
 ## Title
 
 - Check recent commits (`git log --oneline -20`) to determine the repo's commit style:
-  - **subject** (default): `${subject}: ${summary}` where subject is optional (e.g., `api: add timeout to request` or `add timeout to request`)
-  - **conventional**: `${type}: ${summary}` where type is required (e.g., `fix: add timeout to request`)
-  - Use conventional style if most commits use conventional commit prefixes (feat:, fix:, etc.)
-  - Otherwise, use subject-oriented format
+  - **subject** (default): `${subject}: ${summary}` (e.g., `api: add timeout to request`)
+  - **conventional**: `${type}: ${summary}` (e.g., `fix: add timeout to request`)
 - Keep under 50 characters, max 100
 - Use imperative mood, lowercase except proper nouns
 
 ## Body
 
-- Use strategy in `context.md` to obtain context about the change if the conversation does not provide enough information.
-- Start with 1-3 sentences summarizing the change. Go straight into the description, without a preceding header.
-- **Wrap all code identifiers with backticks**: function names, method names, class names, variable names, file paths, HTTP endpoints, status codes, parameters, etc.
-- Use `##` sections for larger changes. Include one or more of the following sections as appropriate. Sections can have multiple subsections if subgroups are present.
-
-  - `## Issue`: Root cause analysis, link existing issues. Use this for bug fixes, which should include a related issue.
-  - `## Changes`: High-level bulleted description of changes made.
-    - Emphasize API and interface changes first.
-      - Example: Adds `POST /users` endpoint to create users
-      - Example: Updates `User.create` to accept `email` parameter.
-      - Example: Handles `404` errors in `GET /users/{id}`.
-    - Do not list modified files by path, line number, etc. Summarize the user impact of changes, do not narrate the code.
-    - Include refactoring or cleanup changes as separate bullet points.
-      - Example: Refactors `UserService` to use dependency injection.
-      - Example: Extracts repeated user getter logic into `UserRepository`.
-  - `## Testing`: Only include if tests were added/modified or if manual testing was performed. Omit this section entirely if no testing discussion occurred.
-    - Focus on qualitative insights about test coverage and approach, not quantity or CI status.
-    - Good examples:
-      - ✓ "Tests cover error handling for malformed JSON responses"
-      - ✓ "Added integration tests that verify the full request/response cycle"
-      - ✓ "Extended existing auth tests to cover the new OAuth flow"
-      - ✓ "Manually verified behavior with screen reader on iOS Safari"
-    - Bad examples (avoid these):
-      - ✗ "All tests passed" (CI status already shows this)
-      - ✗ "Added 5 unit tests" (quantity is unimportant)
-      - ✗ "Tests work correctly" (too vague)
-    - Include manual testing steps as `###` checklist only if they were actually performed or discussed.
-  - `## References`: ONLY include if there are relevant links or related issues.
-    - Bulleted list of links or related issues and code reviews
-    - Use `Closes #<issue>` if the change closes an issue
+- Use strategy in [`context.md`](context.md) to gather context if needed
+- Start with 1-3 sentences summarizing the change (no preceding header)
+- **Wrap all code identifiers with backticks**: function names, class names, file paths, endpoints, status codes, etc.
+- Use `##` sections for larger changes. See [`sections.md`](sections.md) for detailed guidance on:
+  - `## Issue` - Root cause analysis and issue linking
+  - `## Changes` - High-level description of changes
+  - `## Testing` - Test coverage insights
+  - `## References` - Related links and issues
 
 ## Issue Handling
 
-When an issue is referenced in a pull request:
+When an issue is referenced:
 
-- **ONLY reference the issue** in the pull request body/description using issue numbers (e.g., `Closes #123`, `Fixes #456`, `Related to #789`)
-- **NEVER modify the issue directly** - do not add comments, labels, milestones, assignees, or make any other changes to the issue itself
-- The only interaction with issues should be linking them in the PR description to establish the relationship
+- **ONLY reference the issue** in the PR body (e.g., `Closes #123`, `Fixes #456`)
+- **NEVER modify the issue directly** - no comments, labels, milestones, or assignees
 
 ## Workflow
 
-See [`workflow.md`](./workflow.md) for instructions on how to create a new pull request.
+See [`workflow.md`](workflow.md) for creating a new pull request.

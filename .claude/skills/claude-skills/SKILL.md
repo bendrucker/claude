@@ -6,18 +6,13 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, WebFetch(domain:docs.claude
 
 # Claude Code Skills Development
 
-Reference documentation for developing effective Claude Code Skills. The context window is a public good - only include information Claude doesn't already possess.
+Reference for developing effective skills. The context window is a public good - only include information Claude doesn't already possess.
 
 ## Core Principles
 
-**Conciseness**: Keep `SKILL.md` under 500 lines. Use progressive disclosure - split detailed content into separate files loaded on-demand.
-
-**Appropriate Freedom**: Match specificity to task fragility:
-- Text instructions for flexible tasks
-- Pseudocode for moderate variation
-- Specific scripts for error-prone operations
-
-**Cross-Model Testing**: Validate skills across Haiku, Sonnet, and Opus for effectiveness.
+- **Conciseness**: Keep `SKILL.md` under 500 lines. Use progressive disclosure.
+- **Appropriate Freedom**: Text for flexible tasks, pseudocode for moderate variation, scripts for error-prone operations.
+- **Cross-Model Testing**: Validate across Haiku, Sonnet, and Opus.
 
 ## Skill Structure
 
@@ -27,162 +22,48 @@ name: skill-name
 description: Third-person capability description with trigger terms
 allowed-tools: [Optional tool restrictions]
 ---
-
-# Overview and navigation (SKILL.md stays minimal)
 ```
 
-### Storage Locations
+**Storage**: `~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
 
-- **Personal**: `~/.claude/skills/`
-- **Project**: `.claude/skills/` (shared via git)
-- **Plugin**: Bundled with installed plugins
+**Description**: Third-person, includes trigger terms and use cases. This is the primary activation mechanism.
 
-### Description Best Practices
+## Bundled Resources
 
-Write in third person to avoid system prompt conflicts:
-
-✓ "Analyzing spreadsheets and generating reports from Excel files. Use when working with XLSX files, data analysis, or report generation."
-
-✗ "I can help you analyze spreadsheets..."
-
-Include:
-- What the skill does
-- Specific trigger terms
-- Key use cases
-
-## Information Architecture
-
-**Progressive Disclosure Pattern**:
 ```
 skill-name/
-├── SKILL.md (overview, navigation only)
-├── REFERENCE.md (detailed info, loaded as needed)
-├── EXAMPLES.md (usage examples)
-└── scripts/ (executable utilities)
+├── SKILL.md (required - overview, navigation)
+├── references/ (documentation loaded as needed)
+├── scripts/ (executable utilities)
+└── assets/ (templates, images for output)
 ```
 
-**File References**: Keep one level deep from `SKILL.md`. Avoid nested references that cause partial reads.
+**Naming**: Reserve ALL CAPS for files with special meaning (SKILL.md, README.md, CONTRIBUTING.md). Use lowercase for all other files (setup.md, examples.md, troubleshooting.md).
 
-## Content Guidelines
+Keep references one level deep. For files >100 lines, include a table of contents.
 
-**Consistent Terminology**: Choose one term per concept. Always "API endpoint," not mixing with "URL" or "path."
+## Development Process
 
-**Examples Over Description**: Provide input/output pairs showing desired style and detail level.
+1. Define 3 test scenarios before documentation
+2. Measure baseline without skill
+3. Iterative: one instance creates, another tests
+4. Observe navigation patterns
+5. Refine based on behavior
 
-**Workflows with Checklists**: For complex tasks, provide copyable checklists Claude can track:
-```
-Step 1: Analyze form (run analyze_form.py)
-Step 2: Create mapping structure
-Step 3: Apply transformations
-```
+## References
 
-**Avoid Time-Sensitive Info**: Use "Old Patterns" sections for deprecated methods rather than time-based conditionals.
+Load detailed guides as needed:
 
-## Development Workflow
+- **[references/patterns.md](references/patterns.md)** - Progressive disclosure patterns, output templates, workflow design
+- **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, YAML errors, path problems, checklist
 
-1. **Create Representative Tests**: Define three test scenarios before extensive documentation
+## Quick Reference
 
-2. **Measure Baseline**: Test performance without skill to identify improvement areas
+**Common Patterns**: Read-only (`[Read, Grep, Glob]`), Script-based (`[Read, Bash, Write]`), Template-based (`[Read, Write, Edit]`)
 
-3. **Iterative Development**: Use one Claude instance to create/refine skill content while testing with another on real tasks
+**Anti-Patterns**: Windows paths, too many options, vague descriptions, nested references, scripts that punt errors
 
-4. **Observe Navigation**: Monitor how Claude uses the skill - unexpected file access indicates structure issues
-
-5. **Refine Based on Behavior**: Adjust based on observed gaps and patterns
-
-## Executable Code Best Practices
-
-**Error Handling**: Handle conditions explicitly rather than failing and requiring intervention.
-
-**Justified Constants**: Document why parameters exist:
-```python
-# Three retries balances reliability vs speed
-# Most failures resolve by second retry
-MAX_RETRIES = 3
-```
-
-**Deterministic vs Reference**: Clarify intent:
-- "Run analyze_form.py" (execute)
-- "See analyze_form.py" (read as reference)
-
-**MCP Tool Names**: Use fully qualified format: `ServerName:tool_name`
-
-**Package Dependencies**: List required packages and verify availability.
-
-## Common Patterns
-
-### Read-Only Reference Skills
-
-```yaml
-allowed-tools: [Read, Grep, Glob]
-```
-
-For documentation and code analysis.
-
-### Script-Based Skills
-
-```yaml
-allowed-tools: [Read, Bash, Write]
-```
-
-Reference scripts with forward slashes: `scripts/helper.py`
-
-### Template-Based Skills
-
-```yaml
-allowed-tools: [Read, Write, Edit]
-```
-
-Store templates in `templates/` directory.
-
-## Anti-Patterns to Avoid
-
-- Windows-style paths (use forward slashes everywhere)
-- Too many options (provide one default with escape hatches)
-- Vague descriptions ("Helps with documents")
-- Deeply nested references
-- Scripts that punt errors to Claude
-- Time-based conditionals
-
-## Troubleshooting
-
-### Skill Not Activating
-
-1. Verify description includes specific trigger terms
-2. Check YAML syntax (no tabs, proper `---` delimiters)
-3. Confirm file location
-4. Test with explicit trigger phrases
-5. For syntax or feature questions, use Task tool with `subagent_type='claude-code-guide'`
-
-### YAML Errors
-
-- Use spaces, never tabs
-- Quote strings with special characters
-- Proper `---` delimiters
-
-### Path Issues
-
-- Use forward slashes
-- Verify paths exist
-- Use `~` for home directory in personal skills
-
-## Final Checklist
-
-Before deploying a skill:
-
-✓ Third-person description with specific trigger terms
-✓ `SKILL.md` under 500 lines
-✓ One-level-deep file references
-✓ Consistent terminology throughout
-✓ Concrete examples provided
-✓ Progressive disclosure structure
-✓ Clear workflows with steps
-✓ Scripts with explicit error handling
-✓ All package dependencies listed
-✓ Tested across Haiku/Sonnet/Opus
-✓ Real-world scenario validation
-
-## Additional Resources
+## Resources
 
 - [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills.md)
 - [Agent Skills Best Practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices.md)

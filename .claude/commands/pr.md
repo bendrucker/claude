@@ -23,11 +23,15 @@ gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'  # Base branc
 
 If `git status --porcelain` shows uncommitted changes:
 
-1. Stage all changes: `git add -A`
-2. Create a commit using the pull-request skill for message formatting
-3. Re-capture the commit SHA after committing
+1. If current branch == base branch, create and switch to a topic branch:
+   - Generate a branch name based on the changes (e.g., `fix-typo`, `add-feature`)
+   - `git checkout -b <topic-branch>`
+2. Stage all changes: `git add -A`
+3. Create a commit using the pull-request skill for message formatting
+4. Capture the commit SHA and topic branch name
+5. Switch back to the original branch: `git checkout <original-branch>`
 
-**Do not background until all changes are committed.** The commit is the fork point.
+**Do not background until changes are committed on a topic branch and you've returned to the original branch.**
 
 ## Spawn Background Agent
 
@@ -46,11 +50,10 @@ Create a pull request with the following pre-captured state:
 ## Instructions
 
 1. Change to the working directory
-2. Checkout the branch: `git checkout <branch>`
-3. Push the branch: `git push -u origin <branch>`
-4. Load the pull-request skill for formatting guidelines
-5. Create the PR with `gh pr create --base <base-branch>`
-6. Return the PR URL
+2. Push the branch: `git push -u origin <branch>`
+3. Load the pull-request skill for formatting guidelines
+4. Create the PR with `gh pr create --base <base-branch> --head <branch>`
+5. Return the PR URL
 
 ## Constraints
 

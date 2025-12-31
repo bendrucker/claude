@@ -15,6 +15,7 @@
 
 - Avoid creating or adding to catch-all packages/modules like `utils` or similar. Provide meaningful names for packages and keep them well-scoped, but not overly small.
 - Break code into multiple files where appropriate first before splitting across directories.
+- Do not number steps or phases in code (e.g., "Phase 1:", "Step 2:"). Use descriptive function names and call them in sequence. Numbering creates tight coupling, obscures whether order matters, and impedes inserting new steps.
 
 ## Workflow
 

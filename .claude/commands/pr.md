@@ -46,11 +46,10 @@ Create a pull request with the following pre-captured state:
 ## Instructions
 
 1. Change to the working directory
-2. Checkout the branch: `git checkout <branch>`
-3. Push the branch: `git push -u origin <branch>`
-4. Load the pull-request skill for formatting guidelines
-5. Create the PR with `gh pr create --base <base-branch>`
-6. Return the PR URL
+2. Push the branch: `git push -u origin <branch>`
+3. Load the pull-request skill for formatting guidelines
+4. Create the PR with `gh pr create --base <base-branch>`
+5. Return the PR URL
 
 ## Constraints
 

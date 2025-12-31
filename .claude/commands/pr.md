@@ -52,13 +52,18 @@ Create a pull request with the following pre-captured state:
 1. Change to the working directory
 2. Push the branch: `git push -u origin <branch>`
 3. Load the pull-request skill for formatting guidelines
-4. Create the PR with `gh pr create --base <base-branch> --head <branch>`
-5. Return the PR URL
+4. Write the PR body to `tmp/pr-body.md` following the skill format:
+   - Start with 1-3 sentences summarizing the change (NO leading ## header)
+   - Use `## Changes` for bulleted list of changes
+   - Use `## Testing` only if tests were added or manual testing is needed
+5. Create the PR: `gh pr create --base <base-branch> --head <branch> --title "..." --body-file tmp/pr-body.md`
+6. Return the PR URL
 
 ## Constraints
 
 - Do NOT make any commits - only push and create PR
 - Use the captured working directory path (important for worktrees)
+- MUST use `--body-file` with a temp file - heredocs fail in sandbox environments
 - Follow the pull-request skill for title and body formatting
 ```
 

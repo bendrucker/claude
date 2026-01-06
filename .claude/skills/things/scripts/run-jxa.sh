@@ -43,7 +43,7 @@ fi
 ESBUILD_ARGS=(
   --bundle
   --platform=neutral
-  --format=iife
+  --format=esm
   --log-level=error
 )
 

@@ -12,16 +12,16 @@ Batch-process issues into draft PRs using git worktrees for isolation.
 
 - **Batch size**: 5 issues max per round (larger batches split automatically)
 - **No worktree cleanup**: PRs may need iteration after CI feedback
-- **Issue linking**: Use `Closes #123` (GitHub) or `Closes ENG-XXX` (Linear) in commit body
+- **Issue linking**: Include `Closes #123` or `Closes ENG-XXX` in PR body (not commit)
 
 ## Workflow
 
-1. **Gather issues** - Load `linear` or `github` skill, fetch details, split into batches of 5
+1. **Gather issues** - Load `linear`, `github`, or `gitlab` skill and fetch details, split into batches of 5
 2. **Clarify requirements** - Use AskUserQuestion upfront to resolve ambiguities
 3. **Plan all issues** - Run planning agents in parallel (verify paths, line numbers)
 4. **Create worktrees** - One per issue in `.worktrees/`
 5. **Implement in parallel** - Agents commit, push, and write PR body to file
-6. **Create PRs** - Parent runs `gh pr create --body-file` for each
+6. **Create PRs** - Parent runs `gh pr create` or `glab mr create` with `--body-file`
 7. **Monitor CI** - Dispatch agent to watch for failures across branches
 
 See [workflow.md](workflow.md) for detailed steps.
@@ -44,9 +44,7 @@ See [agents.md](agents.md) for agent configuration.
 ## Quick Start
 
 ```
-# Linear issues
 /parallel-prs ENG-101 ENG-102 ENG-103
-
-# GitHub issues
-/parallel-prs #123 #124 #125
 ```
+
+Load the appropriate skill (`github`, `gitlab`, or `linear`) for vendor-specific instructions.

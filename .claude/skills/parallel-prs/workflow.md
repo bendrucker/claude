@@ -2,11 +2,7 @@
 
 ## Gather Issues
 
-Parse arguments as issue identifiers:
-- **Linear**: `ENG-101 ENG-102 ENG-103`
-- **GitHub**: `#123 #124 #125` or `owner/repo#123`
-
-Load the appropriate skill (`linear` or `github`) based on issue format.
+Parse arguments as issue identifiers and load the appropriate skill (`github`, `gitlab`, or `linear`).
 
 Validate:
 - All issues exist and are accessible
@@ -68,11 +64,12 @@ prompt: |
   Implement: {plan}
 
   After implementation:
-  1. Commit with message including "Closes {issue-ref}"
+  1. Commit changes
   2. Push to remote
   3. Write PR body to tmp/{branch}/pr-body.md following pull-request skill format:
      - Title line (first line)
      - 1-3 sentence summary
+     - Include "Closes {issue-ref}" for issue linking
      - ## sections as needed (Issue, Changes, Testing)
   4. Return - DO NOT create the PR itself
 
@@ -81,27 +78,8 @@ prompt: |
 
 ## Create PRs
 
-After all implementations complete, create PRs mechanically:
-
-```bash
-gh pr create --title "$(head -1 tmp/{branch}/pr-body.md)" \
-  --body-file tmp/{branch}/pr-body.md \
-  --head {branch}
-```
-
-The implementation agent wrote the content; parent just executes the command.
+After all implementations complete, create PRs mechanically using `--body-file tmp/{branch}/pr-body.md`. Load the `github` or `gitlab` skill for the appropriate CLI command.
 
 ## Monitor CI
 
-After all PRs created, launch CI monitoring agent:
-
-```
-subagent_type: github-actions-monitor
-prompt: |
-  Monitor GitHub Actions for these PRs:
-  - PR #123 (ENG-101)
-  - PR #124 (ENG-102)
-  - PR #125 (ENG-103)
-
-  Report any failures with logs.
-```
+After all PRs created, launch CI monitoring agent to watch for failures and report logs.

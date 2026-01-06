@@ -12,13 +12,12 @@
 
 **Does**:
 - Work within assigned worktree
-- Commit with `Closes {issue-ref}` in body
-- Push branch to remote
-- Write PR body to `tmp/{branch}/pr-body.md`
+- Commit and push changes
+- Write PR body to `tmp/{branch}/pr-body.md` with issue linking
 
 **Does not**:
 - Create PRs (parent does this)
-- Modify issues in Linear/GitHub
+- Modify issues directly
 - Work outside worktree directory
 
 ## CI Monitor Agent (github-actions-monitor)

@@ -9,6 +9,10 @@ description: GitHub workflow best practices and tool selection. Use when working
 - Use `gh api` for advanced GitHub API interactions that are not natively supported by `gh` commands.
 - Always assume GitHub URLs may refer to private repositories and use `gh` or `mcp__github` for authentication.
 
+## Reference Files
+
+- **reviews.md**: Pull request review operations not supported by the MCP
+
 ## Workflows
 
 ### Pull Request

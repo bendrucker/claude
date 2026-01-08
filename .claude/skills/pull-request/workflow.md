@@ -10,6 +10,7 @@ When creating a pull request:
 3. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard).
 4. Push the branch to remote.
 5. Create the pull request:
-   - Write the PR body to a temp file first (e.g., `tmp/pr-body.md`)
-   - Use `gh pr create --title "..." --body-file tmp/pr-body.md`
+   - Write the PR body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
+   - Use `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
+   - Include the branch name in the filename to avoid conflicts with concurrent agents
    - This avoids escaping issues with heredocs in shell commands

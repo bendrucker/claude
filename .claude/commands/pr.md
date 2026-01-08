@@ -52,11 +52,11 @@ Create a pull request with the following pre-captured state:
 1. Change to the working directory
 2. Push the branch: `git push -u origin <branch>`
 3. Load the pull-request skill for formatting guidelines
-4. Write the PR body to `tmp/pr-body.md` following the skill format:
+4. Write the PR body to `tmp/pr-body-<branch>.md` following the skill format:
    - Start with 1-3 sentences summarizing the change (NO leading ## header)
    - Use `## Changes` for bulleted list of changes
    - Use `## Testing` only if tests were added or manual testing is needed
-5. Create the PR: `gh pr create --base <base-branch> --head <branch> --title "..." --body-file tmp/pr-body.md`
+5. Create the PR: `gh pr create --base <base-branch> --head <branch> --title "..." --body-file tmp/pr-body-<branch>.md`
 6. Return the PR URL
 
 ## Constraints

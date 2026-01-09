@@ -76,3 +76,4 @@ Load detailed guides as needed:
 - **Verification**: ALWAYS verify updates succeeded by reading back the todo with JXA
 - **Repeating tasks**: Filter by comparing `creationDate` to midnight (see [troubleshooting.md](troubleshooting.md))
 - **TypeScript mode**: Use `scripts/run-jxa.sh` for type-safe JXA with autocomplete
+- **Moving out of inbox**: Set `when=anytime` to move a todo out of inbox without assigning an area

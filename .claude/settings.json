@@ -87,7 +87,25 @@
     "excludedCommands": [
       "code",
       "git",
-      "docker"
+      "docker",
+      "pbcopy",
+      "pbpaste",
+      "open",
+      "osascript",
+      "ssh",
+      "scp",
+      "security",
+      "defaults",
+      "launchctl",
+      "rsync",
+      "screencapture",
+      "aws",
+      "gcloud",
+      "az",
+      "say",
+      "afplay",
+      "diskutil",
+      "networksetup"
     ],
     "network": {
       "allowUnixSockets": [

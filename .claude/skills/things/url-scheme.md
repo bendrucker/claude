@@ -93,6 +93,7 @@ open "things:///update?id=4BE64FEA-8FEF-4F4F-B8B2-4E74605D5FA5&auth-token=YOUR_T
 
 **Notes:**
 - Cannot update `when` or `deadline` on repeating to-dos
+- To move to an area, use `list-id` with the area ID (not `area-id`)
 - Projects require all child to-dos completed before marking complete
 
 ### update-project - Modify Projects

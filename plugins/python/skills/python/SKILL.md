@@ -6,11 +6,9 @@ description: Python coding standards, best practices, type hints, and testing pa
 
 - Use the latest Python language features appropriate for the project's minimum supported version.
 
-## Package Management
+## Tooling
 
-- Use `uv` for dependency management and package execution instead of virtual environments.
-- Run scripts with `uv run <script>`.
-- Add dependencies with `uv add <package>`.
+Load the `astral:uv`, `astral:ruff`, and `astral:ty` skills for detailed guidance on Python tooling.
 
 ## Documentation
 

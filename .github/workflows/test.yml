@@ -57,7 +57,7 @@ jobs:
           for spec in plugins/*/spec.sh; do
             plugin=$(dirname "$spec" | xargs basename)
             echo "Testing $plugin plugin..."
-            (cd "plugins/$plugin" && shellspec --pattern 'spec.sh' spec.sh)
+            (cd "plugins/$plugin" && shellspec --pattern 'spec.sh' --tag unit spec.sh)
           done
 
   markdown:

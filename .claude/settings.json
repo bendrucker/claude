@@ -94,13 +94,20 @@
     "linear@claude-plugins-official": true,
     "ralph-wiggum@claude-code-plugins": true,
     "code-simplifier@claude-plugins-official": true,
-    "github@claude-plugins-official": true
+    "github@claude-plugins-official": true,
+    "astral@astral-sh": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
       "source": {
         "source": "github",
         "repo": "bendrucker/claude"
+      }
+    },
+    "astral-sh": {
+      "source": {
+        "source": "github",
+        "repo": "astral-sh/claude-code-plugins"
       }
     }
   },

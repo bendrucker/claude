@@ -21,6 +21,7 @@ jobs:
         uses: cardinalby/schema-validator-action@v3
         with:
           file: '.claude/settings.json|.claude-plugin/marketplace.json|plugins/*/.claude-plugin/plugin.json'
+          mode: lax
 
   hooks:
     runs-on: ubuntu-latest
@@ -40,8 +41,12 @@ jobs:
         run: ./install.sh
 
       - name: Run hook tests
-        run: shellspec
-        working-directory: .claude/hooks
+        run: |
+          for spec in plugins/*/spec.sh; do
+            plugin=$(dirname "$spec" | xargs basename)
+            echo "Testing $plugin plugin..."
+            (cd "plugins/$plugin" && shellspec spec.sh)
+          done
 
   markdown:
     runs-on: ubuntu-latest

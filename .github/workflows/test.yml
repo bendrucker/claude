@@ -17,11 +17,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Validate JSON schemas
+      - name: Validate settings.json
         uses: cardinalby/schema-validator-action@v3
         with:
-          file: '.claude/settings.json|.claude-plugin/marketplace.json|plugins/*/.claude-plugin/plugin.json'
+          file: '.claude/settings.json'
           mode: lax
+
+      - name: Validate marketplace.json
+        uses: cardinalby/schema-validator-action@v3
+        with:
+          file: '.claude-plugin/marketplace.json'
+          schema: 'schemas/marketplace.schema.json'
+
+      - name: Validate plugin.json files
+        uses: cardinalby/schema-validator-action@v3
+        with:
+          file: 'plugins/*/.claude-plugin/plugin.json'
+          schema: 'schemas/plugin.schema.json'
 
   hooks:
     runs-on: ubuntu-latest
@@ -45,7 +57,7 @@ jobs:
           for spec in plugins/*/spec.sh; do
             plugin=$(dirname "$spec" | xargs basename)
             echo "Testing $plugin plugin..."
-            (cd "plugins/$plugin" && shellspec spec.sh)
+            (cd "plugins/$plugin" && shellspec --pattern 'spec.sh' spec.sh)
           done
 
   markdown:

@@ -1,0 +1,16 @@
+{
+  "description": "Blocks modification of generated Go files",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

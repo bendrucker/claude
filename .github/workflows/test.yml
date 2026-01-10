@@ -11,6 +11,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  json-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate settings.json
+        uses: cardinalby/schema-validator-action@v3
+        with:
+          file: '.claude/settings.json'
+          mode: lax
+
+      - name: Validate marketplace.json
+        uses: cardinalby/schema-validator-action@v3
+        with:
+          file: '.claude-plugin/marketplace.json'
+          schema: 'schemas/marketplace.schema.json'
+
+      - name: Validate plugin.json files
+        uses: cardinalby/schema-validator-action@v3
+        with:
+          file: 'plugins/*/.claude-plugin/plugin.json'
+          schema: 'schemas/plugin.schema.json'
+
   hooks:
     runs-on: ubuntu-latest
     env:
@@ -29,8 +53,12 @@ jobs:
         run: ./install.sh
 
       - name: Run hook tests
-        run: shellspec
-        working-directory: .claude/hooks
+        run: |
+          for spec in plugins/*/spec.sh; do
+            plugin=$(dirname "$spec" | xargs basename)
+            echo "Testing $plugin plugin..."
+            (cd "plugins/$plugin" && shellspec --pattern 'spec.sh' --tag unit spec.sh)
+          done
 
   markdown:
     runs-on: ubuntu-latest

@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/marketplace.schema.json",
+  "title": "Claude Code Marketplace",
+  "description": "Configuration file for a Claude Code plugin marketplace",
+  "type": "object",
+  "required": ["name", "owner", "plugins"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    },
+    "name": {
+      "type": "string",
+      "description": "Marketplace identifier in kebab-case",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "not": {
+        "enum": [
+          "claude-code-marketplace",
+          "claude-code-plugins",
+          "claude-plugins-official",
+          "anthropic-marketplace",
+          "anthropic-plugins",
+          "agent-skills",
+          "life-sciences"
+        ]
+      }
+    },
+    "version": {
+      "type": "string",
+      "description": "Marketplace version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief marketplace description"
+    },
+    "owner": {
+      "$ref": "#/$defs/owner"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "pluginRoot": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "plugins": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pluginEntry" },
+      "description": "List of available plugins"
+    }
+  },
+  "$defs": {
+    "owner": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "author": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "pluginEntry": {
+      "type": "object",
+      "required": ["name", "source"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Plugin identifier in kebab-case",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "source": {
+          "$ref": "#/$defs/pluginSource"
+        },
+        "description": { "type": "string" },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "author": { "$ref": "#/$defs/author" },
+        "homepage": { "type": "string", "format": "uri" },
+        "repository": { "type": "string", "format": "uri" },
+        "license": { "type": "string" },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "category": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "strict": {
+          "type": "boolean",
+          "default": true
+        },
+        "commands": { "$ref": "#/$defs/pathOrPaths" },
+        "agents": { "$ref": "#/$defs/pathOrPaths" },
+        "skills": { "$ref": "#/$defs/pathOrPaths" },
+        "hooks": { "$ref": "#/$defs/pathOrObject" },
+        "mcpServers": { "$ref": "#/$defs/pathOrObject" },
+        "lspServers": { "$ref": "#/$defs/pathOrObject" },
+        "outputStyles": { "$ref": "#/$defs/pathOrPaths" }
+      },
+      "additionalProperties": false
+    },
+    "pluginSource": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Relative path to plugin directory",
+          "pattern": "^\\.\\/.*"
+        },
+        {
+          "type": "object",
+          "required": ["source", "repo"],
+          "properties": {
+            "source": { "const": "github" },
+            "repo": {
+              "type": "string",
+              "pattern": "^[\\w-]+/[\\w-]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["source", "url"],
+          "properties": {
+            "source": { "const": "url" },
+            "url": { "type": "string", "format": "uri" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "pathOrPaths": {
+      "oneOf": [
+        { "type": "string", "pattern": "^\\.\\/.*" },
+        {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^\\.\\/.*" }
+        }
+      ]
+    },
+    "pathOrObject": {
+      "oneOf": [
+        { "type": "string", "pattern": "^\\.\\/.*" },
+        { "type": "object" }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

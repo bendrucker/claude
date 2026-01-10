@@ -3,14 +3,14 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    ".claude/skills/*"
+    "plugins/things/skills/things"
   ],
   "scripts": {
     "build": "tsc --noEmit",
     "lint": "npm run lint:agents && npm run lint:commands && npm run lint:skills",
-    "lint:agents": "remark .claude/agents/*.md",
-    "lint:commands": "remark .claude/commands/*.md",
-    "lint:skills": "remark .claude/skills/*/SKILL.md"
+    "lint:agents": "remark plugins/*/agents/*.md",
+    "lint:commands": "remark .claude/commands/*.md plugins/*/commands/*.md",
+    "lint:skills": "remark plugins/*/skills/*/SKILL.md"
   },
   "devDependencies": {
     "remark": "^15.0.1",

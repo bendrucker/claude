@@ -1,0 +1,8 @@
+{
+  "name": "newline",
+  "description": "POSIX-compliant trailing newline management for files",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

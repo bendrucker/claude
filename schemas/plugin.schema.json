@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/plugin.schema.json",
+  "title": "Claude Code Plugin",
+  "description": "Configuration file for a Claude Code plugin",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique identifier in kebab-case (no spaces)",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version (MAJOR.MINOR.PATCH)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief explanation of plugin purpose"
+    },
+    "author": {
+      "$ref": "#/$defs/author"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "Documentation URL"
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri",
+      "description": "Source code repository URL"
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX license identifier"
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Discovery tags"
+    },
+    "commands": {
+      "$ref": "#/$defs/pathOrPaths",
+      "description": "Path(s) to custom command files/directories"
+    },
+    "agents": {
+      "$ref": "#/$defs/pathOrPaths",
+      "description": "Path(s) to custom agent files"
+    },
+    "skills": {
+      "$ref": "#/$defs/pathOrPaths",
+      "description": "Path(s) to agent skill directories"
+    },
+    "hooks": {
+      "$ref": "#/$defs/pathOrObject",
+      "description": "Hook config path or inline config"
+    },
+    "mcpServers": {
+      "$ref": "#/$defs/pathOrObject",
+      "description": "MCP config path or inline config"
+    },
+    "outputStyles": {
+      "$ref": "#/$defs/pathOrPaths",
+      "description": "Path(s) to output style files/directories"
+    },
+    "lspServers": {
+      "$ref": "#/$defs/pathOrObject",
+      "description": "LSP config path or inline config"
+    }
+  },
+  "$defs": {
+    "author": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "pathOrPaths": {
+      "oneOf": [
+        { "type": "string", "pattern": "^\\.\\/.*" },
+        {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^\\.\\/.*" }
+        }
+      ]
+    },
+    "pathOrObject": {
+      "oneOf": [
+        { "type": "string", "pattern": "^\\.\\/.*" },
+        { "type": "object" }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

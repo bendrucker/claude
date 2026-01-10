@@ -1,0 +1,8 @@
+{
+  "name": "shell",
+  "description": "Shell scripting best practices and conventions for Bash commands",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

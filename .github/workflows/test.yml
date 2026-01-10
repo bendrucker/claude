@@ -11,6 +11,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  json-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate JSON schemas
+        uses: cardinalby/schema-validator-action@v3
+        with:
+          file: '.claude/settings.json|.claude-plugin/marketplace.json|plugins/*/.claude-plugin/plugin.json'
+
   hooks:
     runs-on: ubuntu-latest
     env:

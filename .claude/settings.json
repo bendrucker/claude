@@ -50,15 +50,6 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/go/check.sh"
-          }
-        ]
-      },
-      {
         "matcher": "Edit|MultiEdit",
         "hooks": [
           {
@@ -79,11 +70,43 @@
     ]
   },
   "enabledPlugins": {
-    "pr-review-toolkit@claude-code-plugins": true
+    "pr-review-toolkit@claude-code-plugins": true,
+    "go@bendrucker": true,
+    "terraform@bendrucker": true,
+    "python@bendrucker": true,
+    "shell@bendrucker": true,
+    "typescript@bendrucker": true,
+    "javascript@bendrucker": true,
+    "json@bendrucker": true,
+    "git@bendrucker": true,
+    "gitlab@bendrucker": true,
+    "linear@bendrucker": true,
+    "things@bendrucker": true,
+    "refine-issue@bendrucker": true,
+    "implement-issue@bendrucker": true,
+    "review-pr@bendrucker": true,
+    "newline@bendrucker": true,
+    "github@bendrucker": true,
+    "claude-code@bendrucker": true,
+    "pull-request@bendrucker": true,
+    "parallel-prs@bendrucker": true
+  },
+  "extraKnownMarketplaces": {
+    "bendrucker": {
+      "source": {
+        "source": "github",
+        "repo": "bendrucker/claude"
+      }
+    }
   },
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowUnixSockets": [
+        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+      ]
+    },
     "excludedCommands": [
       "code",
       "git",
@@ -106,12 +129,7 @@
       "afplay",
       "diskutil",
       "networksetup"
-    ],
-    "network": {
-      "allowUnixSockets": [
-        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
-      ]
-    }
+    ]
   },
   "alwaysThinkingEnabled": true
 }

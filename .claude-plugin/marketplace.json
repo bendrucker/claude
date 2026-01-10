@@ -1,0 +1,107 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "bendrucker",
+  "version": "1.0.0",
+  "description": "Claude Code plugins for language support, workflows, and integrations",
+  "owner": {
+    "name": "Ben Drucker",
+    "url": "https://github.com/bendrucker"
+  },
+  "plugins": [
+    {
+      "name": "go",
+      "description": "Go language coding standards, best practices, and testing patterns",
+      "source": "./plugins/go"
+    },
+    {
+      "name": "terraform",
+      "description": "Terraform configuration, CLI, modules, and providers",
+      "source": "./plugins/terraform"
+    },
+    {
+      "name": "python",
+      "description": "Python coding standards, best practices, type hints, and testing patterns",
+      "source": "./plugins/python"
+    },
+    {
+      "name": "shell",
+      "description": "Shell scripting best practices and conventions for Bash commands",
+      "source": "./plugins/shell"
+    },
+    {
+      "name": "typescript",
+      "description": "TypeScript coding standards and best practices",
+      "source": "./plugins/typescript"
+    },
+    {
+      "name": "javascript",
+      "description": "JavaScript coding standards and best practices",
+      "source": "./plugins/javascript"
+    },
+    {
+      "name": "json",
+      "description": "JSON processing and handling best practices using jq",
+      "source": "./plugins/json"
+    },
+    {
+      "name": "git",
+      "description": "Git workflow and branching best practices",
+      "source": "./plugins/git"
+    },
+    {
+      "name": "gitlab",
+      "description": "GitLab workflow best practices and glab CLI usage",
+      "source": "./plugins/gitlab"
+    },
+    {
+      "name": "linear",
+      "description": "Managing Linear issues, projects, and teams",
+      "source": "./plugins/linear"
+    },
+    {
+      "name": "things",
+      "description": "Interacting with Things 3 task manager for Mac",
+      "source": "./plugins/things"
+    },
+    {
+      "name": "refine-issue",
+      "description": "Refining issues with technical context and structured details",
+      "source": "./plugins/refine-issue"
+    },
+    {
+      "name": "implement-issue",
+      "description": "Implement a feature or fix based on an issue",
+      "source": "./plugins/implement-issue"
+    },
+    {
+      "name": "review-pr",
+      "description": "Review a pull request or merge request",
+      "source": "./plugins/review-pr"
+    },
+    {
+      "name": "newline",
+      "description": "POSIX-compliant trailing newline management",
+      "source": "./plugins/newline"
+    },
+    {
+      "name": "github",
+      "description": "GitHub workflow, Actions monitoring, and rulesets management",
+      "source": "./plugins/github"
+    },
+    {
+      "name": "claude-code",
+      "description": "Meta-tools for Claude Code configuration and customization",
+      "source": "./plugins/claude-code"
+    },
+    {
+      "name": "pull-request",
+      "description": "Create pull requests with proper formatting",
+      "source": "./plugins/pull-request"
+    },
+    {
+      "name": "parallel-prs",
+      "description": "Batch-process multiple issues into draft PRs",
+      "source": "./plugins/parallel-prs"
+    }
+  ]
+}

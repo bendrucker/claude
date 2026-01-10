@@ -1,0 +1,8 @@
+{
+  "name": "git",
+  "description": "Git workflow and branching best practices",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

@@ -4,7 +4,7 @@ This repository contains my personal Claude Code configuration and a plugin mark
 
 ## Structure
 
-- `plugins/`: 19 plugins providing language support, workflows, and integrations
+- `plugins/`: Plugins providing language support, workflows, and integrations
 - `.claude-plugin/marketplace.json`: Marketplace definition listing all available plugins
 - `schemas/`: JSON Schema definitions for `plugin.schema.json` and `marketplace.schema.json`
 - `.claude/`: My personal configuration directory, symlinked to `~/.claude`

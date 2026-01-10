@@ -4,7 +4,7 @@ A plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude
 
 ## Overview
 
-This repository provides 19 plugins for Claude Code, organized as a plugin marketplace. Plugins extend Claude Code with language conventions, workflow automation, service integrations, and custom behaviors.
+This repository provides plugins for Claude Code, organized as a plugin marketplace. Plugins extend Claude Code with language conventions, workflow automation, service integrations, and custom behaviors.
 
 ## Installation
 

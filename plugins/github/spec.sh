@@ -6,8 +6,7 @@ Describe 'GitHub fetch hook'
   # Helper to run hook directly with JSON input
   run_hook() {
     local url="$1"
-    # ShellSpec project root is .claude/hooks/, so hook is at github/fetch.sh
-    jq -n --arg url "$url" '{tool_name: "WebFetch", tool_input: {url: $url}}' | github/fetch.sh
+    jq -n --arg url "$url" '{tool_name: "WebFetch", tool_input: {url: $url}}' | ./scripts/fetch.sh
   }
 
   # Custom assertion functions for satisfy matcher

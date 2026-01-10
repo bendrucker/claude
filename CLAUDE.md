@@ -1,31 +1,29 @@
-# Claude Code Configuration
+# Claude Code Plugin Marketplace
 
-This repository is my shared, open-source configuration for Claude Code, an AI coding assistant by Anthropic.
+This repository contains my personal Claude Code configuration and a plugin marketplace (`bendrucker`) that allows others to install portions of my setup.
 
-## Contents
+## Structure
 
-- `CLAUDE.md`: Project memory file for this configuration repository
-- `.claude/`: User configuration directory that gets symlinked to `~/.claude`
-- `.claude/CLAUDE.md`: User memory file for Claude sessions
-- `.claude/commands/`: Custom user commands directory
-- `.claude/settings.json`: User settings for Claude Code
+- `plugins/`: 19 plugins providing language support, workflows, and integrations
+- `.claude-plugin/marketplace.json`: Marketplace definition listing all available plugins
+- `schemas/`: JSON Schema definitions for `plugin.schema.json` and `marketplace.schema.json`
+- `.claude/`: My personal configuration directory, symlinked to `~/.claude`
 - `install.sh`: Setup script that creates symlinks from `.claude/` to `~/.claude`
+
+## Plugin Architecture
+
+Each plugin in `plugins/` contains:
+- `.claude-plugin/plugin.json`: Plugin metadata
+- `skills/`: Skill definitions with `SKILL.md` and reference files
+- `hooks/`: Optional hook definitions (`hooks.json`)
+- `commands/`: Optional slash commands
+- `agents/`: Optional agent definitions
 
 ## Workflow
 
-- The `.claude/` directory is symlinked to `~/.claude/`. New files and directories created in `.claude/` are immediately available - no need to run `./install.sh` unless the symlink itself needs to be recreated.
+- The `.claude/` directory is symlinked to `~/.claude/`. New files are immediately available without re-running `install.sh`.
+- Plugin changes take effect immediately in new Claude sessions.
 
-## Settings Configuration
+## Settings
 
-The `.claude/settings.json` file contains user settings for Claude Code. Example configuration:
-
-```json
-{
-  "permissions": {
-    "allow": ["Bash(mkdir:*)", "WebFetch(domain:github.com)"],
-    "deny": []
-  }
-}
-```
-
-Refer to https://docs.anthropic.com/en/docs/claude-code/settings for the full list of available settings.
+My `.claude/settings.json` enables all plugins from this marketplace plus third-party plugins. See the [settings documentation](https://docs.anthropic.com/en/docs/claude-code/settings) for available options.

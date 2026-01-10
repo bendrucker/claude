@@ -89,7 +89,12 @@
     "github@bendrucker": true,
     "claude-code@bendrucker": true,
     "pull-request@bendrucker": true,
-    "parallel-prs@bendrucker": true
+    "parallel-prs@bendrucker": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "linear@claude-plugins-official": true,
+    "ralph-wiggum@claude-code-plugins": true,
+    "code-simplifier@claude-plugins-official": true,
+    "github@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

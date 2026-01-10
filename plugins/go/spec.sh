@@ -59,11 +59,10 @@ func main() {
 }
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | ./scripts/check.sh 2>&1"
-      The status should equal 2
+      When run sh -c "echo '$input' | ./scripts/check.sh"
+      The status should be success
+      The output should include '"permissionDecision":"deny"'
       The output should include "Cannot modify generated Go file"
-      The output should include "Update the generator code instead"
-      The output should include "go generate"
       rm -f "$test_file"
     End
 
@@ -94,8 +93,9 @@ package pb
 type Test struct {}
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | ./scripts/check.sh 2>&1"
-      The status should equal 2
+      When run sh -c "echo '$input' | ./scripts/check.sh"
+      The status should be success
+      The output should include '"permissionDecision":"deny"'
       The output should include "Cannot modify generated Go file"
       rm -f "$test_file"
     End
@@ -128,8 +128,9 @@ EOF
 package main
 EOF
       input=$(jq -n --arg file_path "$test_file" '{tool_input: {file_path: $file_path}}')
-      When run sh -c "echo '$input' | ./scripts/check.sh 2>&1"
-      The status should equal 2
+      When run sh -c "echo '$input' | ./scripts/check.sh"
+      The status should be success
+      The output should include '"permissionDecision":"deny"'
       The output should include "Cannot modify generated Go file"
       rm -f "$test_file"
     End

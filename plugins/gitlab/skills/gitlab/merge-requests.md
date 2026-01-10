@@ -168,6 +168,24 @@ glab mr close 123
 glab mr reopen 123
 ```
 
+## Merge Request Dependencies
+
+Block an MR from merging until another MR merges first. Requires Premium/Ultimate.
+
+```bash
+# Get the blocking MR's internal ID (not the !number)
+glab api "projects/:fullpath/merge_requests/<iid>" | jq '.id'
+
+# Add dependency: MR 38 blocked by MR 37
+glab api -X POST "projects/:fullpath/merge_requests/38/blocks" \
+  -f "blocking_merge_request_id=<internal_id_of_37>"
+
+# View dependencies
+glab api "projects/:fullpath/merge_requests/38/blocks"
+```
+
+The blocked MR will show `detailed_merge_status: "merge_request_blocked"` until the blocking MR merges.
+
 ## Best Practices
 
 - **Always push first**: Run `git push -u origin <branch>` before `glab mr create`

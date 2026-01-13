@@ -53,12 +53,7 @@ jobs:
         run: ./install.sh
 
       - name: Run hook tests
-        run: |
-          for spec in plugins/*/spec.sh; do
-            plugin=$(dirname "$spec" | xargs basename)
-            echo "Testing $plugin plugin..."
-            (cd "plugins/$plugin" && shellspec --pattern 'spec.sh' --tag unit spec.sh)
-          done
+        run: shellspec --tag unit
 
   markdown:
     runs-on: ubuntu-latest

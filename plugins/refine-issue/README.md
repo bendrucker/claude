@@ -5,7 +5,3 @@ Refining issues with technical context and structured details for Claude Code.
 ## Contents
 
 - **Skill**: Guidance on expanding brief descriptions into detailed issues for bugs, features, and refactors
-
-## Activation
-
-The skill activates when refining or detailing issue descriptions.

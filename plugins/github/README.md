@@ -10,10 +10,6 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
   - `github-rulesets-manager`: Configure repository rulesets and branch protection
 - **Hook**: Intercepts WebFetch for efficient GitHub data access
 
-## Activation
-
-The skill activates when working with GitHub repositories, pull requests, or using `gh` CLI.
-
 ## Testing
 
 ```bash

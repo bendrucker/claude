@@ -26,10 +26,9 @@ Each plugin should have a `README.md` with consistent sections:
 
 - **Title**: `# Plugin Name` with a one-line description
 - **Contents**: List what the plugin provides (skills, hooks, agents, commands)
-- **Activation**: When the skill activates (for skill-based plugins)
 - **Testing**: How to run tests (if `spec.sh` exists)
 
-Do not include installation instructions—assume the marketplace is already configured.
+Do not include installation instructions or skill activation details—the README is an index, not documentation. Users can read the skill files directly for activation patterns.
 
 ## Hooks
 

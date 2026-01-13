@@ -5,7 +5,3 @@ JSON processing and handling best practices using jq for Claude Code.
 ## Contents
 
 - **Skill**: Guidance on JSON parsing, generation, and processing with jq
-
-## Activation
-
-The skill activates when working with JSON data or files.

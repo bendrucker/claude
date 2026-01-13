@@ -22,7 +22,3 @@ Unlike many Things integrations that read or write directly to the SQLite databa
 
 - **Skill**: Comprehensive guidance on JXA scripting and URL scheme usage
 - **Scripts**: Reusable automation scripts (`url.js`, `reorder.js`)
-
-## Activation
-
-The skill activates when managing personal todos or tasks on macOS.

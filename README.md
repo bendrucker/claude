@@ -10,7 +10,7 @@ It also contains my `settings.json` to synchronize my shared settings across mac
 
 ## Plugins
 
-Browse the [`plugins/`](plugins/) directory to see available plugins. Each plugin has its own README with installation instructions.
+Browse the [`plugins/`](plugins/) directory to see available plugins. Each plugin has its own README describing its contents.
 
 ## License
 

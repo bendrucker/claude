@@ -35,6 +35,12 @@ osascript scripts/url.js update id=ABC-123 append-notes="Additional info"
 osascript scripts/url.js show id=today
 ```
 
+**Reorder a list or project items:**
+```bash
+osascript scripts/reorder.js [--list today|anytime|someday] <id1> <id2> <id3> ...
+```
+Items appear at the top of the list in the order specified. Default list is `today`. Also works for items within a project - use the `--list` value matching the items' current scheduling state.
+
 ## Built-in List IDs
 
 - `TMInboxListSource` - Inbox

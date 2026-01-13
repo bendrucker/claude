@@ -25,22 +25,29 @@ High-level bulleted description of changes made.
 
 ## Testing
 
-Only include if tests were added/modified or manual testing was performed. Omit entirely if no testing discussion occurred.
+Only include if tests were added/modified or manual testing was performed. Omit entirely if no testing discussion is relevant.
 
-Focus on qualitative insights about coverage and approach:
+**NEVER mention test counts** - phrases like "Added N tests" or "13 unit tests" provide no value. The number of tests doesn't indicate coverage quality, and readers can count tests themselves if they care.
+
+Focus on **what** is covered and **why** it matters:
 
 **Good examples:**
 - "Tests cover error handling for malformed JSON responses"
-- "Added integration tests for full request/response cycle"
-- "Extended auth tests to cover new OAuth flow"
-- "Manually verified screen reader behavior on iOS Safari"
+- "Added integration tests for the full request/response cycle"
+- "Extended auth tests to cover the new OAuth flow"
+- "Verified edge cases: empty input, null values, and Unicode handling"
 
-**Bad examples (avoid):**
+**Coverage gaps**: Note anything that merited testing but was difficult to automate:
+- "Rate limiting behavior requires manual verification against live API"
+- "Visual layout changes verified in browser but not covered by snapshot tests"
+
+**Manual verification**: Include any testing done outside of automated tests—running commands, checking output, verifying behavior in a browser or tool. This counts whether performed by the user or by Claude during the session.
+
+**Patterns to avoid:**
+- "Added N tests" or "N unit tests" (counts are noise)
 - "All tests passed" (CI shows this)
-- "Added 5 unit tests" (quantity is unimportant)
 - "Tests work correctly" (too vague)
-
-Include manual testing steps as `###` checklist only if actually performed.
+- Listing test file names without explaining coverage
 
 ## References
 

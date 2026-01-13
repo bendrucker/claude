@@ -104,6 +104,11 @@
       "source": "./plugins/parallel-prs"
     },
     {
+      "name": "interview",
+      "description": "Interview-driven planning and clarification",
+      "source": "./plugins/interview"
+    },
+    {
       "name": "agents-md",
       "description": "Loads AGENTS.md files automatically into Claude Code sessions",
       "source": { "source": "github", "repo": "bendrucker/claude-code-agents-md" }

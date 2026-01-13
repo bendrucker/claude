@@ -18,6 +18,53 @@ Each plugin in `plugins/` contains:
 - `hooks/`: Optional hook definitions (`hooks.json`)
 - `commands/`: Optional slash commands
 - `agents/`: Optional agent definitions
+- `spec.sh`: ShellSpec test file (run with `shellspec plugins/<name>/spec.sh`)
+
+## Hooks
+
+Hooks intercept tool calls and can modify inputs, block execution, or request user confirmation. Define hooks in `hooks/hooks.json`:
+
+```json
+{
+  "description": "Sets default state for new issues",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__linear__create_issue",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/default-state.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The `matcher` field supports regex patterns (e.g., `Edit|MultiEdit|Write`). Hook scripts receive JSON on stdin with `tool_name` and `tool_input`.
+
+### PreToolUse Hook Outputs
+
+Hook scripts can output JSON to control behavior:
+
+- **Modify input**: Return `updatedInput` to merge fields into the tool input
+  ```json
+  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {"state": "Todo"}}}
+  ```
+- **Block execution**: Return `permissionDecision: "deny"` with a reason
+  ```json
+  {"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Use: gh repo view"}}
+  ```
+- **Request confirmation**: Return `permissionDecision: "ask"` with a reason
+- **Allow without modification**: Exit with no output
+
+See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [plugins/github/scripts/](plugins/github/scripts/) for permission decisions.
+
+## Testing
+
+Plugins use [ShellSpec](https://shellspec.info/) for testing. Each plugin should have a `spec.sh` file that tests hook scripts directly by piping JSON input. See [plugins/linear/spec.sh](plugins/linear/spec.sh) and [plugins/github/spec.sh](plugins/github/spec.sh) for examples.
 
 ## Workflow
 

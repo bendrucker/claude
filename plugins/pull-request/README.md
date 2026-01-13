@@ -2,10 +2,12 @@
 
 Create pull requests with proper formatting and content guidelines.
 
-## Skills
+## Contents
 
-- **pull-request**: Guidelines for creating PRs with proper title formatting, body structure, and section organization
+- **Skill**: Guidelines for creating PRs with proper title formatting, body structure, and section organization
+- **Command**: `/pull-request:create` to create a PR for the current branch (supports background execution)
+- **Hook**: Validates PR body content before creation
 
-## Commands
+## Activation
 
-- `/pull-request:create`: Create a pull request for the current branch, with optional background execution
+The skill activates when creating pull requests or merge requests on GitHub or GitLab.

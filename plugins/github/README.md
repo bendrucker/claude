@@ -2,27 +2,20 @@
 
 GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
 
-## Features
-
-- **GitHub Skill**: Best practices for GitHub CLI and MCP tool selection
-- **Actions Monitor Agent**: Track GitHub Actions workflow runs and retrieve failure logs
-- **Rulesets Manager Agent**: Configure repository rulesets and branch protection
-
-## Installation
-
-Add the plugin to your Claude Code configuration:
-
-```json
-{
-  "plugins": [
-    "bendrucker/claude#plugins/github"
-  ]
-}
-```
-
 ## Contents
 
-- `skills/github/`: GitHub workflow best practices
-- `agents/`: Specialized agents for Actions monitoring and rulesets management
-- `hooks/`: WebFetch interceptor for efficient GitHub data access
-- `scripts/`: Hook implementation scripts
+- **Skill**: Best practices for GitHub CLI and MCP tool selection
+- **Agents**:
+  - `github-actions-monitor`: Track workflow runs and retrieve failure logs
+  - `github-rulesets-manager`: Configure repository rulesets and branch protection
+- **Hook**: Intercepts WebFetch for efficient GitHub data access
+
+## Activation
+
+The skill activates when working with GitHub repositories, pull requests, or using `gh` CLI.
+
+## Testing
+
+```bash
+shellspec plugins/github/spec.sh
+```

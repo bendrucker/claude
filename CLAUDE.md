@@ -20,6 +20,17 @@ Each plugin in `plugins/` contains:
 - `agents/`: Optional agent definitions
 - `spec.sh`: ShellSpec test file (run with `shellspec plugins/<name>/spec.sh`)
 
+### Plugin READMEs
+
+Each plugin should have a `README.md` with consistent sections:
+
+- **Title**: `# Plugin Name` with a one-line description
+- **Contents**: List what the plugin provides (skills, hooks, agents, commands)
+- **Activation**: When the skill activates (for skill-based plugins)
+- **Testing**: How to run tests (if `spec.sh` exists)
+
+Do not include installation instructions—assume the marketplace is already configured.
+
 ## Hooks
 
 Hooks intercept tool calls and can modify inputs, block execution, or request user confirmation. Define hooks in `hooks/hooks.json`:

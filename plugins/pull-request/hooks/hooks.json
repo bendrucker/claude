@@ -1,0 +1,16 @@
+{
+  "description": "Validates PR body content before creation",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(gh pr create:*)|Bash(gh pr edit:*)|Bash(glab mr create:*)|Bash(glab mr update:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/validate-pr.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -7,19 +7,21 @@ Practical examples for common Things automation tasks.
 ### Simple Todo
 
 ```bash
-open "things:///add?title=Call%20dentist&when=today"
+osascript scripts/url.js add title="Call dentist" when=today
 ```
 
 ### Todo with Full Details
 
 ```bash
-open "things:///add?title=Quarterly%20Review&notes=Review%20goals%20and%20metrics&when=2025-11-01&deadline=2025-11-07&tags=Work,Planning"
+osascript scripts/url.js add title="Quarterly Review" notes="Review goals and metrics" when=2025-11-01 deadline=2025-11-07 tags=Work,Planning
 ```
 
 ### Multiple Todos at Once
 
 ```bash
-open "things:///add?titles=Buy%20milk%0aPick%20up%20dry%20cleaning%0aWalk%20dog&when=today"
+osascript scripts/url.js add titles="Buy milk
+Pick up dry cleaning
+Walk dog" when=today
 ```
 
 ### Todo with Checklist
@@ -45,15 +47,11 @@ open "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 
 ```bash
 # By project name
-open "things:///add?title=Write%20chapter%203&list=Book%20Writing&when=anytime"
+osascript scripts/url.js add title="Write chapter 3" list="Book Writing" when=anytime
 
 # Or get project ID via JXA and use list-id
-project_id=$(osascript -l JavaScript -e '
-const app = Application("Things3");
-const project = app.projects.whose({name: "Book Writing"})[0];
-project ? project.id() : "";
-')
-open "things:///add?title=Write%20chapter%203&list-id=$project_id&when=anytime"
+project_id=$(scripts/run-jxa.sh 'const app = Application("Things3"); const p = app.projects.whose({name: "Book Writing"})[0]; p ? p.id() : "";')
+osascript scripts/url.js add title="Write chapter 3" list-id="$project_id" when=anytime
 ```
 
 ## Creating Projects
@@ -61,19 +59,22 @@ open "things:///add?title=Write%20chapter%203&list-id=$project_id&when=anytime"
 ### Simple Project
 
 ```bash
-open "things:///add-project?title=Website%20Redesign&when=today&tags=Work"
+osascript scripts/url.js add-project title="Website Redesign" when=today tags=Work
 ```
 
 ### Project with Todos
 
 ```bash
-open "things:///add-project?title=Plan%20vacation&when=tomorrow&to-dos=Research%20destinations%0aBook%20flights%0aBook%20hotel%0aCreate%20itinerary"
+osascript scripts/url.js add-project title="Plan vacation" when=tomorrow to-dos="Research destinations
+Book flights
+Book hotel
+Create itinerary"
 ```
 
 ### Project in Area
 
 ```bash
-open "things:///add-project?title=Kitchen%20renovation&area=Home&when=someday"
+osascript scripts/url.js add-project title="Kitchen renovation" area=Home when=someday
 ```
 
 ### Complex Project with JSON
@@ -230,27 +231,24 @@ if (project) {
 
 ## Updating Todos
 
-**Prerequisite**: `AUTH_TOKEN=$(security find-generic-password -a "$USER" -s "things-auth-token" -w)` (see `@1password.md` for setup)
+Auth token is fetched automatically by `osascript scripts/url.js` (see `@1password.md` for setup).
 
 ### Append Notes
 
 ```bash
-todo_id=$(osascript -l JavaScript -e '
-const app = Application("Things3");
-const todo = app.lists.byId("TMTodayListSource").toDos().whose({name: "Call dentist"})[0];
-todo ? todo.id() : "";
-')
-open "things:///update?id=$todo_id&auth-token=$AUTH_TOKEN&append-notes=Appointment%20at%202pm"
+todo_id=$(scripts/run-jxa.sh 'const app = Application("Things3"); const t = app.lists.byId("TMTodayListSource").toDos().whose({name: "Call dentist"})[0]; t ? t.id() : "";')
+osascript scripts/url.js update id="$todo_id" append-notes="Appointment at 2pm"
 ```
 
 ### Add Tags / Move / Reschedule / Complete
 
 ```bash
-open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&add-tags=Urgent,Important"
-open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&list=New%20Project"
-open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&when=tomorrow"
-open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&completed=true"
-open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&append-checklist-items=Item%201%0aItem%202"
+osascript scripts/url.js update id=ABC-123 add-tags=Urgent,Important
+osascript scripts/url.js update id=ABC-123 list="New Project"
+osascript scripts/url.js update id=ABC-123 when=tomorrow
+osascript scripts/url.js update id=ABC-123 completed=true
+osascript scripts/url.js update id=ABC-123 append-checklist-items="Item 1
+Item 2"
 ```
 
 ## Navigation
@@ -258,41 +256,29 @@ open "things:///update?id=ABC-123&auth-token=$AUTH_TOKEN&append-checklist-items=
 ### Show Built-in Lists
 
 ```bash
-# Show Today
-open "things:///show?id=today"
-
-# Show Inbox
-open "things:///show?id=inbox"
-
-# Show Upcoming
-open "things:///show?id=upcoming"
-
-# Show Anytime
-open "things:///show?id=anytime"
+osascript scripts/url.js show id=today
+osascript scripts/url.js show id=inbox
+osascript scripts/url.js show id=upcoming
+osascript scripts/url.js show id=anytime
 ```
 
 ### Show Specific Todo
 
 ```bash
-todo_id="ABC-123"
-open "things:///show?id=$todo_id"
+osascript scripts/url.js show id=ABC-123
 ```
 
 ### Show Project
 
 ```bash
-project_id=$(osascript -l JavaScript -e '
-const app = Application("Things3");
-const project = app.projects.whose({name: "Website Redesign"})[0];
-project ? project.id() : "";
-')
-open "things:///show?id=$project_id"
+project_id=$(scripts/run-jxa.sh 'const app = Application("Things3"); const p = app.projects.whose({name: "Website Redesign"})[0]; p ? p.id() : "";')
+osascript scripts/url.js show id="$project_id"
 ```
 
 ### Search
 
 ```bash
-open "things:///search?query=meeting%20notes"
+osascript scripts/url.js search query="meeting notes"
 ```
 
 ## Advanced Workflows
@@ -304,19 +290,10 @@ open "things:///search?query=meeting%20notes"
 
 # Get today's todos
 echo "Today's Todos:"
-osascript -l JavaScript -e '
-const app = Application("Things3");
-const today = app.lists.byId("TMTodayListSource");
-const todos = today.toDos().map(todo => ({
-  name: todo.name(),
-  project: todo.project()?.name() || "None",
-  dueDate: todo.dueDate()?.toString() || "None"
-}));
-console.log(JSON.stringify(todos, null, 2));
-'
+scripts/run-jxa.sh 'const app = Application("Things3"); const today = app.lists.byId("TMTodayListSource"); JSON.stringify(today.toDos().map(t => ({name: t.name(), project: t.project()?.name() || "None", dueDate: t.dueDate()?.toString() || "None"})), null, 2);'
 
 # Show Today list
-open "things:///show?id=today"
+osascript scripts/url.js show id=today
 ```
 
 ### Create Weekly Review Project
@@ -348,13 +325,10 @@ open "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 ### Bulk Tag All Inbox Items
 
 ```bash
-todo_ids=$(osascript -l JavaScript -e '
-const app = Application("Things3");
-JSON.stringify(app.lists.byId("TMInboxListSource").toDos().map(t => t.id()));
-' | jq -r '.[]')
+todo_ids=$(scripts/run-jxa.sh 'const app = Application("Things3"); JSON.stringify(app.lists.byId("TMInboxListSource").toDos().map(t => t.id()));' | jq -r '.[]')
 
 for todo_id in $todo_ids; do
-  open "things:///update?id=$todo_id&auth-token=$AUTH_TOKEN&add-tags=Needs%20Review"
+  osascript scripts/url.js update id="$todo_id" add-tags="Needs Review"
   sleep 0.1
 done
 ```

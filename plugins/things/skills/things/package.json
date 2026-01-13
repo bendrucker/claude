@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "types:generate": "sdef-to-dts /Applications/Things3.app --output src/Things3.d.ts",
-    "build": "esbuild src/example.ts --bundle --platform=neutral --format=iife --log-level=error > /dev/null"
+    "build": "esbuild src/example.ts --bundle --platform=neutral --format=iife --log-level=error > /dev/null",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +17,7 @@
     "@jxa/run": "^1.4.0",
     "@jxa/sdef-to-dts": "^1.4.0",
     "@types/node": "^25.0.5",
-    "esbuild": "^0.27.2"
+    "esbuild": "^0.27.2",
+    "typescript": "^5.7.3"
   }
 }

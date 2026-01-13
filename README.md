@@ -49,6 +49,7 @@ Available plugins are listed in the [marketplace configuration](.claude-plugin/m
 
 | Plugin | Description |
 |--------|-------------|
+| [agents-md](https://github.com/bendrucker/claude-code-agents-md) | Automatic AGENTS.md file loading |
 | [git](plugins/git) | Git workflow and branching |
 | [github](plugins/github) | GitHub CLI, Actions monitoring, rulesets |
 | [gitlab](plugins/gitlab) | GitLab MR workflows |

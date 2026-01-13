@@ -22,12 +22,7 @@ git worktree add .worktrees/{slug} -b {type}/{issue-id}-{slug} main
 
 Implementation agents work in assigned worktree, then:
 1. Commit and push
-2. Write PR body to `tmp/{branch}/pr-body.md` with `Closes {issue-ref}`
-3. Return (do NOT create PR - subagents cannot use Skill tool)
-
-## Create PRs
-
-Parent creates PRs using `--body-file tmp/{branch}/pr-body.md`.
+2. Load `pull-request` skill and create PR (write body to `tmp/{branch}/pr-body.md` first)
 
 ## Monitor CI
 

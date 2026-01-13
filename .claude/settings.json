@@ -90,6 +90,7 @@
     "claude-code@bendrucker": true,
     "pull-request@bendrucker": true,
     "parallel-prs@bendrucker": true,
+    "interview@bendrucker": true,
     "pr-review-toolkit@claude-plugins-official": true,
     "linear@claude-plugins-official": true,
     "ralph-wiggum@claude-code-plugins": true,

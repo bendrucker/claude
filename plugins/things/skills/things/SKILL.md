@@ -11,8 +11,7 @@ Interact with Things 3, the user's personal task manager for Mac.
 ## Quick Start
 
 **Read operations**: Use TypeScript with esbuild to write type-safe JXA code via `scripts/run-jxa.sh`
-**Write operations**: Use `things://` URL schemes (`things:///add`, `things:///update`, `things:///json`)
-**Auth token**: `security find-generic-password -a "$USER" -s "things-auth-token" -w` (see `@1password.md` for setup)
+**Write operations**: Use `osascript scripts/url.js` which handles auth tokens and URL encoding automatically
 
 ## Common Commands
 
@@ -23,18 +22,17 @@ scripts/run-jxa.sh 'const app = Application("Things3"); const today = app.lists.
 
 **Create a todo:**
 ```bash
-open "things:///add?title=Task%20name&when=today&tags=Work"
+osascript scripts/url.js add title="Task name" when=today tags=Work
 ```
 
 **Update a todo:**
 ```bash
-auth_token=$(security find-generic-password -a "$USER" -s "things-auth-token" -w)
-open "things:///update?id=ABC-123&auth-token=$auth_token&append-notes=Additional%20info"
+osascript scripts/url.js update id=ABC-123 append-notes="Additional info"
 ```
 
 **Navigate to today:**
 ```bash
-open "things:///show?id=today"
+osascript scripts/url.js show id=today
 ```
 
 ## Built-in List IDs
@@ -72,8 +70,8 @@ Load detailed guides as needed:
 
 ## Essential Tips
 
-- **URL encoding**: Always URL-encode parameters (spaces → `%20`, newlines → `%0a`)
 - **Verification**: ALWAYS verify updates succeeded by reading back the todo with JXA
 - **Repeating tasks**: Filter by comparing `creationDate` to midnight (see [troubleshooting.md](troubleshooting.md))
 - **TypeScript mode**: Use `scripts/run-jxa.sh` for type-safe JXA with autocomplete
 - **Moving out of inbox**: Set `when=anytime` to move a todo out of inbox without assigning an area
+- **Raw URL scheme**: For edge cases not covered by `url.js`, use `open "things:///..."` directly (see [url-scheme.md](url-scheme.md))

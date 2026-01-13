@@ -70,6 +70,13 @@ await linear.create_issue({
 })
 ```
 
+**Label Lookup**: Labels can exist at the workspace level or team level. When searching for labels, check both:
+
+1. Workspace labels: `list_issue_labels()` (no team filter)
+2. Team labels: `list_issue_labels({ team: "TEAM" })`
+
+If a label isn't found at the workspace level, check the team before concluding it doesn't exist.
+
 ## SDK Automation Scripts
 
 **Use only when MCP tools are insufficient.** For complex operations involving loops, mapping, or bulk updates, write TypeScript scripts using `@linear/sdk`. See `sdk.md` for:

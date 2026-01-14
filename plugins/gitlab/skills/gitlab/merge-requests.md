@@ -199,3 +199,36 @@ The blocked MR will show `detailed_merge_status: "merge_request_blocked"` until 
 - Forgetting to push the branch before creating MR
 - Using `gh pr` commands instead of `glab mr`
 - Calling them "pull requests" in command syntax
+
+## Differences from GitHub CLI
+
+The `glab` CLI is similar to `gh` but has key differences:
+
+| Feature | GitHub (`gh pr`) | GitLab (`glab mr`) |
+|---------|------------------|-------------------|
+| Body from file | `--body-file FILE` | Not available; use `--description "$(cat FILE)"` |
+| Auto-fill + custom | Can combine `--fill` with other flags | `--fill` conflicts with `--title`/`--description` |
+
+### Reading Description from File
+
+GitHub:
+```bash
+gh pr create --title "..." --body-file tmp/pr-body.md
+```
+
+GitLab:
+```bash
+glab mr create --title "..." --description "$(cat tmp/pr-body.md)"
+```
+
+### Auto-fill Behavior
+
+With `glab`, the `--fill` flag auto-populates title and description from commits but **cannot be combined** with `--title` or `--description`. Choose one approach:
+
+```bash
+# Auto-fill from commits (no custom title/description)
+glab mr create --fill
+
+# Custom title and description (no auto-fill)
+glab mr create --title "..." --description "..."
+```

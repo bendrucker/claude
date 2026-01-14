@@ -15,7 +15,7 @@ This skill activates for:
 
 ## Process
 
-### Search Phase
+### Search
 
 Identify relevant sources based on context:
 - **GitHub**: Search for repositories matching the problem space
@@ -27,7 +27,7 @@ Run searches in parallel. Infer the ecosystem from:
 2. Query terms (e.g., "React hook for X" implies npm)
 3. Ask only if genuinely ambiguous
 
-### Investigation Phase
+### Investigation
 
 Start with 2-3 most promising projects:
 1. Read README and high-level docs to assess relevance
@@ -44,7 +44,7 @@ Investigate [project] for prior art on [topic]:
 - What can we learn for our use case?
 ```
 
-### Synthesis Phase
+### Synthesis
 
 Gather findings and produce a recommendation:
 - Identify common patterns across solutions

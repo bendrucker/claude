@@ -128,8 +128,38 @@ Describe 'Numbering hook'
       The output should be blank
     End
 
-    It 'skips unsupported file types (Markdown)'
-      When run run_hook "write" "Write" "README.md" '# Step 1: Introduction'
+  End
+
+  Context 'Markdown numbered headings'
+    It 'detects "# 1. Introduction"'
+      When run run_hook "write" "Write" "README.md" '# 1. Introduction'
+      The status should be success
+      The output should satisfy has_decision "deny"
+      The output should satisfy contains_reason "1. Introduction"
+    End
+
+    It 'detects "## Step 2: Setup"'
+      When run run_hook "write" "Write" "docs.md" '## Step 2: Setup'
+      The status should be success
+      The output should satisfy has_decision "deny"
+      The output should satisfy contains_reason "Step 2"
+    End
+
+    It 'detects "### Phase 3"'
+      When run run_hook "write" "Write" "guide.markdown" '### Phase 3'
+      The status should be success
+      The output should satisfy has_decision "deny"
+      The output should satisfy contains_reason "Phase 3"
+    End
+
+    It 'allows descriptive headings'
+      When run run_hook "write" "Write" "README.md" '# Introduction'
+      The status should be success
+      The output should be blank
+    End
+
+    It 'allows headings with numbers mid-text'
+      When run run_hook "write" "Write" "README.md" '# Using OAuth2 for Authentication'
       The status should be success
       The output should be blank
     End

@@ -40,7 +40,7 @@ case "$ext" in
 esac
 
 # Create temp file with correct extension for language detection
-tmp_file="/tmp/claude/hook-check.${ext}"
+tmp_file="${TMPDIR:-/tmp}/hook-check.${ext}"
 echo "$content" > "$tmp_file"
 
 # Run ast-grep on the temp file

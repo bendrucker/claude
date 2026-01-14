@@ -1,0 +1,8 @@
+{
+  "name": "style",
+  "description": "Code style enforcement hooks",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

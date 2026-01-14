@@ -1,0 +1,64 @@
+id: numbering
+language: go
+severity: error
+message: "Numbered identifier creates tight coupling: $NAME"
+note: "Use descriptive names instead. See CLAUDE.md Organization guidelines."
+rule:
+  any:
+    - pattern: "func $NAME($$$) { $$$ }"
+    - pattern: "func ($RECV) $NAME($$$) { $$$ }"
+    - pattern: "const $NAME = $$$"
+    - pattern: "var $NAME = $$$"
+    - pattern: "type $NAME $$$"
+constraints:
+  NAME:
+    regex: "(?i)(step|phase|part)[0-9]+"
+---
+id: numbering
+language: javascript
+severity: error
+message: "Numbered identifier creates tight coupling: $NAME"
+note: "Use descriptive names instead. See CLAUDE.md Organization guidelines."
+rule:
+  any:
+    - pattern: "function $NAME($$$) { $$$ }"
+    - pattern: "const $NAME = $$$"
+    - pattern: "let $NAME = $$$"
+    - pattern: "var $NAME = $$$"
+constraints:
+  NAME:
+    regex: "(?i)(step|phase|part)[0-9]+"
+---
+id: numbering
+language: typescript
+severity: error
+message: "Numbered identifier creates tight coupling: $NAME"
+note: "Use descriptive names instead. See CLAUDE.md Organization guidelines."
+rule:
+  any:
+    - pattern: "function $NAME($$$) { $$$ }"
+    - pattern: "const $NAME = $$$"
+    - pattern: "let $NAME = $$$"
+    - pattern: "var $NAME = $$$"
+    - pattern: "type $NAME = $$$"
+    - pattern: "interface $NAME { $$$ }"
+constraints:
+  NAME:
+    regex: "(?i)(step|phase|part)[0-9]+"
+---
+id: numbering
+language: python
+severity: error
+message: "Numbered identifier creates tight coupling: $NAME"
+note: "Use descriptive names instead. See CLAUDE.md Organization guidelines."
+rule:
+  any:
+    - pattern: |
+        def $NAME($$$):
+            $$$BODY
+    - pattern: |
+        class $NAME:
+            $$$BODY
+constraints:
+  NAME:
+    regex: "(?i)(step|phase|part)[0-9]+"

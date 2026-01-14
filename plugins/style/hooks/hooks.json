@@ -1,0 +1,25 @@
+{
+  "description": "Detects numbered identifiers in code using ast-grep",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/numbering.sh write"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/numbering.sh edit"
+          }
+        ]
+      }
+    ]
+  }
+}

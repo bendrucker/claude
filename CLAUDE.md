@@ -76,6 +76,10 @@ See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [p
 
 Plugins use [ShellSpec](https://shellspec.info/) for testing. Each plugin should have a `spec.sh` file that tests hook scripts directly by piping JSON input. See [plugins/linear/spec.sh](plugins/linear/spec.sh) and [plugins/github/spec.sh](plugins/github/spec.sh) for examples.
 
+## Verification
+
+Run `scripts/check-marketplace.sh` to verify all plugin directories are listed in `marketplace.json`. This check runs in CI and should pass before merging.
+
 ## Workflow
 
 - The `.claude/` directory is symlinked to `~/.claude/`. New files are immediately available without re-running `install.sh`.

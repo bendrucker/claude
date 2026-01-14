@@ -11,6 +11,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  marketplace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Check marketplace completeness
+        run: ./scripts/check-marketplace.sh
+
   json-schema:
     runs-on: ubuntu-latest
     steps:

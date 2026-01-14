@@ -84,6 +84,11 @@
       "source": "./plugins/newline"
     },
     {
+      "name": "style",
+      "description": "Code style enforcement hooks",
+      "source": "./plugins/style"
+    },
+    {
       "name": "github",
       "description": "GitHub workflow, Actions monitoring, and rulesets management",
       "source": "./plugins/github"

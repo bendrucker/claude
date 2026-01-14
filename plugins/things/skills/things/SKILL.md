@@ -10,14 +10,14 @@ Interact with Things 3, the user's personal task manager for Mac.
 
 ## Quick Start
 
-**Read operations**: Use TypeScript with esbuild to write type-safe JXA code via `scripts/run-jxa.sh`
+**Read operations**: Use `osascript -l JavaScript -e '...'` for inline JXA
 **Write operations**: Use `osascript scripts/url.js` which handles auth tokens and URL encoding automatically
 
 ## Common Commands
 
 **Read today's todos:**
 ```bash
-scripts/run-jxa.sh 'const app = Application("Things3"); const today = app.lists.byId("TMTodayListSource"); JSON.stringify(today.toDos().map(t => ({id: t.id(), name: t.name()})), null, 2);'
+osascript -l JavaScript -e 'const app = Application("Things3"); const today = app.lists.byId("TMTodayListSource"); JSON.stringify(today.toDos().map(t => ({id: t.id(), name: t.name()})), null, 2);'
 ```
 
 **Create a todo:**
@@ -78,6 +78,6 @@ Load detailed guides as needed:
 
 - **Verification**: ALWAYS verify updates succeeded by reading back the todo with JXA
 - **Repeating tasks**: Filter by comparing `creationDate` to midnight (see [troubleshooting.md](troubleshooting.md))
-- **TypeScript mode**: Use `scripts/run-jxa.sh` for type-safe JXA with autocomplete
 - **Moving out of inbox**: Set `when=anytime` to move a todo out of inbox without assigning an area
 - **Raw URL scheme**: For edge cases not covered by `url.js`, use `open "things:///..."` directly (see [url-scheme.md](url-scheme.md))
+- **Type reference**: See [jxa.md](jxa.md) for the complete Things3 JXA API

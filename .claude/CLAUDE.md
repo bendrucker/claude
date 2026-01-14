@@ -17,6 +17,13 @@
 - Break code into multiple files where appropriate first before splitting across directories.
 - Do not number steps or phases in code (e.g., "Phase 1:", "Step 2:"). Use descriptive function names and call them in sequence. Numbering creates tight coupling, obscures whether order matters, and impedes inserting new steps.
 
+## Plan Mode
+
+When writing plans, be extremely concise. Sacrifice grammar for the sake of concision.
+
+- End every plan with a numbered list of concrete steps
+- List any unresolved questions at the end (edge cases, error handling, unclear requirements)
+
 ## Workflow
 
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.

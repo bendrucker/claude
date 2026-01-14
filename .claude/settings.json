@@ -56,7 +56,8 @@
     "github@claude-plugins-official": true,
     "astral@astral-sh": true,
     "agents-md@bendrucker": true,
-    "ast-grep@ast-grep": true
+    "ast-grep@ast-grep": true,
+    "worktrunk@worktrunk": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -75,6 +76,12 @@
       "source": {
         "source": "github",
         "repo": "ast-grep/claude-skill"
+      }
+    },
+    "worktrunk": {
+      "source": {
+        "source": "github",
+        "repo": "max-sixty/worktrunk"
       }
     }
   },
@@ -109,5 +116,9 @@
       "networksetup:*"
     ]
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "statusLine": {
+    "type": "command",
+    "command": "wt list statusline --claude-code"
+  }
 }

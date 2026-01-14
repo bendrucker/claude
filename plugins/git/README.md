@@ -6,4 +6,3 @@ Git workflow and branching best practices for Claude Code.
 
 - **Skills**:
   - `git`: Git commands, branching, and commit message formatting
-  - `worktrees`: Managing git worktrees for parallel development

@@ -69,7 +69,7 @@ Respond in the conversation with structured markdown (not files):
 - **Repository**: [link]
 - **Relevance**: [why this matters to the query]
 - **Approach**: [how it solves the problem]
-- **Key insights**: [what to learn from it]
+- **Lessons**: [what to learn from it]
 
 #### [Next Project]
 ...

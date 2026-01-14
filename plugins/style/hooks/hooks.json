@@ -1,5 +1,5 @@
 {
-  "description": "Detects inappropriate numbered sequences in code and documentation",
+  "description": "Detects numbered identifiers in code using ast-grep",
   "hooks": {
     "PreToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/anti-numbering.sh write"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/numbering.sh write"
           }
         ]
       },
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/anti-numbering.sh edit"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/numbering.sh edit"
           }
         ]
       }

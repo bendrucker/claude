@@ -55,7 +55,8 @@
     "code-simplifier@claude-plugins-official": true,
     "github@claude-plugins-official": true,
     "astral@astral-sh": true,
-    "agents-md@bendrucker": true
+    "agents-md@bendrucker": true,
+    "ast-grep@ast-grep": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -68,6 +69,12 @@
       "source": {
         "source": "github",
         "repo": "astral-sh/claude-code-plugins"
+      }
+    },
+    "ast-grep": {
+      "source": {
+        "source": "github",
+        "repo": "ast-grep/claude-skill"
       }
     }
   },

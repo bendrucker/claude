@@ -27,6 +27,10 @@
     ],
     "deny": []
   },
+  "statusLine": {
+    "type": "command",
+    "command": "wt list statusline --claude-code"
+  },
   "enabledPlugins": {
     "pr-review-toolkit@claude-code-plugins": true,
     "go@bendrucker": true,
@@ -49,7 +53,6 @@
     "pull-request@bendrucker": true,
     "parallel-prs@bendrucker": true,
     "interview@bendrucker": true,
-    "pr-review-toolkit@claude-plugins-official": true,
     "linear@claude-plugins-official": true,
     "ralph-wiggum@claude-code-plugins": true,
     "code-simplifier@claude-plugins-official": true,
@@ -116,9 +119,5 @@
       "networksetup:*"
     ]
   },
-  "alwaysThinkingEnabled": true,
-  "statusLine": {
-    "type": "command",
-    "command": "wt list statusline --claude-code"
-  }
+  "alwaysThinkingEnabled": true
 }

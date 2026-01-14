@@ -114,6 +114,11 @@
       "source": "./plugins/interview"
     },
     {
+      "name": "research",
+      "description": "Research existing solutions when exploring a new problem space",
+      "source": "./plugins/research"
+    },
+    {
       "name": "agents-md",
       "description": "Loads AGENTS.md files automatically into Claude Code sessions",
       "source": { "source": "github", "repo": "bendrucker/claude-code-agents-md" }

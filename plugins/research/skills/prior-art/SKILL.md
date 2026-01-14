@@ -6,13 +6,6 @@ description: |
 
 Research prior art for: $ARGUMENTS
 
-## Activation
-
-This skill activates for:
-- `/prior-art <query>` slash command
-- Mentions of "prior art", "existing solutions", "existing libraries"
-- Questions like "what libraries exist for X", "how do others solve X"
-
 ## Process
 
 ### Search

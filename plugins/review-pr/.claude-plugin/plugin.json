@@ -1,8 +1,0 @@
-{
-  "name": "review-pr",
-  "description": "Review a pull request or merge request",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  }
-}

@@ -42,7 +42,7 @@
     "things@bendrucker": true,
     "refine-issue@bendrucker": true,
     "implement-issue@bendrucker": true,
-    "review-pr@bendrucker": true,
+    "review@bendrucker": true,
     "newline@bendrucker": true,
     "github@bendrucker": true,
     "claude-code@bendrucker": true,

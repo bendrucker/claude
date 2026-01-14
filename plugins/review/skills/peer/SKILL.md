@@ -1,11 +1,11 @@
 ---
-name: review-pr
+name: peer
 description: |
-  Review a pull request or merge request. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes. Supports GitHub and GitLab.
+  Review a pull request when requested by a peer. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes. Supports GitHub and GitLab.
 allowed-tools: Bash(gh:*), mcp__github
 ---
 
-# Review Pull Request
+# Peer Review
 
 Assist me in reviewing this PR: $ARGUMENTS
 

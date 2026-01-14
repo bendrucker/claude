@@ -74,9 +74,9 @@
       "source": "./plugins/implement-issue"
     },
     {
-      "name": "review-pr",
-      "description": "Review a pull request or merge request",
-      "source": "./plugins/review-pr"
+      "name": "review",
+      "description": "Code review workflows for peer and self review",
+      "source": "./plugins/review"
     },
     {
       "name": "newline",

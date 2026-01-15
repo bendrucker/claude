@@ -1,6 +1,6 @@
 ---
 name: linear
-description: Managing Linear issues, projects, and teams. Use when working with Linear tasks, creating issues, updating status, querying projects, or managing team workflows.
+description: Interacting with Linear issues, projects, and teams. Use when creating issues, updating issues, querying issues, managing projects, working on tasks, discussing backlogs, or any interaction with Linear.
 allowed-tools:
   - mcp__linear
   - WebFetch(domain:linear.app)
@@ -100,6 +100,17 @@ LINEAR_API_KEY=lin_api_xxx node scripts/query.ts "query { viewer { id name } }"
 ```
 
 If `LINEAR_API_KEY` is not provided to the Claude process, inform the user that GraphQL queries cannot be executed without an API key.
+
+## Opening Issues in the Desktop App
+
+Use the `linear://` URL scheme to open issues in the native Mac app instead of the browser:
+
+```bash
+# Replace https://linear.app with linear:// in any Linear URL
+open "linear://team-slug/issue/ENG-123"
+```
+
+The desktop app must be installed. When given an issue identifier (e.g., `ENG-123`), construct the URL using the team's workspace slug and issue identifier.
 
 ## Reference
 

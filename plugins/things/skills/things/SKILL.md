@@ -74,6 +74,18 @@ Load detailed guides as needed:
 - **[1password.md](1password.md)** - Auth token setup and keychain configuration
 - **[troubleshooting.md](troubleshooting.md)** - Common issues, best practices, repeating task detection
 
+## Notes Formatting
+
+Things supports [Markdown in notes](https://culturedcode.com/things/support/articles/4651820/). Use formatting for readability:
+
+- **Headings**: Use `#`, `##`, `###` at line start
+- **Bold**: Use `**text**` for emphasis
+- **Highlights**: Use `::text::` for highlighted text
+- **Code blocks**: Wrap commands or code in triple backticks
+- **Inline code**: Use backticks for `identifiers`, `file paths`, `commands`
+- **Links**: Use `[title](url)` for clickable links
+- **Lists**: Use `-` or `1.` for bulleted/numbered lists
+
 ## Essential Tips
 
 - **Verification**: ALWAYS verify updates succeeded by reading back the todo with JXA

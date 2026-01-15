@@ -28,9 +28,15 @@ function requiresAuth(command) {
  * @returns {string}
  */
 function getAuthToken(app) {
-  return app.doShellScript(
-    'security find-generic-password -a "$USER" -s "things-auth-token" -w'
-  );
+  try {
+    return app.doShellScript(
+      'security find-generic-password -a "$USER" -s "things-auth-token" -w'
+    );
+  } catch (e) {
+    throw new Error(
+      'Things auth token not found in keychain. See 1password.md for setup instructions.'
+    );
+  }
 }
 
 /**

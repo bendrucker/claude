@@ -1,0 +1,183 @@
+#!/usr/bin/env zsh
+# shellcheck shell=bash
+# Nightly Claude configuration sync and plugin upgrade
+# Syncs repo, updates marketplaces and plugins, creates Things task on failure
+
+set -e
+
+SCRIPT_DIR="${0:A:h}"
+CLAUDE_REPO_HOME="${CLAUDE_REPO_HOME:-$HOME/.claude-repo}"
+LOG_TAG="claude-upgrade"
+
+log() {
+  local msg="$1"
+  logger -t "$LOG_TAG" "$msg" 2>/dev/null || true
+  echo "$msg"
+}
+
+notify() {
+  local title="$1"
+  local message="$2"
+
+  if [[ "$(uname)" != "Darwin" ]]; then
+    return
+  fi
+
+  osascript -e "display notification \"$message\" with title \"$title\" sound name \"Basso\"" 2>/dev/null || true
+}
+
+sync_repo() {
+  log "Syncing Claude repository..."
+
+  if [[ -L "$CLAUDE_REPO_HOME" ]]; then
+    log "ERROR: $CLAUDE_REPO_HOME is a symlink - run scripts/setup first"
+    notify "Claude Upgrade" "Failed: ~/.claude-repo is a symlink"
+    return 1
+  fi
+
+  if [[ ! -d "$CLAUDE_REPO_HOME/.git" ]]; then
+    log "ERROR: $CLAUDE_REPO_HOME is not a git repository"
+    notify "Claude Upgrade" "Failed: not a git repository"
+    return 1
+  fi
+
+  cd "$CLAUDE_REPO_HOME"
+
+  if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+    log "ERROR: Local changes in $CLAUDE_REPO_HOME - skipping sync"
+    notify "Claude Upgrade" "Skipped: local changes present"
+    return 1
+  fi
+
+  local default_branch
+  default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+  if [[ -z "$default_branch" ]]; then
+    git remote set-head origin --auto 2>/dev/null || true
+    default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+  fi
+  default_branch="${default_branch:-main}"
+
+  local retries=4 delay=2
+  for ((i=1; i<=retries; i++)); do
+    if git fetch origin "$default_branch" 2>&1; then
+      break
+    fi
+    if ((i < retries)); then
+      log "Fetch failed, retrying in ${delay}s... (attempt $i/$retries)"
+      sleep "$delay"
+      delay=$((delay * 2))
+    else
+      log "ERROR: Failed to fetch after retries"
+      notify "Claude Upgrade" "Failed: network error"
+      return 1
+    fi
+  done
+
+  local local_rev remote_rev
+  local_rev=$(git rev-parse HEAD)
+  remote_rev=$(git rev-parse "origin/$default_branch")
+
+  if [[ "$local_rev" == "$remote_rev" ]]; then
+    log "Repository already up to date (${local_rev:0:7})"
+    return 0
+  fi
+
+  log "Updating repository from ${local_rev:0:7} to ${remote_rev:0:7}..."
+
+  if git pull --ff-only origin "$default_branch" 2>&1; then
+    log "Repository updated to $(git rev-parse --short HEAD)"
+  else
+    log "ERROR: Failed to pull repository"
+    notify "Claude Upgrade" "Failed: could not pull"
+    return 1
+  fi
+}
+
+update_marketplaces() {
+  log "Updating marketplaces..."
+  if ! claude plugin marketplace update 2>&1; then
+    log "WARNING: marketplace update had issues"
+    return 1
+  fi
+}
+
+update_plugins() {
+  log "Updating plugins..."
+
+  local settings_file="$CLAUDE_REPO_HOME/.claude/settings.json"
+  if [[ ! -f "$settings_file" ]]; then
+    log "WARNING: settings.json not found at $settings_file"
+    return 0
+  fi
+
+  local plugins
+  plugins=$(jq -r '.enabledPlugins // {} | keys[]' "$settings_file" 2>/dev/null)
+
+  if [[ -z "$plugins" ]]; then
+    log "No enabled plugins found"
+    return 0
+  fi
+
+  local failed=0
+  while IFS= read -r plugin; do
+    log "  Updating $plugin..."
+    if ! claude plugin update "$plugin" 2>&1; then
+      log "  WARNING: Failed to update $plugin"
+      ((failed++))
+    fi
+  done <<< "$plugins"
+
+  if ((failed > 0)); then
+    log "WARNING: $failed plugin(s) failed to update"
+  fi
+}
+
+create_things_task() {
+  local output="$1"
+
+  log "Creating Things task for upgrade failure..."
+
+  local notes='```sh
+claude-upgrade
+```
+
+## Error Output
+```
+'"$output"'
+```'
+
+  local encoded_notes encoded_title
+  encoded_notes=$(echo "$notes" | jq -sRr @uri)
+  encoded_title=$(echo "Claude upgrade failed" | jq -sRr @uri)
+
+  open "things:///add?title=${encoded_title}&notes=${encoded_notes}&when=today"
+
+  notify "Claude Upgrade" "Upgrade failed - see Things task"
+}
+
+main() {
+  local output
+  output=$(mktemp)
+  trap "rm -f $output" EXIT
+
+  {
+    if ! sync_repo; then
+      exit 1
+    fi
+
+    if ! update_marketplaces; then
+      log "WARNING: Marketplace update failed, continuing..."
+    fi
+
+    update_plugins
+  } 2>&1 | tee "$output"
+
+  if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+    create_things_task "$(cat "$output")"
+    exit 1
+  fi
+
+  log "All upgrades completed successfully"
+}
+
+main

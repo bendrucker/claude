@@ -4,7 +4,7 @@ Meta-tools for Claude Code configuration and customization.
 
 ## Skills
 
-- **claude-code**: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows
+- **skills**: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows
 
 ## Agents
 

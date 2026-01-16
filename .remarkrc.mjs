@@ -8,13 +8,13 @@ const remarkConfig = {
 			remarkLintFrontmatterSchema,
 			{
 				schemas: {
-					'.claude/agents/schema.json': [
+					'schemas/agent.schema.json': [
 						'.claude/agents/*.md'
 					],
-					'.claude/commands/schema.json': [
+					'schemas/command.schema.json': [
 						'.claude/commands/*.md'
 					],
-					'.claude/skills/schema.json': [
+					'schemas/skill.schema.json': [
 						'.claude/skills/*/SKILL.md'
 					]
 				}

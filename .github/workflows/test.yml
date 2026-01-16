@@ -39,9 +39,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          always_args=(
+            --always=schemas/
+            --always=scripts/
+            --always=.github/workflows/test.yml
+            --always=.claude-plugin/marketplace.json
+          )
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             readarray -t files < <(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path')
-            plugins=$(npx tsx scripts/list-plugins.ts "${files[@]}")
+            plugins=$(npx tsx scripts/list-plugins.ts "${always_args[@]}" "${files[@]}")
           else
             plugins=$(npx tsx scripts/list-plugins.ts)
           fi

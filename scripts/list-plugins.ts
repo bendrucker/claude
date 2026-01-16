@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { parseArgs } from 'node:util';
 
 interface PluginEntry {
   name: string;
@@ -8,13 +9,6 @@ interface PluginEntry {
 interface Marketplace {
   plugins: PluginEntry[];
 }
-
-const INFRASTRUCTURE_PATHS = [
-  'schemas/',
-  'scripts/',
-  '.github/workflows/test.yml',
-  '.claude-plugin/marketplace.json'
-] as const;
 
 function getLocalPlugins(): string[] {
   const content = readFileSync('.claude-plugin/marketplace.json', 'utf8');
@@ -33,17 +27,25 @@ function extractPluginNames(files: string[]): string[] {
   return [...plugins];
 }
 
-function hasInfrastructureChanges(files: string[]): boolean {
-  return files.some(file => INFRASTRUCTURE_PATHS.some(path => file.startsWith(path)));
+function matchesAlwaysPaths(files: string[], alwaysPaths: string[]): boolean {
+  return files.some(file => alwaysPaths.some(path => file.startsWith(path)));
 }
 
 function main(): void {
-  const changedFiles = process.argv.slice(2);
+  const { values, positionals } = parseArgs({
+    options: {
+      always: { type: 'string', multiple: true, default: [] }
+    },
+    allowPositionals: true
+  });
+
+  const alwaysPaths = values.always ?? [];
+  const changedFiles = positionals;
   const allPlugins = getLocalPlugins();
 
   let plugins: string[];
   if (changedFiles.length > 0) {
-    if (hasInfrastructureChanges(changedFiles)) {
+    if (matchesAlwaysPaths(changedFiles, alwaysPaths)) {
       plugins = allPlugins;
     } else {
       const changedPlugins = extractPluginNames(changedFiles);

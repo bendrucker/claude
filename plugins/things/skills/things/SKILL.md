@@ -7,11 +7,11 @@ hooks:
     - matcher: "Bash(osascript:*)"
       hooks:
         - type: command
-          command: "./scripts/disable-sandbox.sh"
+          command: "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"updatedInput\":{\"dangerouslyDisableSandbox\":true}}}'"
     - matcher: "Bash(open:*)"
       hooks:
         - type: command
-          command: "./scripts/disable-sandbox.sh"
+          command: "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"updatedInput\":{\"dangerouslyDisableSandbox\":true}}}'"
 ---
 
 # Things 3 Task Manager

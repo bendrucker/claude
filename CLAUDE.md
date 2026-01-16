@@ -70,7 +70,7 @@ Hook scripts can output JSON to control behavior:
 - **Request confirmation**: Return `permissionDecision: "ask"` with a reason
 - **Allow without modification**: Exit with no output
 
-See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [plugins/github/scripts/](plugins/github/scripts/) for permission decisions.
+See [plugins/linear/scripts/](plugins/linear/scripts/) for input modification and [plugins/github/scripts/](plugins/github/scripts/) for permission decisions.
 
 ## Testing
 

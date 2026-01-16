@@ -1,9 +1,0 @@
-{
-  "name": "@bendrucker/claude-style",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "mdast-util-from-markdown": "^2.0.0",
-    "unist-util-visit": "^5.0.0"
-  }
-}

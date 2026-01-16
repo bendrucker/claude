@@ -146,6 +146,42 @@ hooks:
 
 Skill hooks are scoped to the skill's execution and cleaned up when the skill finishes.
 
+### Prefer Specific Matchers
+
+Use tool argument patterns instead of generic tool names with internal filtering. Combine multiple patterns with `|`:
+
+```yaml
+# Preferred: specific matchers, combined with pipe, readable multi-line YAML
+hooks:
+  PreToolUse:
+    - matcher: "Bash(osascript:*)|Bash(open:*)"
+      hooks:
+        - type: command
+          command: |
+            jq -n '{
+              hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                updatedInput: { dangerouslyDisableSandbox: true }
+              }
+            }'
+```
+
+```yaml
+# Avoid: generic matcher with internal filtering
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/maybe-disable-sandbox.sh"
+```
+
+**Best practices:**
+- Use specific matchers (`Bash(osascript:*)`) over generic ones (`Bash`)
+- Combine related matchers with `|` instead of duplicating hook entries
+- Use YAML multi-line syntax (`|`) for readable commands
+- Use `jq -n` for static JSON responses instead of escaped echo strings
+
 ## Content Guidelines
 
 - **Consistent Terminology**: One term per concept

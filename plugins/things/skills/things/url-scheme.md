@@ -38,7 +38,7 @@ Creates new to-do items in Things.
 
 **Example:**
 ```bash
-open "things:///add?title=Buy%20milk&notes=Low%20fat&when=evening&tags=Errand"
+open -g "things:///add?title=Buy%20milk&notes=Low%20fat&when=evening&tags=Errand"
 ```
 
 ### add-project - Create Projects
@@ -59,7 +59,7 @@ Creates new projects with optional to-dos and areas.
 
 **Example:**
 ```bash
-open "things:///add-project?title=Build%20treehouse&when=today&area=Home"
+open -g "things:///add-project?title=Build%20treehouse&when=today&area=Home"
 ```
 
 ### update - Modify To-dos
@@ -88,7 +88,7 @@ Updates existing to-do properties. **Requires `auth-token` and `id`.**
 
 **Example:**
 ```bash
-open "things:///update?id=4BE64FEA-8FEF-4F4F-B8B2-4E74605D5FA5&auth-token=YOUR_TOKEN&append-notes=Updated%20info"
+open -g "things:///update?id=4BE64FEA-8FEF-4F4F-B8B2-4E74605D5FA5&auth-token=YOUR_TOKEN&append-notes=Updated%20info"
 ```
 
 **Notes:**
@@ -127,8 +127,8 @@ Navigates to specific items or built-in lists.
 
 **Example:**
 ```bash
-open "things:///show?id=today"
-open "things:///show?query=Weekly%20Review&filter=Work,Planning"
+open -g "things:///show?id=today"
+open -g "things:///show?query=Weekly%20Review&filter=Work,Planning"
 ```
 
 ### search - Open Search
@@ -140,7 +140,7 @@ Invokes the search interface.
 
 **Example:**
 ```bash
-open "things:///search?query=meeting%20notes"
+open -g "things:///search?query=meeting%20notes"
 ```
 
 ### version - Check Compatibility
@@ -149,7 +149,7 @@ Returns app and URL scheme version information.
 
 **Example:**
 ```bash
-open "things:///version"
+open -g "things:///version"
 ```
 
 ---
@@ -186,7 +186,7 @@ The `json` command enables creating complex structures with projects, to-dos, he
 **Basic Usage:**
 ```bash
 data='[{"type":"to-do","attributes":{"title":"Task name"}}]'
-open "things:///json?data=$(echo "$data" | jq -sRr @uri)"
+open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 ```
 
 ### Supported Object Types
@@ -297,7 +297,7 @@ data='[
     }
   }
 ]'
-open "things:///json?data=$(echo "$data" | jq -sRr @uri)"
+open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 ```
 
 ---

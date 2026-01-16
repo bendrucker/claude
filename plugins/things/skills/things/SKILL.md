@@ -7,11 +7,23 @@ hooks:
     - matcher: "Bash(osascript:*)"
       hooks:
         - type: command
-          command: "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"updatedInput\":{\"dangerouslyDisableSandbox\":true}}}'"
+          command: |
+            jq -n '{
+              hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                updatedInput: { dangerouslyDisableSandbox: true }
+              }
+            }'
     - matcher: "Bash(open:*)"
       hooks:
         - type: command
-          command: "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"updatedInput\":{\"dangerouslyDisableSandbox\":true}}}'"
+          command: |
+            jq -n '{
+              hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                updatedInput: { dangerouslyDisableSandbox: true }
+              }
+            }'
 ---
 
 # Things 3 Task Manager

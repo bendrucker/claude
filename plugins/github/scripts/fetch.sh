@@ -30,13 +30,13 @@ output_json() {
 if [[ "$url" =~ github\.com/([^/]+)/([^/]+) ]]; then
   # Repository root - get README
   if [[ "$url" =~ ^https://github\.com/[^/]+/[^/]+/?$ ]]; then
-    output_json "deny" "Use: gh repo view [<repository>]"
+    output_json "deny" "Use: gh repo view [<repository>]. Run /github:gh for more patterns."
     exit 0
   fi
 
   # Files/directories
   if [[ "$url" =~ /blob/([^/]+)/(.+)$ ]] || [[ "$url" =~ /tree/([^/]+)/?(.*)$ ]]; then
-    output_json "deny" "Use: gh api to fetch file contents"
+    output_json "deny" "Use: gh api to fetch file contents. Run /github:gh for more patterns."
     exit 0
   fi
 
@@ -45,9 +45,9 @@ if [[ "$url" =~ github\.com/([^/]+)/([^/]+) ]]; then
     type="${BASH_REMATCH[1]}"
     number="${BASH_REMATCH[2]}"
     if [[ "$type" == "issues" ]]; then
-      output_json "deny" "Use: gh issue view $number"
+      output_json "deny" "Use: gh issue view $number. Run /github:gh for more patterns."
     else
-      output_json "deny" "Use: gh pr view $number"
+      output_json "deny" "Use: gh pr view $number. Run /github:gh for more patterns."
     fi
     exit 0
   fi
@@ -55,18 +55,18 @@ if [[ "$url" =~ github\.com/([^/]+)/([^/]+) ]]; then
   # Actions job logs
   if [[ "$url" =~ /actions/runs/([0-9]+)/job/([0-9]+)$ ]]; then
     job_id="${BASH_REMATCH[2]}"
-    output_json "deny" "Use: gh run view --job $job_id --log"
+    output_json "deny" "Use: gh run view --job $job_id --log. Run /github:gh for more patterns."
     exit 0
   fi
 
   # Actions workflow run
   if [[ "$url" =~ /actions/runs/([0-9]+)$ ]]; then
     run_id="${BASH_REMATCH[1]}"
-    output_json "deny" "Use: gh run view $run_id"
+    output_json "deny" "Use: gh run view $run_id. Run /github:gh for more patterns."
     exit 0
   fi
 fi
 
 # Unknown GitHub URL pattern - ask user
-output_json "ask" "Unknown GitHub URL pattern. Consider using gh CLI."
+output_json "ask" "Unknown GitHub URL pattern. Run /github:gh for guidance."
 exit 0

@@ -113,6 +113,10 @@ In settings.json, reference scripts like:
 **Hook Configuration Syntax**:
 - Use array format for hook types (PostToolUse, PreToolUse, etc.)
 - Each array element has a "matcher" field for tool matching
-- "matcher" supports regex-like patterns (e.g., "Write|Edit|MultiEdit")
+- "matcher" supports regex-like patterns (e.g., `Write|Edit|MultiEdit`)
+- "matcher" supports tool argument patterns (e.g., `Bash(osascript:*)`, `Bash(npm:*)`)
+- Combine matchers with `|`: `Bash(osascript:*)|Bash(open:*)`
 - Each matcher has a "hooks" array with hook definitions
 - Each hook has "type": "command" and "command" with the script path
+- Use YAML multi-line syntax (`|`) for readable inline commands
+- Use `jq -n` for static JSON responses instead of escaped echo strings

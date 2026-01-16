@@ -5,6 +5,12 @@ allowed-tools:
   - mcp__linear
   - WebFetch(domain:linear.app)
   - Bash
+hooks:
+  PreToolUse:
+    - matcher: mcp__linear__create_issue
+      hooks:
+        - type: command
+          command: "${CLAUDE_PLUGIN_ROOT}/scripts/default-state.sh"
 ---
 
 # Linear

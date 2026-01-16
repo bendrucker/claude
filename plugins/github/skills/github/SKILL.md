@@ -1,6 +1,12 @@
 ---
 name: github
 description: GitHub workflow best practices and tool selection. Use when working with GitHub repositories, pull requests, issues, or GitHub API interactions.
+hooks:
+  PreToolUse:
+    - matcher: WebFetch
+      hooks:
+        - type: command
+          command: "${CLAUDE_PLUGIN_ROOT}/scripts/fetch.sh"
 ---
 # GitHub
 

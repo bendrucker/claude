@@ -20,6 +20,10 @@ Each plugin in `plugins/` contains:
 - `agents/`: Optional agent definitions
 - `spec.sh`: ShellSpec test file (run with `shellspec plugins/<name>/spec.sh`)
 
+### Naming
+
+The plugin name forms a namespace for its contents (e.g., `gitlab:ci-monitor`). Avoid repeating the plugin name in skill, agent, or command names to prevent stuttering like `gitlab:gitlab-ci`.
+
 ### Plugin READMEs
 
 Each plugin should have a `README.md` with consistent sections:

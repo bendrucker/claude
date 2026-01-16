@@ -1,31 +1,104 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Claude Code Agent Schema",
-  "description": "Schema for Claude Code agent YAML frontmatter - https://docs.anthropic.com/en/docs/claude-code/agents",
+  "description": "Schema for Claude Code agent YAML frontmatter - https://code.claude.com/docs/en/sub-agents",
   "type": "object",
   "properties": {
     "name": {
       "type": "string",
-      "description": "The name of the agent"
+      "description": "Unique identifier using lowercase letters and hyphens"
     },
     "description": {
       "type": "string",
-      "description": "Description of the agent's purpose and when to use it"
+      "description": "When Claude should delegate to this agent"
     },
     "tools": {
       "type": "string",
-      "description": "Comma-separated list of tools the agent can use"
+      "description": "Comma-separated list of tools the agent can use. Inherits all tools if omitted."
+    },
+    "disallowedTools": {
+      "type": "string",
+      "description": "Comma-separated list of tools to deny, removed from inherited or specified list"
     },
     "model": {
       "type": "string",
-      "enum": ["haiku", "sonnet", "opus"],
-      "description": "The model to use for this agent"
+      "enum": ["haiku", "sonnet", "opus", "inherit"],
+      "description": "The model to use for this agent. Defaults to sonnet if omitted."
+    },
+    "permissionMode": {
+      "type": "string",
+      "enum": ["default", "acceptEdits", "dontAsk", "bypassPermissions", "plan"],
+      "description": "Permission mode for the agent"
+    },
+    "skills": {
+      "type": "string",
+      "description": "Comma-separated list of skills to load into the agent's context at startup"
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Lifecycle hooks scoped to this agent",
+      "properties": {
+        "PreToolUse": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "PostToolUse": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "Stop": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookEntry"
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "color": {
       "type": "string",
-      "description": "Color for the agent in the UI"
+      "description": "Color for the agent status line in the UI"
     }
   },
   "required": ["name", "description"],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "hookMatcher": {
+      "type": "object",
+      "properties": {
+        "matcher": {
+          "type": "string",
+          "description": "Regex pattern to match tool names"
+        },
+        "hooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookEntry"
+          }
+        }
+      },
+      "required": ["matcher", "hooks"],
+      "additionalProperties": false
+    },
+    "hookEntry": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["command"],
+          "description": "Hook type"
+        },
+        "command": {
+          "type": "string",
+          "description": "Shell command to execute"
+        }
+      },
+      "required": ["type", "command"],
+      "additionalProperties": false
+    }
+  }
 }

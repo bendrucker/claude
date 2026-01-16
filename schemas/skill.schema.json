@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Claude Code Skill Schema",
-  "description": "Schema for Claude Code skill YAML frontmatter - https://docs.claude.com/en/docs/claude-code/skills",
+  "description": "Schema for Claude Code skill YAML frontmatter - https://code.claude.com/docs/en/skills",
   "type": "object",
   "properties": {
     "name": {
@@ -36,29 +36,7 @@
       "description": "Agent type to use when context: fork is set (e.g., Explore, Plan, general-purpose, or custom agent name). Defaults to general-purpose."
     },
     "hooks": {
-      "type": "object",
-      "description": "Hooks scoped to this skill's lifecycle",
-      "properties": {
-        "PreToolUse": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/hookMatcher"
-          }
-        },
-        "PostToolUse": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/hookMatcher"
-          }
-        },
-        "Stop": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/hookEntry"
-          }
-        }
-      },
-      "additionalProperties": false
+      "$ref": "hooks.schema.json"
     },
     "user-invocable": {
       "type": "boolean",
@@ -72,45 +50,5 @@
     }
   },
   "required": ["name", "description"],
-  "additionalProperties": false,
-  "$defs": {
-    "hookMatcher": {
-      "type": "object",
-      "properties": {
-        "matcher": {
-          "type": "string",
-          "description": "Regex pattern to match tool names"
-        },
-        "hooks": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/hookEntry"
-          }
-        }
-      },
-      "required": ["matcher", "hooks"],
-      "additionalProperties": false
-    },
-    "hookEntry": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["command"],
-          "description": "Hook type"
-        },
-        "command": {
-          "type": "string",
-          "description": "Shell command to execute"
-        },
-        "once": {
-          "type": "boolean",
-          "default": false,
-          "description": "Run the hook only once per session"
-        }
-      },
-      "required": ["type", "command"],
-      "additionalProperties": false
-    }
-  }
+  "additionalProperties": false
 }

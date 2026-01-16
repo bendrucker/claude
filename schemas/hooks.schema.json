@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/hooks.schema.json",
+  "title": "Claude Code Hooks Schema",
+  "description": "Schema for Claude Code lifecycle hooks - https://code.claude.com/docs/en/hooks",
+  "type": "object",
+  "properties": {
+    "PreToolUse": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run before a tool is executed"
+    },
+    "PostToolUse": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run after a tool is executed"
+    },
+    "Stop": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookEntry"
+      },
+      "description": "Hooks that run when the agent stops"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "hookMatcher": {
+      "type": "object",
+      "properties": {
+        "matcher": {
+          "type": "string",
+          "description": "Regex pattern to match tool names"
+        },
+        "hooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookEntry"
+          }
+        }
+      },
+      "required": ["matcher", "hooks"],
+      "additionalProperties": false
+    },
+    "hookEntry": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["command"],
+          "description": "Hook type"
+        },
+        "command": {
+          "type": "string",
+          "description": "Shell command to execute"
+        },
+        "once": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run the hook only once per session"
+        }
+      },
+      "required": ["type", "command"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,12 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Claude Code Command Schema",
-  "description": "Schema for Claude Code command YAML frontmatter - https://docs.anthropic.com/en/docs/claude-code/slash-commands",
+  "description": "Schema for Claude Code command YAML frontmatter - https://code.claude.com/docs/en/slash-commands",
   "type": "object",
   "properties": {
     "description": {
       "type": "string",
-      "description": "Brief description of the command"
+      "description": "Brief description of the command. Defaults to the first line from the prompt if not specified."
     },
     "allowed-tools": {
       "type": ["string", "array"],
@@ -17,9 +17,29 @@
     },
     "argument-hint": {
       "type": "string",
-      "description": "The arguments expected for the slash command. This hint is shown to the user when auto-completing the slash command."
+      "description": "Expected arguments for the slash command. Shown during auto-complete."
+    },
+    "context": {
+      "type": "string",
+      "enum": ["fork"],
+      "description": "Set to 'fork' to run in a forked sub-agent context with its own conversation history"
+    },
+    "agent": {
+      "type": "string",
+      "description": "Agent type to use when context: fork is set. Defaults to general-purpose."
+    },
+    "model": {
+      "type": "string",
+      "description": "Specific Claude model to use. Inherits from the conversation if not specified."
+    },
+    "hooks": {
+      "$ref": "hooks.schema.json"
+    },
+    "disable-model-invocation": {
+      "type": "boolean",
+      "default": false,
+      "description": "Prevent the Skill tool from calling this command"
     }
   },
-  "required": ["description"],
   "additionalProperties": false
 }

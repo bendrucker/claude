@@ -20,13 +20,37 @@ Reference for developing effective skills. The context window is a public good -
 ---
 name: skill-name
 description: Third-person capability description with trigger terms
-allowed-tools: [Optional tool restrictions]
+allowed-tools: [Read, Grep, Glob]         # Optional: tool restrictions
+model: claude-sonnet-4-20250514           # Optional: override model
+context: fork                             # Optional: run in isolated subagent
+agent: Explore                            # Optional: agent type for fork
+user-invocable: false                     # Optional: hide from slash menu
+hooks:                                    # Optional: skill-scoped hooks
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/validate.sh"
+          once: true
 ---
 ```
 
-**Storage**: `~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
+**Required Fields**:
+- `name`: Lowercase letters, numbers, hyphens only (max 64 chars). Match directory name.
+- `description`: Third-person, includes trigger terms and use cases (max 1024 chars).
 
-**Description**: Third-person, includes trigger terms and use cases. This is the primary activation mechanism.
+**Optional Fields**:
+- `allowed-tools`: Tools Claude can use without permission when skill is active
+- `model`: Override the conversation's model
+- `context`: Set to `fork` to run in isolated subagent context
+- `agent`: Agent type when `context: fork` (`Explore`, `Plan`, `general-purpose`, or custom)
+- `user-invocable`: Hide from slash menu when `false` (default: `true`)
+- `disable-model-invocation`: Block programmatic invocation via Skill tool
+- `hooks`: Skill-scoped hooks (`PreToolUse`, `PostToolUse`, `Stop`)
+
+**Naming**: Use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`, `managing-databases`. Avoid vague names like `helper`, `utils`.
+
+**Storage**: `~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
 
 ## Bundled Resources
 
@@ -38,24 +62,24 @@ skill-name/
 └── assets/ (templates, images for output)
 ```
 
-**Naming**: Reserve ALL CAPS for files with special meaning (SKILL.md, README.md, CONTRIBUTING.md). Use lowercase for all other files (setup.md, examples.md, troubleshooting.md).
+**File Naming**: Reserve ALL CAPS for files with special meaning (SKILL.md, README.md). Use lowercase for all other files (setup.md, examples.md).
 
 Keep references one level deep. For files >100 lines, include a table of contents.
 
 ## Development Process
 
-1. Define 3 test scenarios before documentation
-2. Measure baseline without skill
-3. Iterative: one instance creates, another tests
-4. Observe navigation patterns
-5. Refine based on behavior
+- Define 3 test scenarios before documentation
+- Measure baseline without skill
+- Iterative: one instance creates, another tests
+- Observe navigation patterns
+- Refine based on behavior
 
 ## References
 
 Load detailed guides as needed:
 
-- **[references/patterns.md](references/patterns.md)** - Progressive disclosure patterns, output templates, workflow design
-- **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, YAML errors, path problems, checklist
+- **[references/patterns.md](references/patterns.md)** - Progressive disclosure, templates, workflows, subagent integration
+- **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, YAML errors, plugin cache, checklist
 
 ## Quick Reference
 
@@ -65,5 +89,5 @@ Load detailed guides as needed:
 
 ## Resources
 
-- [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills.md)
-- [Agent Skills Best Practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices.md)
+- [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills)
+- [Agent Skills Best Practices](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills/best-practices)

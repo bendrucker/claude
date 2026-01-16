@@ -3,6 +3,8 @@ name: peer
 description: |
   Review a pull request when requested by a peer. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes. Supports GitHub and GitLab.
 allowed-tools: Bash(gh:*), mcp__github
+context: fork
+agent: Explore
 ---
 
 # Peer Review

@@ -3,6 +3,7 @@ name: self
 description: |
   Self-review your own code changes using a visual diff viewer. Opens a GitHub-style web UI where you can add comments on changed lines. Comments are returned to Claude for action.
 allowed-tools: Bash(npx:*)
+context: fork
 ---
 
 # Self Review

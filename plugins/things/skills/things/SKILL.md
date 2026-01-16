@@ -4,17 +4,7 @@ description: Interacting with Things 3 task manager for Mac. Use when working wi
 allowed-tools: [Bash(osascript:*), Bash(open:*), Read]
 hooks:
   PreToolUse:
-    - matcher: "Bash(osascript:*)"
-      hooks:
-        - type: command
-          command: |
-            jq -n '{
-              hookSpecificOutput: {
-                hookEventName: "PreToolUse",
-                updatedInput: { dangerouslyDisableSandbox: true }
-              }
-            }'
-    - matcher: "Bash(open:*)"
+    - matcher: "Bash(osascript:*)|Bash(open:*)"
       hooks:
         - type: command
           command: |

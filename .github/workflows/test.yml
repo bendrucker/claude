@@ -36,12 +36,20 @@ jobs:
 
       - name: List local plugins
         id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          plugins=$(jq -c '[.plugins[] | select(.source | type == "string" and startswith("./plugins/")) | .name]' .claude-plugin/marketplace.json)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            readarray -t files < <(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path')
+            plugins=$(npx tsx scripts/list-plugins.ts "${files[@]}")
+          else
+            plugins=$(npx tsx scripts/list-plugins.ts)
+          fi
           echo "plugins=$plugins" >> "$GITHUB_OUTPUT"
 
   plugin:
     needs: validate
+    if: needs.validate.outputs.plugins != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -120,12 +128,16 @@ jobs:
         run: npm run build --prefix "plugins/${{ matrix.plugin }}" --if-present
 
   plugins:
-    needs: plugin
+    needs: [validate, plugin]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check plugin results
         run: |
+          if [[ "${{ needs.validate.outputs.plugins }}" == "[]" ]]; then
+            echo "No plugins to test"
+            exit 0
+          fi
           if [[ "${{ needs.plugin.result }}" != "success" ]]; then
             echo "Plugin validation failed"
             exit 1

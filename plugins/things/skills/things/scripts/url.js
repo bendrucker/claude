@@ -85,5 +85,5 @@ function run(argv) {
     url += '?' + params.join('&');
   }
 
-  app.openLocation(url);
+  app.doShellScript(`open -g "${url}"`);
 }

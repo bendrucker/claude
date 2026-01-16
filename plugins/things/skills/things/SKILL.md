@@ -104,5 +104,5 @@ Things supports [Markdown in notes](https://culturedcode.com/things/support/arti
 - **Verification**: ALWAYS verify updates succeeded by reading back the todo with JXA
 - **Repeating tasks**: Filter by comparing `creationDate` to midnight (see [troubleshooting.md](troubleshooting.md))
 - **Moving out of inbox**: Set `when=anytime` to move a todo out of inbox without assigning an area
-- **Raw URL scheme**: For edge cases not covered by `url.js`, use `open "things:///..."` directly (see [url-scheme.md](url-scheme.md))
+- **Raw URL scheme**: For edge cases not covered by `url.js`, use `open -g "things:///..."` directly (see [url-scheme.md](url-scheme.md))
 - **Type reference**: See [jxa.md](jxa.md) for the complete Things3 JXA API

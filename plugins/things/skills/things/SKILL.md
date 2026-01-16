@@ -85,6 +85,7 @@ Load detailed guides as needed:
 - **[url-scheme.md](url-scheme.md)** - URL scheme commands and parameters
 - **[1password.md](1password.md)** - Auth token setup and keychain configuration
 - **[troubleshooting.md](troubleshooting.md)** - Common issues, best practices, repeating task detection
+- **[daily-review.md](daily-review.md)** - Interactive daily review workflow for inbox, today, and priorities
 
 ## Notes Formatting
 

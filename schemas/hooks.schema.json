@@ -31,41 +31,80 @@
   "$defs": {
     "hookMatcher": {
       "type": "object",
+      "description": "Hook matcher configuration with multiple hooks",
+      "additionalProperties": false,
+      "required": ["hooks"],
       "properties": {
         "matcher": {
           "type": "string",
-          "description": "Regex pattern to match tool names"
+          "description": "Pattern to match tool names, case-sensitive (only for PreToolUse and PostToolUse)"
         },
         "hooks": {
           "type": "array",
+          "description": "Array of hooks to execute",
           "items": {
             "$ref": "#/$defs/hookEntry"
           }
         }
-      },
-      "required": ["matcher", "hooks"],
-      "additionalProperties": false
+      }
     },
     "hookEntry": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["command"],
-          "description": "Hook type"
+      "anyOf": [
+        {
+          "type": "object",
+          "description": "Bash command hook",
+          "additionalProperties": false,
+          "required": ["type", "command"],
+          "properties": {
+            "type": {
+              "const": "command",
+              "description": "Hook type"
+            },
+            "command": {
+              "type": "string",
+              "description": "Shell command to execute",
+              "minLength": 1
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Timeout in seconds",
+              "exclusiveMinimum": 0
+            },
+            "once": {
+              "type": "boolean",
+              "default": false,
+              "description": "Run the hook only once per session"
+            }
+          }
         },
-        "command": {
-          "type": "string",
-          "description": "Shell command to execute"
-        },
-        "once": {
-          "type": "boolean",
-          "default": false,
-          "description": "Run the hook only once per session"
+        {
+          "type": "object",
+          "description": "LLM prompt hook",
+          "additionalProperties": false,
+          "required": ["type", "prompt"],
+          "properties": {
+            "type": {
+              "const": "prompt",
+              "description": "Hook type"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Prompt to evaluate with LLM. Use $ARGUMENTS placeholder for hook input JSON.",
+              "minLength": 1
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Timeout in seconds",
+              "exclusiveMinimum": 0
+            },
+            "once": {
+              "type": "boolean",
+              "default": false,
+              "description": "Run the hook only once per session"
+            }
+          }
         }
-      },
-      "required": ["type", "command"],
-      "additionalProperties": false
+      ]
     }
   }
 }

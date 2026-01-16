@@ -54,9 +54,9 @@ output_response() {
 check_markdown() {
   local content="$1"
 
-  # Run the check script via npx (installs deps on first run)
+  # Run the check script via npx (installs deps on first run, cached after)
   local result
-  result=$(cd "$plugin_dir" && npx --yes node scripts/check-markdown-headings.js "$content" 2>/dev/null || true)
+  result=$(npx -y -p mdast-util-from-markdown@2 -p unist-util-visit@5 node "$plugin_dir/scripts/check-markdown-headings.js" "$content" 2>/dev/null || true)
 
   if [[ -n "$result" && "$result" != "[]" ]]; then
     local first_match

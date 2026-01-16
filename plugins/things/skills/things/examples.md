@@ -354,3 +354,91 @@ todos.forEach(todo => {
 markdown;
 ' > today.md
 ```
+
+## Logbook Queries
+
+The logbook contains completed/canceled tasks sorted by completion date (most recent first). Unlike Inbox/Today (tens of items) or Anytime/Upcoming/Someday (up to hundreds), the logbook can contain thousands to tens of thousands of items accumulated over years.
+
+**Performance characteristics:**
+- `properties()` batching: ~70-80ms per item
+- Full scan of 10k items: ~15-20 minutes
+- Date-range queries are efficient due to sort order
+
+### Recent Completions (Last Week)
+
+Scan from index 0 and stop when items are older than the target date:
+
+```bash
+osascript -l JavaScript -e '
+const app = Application("Things3");
+const logbook = app.lists.byId("TMLogbookListSource");
+const todos = logbook.toDos();
+
+const oneWeekAgo = new Date();
+oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+const result = [];
+for (let i = 0; i < todos.length; i++) {
+  const p = todos[i].properties();
+  if (!p.completionDate || p.completionDate < oneWeekAgo) break;
+  result.push({
+    id: p.id,
+    name: p.name,
+    completionDate: p.completionDate,
+    status: p.status
+  });
+}
+
+JSON.stringify(result, null, 2);
+'
+```
+
+### Completions in Date Range
+
+```bash
+osascript -l JavaScript -e '
+const app = Application("Things3");
+const logbook = app.lists.byId("TMLogbookListSource");
+const todos = logbook.toDos();
+
+const startDate = new Date("2025-12-01");
+const endDate = new Date("2025-12-31");
+
+const result = [];
+for (let i = 0; i < todos.length; i++) {
+  const p = todos[i].properties();
+  if (!p.completionDate) continue;
+  if (p.completionDate > endDate) continue;  // Skip newer items
+  if (p.completionDate < startDate) break;   // Stop at older items
+  result.push({
+    id: p.id,
+    name: p.name,
+    completionDate: p.completionDate
+  });
+}
+
+JSON.stringify({count: result.length, items: result}, null, 2);
+'
+```
+
+### Count Items Per Month
+
+For analytics across the full logbook (expect ~15-20 min for large databases):
+
+```bash
+osascript -l JavaScript -e '
+const app = Application("Things3");
+const logbook = app.lists.byId("TMLogbookListSource");
+const todos = logbook.toDos();
+
+const counts = {};
+for (let i = 0; i < todos.length; i++) {
+  const p = todos[i].properties();
+  if (!p.completionDate) continue;
+  const month = p.completionDate.toISOString().slice(0, 7);
+  counts[month] = (counts[month] || 0) + 1;
+}
+
+JSON.stringify(counts, null, 2);
+'
+```

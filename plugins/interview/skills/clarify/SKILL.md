@@ -2,6 +2,7 @@
 name: clarify
 description: |
   Targeted interview for execution-time clarification. Use when you hit an ambiguity or decision point during implementation that needs user input before proceeding.
+context: fork
 ---
 
 # Clarification Interview

@@ -58,6 +58,8 @@
     "code-simplifier@claude-plugins-official": true,
     "github@claude-plugins-official": true,
     "astral@astral-sh": true,
+    "research@bendrucker": true,
+    "style@bendrucker": true,
     "agents-md@bendrucker": true,
     "ast-grep@ast-grep": true,
     "worktrunk@worktrunk": true

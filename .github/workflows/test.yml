@@ -34,6 +34,21 @@ jobs:
       - name: Check marketplace completeness
         run: ./scripts/check-marketplace.sh
 
+      - name: Check for unenabled plugins
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! output=$(./scripts/check-enabled-plugins.sh 2>&1); then
+            gh pr comment ${{ github.event.pull_request.number }} --body "⚠️ **Warning:** Some marketplace plugins are not enabled in \`.claude/settings.json\`:
+
+          \`\`\`
+          $output
+          \`\`\`
+
+          Consider adding these to \`enabledPlugins\` if they should be active."
+          fi
+
       - name: List local plugins
         id: list
         env:
@@ -44,6 +59,7 @@ jobs:
             --always=scripts/
             --always=.github/workflows/test.yml
             --always=.claude-plugin/marketplace.json
+            --always=.claude/settings.json
           )
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             readarray -t files < <(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path')

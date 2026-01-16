@@ -119,6 +119,18 @@ jobs:
         if: steps.inspect.outputs.has_package == 'true'
         run: npm run build --prefix "plugins/${{ matrix.plugin }}" --if-present
 
+  plugins:
+    needs: plugin
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check plugin results
+        run: |
+          if [[ "${{ needs.plugin.result }}" != "success" ]]; then
+            echo "Plugin validation failed"
+            exit 1
+          fi
+
   markdown:
     runs-on: ubuntu-latest
     steps:

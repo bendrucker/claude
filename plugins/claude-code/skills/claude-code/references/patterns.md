@@ -92,6 +92,60 @@ Output: feat(auth): implement JWT-based authentication
    **Editing?** → Follow editing workflow
 ```
 
+## Skills and Subagents
+
+### Give a subagent access to skills
+
+Custom agents in `.claude/agents/` can list skills in their `skills` field:
+
+```yaml
+# .claude/agents/code-reviewer.md
+---
+name: code-reviewer
+description: Review code for quality and best practices
+skills: pr-review, security-check
+---
+```
+
+Skills listed here are injected into the subagent's context at startup. Built-in agents (Explore, Plan, general-purpose) do not inherit skills.
+
+### Run a skill in a subagent context
+
+Use `context: fork` to run a skill in an isolated subagent:
+
+```yaml
+---
+name: code-analysis
+description: Analyze code quality and generate detailed reports
+context: fork
+agent: Explore
+---
+```
+
+The skill runs with its own conversation history, avoiding clutter in the main conversation.
+
+## Skill-Scoped Hooks
+
+Define hooks that run during the skill's lifecycle:
+
+```yaml
+---
+name: secure-operations
+description: Perform operations with additional security checks
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/security-check.sh"
+          once: true
+---
+```
+
+**`once: true`**: Run the hook only once per session. After first successful execution, the hook is removed. Useful for one-time validation or setup.
+
+Skill hooks are scoped to the skill's execution and cleaned up when the skill finishes.
+
 ## Content Guidelines
 
 - **Consistent Terminology**: One term per concept

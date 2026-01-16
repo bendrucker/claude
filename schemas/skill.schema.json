@@ -6,20 +6,111 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "The name of the skill"
+      "description": "Skill name. Lowercase letters, numbers, and hyphens only (max 64 characters). Should match the directory name.",
+      "pattern": "^[a-z0-9-]+$",
+      "maxLength": 64
     },
     "description": {
       "type": "string",
-      "description": "Third-person capability description with trigger terms"
+      "description": "Third-person capability description with trigger terms (max 1024 characters). Claude uses this to decide when to apply the skill.",
+      "maxLength": 1024
     },
     "allowed-tools": {
       "type": ["string", "array"],
       "items": {
         "type": "string"
       },
-      "description": "List of tools the skill can use"
+      "description": "Tools Claude can use without asking permission when this skill is active"
+    },
+    "model": {
+      "type": "string",
+      "description": "Model to use when this skill is active (e.g., claude-sonnet-4-20250514). Defaults to the conversation's model."
+    },
+    "context": {
+      "type": "string",
+      "enum": ["fork"],
+      "description": "Set to 'fork' to run the skill in a forked sub-agent context with its own conversation history"
+    },
+    "agent": {
+      "type": "string",
+      "description": "Agent type to use when context: fork is set (e.g., Explore, Plan, general-purpose, or custom agent name). Defaults to general-purpose."
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Hooks scoped to this skill's lifecycle",
+      "properties": {
+        "PreToolUse": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "PostToolUse": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "Stop": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookEntry"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "user-invocable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Controls whether the skill appears in the slash command menu. Does not affect the Skill tool or automatic discovery."
+    },
+    "disable-model-invocation": {
+      "type": "boolean",
+      "default": false,
+      "description": "Block programmatic invocation via the Skill tool. Does not affect slash menu or auto-discovery."
     }
   },
   "required": ["name", "description"],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "hookMatcher": {
+      "type": "object",
+      "properties": {
+        "matcher": {
+          "type": "string",
+          "description": "Regex pattern to match tool names"
+        },
+        "hooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookEntry"
+          }
+        }
+      },
+      "required": ["matcher", "hooks"],
+      "additionalProperties": false
+    },
+    "hookEntry": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["command"],
+          "description": "Hook type"
+        },
+        "command": {
+          "type": "string",
+          "description": "Shell command to execute"
+        },
+        "once": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run the hook only once per session"
+        }
+      },
+      "required": ["type", "command"],
+      "additionalProperties": false
+    }
+  }
 }

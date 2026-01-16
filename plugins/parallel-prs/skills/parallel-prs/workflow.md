@@ -14,9 +14,13 @@ Plan agents (in parallel) verify file paths exist, line numbers are current, and
 
 ## Create Worktrees
 
+Use worktrunk to create worktrees with proper hooks and path templates:
+
 ```bash
-git worktree add .worktrees/{slug} -b {type}/{issue-id}-{slug} main
+wt switch --create {type}/{issue-id}-{slug}
 ```
+
+Worktrunk handles branch creation and worktree placement automatically based on user configuration.
 
 ## Implement in Parallel
 

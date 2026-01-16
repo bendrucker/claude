@@ -1,7 +1,7 @@
 ---
 name: parallel-prs
 description: Batch-process multiple issues into draft PRs using parallel worktrees. Use when implementing several related issues simultaneously, creating multiple PRs in parallel, or batch-processing a backlog.
-allowed-tools: Bash(git:*), Bash(gh:*)
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(wt:*)
 ---
 
 # parallel-prs
@@ -17,7 +17,7 @@ allowed-tools: Bash(git:*), Bash(gh:*)
 1. Load `linear`, `github`, or `gitlab` skill; fetch issue details
 2. Ask user to clarify ambiguities upfront
 3. Plan agents verify paths/line numbers in parallel
-4. Create worktrees in `.worktrees/{slug}`
+4. Create worktrees with `wt switch --create`
 5. Implementation agents commit, push, load `pull-request` skill, create PR
 6. Monitor CI for failures
 

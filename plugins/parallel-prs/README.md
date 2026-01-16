@@ -2,6 +2,10 @@
 
 Batch-process multiple issues into draft PRs using parallel worktrees.
 
+## Dependencies
+
+- **worktrunk** (`worktrunk@worktrunk`): Required for worktree management. See [installation instructions](https://worktrunk.dev/#install).
+
 ## Usage
 
 Use when:
@@ -20,7 +24,7 @@ Use when:
 1. Load `linear`, `github`, or `gitlab` skill; fetch issue details
 2. Ask user to clarify ambiguities upfront
 3. Plan agents verify paths/line numbers in parallel
-4. Create worktrees in `.worktrees/{slug}`
+4. Create worktrees with `wt switch --create`
 5. Implementation agents commit, push, write PR body to `tmp/{branch}/pr-body.md`
 6. Parent creates PRs with `--body-file` (subagents cannot use Skill tool)
 7. Monitor CI for failures

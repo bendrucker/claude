@@ -12,9 +12,13 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 - **api**: REST and GraphQL API access
 - **docs**: Navigating GitLab documentation
 
-### Other
+### Agents
 
-- **Hook**: Transforms GitLab URLs into API requests for better content fetching
+- **ci-monitor**: Investigates CI pipeline failures and extracts relevant log snippets
+
+### Hooks
+
+- Transforms GitLab URLs into API requests for better content fetching
 
 ## Testing
 

@@ -36,14 +36,14 @@ Describe 'GitHub fetch hook'
         When run run_hook "https://github.com/bendrucker/deployments"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh repo view [<repository>]"
+        The output should satisfy has_exact_reason "Use: gh repo view [<repository>]. Run /github:gh for more patterns."
       End
 
       It 'handles repository URL with trailing slash'
         When run run_hook "https://github.com/bendrucker/deployments/"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh repo view [<repository>]"
+        The output should satisfy has_exact_reason "Use: gh repo view [<repository>]. Run /github:gh for more patterns."
       End
     End
 
@@ -52,7 +52,7 @@ Describe 'GitHub fetch hook'
         When run run_hook "https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh api to fetch file contents"
+        The output should satisfy has_exact_reason "Use: gh api to fetch file contents. Run /github:gh for more patterns."
       End
     End
 
@@ -61,14 +61,14 @@ Describe 'GitHub fetch hook'
         When run run_hook "https://github.com/owner/repo/tree/main/src"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh api to fetch file contents"
+        The output should satisfy has_exact_reason "Use: gh api to fetch file contents. Run /github:gh for more patterns."
       End
 
       It 'handles root directory tree'
         When run run_hook "https://github.com/owner/repo/tree/main"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh api to fetch file contents"
+        The output should satisfy has_exact_reason "Use: gh api to fetch file contents. Run /github:gh for more patterns."
       End
     End
 
@@ -77,14 +77,14 @@ Describe 'GitHub fetch hook'
         When run run_hook "https://github.com/owner/repo/issues/123"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh issue view 123"
+        The output should satisfy has_exact_reason "Use: gh issue view 123. Run /github:gh for more patterns."
       End
 
       It 'denies and suggests gh pr view'
         When run run_hook "https://github.com/owner/repo/pull/456"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh pr view 456"
+        The output should satisfy has_exact_reason "Use: gh pr view 456. Run /github:gh for more patterns."
       End
     End
 
@@ -93,14 +93,14 @@ Describe 'GitHub fetch hook'
         When run run_hook "https://github.com/owner/repo/actions/runs/12345"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh run view 12345"
+        The output should satisfy has_exact_reason "Use: gh run view 12345. Run /github:gh for more patterns."
       End
 
       It 'denies and suggests gh run view with job flag for specific job'
         When run run_hook "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490"
         The status should be success
         The output should satisfy has_decision "deny"
-        The output should satisfy has_exact_reason "Use: gh run view --job 57098829490 --log"
+        The output should satisfy has_exact_reason "Use: gh run view --job 57098829490 --log. Run /github:gh for more patterns."
       End
     End
 
@@ -109,7 +109,7 @@ Describe 'GitHub fetch hook'
         When run run_hook "https://github.com/explore"
         The status should be success
         The output should satisfy has_decision "ask"
-        The output should satisfy contains_reason "Unknown GitHub URL pattern"
+        The output should satisfy contains_reason "Run /github:gh for guidance"
       End
     End
   End

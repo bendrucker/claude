@@ -1,6 +1,7 @@
 ---
 name: python
 description: Python coding standards, best practices, type hints, and testing patterns. Use when writing or reviewing Python code, implementing tests, or discussing Python language features.
+user-invocable: false
 ---
 # Python
 

@@ -1,6 +1,7 @@
 ---
 name: javascript
 description: JavaScript coding standards and best practices for JavaScript and TypeScript. Use when writing or reviewing JavaScript code, working with promises, or discussing JavaScript patterns.
+user-invocable: false
 ---
 # JavaScript
 

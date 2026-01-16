@@ -48,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      CLAUDE_REPO_HOME: ${{ github.workspace }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -59,7 +60,7 @@ jobs:
         run: curl -fsSL https://git.io/shellspec | sh -s -- --yes 0.28.1
 
       - name: Setup Claude configuration
-        run: ./install.sh
+        run: CLAUDE_REPO_HOME="$GITHUB_WORKSPACE" ./install.sh
 
       - name: Run hook tests
         run: shellspec --tag unit
@@ -117,6 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      CLAUDE_REPO_HOME: ${{ github.workspace }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -125,7 +127,7 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code@latest
 
       - name: Setup Claude configuration
-        run: ./install.sh
+        run: CLAUDE_REPO_HOME="$GITHUB_WORKSPACE" ./install.sh
 
       - name: Generate context report
         run: |

@@ -2,6 +2,33 @@
 
 Common issues, solutions, and best practices for Things automation.
 
+## Things App Not Running
+
+JXA commands require Things 3 to be running. If not running, you'll see errors like:
+
+```
+Error: Application can't be found.
+```
+
+**Launch Things before running commands:**
+
+```bash
+open -g -a "Things3"
+```
+
+The `-g` flag opens in background without stealing focus.
+
+### Sandbox Errors vs App Not Running
+
+**Important**: Sandbox permission errors can look similar to "app not running" errors. If you see errors about file access or permissions, the issue is likely sandbox restrictions, not Things being closed.
+
+Sandbox errors typically mention:
+- `Operation not permitted`
+- `Sandbox: deny`
+- File path access errors
+
+The skill's hook automatically runs osascript commands outside the sandbox. If you still see sandbox errors, verify the hook is active or run the command with `dangerouslyDisableSandbox: true`.
+
 ## Updates Not Working
 
 If `things:///update` doesn't apply changes:
@@ -25,7 +52,7 @@ If they don't match, update the keychain (see `@1password.md`):
 security delete-generic-password -a "$USER" -s "things-auth-token"
 
 # Store new token
-AUTH_TOKEN=$(op item get 5iene5gxngiqrxknafb7gslm4q --fields label=credential)
+AUTH_TOKEN=$(op item get 5iene5gxngiqrxknafb7gslm4q --fields label=credential --reveal)
 security add-generic-password -a "$USER" -s "things-auth-token" -w "$AUTH_TOKEN" -U
 unset AUTH_TOKEN
 ```
@@ -256,6 +283,19 @@ for todo_id in $todo_ids; do
   open "things:///update?id=$todo_id&auth-token=$AUTH_TOKEN&add-tags=Processed"
   sleep 0.1  # 100ms delay
 done
+```
+
+## Reorder Script Issues
+
+The `scripts/reorder.js` script requires running outside the sandbox to access the keychain for auth tokens. The skill's hook automatically handles this for `osascript` commands.
+
+If reorder fails with permission errors:
+1. Verify the hook is active (check skill frontmatter)
+2. Ensure the command starts with `osascript` (the hook matches `Bash(osascript:*)`)
+
+**Correct invocation:**
+```bash
+osascript scripts/reorder.js <id1> <id2> <id3>
 ```
 
 ## Error Messages

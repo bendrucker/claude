@@ -11,6 +11,7 @@ hooks:
             jq -n '{
               hookSpecificOutput: {
                 hookEventName: "PreToolUse",
+                permissionDecision: "allow",
                 updatedInput: { dangerouslyDisableSandbox: true }
               }
             }'
@@ -61,6 +62,13 @@ Items appear at the top of the list in the order specified. Default list is `tod
 - `TMCalendarListSource` - Upcoming
 - `TMSomedayListSource` - Someday
 - `TMLogbookListSource` - Logbook
+
+## Lookup Area IDs
+
+The `list` parameter only works with project names. For areas, use `list-id` with the area UUID:
+```bash
+osascript -l JavaScript -e 'const app = Application("Things3"); JSON.stringify(app.areas().map(a => ({name: a.name(), id: a.id()})), null, 2);'
+```
 
 ## When Values
 

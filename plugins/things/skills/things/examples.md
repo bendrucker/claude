@@ -355,6 +355,22 @@ markdown;
 ' > today.md
 ```
 
+## Linking Tasks
+
+### Create Follow-up with Link to Original
+
+```bash
+original_id="ABC-123"
+osascript scripts/url.js add title="Follow up: Review proposal" notes="Original task: things:///show?id=$original_id" when=tomorrow
+```
+
+### Link Related Tasks in Notes
+
+```bash
+related_id="DEF-456"
+osascript scripts/url.js update id=ABC-123 append-notes="Related: things:///show?id=$related_id"
+```
+
 ## Logbook Queries
 
 The logbook contains completed/canceled tasks sorted by completion date (most recent first). Unlike Inbox/Today (tens of items) or Anytime/Upcoming/Someday (up to hundreds), the logbook can contain thousands to tens of thousands of items accumulated over years.

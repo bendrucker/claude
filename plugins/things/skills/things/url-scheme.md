@@ -30,11 +30,16 @@ Creates new to-do items in Things.
 - `deadline` (date string) - Due date in `yyyy-mm-dd` format
 - `tags` (comma-separated) - Tag names
 - `checklist-items` (newline-separated, max 100) - Checklist items
-- `list` or `list-id` - Project/area destination name or ID
+- `list` or `list-id` - Project/area destination (see note below)
 - `heading` or `heading-id` - Heading within a project
 - `completed` (boolean) - Mark as completed
 - `canceled` (boolean) - Mark as canceled
 - `reveal` (boolean) - Navigate to new item after creation
+
+**Note on `list` vs `list-id`:**
+- `list` works with **project names** only
+- For **areas**, you must use `list-id` with the area's UUID
+- To find area IDs, use JXA: `app.areas().map(a => ({name: a.name(), id: a.id()}))`
 
 **Example:**
 ```bash

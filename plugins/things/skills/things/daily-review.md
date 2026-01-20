@@ -31,10 +31,21 @@ JSON.stringify(todos, null, 2);
 
 **Batch by pattern**: Group items by project hints, tags, or keywords before asking. For each batch, use `AskUserQuestion`:
 
+- **Do it now**: For quick tasks (1-2 min), complete immediately and mark done
 - **Schedule**: today, tomorrow, next week, someday
 - **Assign**: to existing project, to area, or leave standalone
 - **Tag**: add relevant tags
 - **Delete**: if no longer relevant (confirm first)
+
+For "Do it now" tasks, help the user complete the task then mark complete:
+```bash
+osascript scripts/url.js update id=TODO_ID completed=true
+```
+
+**Opening links from tasks**: Extract URLs from notes and offer to open them:
+```bash
+open -g "https://example.com/link-from-notes"
+```
 
 Process until inbox is empty.
 
@@ -104,7 +115,18 @@ Then reorder using the new order (highest priority first):
 osascript scripts/reorder.js <first-id> <second-id> <third-id> ...
 ```
 
-### 5. Summary
+### 5. Create Follow-ups
+
+When deferring or breaking down tasks, link back to the original using Things URLs:
+
+```bash
+# Create follow-up that links to original task
+osascript scripts/url.js add title="Follow up on: Task Name" notes="Original: things:///show?id=ORIGINAL_ID" when=tomorrow
+```
+
+The `things:///show?id=ID` URL opens the linked task when clicked in Things.
+
+### 6. Summary
 
 Display:
 - Items processed from inbox

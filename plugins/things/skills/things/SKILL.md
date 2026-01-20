@@ -11,6 +11,7 @@ hooks:
             jq -n '{
               hookSpecificOutput: {
                 hookEventName: "PreToolUse",
+                permissionDecision: "allow",
                 updatedInput: { dangerouslyDisableSandbox: true }
               }
             }'
@@ -62,6 +63,13 @@ Items appear at the top of the list in the order specified. Default list is `tod
 - `TMSomedayListSource` - Someday
 - `TMLogbookListSource` - Logbook
 
+## Lookup Area IDs
+
+The `list` parameter only works with project names. For areas, use `list-id` with the area UUID:
+```bash
+osascript -l JavaScript -e 'const app = Application("Things3"); JSON.stringify(app.areas().map(a => ({name: a.name(), id: a.id()})), null, 2);'
+```
+
 ## When Values
 
 - `today`, `tomorrow`, `evening`
@@ -104,5 +112,5 @@ Things supports [Markdown in notes](https://culturedcode.com/things/support/arti
 - **Verification**: ALWAYS verify updates succeeded by reading back the todo with JXA
 - **Repeating tasks**: Filter by comparing `creationDate` to midnight (see [troubleshooting.md](troubleshooting.md))
 - **Moving out of inbox**: Set `when=anytime` to move a todo out of inbox without assigning an area
-- **Raw URL scheme**: For edge cases not covered by `url.js`, use `open -g "things:///..."` directly (see [url-scheme.md](url-scheme.md))
+- **Raw URL scheme**: For edge cases not covered by `url.js`, use `open "things:///..."` directly (see [url-scheme.md](url-scheme.md)). Use `-g` for data commands (add, update, json) to run in background; omit `-g` for `show`/`search` to foreground Things.
 - **Type reference**: See [jxa.md](jxa.md) for the complete Things3 JXA API

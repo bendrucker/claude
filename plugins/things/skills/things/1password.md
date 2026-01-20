@@ -4,7 +4,7 @@
 
 ```bash
 # One-time setup: Store token in keychain
-AUTH_TOKEN=$(op item get 5iene5gxngiqrxknafb7gslm4q --fields label=credential)
+AUTH_TOKEN=$(op item get 5iene5gxngiqrxknafb7gslm4q --fields label=credential --reveal)
 security add-generic-password -a "$USER" -s "things-auth-token" -w "$AUTH_TOKEN" -U
 unset AUTH_TOKEN
 

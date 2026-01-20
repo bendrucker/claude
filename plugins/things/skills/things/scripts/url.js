@@ -85,5 +85,7 @@ function run(argv) {
     url += '?' + params.join('&');
   }
 
-  app.doShellScript(`open -g "${url}"`);
+  // show/search foreground Things; data commands run in background
+  const background = command !== 'show' && command !== 'search';
+  app.doShellScript(`open ${background ? '-g ' : ''}"${url}"`);
 }

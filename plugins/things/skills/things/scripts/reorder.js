@@ -40,7 +40,7 @@ function executeJsonUpdate(app, token, data) {
     encodeURIComponent(token) +
     '&data=' +
     encodeURIComponent(JSON.stringify(data));
-  app.openLocation(url);
+  app.doShellScript(`open -g "${url}"`);
 }
 
 /**

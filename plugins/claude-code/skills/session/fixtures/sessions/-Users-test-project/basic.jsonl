@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"How do I fix this error?"},"sessionId":"basic-session","cwd":"/Users/test/project","gitBranch":"main","timestamp":"2024-01-15T10:00:00.000Z","uuid":"uuid-1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Let me help you fix that error. The issue is with the null check."}]},"sessionId":"basic-session","timestamp":"2024-01-15T10:01:00.000Z","uuid":"uuid-2"}

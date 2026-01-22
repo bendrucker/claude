@@ -1,0 +1,4 @@
+not valid json at all
+{"type":"user","message":{"role":"user","content":"Valid message after invalid"},"sessionId":"malformed-session","cwd":"/Users/test/malformed","timestamp":"2024-01-19T10:00:00.000Z","uuid":"uuid-1"}
+{incomplete json
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Valid response"}]},"sessionId":"malformed-session","timestamp":"2024-01-19T10:01:00.000Z","uuid":"uuid-2"}

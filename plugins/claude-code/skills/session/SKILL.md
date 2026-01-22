@@ -1,12 +1,12 @@
 ---
 name: session
-description: View current Claude Code session information including ID, duration, tool usage stats, and log file path. Use when debugging sessions, reviewing activity, or linking to session logs.
+description: View current session info or search conversation history. Use when debugging sessions, reviewing activity, finding past discussions, or summarizing recent work.
 allowed-tools: [Bash, Read]
 ---
 
 # Session Information
 
-Access details about the current Claude Code session.
+Access details about the current Claude Code session or search past conversations.
 
 ## Current Session
 
@@ -17,6 +17,23 @@ Run the info script to get full session details:
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/info.sh "${CLAUDE_SESSION_ID}"
 ```
+
+## Search History
+
+Search past conversations or get a digest of recent work:
+
+```bash
+# Search for specific topics
+tsx ${CLAUDE_PLUGIN_ROOT}/scripts/search.ts "error handling"
+
+# Get today's conversation digest
+tsx ${CLAUDE_PLUGIN_ROOT}/scripts/search.ts --digest today
+
+# Search with date filters
+tsx ${CLAUDE_PLUGIN_ROOT}/scripts/search.ts "auth" --after yesterday
+```
+
+See [search.md](mdc:search.md) for advanced filtering options.
 
 ## Session File Location
 

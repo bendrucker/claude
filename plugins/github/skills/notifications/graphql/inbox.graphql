@@ -1,0 +1,16 @@
+query Inbox {
+  viewer {
+    notificationThreads(first: 50, filterBy: {statuses: [UNREAD, READ]}) {
+      nodes {
+        id
+        summaryId
+        title
+        isUnread
+        isDone
+        isSaved
+        reason
+        url
+      }
+    }
+  }
+}

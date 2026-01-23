@@ -62,8 +62,6 @@ Describe "block-default-branch-commit hook"
   Describe "commit on default branch"
     It "blocks commit on main branch"
       cd "$test_repo"
-      # Simulate symbolic-ref pointing to main
-      mkdir -p .git/refs/remotes/origin
       git symbolic-ref refs/remotes/origin/HEAD refs/heads/main
       input=$(jq -n '{tool_input: {command: "git commit -m \"test\""}}')
       When run sh -c "echo '$input' | $OLDPWD/scripts/block-default-branch-commit.sh"
@@ -75,7 +73,6 @@ Describe "block-default-branch-commit hook"
 
     It "blocks commit with additional flags"
       cd "$test_repo"
-      mkdir -p .git/refs/remotes/origin
       git symbolic-ref refs/remotes/origin/HEAD refs/heads/main
       input=$(jq -n '{tool_input: {command: "git commit -a -m \"test\""}}')
       When run sh -c "echo '$input' | $OLDPWD/scripts/block-default-branch-commit.sh"

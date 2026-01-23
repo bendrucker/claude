@@ -17,8 +17,11 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
 fi
 
 get_default_branch() {
-  local cache_file="${TMPDIR:-/tmp}/claude-default-branch-$(git rev-parse --show-toplevel 2>/dev/null | md5 -q)"
-  
+  local repo_root
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || return
+  local safe_path="${repo_root//\//_}"
+  local cache_file="${TMPDIR:-/tmp}/claude-default-branch${safe_path}"
+
   # Check cache (valid for current session)
   if [[ -f "$cache_file" ]]; then
     cat "$cache_file"
@@ -71,5 +74,4 @@ if [[ "$current_branch" == "$default_branch" ]]; then
         permissionDecisionReason: ("Cannot commit directly to " + $branch + ". Create a topic branch first with: git checkout -b <branch-name>")
       }
     }'
-  exit 0
 fi

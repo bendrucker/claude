@@ -22,7 +22,7 @@ export interface JXAArray<T> {
 export function toArray<T>(jxaArr: JXAArray<T>): T[] {
   const arr: T[] = [];
   for (let i = 0; i < jxaArr.length; i++) {
-    arr.push(jxaArr[i]);
+    arr.push(jxaArr[i] as T);
   }
   return arr;
 }

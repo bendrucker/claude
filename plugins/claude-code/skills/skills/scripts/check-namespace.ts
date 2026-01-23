@@ -2,13 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
-
-export interface HookInput {
-  tool_input: {
-    file_path?: string;
-    filePath?: string;
-  };
-}
+import type { PostToolUseInput } from "@constellos/claude-code-kit";
 
 export function extractPluginName(filePath: string): string | null {
   const match = filePath.match(/plugins\/([^/]+)\//);
@@ -53,10 +47,11 @@ export function checkStuttering(
   return null;
 }
 
-export function processHookInput(input: HookInput): string[] {
+export function processHookInput(input: PostToolUseInput): string[] {
   const warnings: string[] = [];
 
-  const filePath = input.tool_input.file_path ?? input.tool_input.filePath;
+  if (input.tool_name !== "Write" && input.tool_name !== "Edit") return warnings;
+  const filePath = input.tool_input.file_path;
   if (!filePath) return warnings;
 
   const pluginName = extractPluginName(filePath);
@@ -85,9 +80,9 @@ async function main(): Promise<void> {
   }
   const inputText = Buffer.concat(chunks).toString("utf-8");
 
-  let input: HookInput;
+  let input: PostToolUseInput;
   try {
-    input = JSON.parse(inputText) as HookInput;
+    input = JSON.parse(inputText) as PostToolUseInput;
   } catch {
     return;
   }

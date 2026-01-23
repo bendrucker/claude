@@ -34,6 +34,16 @@ Each plugin should have a `README.md` with consistent sections:
 
 Do not include installation instructions or skill activation details—the README is an index, not documentation. Users can read the skill files directly for activation patterns.
 
+### Dependencies
+
+The root `package.json` contains shared tooling (vitest, tsx, typescript) and dependencies used across multiple plugins (e.g., `url-pattern`). Plugin-specific dependencies belong in their own `package.json`:
+
+- Create `plugins/<name>/package.json` for plugin-specific dependencies
+- Add the plugin to the root `workspaces` array
+- Run `npm install` to link the workspace
+
+Avoid collecting all dependencies in the root package.json. Each plugin should be self-contained where practical.
+
 ## Hooks
 
 Hooks intercept tool calls and can modify inputs, block execution, or request user confirmation. Define hooks in `hooks/hooks.json`:

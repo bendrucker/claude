@@ -13,7 +13,7 @@
  */
 
 /** @type {import('../src/url').AuthRequiredCommand[]} */
-const AUTH_REQUIRED_COMMANDS = ['update', 'update-project', 'json'];
+const AUTH_REQUIRED_COMMANDS = ["update", "update-project", "json"];
 
 /**
  * @param {string} command
@@ -29,12 +29,10 @@ function requiresAuth(command) {
  */
 function getAuthToken(app) {
   try {
-    return app.doShellScript(
-      'security find-generic-password -a "$USER" -s "things-auth-token" -w'
-    );
-  } catch (e) {
+    return app.doShellScript('security find-generic-password -a "$USER" -s "things-auth-token" -w');
+  } catch (_e) {
     throw new Error(
-      'Things auth token not found in keychain. See 1password.md for setup instructions.'
+      "Things auth token not found in keychain. See 1password.md for setup instructions.",
     );
   }
 }
@@ -44,17 +42,26 @@ function getAuthToken(app) {
  * @returns {command is import('../src/url').Command}
  */
 function isValidCommand(command) {
-  return ['add', 'add-project', 'update', 'update-project', 'show', 'search', 'json', 'version'].includes(command);
+  return [
+    "add",
+    "add-project",
+    "update",
+    "update-project",
+    "show",
+    "search",
+    "json",
+    "version",
+  ].includes(command);
 }
 
 /**
  * @param {string[]} argv
  */
-function run(argv) {
+function _run(argv) {
   const command = argv[0];
   if (!command || !isValidCommand(command)) {
-    console.log('Usage: osascript scripts/url.js <command> [key=value ...]');
-    console.log('Commands: add, add-project, update, update-project, show, search, json');
+    console.log("Usage: osascript scripts/url.js <command> [key=value ...]");
+    console.log("Commands: add, add-project, update, update-project, show, search, json");
     return;
   }
 
@@ -72,7 +79,7 @@ function run(argv) {
 
   for (let i = 1; i < argv.length; i++) {
     const arg = argv[i];
-    const eqIndex = arg.indexOf('=');
+    const eqIndex = arg.indexOf("=");
     if (eqIndex === -1) continue;
 
     const key = arg.substring(0, eqIndex);
@@ -82,10 +89,10 @@ function run(argv) {
 
   let url = `things:///${command}`;
   if (params.length > 0) {
-    url += '?' + params.join('&');
+    url += `?${params.join("&")}`;
   }
 
   // show/search foreground Things; data commands run in background
-  const background = command !== 'show' && command !== 'search';
-  app.doShellScript(`open ${background ? '-g ' : ''}"${url}"`);
+  const background = command !== "show" && command !== "search";
+  app.doShellScript(`open ${background ? "-g " : ""}"${url}"`);
 }

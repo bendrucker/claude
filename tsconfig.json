@@ -13,8 +13,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": [
-    "./**/*.ts",
-    ".claude/**/*.ts"
-  ]
+  "include": ["./**/*.ts", ".claude/**/*.ts"]
 }

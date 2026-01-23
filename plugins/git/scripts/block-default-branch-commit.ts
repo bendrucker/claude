@@ -1,14 +1,11 @@
 #!/usr/bin/env npx tsx
 
-import { execSync } from "child_process";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
+import { execSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type {
-  PreToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
 
 export type BashInput = {
   command?: string;
@@ -25,9 +22,7 @@ function isInGitRepo(): boolean {
 
 function getCurrentBranch(): string | null {
   try {
-    return execSync("git symbolic-ref --short HEAD", { stdio: "pipe" })
-      .toString()
-      .trim();
+    return execSync("git symbolic-ref --short HEAD", { stdio: "pipe" }).toString().trim();
   } catch {
     return null;
   }
@@ -35,9 +30,7 @@ function getCurrentBranch(): string | null {
 
 export function getDefaultBranch(): string | null {
   try {
-    const repoRoot = execSync("git rev-parse --show-toplevel", { stdio: "pipe" })
-      .toString()
-      .trim();
+    const repoRoot = execSync("git rev-parse --show-toplevel", { stdio: "pipe" }).toString().trim();
     const safePath = repoRoot.replace(/\//g, "_");
     const tmpDir = process.env.TMPDIR || os.tmpdir();
     const cacheFile = path.join(tmpDir, `claude-default-branch${safePath}`);
@@ -59,7 +52,7 @@ export function getDefaultBranch(): string | null {
       try {
         defaultBranch = execSync(
           "gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'",
-          { stdio: "pipe" }
+          { stdio: "pipe" },
         )
           .toString()
           .trim();
@@ -88,9 +81,7 @@ export function formatDenyOutput(branch: string): SyncHookJSONOutput {
   };
 }
 
-export function processInput(
-  _input: PreToolUseHookInput
-): SyncHookJSONOutput | null {
+export function processInput(_input: PreToolUseHookInput): SyncHookJSONOutput | null {
   if (!isInGitRepo()) {
     return null;
   }
@@ -118,7 +109,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[git/block-default-branch-commit] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[git/block-default-branch-commit] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

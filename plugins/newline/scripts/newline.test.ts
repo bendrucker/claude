@@ -1,23 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
-import type {
-  PreToolUseHookInput,
-  PostToolUseHookInput,
-} from "@anthropic-ai/claude-code";
+import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import type { PreToolUseHookInput, PostToolUseHookInput } from "@anthropic-ai/claude-code";
 import { hasTrailingNewline, processInput as checkInput } from "./check.ts";
 import { ensureTrailingNewline, processInput as ensureInput } from "./ensure.ts";
-import {
-  preserveNewlineState,
-  processInput as preserveInput,
-} from "./preserve.ts";
-import {
-  getState,
-  setState,
-  clearState,
-  clearAllState,
-} from "./state.ts";
+import { preserveNewlineState, processInput as preserveInput } from "./preserve.ts";
+import { getState, setState, clearState, clearAllState } from "./state.ts";
 
 const testDir = join(tmpdir(), "newline-test");
 
@@ -124,7 +113,6 @@ describe("check.ts", () => {
       checkInput(mockPreToolInput(filePath));
       expect(getState("newline", filePath)).toBe("");
     });
-
   });
 });
 
@@ -163,9 +151,7 @@ describe("ensure.ts", () => {
       const filePath = join(testDir, "no_newline.txt");
       writeFileSync(filePath, "content");
       const output = ensureInput(mockPostToolInput(filePath));
-      expect(output?.hookSpecificOutput?.additionalContext).toContain(
-        "Added trailing newline"
-      );
+      expect(output?.hookSpecificOutput?.additionalContext).toContain("Added trailing newline");
     });
   });
 });
@@ -212,7 +198,6 @@ describe("preserve.ts", () => {
       preserveInput(mockPostToolInput(filePath));
       expect(getState("newline", filePath)).toBe("");
     });
-
   });
 });
 

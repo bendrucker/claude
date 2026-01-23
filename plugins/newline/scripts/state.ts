@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
-import { createHash } from "crypto";
-import { tmpdir } from "os";
-import { join } from "path";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 type StateStore = Record<string, string>;
 

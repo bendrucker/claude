@@ -1,18 +1,15 @@
 #!/usr/bin/env npx tsx
 
-import { execSync } from "child_process";
-import { writeFileSync, unlinkSync } from "fs";
-import { tmpdir } from "os";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { execSync } from "node:child_process";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import type { Heading, Text } from "mdast";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type {
-  PreToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
 
 export type WriteInput = { file_path: string; content: string };
 export type EditInput = { file_path: string; new_string: string };
@@ -60,7 +57,7 @@ export function checkMarkdown(content: string): string | null {
   });
 
   if (matches.length > 0) {
-    return `Numbered heading: ${matches[0]!.text}`;
+    return `Numbered heading: ${matches[0]?.text}`;
   }
 
   return null;
@@ -97,7 +94,7 @@ export function checkCode(content: string, ext: string): string | null {
     if (result) {
       const matches: AstGrepMatch[] = JSON.parse(result);
       if (matches.length > 0) {
-        return matches[0]!.message;
+        return matches[0]?.message;
       }
     }
   } catch {
@@ -113,10 +110,7 @@ export function checkCode(content: string, ext: string): string | null {
   return null;
 }
 
-export function formatOutput(
-  decision: "deny" | "ask",
-  reason: string
-): SyncHookJSONOutput {
+export function formatOutput(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
@@ -126,10 +120,7 @@ export function formatOutput(
   };
 }
 
-export function processInput(
-  input: PreToolUseHookInput,
-  mode: Mode
-): SyncHookJSONOutput | null {
+export function processInput(input: PreToolUseHookInput, mode: Mode): SyncHookJSONOutput | null {
   const toolName = input.tool_name;
 
   let content: string;
@@ -180,7 +171,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[style/numbering] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[style/numbering] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

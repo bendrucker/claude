@@ -2,10 +2,7 @@
 
 import UrlPattern from "url-pattern";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type {
-  PreToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
 
 export type WebFetchInput = { url: string; prompt: string };
 
@@ -75,9 +72,7 @@ export function matchRoute(path: string): RouteMatch | null {
   return null;
 }
 
-export function parseGitLabUrl(
-  url: string
-): { type: string; suggestion: string } | null {
+export function parseGitLabUrl(url: string): { type: string; suggestion: string } | null {
   const path = url.slice("https://gitlab.com/".length);
 
   // Check if this contains a /-/ path separator (resource path)
@@ -113,7 +108,7 @@ export function parseGitLabUrl(
 
 export function formatOutput(
   decision: "allow" | "deny" | "ask",
-  reason: string
+  reason: string,
 ): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
@@ -124,9 +119,7 @@ export function formatOutput(
   };
 }
 
-export function processInput(
-  input: PreToolUseHookInput
-): SyncHookJSONOutput | null {
+export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
   const { url } = input.tool_input as WebFetchInput;
 
   if (!isGitLabUrl(url)) {
@@ -147,7 +140,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[gitlab/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[gitlab/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

@@ -1,10 +1,7 @@
 #!/usr/bin/env npx tsx
 
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type {
-  PreToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
 
 export type CreateIssueInput = {
   title?: string;
@@ -17,9 +14,7 @@ export function getDefaultState(assignee: string | undefined): string {
   return assignee ? "Todo" : "Backlog";
 }
 
-export function processInput(
-  input: PreToolUseHookInput
-): SyncHookJSONOutput | null {
+export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
   const { state, assignee } = input.tool_input as CreateIssueInput;
 
   // Only modify if state is not set
@@ -44,7 +39,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[linear/default-state] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[linear/default-state] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

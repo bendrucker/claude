@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
-import {
-  isGitHubUrl,
-  parseGitHubUrl,
-  formatOutput,
-  processInput,
-} from "./fetch.ts";
+import { isGitHubUrl, parseGitHubUrl, formatOutput, processInput } from "./fetch.ts";
 
 function mockInput(url: string): PreToolUseHookInput {
   return {
@@ -51,16 +46,14 @@ describe("parseGitHubUrl", () => {
 
   it("detects file content (blob URL)", () => {
     const result = parseGitHubUrl(
-      "https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts"
+      "https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts",
     );
     expect(result?.type).toBe("file");
     expect(result?.suggestion).toContain("gh api");
   });
 
   it("detects directory (tree URL)", () => {
-    const result = parseGitHubUrl(
-      "https://github.com/owner/repo/tree/main/src"
-    );
+    const result = parseGitHubUrl("https://github.com/owner/repo/tree/main/src");
     expect(result?.type).toBe("file");
     expect(result?.suggestion).toContain("gh api");
   });
@@ -74,36 +67,28 @@ describe("parseGitHubUrl", () => {
   it("detects issues", () => {
     const result = parseGitHubUrl("https://github.com/owner/repo/issues/123");
     expect(result?.type).toBe("issue");
-    expect(result?.suggestion).toBe(
-      "Use: gh issue view 123. Run /github:gh for more patterns."
-    );
+    expect(result?.suggestion).toBe("Use: gh issue view 123. Run /github:gh for more patterns.");
   });
 
   it("detects PRs", () => {
     const result = parseGitHubUrl("https://github.com/owner/repo/pull/456");
     expect(result?.type).toBe("pr");
-    expect(result?.suggestion).toBe(
-      "Use: gh pr view 456. Run /github:gh for more patterns."
-    );
+    expect(result?.suggestion).toBe("Use: gh pr view 456. Run /github:gh for more patterns.");
   });
 
   it("detects Actions run", () => {
-    const result = parseGitHubUrl(
-      "https://github.com/owner/repo/actions/runs/12345"
-    );
+    const result = parseGitHubUrl("https://github.com/owner/repo/actions/runs/12345");
     expect(result?.type).toBe("run");
-    expect(result?.suggestion).toBe(
-      "Use: gh run view 12345. Run /github:gh for more patterns."
-    );
+    expect(result?.suggestion).toBe("Use: gh run view 12345. Run /github:gh for more patterns.");
   });
 
   it("detects Actions job", () => {
     const result = parseGitHubUrl(
-      "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490"
+      "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490",
     );
     expect(result?.type).toBe("job");
     expect(result?.suggestion).toBe(
-      "Use: gh run view --job 57098829490 --log. Run /github:gh for more patterns."
+      "Use: gh run view --job 57098829490 --log. Run /github:gh for more patterns.",
     );
   });
 });
@@ -138,96 +123,80 @@ describe("processInput", () => {
   });
 
   it("denies repo root with gh repo view suggestion", () => {
-    const output = processInput(
-      mockInput("https://github.com/bendrucker/deployments")
-    );
+    const output = processInput(mockInput("https://github.com/bendrucker/deployments"));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh repo view [<repository>]. Run /github:gh for more patterns."
+      "Use: gh repo view [<repository>]. Run /github:gh for more patterns.",
     );
   });
 
   it("handles repository URL with trailing slash", () => {
-    const output = processInput(
-      mockInput("https://github.com/bendrucker/deployments/")
-    );
+    const output = processInput(mockInput("https://github.com/bendrucker/deployments/"));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh repo view [<repository>]. Run /github:gh for more patterns."
+      "Use: gh repo view [<repository>]. Run /github:gh for more patterns.",
     );
   });
 
   it("denies file content with gh api suggestion", () => {
     const output = processInput(
-      mockInput(
-        "https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts"
-      )
+      mockInput("https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts"),
     );
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh api to fetch file contents. Run /github:gh for more patterns."
+      "Use: gh api to fetch file contents. Run /github:gh for more patterns.",
     );
   });
 
   it("denies directory with gh api suggestion", () => {
-    const output = processInput(
-      mockInput("https://github.com/owner/repo/tree/main/src")
-    );
+    const output = processInput(mockInput("https://github.com/owner/repo/tree/main/src"));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh api to fetch file contents. Run /github:gh for more patterns."
+      "Use: gh api to fetch file contents. Run /github:gh for more patterns.",
     );
   });
 
   it("handles root directory tree", () => {
-    const output = processInput(
-      mockInput("https://github.com/owner/repo/tree/main")
-    );
+    const output = processInput(mockInput("https://github.com/owner/repo/tree/main"));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh api to fetch file contents. Run /github:gh for more patterns."
+      "Use: gh api to fetch file contents. Run /github:gh for more patterns.",
     );
   });
 
   it("denies issues with gh issue view suggestion", () => {
-    const output = processInput(
-      mockInput("https://github.com/owner/repo/issues/123")
-    );
+    const output = processInput(mockInput("https://github.com/owner/repo/issues/123"));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh issue view 123. Run /github:gh for more patterns."
+      "Use: gh issue view 123. Run /github:gh for more patterns.",
     );
   });
 
   it("denies PRs with gh pr view suggestion", () => {
-    const output = processInput(
-      mockInput("https://github.com/owner/repo/pull/456")
-    );
+    const output = processInput(mockInput("https://github.com/owner/repo/pull/456"));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh pr view 456. Run /github:gh for more patterns."
+      "Use: gh pr view 456. Run /github:gh for more patterns.",
     );
   });
 
   it("denies Actions run with gh run view suggestion", () => {
-    const output = processInput(
-      mockInput("https://github.com/owner/repo/actions/runs/12345")
-    );
+    const output = processInput(mockInput("https://github.com/owner/repo/actions/runs/12345"));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh run view 12345. Run /github:gh for more patterns."
+      "Use: gh run view 12345. Run /github:gh for more patterns.",
     );
   });
 
   it("denies Actions job with gh run view --job suggestion", () => {
     const output = processInput(
       mockInput(
-        "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490"
-      )
+        "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490",
+      ),
     );
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
-      "Use: gh run view --job 57098829490 --log. Run /github:gh for more patterns."
+      "Use: gh run view --job 57098829490 --log. Run /github:gh for more patterns.",
     );
   });
 
@@ -235,7 +204,7 @@ describe("processInput", () => {
     const output = processInput(mockInput("https://github.com/explore"));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("ask");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain(
-      "Run /github:gh for guidance"
+      "Run /github:gh for guidance",
     );
   });
 });

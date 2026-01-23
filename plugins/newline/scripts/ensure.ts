@@ -1,11 +1,8 @@
 #!/usr/bin/env npx tsx
 
-import { existsSync, readFileSync, writeFileSync, statSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type {
-  PostToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
 
 type ToolInput = {
   file_path?: string;
@@ -26,13 +23,11 @@ export function ensureTrailingNewline(filePath: string): string | null {
     return "File already has trailing newline";
   }
 
-  writeFileSync(filePath, content + "\n");
+  writeFileSync(filePath, `${content}\n`);
   return "Added trailing newline";
 }
 
-export function processInput(
-  input: PostToolUseHookInput
-): SyncHookJSONOutput | null {
+export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | null {
   const { file_path: filePath } = input.tool_input as ToolInput;
 
   const message = ensureTrailingNewline(filePath);
@@ -55,7 +50,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PostToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[newline/ensure] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[newline/ensure] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     process.exit(1);
   }
@@ -66,9 +61,7 @@ async function main(): Promise<void> {
       writeStdoutJson(output);
     }
   } catch (error) {
-    console.error(
-      `[newline/ensure] ${error instanceof Error ? error.message : String(error)}`
-    );
+    console.error(`[newline/ensure] ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }

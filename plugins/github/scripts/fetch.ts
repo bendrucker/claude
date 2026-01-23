@@ -2,10 +2,7 @@
 
 import UrlPattern from "url-pattern";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type {
-  PreToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
 
 export type WebFetchInput = { url: string; prompt: string };
 
@@ -80,9 +77,7 @@ export function matchRoute(path: string): RouteMatch | null {
   return null;
 }
 
-export function parseGitHubUrl(
-  url: string
-): { type: string; suggestion: string } | null {
+export function parseGitHubUrl(url: string): { type: string; suggestion: string } | null {
   // Strip the GitHub prefix to simplify pattern matching
   const path = url.slice("https://github.com/".length);
 
@@ -126,7 +121,7 @@ export function parseGitHubUrl(
 
 export function formatOutput(
   decision: "allow" | "deny" | "ask",
-  reason: string
+  reason: string,
 ): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
@@ -137,9 +132,7 @@ export function formatOutput(
   };
 }
 
-export function processInput(
-  input: PreToolUseHookInput
-): SyncHookJSONOutput | null {
+export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
   const { url } = input.tool_input as WebFetchInput;
 
   if (!isGitHubUrl(url)) {
@@ -160,7 +153,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[github/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[github/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

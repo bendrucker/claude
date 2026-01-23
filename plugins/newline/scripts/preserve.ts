@@ -1,21 +1,15 @@
 #!/usr/bin/env npx tsx
 
-import { existsSync, readFileSync, writeFileSync, statSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type {
-  PostToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
 import { getState, clearState } from "./state.ts";
 
 type ToolInput = {
   file_path?: string;
 };
 
-export function preserveNewlineState(
-  filePath: string,
-  hadNewline: string
-): string | null {
+export function preserveNewlineState(filePath: string, hadNewline: string): string | null {
   if (!existsSync(filePath)) {
     return null;
   }
@@ -29,7 +23,7 @@ export function preserveNewlineState(
   const hasNewline = content.endsWith("\n");
 
   if (hadNewline === "1" && !hasNewline) {
-    writeFileSync(filePath, content + "\n");
+    writeFileSync(filePath, `${content}\n`);
     return "Added trailing newline (preserving original state)";
   }
 
@@ -41,9 +35,7 @@ export function preserveNewlineState(
   return null;
 }
 
-export function processInput(
-  input: PostToolUseHookInput
-): SyncHookJSONOutput | null {
+export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | null {
   const { file_path: filePath } = input.tool_input as ToolInput;
 
   const hadNewline = getState("newline", filePath);
@@ -69,7 +61,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PostToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[newline/preserve] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[newline/preserve] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     process.exit(1);
   }
@@ -80,9 +72,7 @@ async function main(): Promise<void> {
       writeStdoutJson(output);
     }
   } catch (error) {
-    console.error(
-      `[newline/preserve] ${error instanceof Error ? error.message : String(error)}`
-    );
+    console.error(`[newline/preserve] ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }

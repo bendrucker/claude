@@ -2,9 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
 import { getDefaultState, processInput } from "./default-state.ts";
 
-function mockInput(
-  toolInput: Record<string, unknown>
-): PreToolUseHookInput {
+function mockInput(toolInput: Record<string, unknown>): PreToolUseHookInput {
   return {
     hook_event_name: "PreToolUse",
     session_id: "test",
@@ -31,9 +29,7 @@ describe("getDefaultState", () => {
 
 describe("processInput", () => {
   it("defaults to Backlog when no assignee", () => {
-    const output = processInput(
-      mockInput({ title: "Test issue", team: "ENG" })
-    );
+    const output = processInput(mockInput({ title: "Test issue", team: "ENG" }));
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -45,9 +41,7 @@ describe("processInput", () => {
   });
 
   it("defaults to Todo when assignee is set", () => {
-    const output = processInput(
-      mockInput({ title: "Test issue", team: "ENG", assignee: "me" })
-    );
+    const output = processInput(mockInput({ title: "Test issue", team: "ENG", assignee: "me" }));
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -59,9 +53,7 @@ describe("processInput", () => {
   });
 
   it("defaults to Backlog when assignee is empty string", () => {
-    const output = processInput(
-      mockInput({ title: "Test issue", team: "ENG", assignee: "" })
-    );
+    const output = processInput(mockInput({ title: "Test issue", team: "ENG", assignee: "" }));
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -74,7 +66,7 @@ describe("processInput", () => {
 
   it("does not modify the input when state is already set", () => {
     const output = processInput(
-      mockInput({ title: "Test issue", team: "ENG", state: "In Progress" })
+      mockInput({ title: "Test issue", team: "ENG", state: "In Progress" }),
     );
     expect(output).toBeNull();
   });
@@ -86,7 +78,7 @@ describe("processInput", () => {
         team: "ENG",
         state: "Done",
         assignee: "me",
-      })
+      }),
     );
     expect(output).toBeNull();
   });

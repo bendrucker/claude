@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 
-import { existsSync, readFileSync, statSync } from "fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { readStdinJson } from "@constellos/claude-code-kit/runners";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
 import { setState } from "./state.ts";
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[newline/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[newline/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     process.exit(1);
   }
@@ -49,9 +49,7 @@ async function main(): Promise<void> {
   try {
     processInput(input);
   } catch (error) {
-    console.error(
-      `[newline/check] ${error instanceof Error ? error.message : String(error)}`
-    );
+    console.error(`[newline/check] ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }

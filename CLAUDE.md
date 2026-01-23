@@ -18,7 +18,6 @@ Each plugin in `plugins/` contains:
 - `hooks/`: Optional hook definitions (`hooks.json`)
 - `commands/`: Optional slash commands
 - `agents/`: Optional agent definitions
-- `spec.sh`: ShellSpec test file (run with `shellspec plugins/<name>/spec.sh`)
 
 ### Naming
 
@@ -88,7 +87,7 @@ See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [p
 
 ## Testing
 
-Plugins use [Vitest](https://vitest.dev/) for TypeScript tests (`npm test -- plugins/<name>`) or [ShellSpec](https://shellspec.info/) for shell script tests (`shellspec plugins/<name>/spec.sh`).
+Plugins use [Vitest](https://vitest.dev/) for tests. Run all tests with `npm test` or filter by plugin with `npm test -- plugins/<name>`.
 
 ## Verification
 

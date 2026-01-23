@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { execSync } from "child_process";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
+import { execSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
 import { formatDenyOutput, processInput } from "./block-default-branch-commit.ts";
 
@@ -66,10 +66,10 @@ describe("processInput", () => {
     const output = processInput(mockInput('git commit -m "test"'));
     expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain(
-      "Cannot commit directly to main"
+      "Cannot commit directly to main",
     );
     expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain(
-      "Create a topic branch first"
+      "Create a topic branch first",
     );
   });
 

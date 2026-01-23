@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { execSync } from "child_process";
+import { execSync } from "node:child_process";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
 import { processInput, checkMarkdown, checkCode, formatOutput } from "./numbering.ts";
 
@@ -142,7 +142,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("detects func step1()", () => {
       const output = processInput(
         mockWriteInput("main.go", 'package main\nfunc step1() { fmt.Println("test") }'),
-        "write"
+        "write",
       );
       expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
       expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain("step1");
@@ -151,7 +151,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("detects func phase2()", () => {
       const output = processInput(
         mockWriteInput("main.go", "package main\nfunc phase2() {}"),
-        "write"
+        "write",
       );
       expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
       expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain("phase2");
@@ -160,7 +160,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("allows descriptive function names", () => {
       const output = processInput(
         mockWriteInput("main.go", 'package main\nfunc processItems() { fmt.Println("test") }'),
-        "write"
+        "write",
       );
       expect(output).toBeNull();
     });
@@ -170,7 +170,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("detects function step1()", () => {
       const output = processInput(
         mockWriteInput("app.js", 'function step1() { console.log("test"); }'),
-        "write"
+        "write",
       );
       expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     });
@@ -183,7 +183,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("allows descriptive names", () => {
       const output = processInput(
         mockWriteInput("app.js", 'function handleSubmit() { console.log("test"); }'),
-        "write"
+        "write",
       );
       expect(output).toBeNull();
     });
@@ -191,25 +191,19 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
   describe("Python numbered identifiers", () => {
     it("detects def step1()", () => {
-      const output = processInput(
-        mockWriteInput("script.py", "def step1():\n    pass"),
-        "write"
-      );
+      const output = processInput(mockWriteInput("script.py", "def step1():\n    pass"), "write");
       expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     });
 
     it("detects class Phase2", () => {
-      const output = processInput(
-        mockWriteInput("script.py", "class Phase2:\n    pass"),
-        "write"
-      );
+      const output = processInput(mockWriteInput("script.py", "class Phase2:\n    pass"), "write");
       expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     });
 
     it("allows descriptive names", () => {
       const output = processInput(
         mockWriteInput("script.py", "def process_items():\n    pass"),
-        "write"
+        "write",
       );
       expect(output).toBeNull();
     });
@@ -219,7 +213,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("blocks Write tool with deny", () => {
       const output = processInput(
         mockWriteInput("main.go", "package main\nfunc step1() {}"),
-        "write"
+        "write",
       );
       expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     });
@@ -242,10 +236,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     });
 
     it("skips unsupported file types (JSON)", () => {
-      const output = processInput(
-        mockWriteInput("config.json", '{"step1": "value"}'),
-        "write"
-      );
+      const output = processInput(mockWriteInput("config.json", '{"step1": "value"}'), "write");
       expect(output).toBeNull();
     });
   });
@@ -264,7 +255,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("checks test_*.py files", () => {
       const output = processInput(
         mockWriteInput("test_utils.py", "def step1():\n    pass"),
-        "write"
+        "write",
       );
       expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
     });
@@ -298,7 +289,7 @@ describe("processInput with markdown", () => {
   it("allows headings with numbers mid-text", () => {
     const output = processInput(
       mockWriteInput("README.md", "# Using OAuth2 for Authentication"),
-      "write"
+      "write",
     );
     expect(output).toBeNull();
   });

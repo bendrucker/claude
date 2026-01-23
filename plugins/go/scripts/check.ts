@@ -1,11 +1,8 @@
 #!/usr/bin/env npx tsx
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync } from "node:fs";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type {
-  PreToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
 
 export type FileInput = {
   file_path?: string;
@@ -43,9 +40,7 @@ export function isGeneratedFile(content: string): boolean {
   return foundMarker && foundCode;
 }
 
-export function processInput(
-  input: PreToolUseHookInput
-): SyncHookJSONOutput | null {
+export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
   const { file_path: filePath } = input.tool_input as FileInput;
 
   // Only check .go files
@@ -79,7 +74,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[go/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[go/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

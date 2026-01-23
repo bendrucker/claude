@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
-import { getDefaultState, processInput } from "./default-state.ts";
+import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { getDefaultState, processInput } from "./default-state";
 
 function mockInput(toolInput: Record<string, unknown>): PreToolUseHookInput {
   return {
@@ -10,6 +10,7 @@ function mockInput(toolInput: Record<string, unknown>): PreToolUseHookInput {
     cwd: "/tmp",
     tool_name: "mcp__linear__create_issue",
     tool_input: toolInput,
+    tool_use_id: "test",
   };
 }
 

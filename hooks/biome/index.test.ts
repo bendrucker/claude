@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { PostToolUseHookInput } from "@anthropic-ai/claude-code";
+import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { processInput, runBiome } from ".";
 
 let tempDir: string;
@@ -19,6 +19,7 @@ function mockPostToolUseInput(
     tool_response: {},
     transcript_path: "/tmp/transcript.json",
     cwd: process.cwd(),
+    tool_use_id: "test",
   };
 }
 

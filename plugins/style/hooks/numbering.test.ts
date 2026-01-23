@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
-import { processInput, checkMarkdown, checkCode, formatOutput } from "./numbering.ts";
+import type { PreToolUseHookInput, PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
+import { processInput, checkMarkdown, checkCode, formatOutput } from "./numbering";
 
 function hasSg(): boolean {
   try {
@@ -20,6 +20,7 @@ function mockWriteInput(filePath: string, content: string): PreToolUseHookInput 
     cwd: "/tmp",
     tool_name: "Write",
     tool_input: { file_path: filePath, content },
+    tool_use_id: "test",
   };
 }
 
@@ -31,7 +32,14 @@ function mockEditInput(filePath: string, newString: string): PreToolUseHookInput
     cwd: "/tmp",
     tool_name: "Edit",
     tool_input: { file_path: filePath, new_string: newString },
+    tool_use_id: "test",
   };
+}
+
+function getOutput(input: PreToolUseHookInput, mode: "write" | "edit" = "write"): PreToolUseHookSpecificOutput | null {
+  const result = processInput(input, mode);
+  if (!result) return null;
+  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
 
 describe("formatOutput", () => {
@@ -140,25 +148,25 @@ describe.skipIf(!hasSg())("checkCode (requires sg)", () => {
 describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
   describe("Go numbered identifiers", () => {
     it("detects func step1()", () => {
-      const output = processInput(
+      const output = getOutput(
         mockWriteInput("main.go", 'package main\nfunc step1() { fmt.Println("test") }'),
         "write",
       );
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-      expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain("step1");
+      expect(output?.permissionDecision).toBe("deny");
+      expect(output?.permissionDecisionReason).toContain("step1");
     });
 
     it("detects func phase2()", () => {
-      const output = processInput(
+      const output = getOutput(
         mockWriteInput("main.go", "package main\nfunc phase2() {}"),
         "write",
       );
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-      expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain("phase2");
+      expect(output?.permissionDecision).toBe("deny");
+      expect(output?.permissionDecisionReason).toContain("phase2");
     });
 
     it("allows descriptive function names", () => {
-      const output = processInput(
+      const output = getOutput(
         mockWriteInput("main.go", 'package main\nfunc processItems() { fmt.Println("test") }'),
         "write",
       );
@@ -168,20 +176,20 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
   describe("JavaScript numbered identifiers", () => {
     it("detects function step1()", () => {
-      const output = processInput(
+      const output = getOutput(
         mockWriteInput("app.js", 'function step1() { console.log("test"); }'),
         "write",
       );
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("detects const part3", () => {
-      const output = processInput(mockWriteInput("app.js", "const part3 = () => {};"), "write");
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      const output = getOutput(mockWriteInput("app.js", "const part3 = () => {};"), "write");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("allows descriptive names", () => {
-      const output = processInput(
+      const output = getOutput(
         mockWriteInput("app.js", 'function handleSubmit() { console.log("test"); }'),
         "write",
       );
@@ -191,17 +199,17 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
   describe("Python numbered identifiers", () => {
     it("detects def step1()", () => {
-      const output = processInput(mockWriteInput("script.py", "def step1():\n    pass"), "write");
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      const output = getOutput(mockWriteInput("script.py", "def step1():\n    pass"), "write");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("detects class Phase2", () => {
-      const output = processInput(mockWriteInput("script.py", "class Phase2:\n    pass"), "write");
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      const output = getOutput(mockWriteInput("script.py", "class Phase2:\n    pass"), "write");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("allows descriptive names", () => {
-      const output = processInput(
+      const output = getOutput(
         mockWriteInput("script.py", "def process_items():\n    pass"),
         "write",
       );
@@ -211,83 +219,83 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
   describe("Write vs Edit mode", () => {
     it("blocks Write tool with deny", () => {
-      const output = processInput(
+      const output = getOutput(
         mockWriteInput("main.go", "package main\nfunc step1() {}"),
         "write",
       );
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("asks for Edit tool instead of deny", () => {
-      const output = processInput(mockEditInput("main.go", "func step1() {}"), "edit");
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("ask");
+      const output = getOutput(mockEditInput("main.go", "func step1() {}"), "edit");
+      expect(output?.permissionDecision).toBe("ask");
     });
   });
 
   describe("File type filtering", () => {
     it("checks Go files", () => {
-      const output = processInput(mockWriteInput("main.go", "func step1() {}"), "write");
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      const output = getOutput(mockWriteInput("main.go", "func step1() {}"), "write");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("checks TypeScript files", () => {
-      const output = processInput(mockWriteInput("app.ts", "function step1() {}"), "write");
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      const output = getOutput(mockWriteInput("app.ts", "function step1() {}"), "write");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("skips unsupported file types (JSON)", () => {
-      const output = processInput(mockWriteInput("config.json", '{"step1": "value"}'), "write");
+      const output = getOutput(mockWriteInput("config.json", '{"step1": "value"}'), "write");
       expect(output).toBeNull();
     });
   });
 
   describe("Test files are NOT excluded", () => {
     it("checks *_test.go files", () => {
-      const output = processInput(mockWriteInput("main_test.go", "func step1() {}"), "write");
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      const output = getOutput(mockWriteInput("main_test.go", "func step1() {}"), "write");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("checks *.spec.ts files", () => {
-      const output = processInput(mockWriteInput("app.spec.ts", "function step1() {}"), "write");
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      const output = getOutput(mockWriteInput("app.spec.ts", "function step1() {}"), "write");
+      expect(output?.permissionDecision).toBe("deny");
     });
 
     it("checks test_*.py files", () => {
-      const output = processInput(
+      const output = getOutput(
         mockWriteInput("test_utils.py", "def step1():\n    pass"),
         "write",
       );
-      expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+      expect(output?.permissionDecision).toBe("deny");
     });
   });
 });
 
 describe("processInput with markdown", () => {
   it('detects "# 1. Introduction"', () => {
-    const output = processInput(mockWriteInput("README.md", "# 1. Introduction"), "write");
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain("1. Introduction");
+    const output = getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toContain("1. Introduction");
   });
 
   it('detects "## Step 2: Setup"', () => {
-    const output = processInput(mockWriteInput("docs.md", "## Step 2: Setup"), "write");
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain("Step 2");
+    const output = getOutput(mockWriteInput("docs.md", "## Step 2: Setup"), "write");
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toContain("Step 2");
   });
 
   it('detects "### Phase 3"', () => {
-    const output = processInput(mockWriteInput("guide.markdown", "### Phase 3"), "write");
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain("Phase 3");
+    const output = getOutput(mockWriteInput("guide.markdown", "### Phase 3"), "write");
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toContain("Phase 3");
   });
 
   it("allows descriptive headings", () => {
-    const output = processInput(mockWriteInput("README.md", "# Introduction"), "write");
+    const output = getOutput(mockWriteInput("README.md", "# Introduction"), "write");
     expect(output).toBeNull();
   });
 
   it("allows headings with numbers mid-text", () => {
-    const output = processInput(
+    const output = getOutput(
       mockWriteInput("README.md", "# Using OAuth2 for Authentication"),
       "write",
     );
@@ -304,8 +312,9 @@ describe("processInput edge cases", () => {
       cwd: "/tmp",
       tool_name: "Bash",
       tool_input: { command: "echo hello" },
+      tool_use_id: "test",
     };
-    expect(processInput(input, "write")).toBeNull();
+    expect(getOutput(input, "write")).toBeNull();
   });
 
   it("returns null for missing content", () => {
@@ -316,7 +325,8 @@ describe("processInput edge cases", () => {
       cwd: "/tmp",
       tool_name: "Write",
       tool_input: { file_path: "test.go" },
+      tool_use_id: "test",
     };
-    expect(processInput(input, "write")).toBeNull();
+    expect(getOutput(input, "write")).toBeNull();
   });
 });

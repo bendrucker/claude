@@ -2,7 +2,7 @@
 
 import { execSync } from "node:child_process";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
+import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 export type WriteInput = { file_path: string };
 export type EditInput = { file_path: string };

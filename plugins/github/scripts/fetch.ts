@@ -2,7 +2,7 @@
 
 import UrlPattern from "url-pattern";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 export type WebFetchInput = { url: string; prompt: string };
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
-import { isGitLabUrl, parseGitLabUrl, formatOutput, processInput } from "./fetch.ts";
+import type { PreToolUseHookInput, PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
+import { isGitLabUrl, parseGitLabUrl, formatOutput, processInput } from "./fetch";
 
 function mockInput(url: string): PreToolUseHookInput {
   return {
@@ -10,7 +10,14 @@ function mockInput(url: string): PreToolUseHookInput {
     cwd: "/tmp",
     tool_name: "WebFetch",
     tool_input: { url, prompt: "test" },
+    tool_use_id: "test",
   };
+}
+
+function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
+  const result = processInput(input);
+  if (!result) return null;
+  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
 
 describe("isGitLabUrl", () => {
@@ -130,95 +137,95 @@ describe("processInput", () => {
   });
 
   it("denies project root with glab repo view suggestion", () => {
-    const output = processInput(mockInput("https://gitlab.com/gitlab-org/gitlab"));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab"));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab repo view [<project>]. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("handles project URL with trailing slash", () => {
-    const output = processInput(mockInput("https://gitlab.com/gitlab-org/gitlab/"));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/"));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab repo view [<project>]. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("handles nested group projects", () => {
-    const output = processInput(mockInput("https://gitlab.com/group/subgroup/project"));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    const output = getOutput(mockInput("https://gitlab.com/group/subgroup/project"));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab repo view [<project>]. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("denies file content with glab api suggestion", () => {
-    const output = processInput(
+    const output = getOutput(
       mockInput("https://gitlab.com/gitlab-org/gitlab/-/blob/master/README.md"),
     );
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab api to fetch file contents. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("denies directory with glab api suggestion", () => {
-    const output = processInput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/tree/main/src"));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/tree/main/src"));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab api to fetch file contents. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("handles root directory tree", () => {
-    const output = processInput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/tree/main"));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/tree/main"));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab api to fetch file contents. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("denies issues with glab issue view suggestion", () => {
-    const output = processInput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/issues/123"));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/issues/123"));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab issue view 123. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("denies MRs with glab mr view suggestion", () => {
-    const output = processInput(
+    const output = getOutput(
       mockInput("https://gitlab.com/gitlab-org/gitlab/-/merge_requests/456"),
     );
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab mr view 456. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("denies pipelines with glab ci view suggestion", () => {
-    const output = processInput(
+    const output = getOutput(
       mockInput("https://gitlab.com/gitlab-org/gitlab/-/pipelines/12345"),
     );
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab ci view 12345. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("denies jobs with glab ci trace suggestion", () => {
-    const output = processInput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/jobs/67890"));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toBe(
+    const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/jobs/67890"));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(
       "Use: glab ci trace 67890. Run /gitlab:glab for more patterns.",
     );
   });
 
   it("asks for unknown GitLab URL patterns", () => {
-    const output = processInput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/settings"));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("ask");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain(
+    const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/settings"));
+    expect(output?.permissionDecision).toBe("ask");
+    expect(output?.permissionDecisionReason).toContain(
       "Unknown GitLab URL pattern",
     );
   });

@@ -3,8 +3,8 @@ import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
-import { formatDenyOutput, processInput } from "./block-default-branch-commit.ts";
+import type { PreToolUseHookInput, PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
+import { formatDenyOutput, processInput } from "./block-default-branch-commit";
 
 function mockInput(command: string): PreToolUseHookInput {
   return {
@@ -14,7 +14,14 @@ function mockInput(command: string): PreToolUseHookInput {
     cwd: "/tmp",
     tool_name: "Bash",
     tool_input: { command },
+    tool_use_id: "test",
   };
+}
+
+function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
+  const result = processInput(input);
+  if (!result) return null;
+  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
 
 describe("formatDenyOutput", () => {
@@ -63,19 +70,15 @@ describe("processInput", () => {
   });
 
   it("blocks commit on main branch", () => {
-    const output = processInput(mockInput('git commit -m "test"'));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain(
-      "Cannot commit directly to main",
-    );
-    expect(output?.hookSpecificOutput?.permissionDecisionReason).toContain(
-      "Create a topic branch first",
-    );
+    const output = getOutput(mockInput('git commit -m "test"'));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toContain("Cannot commit directly to main");
+    expect(output?.permissionDecisionReason).toContain("Create a topic branch first");
   });
 
   it("blocks commit with additional flags", () => {
-    const output = processInput(mockInput('git commit -a -m "test"'));
-    expect(output?.hookSpecificOutput?.permissionDecision).toBe("deny");
+    const output = getOutput(mockInput('git commit -a -m "test"'));
+    expect(output?.permissionDecision).toBe("deny");
   });
 
   it("allows commit in detached HEAD state", () => {

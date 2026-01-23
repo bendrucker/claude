@@ -9,7 +9,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import type { Heading, Text } from "mdast";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 export type WriteInput = { file_path: string; content: string };
 export type EditInput = { file_path: string; new_string: string };
@@ -94,7 +94,7 @@ export function checkCode(content: string, ext: string): string | null {
     if (result) {
       const matches: AstGrepMatch[] = JSON.parse(result);
       if (matches.length > 0) {
-        return matches[0]?.message;
+        return matches[0]?.message ?? null;
       }
     }
   } catch {

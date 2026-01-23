@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
-import { isGeneratedFile, processInput } from "./check.ts";
+import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { isGeneratedFile, processInput } from "./check";
 
 function mockInput(filePath: string): PreToolUseHookInput {
   return {
@@ -13,6 +13,7 @@ function mockInput(filePath: string): PreToolUseHookInput {
     cwd: "/tmp",
     tool_name: "Edit",
     tool_input: { file_path: filePath },
+    tool_use_id: "test",
   };
 }
 

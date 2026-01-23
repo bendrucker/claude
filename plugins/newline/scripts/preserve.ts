@@ -2,8 +2,8 @@
 
 import { existsSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
-import { getState, clearState } from "./state.ts";
+import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { getState, clearState } from "./state";
 
 type ToolInput = {
   file_path?: string;
@@ -37,6 +37,7 @@ export function preserveNewlineState(filePath: string, hadNewline: string): stri
 
 export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | null {
   const { file_path: filePath } = input.tool_input as ToolInput;
+  if (!filePath) return null;
 
   const hadNewline = getState("newline", filePath);
   const message = preserveNewlineState(filePath, hadNewline);

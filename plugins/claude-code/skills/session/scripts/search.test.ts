@@ -113,7 +113,9 @@ describe("searchConversations", () => {
     const results = await searchConversations("error", { projectsDir: fixturesDir });
     expect(results.length).toBeGreaterThan(0);
     for (let i = 1; i < results.length; i++) {
-      expect(results[i - 1]?.score).toBeGreaterThanOrEqual(results[i]?.score);
+      const prevScore = results[i - 1]?.score ?? 0;
+      const currScore = results[i]?.score ?? 0;
+      expect(prevScore).toBeGreaterThanOrEqual(currScore);
     }
   });
 

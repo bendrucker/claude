@@ -2,8 +2,8 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { readStdinJson } from "@constellos/claude-code-kit/runners";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-code";
-import { setState } from "./state.ts";
+import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { setState } from "./state";
 
 type ToolInput = {
   file_path?: string;
@@ -25,6 +25,7 @@ export function hasTrailingNewline(filePath: string): boolean | null {
 
 export function processInput(input: PreToolUseHookInput): void {
   const { file_path: filePath } = input.tool_input as ToolInput;
+  if (!filePath) return;
 
   const hasNewline = hasTrailingNewline(filePath);
 

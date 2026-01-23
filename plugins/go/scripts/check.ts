@@ -2,7 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-code";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 export type FileInput = {
   file_path?: string;
@@ -44,7 +44,7 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   const { file_path: filePath } = input.tool_input as FileInput;
 
   // Only check .go files
-  if (!filePath.endsWith(".go")) {
+  if (!filePath || !filePath.endsWith(".go")) {
     return null;
   }
 

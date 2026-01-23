@@ -192,7 +192,7 @@ jobs:
 
       - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
-        run: npm test -- "plugins/${{ matrix.plugin }}/"
+        run: npm run test:unit -- "plugins/${{ matrix.plugin }}/"
 
   plugins:
     needs: [validate, plugin]

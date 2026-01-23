@@ -8,7 +8,8 @@ import { processInput, checkMarkdown, checkCode, formatOutput } from "./numberin
 
 function hasSg(): boolean {
   try {
-    execSync("command -v sg", { stdio: ["pipe", "pipe", "pipe"] });
+    // Check if sg is ast-grep by verifying scan command works
+    execSync("sg scan --help", { stdio: ["pipe", "pipe", "pipe"] });
     return true;
   } catch {
     return false;

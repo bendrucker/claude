@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/fetch.sh"
+            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/fetch.ts"
           }
         ]
       }

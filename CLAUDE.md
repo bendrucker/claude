@@ -78,7 +78,7 @@ See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [p
 
 ## Testing
 
-Plugins use [ShellSpec](https://shellspec.info/) for testing. Each plugin should have a `spec.sh` file that tests hook scripts directly by piping JSON input. See [plugins/linear/spec.sh](plugins/linear/spec.sh) and [plugins/github/spec.sh](plugins/github/spec.sh) for examples.
+Plugins use [ShellSpec](https://shellspec.info/) for testing. Each plugin should have a `spec.sh` file that tests hook scripts directly by piping JSON input. See [plugins/linear/spec.sh](plugins/linear/spec.sh) for an example.
 
 ## Verification
 

@@ -15,9 +15,9 @@
  */
 
 const INTERMEDIATE_LIST = {
-  today: 'anytime',
-  anytime: 'someday',
-  someday: 'anytime'
+  today: "anytime",
+  anytime: "someday",
+  someday: "anytime",
 };
 
 /**
@@ -25,9 +25,7 @@ const INTERMEDIATE_LIST = {
  * @returns {string}
  */
 function getAuthToken(app) {
-  return app.doShellScript(
-    'security find-generic-password -a "$USER" -s "things-auth-token" -w'
-  );
+  return app.doShellScript('security find-generic-password -a "$USER" -s "things-auth-token" -w');
 }
 
 /**
@@ -36,9 +34,10 @@ function getAuthToken(app) {
  * @param {Array<{type: string, operation: string, id: string, attributes: object}>} data
  */
 function executeJsonUpdate(app, token, data) {
-  const url = 'things:///json?auth-token=' +
+  const url =
+    "things:///json?auth-token=" +
     encodeURIComponent(token) +
-    '&data=' +
+    "&data=" +
     encodeURIComponent(JSON.stringify(data));
   app.doShellScript(`open -g "${url}"`);
 }
@@ -46,13 +45,13 @@ function executeJsonUpdate(app, token, data) {
 /**
  * @param {string[]} argv
  */
-function run(argv) {
-  let targetList = 'today';
-  let ids = [];
+function _run(argv) {
+  let targetList = "today";
+  const ids = [];
 
   // Parse arguments
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--list' && i + 1 < argv.length) {
+    if (argv[i] === "--list" && i + 1 < argv.length) {
       targetList = argv[i + 1];
       i++;
     } else {
@@ -61,14 +60,14 @@ function run(argv) {
   }
 
   if (ids.length === 0) {
-    console.log('Usage: osascript scripts/reorder.js [--list <list>] <id1> <id2> ...');
-    console.log('Lists: today (default), anytime, someday');
-    return JSON.stringify({ error: 'No IDs provided' });
+    console.log("Usage: osascript scripts/reorder.js [--list <list>] <id1> <id2> ...");
+    console.log("Lists: today (default), anytime, someday");
+    return JSON.stringify({ error: "No IDs provided" });
   }
 
   const intermediate = INTERMEDIATE_LIST[targetList];
   if (!intermediate) {
-    return JSON.stringify({ error: 'Invalid list: ' + targetList });
+    return JSON.stringify({ error: `Invalid list: ${targetList}` });
   }
 
   /** @type {import('../src/url').JXAApplication} */
@@ -78,20 +77,20 @@ function run(argv) {
   const token = getAuthToken(app);
 
   // Move all items to intermediate list (clears their position)
-  const intermediateData = ids.map(id => ({
-    type: 'to-do',
-    operation: 'update',
+  const intermediateData = ids.map((id) => ({
+    type: "to-do",
+    operation: "update",
     id: id,
-    attributes: { when: intermediate }
+    attributes: { when: intermediate },
   }));
   executeJsonUpdate(app, token, intermediateData);
 
   // Move items to target list in desired order (assigns sequential indices)
-  const targetData = ids.map(id => ({
-    type: 'to-do',
-    operation: 'update',
+  const targetData = ids.map((id) => ({
+    type: "to-do",
+    operation: "update",
     id: id,
-    attributes: { when: targetList }
+    attributes: { when: targetList },
   }));
   executeJsonUpdate(app, token, targetData);
 

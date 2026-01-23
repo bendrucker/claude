@@ -1,10 +1,8 @@
 #!/usr/bin/env npx tsx
 
 import UrlPattern from "url-pattern";
-import type {
-  PreToolUseHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-code";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 export type WebFetchInput = { url: string; prompt: string };
 
@@ -79,9 +77,7 @@ export function matchRoute(path: string): RouteMatch | null {
   return null;
 }
 
-export function parseGitHubUrl(
-  url: string
-): { type: string; suggestion: string } | null {
+export function parseGitHubUrl(url: string): { type: string; suggestion: string } | null {
   // Strip the GitHub prefix to simplify pattern matching
   const path = url.slice("https://github.com/".length);
 
@@ -125,7 +121,7 @@ export function parseGitHubUrl(
 
 export function formatOutput(
   decision: "allow" | "deny" | "ask",
-  reason: string
+  reason: string,
 ): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
@@ -136,13 +132,10 @@ export function formatOutput(
   };
 }
 
-export function processInput(
-  input: PreToolUseHookInput
-): SyncHookJSONOutput | null {
-  const toolInput = input.tool_input as WebFetchInput | undefined;
-  const url = toolInput?.url;
+export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
+  const { url } = input.tool_input as WebFetchInput;
 
-  if (!url || !isGitHubUrl(url)) {
+  if (!isGitHubUrl(url)) {
     return null;
   }
 
@@ -155,25 +148,19 @@ export function processInput(
 }
 
 async function main(): Promise<void> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
-  }
-  const inputText = Buffer.concat(chunks).toString("utf-8");
-
   let input: PreToolUseHookInput;
   try {
-    input = JSON.parse(inputText) as PreToolUseHookInput;
+    input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[github/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
+      `[github/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }
 
   const output = processInput(input);
   if (output) {
-    console.log(JSON.stringify(output));
+    writeStdoutJson(output);
   }
 }
 

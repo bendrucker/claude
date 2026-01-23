@@ -92,10 +92,7 @@
       ]
     },
     "pathOrObject": {
-      "oneOf": [
-        { "type": "string", "pattern": "^\\.\\/.*" },
-        { "type": "object" }
-      ]
+      "oneOf": [{ "type": "string", "pattern": "^\\.\\/.*" }, { "type": "object" }]
     }
   },
   "additionalProperties": false

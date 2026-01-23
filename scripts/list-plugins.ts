@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { parseArgs } from 'node:util';
+import { readFileSync } from "node:fs";
+import { parseArgs } from "node:util";
 
 interface PluginEntry {
   name: string;
@@ -11,11 +11,11 @@ interface Marketplace {
 }
 
 function getLocalPlugins(): string[] {
-  const content = readFileSync('.claude-plugin/marketplace.json', 'utf8');
+  const content = readFileSync(".claude-plugin/marketplace.json", "utf8");
   const marketplace: Marketplace = JSON.parse(content);
   return marketplace.plugins
-    .filter((p): p is PluginEntry & { source: string } => typeof p.source === 'string')
-    .map(p => p.name);
+    .filter((p): p is PluginEntry & { source: string } => typeof p.source === "string")
+    .map((p) => p.name);
 }
 
 function extractPluginNames(files: string[]): string[] {
@@ -28,15 +28,15 @@ function extractPluginNames(files: string[]): string[] {
 }
 
 function matchesAlwaysPaths(files: string[], alwaysPaths: string[]): boolean {
-  return files.some(file => alwaysPaths.some(path => file.startsWith(path)));
+  return files.some((file) => alwaysPaths.some((path) => file.startsWith(path)));
 }
 
 function main(): void {
   const { values, positionals } = parseArgs({
     options: {
-      always: { type: 'string', multiple: true, default: [] }
+      always: { type: "string", multiple: true, default: [] },
     },
-    allowPositionals: true
+    allowPositionals: true,
   });
 
   const alwaysPaths = values.always ?? [];
@@ -49,7 +49,7 @@ function main(): void {
       plugins = allPlugins;
     } else {
       const changedPlugins = extractPluginNames(changedFiles);
-      plugins = allPlugins.filter(p => changedPlugins.includes(p));
+      plugins = allPlugins.filter((p) => changedPlugins.includes(p));
     }
   } else {
     plugins = allPlugins;

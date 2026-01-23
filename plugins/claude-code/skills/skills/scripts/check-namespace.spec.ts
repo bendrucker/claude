@@ -65,7 +65,9 @@ describe("getResourceName", () => {
 
   it("extracts name from agent filename", () => {
     expect(getResourceName("/plugins/gitlab/agents/reviewer.md", "agent")).toBe("reviewer");
-    expect(getResourceName("/plugins/gitlab/agents/gitlab-reviewer.md", "agent")).toBe("gitlab-reviewer");
+    expect(getResourceName("/plugins/gitlab/agents/gitlab-reviewer.md", "agent")).toBe(
+      "gitlab-reviewer",
+    );
   });
 
   it("extracts name from command filename", () => {

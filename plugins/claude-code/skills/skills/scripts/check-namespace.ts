@@ -2,6 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
+import { readStdinJson } from "@constellos/claude-code-kit/runners";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
 
 export function extractPluginName(filePath: string): string | null {
@@ -9,9 +10,7 @@ export function extractPluginName(filePath: string): string | null {
   return match?.[1] ?? null;
 }
 
-export function getResourceType(
-  filePath: string
-): "agent" | "command" | "skill" {
+export function getResourceType(filePath: string): "agent" | "command" | "skill" {
   if (/\/agents\/.*\.md$/.test(filePath)) return "agent";
   if (/\/commands\/.*\.md$/.test(filePath)) return "command";
   return "skill";
@@ -31,15 +30,9 @@ export function getResourceName(filePath: string, type: string): string | null {
   }
 }
 
-export function checkStuttering(
-  name: string,
-  pluginName: string
-): string | null {
+export function checkStuttering(name: string, pluginName: string): string | null {
   const pluginPattern = pluginName.replace(/-/g, "[-_]");
-  const regex = new RegExp(
-    `^${pluginPattern}[-_]|[-_]${pluginPattern}$|^${pluginPattern}$`,
-    "i"
-  );
+  const regex = new RegExp(`^${pluginPattern}[-_]|[-_]${pluginPattern}$|^${pluginPattern}$`, "i");
 
   if (regex.test(name)) {
     return `'${name}' stutters with plugin namespace '${pluginName}'`;
@@ -66,7 +59,7 @@ export function processHookInput(input: PostToolUseInput): string[] {
     warnings.push(`Warning: ${type} name ${stutterWarning}`);
     warnings.push(`  Qualified name would be: ${pluginName}:${name}`);
     warnings.push(
-      `  Consider renaming to avoid repetition (e.g., ${pluginName}:${pluginName}-foo -> ${pluginName}:foo)`
+      `  Consider renaming to avoid repetition (e.g., ${pluginName}:${pluginName}-foo -> ${pluginName}:foo)`,
     );
   }
 
@@ -74,15 +67,9 @@ export function processHookInput(input: PostToolUseInput): string[] {
 }
 
 async function main(): Promise<void> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
-  }
-  const inputText = Buffer.concat(chunks).toString("utf-8");
-
   let input: PostToolUseInput;
   try {
-    input = JSON.parse(inputText) as PostToolUseInput;
+    input = await readStdinJson<PostToolUseInput>();
   } catch {
     return;
   }

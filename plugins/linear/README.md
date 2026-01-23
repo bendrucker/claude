@@ -10,5 +10,5 @@ Managing Linear issues, projects, and teams for Claude Code.
 ## Testing
 
 ```bash
-shellspec plugins/linear/spec.sh
+npm test -- plugins/linear
 ```

@@ -18,7 +18,6 @@ Each plugin in `plugins/` contains:
 - `hooks/`: Optional hook definitions (`hooks.json`)
 - `commands/`: Optional slash commands
 - `agents/`: Optional agent definitions
-- `spec.sh`: ShellSpec test file (run with `shellspec plugins/<name>/spec.sh`)
 
 ### Naming
 
@@ -30,9 +29,19 @@ Each plugin should have a `README.md` with consistent sections:
 
 - **Title**: `# Plugin Name` with a one-line description
 - **Contents**: List what the plugin provides (skills, hooks, agents, commands)
-- **Testing**: How to run tests (if `spec.sh` exists)
+- **Testing**: How to run tests (if the plugin has tests)
 
 Do not include installation instructions or skill activation details—the README is an index, not documentation. Users can read the skill files directly for activation patterns.
+
+### Dependencies
+
+The root `package.json` contains shared tooling (vitest, tsx, typescript) and dependencies used across multiple plugins (e.g., `url-pattern`). Plugin-specific dependencies belong in their own `package.json`:
+
+- Create `plugins/<name>/package.json` for plugin-specific dependencies
+- Add the plugin to the root `workspaces` array
+- Run `npm install` to link the workspace
+
+Avoid collecting all dependencies in the root package.json. Each plugin should be self-contained where practical.
 
 ## Hooks
 
@@ -48,7 +57,7 @@ Hooks intercept tool calls and can modify inputs, block execution, or request us
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/default-state.sh"
+            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/hooks/default-state.ts"
           }
         ]
       }
@@ -76,9 +85,57 @@ Hook scripts can output JSON to control behavior:
 
 See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [plugins/github/scripts/](plugins/github/scripts/) for permission decisions.
 
+### PostToolUse Hook Outputs
+
+PostToolUse hooks run after a tool completes and can provide feedback to Claude:
+
+- **Add context**: Return `additionalContext` to inform Claude about the result
+  ```json
+  {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "Lint errors found..."}}
+  ```
+
+### Project-Level Hooks
+
+Hooks can also be defined at the project level in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx hooks/biome"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This repository includes a Biome PostToolUse hook (`hooks/biome/`) that runs after file edits to check for lint errors. If errors are found, they're fed back to Claude for correction.
+
 ## Testing
 
-Plugins use [ShellSpec](https://shellspec.info/) for testing. Each plugin should have a `spec.sh` file that tests hook scripts directly by piping JSON input. See [plugins/linear/spec.sh](plugins/linear/spec.sh) for an example.
+Plugins use [Vitest](https://vitest.dev/) for tests. Run all tests with `npm test` or filter by plugin with `npm test -- plugins/<name>`.
+
+### CI Structure
+
+Tests run per-plugin in the CI matrix for:
+- **Parallelization**: Integration tests can take seconds; running in parallel across plugins is faster
+- **Clear feedback**: Failed tests clearly indicate which plugin has the issue
+
+Root-level tests (e.g., `hooks/`) run in a dedicated job since they're not part of any plugin.
+
+### Conventions
+
+- **`npm test` runs all tests**: Use specific scripts like `test:unit` or `test:integration` for subsets. Never make the default `npm test` run only a subset.
+- **Use file patterns for test separation**: Vitest projects separate `*.test.ts` (unit) from `*.integration.ts` (integration) via include/exclude patterns. Don't use environment variables to conditionally skip tests.
+- **No `.js` imports in TypeScript**: Import from `./module` not `./module.js`. The bundler/runtime handles resolution.
+- **Prefer skills over agents**: Skills are invocable via the Skill tool. Agents require the Task tool. If something should be directly invocable, make it a skill.
 
 ## Verification
 

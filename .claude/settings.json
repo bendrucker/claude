@@ -118,5 +118,18 @@
       "networksetup:*"
     ]
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx hooks/biome"
+          }
+        ]
+      }
+    ]
+  }
 }

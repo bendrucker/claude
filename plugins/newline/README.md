@@ -11,3 +11,9 @@ This plugin ensures all edited files maintain proper POSIX-compliant trailing ne
 - **PreToolUse (Edit|MultiEdit)**: Checks if files have trailing newlines before edits and stores state
 - **PostToolUse (Write)**: Ensures newly written files have trailing newlines
 - **PostToolUse (Edit|MultiEdit)**: Preserves trailing newline state after edits
+
+## Testing
+
+```sh
+npm test -- plugins/newline
+```

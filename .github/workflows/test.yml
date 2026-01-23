@@ -11,6 +11,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript build
+        run: npm run build
+
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test -- "hooks/biome"
+
   validate:
     runs-on: ubuntu-latest
     outputs:
@@ -93,8 +150,8 @@ jobs:
           echo "has_skills=$([[ -d "plugins/$plugin/skills" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_agents=$([[ -d "plugins/$plugin/agents" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_commands=$([[ -d "plugins/$plugin/commands" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "has_spec=$([[ -f "plugins/$plugin/spec.sh" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_tests=$(find "plugins/$plugin" \( -name '*.test.ts' -o -name '*.integration.ts' \) | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -125,29 +182,17 @@ jobs:
         if: steps.inspect.outputs.has_commands == 'true'
         run: npx remark "plugins/${{ matrix.plugin }}/commands/*.md"
 
-      - name: Install Claude Code CLI
-        if: steps.inspect.outputs.has_spec == 'true'
-        run: npm install -g @anthropic-ai/claude-code@latest
-
-      - name: Install ShellSpec
-        if: steps.inspect.outputs.has_spec == 'true'
-        run: curl -fsSL https://git.io/shellspec | sh -s -- --yes 0.28.1
-
-      - name: Setup Claude configuration
-        if: steps.inspect.outputs.has_spec == 'true'
-        run: CLAUDE_REPO_HOME="$GITHUB_WORKSPACE" ./install.sh
-
-      - name: Run ShellSpec tests
-        if: steps.inspect.outputs.has_spec == 'true'
-        run: shellspec "plugins/${{ matrix.plugin }}/spec.sh" --tag unit
-
       - name: Install package dependencies
-        if: steps.inspect.outputs.has_package == 'true'
+        if: steps.inspect.outputs.has_package == 'true' && hashFiles(format('plugins/{0}/package-lock.json', matrix.plugin)) != ''
         run: npm ci --prefix "plugins/${{ matrix.plugin }}"
 
       - name: Build TypeScript
         if: steps.inspect.outputs.has_package == 'true'
         run: npm run build --prefix "plugins/${{ matrix.plugin }}" --if-present
+
+      - name: Run tests
+        if: steps.inspect.outputs.has_tests == 'true'
+        run: npm run test:unit -- "plugins/${{ matrix.plugin }}/"
 
   plugins:
     needs: [validate, plugin]

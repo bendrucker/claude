@@ -52,8 +52,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    env:
-      INTEGRATION: '1'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -139,7 +137,6 @@ jobs:
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       CLAUDE_REPO_HOME: ${{ github.workspace }}
-      INTEGRATION: '1'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6

@@ -122,6 +122,14 @@ This repository includes a Biome PostToolUse hook (`hooks/biome/`) that runs aft
 
 Plugins use [Vitest](https://vitest.dev/) for tests. Run all tests with `npm test` or filter by plugin with `npm test -- plugins/<name>`.
 
+### CI Structure
+
+Tests run per-plugin in the CI matrix for:
+- **Parallelization**: Integration tests can take seconds; running in parallel across plugins is faster
+- **Clear feedback**: Failed tests clearly indicate which plugin has the issue
+
+Root-level tests (e.g., `hooks/`) run in a dedicated job since they're not part of any plugin.
+
 ## Verification
 
 Run `scripts/check-marketplace.sh` to verify all plugin directories are listed in `marketplace.json`. This check runs in CI and should pass before merging.

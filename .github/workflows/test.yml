@@ -65,8 +65,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Run root-level tests
+        run: npm test -- hooks/
 
   validate:
     runs-on: ubuntu-latest
@@ -151,6 +151,7 @@ jobs:
           echo "has_agents=$([[ -d "plugins/$plugin/agents" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_commands=$([[ -d "plugins/$plugin/commands" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_tests=$(find "plugins/$plugin" -name '*.test.ts' -o -name '*.integration.ts' | head -1 | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -188,6 +189,10 @@ jobs:
       - name: Build TypeScript
         if: steps.inspect.outputs.has_package == 'true'
         run: npm run build --prefix "plugins/${{ matrix.plugin }}" --if-present
+
+      - name: Run tests
+        if: steps.inspect.outputs.has_tests == 'true'
+        run: npm test -- "plugins/${{ matrix.plugin }}"
 
   plugins:
     needs: [validate, plugin]

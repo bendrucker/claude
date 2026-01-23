@@ -11,3 +11,9 @@ Meta-tools for Claude Code configuration and customization.
 
 - **claude-code-hooks.md**: Developing Claude Code hooks for automated workflows
 - **claude-md.md**: Creating and organizing CLAUDE.md project memory files
+
+## Testing
+
+```bash
+npx vitest run plugins/claude-code/
+```

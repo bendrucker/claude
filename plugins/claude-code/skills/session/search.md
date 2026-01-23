@@ -5,7 +5,7 @@ Advanced options for searching conversation history.
 ## CLI Options
 
 ```
-tsx search.ts [query] [options]
+npx tsx scripts/search.ts [query] [options]
 
 Options:
   --digest         Show digest of recent conversations (no query needed)
@@ -18,23 +18,22 @@ Options:
 
 ## Date Filtering
 
-Natural language dates:
+Uses [chrono-node](https://github.com/wanasit/chrono) for natural language date parsing:
 
-- `today` - Start of current day
-- `yesterday` - Start of yesterday
-- `this week` or `week` - 7 days ago
-
-ISO dates work as well: `2024-01-15`
+- `today`, `yesterday`
+- `last week`, `2 days ago`, `last month`
+- `January 15`, `Jan 15 2024`
+- ISO dates: `2024-01-15`
 
 ```bash
 # Conversations from the last week
-tsx search.ts --digest week
+npx tsx scripts/search.ts --digest "last week"
 
 # Search only today's sessions
-tsx search.ts "error" --after today
+npx tsx scripts/search.ts "error" --after today
 
 # Range query
-tsx search.ts "refactor" --after 2024-01-01 --before 2024-01-31
+npx tsx scripts/search.ts "refactor" --after 2024-01-01 --before 2024-01-31
 ```
 
 ## Project Filtering
@@ -43,10 +42,10 @@ Filter by project path:
 
 ```bash
 # Only search in a specific project
-tsx search.ts "bug" --project /Users/ben/src/myproject
+npx tsx scripts/search.ts "bug" --project /Users/ben/src/myproject
 
 # Partial path matching works
-tsx search.ts "test" --project myproject
+npx tsx scripts/search.ts "test" --project myproject
 ```
 
 ## JSON Output
@@ -55,10 +54,10 @@ Use `--format json` for programmatic access:
 
 ```bash
 # Pipe search results to jq
-tsx search.ts "auth" --format json | jq '.[] | .conversation.summary'
+npx tsx scripts/search.ts "auth" --format json | jq '.[] | .conversation.summary'
 
 # Get session IDs from digest
-tsx search.ts --digest today --format json | jq '.[].sessionId'
+npx tsx scripts/search.ts --digest today --format json | jq '.[].sessionId'
 ```
 
 ## Relevance Scoring

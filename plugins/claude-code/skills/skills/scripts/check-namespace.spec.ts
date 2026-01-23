@@ -2,13 +2,28 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { PostToolUseInput } from "@constellos/claude-code-kit";
 import {
   extractPluginName,
   getResourceType,
   getResourceName,
   checkStuttering,
   processHookInput,
-} from "./check-namespace.ts";
+} from "./check-namespace";
+
+function mockWriteInput(filePath: string): PostToolUseInput {
+  return {
+    session_id: "test",
+    transcript_path: "/tmp/transcript.jsonl",
+    cwd: "/tmp",
+    permission_mode: "default",
+    hook_event_name: "PostToolUse",
+    tool_use_id: "test-id",
+    tool_name: "Write",
+    tool_input: { file_path: filePath, content: "" },
+    tool_response: { message: "ok", bytes_written: 0 },
+  };
+}
 
 describe("extractPluginName", () => {
   it("extracts plugin name from path", () => {
@@ -112,7 +127,7 @@ describe("processHookInput", () => {
     const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
     writeFileSync(skillPath, "name: gitlab-ci\n");
 
-    const warnings = processHookInput({ tool_input: { file_path: skillPath } });
+    const warnings = processHookInput(mockWriteInput(skillPath));
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("Warning");
     expect(warnings[0]).toContain("skill name");
@@ -122,7 +137,7 @@ describe("processHookInput", () => {
     const agentPath = join(testDir, "plugins/gitlab/agents/gitlab-reviewer.md");
     writeFileSync(agentPath, "---\n");
 
-    const warnings = processHookInput({ tool_input: { file_path: agentPath } });
+    const warnings = processHookInput(mockWriteInput(agentPath));
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("agent name");
   });
@@ -131,7 +146,7 @@ describe("processHookInput", () => {
     const cmdPath = join(testDir, "plugins/gitlab/commands/gitlab-merge.md");
     writeFileSync(cmdPath, "---\n");
 
-    const warnings = processHookInput({ tool_input: { file_path: cmdPath } });
+    const warnings = processHookInput(mockWriteInput(cmdPath));
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("command name");
   });
@@ -140,27 +155,28 @@ describe("processHookInput", () => {
     const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
     writeFileSync(skillPath, "name: ci\n");
 
-    const warnings = processHookInput({ tool_input: { file_path: skillPath } });
+    const warnings = processHookInput(mockWriteInput(skillPath));
     expect(warnings).toEqual([]);
   });
 
   it("returns empty for non-plugin paths", () => {
-    const warnings = processHookInput({
-      tool_input: { file_path: "/Users/ben/src/project/SKILL.md" },
-    });
+    const warnings = processHookInput(mockWriteInput("/Users/ben/src/project/SKILL.md"));
     expect(warnings).toEqual([]);
   });
 
-  it("returns empty for missing file_path", () => {
-    const warnings = processHookInput({ tool_input: {} });
+  it("returns empty for non-file tools", () => {
+    const input: PostToolUseInput = {
+      session_id: "test",
+      transcript_path: "/tmp/transcript.jsonl",
+      cwd: "/tmp",
+      permission_mode: "default",
+      hook_event_name: "PostToolUse",
+      tool_use_id: "test-id",
+      tool_name: "Bash",
+      tool_input: { command: "ls" },
+      tool_response: { output: "", exit_code: 0 },
+    };
+    const warnings = processHookInput(input);
     expect(warnings).toEqual([]);
-  });
-
-  it("handles filePath variant", () => {
-    const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
-    writeFileSync(skillPath, "name: gitlab-ci\n");
-
-    const warnings = processHookInput({ tool_input: { filePath: skillPath } });
-    expect(warnings.length).toBeGreaterThan(0);
   });
 });

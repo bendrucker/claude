@@ -13,5 +13,5 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
 ## Testing
 
 ```bash
-shellspec plugins/github/spec.sh
+npm test -- plugins/github
 ```

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
-import type { PreToolUseHookInput, PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  PreToolUseHookInput,
+  PreToolUseHookSpecificOutput,
+} from "@anthropic-ai/claude-agent-sdk";
 import { processInput, checkMarkdown, checkCode, formatOutput } from "./numbering";
 
 function hasSg(): boolean {
@@ -36,7 +39,10 @@ function mockEditInput(filePath: string, newString: string): PreToolUseHookInput
   };
 }
 
-function getOutput(input: PreToolUseHookInput, mode: "write" | "edit" = "write"): PreToolUseHookSpecificOutput | null {
+function getOutput(
+  input: PreToolUseHookInput,
+  mode: "write" | "edit" = "write",
+): PreToolUseHookSpecificOutput | null {
   const result = processInput(input, mode);
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
@@ -219,10 +225,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
   describe("Write vs Edit mode", () => {
     it("blocks Write tool with deny", () => {
-      const output = getOutput(
-        mockWriteInput("main.go", "package main\nfunc step1() {}"),
-        "write",
-      );
+      const output = getOutput(mockWriteInput("main.go", "package main\nfunc step1() {}"), "write");
       expect(output?.permissionDecision).toBe("deny");
     });
 
@@ -261,10 +264,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     });
 
     it("checks test_*.py files", () => {
-      const output = getOutput(
-        mockWriteInput("test_utils.py", "def step1():\n    pass"),
-        "write",
-      );
+      const output = getOutput(mockWriteInput("test_utils.py", "def step1():\n    pass"), "write");
       expect(output?.permissionDecision).toBe("deny");
     });
   });

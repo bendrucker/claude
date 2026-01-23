@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import type { PreToolUseHookInput, PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  PreToolUseHookInput,
+  PreToolUseHookSpecificOutput,
+} from "@anthropic-ai/claude-agent-sdk";
 import { isGitLabUrl, parseGitLabUrl, formatOutput, processInput } from "./fetch";
 
 function mockInput(url: string): PreToolUseHookInput {
@@ -205,9 +208,7 @@ describe("processInput", () => {
   });
 
   it("denies pipelines with glab ci view suggestion", () => {
-    const output = getOutput(
-      mockInput("https://gitlab.com/gitlab-org/gitlab/-/pipelines/12345"),
-    );
+    const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/pipelines/12345"));
     expect(output?.permissionDecision).toBe("deny");
     expect(output?.permissionDecisionReason).toBe(
       "Use: glab ci view 12345. Run /gitlab:glab for more patterns.",
@@ -225,8 +226,6 @@ describe("processInput", () => {
   it("asks for unknown GitLab URL patterns", () => {
     const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/settings"));
     expect(output?.permissionDecision).toBe("ask");
-    expect(output?.permissionDecisionReason).toContain(
-      "Unknown GitLab URL pattern",
-    );
+    expect(output?.permissionDecisionReason).toContain("Unknown GitLab URL pattern");
   });
 });

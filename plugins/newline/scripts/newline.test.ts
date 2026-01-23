@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { PreToolUseHookInput, PostToolUseHookInput, PostToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  PreToolUseHookInput,
+  PostToolUseHookInput,
+  PostToolUseHookSpecificOutput,
+} from "@anthropic-ai/claude-agent-sdk";
 import { hasTrailingNewline, processInput as checkInput } from "./check";
 import { ensureTrailingNewline, processInput as ensureInput } from "./ensure";
 import { preserveNewlineState, processInput as preserveInput } from "./preserve";

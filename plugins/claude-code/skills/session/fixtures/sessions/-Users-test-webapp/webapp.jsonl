@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"How do I add authentication to my webapp?"},"sessionId":"webapp-session","cwd":"/Users/test/webapp","gitBranch":"feature/auth","timestamp":"2024-01-20T10:00:00.000Z","uuid":"uuid-1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I can help you add authentication. Let me show you how to implement OAuth."}]},"sessionId":"webapp-session","timestamp":"2024-01-20T10:01:00.000Z","uuid":"uuid-2"}

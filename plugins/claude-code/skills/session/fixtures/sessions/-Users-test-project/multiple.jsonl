@@ -1,0 +1,5 @@
+{"type":"user","message":{"role":"user","content":"Can you help me refactor this authentication module?"},"sessionId":"multiple-session","cwd":"/Users/test/webapp","gitBranch":"feature/auth","timestamp":"2024-01-16T09:00:00.000Z","uuid":"uuid-1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll help you refactor the authentication module. Let me first understand the current structure."}]},"sessionId":"multiple-session","timestamp":"2024-01-16T09:01:00.000Z","uuid":"uuid-2"}
+{"type":"user","message":{"role":"user","content":"The login function is too complex"},"sessionId":"multiple-session","timestamp":"2024-01-16T09:05:00.000Z","uuid":"uuid-3"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I see. Let's break down the login function into smaller, more manageable pieces."}]},"sessionId":"multiple-session","timestamp":"2024-01-16T09:06:00.000Z","uuid":"uuid-4"}
+{"type":"user","message":{"role":"user","content":"Great, that looks much better now"},"sessionId":"multiple-session","timestamp":"2024-01-16T09:30:00.000Z","uuid":"uuid-5"}

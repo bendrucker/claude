@@ -9,5 +9,5 @@ Code style enforcement hooks.
 ## Testing
 
 ```sh
-shellspec plugins/style/spec.sh
+npm test -- plugins/style
 ```

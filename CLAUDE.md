@@ -48,7 +48,7 @@ Hooks intercept tool calls and can modify inputs, block execution, or request us
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/default-state.sh"
+            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/hooks/default-state.ts"
           }
         ]
       }
@@ -78,7 +78,7 @@ See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [p
 
 ## Testing
 
-Plugins use [ShellSpec](https://shellspec.info/) for testing. Each plugin should have a `spec.sh` file that tests hook scripts directly by piping JSON input. See [plugins/linear/spec.sh](plugins/linear/spec.sh) for an example.
+Plugins use [Vitest](https://vitest.dev/) for TypeScript tests (`npm test -- plugins/<name>`) or [ShellSpec](https://shellspec.info/) for shell script tests (`shellspec plugins/<name>/spec.sh`).
 
 ## Verification
 

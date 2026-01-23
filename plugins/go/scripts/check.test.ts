@@ -173,19 +173,6 @@ type Test struct {}`
     expect(output).toBeNull();
   });
 
-  it("handles empty input gracefully", () => {
-    const input = {
-      hook_event_name: "PreToolUse",
-      session_id: "test",
-      transcript_path: "/tmp/test",
-      cwd: "/tmp",
-      tool_name: "Edit",
-      tool_input: {},
-    } as PreToolUseHookInput;
-    const output = processInput(input);
-    expect(output).toBeNull();
-  });
-
   it("blocks Go files with marker and blank lines before code", () => {
     const filePath = join(tempDir, "blanks.go");
     writeFileSync(

@@ -46,13 +46,7 @@ export function isGeneratedFile(content: string): boolean {
 export function processInput(
   input: PreToolUseHookInput
 ): SyncHookJSONOutput | null {
-  const toolInput = input.tool_input as FileInput | undefined;
-  const filePath = toolInput?.file_path;
-
-  // No file_path in input, allow operation
-  if (!filePath) {
-    return null;
-  }
+  const { file_path: filePath } = input.tool_input as FileInput;
 
   // Only check .go files
   if (!filePath.endsWith(".go")) {

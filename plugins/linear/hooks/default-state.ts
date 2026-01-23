@@ -20,15 +20,12 @@ export function getDefaultState(assignee: string | undefined): string {
 export function processInput(
   input: PreToolUseHookInput
 ): SyncHookJSONOutput | null {
-  const toolInput = input.tool_input as CreateIssueInput | undefined;
-  const state = toolInput?.state;
+  const { state, assignee } = input.tool_input as CreateIssueInput;
 
   // Only modify if state is not set
   if (state) {
     return null;
   }
-
-  const assignee = toolInput?.assignee || undefined;
   const defaultState = getDefaultState(assignee);
 
   return {

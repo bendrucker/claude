@@ -127,10 +127,9 @@ export function formatOutput(
 export function processInput(
   input: PreToolUseHookInput
 ): SyncHookJSONOutput | null {
-  const toolInput = input.tool_input as WebFetchInput | undefined;
-  const url = toolInput?.url;
+  const { url } = input.tool_input as WebFetchInput;
 
-  if (!url || !isGitLabUrl(url)) {
+  if (!isGitLabUrl(url)) {
     return null;
   }
 

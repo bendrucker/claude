@@ -24,12 +24,7 @@ export function hasTrailingNewline(filePath: string): boolean | null {
 }
 
 export function processInput(input: PreToolUseHookInput): void {
-  const toolInput = input.tool_input as ToolInput | undefined;
-  const filePath = toolInput?.file_path;
-
-  if (!filePath) {
-    throw new Error("No file_path found in input");
-  }
+  const { file_path: filePath } = input.tool_input as ToolInput;
 
   const hasNewline = hasTrailingNewline(filePath);
 

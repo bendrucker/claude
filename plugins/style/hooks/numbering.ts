@@ -132,22 +132,18 @@ export function processInput(
 ): SyncHookJSONOutput | null {
   const toolName = input.tool_name;
 
-  let content: string | undefined;
-  let filePath: string | undefined;
+  let content: string;
+  let filePath: string;
 
   if (toolName === "Write") {
-    const toolInput = input.tool_input as WriteInput | undefined;
-    content = toolInput?.content;
-    filePath = toolInput?.file_path;
+    const toolInput = input.tool_input as WriteInput;
+    content = toolInput.content;
+    filePath = toolInput.file_path;
   } else if (toolName === "Edit") {
-    const toolInput = input.tool_input as EditInput | undefined;
-    content = toolInput?.new_string;
-    filePath = toolInput?.file_path;
+    const toolInput = input.tool_input as EditInput;
+    content = toolInput.new_string;
+    filePath = toolInput.file_path;
   } else {
-    return null;
-  }
-
-  if (!content || !filePath) {
     return null;
   }
 

@@ -125,17 +125,6 @@ describe("check.ts", () => {
       expect(getState("newline", filePath)).toBe("");
     });
 
-    it("throws error for missing file_path", () => {
-      const input: PreToolUseHookInput = {
-        hook_event_name: "PreToolUse",
-        session_id: "test",
-        transcript_path: "/tmp/test",
-        cwd: "/tmp",
-        tool_name: "Edit",
-        tool_input: {},
-      };
-      expect(() => checkInput(input)).toThrow("No file_path found");
-    });
   });
 });
 
@@ -170,19 +159,6 @@ describe("ensure.ts", () => {
   });
 
   describe("processInput", () => {
-    it("throws error for missing file_path", () => {
-      const input: PostToolUseHookInput = {
-        hook_event_name: "PostToolUse",
-        session_id: "test",
-        transcript_path: "/tmp/test",
-        cwd: "/tmp",
-        tool_name: "Write",
-        tool_input: {},
-        tool_result: "Success",
-      };
-      expect(() => ensureInput(input)).toThrow("No file_path found");
-    });
-
     it("returns additionalContext when adding newline", () => {
       const filePath = join(testDir, "no_newline.txt");
       writeFileSync(filePath, "content");
@@ -237,18 +213,6 @@ describe("preserve.ts", () => {
       expect(getState("newline", filePath)).toBe("");
     });
 
-    it("throws error for missing file_path", () => {
-      const input: PostToolUseHookInput = {
-        hook_event_name: "PostToolUse",
-        session_id: "test",
-        transcript_path: "/tmp/test",
-        cwd: "/tmp",
-        tool_name: "Edit",
-        tool_input: {},
-        tool_result: "Success",
-      };
-      expect(() => preserveInput(input)).toThrow("No file_path found");
-    });
   });
 });
 

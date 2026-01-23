@@ -29,7 +29,7 @@ Each plugin should have a `README.md` with consistent sections:
 
 - **Title**: `# Plugin Name` with a one-line description
 - **Contents**: List what the plugin provides (skills, hooks, agents, commands)
-- **Testing**: How to run tests (if `spec.sh` exists)
+- **Testing**: How to run tests (if the plugin has tests)
 
 Do not include installation instructions or skill activation details—the README is an index, not documentation. Users can read the skill files directly for activation patterns.
 
@@ -129,6 +129,13 @@ Tests run per-plugin in the CI matrix for:
 - **Clear feedback**: Failed tests clearly indicate which plugin has the issue
 
 Root-level tests (e.g., `hooks/`) run in a dedicated job since they're not part of any plugin.
+
+### Conventions
+
+- **`npm test` runs all tests**: Use specific scripts like `test:unit` or `test:integration` for subsets. Never make the default `npm test` run only a subset.
+- **Use file patterns for test separation**: Vitest projects separate `*.test.ts` (unit) from `*.integration.ts` (integration) via include/exclude patterns. Don't use environment variables to conditionally skip tests.
+- **No `.js` imports in TypeScript**: Import from `./module` not `./module.js`. The bundler/runtime handles resolution.
+- **Prefer skills over agents**: Skills are invocable via the Skill tool. Agents require the Task tool. If something should be directly invocable, make it a skill.
 
 ## Verification
 

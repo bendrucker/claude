@@ -259,8 +259,8 @@ describe('parseDate', () => {
     expect(date.getDate()).toBe(expected.getDate())
   })
 
-  it('parses "week" as 7 days ago', () => {
-    const date = parseDate('week')
+  it('parses "last week" as 7 days ago', () => {
+    const date = parseDate('last week')
     const expected = new Date()
     expected.setDate(expected.getDate() - 7)
     expect(date.getFullYear()).toBe(expected.getFullYear())
@@ -276,7 +276,7 @@ describe('parseDate', () => {
   })
 
   it('throws on invalid date strings', () => {
-    expect(() => parseDate('not-a-date')).toThrow('Invalid date')
+    expect(() => parseDate('not-a-date')).toThrow('Unable to parse date')
   })
 
   it('is case insensitive for keywords', () => {

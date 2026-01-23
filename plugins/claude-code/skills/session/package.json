@@ -1,0 +1,9 @@
+{
+  "name": "session",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "chrono-node": "^2.7.7"
+  }
+}

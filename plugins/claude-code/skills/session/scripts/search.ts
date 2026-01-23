@@ -3,6 +3,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
+import * as chrono from 'chrono-node'
 
 export interface ToolUse {
   readonly name: string
@@ -373,26 +374,11 @@ export function formatSearchResults(results: SearchResult[]): string {
 }
 
 export function parseDate(dateStr: string): Date {
-  const lower = dateStr.toLowerCase()
-  const today = startOfDay(new Date())
-
-  switch (lower) {
-    case 'today':
-      return today
-    case 'yesterday':
-      today.setDate(today.getDate() - 1)
-      return today
-    case 'this week':
-    case 'week':
-      today.setDate(today.getDate() - WEEK_DAYS)
-      return today
+  const parsed = chrono.parseDate(dateStr)
+  if (!parsed) {
+    throw new Error(`Unable to parse date: "${dateStr}"`)
   }
-
-  const parsed = new Date(dateStr)
-  if (isNaN(parsed.getTime())) {
-    throw new Error(`Invalid date: "${dateStr}". Use ISO format (2024-01-15) or keywords (today, yesterday, week)`)
-  }
-  return parsed
+  return startOfDay(parsed)
 }
 
 function printUsage(): void {
@@ -492,7 +478,7 @@ async function main(): Promise<void> {
 const isMain = import.meta.url === `file://${process.argv[1]}`
 if (isMain) {
   main().catch(err => {
-    console.error(err)
+    console.error(err instanceof Error ? err.message : err)
     process.exit(1)
   })
 }

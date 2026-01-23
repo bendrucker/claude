@@ -15,5 +15,5 @@ Meta-tools for Claude Code configuration and customization.
 ## Testing
 
 ```bash
-shellspec plugins/claude-code/spec.sh
+npx vitest run plugins/claude-code/
 ```

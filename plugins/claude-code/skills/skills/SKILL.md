@@ -7,7 +7,7 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "${CLAUDE_SKILL_ROOT}/scripts/check-namespace.sh"
+          command: "npx tsx ${CLAUDE_SKILL_ROOT}/scripts/check-namespace.ts"
 ---
 
 # Claude Code Skills Development

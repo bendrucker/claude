@@ -15,7 +15,7 @@ Access details about the current Claude Code session or search past conversation
 Run the info script to get full session details:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/info.sh "${CLAUDE_SESSION_ID}"
+./scripts/info.sh "${CLAUDE_SESSION_ID}"
 ```
 
 ## Search History
@@ -24,13 +24,13 @@ Search past conversations or get a digest of recent work:
 
 ```bash
 # Search for specific topics
-tsx ${CLAUDE_PLUGIN_ROOT}/scripts/search.ts "error handling"
+tsx ./scripts/search.ts "error handling"
 
 # Get today's conversation digest
-tsx ${CLAUDE_PLUGIN_ROOT}/scripts/search.ts --digest today
+tsx ./scripts/search.ts --digest today
 
 # Search with date filters
-tsx ${CLAUDE_PLUGIN_ROOT}/scripts/search.ts "auth" --after yesterday
+tsx ./scripts/search.ts "auth" --after yesterday
 ```
 
 See [search.md](mdc:search.md) for advanced filtering options.

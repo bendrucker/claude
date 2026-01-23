@@ -85,6 +85,39 @@ Hook scripts can output JSON to control behavior:
 
 See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [plugins/github/scripts/](plugins/github/scripts/) for permission decisions.
 
+### PostToolUse Hook Outputs
+
+PostToolUse hooks run after a tool completes and can provide feedback to Claude:
+
+- **Add context**: Return `additionalContext` to inform Claude about the result
+  ```json
+  {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "Lint errors found..."}}
+  ```
+
+### Project-Level Hooks
+
+Hooks can also be defined at the project level in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx hooks/biome"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This repository includes a Biome PostToolUse hook (`hooks/biome/`) that runs after file edits to check for lint errors. If errors are found, they're fed back to Claude for correction.
+
 ## Testing
 
 Plugins use [Vitest](https://vitest.dev/) for tests. Run all tests with `npm test` or filter by plugin with `npm test -- plugins/<name>`.

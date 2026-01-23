@@ -30,7 +30,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function getExtension(filePath: string): string {
   const parts = filePath.split(".");
-  return parts.length > 1 ? parts[parts.length - 1]! : "";
+  return parts.length > 1 ? (parts.at(-1) ?? "") : "";
 }
 
 function isMarkdownFile(ext: string): boolean {

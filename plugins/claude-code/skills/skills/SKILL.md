@@ -4,7 +4,7 @@ description: Creating and optimizing Claude Code Skills including activation pat
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, WebFetch(domain:docs.claude.com)]
 hooks:
   PostToolUse:
-    - matcher: "Write(file_path:**/plugins/**)|Edit(file_path:**/plugins/**)"
+    - matcher: "Write|Edit"
       hooks:
         - type: command
           command: "${CLAUDE_SKILL_ROOT}/scripts/check-namespace.sh"

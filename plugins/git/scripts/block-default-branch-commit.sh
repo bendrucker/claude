@@ -1,15 +1,7 @@
 #!/bin/bash
 
 # PreToolUse hook to block direct commits to the default branch
-# Detects git commit commands and checks if on default branch
-
-input=$(cat)
-command=$(printf "%s" "$input" | jq -r '.tool_input.command // empty')
-
-# Only check if command contains git commit
-if [[ ! "$command" =~ git[[:space:]]+commit ]]; then
-  exit 0
-fi
+# Matcher: Bash(git commit:*) handles filtering to git commit commands
 
 # Check if we are in a git repository
 if ! git rev-parse --git-dir > /dev/null 2>&1; then

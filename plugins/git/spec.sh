@@ -22,31 +22,8 @@ Describe "block-default-branch-commit hook"
   BeforeEach setup
   AfterEach cleanup
 
-  Describe "non-commit commands"
-    It "allows git status"
-      input=$(jq -n '{tool_input: {command: "git status"}}')
-      cd "$test_repo"
-      When run sh -c "echo '$input' | $OLDPWD/scripts/block-default-branch-commit.sh"
-      The status should be success
-      The output should be blank
-    End
-
-    It "allows git push"
-      input=$(jq -n '{tool_input: {command: "git push origin main"}}')
-      cd "$test_repo"
-      When run sh -c "echo '$input' | $OLDPWD/scripts/block-default-branch-commit.sh"
-      The status should be success
-      The output should be blank
-    End
-
-    It "allows non-git commands"
-      input=$(jq -n '{tool_input: {command: "ls -la"}}')
-      cd "$test_repo"
-      When run sh -c "echo '$input' | $OLDPWD/scripts/block-default-branch-commit.sh"
-      The status should be success
-      The output should be blank
-    End
-  End
+  # Note: non-commit commands are filtered by the matcher (Bash(git commit:*))
+  # so we only test scenarios where the hook is actually invoked
 
   Describe "commit on topic branch"
     It "allows commit on feature branch"
@@ -104,13 +81,4 @@ Describe "block-default-branch-commit hook"
     End
   End
 
-  Describe "empty input"
-    It "handles empty input gracefully"
-      input='{}'
-      cd "$test_repo"
-      When run sh -c "echo '$input' | $OLDPWD/scripts/block-default-branch-commit.sh"
-      The status should be success
-      The output should be blank
-    End
-  End
 End

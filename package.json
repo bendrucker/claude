@@ -17,9 +17,9 @@
     "lint:md:agents": "remark plugins/*/agents/*.md",
     "lint:md:commands": "remark .claude/commands/*.md plugins/*/commands/*.md",
     "lint:md:skills": "remark plugins/*/skills/*/SKILL.md",
-    "test": "vitest --project unit",
-    "test:integration": "INTEGRATION=1 vitest --project integration",
-    "test:all": "INTEGRATION=1 vitest"
+    "test": "vitest",
+    "test:unit": "vitest --project unit",
+    "test:integration": "vitest --project integration"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.17",

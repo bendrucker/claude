@@ -10,5 +10,5 @@ Go language coding standards, best practices, and testing patterns for Claude Co
 ## Testing
 
 ```bash
-cd plugins/go && shellspec spec.sh
+npm test -- plugins/go
 ```

@@ -2,6 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
+import { readStdinJson } from "@constellos/claude-code-kit/runners";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
 
 export function extractPluginName(filePath: string): string | null {
@@ -74,15 +75,9 @@ export function processHookInput(input: PostToolUseInput): string[] {
 }
 
 async function main(): Promise<void> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
-  }
-  const inputText = Buffer.concat(chunks).toString("utf-8");
-
   let input: PostToolUseInput;
   try {
-    input = JSON.parse(inputText) as PostToolUseInput;
+    input = await readStdinJson<PostToolUseInput>();
   } catch {
     return;
   }

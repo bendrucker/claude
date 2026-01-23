@@ -32,7 +32,9 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
+    "mdast-util-from-markdown": "^2.0.2",
     "typescript": "^5.9.3",
+    "unist-util-visit": "^5.0.0",
     "url-pattern": "^1.0.3"
   },
   "overrides": {

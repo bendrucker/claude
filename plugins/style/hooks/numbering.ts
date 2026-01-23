@@ -5,6 +5,10 @@ import { writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { visit } from "unist-util-visit";
+import type { Heading, Text } from "mdast";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type {
   PreToolUseHookInput,
   SyncHookJSONOutput,
@@ -29,7 +33,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function getExtension(filePath: string): string {
   const parts = filePath.split(".");
-  return parts.length > 1 ? parts[parts.length - 1] : "";
+  return parts.length > 1 ? parts[parts.length - 1]! : "";
 }
 
 function isMarkdownFile(ext: string): boolean {
@@ -37,23 +41,26 @@ function isMarkdownFile(ext: string): boolean {
 }
 
 export function checkMarkdown(content: string): string | null {
-  const pluginDir = join(__dirname, "..");
-  const scriptPath = join(pluginDir, "scripts", "check-markdown-headings.js");
+  const ast = fromMarkdown(content);
+  const matches: MarkdownMatch[] = [];
 
-  try {
-    const result = execSync(
-      `npx -y -p mdast-util-from-markdown@2 -p unist-util-visit@5 node "${scriptPath}" "${content.replace(/"/g, '\\"')}"`,
-      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
-    ).trim();
+  visit(ast, "heading", (node: Heading) => {
+    const text = node.children
+      .filter((child): child is Text => child.type === "text")
+      .map((child) => child.value)
+      .join("");
 
-    if (result && result !== "[]") {
-      const matches: MarkdownMatch[] = JSON.parse(result);
-      if (matches.length > 0) {
-        return `Numbered heading: ${matches[0].text}`;
-      }
+    if (/^[0-9]+\.\s/.test(text) || /^(Step|Phase|Part)\s+[0-9]+/i.test(text)) {
+      matches.push({
+        text: text.trim(),
+        line: node.position?.start?.line || 0,
+        column: node.position?.start?.column || 0,
+      });
     }
-  } catch {
-    // Script failed or no matches
+  });
+
+  if (matches.length > 0) {
+    return `Numbered heading: ${matches[0]!.text}`;
   }
 
   return null;
@@ -90,7 +97,7 @@ export function checkCode(content: string, ext: string): string | null {
     if (result) {
       const matches: AstGrepMatch[] = JSON.parse(result);
       if (matches.length > 0) {
-        return matches[0].message;
+        return matches[0]!.message;
       }
     }
   } catch {
@@ -172,15 +179,9 @@ Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
 async function main(): Promise<void> {
   const mode = (process.argv[2] || "write") as Mode;
 
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
-  }
-  const inputText = Buffer.concat(chunks).toString("utf-8");
-
   let input: PreToolUseHookInput;
   try {
-    input = JSON.parse(inputText) as PreToolUseHookInput;
+    input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
       `[style/numbering] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
@@ -190,7 +191,7 @@ async function main(): Promise<void> {
 
   const output = processInput(input, mode);
   if (output) {
-    console.log(JSON.stringify(output));
+    writeStdoutJson(output);
   }
 }
 

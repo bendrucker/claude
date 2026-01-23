@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check.sh"
+            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/check.ts"
           }
         ]
       }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/ensure.sh"
+            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/ensure.ts"
           }
         ]
       },
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/preserve.sh"
+            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/preserve.ts"
           }
         ]
       }

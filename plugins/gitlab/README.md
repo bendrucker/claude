@@ -23,5 +23,5 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 ## Testing
 
 ```bash
-shellspec plugins/gitlab/spec.sh
+npm test -- plugins/gitlab
 ```

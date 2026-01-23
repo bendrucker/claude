@@ -12,5 +12,5 @@ Git workflow and branching best practices for Claude Code.
 ## Testing
 
 ```bash
-shellspec plugins/git/spec.sh
+npm test -- plugins/git
 ```

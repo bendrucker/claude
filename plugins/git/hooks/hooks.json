@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/block-default-branch-commit.sh"
+            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/block-default-branch-commit.ts"
           }
         ]
       }

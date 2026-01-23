@@ -1,6 +1,7 @@
 #!/usr/bin/env npx tsx
 
 import UrlPattern from "url-pattern";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type {
   PreToolUseHookInput,
   SyncHookJSONOutput,
@@ -155,15 +156,9 @@ export function processInput(
 }
 
 async function main(): Promise<void> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
-  }
-  const inputText = Buffer.concat(chunks).toString("utf-8");
-
   let input: PreToolUseHookInput;
   try {
-    input = JSON.parse(inputText) as PreToolUseHookInput;
+    input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
       `[github/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`
@@ -173,7 +168,7 @@ async function main(): Promise<void> {
 
   const output = processInput(input);
   if (output) {
-    console.log(JSON.stringify(output));
+    writeStdoutJson(output);
   }
 }
 

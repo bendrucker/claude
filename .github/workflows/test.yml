@@ -183,7 +183,7 @@ jobs:
         run: npx remark "plugins/${{ matrix.plugin }}/commands/*.md"
 
       - name: Install package dependencies
-        if: steps.inspect.outputs.has_package == 'true'
+        if: steps.inspect.outputs.has_package == 'true' && hashFiles(format('plugins/{0}/package-lock.json', matrix.plugin)) != ''
         run: npm ci --prefix "plugins/${{ matrix.plugin }}"
 
       - name: Build TypeScript
@@ -192,7 +192,7 @@ jobs:
 
       - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
-        run: npm test -- "plugins/${{ matrix.plugin }}"
+        run: npm test -- "plugins/${{ matrix.plugin }}/"
 
   plugins:
     needs: [validate, plugin]

@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.17",
-    "@anthropic-ai/claude-code": "^1.0.17",
+    "@anthropic-ai/claude-code": "^2.0.65",
     "@constellos/claude-code-kit": "^0.4.0",
     "@linear/sdk": "^71.0.0",
     "ajv": "^8.17.1",

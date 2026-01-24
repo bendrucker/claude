@@ -5,7 +5,8 @@
   "workspaces": [
     "plugins/claude-code/skills/session",
     "plugins/style",
-    "plugins/things/skills/things"
+    "plugins/things/skills/things",
+    "plugins/type-ignore"
   ],
   "scripts": {
     "build": "tsc --noEmit",

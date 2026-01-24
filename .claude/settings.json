@@ -57,6 +57,7 @@
     "astral@astral-sh": true,
     "research@bendrucker": true,
     "style@bendrucker": true,
+    "type-ignore@bendrucker": true,
     "agents-md@bendrucker": true,
     "ast-grep@ast-grep": true,
     "worktrunk@worktrunk": true

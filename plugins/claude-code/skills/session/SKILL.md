@@ -36,7 +36,7 @@ npx tsx scripts/search.ts "auth" --after yesterday
 npx tsx scripts/search.ts --stats --after "last week"
 ```
 
-See [search.md](mdc:search.md) for filtering and JSON output options.
+See [search.md](search.md) for filtering and JSON output options.
 
 ## Session File Location
 

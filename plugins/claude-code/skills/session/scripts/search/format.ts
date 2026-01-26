@@ -1,11 +1,10 @@
 import { type Conversation, DISPLAY_LIMITS, type SearchResult } from "./types";
 
+const TIMESTAMP_FORMAT = "YYYY-MM-DD HH:MM";
+
 function formatTimestamp(date: Date | null): string {
   if (!date) return "unknown";
-  return date
-    .toISOString()
-    .replace("T", " ")
-    .replace(/:\d{2}\.\d{3}Z$/, "");
+  return date.toISOString().replace("T", " ").slice(0, TIMESTAMP_FORMAT.length);
 }
 
 export function formatDigest(conversations: Conversation[]): string {

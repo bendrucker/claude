@@ -45,27 +45,42 @@ describe("type-ignore detection hook", () => {
   describe("findIgnorePattern", () => {
     it("detects @ts-ignore in TypeScript", () => {
       const content = "// @ts-ignore\nconst x = bad();";
-      expect(findIgnorePattern(content, "typescript")).toBe("@ts-ignore");
+      expect(findIgnorePattern(content, "typescript")).toEqual({
+        label: "@ts-ignore",
+        match: "@ts-ignore",
+      });
     });
 
     it("detects @ts-expect-error in TypeScript", () => {
       const content = "// @ts-expect-error\nconst x = bad();";
-      expect(findIgnorePattern(content, "typescript")).toBe("@ts-expect-error");
+      expect(findIgnorePattern(content, "typescript")).toEqual({
+        label: "@ts-expect-error",
+        match: "@ts-expect-error",
+      });
     });
 
     it("detects eslint-disable in TypeScript", () => {
       const content = "// eslint-disable-next-line\nconst x = 1;";
-      expect(findIgnorePattern(content, "typescript")).toBe("eslint-disable-next-line");
+      expect(findIgnorePattern(content, "typescript")).toEqual({
+        label: "eslint-disable",
+        match: "eslint-disable-next-line",
+      });
     });
 
     it("detects # type: ignore in Python", () => {
       const content = "x = bad()  # type: ignore";
-      expect(findIgnorePattern(content, "python")).toBe("# type: ignore");
+      expect(findIgnorePattern(content, "python")).toEqual({
+        label: "type: ignore",
+        match: "# type: ignore",
+      });
     });
 
     it("detects # noqa in Python", () => {
       const content = "import unused  # noqa";
-      expect(findIgnorePattern(content, "python")).toBe("# noqa");
+      expect(findIgnorePattern(content, "python")).toEqual({
+        label: "noqa",
+        match: "# noqa",
+      });
     });
 
     it("returns null for clean code", () => {
@@ -78,7 +93,10 @@ describe("type-ignore detection hook", () => {
     it("detects new ignore in TypeScript Edit", () => {
       const oldString = "const x = bad();";
       const newString = "// @ts-ignore\nconst x = bad();";
-      expect(hasNewIgnore(oldString, newString, "typescript")).toBe("@ts-ignore");
+      expect(hasNewIgnore(oldString, newString, "typescript")).toEqual({
+        label: "@ts-ignore",
+        match: "@ts-ignore",
+      });
     });
 
     it("returns null when ignore already existed", () => {
@@ -96,7 +114,10 @@ describe("type-ignore detection hook", () => {
     it("detects new Python ignore", () => {
       const oldString = "result = func()";
       const newString = "result = func()  # type: ignore";
-      expect(hasNewIgnore(oldString, newString, "python")).toBe("# type: ignore");
+      expect(hasNewIgnore(oldString, newString, "python")).toEqual({
+        label: "type: ignore",
+        match: "# type: ignore",
+      });
     });
   });
 
@@ -168,7 +189,7 @@ describe("type-ignore detection hook", () => {
       expect(result).not.toBeNull();
       const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
         .additionalContext;
-      expect(additionalContext).toContain("# type: ignore");
+      expect(additionalContext).toContain("type: ignore");
     });
 
     it("ignores non-target file extensions", () => {

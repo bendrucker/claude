@@ -1,8 +1,5 @@
 {
   "name": "@bendrucker/type-ignore",
   "private": true,
-  "type": "module",
-  "dependencies": {
-    "leasot": "^14.4.0"
-  }
+  "type": "module"
 }

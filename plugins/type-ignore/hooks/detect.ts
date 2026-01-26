@@ -4,16 +4,15 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { EXTENSION_MAP, LANGUAGES, TARGET_EXTENSIONS } from "./languages";
 
 export type WriteInput = { file_path: string; content: string };
 export type EditInput = { file_path: string; old_string: string; new_string: string };
 
-const TARGET_EXTENSIONS = new Set(["ts", "tsx", "py"]);
-
-const IGNORE_PATTERNS: Record<string, RegExp[]> = {
-  typescript: [/@ts-ignore/, /@ts-expect-error/, /eslint-disable(?:-next-line)?/],
-  python: [/#\s*type:\s*ignore/, /#\s*noqa/],
-};
+export interface PatternMatch {
+  label: string;
+  match: string;
+}
 
 const MARKER_DIR = "/tmp/claude/type-ignore-active";
 const MARKER_TTL_MS = 10 * 60 * 1000;
@@ -28,23 +27,18 @@ function isTargetFile(filePath: string): boolean {
   return TARGET_EXTENSIONS.has(ext);
 }
 
-function getLanguage(filePath: string): "typescript" | "python" | null {
+function getLanguage(filePath: string): string | null {
   const ext = getExtension(filePath);
-  if (ext === "ts" || ext === "tsx") return "typescript";
-  if (ext === "py") return "python";
-  return null;
+  return EXTENSION_MAP.get(ext) ?? null;
 }
 
-export function findIgnorePattern(
-  content: string,
-  language: "typescript" | "python",
-): string | null {
-  const patterns = IGNORE_PATTERNS[language];
-  if (!patterns) return null;
-  for (const pattern of patterns) {
-    const match = content.match(pattern);
+export function findIgnorePattern(content: string, language: string): PatternMatch | null {
+  const config = LANGUAGES[language];
+  if (!config) return null;
+  for (const pattern of config.patterns) {
+    const match = content.match(pattern.regex);
     if (match) {
-      return match[0];
+      return { label: pattern.label, match: match[0] };
     }
   }
   return null;
@@ -53,13 +47,13 @@ export function findIgnorePattern(
 export function hasNewIgnore(
   oldString: string,
   newString: string,
-  language: "typescript" | "python",
-): string | null {
+  language: string,
+): PatternMatch | null {
   const newPattern = findIgnorePattern(newString, language);
   if (!newPattern) return null;
 
   const oldPattern = findIgnorePattern(oldString, language);
-  if (oldPattern && newPattern === oldPattern) {
+  if (oldPattern && newPattern.match === oldPattern.match) {
     return null;
   }
 
@@ -155,11 +149,11 @@ export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | 
     return null;
   }
 
-  const lineNumber = findLineNumber(newContent, pattern);
+  const lineNumber = findLineNumber(newContent, pattern.match);
 
   setMarker();
 
-  return formatOutput(filePath, lineNumber, pattern);
+  return formatOutput(filePath, lineNumber, pattern.label);
 }
 
 async function main(): Promise<void> {

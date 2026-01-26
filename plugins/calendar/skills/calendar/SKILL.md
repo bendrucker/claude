@@ -9,8 +9,11 @@ hooks:
         - type: command
           command: |
             cat | jq '
+              # EventKit requires system access — disable sandbox for all commands
               if (.tool_input.command | test("cal\\.swift\\s+(calendars|list|get)\\b"))
+              # Auto-allow read operations
               then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {dangerouslyDisableSandbox: true}}}
+              # Prompt before mutating calendar data
               else {hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: {dangerouslyDisableSandbox: true}}}
               end'
 ---

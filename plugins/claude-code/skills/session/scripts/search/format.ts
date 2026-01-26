@@ -2,8 +2,7 @@ import { type Conversation, DISPLAY_LIMITS, type SearchResult } from "./types";
 
 function formatTimestamp(date: Date | null): string {
   if (!date) return "unknown";
-  const [day, time] = date.toISOString().split("T");
-  return `${day} ${time.slice(0, 5)}`;
+  return date.toISOString().replace("T", " ").slice(0, 16);
 }
 
 export function formatDigest(conversations: Conversation[]): string {

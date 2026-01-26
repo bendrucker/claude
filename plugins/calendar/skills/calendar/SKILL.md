@@ -7,27 +7,7 @@ hooks:
     - matcher: "Bash(swift:*)"
       hooks:
         - type: command
-          command: |
-            input=$(cat)
-            command=$(echo "$input" | jq -r '.tool_input.command // ""')
-            cal_script=$(echo "$command" | grep -o 'cal\.swift [a-z]*' | awk '{print $2}')
-            read_commands="calendars list get"
-            if echo "$read_commands" | grep -qw "$cal_script"; then
-              jq -n '{
-                hookSpecificOutput: {
-                  hookEventName: "PreToolUse",
-                  permissionDecision: "allow",
-                  updatedInput: { dangerouslyDisableSandbox: true }
-                }
-              }'
-            else
-              jq -n '{
-                hookSpecificOutput: {
-                  hookEventName: "PreToolUse",
-                  updatedInput: { dangerouslyDisableSandbox: true }
-                }
-              }'
-            fi
+          command: npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/sandbox-bypass.ts
 ---
 
 # macOS Calendar

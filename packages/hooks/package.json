@@ -1,0 +1,8 @@
+{
+  "name": "@bendrucker/hooks",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./sandbox-bypass": "./sandbox-bypass.ts"
+  }
+}

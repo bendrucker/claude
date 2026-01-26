@@ -38,7 +38,7 @@ Reference for creating and configuring Claude Code hooks. When uncertain about s
         "hooks": [
           {
             "type": "command",
-            "command": "npx tsx hooks/biome"
+            "command": "bun hooks/biome"
           }
         ]
       }
@@ -113,7 +113,7 @@ Store complex hooks in `.claude/hooks/` or project `hooks/` directory:
 
 Reference with:
 ```json
-"command": "npx tsx $CLAUDE_PROJECT_DIR/.claude/hooks/my-hook.ts"
+"command": "bun $CLAUDE_PROJECT_DIR/.claude/hooks/my-hook.ts"
 ```
 
 ## Examples

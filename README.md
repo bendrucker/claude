@@ -8,6 +8,10 @@ This repository provides plugins for Claude Code, organized as a plugin marketpl
 
 It also contains my `settings.json` to synchronize my shared settings across machines.
 
+## Prerequisites
+
+Many plugins include TypeScript hooks and scripts that require [Bun](https://bun.sh) to run. See [Bun's installation guide](https://bun.sh/docs/installation) for setup instructions. Bun runs TypeScript natively and auto-installs missing dependencies on first run.
+
 ## Plugins
 
 Browse the [`plugins/`](plugins/) directory to see available plugins. Each plugin has its own README describing its contents.

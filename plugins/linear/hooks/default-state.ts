@@ -1,7 +1,7 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export type CreateIssueInput = {
   title?: string;

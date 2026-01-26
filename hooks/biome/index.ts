@@ -1,8 +1,8 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 import { execSync } from "node:child_process";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export type WriteInput = { file_path: string };
 export type EditInput = { file_path: string };

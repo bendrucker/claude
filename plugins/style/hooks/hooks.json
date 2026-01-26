@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts write"
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts write"
           }
         ]
       },
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts edit"
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts edit"
           }
         ]
       }

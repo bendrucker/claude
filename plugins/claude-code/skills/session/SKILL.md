@@ -15,7 +15,7 @@ Access details about the current Claude Code session or search past conversation
 Run the info script to get full session details:
 
 ```bash
-scripts/info.sh "${CLAUDE_SESSION_ID}"
+npx tsx scripts/info.ts "${CLAUDE_SESSION_ID}"
 ```
 
 ## Search History

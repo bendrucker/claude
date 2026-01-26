@@ -137,6 +137,16 @@ Root-level tests (e.g., `hooks/`) run in a dedicated job since they're not part 
 - **No `.js` imports in TypeScript**: Import from `./module` not `./module.js`. The bundler/runtime handles resolution.
 - **Prefer skills over agents**: Skills are invocable via the Skill tool. Agents require the Task tool. If something should be directly invocable, make it a skill.
 
+### Local Plugin Testing
+
+To test a plugin end-to-end without publishing, use `--plugin-dir` with `--setting-sources local` to isolate from user/project settings:
+
+```bash
+claude --plugin-dir ./plugins/<name> --setting-sources local
+```
+
+This loads only the specified plugin directory, bypassing marketplace-installed versions. Use this workflow to verify skills, hooks, and scripts work correctly before committing.
+
 ## Verification
 
 Run `scripts/check-marketplace.sh` to verify all plugin directories are listed in `marketplace.json`. This check runs in CI and should pass before merging.

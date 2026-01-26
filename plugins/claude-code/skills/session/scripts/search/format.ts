@@ -1,17 +1,10 @@
 import { type Conversation, DISPLAY_LIMITS, type SearchResult } from "./types";
 
-const timestampFormat = new Intl.DateTimeFormat("sv-SE", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "UTC",
-});
+const TIMESTAMP_FORMAT = "YYYY-MM-DD HH:MM";
 
 function formatTimestamp(date: Date | null): string {
   if (!date) return "unknown";
-  return timestampFormat.format(date);
+  return date.toISOString().replace("T", " ").slice(0, TIMESTAMP_FORMAT.length);
 }
 
 export function formatDigest(conversations: Conversation[]): string {

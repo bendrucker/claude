@@ -41,8 +41,11 @@ When invoked directly by the user, scan the specified scope (file, directory, or
 
 ## Supported Patterns
 
-- TypeScript: `@ts-ignore`, `@ts-expect-error`, `eslint-disable[-next-line]`
-- Python: `# type: ignore`, `# noqa`
+- TypeScript/JavaScript: `@ts-ignore`, `@ts-expect-error`, `eslint-disable[-next-line]`, `biome-ignore`
+- Python: `# type: ignore`, `# noqa`, `# pylint: disable`
+- Go: `//nolint`, `//lint:ignore`
+- Rust: `#[allow(...)]`
+- Ruby: `# rubocop:disable`
 
 ## Fixing Strategy
 

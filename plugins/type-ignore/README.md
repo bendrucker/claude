@@ -6,15 +6,17 @@ Detects and eliminates type ignores across your codebase.
 
 - **Hooks**
   - `detect.ts` — PostToolUse hook that detects new type/lint ignores in edits
-  - `commit-todos.ts` — PostToolUse hook that warns about new TODOs in commits
 
 - **Agents**
   - `fixer` — Fixes type errors instead of ignoring them
 
 ## Patterns Detected
 
-- TypeScript: `@ts-ignore`, `@ts-expect-error`, `eslint-disable[-next-line]`
-- Python: `# type: ignore`, `# noqa`
+- TypeScript/JavaScript: `@ts-ignore`, `@ts-expect-error`, `eslint-disable[-next-line]`, `biome-ignore`
+- Python: `# type: ignore`, `# noqa`, `# pylint: disable`
+- Go: `//nolint`, `//lint:ignore`
+- Rust: `#[allow(...)]`
+- Ruby: `# rubocop:disable`
 
 ## Usage
 

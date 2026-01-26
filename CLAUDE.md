@@ -43,6 +43,15 @@ The root `package.json` contains shared tooling (vitest, typescript) and depende
 
 Avoid collecting all dependencies in the root package.json. Each plugin should be self-contained where practical.
 
+### Lockfile Conflicts
+
+When resolving `package-lock.json` conflicts during rebase, don't regenerate from scratch—this loses cross-platform optional dependencies. Instead:
+
+1. Accept the lockfile from the base branch: `git checkout origin/main -- package-lock.json`
+2. Run `npm install` to apply your `package.json` changes
+
+This preserves platform-specific optional dependencies (Linux, Windows, etc.) that CI requires.
+
 ### Bun
 
 Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing dependencies on first run, eliminating the need to run `npm install` before executing scripts. This simplifies hook execution since hooks run in isolated contexts where `node_modules` may not be readily available.

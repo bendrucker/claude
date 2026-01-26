@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 
 import { parseDate } from "./search/date";
 import { formatDigest, formatSearchResults } from "./search/format";

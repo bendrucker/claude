@@ -1,8 +1,8 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
-import UrlPattern from "url-pattern";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import UrlPattern from "url-pattern";
 
 export type WebFetchInput = { url: string; prompt: string };
 

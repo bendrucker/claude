@@ -1,9 +1,9 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { readStdinJson } from "@constellos/claude-code-kit/runners";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
+import { readStdinJson } from "@constellos/claude-code-kit/runners";
 
 export function extractPluginName(filePath: string): string | null {
   const match = filePath.match(/plugins\/([^/]+)\//);

@@ -1,11 +1,11 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export type BashInput = {
   command?: string;

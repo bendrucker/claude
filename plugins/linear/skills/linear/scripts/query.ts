@@ -1,11 +1,11 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 /**
  * Execute ad-hoc GraphQL queries against the Linear API
  *
  * Usage:
- *   LINEAR_API_KEY=lin_api_xxx npx tsx query.ts "query { viewer { id name } }"
- *   LINEAR_API_KEY=lin_api_xxx npx tsx query.ts "query { viewer { id name } }" '{"var": "value"}'
+ *   LINEAR_API_KEY=lin_api_xxx bun query.ts "query { viewer { id name } }"
+ *   LINEAR_API_KEY=lin_api_xxx bun query.ts "query { viewer { id name } }" '{"var": "value"}'
  */
 
 import { LinearClient } from "@linear/sdk";
@@ -33,7 +33,7 @@ async function main() {
     console.error("Error: LINEAR_API_KEY environment variable is required");
     console.error("");
     console.error("Usage:");
-    console.error('  LINEAR_API_KEY=lin_api_xxx npx tsx query.ts "query { viewer { id name } }"');
+    console.error('  LINEAR_API_KEY=lin_api_xxx bun query.ts "query { viewer { id name } }"');
     process.exit(1);
   }
 
@@ -44,9 +44,9 @@ async function main() {
     console.error("Error: Query argument is required");
     console.error("");
     console.error("Usage:");
-    console.error('  LINEAR_API_KEY=lin_api_xxx npx tsx query.ts "query { viewer { id name } }"');
+    console.error('  LINEAR_API_KEY=lin_api_xxx bun query.ts "query { viewer { id name } }"');
     console.error(
-      '  LINEAR_API_KEY=lin_api_xxx npx tsx query.ts "query($id: String!) { issue(id: $id) { title } }" \'{"id": "ISSUE_ID"}\'',
+      '  LINEAR_API_KEY=lin_api_xxx bun query.ts "query($id: String!) { issue(id: $id) { title } }" \'{"id": "ISSUE_ID"}\'',
     );
     process.exit(1);
   }

@@ -22,7 +22,7 @@ For ad-hoc queries and automation, use the `@linear/sdk` package with `npx` and 
 The skill includes `scripts/query.ts` for executing GraphQL queries. Run it with:
 
 ```bash
-LINEAR_API_KEY=lin_api_xxx npx tsx scripts/query.ts "query { viewer { id name } }"
+LINEAR_API_KEY=lin_api_xxx bun scripts/query.ts "query { viewer { id name } }"
 ```
 
 **Environment Variable**: The script requires `LINEAR_API_KEY` to be set. If not provided to the Claude process, you cannot execute GraphQL queries automatically.
@@ -158,5 +158,5 @@ for (const issue of issues.nodes) {
 Use GraphQL introspection to discover the API schema:
 
 ```bash
-LINEAR_API_KEY=lin_api_xxx npx tsx scripts/query.ts "{ __schema { types { name description } } }"
+LINEAR_API_KEY=lin_api_xxx bun scripts/query.ts "{ __schema { types { name description } } }"
 ```

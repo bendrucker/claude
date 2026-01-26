@@ -3,7 +3,6 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*",
     "plugins/claude-code/skills/session",
     "plugins/style",
     "plugins/things/skills/things"

@@ -7,7 +7,12 @@ hooks:
     - matcher: "Bash(swift:*)"
       hooks:
         - type: command
-          command: npx tsx ${CLAUDE_PLUGIN_ROOT}/scripts/sandbox-bypass.ts
+          command: |
+            cat | jq '
+              if (.tool_input.command | test("cal\\.swift\\s+(calendars|list|get)\\b"))
+              then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {dangerouslyDisableSandbox: true}}}
+              else {hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: {dangerouslyDisableSandbox: true}}}
+              end'
 ---
 
 # macOS Calendar

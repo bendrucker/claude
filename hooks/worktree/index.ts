@@ -37,11 +37,10 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   }
 
   const match = command.match(/\bgit\s+worktree\s+(\w+)/);
-  if (!match) {
+  const subcommand = match?.[1];
+  if (!subcommand) {
     return null;
   }
-
-  const subcommand = match[1];
   if (REPLACED_SUBCOMMANDS.has(subcommand)) {
     return formatDenyOutput(subcommand);
   }

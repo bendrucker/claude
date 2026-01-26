@@ -124,6 +124,11 @@
       "source": "./plugins/research"
     },
     {
+      "name": "type-ignore",
+      "description": "Detects and eliminates type ignores across your codebase",
+      "source": "./plugins/type-ignore"
+    },
+    {
       "name": "agents-md",
       "description": "Loads AGENTS.md files automatically into Claude Code sessions",
       "source": { "source": "github", "repo": "bendrucker/claude-code-agents-md" }

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "arg": "^5.0.2",
     "chrono-node": "^2.7.7"
   }
 }

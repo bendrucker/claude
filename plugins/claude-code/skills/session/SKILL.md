@@ -27,7 +27,7 @@ Search past conversations or get a digest of recent work:
 npx tsx scripts/search.ts "error handling"
 
 # Get today's conversation digest
-npx tsx scripts/search.ts --digest today
+npx tsx scripts/search.ts --digest --after today
 
 # Search with date filters
 npx tsx scripts/search.ts "auth" --after yesterday
@@ -36,7 +36,7 @@ npx tsx scripts/search.ts "auth" --after yesterday
 npx tsx scripts/search.ts --stats --after "last week"
 ```
 
-See [search.md](mdc:search.md) for advanced filtering options (`--complete-only`, `--format json`, etc).
+See [search.md](mdc:search.md) for filtering and JSON output options.
 
 ## Session File Location
 

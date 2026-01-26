@@ -221,11 +221,10 @@ describe("getDigest", () => {
     expect(result.totalCount).toBeGreaterThan(1);
   });
 
-  it("filters incomplete sessions with completeOnly", async () => {
-    const result = await getDigest({ projectsDir: fixturesDir, completeOnly: true });
+  it("excludes empty sessions by default", async () => {
+    const result = await getDigest({ projectsDir: fixturesDir });
     for (const conv of result.conversations) {
-      expect(conv.startTime).not.toBeNull();
-      expect(conv.endTime).not.toBeNull();
+      expect(conv.messages.length).toBeGreaterThan(0);
     }
   });
 });

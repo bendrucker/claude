@@ -14,9 +14,10 @@ Options:
   --before DATE      Only include conversations before this date
   --project PATH     Filter by project path
   --limit N          Maximum results (default: 10 for search, 20 for digest)
-  --complete-only    Only include sessions with start and end times
   --format FORMAT    Output format: text (default) or json
 ```
+
+Empty sessions (started but no messages sent) are filtered out automatically.
 
 ## Date Filtering
 
@@ -29,7 +30,7 @@ Uses [chrono-node](https://github.com/wanasit/chrono) for natural language date 
 
 ```bash
 # Conversations from the last week
-npx tsx scripts/search.ts --digest "last week"
+npx tsx scripts/search.ts --digest --after "last week"
 
 # Search only today's sessions
 npx tsx scripts/search.ts "error" --after today
@@ -63,17 +64,6 @@ npx tsx scripts/search.ts --stats --project myproject
 ```
 
 Output shows session counts and total minutes per project, sorted by time spent.
-
-## Filtering Incomplete Sessions
-
-Some sessions may have null timestamps (e.g., interrupted sessions). Use `--complete-only` to exclude them:
-
-```bash
-# Only sessions with valid start/end times
-npx tsx scripts/search.ts --digest "last week" --complete-only
-```
-
-This is useful when piping to jq for duration calculations.
 
 ## JSON Output
 

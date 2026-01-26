@@ -8,12 +8,14 @@ Advanced options for searching conversation history.
 npx tsx scripts/search.ts [query] [options]
 
 Options:
-  --digest         Show digest of recent conversations (no query needed)
-  --after DATE     Only include conversations after this date
-  --before DATE    Only include conversations before this date
-  --project PATH   Filter by project path
-  --limit N        Maximum results (default: 10 for search, 20 for digest)
-  --format FORMAT  Output format: text (default) or json
+  --digest           Show digest of recent conversations (no query needed)
+  --stats            Show aggregated statistics grouped by project
+  --after DATE       Only include conversations after this date
+  --before DATE      Only include conversations before this date
+  --project PATH     Filter by project path
+  --limit N          Maximum results (default: 10 for search, 20 for digest)
+  --complete-only    Only include sessions with start and end times
+  --format FORMAT    Output format: text (default) or json
 ```
 
 ## Date Filtering
@@ -48,6 +50,31 @@ npx tsx scripts/search.ts "bug" --project /Users/ben/src/myproject
 npx tsx scripts/search.ts "test" --project myproject
 ```
 
+## Statistics
+
+Get aggregated statistics by project:
+
+```bash
+# Weekly stats by project
+npx tsx scripts/search.ts --stats --after "last week"
+
+# Stats for a specific project
+npx tsx scripts/search.ts --stats --project myproject
+```
+
+Output shows session counts and total minutes per project, sorted by time spent.
+
+## Filtering Incomplete Sessions
+
+Some sessions may have null timestamps (e.g., interrupted sessions). Use `--complete-only` to exclude them:
+
+```bash
+# Only sessions with valid start/end times
+npx tsx scripts/search.ts --digest "last week" --complete-only
+```
+
+This is useful when piping to jq for duration calculations.
+
 ## JSON Output
 
 Use `--format json` for programmatic access:
@@ -58,7 +85,17 @@ npx tsx scripts/search.ts "auth" --format json | jq '.[] | .conversation.summary
 
 # Get session IDs from digest
 npx tsx scripts/search.ts --digest today --format json | jq '.[].sessionId'
+
+# Stats as JSON
+npx tsx scripts/search.ts --stats --after "last week" --format json
 ```
+
+### JSON Fields
+
+The JSON output includes computed fields for convenience:
+
+- `projectName` - Last component of projectPath (e.g., "api" from "/Users/ben/src/api")
+- `durationMinutes` - Pre-computed session duration in minutes
 
 ## Relevance Scoring
 

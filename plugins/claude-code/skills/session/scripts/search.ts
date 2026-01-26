@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 
 import * as fs from "node:fs";
-import * as path from "node:path";
 import * as os from "node:os";
+import * as path from "node:path";
 import * as chrono from "chrono-node";
 
 export interface ToolUse {
@@ -20,11 +20,13 @@ export interface Message {
 export interface Conversation {
   readonly sessionId: string;
   readonly projectPath: string | null;
+  readonly projectName: string | null;
   readonly filePath: string;
   readonly messages: readonly Message[];
   readonly summary: string | null;
   readonly startTime: Date | null;
   readonly endTime: Date | null;
+  readonly durationMinutes: number | null;
   readonly gitBranch: string | null;
 }
 
@@ -40,6 +42,16 @@ interface SearchOptions {
   after?: Date;
   project?: string;
   limit?: number;
+  completeOnly?: boolean;
+}
+
+export interface ProjectStats {
+  readonly projectPath: string;
+  readonly projectName: string;
+  readonly sessionCount: number;
+  readonly totalMinutes: number;
+  readonly firstSession: Date | null;
+  readonly lastSession: Date | null;
 }
 
 const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
@@ -187,14 +199,20 @@ export function parseConversationFile(filePath: string): Conversation {
     console.error(`Warning: Failed to parse any lines in ${filePath}`);
   }
 
+  const projectName = projectPath ? path.basename(projectPath) : null;
+  const durationMinutes =
+    startTime && endTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000 / 60) : null;
+
   return {
     sessionId,
     projectPath,
+    projectName,
     filePath,
     messages,
     summary,
     startTime,
     endTime,
+    durationMinutes,
     gitBranch,
   };
 }
@@ -262,6 +280,10 @@ function isWithinDateRange(conversation: Conversation, options: SearchOptions): 
   return true;
 }
 
+function isComplete(conversation: Conversation): boolean {
+  return conversation.startTime !== null && conversation.endTime !== null;
+}
+
 function loadConversations(options: SearchOptions): Conversation[] {
   const projectsDir =
     options.projectsDir || process.env.CLAUDE_PROJECTS_DIR || DEFAULT_PROJECTS_DIR;
@@ -288,6 +310,9 @@ function loadConversations(options: SearchOptions): Conversation[] {
 
     for (const sessionFile of sessionFiles) {
       const conversation = parseConversationFile(sessionFile);
+      if (options.completeOnly && !isComplete(conversation)) {
+        continue;
+      }
       if (isWithinDateRange(conversation, options)) {
         conversations.push(conversation);
       }
@@ -317,7 +342,13 @@ export async function searchConversations(
   return results.slice(0, limit);
 }
 
-export async function getDigest(options: SearchOptions = {}): Promise<Conversation[]> {
+export interface DigestResult {
+  conversations: Conversation[];
+  totalCount: number;
+  truncated: boolean;
+}
+
+export async function getDigest(options: SearchOptions = {}): Promise<DigestResult> {
   const conversations = loadConversations(options);
 
   conversations.sort((a, b) => {
@@ -327,7 +358,64 @@ export async function getDigest(options: SearchOptions = {}): Promise<Conversati
   });
 
   const limit = options.limit ?? DEFAULT_LIMITS.digest;
-  return conversations.slice(0, limit);
+  const totalCount = conversations.length;
+  const truncated = conversations.length > limit;
+
+  return {
+    conversations: conversations.slice(0, limit),
+    totalCount,
+    truncated,
+  };
+}
+
+export async function getStats(options: SearchOptions = {}): Promise<ProjectStats[]> {
+  const conversations = loadConversations(options);
+
+  const statsMap = new Map<
+    string,
+    {
+      projectPath: string;
+      projectName: string;
+      sessionCount: number;
+      totalMinutes: number;
+      firstSession: Date | null;
+      lastSession: Date | null;
+    }
+  >();
+
+  for (const conv of conversations) {
+    const key = conv.projectPath ?? "unknown";
+    const existing = statsMap.get(key);
+
+    if (existing) {
+      existing.sessionCount++;
+      if (conv.durationMinutes !== null) {
+        existing.totalMinutes += conv.durationMinutes;
+      }
+      if (conv.startTime) {
+        if (!existing.firstSession || conv.startTime < existing.firstSession) {
+          existing.firstSession = conv.startTime;
+        }
+        if (!existing.lastSession || conv.startTime > existing.lastSession) {
+          existing.lastSession = conv.startTime;
+        }
+      }
+    } else {
+      statsMap.set(key, {
+        projectPath: key,
+        projectName: conv.projectName ?? path.basename(key),
+        sessionCount: 1,
+        totalMinutes: conv.durationMinutes ?? 0,
+        firstSession: conv.startTime,
+        lastSession: conv.startTime,
+      });
+    }
+  }
+
+  const stats = Array.from(statsMap.values());
+  stats.sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  return stats;
 }
 
 function formatTimestamp(date: Date | null): string {
@@ -336,12 +424,22 @@ function formatTimestamp(date: Date | null): string {
   return `${iso.split("T")[0]} ${iso.split("T")[1]?.slice(0, 5)}`;
 }
 
-export function formatDigest(conversations: Conversation[]): string {
+export function formatDigest(result: DigestResult): string {
+  const { conversations, totalCount, truncated } = result;
+
   if (conversations.length === 0) {
     return "No conversations found.";
   }
 
   const lines: string[] = [];
+
+  if (truncated) {
+    lines.push(
+      `Warning: Showing ${conversations.length} of ${totalCount} sessions. Use --limit ${totalCount} to see all.`,
+    );
+    lines.push("");
+  }
+
   for (const conv of conversations) {
     const timestamp = formatTimestamp(conv.startTime);
     const project = conv.projectPath || "unknown";
@@ -353,6 +451,31 @@ export function formatDigest(conversations: Conversation[]): string {
     }
     lines.push("");
   }
+
+  return lines.join("\n");
+}
+
+export function formatStats(stats: ProjectStats[]): string {
+  if (stats.length === 0) {
+    return "No sessions found.";
+  }
+
+  const lines: string[] = [];
+  lines.push("Project                                  Sessions    Minutes");
+  lines.push("─".repeat(60));
+
+  for (const stat of stats) {
+    const name = stat.projectName.slice(0, 38).padEnd(38);
+    const sessions = stat.sessionCount.toString().padStart(8);
+    const minutes = stat.totalMinutes.toString().padStart(10);
+    lines.push(`${name} ${sessions} ${minutes}`);
+  }
+
+  lines.push("─".repeat(60));
+  const totalSessions = stats.reduce((sum, s) => sum + s.sessionCount, 0);
+  const totalMinutes = stats.reduce((sum, s) => sum + s.totalMinutes, 0);
+  const totalLine = `${"Total".padEnd(38)} ${totalSessions.toString().padStart(8)} ${totalMinutes.toString().padStart(10)}`;
+  lines.push(totalLine);
 
   return lines.join("\n");
 }
@@ -396,20 +519,24 @@ function printUsage(): void {
 Search conversation history or get a digest of recent sessions.
 
 Options:
-  --digest         Show digest of recent conversations (no query needed)
-  --after DATE     Only include conversations after this date
-  --before DATE    Only include conversations before this date
-  --project PATH   Filter by project path
-  --limit N        Maximum results (default: 10 for search, 20 for digest)
-  --format FORMAT  Output format: text (default) or json
+  --digest           Show digest of recent conversations (no query needed)
+  --stats            Show aggregated statistics grouped by project
+  --after DATE       Only include conversations after this date
+  --before DATE      Only include conversations before this date
+  --project PATH     Filter by project path
+  --limit N          Maximum results (default: 10 for search, 20 for digest)
+  --complete-only    Only include sessions with start and end times
+  --format FORMAT    Output format: text (default) or json
 
 Date formats:
   today, yesterday, this week, or ISO date (2024-01-15)
 
 Examples:
-  search.ts "fix error"              # Search for conversations about errors
-  search.ts --digest today           # Today's conversation digest
-  search.ts "auth" --after yesterday # Auth discussions since yesterday
+  search.ts "fix error"                  # Search for conversations about errors
+  search.ts --digest today               # Today's conversation digest
+  search.ts "auth" --after yesterday     # Auth discussions since yesterday
+  search.ts --stats --after "last week"  # Stats by project for the week
+  search.ts --digest "last week" --complete-only  # Only complete sessions
 `);
 }
 
@@ -424,6 +551,7 @@ async function main(): Promise<void> {
   const options: SearchOptions = {};
   let query = "";
   let isDigest = false;
+  let isStats = false;
   let format = "text";
 
   for (let i = 0; i < args.length; i++) {
@@ -432,6 +560,12 @@ async function main(): Promise<void> {
 
     if (arg === "--digest") {
       isDigest = true;
+      if (nextArg && !nextArg.startsWith("--")) {
+        options.after = parseDate(nextArg);
+        i++;
+      }
+    } else if (arg === "--stats") {
+      isStats = true;
       if (nextArg && !nextArg.startsWith("--")) {
         options.after = parseDate(nextArg);
         i++;
@@ -452,6 +586,8 @@ async function main(): Promise<void> {
       }
       options.limit = limit;
       i++;
+    } else if (arg === "--complete-only") {
+      options.completeOnly = true;
     } else if (arg === "--format" && nextArg) {
       if (nextArg !== "text" && nextArg !== "json") {
         throw new Error(`Invalid --format: "${nextArg}". Must be "text" or "json"`);
@@ -463,12 +599,19 @@ async function main(): Promise<void> {
     }
   }
 
-  if (isDigest) {
-    const conversations = await getDigest(options);
+  if (isStats) {
+    const stats = await getStats(options);
     if (format === "json") {
-      console.log(JSON.stringify(conversations, null, 2));
+      console.log(JSON.stringify(stats, null, 2));
     } else {
-      console.log(formatDigest(conversations));
+      console.log(formatStats(stats));
+    }
+  } else if (isDigest) {
+    const result = await getDigest(options);
+    if (format === "json") {
+      console.log(JSON.stringify(result.conversations, null, 2));
+    } else {
+      console.log(formatDigest(result));
     }
   } else if (query) {
     const results = await searchConversations(query, options);

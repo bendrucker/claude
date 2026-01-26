@@ -1,14 +1,16 @@
-import { describe, it, expect } from "vitest";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 import {
-  parseConversationFile,
   calculateRelevanceScore,
-  searchConversations,
-  getDigest,
   formatDigest,
   formatSearchResults,
+  formatStats,
+  getDigest,
+  getStats,
+  parseConversationFile,
   parseDate,
+  searchConversations,
 } from "./search.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,6 +36,16 @@ describe("parseConversationFile", () => {
     const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
     expect(conv.startTime).toEqual(new Date("2024-01-15T10:00:00.000Z"));
     expect(conv.endTime).toEqual(new Date("2024-01-15T10:01:00.000Z"));
+  });
+
+  it("computes durationMinutes from timestamps", () => {
+    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+    expect(conv.durationMinutes).toBe(1);
+  });
+
+  it("extracts projectName from projectPath", () => {
+    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+    expect(conv.projectName).toBe("project");
   });
 
   it("extracts tool uses from assistant messages", () => {
@@ -177,50 +189,120 @@ describe("searchConversations", () => {
 
 describe("getDigest", () => {
   it("returns conversations sorted by start time descending", async () => {
-    const conversations = await getDigest({ projectsDir: fixturesDir });
-    expect(conversations.length).toBeGreaterThan(0);
-    for (let i = 1; i < conversations.length; i++) {
-      const prev = conversations[i - 1]?.startTime?.getTime() ?? 0;
-      const curr = conversations[i]?.startTime?.getTime() ?? 0;
+    const result = await getDigest({ projectsDir: fixturesDir });
+    expect(result.conversations.length).toBeGreaterThan(0);
+    for (let i = 1; i < result.conversations.length; i++) {
+      const prev = result.conversations[i - 1]?.startTime?.getTime() ?? 0;
+      const curr = result.conversations[i]?.startTime?.getTime() ?? 0;
       expect(prev).toBeGreaterThanOrEqual(curr);
     }
   });
 
   it("respects limit option", async () => {
-    const conversations = await getDigest({ projectsDir: fixturesDir, limit: 2 });
-    expect(conversations.length).toBeLessThanOrEqual(2);
+    const result = await getDigest({ projectsDir: fixturesDir, limit: 2 });
+    expect(result.conversations.length).toBeLessThanOrEqual(2);
   });
 
   it("filters by date range", async () => {
-    const conversations = await getDigest({
+    const result = await getDigest({
       projectsDir: fixturesDir,
       after: new Date("2024-01-17T00:00:00.000Z"),
     });
-    for (const conv of conversations) {
+    for (const conv of result.conversations) {
       expect(conv.startTime?.getTime()).toBeGreaterThanOrEqual(
         new Date("2024-01-17T00:00:00.000Z").getTime(),
       );
+    }
+  });
+
+  it("reports truncation when results exceed limit", async () => {
+    const result = await getDigest({ projectsDir: fixturesDir, limit: 1 });
+    expect(result.truncated).toBe(true);
+    expect(result.totalCount).toBeGreaterThan(1);
+  });
+
+  it("filters incomplete sessions with completeOnly", async () => {
+    const result = await getDigest({ projectsDir: fixturesDir, completeOnly: true });
+    for (const conv of result.conversations) {
+      expect(conv.startTime).not.toBeNull();
+      expect(conv.endTime).not.toBeNull();
     }
   });
 });
 
 describe("formatDigest", () => {
   it("returns message for empty conversations", () => {
-    const output = formatDigest([]);
+    const output = formatDigest({ conversations: [], totalCount: 0, truncated: false });
     expect(output).toBe("No conversations found.");
   });
 
   it("includes date, time, project, and summary", async () => {
-    const conversations = await getDigest({ projectsDir: fixturesDir, limit: 1 });
-    const output = formatDigest(conversations);
+    const result = await getDigest({ projectsDir: fixturesDir, limit: 1 });
+    const output = formatDigest(result);
     expect(output).toMatch(/\[\d{4}-\d{2}-\d{2}/);
     expect(output).toMatch(/\/Users\/test\//);
   });
 
   it("shows branch when available", async () => {
-    const conversations = await getDigest({ projectsDir: fixturesDir });
-    const output = formatDigest(conversations);
+    const result = await getDigest({ projectsDir: fixturesDir });
+    const output = formatDigest(result);
     expect(output).toMatch(/Branch:/);
+  });
+
+  it("shows truncation warning when results limited", async () => {
+    const result = await getDigest({ projectsDir: fixturesDir, limit: 1 });
+    const output = formatDigest(result);
+    expect(output).toMatch(/Warning: Showing 1 of \d+ sessions/);
+  });
+});
+
+describe("getStats", () => {
+  it("aggregates sessions by project", async () => {
+    const stats = await getStats({ projectsDir: fixturesDir });
+    expect(stats.length).toBeGreaterThan(0);
+    for (const stat of stats) {
+      expect(stat.sessionCount).toBeGreaterThan(0);
+      expect(stat.projectName).toBeTruthy();
+    }
+  });
+
+  it("sorts by total minutes descending", async () => {
+    const stats = await getStats({ projectsDir: fixturesDir });
+    for (let i = 1; i < stats.length; i++) {
+      const prev = stats[i - 1]?.totalMinutes ?? 0;
+      const curr = stats[i]?.totalMinutes ?? 0;
+      expect(prev).toBeGreaterThanOrEqual(curr);
+    }
+  });
+
+  it("filters by date range", async () => {
+    const stats = await getStats({
+      projectsDir: fixturesDir,
+      after: new Date("2024-01-17T00:00:00.000Z"),
+    });
+    for (const stat of stats) {
+      if (stat.firstSession) {
+        expect(stat.firstSession.getTime()).toBeGreaterThanOrEqual(
+          new Date("2024-01-17T00:00:00.000Z").getTime(),
+        );
+      }
+    }
+  });
+});
+
+describe("formatStats", () => {
+  it("returns message for empty stats", () => {
+    const output = formatStats([]);
+    expect(output).toBe("No sessions found.");
+  });
+
+  it("includes header and totals", async () => {
+    const stats = await getStats({ projectsDir: fixturesDir });
+    const output = formatStats(stats);
+    expect(output).toMatch(/Project/);
+    expect(output).toMatch(/Sessions/);
+    expect(output).toMatch(/Minutes/);
+    expect(output).toMatch(/Total/);
   });
 });
 

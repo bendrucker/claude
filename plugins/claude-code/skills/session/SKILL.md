@@ -31,9 +31,12 @@ npx tsx scripts/search.ts --digest today
 
 # Search with date filters
 npx tsx scripts/search.ts "auth" --after yesterday
+
+# Get stats by project for the week
+npx tsx scripts/search.ts --stats --after "last week"
 ```
 
-See [search.md](mdc:search.md) for advanced filtering options.
+See [search.md](mdc:search.md) for advanced filtering options (`--complete-only`, `--format json`, etc).
 
 ## Session File Location
 

@@ -55,6 +55,7 @@
     "code-simplifier@claude-plugins-official": true,
     "github@claude-plugins-official": true,
     "astral@astral-sh": true,
+    "calendar@bendrucker": true,
     "research@bendrucker": true,
     "style@bendrucker": true,
     "agents-md@bendrucker": true,

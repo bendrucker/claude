@@ -6,7 +6,7 @@
 
 This repository provides plugins for Claude Code, organized as a plugin marketplace. Plugins extend Claude Code with language conventions, workflow automation, service integrations, and custom behaviors.
 
-It also contains my `settings.json` to synchronize my shared settings across machines.
+It also contains my user configuration to synchronize settings across machines.
 
 ## Prerequisites
 
@@ -15,6 +15,10 @@ Many plugins include TypeScript hooks and scripts that require [Bun](https://bun
 ## Plugins
 
 Browse the [`plugins/`](plugins/) directory to see available plugins. Each plugin has its own README describing its contents.
+
+## User
+
+The [`user/`](user/) directory contains user-level Claude Code configuration that gets symlinked to `~/.claude`. This includes global instructions, settings (plugins, permissions, sandbox), and hooks that apply across all projects.
 
 ## Development
 

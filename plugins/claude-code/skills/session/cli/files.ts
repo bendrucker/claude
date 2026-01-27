@@ -54,3 +54,16 @@ export async function* streamSessionFiles(options: SearchOptions): AsyncGenerato
     }
   }
 }
+
+export async function findSessionFile(
+  sessionId: string,
+  options: SearchOptions = {},
+): Promise<string | null> {
+  const filename = `${sessionId}.jsonl`;
+  for await (const filePath of streamSessionFiles(options)) {
+    if (path.basename(filePath) === filename) {
+      return filePath;
+    }
+  }
+  return null;
+}

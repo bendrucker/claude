@@ -1,11 +1,8 @@
-import type { Dirent } from "node:fs";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
 import {
   compareTimestampsDesc,
-  getProjectsDir,
+  findSessionFile,
   isWithinDateRange,
-  matchesProjectFilter,
+  streamSessionFiles,
 } from "./files";
 import { parseConversationFile } from "./parse";
 import { calculateRelevanceScore } from "./score";
@@ -22,34 +19,10 @@ function hasContent(conversation: Conversation): boolean {
 }
 
 async function loadConversations(options: SearchOptions): Promise<Conversation[]> {
-  const projectsDir = getProjectsDir(options);
-
-  let entries: Dirent[];
-  try {
-    entries = await fs.readdir(projectsDir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-
-  const projectDirs = entries
-    .filter((d) => d.isDirectory())
-    .map((d) => path.join(projectsDir, d.name));
-
   const parsePromises: Promise<Conversation>[] = [];
 
-  for (const projectDir of projectDirs) {
-    if (options.project && !matchesProjectFilter(projectDir, options.project)) {
-      continue;
-    }
-
-    const files = await fs.readdir(projectDir);
-    const sessionFiles = files
-      .filter((f) => f.endsWith(".jsonl"))
-      .map((f) => path.join(projectDir, f));
-
-    for (const sessionFile of sessionFiles) {
-      parsePromises.push(parseConversationFile(sessionFile));
-    }
+  for await (const filePath of streamSessionFiles(options)) {
+    parsePromises.push(parseConversationFile(filePath));
   }
 
   const conversations = await Promise.all(parsePromises);
@@ -92,4 +65,13 @@ export async function getDigest(options: SearchOptions = {}): Promise<DigestResu
     totalCount,
     truncated,
   };
+}
+
+export async function getSession(
+  sessionId: string,
+  options: SearchOptions = {},
+): Promise<Conversation | null> {
+  const filePath = await findSessionFile(sessionId, options);
+  if (!filePath) return null;
+  return parseConversationFile(filePath);
 }

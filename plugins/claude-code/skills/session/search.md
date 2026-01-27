@@ -1,20 +1,17 @@
-# Session Search Reference
+# Session CLI Reference
 
-Advanced options for searching conversation history.
+Advanced options for searching and analyzing conversation history.
 
-## CLI Options
+## Commands
 
 ```
-bun scripts/search.ts [query] [options]
+bun cli <command> [options]
 
-Options:
-  --digest           Show digest of recent conversations (no query needed)
-  --stats            Show aggregated statistics grouped by project
-  --after DATE       Only include conversations after this date
-  --before DATE      Only include conversations before this date
-  --project PATH     Filter by project path
-  --limit N          Maximum results (default: 10 for search, 20 for digest)
-  --format FORMAT    Output format: text (default) or json
+Commands:
+  search <query>   Search conversations by keyword
+  digest           List recent sessions with summaries
+  stats            Show tool usage statistics
+  errors           List tool errors
 ```
 
 Empty sessions (started but no messages sent) are filtered out automatically.
@@ -30,13 +27,13 @@ Uses [chrono-node](https://github.com/wanasit/chrono) for natural language date 
 
 ```bash
 # Conversations from the last week
-bun scripts/search.ts --digest --after "last week"
+bun cli digest --after "last week"
 
 # Search only today's sessions
-bun scripts/search.ts "error" --after today
+bun cli search "error" --after today
 
 # Range query
-bun scripts/search.ts "refactor" --after 2024-01-01 --before 2024-01-31
+bun cli search "refactor" --after 2024-01-01 --before 2024-01-31
 ```
 
 ## Project Filtering
@@ -45,25 +42,56 @@ Filter by project path:
 
 ```bash
 # Only search in a specific project
-bun scripts/search.ts "bug" --project /Users/ben/src/myproject
+bun cli search "bug" --project /Users/ben/src/myproject
 
 # Partial path matching works
-bun scripts/search.ts "test" --project myproject
+bun cli search "test" --project myproject
+```
+
+## Single Session
+
+View details for a specific session:
+
+```bash
+# By session ID
+bun cli digest --session abc-123-def
+
+# Current session (using environment variable)
+bun cli digest --session $CLAUDE_SESSION_ID
 ```
 
 ## Statistics
 
-Get aggregated statistics by project:
+Get aggregated tool usage statistics:
 
 ```bash
-# Weekly stats by project
-bun scripts/search.ts --stats --after "last week"
+# Weekly stats
+bun cli stats --after "last week"
 
 # Stats for a specific project
-bun scripts/search.ts --stats --project myproject
+bun cli stats --project myproject
+
+# Sort by error rate
+bun cli stats --sort rate
 ```
 
-Output shows session counts and total minutes per project, sorted by time spent.
+## Errors
+
+List tool errors with filtering options:
+
+```bash
+# Recent errors
+bun cli errors --after "last week"
+
+# Only actual failures (exclude user rejections)
+bun cli errors --type failure
+
+# Group by error message to find patterns
+bun cli errors --aggregate
+
+# Sort by tool name
+bun cli errors --sort tool --order asc
+```
 
 ## JSON Output
 
@@ -71,13 +99,13 @@ Use `--format json` for programmatic access:
 
 ```bash
 # Pipe search results to jq
-bun scripts/search.ts "auth" --format json | jq '.[] | .conversation.summary'
+bun cli search "auth" --format json | jq '.[] | .conversation.summary'
 
 # Get session IDs from digest
-bun scripts/search.ts --digest --after today --format json | jq '.[].sessionId'
+bun cli digest --after today --format json | jq '.conversations[].sessionId'
 
-# Stats as JSON
-bun scripts/search.ts --stats --after "last week" --format json
+# Filter errors by tool
+bun cli errors --format json | jq '[.[] | select(.toolName == "Bash")]'
 ```
 
 ### JSON Fields

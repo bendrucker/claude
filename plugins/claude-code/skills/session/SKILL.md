@@ -4,101 +4,90 @@ description: View current session info or search conversation history. Use when 
 allowed-tools: [Bash, Read]
 ---
 
-# Session Information
+# Session CLI
 
-Access details about the current Claude Code session or search past conversations.
+Search and analyze Claude Code conversation history.
 
-## Current Session
+**Current Session ID**: `${CLAUDE_SESSION_ID}`
 
-**Session ID**: `${CLAUDE_SESSION_ID}`
-
-Run the info script to get full session details:
+## Commands
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/info.ts "${CLAUDE_SESSION_ID}"
+CLI=${CLAUDE_PLUGIN_ROOT}/skills/session/cli
 ```
 
-## Subcommands
+### digest
 
-The search CLI supports subcommands: `errors`, `stats`, `digest`, or a search query.
-
-### Search
+List recent sessions with summaries.
 
 ```bash
-# Search for specific topics
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search "error handling"
+# Today's sessions
+bun $CLI digest --after today
 
-# Search with date filters
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search "auth" --after yesterday
+# View the current session
+bun $CLI digest --session $CLAUDE_SESSION_ID
+
+# JSON output for piping
+bun $CLI digest --after today --format json | jq '.[].sessionId'
 ```
 
-### Digest
+### search
+
+Search conversations by keyword.
 
 ```bash
-# Get today's conversation digest
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search digest --after today
+bun $CLI search "error handling"
+bun $CLI search "auth" --after yesterday
 ```
 
-### Errors
+### stats
+
+Show tool usage statistics.
 
 ```bash
-# List recent tool errors
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --after "last week"
-
-# Only actual failures (not user rejections)
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --type failure
-
-# Aggregate errors by message to find patterns
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --aggregate
-
-# Sort by tool name ascending
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --sort tool --order asc
-
-# JSON output for further analysis
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --format json \
-  | jq '[.[] | select(.toolName == "Bash")] | .[].content'
+bun $CLI stats --after "last week"
+bun $CLI stats --sort rate  # Sort by error rate
 ```
 
-### Stats
+### errors
+
+List tool errors.
 
 ```bash
-# Get tool usage stats
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search stats --after "last week"
-
-# Sort by error rate descending
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search stats --sort rate
-
-# Sort by error count ascending (fewest errors first)
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search stats --sort errors --order asc
+bun $CLI errors --after "last week"
+bun $CLI errors --type failure  # Exclude user rejections
+bun $CLI errors --aggregate     # Group by error message
 ```
 
 ## Common Options
 
-All subcommands support:
-
-- `--after DATE` - Filter by date (e.g., "today", "yesterday", "last week", "2024-01-15")
+- `--after DATE` - Filter by date (e.g., "today", "yesterday", "last week")
 - `--before DATE` - Filter by date
 - `--project PATH` - Filter by project path
 - `--limit N` - Maximum results
 - `--format FORMAT` - Output format: `text` (default) or `json`
 
-### Errors Options
+## Direct Session Inspection
 
-- `--type TYPE` - Filter by type: `rejection` or `failure`
-- `--aggregate` - Group errors by message
-- `--sort FIELD` - Sort by: `timestamp` (default) or `tool`
-- `--order ORDER` - Sort order: `asc` or `desc` (default)
+For deeper inspection of a single session, use jq directly:
 
-### Stats Options
+```bash
+# Session file path pattern
+FILE=~/.claude/projects/-Users-ben-src-project/$CLAUDE_SESSION_ID.jsonl
 
-- `--sort FIELD` - Sort by: `uses` (default), `errors`, or `rate`
-- `--order ORDER` - Sort order: `asc` or `desc` (default)
+# List all tool uses
+jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name' < "$FILE"
 
-## Session File Location
+# Get the session summary
+jq -r 'select(.type == "summary") | .summary' < "$FILE"
 
-Session logs are stored in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`.
+# Count message types
+jq -r '.type' < "$FILE" | sort | uniq -c
+```
 
 ## Session File Structure
+
+Session logs are stored in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`.
 
 Each line is a JSON object with a `type` field:
 
@@ -106,4 +95,3 @@ Each line is a JSON object with a `type` field:
 - `assistant` - Claude responses with `message.content[]` array
 - `progress` - Tool execution progress and hook events
 - `summary` - Conversation summaries
-- `file-history-snapshot` - File state snapshots

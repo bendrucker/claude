@@ -1,12 +1,12 @@
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { parseDate } from "./search/date";
-import { formatDigest, formatSearchResults, formatStats } from "./search/format";
-import { parseConversationFile } from "./search/parse";
-import { getDigest, searchConversations } from "./search/query";
-import { calculateRelevanceScore } from "./search/score";
-import { getStats } from "./search/stats";
+import { parseDate } from "./date";
+import { formatDigest, formatSearchResults, formatStats } from "./format";
+import { parseConversationFile } from "./parse";
+import { getDigest, searchConversations } from "./query";
+import { calculateRelevanceScore } from "./score";
+import { getStats } from "./stats";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, "..", "fixtures", "sessions");

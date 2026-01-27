@@ -2,7 +2,7 @@
 
 This file covers programming constructs and a selection of commonly-used built-in actions. It is not exhaustive — built-in actions change with each OS release and there are hundreds of them.
 
-**On macOS**, use Phase 1 (Discovery) from the skill to read `WFActions.plist` for the full, current list. For third-party app actions, inspect app bundles or export existing shortcuts.
+**On macOS**, use `discover.swift` to read `WFActions.plist` for the full, current list. See [discovery.md](discovery.md).
 
 **On non-macOS**, this reference and Claude's general knowledge of the Shortcuts app are the fallback.
 
@@ -105,6 +105,6 @@ These actions interact with the built-in Calendar app. Included as an example of
 
 This reference cannot be exhaustive. To find actions not listed here:
 
-1. **macOS discovery**: Parse `WFActions.plist` from WorkflowKit.framework (see SKILL.md Phase 1)
+1. **macOS discovery**: Use `discover.swift` to parse `WFActions.plist` (see [discovery.md](discovery.md))
 2. **Export and inspect**: Create a shortcut in the GUI, export with `shortcuts export`, convert with `plutil -convert xml1`
 3. **Database query**: Search `~/Library/Shortcuts/Shortcuts.sqlite` for action identifiers

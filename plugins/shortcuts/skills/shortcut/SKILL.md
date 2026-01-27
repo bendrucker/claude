@@ -13,9 +13,9 @@ hooks:
 
 # Apple Shortcuts
 
-Generate Apple Shortcuts as XML property list files. Three phases: discover available actions, generate the plist, deploy on macOS.
+Generate Apple Shortcuts as XML property list files.
 
-## Phase 1: Discovery
+## Discovery
 
 Detect the environment first:
 
@@ -30,7 +30,7 @@ uname -s
 
 **On any platform**, use the static action catalog: see [references/actions.md](references/actions.md)
 
-## Phase 2: Generation
+## Generation
 
 Write the shortcut as an XML plist. Load references as needed:
 
@@ -80,7 +80,7 @@ Key conventions:
 - **Variables**: Prefer `Set Variable` / `Get Variable` over inline `WFTextTokenString`.
 - **Action output**: Add `UUID` and `CustomOutputName` to an action's parameters to capture its output.
 
-## Phase 3: Deployment (macOS only)
+## Deployment (macOS only)
 
 See [references/deployment.md](references/deployment.md) for the full pipeline: convert, sign, import, run, iterate.
 

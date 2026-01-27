@@ -36,7 +36,7 @@
       "description": "Agent type to use when context: fork is set (e.g., Explore, Plan, general-purpose, or custom agent name). Defaults to general-purpose."
     },
     "hooks": {
-      "$ref": "hooks.schema.json"
+      "$ref": "hook.schema.json"
     },
     "user-invocable": {
       "type": "boolean",

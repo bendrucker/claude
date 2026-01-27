@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/plugin-hooks.schema.json",
+  "$id": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/plugin-hook.schema.json",
   "title": "Claude Code Plugin Hooks Schema",
   "description": "Schema for Claude Code plugin hooks.json files",
   "type": "object",
@@ -10,7 +10,7 @@
       "description": "Description of what the hooks do"
     },
     "hooks": {
-      "$ref": "hooks.schema.json"
+      "$ref": "hook.schema.json"
     }
   },
   "required": ["hooks"],

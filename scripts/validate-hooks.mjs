@@ -31,12 +31,12 @@ async function main() {
   console.log(`Validating ${file}...`);
 
   // Load and register the base hooks schema first
-  const hooksSchemaContent = await readFile('schemas/hooks.schema.json', 'utf8');
+  const hooksSchemaContent = await readFile('schemas/hook.schema.json', 'utf8');
   const hooksSchema = JSON.parse(hooksSchemaContent);
   ajv.addSchema(hooksSchema);
 
   // Load and compile the plugin-hooks schema
-  const pluginHooksSchemaContent = await readFile('schemas/plugin-hooks.schema.json', 'utf8');
+  const pluginHooksSchemaContent = await readFile('schemas/plugin-hook.schema.json', 'utf8');
   const pluginHooksSchema = JSON.parse(pluginHooksSchemaContent);
   const validate = ajv.compile(pluginHooksSchema);
 

@@ -84,31 +84,34 @@ function validateOrder(order: string | undefined): "asc" | "desc" {
 }
 
 async function runErrors(args: string[]): Promise<void> {
-  const argv = cli({
-    name: "errors",
-    flags: {
-      ...commonFlags,
-      type: {
-        type: String,
-        description: "Filter by type: rejection or failure",
-      },
-      aggregate: {
-        type: Boolean,
-        description: "Group by error message",
-      },
-      sort: {
-        type: String,
-        description: "Sort by: timestamp (default) or tool",
-        default: "timestamp",
-      },
-      order: {
-        type: String,
-        description: "Sort order: asc or desc (default)",
-        default: "desc",
+  const argv = cli(
+    {
+      name: "errors",
+      flags: {
+        ...commonFlags,
+        type: {
+          type: String,
+          description: "Filter by type: rejection or failure",
+        },
+        aggregate: {
+          type: Boolean,
+          description: "Group by error message",
+        },
+        sort: {
+          type: String,
+          description: "Sort by: timestamp (default) or tool",
+          default: "timestamp",
+        },
+        order: {
+          type: String,
+          description: "Sort order: asc or desc (default)",
+          default: "desc",
+        },
       },
     },
-    argv: args,
-  });
+    undefined,
+    args,
+  );
 
   const { options, format } = parseCommonOptions(argv.flags);
 
@@ -150,23 +153,26 @@ async function runErrors(args: string[]): Promise<void> {
 }
 
 async function runStats(args: string[]): Promise<void> {
-  const argv = cli({
-    name: "stats",
-    flags: {
-      ...commonFlags,
-      sort: {
-        type: String,
-        description: "Sort by: uses (default), errors, or rate",
-        default: "uses",
-      },
-      order: {
-        type: String,
-        description: "Sort order: asc or desc (default)",
-        default: "desc",
+  const argv = cli(
+    {
+      name: "stats",
+      flags: {
+        ...commonFlags,
+        sort: {
+          type: String,
+          description: "Sort by: uses (default), errors, or rate",
+          default: "uses",
+        },
+        order: {
+          type: String,
+          description: "Sort order: asc or desc (default)",
+          default: "desc",
+        },
       },
     },
-    argv: args,
-  });
+    undefined,
+    args,
+  );
 
   const { options, format } = parseCommonOptions(argv.flags);
 
@@ -194,17 +200,20 @@ async function runStats(args: string[]): Promise<void> {
 }
 
 async function runDigest(args: string[]): Promise<void> {
-  const argv = cli({
-    name: "digest",
-    flags: {
-      ...commonFlags,
-      session: {
-        type: String,
-        description: "Show a specific session by ID",
+  const argv = cli(
+    {
+      name: "digest",
+      flags: {
+        ...commonFlags,
+        session: {
+          type: String,
+          description: "Show a specific session by ID",
+        },
       },
     },
-    argv: args,
-  });
+    undefined,
+    args,
+  );
 
   const { options, format } = parseCommonOptions(argv.flags);
 
@@ -223,12 +232,15 @@ async function runDigest(args: string[]): Promise<void> {
 }
 
 async function runSearch(args: string[]): Promise<void> {
-  const argv = cli({
-    name: "search",
-    parameters: ["<query>"],
-    flags: commonFlags,
-    argv: args,
-  });
+  const argv = cli(
+    {
+      name: "search",
+      parameters: ["<query>"],
+      flags: commonFlags,
+    },
+    undefined,
+    args,
+  );
 
   const { options, format } = parseCommonOptions(argv.flags);
   const results = await searchConversations(argv._.query, options);

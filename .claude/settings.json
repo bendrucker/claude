@@ -24,6 +24,30 @@
     ],
     "deny": []
   },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ./hooks/worktree"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ./hooks/biome"
+          }
+        ]
+      }
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "wt list statusline --claude-code"
@@ -121,29 +145,5 @@
       "wt:*"
     ]
   },
-  "alwaysThinkingEnabled": true,
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "npx tsx hooks/worktree"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun hooks/biome"
-          }
-        ]
-      }
-    ]
-  }
+  "alwaysThinkingEnabled": true
 }

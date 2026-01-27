@@ -60,6 +60,8 @@ export async function parseConversationFile(filePath: string): Promise<Conversat
   let sessionId = path.basename(filePath, ".jsonl");
   let gitBranch: string | null = null;
   let projectPath: string | null = null;
+  let totalLines = 0;
+  let parseErrors = 0;
 
   const rl = createInterface({
     input: createReadStream(filePath, { encoding: "utf-8" }),
@@ -68,11 +70,13 @@ export async function parseConversationFile(filePath: string): Promise<Conversat
 
   for await (const line of rl) {
     if (!line.trim()) continue;
+    totalLines++;
 
     let record: Record<string, unknown>;
     try {
       record = JSON.parse(line) as Record<string, unknown>;
     } catch {
+      parseErrors++;
       continue;
     }
 
@@ -140,7 +144,7 @@ export async function parseConversationFile(filePath: string): Promise<Conversat
     }
   }
 
-  if (parseErrors > 0 && parseErrors === lines.length) {
+  if (parseErrors > 0 && parseErrors === totalLines) {
     console.error(`Warning: Failed to parse any lines in ${filePath}`);
   }
 

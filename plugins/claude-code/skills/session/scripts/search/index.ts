@@ -149,16 +149,7 @@ async function runErrors(args: ParsedArgs): Promise<void> {
 
 async function runStats(args: ParsedArgs): Promise<void> {
   const stats = await getStats(args.options);
-  if (args.format === "json") {
-    const jsonStats = {
-      tools: Object.fromEntries(stats.tools),
-      projects: Object.fromEntries(stats.projects),
-      totalSessions: stats.totalSessions,
-    };
-    console.log(JSON.stringify(jsonStats, null, 2));
-  } else {
-    console.log(formatStats(stats));
-  }
+  output(stats, args.format, formatStats);
 }
 
 async function runSearch(args: ParsedArgs): Promise<void> {

@@ -2,19 +2,12 @@ import { createReadStream } from "node:fs";
 import * as path from "node:path";
 import { createInterface } from "node:readline";
 import { isWithinDateRange, streamSessionFiles } from "./files";
-import type { SearchOptions } from "./types";
-
-export interface SessionStats {
-  readonly tools: Map<string, { uses: number; errors: number }>;
-  readonly projects: Map<string, { sessions: number; totalMinutes: number }>;
-  readonly totalSessions: number;
-}
+import type { ProjectStats, SearchOptions } from "./types";
 
 interface SessionData {
   projectPath: string | null;
   startTime: Date | null;
   endTime: Date | null;
-  tools: Map<string, { uses: number; errors: number }>;
 }
 
 async function collectSessionData(filePath: string): Promise<SessionData> {
@@ -22,10 +15,7 @@ async function collectSessionData(filePath: string): Promise<SessionData> {
     projectPath: null,
     startTime: null,
     endTime: null,
-    tools: new Map(),
   };
-
-  const toolUseIds = new Map<string, string>();
 
   const rl = createInterface({
     input: createReadStream(filePath, { encoding: "utf-8" }),
@@ -51,53 +41,21 @@ async function collectSessionData(filePath: string): Promise<SessionData> {
       if (!data.startTime || ts < data.startTime) data.startTime = ts;
       if (!data.endTime || ts > data.endTime) data.endTime = ts;
     }
-
-    if (record.type === "assistant") {
-      const message = record.message as Record<string, unknown> | undefined;
-      if (message?.content && Array.isArray(message.content)) {
-        for (const item of message.content) {
-          if (item && typeof item === "object" && item.type === "tool_use") {
-            const toolName = item.name as string;
-            const toolId = item.id as string;
-
-            toolUseIds.set(toolId, toolName);
-
-            const existing = data.tools.get(toolName) || { uses: 0, errors: 0 };
-            existing.uses++;
-            data.tools.set(toolName, existing);
-          }
-        }
-      }
-    }
-
-    if (record.type === "user" && !record.isMeta) {
-      const message = record.message as Record<string, unknown> | undefined;
-      if (message?.content && Array.isArray(message.content)) {
-        for (const item of message.content) {
-          if (item && typeof item === "object" && item.type === "tool_result" && item.is_error) {
-            const toolUseId = item.tool_use_id as string;
-            const toolName = toolUseIds.get(toolUseId);
-            if (toolName) {
-              const existing = data.tools.get(toolName);
-              if (existing) {
-                existing.errors++;
-              }
-            }
-          }
-        }
-      }
-    }
   }
 
   return data;
 }
 
-export async function getStats(options: SearchOptions = {}): Promise<SessionStats> {
-  const stats: SessionStats = {
-    tools: new Map(),
-    projects: new Map(),
-    totalSessions: 0,
-  };
+export async function getStats(options: SearchOptions = {}): Promise<ProjectStats[]> {
+  const projectMap = new Map<
+    string,
+    {
+      sessionCount: number;
+      totalMinutes: number;
+      firstSession: Date | null;
+      lastSession: Date | null;
+    }
+  >();
 
   const filePromises: Promise<SessionData>[] = [];
 
@@ -109,28 +67,46 @@ export async function getStats(options: SearchOptions = {}): Promise<SessionStat
 
   for (const session of sessions) {
     if (!isWithinDateRange(session.startTime, options)) continue;
+    if (!session.projectPath) continue;
 
-    stats.totalSessions++;
+    const existing = projectMap.get(session.projectPath) || {
+      sessionCount: 0,
+      totalMinutes: 0,
+      firstSession: null,
+      lastSession: null,
+    };
 
-    for (const [toolName, toolData] of session.tools) {
-      const existing = stats.tools.get(toolName) || { uses: 0, errors: 0 };
-      existing.uses += toolData.uses;
-      existing.errors += toolData.errors;
-      stats.tools.set(toolName, existing);
+    existing.sessionCount++;
+
+    if (session.startTime && session.endTime) {
+      existing.totalMinutes += Math.round(
+        (session.endTime.getTime() - session.startTime.getTime()) / 60000,
+      );
     }
 
-    if (session.projectPath) {
-      const existing = stats.projects.get(session.projectPath) || {
-        sessions: 0,
-        totalMinutes: 0,
-      };
-      existing.sessions++;
-      if (session.startTime && session.endTime) {
-        existing.totalMinutes += (session.endTime.getTime() - session.startTime.getTime()) / 60000;
+    if (session.startTime) {
+      if (!existing.firstSession || session.startTime < existing.firstSession) {
+        existing.firstSession = session.startTime;
       }
-      stats.projects.set(session.projectPath, existing);
+      if (!existing.lastSession || session.startTime > existing.lastSession) {
+        existing.lastSession = session.startTime;
+      }
     }
+
+    projectMap.set(session.projectPath, existing);
   }
 
-  return stats;
+  const stats: ProjectStats[] = [];
+  for (const [projectPath, data] of projectMap) {
+    stats.push({
+      projectPath,
+      projectName: path.basename(projectPath),
+      sessionCount: data.sessionCount,
+      totalMinutes: data.totalMinutes,
+      firstSession: data.firstSession,
+      lastSession: data.lastSession,
+    });
+  }
+
+  return stats.sort((a, b) => b.totalMinutes - a.totalMinutes);
 }

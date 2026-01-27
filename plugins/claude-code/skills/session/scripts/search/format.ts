@@ -1,12 +1,6 @@
+import { table } from "table";
 import type { ErrorAggregate, ToolError } from "./errors";
-import type { SessionStats } from "./stats";
-import {
-  type Conversation,
-  DISPLAY_LIMITS,
-  type DigestResult,
-  type ProjectStats,
-  type SearchResult,
-} from "./types";
+import { DISPLAY_LIMITS, type DigestResult, type ProjectStats, type SearchResult } from "./types";
 
 const TIMESTAMP_FORMAT = "YYYY-MM-DD HH:MM";
 
@@ -15,13 +9,20 @@ function formatTimestamp(date: Date | null): string {
   return date.toISOString().replace("T", " ").slice(0, TIMESTAMP_FORMAT.length);
 }
 
-export function formatDigest(conversations: Conversation[]): string {
-  if (conversations.length === 0) {
+export function formatDigest(result: DigestResult): string {
+  if (result.conversations.length === 0) {
     return "No conversations found.";
   }
 
   const lines: string[] = [];
-  for (const conv of conversations) {
+
+  if (result.truncated) {
+    lines.push(
+      `Warning: Showing ${result.conversations.length} of ${result.totalCount} sessions\n`,
+    );
+  }
+
+  for (const conv of result.conversations) {
     const timestamp = formatTimestamp(conv.startTime);
     const project = conv.projectPath || "unknown";
 
@@ -103,29 +104,19 @@ export function formatErrorAggregates(aggregates: ErrorAggregate[]): string {
   return lines.join("\n");
 }
 
-export function formatStats(stats: SessionStats): string {
-  const lines: string[] = [];
-
-  lines.push(`Sessions: ${stats.totalSessions}\n`);
-
-  lines.push("Tool Usage:");
-  const toolsSorted = [...stats.tools.entries()].sort((a, b) => b[1].uses - a[1].uses);
-  for (const [name, data] of toolsSorted) {
-    const errorRate = data.uses > 0 ? ((data.errors / data.uses) * 100).toFixed(1) : "0.0";
-    lines.push(`  ${name}: ${data.uses} uses, ${data.errors} errors (${errorRate}%)`);
-  }
-  lines.push("");
-
-  lines.push("Projects (by time):");
-  const projectsSorted = [...stats.projects.entries()].sort(
-    (a, b) => b[1].totalMinutes - a[1].totalMinutes,
-  );
-  for (const [projectPath, data] of projectsSorted) {
-    const hours = Math.floor(data.totalMinutes / 60);
-    const minutes = Math.round(data.totalMinutes % 60);
-    lines.push(`  ${projectPath}`);
-    lines.push(`    ${data.sessions} sessions, ${hours}h ${minutes}m`);
+export function formatStats(stats: ProjectStats[]): string {
+  if (stats.length === 0) {
+    return "No sessions found.";
   }
 
-  return lines.join("\n");
+  const totalSessions = stats.reduce((sum, s) => sum + s.sessionCount, 0);
+  const totalMinutes = stats.reduce((sum, s) => sum + s.totalMinutes, 0);
+
+  const data = [
+    ["Project", "Sessions", "Minutes"],
+    ...stats.map((s) => [s.projectName, s.sessionCount, s.totalMinutes]),
+    ["Total", totalSessions, totalMinutes],
+  ];
+
+  return table(data);
 }

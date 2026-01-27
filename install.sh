@@ -1,33 +1,13 @@
 #!/usr/bin/env bash
-# Create symlinks from ~/.claude/ to the Claude repo's .claude/ directory
+# Create symlinks from ~/.claude/ to the Claude repo's user/ directory
 #
-# By default, links to ~/.claude-repo (installed copy).
-# Use --dev to link to the dev copy instead (for testing changes).
+# To test changes before installing, run ./dev.sh
 
 set -euo pipefail
 
 CLAUDE_REPO_HOME="${CLAUDE_REPO_HOME:-$HOME/.claude-repo}"
-CLAUDE_REPO_DEV="${CLAUDE_REPO_DEV:-$HOME/src/bendrucker/claude}"
 CLAUDE_DIR="$HOME/.claude"
-
-# Parse arguments
-USE_DEV=false
-for arg in "$@"; do
-  case $arg in
-    --dev)
-      USE_DEV=true
-      shift
-      ;;
-  esac
-done
-
-if [[ "$USE_DEV" == "true" ]]; then
-  SOURCE_DIR="$CLAUDE_REPO_DEV/.claude"
-  echo "Installing Claude configuration from dev repo..."
-else
-  SOURCE_DIR="$CLAUDE_REPO_HOME/.claude"
-  echo "Installing Claude configuration from installed repo..."
-fi
+SOURCE_DIR="$CLAUDE_REPO_HOME/user"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Error: Source directory not found: $SOURCE_DIR"

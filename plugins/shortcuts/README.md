@@ -5,6 +5,7 @@ Creating Apple Shortcuts programmatically as plist XML.
 ## Contents
 
 - **Skill: shortcut** — Generating, signing, and deploying Apple Shortcuts from code
+- **Script: discover.swift** — Swift CLI for enumerating available Shortcuts actions on macOS
 
 ## Testing
 
@@ -33,23 +34,39 @@ Raw XML was chosen because it has zero dependencies and lets Claude produce the 
 
 The skill is structured as three phases:
 
-1. **Discovery** — Detect the OS, find available actions. On macOS: parse `WFActions.plist` from `WorkflowKit.framework` for built-in actions, inspect app bundles or export existing shortcuts for third-party app actions. On Linux: fall back on the static reference files and Claude's general knowledge.
+1. **Discovery** — Detect the OS, find available actions. On macOS, the `discover.swift` CLI reads `WFActions.plist` from Apple's private `WorkflowKit.framework` to enumerate all built-in actions with their identifiers, descriptions, and parameters. It also scans installed apps for App Intents metadata. On Linux, fall back on the static reference files.
 
-2. **Generation** — Write the shortcut as an XML plist. The reference files document the plist structure, programming constructs (if/else, repeat, menus, variables), and a curated set of common actions. The reference intentionally does not try to be exhaustive — there are hundreds of actions and they change with each OS release. Discovery handles the rest.
+2. **Generation** — Write the shortcut as an XML plist. Reference files are split by topic (progressive disclosure): plist structure, control flow, variables, parameters, and a static action catalog. Claude loads only the reference needed for the current task.
 
 3. **Deployment** (macOS only) — Convert XML to binary plist (`plutil`), sign (`shortcuts sign`), import (`shortcuts import`), run (`shortcuts run`).
 
 ```
 Phase 1: Discovery
-  uname -s → Darwin? ──► Parse WFActions.plist, inspect app bundles
+  uname -s → Darwin? ──► discover.swift list/search/describe
                  └─ Linux? ──► Use static references only
 
 Phase 2: Generation
+  Load topic-specific references as needed
   Write XML plist with WFWorkflowActions array
 
 Phase 3: Deployment (macOS only)
   plutil → shortcuts sign → shortcuts import → shortcuts run
 ```
+
+### Discovery CLI
+
+`discover.swift` is a raw Swift script (no build step) that reads `WFActions.plist` from `WorkflowKit.framework`. Commands:
+
+| Command | Purpose |
+|---------|---------|
+| `list` | List all built-in action identifiers |
+| `list --category <name>` | Filter by category |
+| `describe <identifier>` | Full details: parameters, input/output types |
+| `search <query>` | Search by identifier, description, keywords |
+| `categories` | List action categories with counts |
+| `apps` | List installed apps with Shortcuts support |
+
+Follows the same pattern as the Calendar plugin's `cal.swift` — interpreted directly by Swift, macOS built-in frameworks only, JSON output.
 
 ### OS Detection
 
@@ -62,12 +79,26 @@ This matters because Claude Code sessions may run on a cloud VM (Linux) where th
 
 ### Signing
 
-iOS 15+ requires signed `.shortcut` files for import. Signing is only available via:
+Shortcuts must be signed before import. Signing is only available via:
 
-1. `shortcuts sign` CLI on macOS Monterey+ (sends to Apple for validation)
+1. `shortcuts sign` CLI on macOS (sends to Apple for validation)
 2. [HubSign](https://routinehub.co) remote signing service (used by Cherri on non-macOS)
 
 The skill currently only supports macOS signing. HubSign could be added as a fallback for Linux environments.
+
+### Progressive Disclosure
+
+The skill uses topic-specific reference files so Claude only loads what it needs:
+
+| Reference | When to load |
+|-----------|-------------|
+| `discovery.md` | Looking for available actions on macOS |
+| `actions.md` | Need the static action catalog (any platform) |
+| `plist-structure.md` | Starting a new shortcut (top-level keys, icon, types) |
+| `control-flow.md` | Writing if/else, repeat, menu blocks |
+| `variables.md` | Passing data between actions |
+| `parameters.md` | Complex parameter encoding (serialization types) |
+| `deployment.md` | Converting, signing, importing, running |
 
 ## Key Resources
 
@@ -91,12 +122,10 @@ No public web resource has a complete, current list of action identifiers. The a
 /System/Library/PrivateFrameworks/WorkflowKit.framework/WFActions.plist
 ```
 
-To discover actions for a specific app, create a shortcut in the GUI, export it, and examine the plist:
+The `discover.swift` CLI reads this file. To manually inspect it:
 
 ```bash
-shortcuts export "MyShortcut" -o test.shortcut
-plutil -convert xml1 test.shortcut
-cat test.shortcut  # now XML
+plutil -convert xml1 -o /tmp/WFActions.xml /System/Library/PrivateFrameworks/WorkflowKit.framework/WFActions.plist
 ```
 
 ## Open Questions
@@ -106,6 +135,6 @@ cat test.shortcut  # now XML
   - Write unit tests that verify generated XML matches expected structure (platform-independent)
   - On macOS CI: generate, sign, import, run a simple shortcut end-to-end
 - **Cherri integration**: Should the skill support generating Cherri code as an alternative to raw XML plist? Cherri provides type safety and simpler syntax, but adds a dependency.
-- **Discovery tooling**: The WFActions.plist approach gives built-in actions, but third-party app actions require inspecting `Metadata.appintents` directories in app bundles or exporting existing shortcuts. A script that automates this (enumerate installed apps → find their Shortcuts actions → output a summary) would make discovery much more reliable.
+- **Third-party app action enumeration**: `discover.swift apps` finds apps with Shortcuts support but can't enumerate their individual actions. The `Metadata.appintents` format is opaque. Best current approach: export an existing shortcut that uses the app and inspect the plist.
 - **Variable handling**: The `WFTextTokenString` / `attachmentsByRange` pattern for inline variable references is complex. For an initial version, the skill recommends using `Set Variable` / `Get Variable` actions instead. Inline variables would improve output quality for complex shortcuts.
-- **Third-party app catalogs**: Users may want shortcuts that interact with specific apps (Things, Data Jar, Toolbox Pro). A reference database of popular third-party app actions would be valuable but is hard to maintain. Discovery scripts are a better long-term solution.
+- **discover.swift testing**: The Swift script needs real-world testing on macOS to verify it can read `WFActions.plist` and produce useful output. The JSON serialization is manual and may need refinement based on the actual plist structure.

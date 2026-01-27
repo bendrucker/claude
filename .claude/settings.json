@@ -117,7 +117,8 @@
       "say:*",
       "afplay:*",
       "diskutil:*",
-      "networksetup:*"
+      "networksetup:*",
+      "wt:*"
     ]
   },
   "alwaysThinkingEnabled": true,

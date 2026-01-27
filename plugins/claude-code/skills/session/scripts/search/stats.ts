@@ -1,9 +1,7 @@
-import type { Dirent } from "node:fs";
 import { createReadStream } from "node:fs";
-import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
 import { createInterface } from "node:readline";
+import { isWithinDateRange, streamSessionFiles } from "./files";
 import type { SearchOptions } from "./types";
 
 export interface SessionStats {
@@ -17,48 +15,6 @@ interface SessionData {
   startTime: Date | null;
   endTime: Date | null;
   tools: Map<string, { uses: number; errors: number }>;
-}
-
-const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
-
-function matchesProjectFilter(projectDir: string, filter: string): boolean {
-  const normalizedFilter = filter.replace(/\//g, "-");
-  return projectDir.includes(normalizedFilter) || projectDir.includes(filter);
-}
-
-function isWithinDateRange(startTime: Date | null, options: SearchOptions): boolean {
-  if (!startTime) return true;
-  if (options.after && startTime < options.after) return false;
-  if (options.before && startTime > options.before) return false;
-  return true;
-}
-
-async function* streamSessionFiles(options: SearchOptions): AsyncGenerator<string> {
-  const projectsDir =
-    options.projectsDir || process.env.CLAUDE_PROJECTS_DIR || DEFAULT_PROJECTS_DIR;
-
-  let entries: Dirent[];
-  try {
-    entries = await fs.readdir(projectsDir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const projectDir = path.join(projectsDir, entry.name);
-
-    if (options.project && !matchesProjectFilter(projectDir, options.project)) {
-      continue;
-    }
-
-    const files = await fs.readdir(projectDir);
-    for (const file of files) {
-      if (file.endsWith(".jsonl")) {
-        yield path.join(projectDir, file);
-      }
-    }
-  }
 }
 
 async function collectSessionData(filePath: string): Promise<SessionData> {

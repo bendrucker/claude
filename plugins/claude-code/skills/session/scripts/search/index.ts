@@ -84,13 +84,10 @@ function parseArgs(args: string[]): ParsedArgs {
     args,
   );
 
-  const mode: Mode = argv.flags.errors
-    ? "errors"
-    : argv.flags.stats
-      ? "stats"
-      : argv.flags.digest
-        ? "digest"
-        : "search";
+  let mode: Mode = "search";
+  if (argv.flags.errors) mode = "errors";
+  else if (argv.flags.stats) mode = "stats";
+  else if (argv.flags.digest) mode = "digest";
 
   const options: SearchOptions = {};
 

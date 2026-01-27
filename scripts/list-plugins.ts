@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 interface PluginEntry {
@@ -8,22 +8,6 @@ interface PluginEntry {
 
 interface Marketplace {
   plugins: PluginEntry[];
-}
-
-interface PluginMatrix {
-  name: string;
-  os: string;
-}
-
-export function detectOs(pluginName: string): string {
-  const path = `plugins/${pluginName}/.claude-plugin/plugin.json`;
-  if (!existsSync(path)) return "ubuntu-latest";
-  const content = readFileSync(path, "utf8");
-  const plugin = JSON.parse(content) as { description?: string };
-  if (plugin.description && /macos/i.test(plugin.description)) {
-    return "macos-latest";
-  }
-  return "ubuntu-latest";
 }
 
 function getLocalPlugins(): string[] {
@@ -59,22 +43,17 @@ function main(): void {
   const changedFiles = positionals;
   const allPlugins = getLocalPlugins();
 
-  let names: string[];
+  let plugins: string[];
   if (changedFiles.length > 0) {
     if (matchesAlwaysPaths(changedFiles, alwaysPaths)) {
-      names = allPlugins;
+      plugins = allPlugins;
     } else {
       const changedPlugins = extractPluginNames(changedFiles);
-      names = allPlugins.filter((p) => changedPlugins.includes(p));
+      plugins = allPlugins.filter((p) => changedPlugins.includes(p));
     }
   } else {
-    names = allPlugins;
+    plugins = allPlugins;
   }
-
-  const plugins: PluginMatrix[] = names.map((name) => ({
-    name,
-    os: detectOs(name),
-  }));
 
   console.log(JSON.stringify(plugins));
 }

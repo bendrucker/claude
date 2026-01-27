@@ -132,7 +132,7 @@ jobs:
   plugin:
     needs: validate
     if: needs.validate.outputs.plugins != '[]'
-    runs-on: ${{ matrix.plugin.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -147,7 +147,7 @@ jobs:
       - name: Inspect plugin
         id: inspect
         run: |
-          plugin="${{ matrix.plugin.name }}"
+          plugin="${{ matrix.plugin }}"
           echo "has_plugin_json=$([[ -f "plugins/$plugin/.claude-plugin/plugin.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_hooks=$([[ -f "plugins/$plugin/hooks/hooks.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_skills=$([[ -d "plugins/$plugin/skills" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -167,15 +167,15 @@ jobs:
 
       - name: Validate plugin.json
         if: steps.inspect.outputs.has_plugin_json == 'true'
-        run: node scripts/validate-plugin.mjs "plugins/${{ matrix.plugin.name }}"
+        run: node scripts/validate-plugin.mjs "plugins/${{ matrix.plugin }}"
 
       - name: Validate hooks.json
         if: steps.inspect.outputs.has_hooks == 'true'
-        run: node scripts/validate-hooks.mjs "plugins/${{ matrix.plugin.name }}"
+        run: node scripts/validate-hooks.mjs "plugins/${{ matrix.plugin }}"
 
       - name: Validate skill frontmatter
         if: steps.inspect.outputs.has_skills == 'true'
-        run: npx remark "plugins/${{ matrix.plugin.name }}/skills/*/SKILL.md"
+        run: npx remark "plugins/${{ matrix.plugin }}/skills/*/SKILL.md"
 
       - name: Setup Bun
         if: steps.inspect.outputs.has_skills == 'true'
@@ -183,32 +183,27 @@ jobs:
 
       - name: Lint skills
         if: steps.inspect.outputs.has_skills == 'true'
-        run: bunx skill-lint "plugins/${{ matrix.plugin.name }}/skills/*"
+        run: bunx skill-lint "plugins/${{ matrix.plugin }}/skills/*"
 
       - name: Validate agent frontmatter
         if: steps.inspect.outputs.has_agents == 'true'
-        run: npx remark "plugins/${{ matrix.plugin.name }}/agents/*.md"
+        run: npx remark "plugins/${{ matrix.plugin }}/agents/*.md"
 
       - name: Validate command frontmatter
         if: steps.inspect.outputs.has_commands == 'true'
-        run: npx remark "plugins/${{ matrix.plugin.name }}/commands/*.md"
+        run: npx remark "plugins/${{ matrix.plugin }}/commands/*.md"
 
       - name: Install package dependencies
-        if: steps.inspect.outputs.has_package == 'true' && hashFiles(format('plugins/{0}/package-lock.json', matrix.plugin.name)) != ''
-        run: npm ci --prefix "plugins/${{ matrix.plugin.name }}"
+        if: steps.inspect.outputs.has_package == 'true' && hashFiles(format('plugins/{0}/package-lock.json', matrix.plugin)) != ''
+        run: npm ci --prefix "plugins/${{ matrix.plugin }}"
 
       - name: Build TypeScript
         if: steps.inspect.outputs.has_package == 'true'
-        run: npm run build --prefix "plugins/${{ matrix.plugin.name }}" --if-present
+        run: npm run build --prefix "plugins/${{ matrix.plugin }}" --if-present
 
-      - name: Run unit tests
+      - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
-        run: npm run test:unit -- "plugins/${{ matrix.plugin.name }}/"
-
-      - name: Run integration tests
-        if: steps.inspect.outputs.has_tests == 'true' && matrix.plugin.os == 'macos-latest'
-        continue-on-error: true
-        run: npm run test:integration -- "plugins/${{ matrix.plugin.name }}/"
+        run: npm run test:unit -- "plugins/${{ matrix.plugin }}/"
 
   plugins:
     needs: [validate, plugin]

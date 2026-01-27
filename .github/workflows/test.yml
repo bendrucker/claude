@@ -66,7 +66,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test -- ".claude/hooks"
+        run: npm test -- ".claude/hooks" "user/hooks"
 
   validate:
     runs-on: ubuntu-latest

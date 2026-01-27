@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ./hooks/worktree"
+            "command": "bun ~/.claude/hooks/worktree"
           }
         ]
       }

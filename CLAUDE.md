@@ -9,7 +9,7 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `schemas/`: JSON Schema definitions for `plugin.schema.json` and `marketplace.schema.json`
 - `user/`: User-level configuration, symlinked to `~/.claude`
 - `.claude/`: Project-level configuration for this repository
-- `install.sh`: Setup script that creates symlinks from `user/` to `~/.claude`
+- `scripts/install.sh`: Setup script that creates symlinks from `user/` to `~/.claude`
 
 ## User
 
@@ -110,7 +110,7 @@ Run `scripts/check-marketplace.sh` to verify all plugin directories are listed i
 
 ## Workflow
 
-- The `user/` directory is symlinked to `~/.claude/`. New files are immediately available without re-running `install.sh`.
+- The `user/` directory is symlinked to `~/.claude/`. New files are immediately available without re-running `scripts/install.sh`.
 - Plugin changes take effect immediately in new Claude sessions.
 
 ## Settings

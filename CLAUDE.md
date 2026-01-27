@@ -120,7 +120,7 @@ Hooks can also be defined at the project level in `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "bun hooks/biome"
+            "command": "bun ./hooks/biome"
           }
         ]
       }
@@ -129,7 +129,7 @@ Hooks can also be defined at the project level in `.claude/settings.json`:
 }
 ```
 
-This repository includes a Biome PostToolUse hook (`hooks/biome/`) that runs after file edits to check for lint errors. If errors are found, they're fed back to Claude for correction.
+This repository includes a Biome PostToolUse hook (`.claude/hooks/biome/`) that runs after file edits to check for lint errors. If errors are found, they're fed back to Claude for correction.
 
 ## Testing
 

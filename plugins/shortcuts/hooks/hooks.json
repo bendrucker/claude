@@ -1,0 +1,16 @@
+{
+  "description": "Gates open command to .shortcut files only",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(open:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/open.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

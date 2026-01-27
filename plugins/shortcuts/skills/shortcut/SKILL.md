@@ -1,10 +1,10 @@
 ---
 name: shortcut
-description: Creating Apple Shortcuts programmatically as plist XML files, signing, importing, and running them. Use when the user wants to build, generate, or automate Apple Shortcuts without the GUI app.
-allowed-tools: [Read, Write, Edit, Bash(swift:*), Bash(plutil:*), Bash(shortcuts:*), Bash(uname:*), Bash(which:*), Glob, Grep]
+description: Creating Apple Shortcuts programmatically as plist XML files. Use when the user wants to build, generate, or author Apple Shortcuts without the GUI app.
+allowed-tools: [Read, Write, Edit, Bash(swift:*), Bash(plutil:*), Bash(shortcuts:*), Bash(open:*), Bash(jq:*), Bash(uname:*), Bash(which:*), Glob, Grep]
 hooks:
   PreToolUse:
-    - matcher: "Bash(swift:*)"
+    - matcher: "Bash(swift:*)|Bash(shortcuts:*)"
       hooks:
         - type: command
           command: |
@@ -80,15 +80,15 @@ Key conventions:
 
 ## Deployment (macOS only)
 
-See [references/deployment.md](references/deployment.md) for the full pipeline: convert, sign, import, run, iterate.
+See [references/deployment.md](references/deployment.md) for the full pipeline: convert, sign, import, iterate.
 
 Quick reference:
 
 ```bash
-plutil -convert binary1 -o "Name.shortcut" "Name.plist"
-shortcuts sign -i "Name.shortcut" -o "Name-signed.shortcut"
-shortcuts import "Name-signed.shortcut"
-shortcuts run "Name"
+plutil -convert binary1 -o "My Shortcut.shortcut" "My Shortcut.plist"
+mkdir -p out
+shortcuts sign -i "My Shortcut.shortcut" -o "out/My Shortcut.shortcut"
+open "out/My Shortcut.shortcut"
 ```
 
 ## Constraints
@@ -105,4 +105,4 @@ shortcuts run "Name"
 - **[references/control-flow.md](references/control-flow.md)** — If/else, repeat, menu with full XML examples
 - **[references/variables.md](references/variables.md)** — Set/Get variable, output UUIDs, token strings
 - **[references/parameters.md](references/parameters.md)** — Value types, serialization, dictionary encoding
-- **[references/deployment.md](references/deployment.md)** — plutil, shortcuts sign/import/run, iteration
+- **[references/deployment.md](references/deployment.md)** — plutil, shortcuts sign, import via open, iteration

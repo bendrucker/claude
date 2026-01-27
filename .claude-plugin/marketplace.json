@@ -125,7 +125,7 @@
     },
     {
       "name": "shortcuts",
-      "description": "Creating Apple Shortcuts programmatically as plist XML",
+      "description": "Creating and running macOS Shortcuts programmatically",
       "source": "./plugins/shortcuts"
     },
     {

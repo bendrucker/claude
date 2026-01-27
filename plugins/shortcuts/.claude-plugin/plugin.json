@@ -1,6 +1,6 @@
 {
   "name": "shortcuts",
-  "description": "Creating Apple Shortcuts programmatically as plist XML",
+  "description": "Creating and running macOS Shortcuts programmatically",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

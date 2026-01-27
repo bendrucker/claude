@@ -1,120 +1,66 @@
 # Deployment
 
-macOS only.
+macOS only. For running and managing shortcuts after deployment, use the `shortcuts:cli` skill.
+
+## Pipeline
+
+```bash
+plutil -lint "My Shortcut.plist"
+plutil -convert binary1 -o "My Shortcut.shortcut" "My Shortcut.plist"
+mkdir -p out
+shortcuts sign -i "My Shortcut.shortcut" -o "out/My Shortcut.shortcut"
+open "out/My Shortcut.shortcut"
+```
+
+Sign into an `out/` directory to preserve the unsigned binary for re-signing after edits. The filename must match the desired shortcut name — the filename (minus `.shortcut`) becomes the name in the Shortcuts app.
 
 ## Convert XML to Binary
 
-The Shortcuts app expects binary plist. Convert your XML plist:
+The Shortcuts app expects binary plist. Validate and convert:
 
 ```bash
-plutil -convert binary1 -o "MyShortcut.shortcut" "MyShortcut.plist"
-```
-
-To validate the XML before converting:
-
-```bash
-plutil -lint "MyShortcut.plist"
+plutil -lint "My Shortcut.plist"
+plutil -convert binary1 -o "My Shortcut.shortcut" "My Shortcut.plist"
 ```
 
 ## Sign
 
-Shortcuts must be signed before import. Signing sends a copy to Apple for validation.
+Shortcuts must be signed before import. Signing contacts Apple's validation service (requires network).
+
+Sign into an output directory so the unsigned binary is preserved for iteration:
 
 ```bash
-shortcuts sign -i "MyShortcut.shortcut" -o "MyShortcut-signed.shortcut"
+mkdir -p out
+shortcuts sign -i "My Shortcut.shortcut" -o "out/My Shortcut.shortcut"
 ```
+
+**The filename (minus `.shortcut`) becomes the shortcut name in the Shortcuts app.** Do not add suffixes like `-signed` to the output path.
 
 Signing modes (for sharing):
 
 ```bash
-# Anyone can import
-shortcuts sign --mode anyone -i "MyShortcut.shortcut" -o "MyShortcut-signed.shortcut"
-
-# Only people in your contacts
-shortcuts sign --mode people-who-know-me -i "MyShortcut.shortcut" -o "MyShortcut-signed.shortcut"
+shortcuts sign --mode anyone -i "My Shortcut.shortcut" -o "out/My Shortcut.shortcut"
+shortcuts sign --mode people-who-know-me -i "My Shortcut.shortcut" -o "out/My Shortcut.shortcut"
 ```
 
 ## Import
 
-```bash
-shortcuts import "MyShortcut-signed.shortcut"
-```
-
-The shortcut appears in the Shortcuts app. The filename (minus extension) becomes the shortcut name.
-
-## Run
+Open the signed file to trigger the Shortcuts app import flow:
 
 ```bash
-# Run by name
-shortcuts run "MyShortcut"
-
-# Run with input from a file
-shortcuts run "MyShortcut" -i input.txt
-
-# Run and capture output to a file
-shortcuts run "MyShortcut" -o output.txt
-
-# Run with text piped from stdin
-echo "hello" | shortcuts run "MyShortcut"
+open "out/My Shortcut.shortcut"
 ```
 
-Text output can be piped to other commands:
-
-```bash
-shortcuts run "MyShortcut" | jq .
-```
-
-## List and Inspect
-
-```bash
-# List all shortcuts
-shortcuts list
-
-# List shortcuts in a folder
-shortcuts list -f "My Folder"
-
-# List folders
-shortcuts list --folders
-
-# Open a shortcut in the Shortcuts GUI editor
-shortcuts view "MyShortcut"
-
-# Export a shortcut to a file
-shortcuts export "MyShortcut" -o "MyShortcut.shortcut"
-```
+The user confirms the import in the Shortcuts app GUI.
 
 ## Iterate
 
-To update a shortcut that's already imported, delete and reimport:
+To update an imported shortcut, delete it in the Shortcuts app, rebuild and reimport:
 
 ```bash
-shortcuts delete "MyShortcut"
-shortcuts import "MyShortcut-signed.shortcut"
+plutil -convert binary1 -o "My Shortcut.shortcut" "My Shortcut.plist"
+shortcuts sign -i "My Shortcut.shortcut" -o "out/My Shortcut.shortcut"
+open "out/My Shortcut.shortcut"
 ```
 
-Full iteration cycle:
-
-```bash
-# 1. Edit the XML plist source
-# 2. Convert
-plutil -convert binary1 -o "MyShortcut.shortcut" "MyShortcut.plist"
-# 3. Sign
-shortcuts sign -i "MyShortcut.shortcut" -o "MyShortcut-signed.shortcut"
-# 4. Replace
-shortcuts delete "MyShortcut"
-shortcuts import "MyShortcut-signed.shortcut"
-# 5. Test
-shortcuts run "MyShortcut"
-```
-
-## Examining Existing Shortcuts
-
-To reverse-engineer an existing shortcut's structure:
-
-```bash
-shortcuts export "MyShortcut" -o /tmp/examine.shortcut
-plutil -convert xml1 /tmp/examine.shortcut
-cat /tmp/examine.shortcut
-```
-
-This is the best way to discover how the Shortcuts app encodes specific actions and parameters.
+There is no CLI command for deleting shortcuts.

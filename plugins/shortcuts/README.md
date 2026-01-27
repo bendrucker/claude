@@ -1,51 +1,49 @@
 # Shortcuts Plugin
 
-Creating Apple Shortcuts programmatically as plist XML.
+Creating and running Apple Shortcuts programmatically.
 
 ## Contents
 
-- **Skill: shortcut** — Generate, sign, and deploy Apple Shortcuts
+- **Skill: shortcut** — Author shortcuts as plist XML, discover actions, deploy
+- **Skill: cli** — Run, list, and manage shortcuts via the `shortcuts` CLI
 - **Script: discover.swift** — Enumerate available actions on macOS
+- **Hook: open** — Gates `open` command to `.shortcut` files only
 
 ## Approach
 
-`.shortcut` files are binary plists. This skill generates XML plists (human-readable, zero dependencies) and converts with `plutil`. Alternatives considered: [Cherri](https://cherrilang.org/) (Go, type-safe, adds dependency), [shortcuts-js](https://github.com/joshfarrant/shortcuts-js) (abandoned), [ScPL](https://github.com/pfgithub/scpl) (abandoned).
+`.shortcut` files are binary plists. The `shortcut` skill generates XML plists (human-readable, zero dependencies) and converts with `plutil`. The `cli` skill covers the `shortcuts` command for running and managing shortcuts.
 
 ### Workflow
 
-**Discovery** → **Generation** → **Deployment**
+**Discovery** → **Generation** → **Deployment** → **Run**
 
-- **Discovery**: `discover.swift` reads `WFActions.plist` from `WorkflowKit.framework`. On Linux, fall back to static references.
+- **Discovery**: `discover.swift` uses WorkflowKit's runtime API (`WFActionRegistry`) to enumerate actions. On Linux, fall back to static references.
 - **Generation**: Write XML plist. References split by topic — load only what's needed.
-- **Deployment** (macOS): `plutil` → `shortcuts sign` → `shortcuts import` → `shortcuts run`.
+- **Deployment** (macOS): `plutil` → `shortcuts sign` → `open` (import).
+- **Run**: `shortcuts run` executes by name or identifier.
 
 ### Discovery CLI
 
-Interpreted Swift, macOS frameworks only, JSON output. Same pattern as Calendar plugin's `cal.swift`.
+Interpreted Swift, macOS frameworks only, JSON output composed with `jq`.
 
 | Command | Purpose |
 |---------|---------|
-| `list [--category <name>]` | All built-in action identifiers |
-| `describe <identifier>` | Parameters, input/output types |
-| `search <query>` | Search identifiers, descriptions, keywords |
-| `categories` | Category list with counts |
+| `actions` | All built-in actions with parameters |
 | `apps` | Installed apps with Shortcuts support |
 
-### OS Detection
-
-`uname -s` → **Darwin**: full pipeline. **Linux**: generate XML only.
+Filter and search via `jq` pipes. See `discovery.md` for examples.
 
 ### References
 
 | File | Topic |
 |------|-------|
-| `discovery.md` | discover.swift CLI |
+| `discovery.md` | discover.swift CLI and jq patterns |
 | `actions.md` | Static action catalog |
 | `plist-structure.md` | Top-level keys, icon, types |
 | `control-flow.md` | If/else, repeat, menu XML |
 | `variables.md` | Set/get, output UUIDs, token strings |
 | `parameters.md` | Value types, serialization |
-| `deployment.md` | Convert, sign, import, run |
+| `deployment.md` | Convert, sign, import, iterate |
 
 ## Resources
 
@@ -54,13 +52,8 @@ Interpreted Swift, macOS frameworks only, JSON output. Same pattern as Calendar 
 - [Cherri Docs](https://cherrilang.org/compiler/file-format.html) — compiler-perspective format overview
 - [WorkflowKit.framework](https://theapplewiki.com/wiki/Dev:WorkflowKit.framework) — framework internals
 - [macOS `shortcuts` CLI](https://ss64.com/mac/shortcuts.html) — man page
-- [0xdevalias Gist](https://gist.github.com/0xdevalias/27d9aea9529be7b6ce59055332a94477) — decompilation workflows
-
-The authoritative action list is `WFActions.plist` in `/System/Library/PrivateFrameworks/WorkflowKit.framework/`. The `discover.swift` CLI reads this.
 
 ## Open Questions
 
-- **Testing**: No automated tests. Options: `plutil -lint` validation, XML structure unit tests, macOS CI end-to-end.
-- **Third-party actions**: `discover.swift apps` finds apps with Shortcuts support but can't list individual actions. `Metadata.appintents` is opaque. Export an existing shortcut and inspect the plist.
-- **discover.swift**: Needs real-world macOS testing against actual `WFActions.plist`.
-- **Cherri**: Could generate Cherri code for type safety, adds a dependency.
+- **Testing**: No automated tests for shortcut generation. Options: `plutil -lint` validation, XML structure unit tests, macOS CI end-to-end.
+- **Third-party actions**: `discover.swift apps` finds apps with Shortcuts support but can't list individual actions. `Metadata.appintents` is opaque. Create a shortcut in the GUI, then inspect with `shortcuts view`.

@@ -1,6 +1,7 @@
 import { table } from "table";
 import type { ErrorAggregate, ToolError } from "./errors";
-import { DISPLAY_LIMITS, type DigestResult, type ProjectStats, type SearchResult } from "./types";
+import type { UsageStats } from "./stats";
+import { DISPLAY_LIMITS, type DigestResult, type SearchResult } from "./types";
 
 const TIMESTAMP_FORMAT = "YYYY-MM-DD HH:MM";
 
@@ -104,19 +105,31 @@ export function formatErrorAggregates(aggregates: ErrorAggregate[]): string {
   return lines.join("\n");
 }
 
-export function formatStats(stats: ProjectStats[]): string {
-  if (stats.length === 0) {
+export function formatStats(stats: UsageStats): string {
+  if (stats.totalSessions === 0) {
     return "No sessions found.";
   }
 
-  const totalSessions = stats.reduce((sum, s) => sum + s.sessionCount, 0);
-  const totalMinutes = stats.reduce((sum, s) => sum + s.totalMinutes, 0);
+  const sections: string[] = [];
 
-  const data = [
-    ["Project", "Sessions", "Minutes"],
-    ...stats.map((s) => [s.projectName, s.sessionCount, s.totalMinutes]),
-    ["Total", totalSessions, totalMinutes],
-  ];
+  sections.push(
+    `${stats.totalSessions} sessions, ${stats.totalToolUses} tool uses, ${stats.totalErrors} errors\n`,
+  );
 
-  return table(data);
+  if (stats.tools.length > 0) {
+    const toolData = [
+      ["Tool", "Uses", "Errors", "Error Rate"],
+      ...stats.tools.map((t) => [t.name, t.uses, t.errors, `${(t.errorRate * 100).toFixed(1)}%`]),
+    ];
+    sections.push(table(toolData));
+  }
+
+  if (stats.sessionsWithMostErrors.length > 0) {
+    sections.push("Sessions with most errors:");
+    for (const s of stats.sessionsWithMostErrors) {
+      sections.push(`  ${s.errorCount} errors: ${s.filePath}`);
+    }
+  }
+
+  return sections.join("\n");
 }

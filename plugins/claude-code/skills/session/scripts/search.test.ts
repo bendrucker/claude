@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import { parseDate } from "./search/date";
 import { formatDigest, formatSearchResults, formatStats } from "./search/format";
 import { parseConversationFile } from "./search/parse";
-import { getDigest, getStats, searchConversations } from "./search/query";
+import { getDigest, searchConversations } from "./search/query";
 import { calculateRelevanceScore } from "./search/score";
+import { getStats } from "./search/stats";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, "..", "fixtures", "sessions");
@@ -250,52 +251,54 @@ describe("formatDigest", () => {
 });
 
 describe("getStats", () => {
-  it("aggregates sessions by project", async () => {
+  it("aggregates tool usage across sessions", async () => {
     const stats = await getStats({ projectsDir: fixturesDir });
-    expect(stats.length).toBeGreaterThan(0);
-    for (const stat of stats) {
-      expect(stat.sessionCount).toBeGreaterThan(0);
-      expect(stat.projectName).toBeTruthy();
+    expect(stats.totalSessions).toBeGreaterThan(0);
+    expect(stats.tools.length).toBeGreaterThan(0);
+    for (const tool of stats.tools) {
+      expect(tool.name).toBeTruthy();
+      expect(tool.uses).toBeGreaterThan(0);
     }
   });
 
-  it("sorts by total minutes descending", async () => {
+  it("sorts tools by usage descending", async () => {
     const stats = await getStats({ projectsDir: fixturesDir });
-    for (let i = 1; i < stats.length; i++) {
-      const prev = stats[i - 1]?.totalMinutes ?? 0;
-      const curr = stats[i]?.totalMinutes ?? 0;
+    for (let i = 1; i < stats.tools.length; i++) {
+      const prev = stats.tools[i - 1]?.uses ?? 0;
+      const curr = stats.tools[i]?.uses ?? 0;
       expect(prev).toBeGreaterThanOrEqual(curr);
     }
   });
 
-  it("filters by date range", async () => {
-    const stats = await getStats({
-      projectsDir: fixturesDir,
-      after: new Date("2024-01-17T00:00:00.000Z"),
-    });
-    for (const stat of stats) {
-      if (stat.firstSession) {
-        expect(stat.firstSession.getTime()).toBeGreaterThanOrEqual(
-          new Date("2024-01-17T00:00:00.000Z").getTime(),
-        );
-      }
+  it("identifies sessions with most errors", async () => {
+    const stats = await getStats({ projectsDir: fixturesDir });
+    for (const session of stats.sessionsWithMostErrors) {
+      expect(session.errorCount).toBeGreaterThan(0);
+      expect(session.filePath).toBeTruthy();
     }
   });
 });
 
 describe("formatStats", () => {
   it("returns message for empty stats", () => {
-    const output = formatStats([]);
+    const emptyStats = {
+      tools: [],
+      sessionsWithMostErrors: [],
+      totalSessions: 0,
+      totalToolUses: 0,
+      totalErrors: 0,
+    };
+    const output = formatStats(emptyStats);
     expect(output).toBe("No sessions found.");
   });
 
-  it("includes header and totals", async () => {
+  it("includes tool table and totals", async () => {
     const stats = await getStats({ projectsDir: fixturesDir });
     const output = formatStats(stats);
-    expect(output).toMatch(/Project/);
-    expect(output).toMatch(/Sessions/);
-    expect(output).toMatch(/Minutes/);
-    expect(output).toMatch(/Total/);
+    expect(output).toMatch(/Tool/);
+    expect(output).toMatch(/Uses/);
+    expect(output).toMatch(/Errors/);
+    expect(output).toMatch(/sessions/);
   });
 });
 

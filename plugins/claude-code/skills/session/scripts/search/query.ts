@@ -8,7 +8,6 @@ import {
   type Conversation,
   DEFAULT_LIMITS,
   type DigestResult,
-  type ProjectStats,
   type SearchOptions,
   type SearchResult,
 } from "./types";
@@ -108,54 +107,4 @@ export async function getDigest(options: SearchOptions = {}): Promise<DigestResu
     totalCount,
     truncated,
   };
-}
-
-export async function getStats(options: SearchOptions = {}): Promise<ProjectStats[]> {
-  const conversations = await loadConversations(options);
-
-  const statsMap = new Map<
-    string,
-    {
-      projectPath: string;
-      projectName: string;
-      sessionCount: number;
-      totalMinutes: number;
-      firstSession: Date | null;
-      lastSession: Date | null;
-    }
-  >();
-
-  for (const conv of conversations) {
-    const key = conv.projectPath ?? "unknown";
-    const existing = statsMap.get(key);
-
-    if (existing) {
-      existing.sessionCount++;
-      if (conv.durationMinutes !== null) {
-        existing.totalMinutes += conv.durationMinutes;
-      }
-      if (conv.startTime) {
-        if (!existing.firstSession || conv.startTime < existing.firstSession) {
-          existing.firstSession = conv.startTime;
-        }
-        if (!existing.lastSession || conv.startTime > existing.lastSession) {
-          existing.lastSession = conv.startTime;
-        }
-      }
-    } else {
-      statsMap.set(key, {
-        projectPath: key,
-        projectName: conv.projectName ?? path.basename(key),
-        sessionCount: 1,
-        totalMinutes: conv.durationMinutes ?? 0,
-        firstSession: conv.startTime,
-        lastSession: conv.startTime,
-      });
-    }
-  }
-
-  const stats = Array.from(statsMap.values());
-  stats.sort((a, b) => b.totalMinutes - a.totalMinutes);
-
-  return stats;
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/hooks.schema.json",
+  "$id": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/hook.schema.json",
   "title": "Claude Code Hooks Schema",
   "description": "Schema for Claude Code lifecycle hooks - https://code.claude.com/docs/en/hooks",
   "type": "object",

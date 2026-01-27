@@ -33,7 +33,7 @@
       "description": "Specific Claude model to use. Inherits from the conversation if not specified."
     },
     "hooks": {
-      "$ref": "hooks.schema.json"
+      "$ref": "hook.schema.json"
     },
     "disable-model-invocation": {
       "type": "boolean",

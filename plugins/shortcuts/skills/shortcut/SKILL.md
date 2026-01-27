@@ -15,16 +15,14 @@ hooks:
 
 Generate Apple Shortcuts as XML property list files.
 
+## Environment
+
+- **OS**: !`uname -s`
+- **shortcuts CLI**: !`which shortcuts 2>/dev/null && echo "available" || echo "not available"`
+
+If the OS is **Darwin** (macOS), use the discovery CLI and the full deployment pipeline (convert, sign, import, run). If **Linux**, generate XML only — signing and import are unavailable. Inform the user.
+
 ## Discovery
-
-Detect the environment first:
-
-```bash
-uname -s
-```
-
-- **Darwin** → macOS. Use the discovery CLI and full deployment pipeline.
-- **Linux** → No Shortcuts. Use static references only. Inform the user.
 
 **On macOS**, use the discovery CLI to find actions: see [references/discovery.md](references/discovery.md)
 

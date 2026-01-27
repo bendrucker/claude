@@ -177,6 +177,14 @@ jobs:
         if: steps.inspect.outputs.has_skills == 'true'
         run: npx remark "plugins/${{ matrix.plugin }}/skills/*/SKILL.md"
 
+      - name: Setup Bun
+        if: steps.inspect.outputs.has_skills == 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Lint skills
+        if: steps.inspect.outputs.has_skills == 'true'
+        run: bunx skill-lint "plugins/${{ matrix.plugin }}/skills/*"
+
       - name: Validate agent frontmatter
         if: steps.inspect.outputs.has_agents == 'true'
         run: npx remark "plugins/${{ matrix.plugin }}/agents/*.md"

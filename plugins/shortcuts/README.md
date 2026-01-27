@@ -53,7 +53,12 @@ Filter and search via `jq` pipes. See `discovery.md` for examples.
 - [WorkflowKit.framework](https://theapplewiki.com/wiki/Dev:WorkflowKit.framework) — framework internals
 - [macOS `shortcuts` CLI](https://ss64.com/mac/shortcuts.html) — man page
 
+## Testing
+
+- **Hook tests**: `hooks/open.test.ts` — unit tests for the `open` command gate. Run with `npm test -- plugins/shortcuts/hooks`.
+- **Discovery tests**: `tests/discover.integration.ts` — integration tests for `discover.swift` output. **Run locally only** — requires WorkflowKit, a private Apple framework unavailable on CI runners. Run with `npm run test:integration -- plugins/shortcuts/`.
+
 ## Open Questions
 
-- **Testing**: No automated tests for shortcut generation. Options: `plutil -lint` validation, XML structure unit tests, macOS CI end-to-end.
+- **Shortcut generation tests**: No automated tests for shortcut generation. Options: `plutil -lint` validation, XML structure unit tests.
 - **Third-party actions**: `discover.swift apps` finds apps with Shortcuts support but can't list individual actions. `Metadata.appintents` is opaque. Create a shortcut in the GUI, then inspect with `shortcuts view`.

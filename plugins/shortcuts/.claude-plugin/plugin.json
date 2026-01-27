@@ -1,0 +1,8 @@
+{
+  "name": "shortcuts",
+  "description": "Creating Apple Shortcuts programmatically as plist XML",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

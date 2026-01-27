@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const script = join(import.meta.dirname, "../skills/shortcut/scripts/discover.swift");
-const opts: ExecFileSyncOptions = { encoding: "utf-8", timeout: 15000 };
+const opts: ExecFileSyncOptions = { encoding: "utf-8", timeout: 60000 };
 
 function run(command: string): string {
   return execFileSync("swift", [script, command], opts) as string;

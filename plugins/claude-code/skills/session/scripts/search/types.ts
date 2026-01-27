@@ -13,11 +13,13 @@ export interface Message {
 export interface Conversation {
   readonly sessionId: string;
   readonly projectPath: string | null;
+  readonly projectName: string | null;
   readonly filePath: string;
   readonly messages: readonly Message[];
   readonly summary: string | null;
   readonly startTime: Date | null;
   readonly endTime: Date | null;
+  readonly durationMinutes: number | null;
   readonly gitBranch: string | null;
 }
 
@@ -25,6 +27,21 @@ export interface SearchResult {
   readonly conversation: Conversation;
   readonly score: number;
   readonly matchedContent: readonly string[];
+}
+
+export interface DigestResult {
+  conversations: Conversation[];
+  totalCount: number;
+  truncated: boolean;
+}
+
+export interface ProjectStats {
+  readonly projectPath: string;
+  readonly projectName: string;
+  readonly sessionCount: number;
+  readonly totalMinutes: number;
+  readonly firstSession: Date | null;
+  readonly lastSession: Date | null;
 }
 
 export interface SearchOptions {

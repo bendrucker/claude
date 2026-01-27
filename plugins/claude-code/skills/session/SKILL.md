@@ -27,13 +27,16 @@ Search past conversations or get a digest of recent work:
 bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts "error handling"
 
 # Get today's conversation digest
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts --digest today
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts --digest --after today
 
 # Search with date filters
 bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts "auth" --after yesterday
+
+# Get stats by project for the week
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts --stats --after "last week"
 ```
 
-See [search.md](mdc:search.md) for advanced filtering options.
+See [search.md](search.md) for filtering and JSON output options.
 
 ## Session File Location
 

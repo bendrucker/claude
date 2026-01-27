@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 
+import arg from "arg";
 import { parseDate } from "./search/date";
-import { formatDigest, formatSearchResults } from "./search/format";
-import { getDigest, searchConversations } from "./search/query";
+import { formatDigest, formatSearchResults, formatStats } from "./search/format";
+import { getDigest, getStats, searchConversations } from "./search/query";
 import type { SearchOptions } from "./search/types";
 
 function printUsage(): void {
@@ -11,79 +12,79 @@ function printUsage(): void {
 Search conversation history or get a digest of recent sessions.
 
 Options:
-  --digest         Show digest of recent conversations (no query needed)
-  --after DATE     Only include conversations after this date
-  --before DATE    Only include conversations before this date
-  --project PATH   Filter by project path
-  --limit N        Maximum results (default: 10 for search, 20 for digest)
-  --format FORMAT  Output format: text (default) or json
+  --digest           Show digest of recent conversations (no query needed)
+  --stats            Show aggregated statistics grouped by project
+  --after DATE       Only include conversations after this date
+  --before DATE      Only include conversations before this date
+  --project PATH     Filter by project path
+  --limit N          Maximum results (default: 10 for search, 20 for digest)
+  --format FORMAT    Output format: text (default) or json
 
 Date formats:
   today, yesterday, this week, or ISO date (2024-01-15)
 
 Examples:
-  search.ts "fix error"              # Search for conversations about errors
-  search.ts --digest today           # Today's conversation digest
-  search.ts "auth" --after yesterday # Auth discussions since yesterday
+  search.ts "fix error"                  # Search for conversations about errors
+  search.ts --digest                     # Recent conversation digest
+  search.ts --digest --after today       # Today's conversations
+  search.ts "auth" --after yesterday     # Auth discussions since yesterday
+  search.ts --stats --after "last week"  # Stats by project for the week
 `);
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  const args = arg(
+    {
+      "--digest": Boolean,
+      "--stats": Boolean,
+      "--after": String,
+      "--before": String,
+      "--project": String,
+      "--limit": Number,
+      "--format": String,
+      "--help": Boolean,
+      "-h": "--help",
+    },
+    { permissive: false },
+  );
 
-  if (args.includes("--help") || args.includes("-h")) {
+  if (args["--help"]) {
     printUsage();
     process.exit(0);
   }
 
-  const options: SearchOptions = {};
-  let query = "";
-  let isDigest = false;
-  let format = "text";
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    const nextArg = args[i + 1];
-
-    if (arg === "--digest") {
-      isDigest = true;
-      if (nextArg && !nextArg.startsWith("--")) {
-        options.after = parseDate(nextArg);
-        i++;
-      }
-    } else if (arg === "--after" && nextArg) {
-      options.after = parseDate(nextArg);
-      i++;
-    } else if (arg === "--before" && nextArg) {
-      options.before = parseDate(nextArg);
-      i++;
-    } else if (arg === "--project" && nextArg) {
-      options.project = nextArg;
-      i++;
-    } else if (arg === "--limit" && nextArg) {
-      const limit = parseInt(nextArg, 10);
-      if (Number.isNaN(limit) || limit < 1) {
-        throw new Error(`Invalid --limit: "${nextArg}". Must be a positive integer`);
-      }
-      options.limit = limit;
-      i++;
-    } else if (arg === "--format" && nextArg) {
-      if (nextArg !== "text" && nextArg !== "json") {
-        throw new Error(`Invalid --format: "${nextArg}". Must be "text" or "json"`);
-      }
-      format = nextArg;
-      i++;
-    } else if (arg && !arg.startsWith("--")) {
-      query = arg;
-    }
+  const format = args["--format"] ?? "text";
+  if (format !== "text" && format !== "json") {
+    throw new Error(`Invalid --format: "${format}". Must be "text" or "json"`);
   }
 
-  if (isDigest) {
-    const conversations = await getDigest(options);
+  const limit = args["--limit"];
+  if (limit !== undefined && (Number.isNaN(limit) || limit < 1)) {
+    throw new Error(`Invalid --limit: "${limit}". Must be a positive integer`);
+  }
+
+  const options: SearchOptions = {
+    ...(args["--after"] && { after: parseDate(args["--after"]) }),
+    ...(args["--before"] && { before: parseDate(args["--before"]) }),
+    ...(args["--project"] && { project: args["--project"] }),
+    ...(limit !== undefined && { limit }),
+  };
+
+  const query = args._[0];
+
+  if (args["--stats"]) {
+    const stats = await getStats(options);
     if (format === "json") {
-      console.log(JSON.stringify(conversations, null, 2));
+      console.log(JSON.stringify(stats, null, 2));
     } else {
-      console.log(formatDigest(conversations));
+      console.log(formatStats(stats));
+    }
+  } else if (args["--digest"]) {
+    const result = await getDigest(options);
+    if (format === "json") {
+      console.log(JSON.stringify(result.conversations, null, 2));
+    } else {
+      console.log(formatDigest(result));
     }
   } else if (query) {
     const results = await searchConversations(query, options);

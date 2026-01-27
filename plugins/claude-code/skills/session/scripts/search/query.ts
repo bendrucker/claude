@@ -4,7 +4,14 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { parseConversationFile } from "./parse";
 import { calculateRelevanceScore } from "./score";
-import { type Conversation, DEFAULT_LIMITS, type SearchOptions, type SearchResult } from "./types";
+import {
+  type Conversation,
+  DEFAULT_LIMITS,
+  type DigestResult,
+  type ProjectStats,
+  type SearchOptions,
+  type SearchResult,
+} from "./types";
 
 const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 
@@ -21,6 +28,10 @@ function isWithinDateRange(conversation: Conversation, options: SearchOptions): 
     return false;
   }
   return true;
+}
+
+function hasContent(conversation: Conversation): boolean {
+  return conversation.messages.length > 0;
 }
 
 async function loadConversations(options: SearchOptions): Promise<Conversation[]> {
@@ -56,7 +67,7 @@ async function loadConversations(options: SearchOptions): Promise<Conversation[]
   }
 
   const conversations = await Promise.all(parsePromises);
-  return conversations.filter((conv) => isWithinDateRange(conv, options));
+  return conversations.filter((conv) => hasContent(conv) && isWithinDateRange(conv, options));
 }
 
 export async function searchConversations(
@@ -79,7 +90,7 @@ export async function searchConversations(
   return results.slice(0, limit);
 }
 
-export async function getDigest(options: SearchOptions = {}): Promise<Conversation[]> {
+export async function getDigest(options: SearchOptions = {}): Promise<DigestResult> {
   const conversations = await loadConversations(options);
 
   conversations.sort((a, b) => {
@@ -89,5 +100,62 @@ export async function getDigest(options: SearchOptions = {}): Promise<Conversati
   });
 
   const limit = options.limit ?? DEFAULT_LIMITS.digest;
-  return conversations.slice(0, limit);
+  const totalCount = conversations.length;
+  const truncated = conversations.length > limit;
+
+  return {
+    conversations: conversations.slice(0, limit),
+    totalCount,
+    truncated,
+  };
+}
+
+export async function getStats(options: SearchOptions = {}): Promise<ProjectStats[]> {
+  const conversations = await loadConversations(options);
+
+  const statsMap = new Map<
+    string,
+    {
+      projectPath: string;
+      projectName: string;
+      sessionCount: number;
+      totalMinutes: number;
+      firstSession: Date | null;
+      lastSession: Date | null;
+    }
+  >();
+
+  for (const conv of conversations) {
+    const key = conv.projectPath ?? "unknown";
+    const existing = statsMap.get(key);
+
+    if (existing) {
+      existing.sessionCount++;
+      if (conv.durationMinutes !== null) {
+        existing.totalMinutes += conv.durationMinutes;
+      }
+      if (conv.startTime) {
+        if (!existing.firstSession || conv.startTime < existing.firstSession) {
+          existing.firstSession = conv.startTime;
+        }
+        if (!existing.lastSession || conv.startTime > existing.lastSession) {
+          existing.lastSession = conv.startTime;
+        }
+      }
+    } else {
+      statsMap.set(key, {
+        projectPath: key,
+        projectName: conv.projectName ?? path.basename(key),
+        sessionCount: 1,
+        totalMinutes: conv.durationMinutes ?? 0,
+        firstSession: conv.startTime,
+        lastSession: conv.startTime,
+      });
+    }
+  }
+
+  const stats = Array.from(statsMap.values());
+  stats.sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  return stats;
 }

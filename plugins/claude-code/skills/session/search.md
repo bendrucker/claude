@@ -8,13 +8,16 @@ Advanced options for searching conversation history.
 bun scripts/search.ts [query] [options]
 
 Options:
-  --digest         Show digest of recent conversations (no query needed)
-  --after DATE     Only include conversations after this date
-  --before DATE    Only include conversations before this date
-  --project PATH   Filter by project path
-  --limit N        Maximum results (default: 10 for search, 20 for digest)
-  --format FORMAT  Output format: text (default) or json
+  --digest           Show digest of recent conversations (no query needed)
+  --stats            Show aggregated statistics grouped by project
+  --after DATE       Only include conversations after this date
+  --before DATE      Only include conversations before this date
+  --project PATH     Filter by project path
+  --limit N          Maximum results (default: 10 for search, 20 for digest)
+  --format FORMAT    Output format: text (default) or json
 ```
+
+Empty sessions (started but no messages sent) are filtered out automatically.
 
 ## Date Filtering
 
@@ -27,7 +30,7 @@ Uses [chrono-node](https://github.com/wanasit/chrono) for natural language date 
 
 ```bash
 # Conversations from the last week
-bun scripts/search.ts --digest "last week"
+bun scripts/search.ts --digest --after "last week"
 
 # Search only today's sessions
 bun scripts/search.ts "error" --after today
@@ -48,6 +51,20 @@ bun scripts/search.ts "bug" --project /Users/ben/src/myproject
 bun scripts/search.ts "test" --project myproject
 ```
 
+## Statistics
+
+Get aggregated statistics by project:
+
+```bash
+# Weekly stats by project
+bun scripts/search.ts --stats --after "last week"
+
+# Stats for a specific project
+bun scripts/search.ts --stats --project myproject
+```
+
+Output shows session counts and total minutes per project, sorted by time spent.
+
 ## JSON Output
 
 Use `--format json` for programmatic access:
@@ -57,8 +74,18 @@ Use `--format json` for programmatic access:
 bun scripts/search.ts "auth" --format json | jq '.[] | .conversation.summary'
 
 # Get session IDs from digest
-bun scripts/search.ts --digest today --format json | jq '.[].sessionId'
+bun scripts/search.ts --digest --after today --format json | jq '.[].sessionId'
+
+# Stats as JSON
+bun scripts/search.ts --stats --after "last week" --format json
 ```
+
+### JSON Fields
+
+The JSON output includes computed fields for convenience:
+
+- `projectName` - Last component of projectPath (e.g., "api" from "/Users/ben/src/api")
+- `durationMinutes` - Pre-computed session duration in minutes
 
 ## Relevance Scoring
 

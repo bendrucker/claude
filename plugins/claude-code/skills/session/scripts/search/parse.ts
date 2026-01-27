@@ -96,14 +96,20 @@ export async function parseConversationFile(filePath: string): Promise<Conversat
     console.error(`Warning: Failed to parse any lines in ${filePath}`);
   }
 
+  const projectName = projectPath ? path.basename(projectPath) : null;
+  const durationMinutes =
+    startTime && endTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000 / 60) : null;
+
   return {
     sessionId,
     projectPath,
+    projectName,
     filePath,
     messages,
     summary,
     startTime,
     endTime,
+    durationMinutes,
     gitBranch,
   };
 }

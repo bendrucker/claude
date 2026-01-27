@@ -39,11 +39,11 @@ const commonFlags = {
 } as const;
 
 function parseCommonOptions(flags: {
-  after?: string;
-  before?: string;
-  project?: string;
-  limit?: number;
-  format?: string;
+  after?: string | undefined;
+  before?: string | undefined;
+  project?: string | undefined;
+  limit?: number | undefined;
+  format?: string | undefined;
 }): { options: SearchOptions; format: "text" | "json" } {
   const options: SearchOptions = {};
 
@@ -76,33 +76,31 @@ function output<T>(data: T, format: "text" | "json", formatter: (data: T) => str
 }
 
 async function runErrors(args: string[]): Promise<void> {
-  const argv = cli(
-    {
-      name: "errors",
-      flags: {
-        ...commonFlags,
-        type: {
-          type: String,
-          description: "Filter by type: rejection or failure",
-        },
-        aggregate: {
-          type: Boolean,
-          description: "Group by error message",
-        },
-        sort: {
-          type: String,
-          description: "Sort by: timestamp (default) or tool",
-          default: "timestamp",
-        },
-        order: {
-          type: String,
-          description: "Sort order: asc or desc (default)",
-          default: "desc",
-        },
+  const argv = cli({
+    name: "errors",
+    flags: {
+      ...commonFlags,
+      type: {
+        type: String,
+        description: "Filter by type: rejection or failure",
+      },
+      aggregate: {
+        type: Boolean,
+        description: "Group by error message",
+      },
+      sort: {
+        type: String,
+        description: "Sort by: timestamp (default) or tool",
+        default: "timestamp",
+      },
+      order: {
+        type: String,
+        description: "Sort order: asc or desc (default)",
+        default: "desc",
       },
     },
-    args,
-  );
+    argv: args,
+  });
 
   const { options, format } = parseCommonOptions(argv.flags);
 
@@ -113,8 +111,11 @@ async function runErrors(args: string[]): Promise<void> {
     options.errorType = argv.flags.type as ErrorType;
   }
 
-  const fetchOptions = argv.flags.aggregate ? { ...options, limit: undefined } : options;
-  let errors = await getErrors(fetchOptions);
+  if (argv.flags.aggregate && options.limit !== undefined) {
+    throw new Error("--aggregate and --limit are mutually exclusive");
+  }
+
+  let errors = await getErrors(options);
 
   const sort = argv.flags.sort;
   if (sort !== "timestamp" && sort !== "tool") {
@@ -144,25 +145,23 @@ async function runErrors(args: string[]): Promise<void> {
 }
 
 async function runStats(args: string[]): Promise<void> {
-  const argv = cli(
-    {
-      name: "stats",
-      flags: {
-        ...commonFlags,
-        sort: {
-          type: String,
-          description: "Sort by: uses (default), errors, or rate",
-          default: "uses",
-        },
-        order: {
-          type: String,
-          description: "Sort order: asc or desc (default)",
-          default: "desc",
-        },
+  const argv = cli({
+    name: "stats",
+    flags: {
+      ...commonFlags,
+      sort: {
+        type: String,
+        description: "Sort by: uses (default), errors, or rate",
+        default: "uses",
+      },
+      order: {
+        type: String,
+        description: "Sort order: asc or desc (default)",
+        default: "desc",
       },
     },
-    args,
-  );
+    argv: args,
+  });
 
   const { options, format } = parseCommonOptions(argv.flags);
 
@@ -193,13 +192,11 @@ async function runStats(args: string[]): Promise<void> {
 }
 
 async function runDigest(args: string[]): Promise<void> {
-  const argv = cli(
-    {
-      name: "digest",
-      flags: commonFlags,
-    },
-    args,
-  );
+  const argv = cli({
+    name: "digest",
+    flags: commonFlags,
+    argv: args,
+  });
 
   const { options, format } = parseCommonOptions(argv.flags);
   const result = await getDigest(options);
@@ -207,14 +204,12 @@ async function runDigest(args: string[]): Promise<void> {
 }
 
 async function runSearch(args: string[]): Promise<void> {
-  const argv = cli(
-    {
-      name: "search",
-      parameters: ["<query>"],
-      flags: commonFlags,
-    },
-    args,
-  );
+  const argv = cli({
+    name: "search",
+    parameters: ["<query>"],
+    flags: commonFlags,
+    argv: args,
+  });
 
   const { options, format } = parseCommonOptions(argv.flags);
   const results = await searchConversations(argv._.query, options);
@@ -230,9 +225,10 @@ const subcommands: Record<string, (args: string[]) => Promise<void>> = {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const subcommand = args[0];
+  const handler = subcommand ? subcommands[subcommand] : undefined;
 
-  if (subcommand && subcommand in subcommands) {
-    await subcommands[subcommand](args.slice(1));
+  if (handler) {
+    await handler(args.slice(1));
   } else {
     await runSearch(args);
   }

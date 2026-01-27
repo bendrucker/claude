@@ -1,0 +1,17 @@
+{
+  "name": "skill-lint",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "skill-lint": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest"
+  },
+  "dependencies": {
+    "yaml": "^2.7.1"
+  }
+}

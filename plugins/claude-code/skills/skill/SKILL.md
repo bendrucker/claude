@@ -80,6 +80,10 @@ Keep references one level deep. For files >100 lines, include a table of content
 - Observe navigation patterns
 - Refine based on behavior
 
+## Validation
+
+Run `bunx skill-lint path/to/skill/` to check for issues before committing. CI runs this automatically.
+
 ## References
 
 Load detailed guides as needed:

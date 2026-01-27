@@ -35,13 +35,26 @@ Do not include installation instructions or skill activation details—the READM
 
 ### Dependencies
 
-The root `package.json` contains shared tooling (vitest, tsx, typescript) and dependencies used across multiple plugins (e.g., `url-pattern`). Plugin-specific dependencies belong in their own `package.json`:
+The root `package.json` contains shared tooling (vitest, typescript) and dependencies used across multiple plugins (e.g., `url-pattern`). Plugin-specific dependencies belong in their own `package.json`:
 
 - Create `plugins/<name>/package.json` for plugin-specific dependencies
 - Add the plugin to the root `workspaces` array
 - Run `npm install` to link the workspace
 
 Avoid collecting all dependencies in the root package.json. Each plugin should be self-contained where practical.
+
+### Lockfile Conflicts
+
+When resolving `package-lock.json` conflicts during rebase, don't regenerate from scratch—this loses cross-platform optional dependencies. Instead:
+
+1. Accept the lockfile from the base branch: `git checkout origin/main -- package-lock.json`
+2. Run `npm install` to apply your `package.json` changes
+
+This preserves platform-specific optional dependencies (Linux, Windows, etc.) that CI requires.
+
+### Bun
+
+Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing dependencies on first run, eliminating the need to run `npm install` before executing scripts. This simplifies hook execution since hooks run in isolated contexts where `node_modules` may not be readily available.
 
 ## Hooks
 
@@ -57,7 +70,7 @@ Hooks intercept tool calls and can modify inputs, block execution, or request us
         "hooks": [
           {
             "type": "command",
-            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/hooks/default-state.ts"
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/default-state.ts"
           }
         ]
       }
@@ -107,7 +120,7 @@ Hooks can also be defined at the project level in `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "npx tsx hooks/biome"
+            "command": "bun hooks/biome"
           }
         ]
       }

@@ -19,7 +19,7 @@ For complex Linear operations involving loops, mapping, or conditional logic, wr
 - Better error handling than raw GraphQL
 - Easier debugging
 
-Run scripts with: `npx tsx script.ts`
+Run scripts with: `bun script.ts`
 
 ## Basic Setup
 
@@ -197,7 +197,7 @@ for (const issue of issues.nodes) {
 ## Script Template
 
 ```typescript
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 import { LinearClient } from '@linear/sdk'
 
 const LINEAR_API_KEY = process.env.LINEAR_API_KEY
@@ -238,10 +238,10 @@ main().catch(error => {
 
 ```bash
 # Direct execution
-npx tsx automation.ts
+bun automation.ts
 
 # With environment variable
-LINEAR_API_KEY=lin_api_xxx npx tsx automation.ts
+LINEAR_API_KEY=lin_api_xxx bun automation.ts
 
 # Make executable (requires shebang)
 chmod +x automation.ts
@@ -272,7 +272,7 @@ chmod +x automation.ts
 
 Scripts require:
 - `@linear/sdk` package
-- `tsx` for execution (via npx or installed)
+- `bun` for execution
 - `LINEAR_API_KEY` environment variable
 
 Install in project: `npm install @linear/sdk`

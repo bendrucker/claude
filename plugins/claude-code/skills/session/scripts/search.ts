@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun
 
 import arg from "arg";
 import { parseDate } from "./search/date";

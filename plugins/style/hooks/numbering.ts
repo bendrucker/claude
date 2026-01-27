@@ -1,15 +1,15 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 import { execSync } from "node:child_process";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import type { Heading, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import type { Heading, Text } from "mdast";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 export type WriteInput = { file_path: string; content: string };
 export type EditInput = { file_path: string; new_string: string };

@@ -1,8 +1,8 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 import { existsSync, readFileSync } from "node:fs";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export type FileInput = {
   file_path?: string;

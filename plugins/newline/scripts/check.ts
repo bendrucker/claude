@@ -1,8 +1,8 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { readStdinJson } from "@constellos/claude-code-kit/runners";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { readStdinJson } from "@constellos/claude-code-kit/runners";
 import { setState } from "./state";
 
 type ToolInput = {

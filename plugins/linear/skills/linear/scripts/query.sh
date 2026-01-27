@@ -18,4 +18,4 @@ if [ -z "${LINEAR_API_KEY:-}" ]; then
   exit 1
 fi
 
-npx tsx "$SCRIPT_DIR/query.ts" "$@"
+bun "$SCRIPT_DIR/query.ts" "$@"

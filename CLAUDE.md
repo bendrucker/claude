@@ -11,6 +11,10 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `.claude/`: Project-level configuration for this repository
 - `install.sh`: Setup script that creates symlinks from `user/` to `~/.claude`
 
+## User
+
+The [`user/`](user/) directory contains user-level Claude Code configuration that gets symlinked to `~/.claude`. This includes global instructions (`CLAUDE.md`), settings (plugins, permissions, sandbox), and hooks that apply across all projects.
+
 ## Plugin Architecture
 
 Each plugin in `plugins/` contains:

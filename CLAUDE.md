@@ -7,8 +7,9 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `plugins/`: Plugins providing language support, workflows, and integrations
 - `.claude-plugin/marketplace.json`: Marketplace definition listing all available plugins
 - `schemas/`: JSON Schema definitions for `plugin.schema.json` and `marketplace.schema.json`
-- `.claude/`: My personal configuration directory, symlinked to `~/.claude`
-- `install.sh`: Setup script that creates symlinks from `.claude/` to `~/.claude`
+- `user/`: User-level configuration, symlinked to `~/.claude`
+- `.claude/`: Project-level configuration for this repository
+- `install.sh`: Setup script that creates symlinks from `user/` to `~/.claude`
 
 ## Plugin Architecture
 
@@ -120,7 +121,7 @@ Hooks can also be defined at the project level in `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "bun ./hooks/biome"
+            "command": "bun ./.claude/hooks/biome"
           }
         ]
       }
@@ -160,15 +161,25 @@ claude --plugin-dir ./plugins/<name> --setting-sources local
 
 This loads only the specified plugin directory, bypassing marketplace-installed versions. Use this workflow to verify skills, hooks, and scripts work correctly before committing.
 
+### Testing User Settings
+
+To test changes to `user/settings.json` before installing:
+
+```bash
+./dev.sh
+```
+
+This disables the installed user settings and loads `user/settings.json` from the working copy instead. Any additional arguments are passed to `claude`.
+
 ## Verification
 
 Run `scripts/check-marketplace.sh` to verify all plugin directories are listed in `marketplace.json`. This check runs in CI and should pass before merging.
 
 ## Workflow
 
-- The `.claude/` directory is symlinked to `~/.claude/`. New files are immediately available without re-running `install.sh`.
+- The `user/` directory is symlinked to `~/.claude/`. New files are immediately available without re-running `install.sh`.
 - Plugin changes take effect immediately in new Claude sessions.
 
 ## Settings
 
-My `.claude/settings.json` enables all plugins from this marketplace plus third-party plugins. See the [settings documentation](https://docs.anthropic.com/en/docs/claude-code/settings) for available options.
+User-level settings live in `user/settings.json` (plugins, permissions, sandbox). Project-level settings live in `.claude/settings.json` (biome hook). See the [settings documentation](https://docs.anthropic.com/en/docs/claude-code/settings) for available options.

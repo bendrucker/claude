@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(man:*)",
+      "WebFetch(domain:proxy.golang.org)",
+      "WebFetch(domain:sum.golang.org)",
+      "WebFetch(domain:api.github.com)",
+      "Edit(/tmp/**)",
+      "Edit(.git/config)",
+      "Edit(.git/config.lock)",
+      "Edit(~/.npm/**)",
+      "Edit(~/.terraform.d/plugin-cache/**)",
+      "Edit(~/.cache/uv/**)",
+      "Edit(~/Library/Caches/go-build/**)",
+      "Edit(~/src/go/pkg/mod/**)",
+      "Edit(~/src/go/pkg/sumdb/**)"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ./hooks/worktree"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "wt list statusline --claude-code"
+  },
+  "enabledPlugins": {
+    "pr-review-toolkit@claude-code-plugins": true,
+    "go@bendrucker": true,
+    "terraform@bendrucker": true,
+    "python@bendrucker": true,
+    "shell@bendrucker": true,
+    "typescript@bendrucker": true,
+    "javascript@bendrucker": true,
+    "json@bendrucker": true,
+    "git@bendrucker": true,
+    "gitlab@bendrucker": true,
+    "linear@bendrucker": true,
+    "things@bendrucker": true,
+    "refine-issue@bendrucker": true,
+    "implement-issue@bendrucker": true,
+    "review@bendrucker": true,
+    "newline@bendrucker": true,
+    "github@bendrucker": true,
+    "claude-code@bendrucker": true,
+    "pull-request@bendrucker": true,
+    "parallel-prs@bendrucker": true,
+    "interview@bendrucker": true,
+    "linear@claude-plugins-official": true,
+    "ralph-wiggum@claude-code-plugins": true,
+    "code-simplifier@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "astral@astral-sh": true,
+    "calendar@bendrucker": true,
+    "research@bendrucker": true,
+    "style@bendrucker": true,
+    "type-ignore@bendrucker": true,
+    "agents-md@bendrucker": true,
+    "ast-grep@ast-grep": true,
+    "worktrunk@worktrunk": true
+  },
+  "extraKnownMarketplaces": {
+    "bendrucker": {
+      "source": {
+        "source": "github",
+        "repo": "bendrucker/claude"
+      }
+    },
+    "astral-sh": {
+      "source": {
+        "source": "github",
+        "repo": "astral-sh/claude-code-plugins"
+      }
+    },
+    "ast-grep": {
+      "source": {
+        "source": "github",
+        "repo": "ast-grep/claude-skill"
+      }
+    },
+    "worktrunk": {
+      "source": {
+        "source": "github",
+        "repo": "max-sixty/worktrunk"
+      }
+    }
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowUnixSockets": [
+        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+      ]
+    },
+    "excludedCommands": [
+      "code:*",
+      "docker:*",
+      "pbcopy:*",
+      "pbpaste:*",
+      "open:*",
+      "osascript:*",
+      "ssh:*",
+      "scp:*",
+      "security:*",
+      "defaults:*",
+      "launchctl:*",
+      "rsync:*",
+      "screencapture:*",
+      "aws:*",
+      "gcloud:*",
+      "az:*",
+      "say:*",
+      "afplay:*",
+      "diskutil:*",
+      "networksetup:*",
+      "wt:*"
+    ]
+  },
+  "alwaysThinkingEnabled": true
+}

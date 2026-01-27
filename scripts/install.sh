@@ -11,7 +11,7 @@ SOURCE_DIR="$CLAUDE_REPO_HOME/user"
 
 if [[ ! -d "$SOURCE_DIR" ]]; then
   echo "Error: Source directory not found: $SOURCE_DIR"
-  echo "Run scripts/setup first to set up the repository."
+  echo "Run scripts/setup.sh first to set up the repository."
   exit 1
 fi
 

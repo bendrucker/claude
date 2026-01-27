@@ -247,7 +247,7 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code@latest
 
       - name: Setup Claude configuration
-        run: CLAUDE_REPO_HOME="$GITHUB_WORKSPACE" ./install.sh
+        run: CLAUDE_REPO_HOME="$GITHUB_WORKSPACE" ./scripts/install.sh
 
       - name: Generate context report
         run: |

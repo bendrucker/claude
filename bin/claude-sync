@@ -31,7 +31,7 @@ notify() {
 }
 
 if [[ -L "$CLAUDE_REPO_HOME" ]]; then
-  log "ERROR: $CLAUDE_REPO_HOME is a symlink - run scripts/setup first"
+  log "ERROR: $CLAUDE_REPO_HOME is a symlink - run scripts/setup.sh first"
   notify "Claude Sync" "Failed: ~/.claude-repo is a symlink" "false"
   exit 1
 fi

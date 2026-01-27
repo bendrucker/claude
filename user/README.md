@@ -2,7 +2,7 @@
 
 This directory contains user-level Claude Code configuration, symlinked to `~/.claude/`.
 
-Run `install.sh` to create the symlinks.
+Run `scripts/install.sh` to create the symlinks.
 
 ## Contents
 

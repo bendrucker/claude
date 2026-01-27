@@ -30,7 +30,7 @@ sync_repo() {
   log "Syncing Claude repository..."
 
   if [[ -L "$CLAUDE_REPO_HOME" ]]; then
-    log "ERROR: $CLAUDE_REPO_HOME is a symlink - run scripts/setup first"
+    log "ERROR: $CLAUDE_REPO_HOME is a symlink - run scripts/setup.sh first"
     notify "Claude Upgrade" "Failed: ~/.claude-repo is a symlink"
     return 1
   fi

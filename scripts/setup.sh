@@ -139,7 +139,7 @@ main() {
   success "Separate directories verified"
 
   info "Creating symlinks from ~/.claude to installed repo..."
-  "$CLAUDE_REPO_HOME/install.sh"
+  "$CLAUDE_REPO_HOME/scripts/install.sh"
 
   if [[ "$(uname)" == "Darwin" ]] && [[ -x "$CLAUDE_REPO_HOME/macos/install.sh" ]]; then
     info "Setting up macOS launchd job..."

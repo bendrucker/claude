@@ -269,21 +269,12 @@ describe("getStats", () => {
       expect(prev).toBeGreaterThanOrEqual(curr);
     }
   });
-
-  it("identifies sessions with most errors", async () => {
-    const stats = await getStats({ projectsDir: fixturesDir });
-    for (const session of stats.sessionsWithMostErrors) {
-      expect(session.errorCount).toBeGreaterThan(0);
-      expect(session.filePath).toBeTruthy();
-    }
-  });
 });
 
 describe("formatStats", () => {
   it("returns message for empty stats", () => {
     const emptyStats = {
       tools: [],
-      sessionsWithMostErrors: [],
       totalSessions: 0,
       totalToolUses: 0,
       totalErrors: 0,

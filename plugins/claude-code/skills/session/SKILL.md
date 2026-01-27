@@ -18,74 +18,81 @@ Run the info script to get full session details:
 bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/info.ts "${CLAUDE_SESSION_ID}"
 ```
 
-## Search History
+## Subcommands
 
-Search past conversations or get a digest of recent work:
+The search CLI supports subcommands: `errors`, `stats`, `digest`, or a search query.
+
+### Search
 
 ```bash
 # Search for specific topics
 bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search "error handling"
 
-# Get today's conversation digest
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --digest --after today
-
 # Search with date filters
 bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search "auth" --after yesterday
-
-# Get stats by project for the week
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --stats --after "last week"
 ```
 
-## Tool Errors
+### Digest
 
-Find tool errors across sessions:
+```bash
+# Get today's conversation digest
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search digest --after today
+```
+
+### Errors
 
 ```bash
 # List recent tool errors
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --errors --after "last week"
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --after "last week"
 
 # Only actual failures (not user rejections)
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --errors --type failure
-
-# Only user rejections
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --errors --type rejection
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --type failure
 
 # Aggregate errors by message to find patterns
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --errors --aggregate
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --aggregate
+
+# Sort by tool name ascending
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --sort tool --order asc
 
 # JSON output for further analysis
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --errors --format json
-
-# Filter by tool and extract patterns with jq
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --errors --type failure --format json \
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search errors --format json \
   | jq '[.[] | select(.toolName == "Bash")] | .[].content'
 ```
 
-## Usage Statistics
-
-Analyze tool usage and project activity:
+### Stats
 
 ```bash
-# Get overall stats
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --stats
+# Get tool usage stats
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search stats --after "last week"
 
-# Stats for a specific project
-bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search --stats --project myproject
+# Sort by error rate descending
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search stats --sort rate
+
+# Sort by error count ascending (fewest errors first)
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search stats --sort errors --order asc
 ```
 
-Stats include:
-- Tool usage counts and error rates
-- Project session counts and time spent
+## Common Options
 
-## Options
+All subcommands support:
 
 - `--after DATE` - Filter by date (e.g., "today", "yesterday", "last week", "2024-01-15")
 - `--before DATE` - Filter by date
 - `--project PATH` - Filter by project path
 - `--limit N` - Maximum results
 - `--format FORMAT` - Output format: `text` (default) or `json`
-- `--aggregate` - Group errors by message (with `--errors`)
-- `--type TYPE` - Filter by error type: `rejection` or `failure` (with `--errors`)
+
+### Errors Options
+
+- `--type TYPE` - Filter by type: `rejection` or `failure`
+- `--aggregate` - Group errors by message
+- `--sort FIELD` - Sort by: `timestamp` (default) or `tool`
+- `--order ORDER` - Sort order: `asc` or `desc` (default)
+
+### Stats Options
+
+- `--sort FIELD` - Sort by: `uses` (default), `errors`, or `rate`
+- `--order ORDER` - Sort order: `asc` or `desc` (default)
 
 ## Session File Location
 

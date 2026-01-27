@@ -122,12 +122,5 @@ export function formatStats(stats: UsageStats): string {
     sections.push(table(toolData));
   }
 
-  if (stats.sessionsWithMostErrors.length > 0) {
-    sections.push("Sessions with most errors:");
-    for (const s of stats.sessionsWithMostErrors) {
-      sections.push(`  ${s.errorCount} errors: ${s.filePath}`);
-    }
-  }
-
   return sections.join("\n");
 }

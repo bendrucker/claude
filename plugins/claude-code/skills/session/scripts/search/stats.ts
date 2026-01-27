@@ -10,43 +10,22 @@ export interface ToolStats {
   readonly errorRate: number;
 }
 
-export interface SessionSummary {
-  readonly sessionId: string;
-  readonly filePath: string;
-  readonly projectPath: string | null;
-  readonly errorCount: number;
-  readonly toolUseCount: number;
-  readonly startTime: Date | null;
-}
-
 export interface UsageStats {
   readonly tools: ToolStats[];
-  readonly sessionsWithMostErrors: SessionSummary[];
   readonly totalSessions: number;
   readonly totalToolUses: number;
   readonly totalErrors: number;
 }
 
 interface SessionData {
-  sessionId: string;
-  filePath: string;
-  projectPath: string | null;
   startTime: Date | null;
   tools: Map<string, { uses: number; errors: number }>;
-  totalErrors: number;
-  totalToolUses: number;
 }
 
 async function collectSessionData(filePath: string): Promise<SessionData> {
-  const sessionId = filePath.split("/").pop()?.replace(".jsonl", "") ?? "";
   const data: SessionData = {
-    sessionId,
-    filePath,
-    projectPath: null,
     startTime: null,
     tools: new Map(),
-    totalErrors: 0,
-    totalToolUses: 0,
   };
 
   const toolUseIds = new Map<string, string>();
@@ -66,10 +45,6 @@ async function collectSessionData(filePath: string): Promise<SessionData> {
       continue;
     }
 
-    if (record.cwd && !data.projectPath) {
-      data.projectPath = record.cwd as string;
-    }
-
     if (record.timestamp && !data.startTime) {
       data.startTime = new Date(record.timestamp as string);
     }
@@ -83,7 +58,6 @@ async function collectSessionData(filePath: string): Promise<SessionData> {
             const toolId = item.id as string;
 
             toolUseIds.set(toolId, toolName);
-            data.totalToolUses++;
 
             const existing = data.tools.get(toolName) || { uses: 0, errors: 0 };
             existing.uses++;
@@ -100,7 +74,6 @@ async function collectSessionData(filePath: string): Promise<SessionData> {
           if (item && typeof item === "object" && item.type === "tool_result" && item.is_error) {
             const toolUseId = item.tool_use_id as string;
             const toolName = toolUseIds.get(toolUseId);
-            data.totalErrors++;
             if (toolName) {
               const existing = data.tools.get(toolName);
               if (existing) {
@@ -118,7 +91,7 @@ async function collectSessionData(filePath: string): Promise<SessionData> {
 
 export async function getStats(options: SearchOptions = {}): Promise<UsageStats> {
   const toolsMap = new Map<string, { uses: number; errors: number }>();
-  const sessions: SessionData[] = [];
+  let totalSessions = 0;
 
   const filePromises: Promise<SessionData>[] = [];
 
@@ -126,12 +99,12 @@ export async function getStats(options: SearchOptions = {}): Promise<UsageStats>
     filePromises.push(collectSessionData(filePath));
   }
 
-  const allSessions = await Promise.all(filePromises);
+  const sessions = await Promise.all(filePromises);
 
-  for (const session of allSessions) {
+  for (const session of sessions) {
     if (!isWithinDateRange(session.startTime, options)) continue;
 
-    sessions.push(session);
+    totalSessions++;
 
     for (const [toolName, toolData] of session.tools) {
       const existing = toolsMap.get(toolName) || { uses: 0, errors: 0 };
@@ -150,24 +123,10 @@ export async function getStats(options: SearchOptions = {}): Promise<UsageStats>
     }))
     .sort((a, b) => b.uses - a.uses);
 
-  const sessionsWithMostErrors = sessions
-    .filter((s) => s.totalErrors > 0)
-    .sort((a, b) => b.totalErrors - a.totalErrors)
-    .slice(0, 10)
-    .map((s) => ({
-      sessionId: s.sessionId,
-      filePath: s.filePath,
-      projectPath: s.projectPath,
-      errorCount: s.totalErrors,
-      toolUseCount: s.totalToolUses,
-      startTime: s.startTime,
-    }));
-
   return {
     tools,
-    sessionsWithMostErrors,
-    totalSessions: sessions.length,
-    totalToolUses: sessions.reduce((sum, s) => sum + s.totalToolUses, 0),
-    totalErrors: sessions.reduce((sum, s) => sum + s.totalErrors, 0),
+    totalSessions,
+    totalToolUses: tools.reduce((sum, t) => sum + t.uses, 0),
+    totalErrors: tools.reduce((sum, t) => sum + t.errors, 0),
   };
 }

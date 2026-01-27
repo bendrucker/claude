@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import {
   compareTimestampsDesc,
+  findSessionFile,
   getProjectsDir,
   isWithinDateRange,
   matchesProjectFilter,
@@ -92,4 +93,13 @@ export async function getDigest(options: SearchOptions = {}): Promise<DigestResu
     totalCount,
     truncated,
   };
+}
+
+export async function getSession(
+  sessionId: string,
+  options: SearchOptions = {},
+): Promise<Conversation | null> {
+  const filePath = await findSessionFile(sessionId, options);
+  if (!filePath) return null;
+  return parseConversationFile(filePath);
 }

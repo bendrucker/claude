@@ -4,9 +4,9 @@ Search and analyze Claude Code conversation history.
 
 ## Contents
 
-- `SKILL.md` - Skill definition with activation patterns
-- `search.md` - CLI reference documentation
-- `scripts/search.ts` - Search implementation
+- `SKILL.md` - Skill definition with CLI usage examples
+- `cli/` - CLI implementation with subcommands: `search`, `digest`, `stats`, `errors`
+- `search.md` - Advanced CLI reference documentation
 
 ## Testing
 

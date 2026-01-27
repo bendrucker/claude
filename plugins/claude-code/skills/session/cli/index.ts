@@ -10,7 +10,7 @@ import {
   formatSearchResults,
   formatStats,
 } from "./format";
-import { getDigest, searchConversations } from "./query";
+import { getDigest, getSession, searchConversations } from "./query";
 import { getStats, type ToolStats } from "./stats";
 import type { ErrorType, SearchOptions } from "./types";
 
@@ -194,11 +194,28 @@ async function runStats(args: string[]): Promise<void> {
 async function runDigest(args: string[]): Promise<void> {
   const argv = cli({
     name: "digest",
-    flags: commonFlags,
+    flags: {
+      ...commonFlags,
+      session: {
+        type: String,
+        description: "Show a specific session by ID",
+      },
+    },
     argv: args,
   });
 
   const { options, format } = parseCommonOptions(argv.flags);
+
+  if (argv.flags.session) {
+    const conversation = await getSession(argv.flags.session, options);
+    if (!conversation) {
+      throw new Error(`Session not found: ${argv.flags.session}`);
+    }
+    const result = { conversations: [conversation], totalCount: 1, truncated: false };
+    output(result, format, formatDigest);
+    return;
+  }
+
   const result = await getDigest(options);
   output(result, format, formatDigest);
 }
@@ -217,21 +234,41 @@ async function runSearch(args: string[]): Promise<void> {
 }
 
 const subcommands: Record<string, (args: string[]) => Promise<void>> = {
-  errors: runErrors,
-  stats: runStats,
+  search: runSearch,
   digest: runDigest,
+  stats: runStats,
+  errors: runErrors,
 };
+
+function showUsage(): void {
+  console.log(`Usage: bun cli <command> [options]
+
+Commands:
+  search <query>   Search conversations by keyword
+  digest           List recent sessions with summaries
+  stats            Show tool usage statistics
+  errors           List tool errors
+
+Run 'bun cli <command> --help' for command-specific options.`);
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const subcommand = args[0];
-  const handler = subcommand ? subcommands[subcommand] : undefined;
 
-  if (handler) {
-    await handler(args.slice(1));
-  } else {
-    await runSearch(args);
+  if (!subcommand || subcommand === "--help" || subcommand === "-h") {
+    showUsage();
+    return;
   }
+
+  const handler = subcommands[subcommand];
+  if (!handler) {
+    console.error(`Unknown command: ${subcommand}\n`);
+    showUsage();
+    process.exit(1);
+  }
+
+  await handler(args.slice(1));
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;

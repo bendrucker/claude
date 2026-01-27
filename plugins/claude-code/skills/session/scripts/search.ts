@@ -64,10 +64,10 @@ async function main(): Promise<void> {
   }
 
   const options: SearchOptions = {
-    after: args["--after"] ? parseDate(args["--after"]) : undefined,
-    before: args["--before"] ? parseDate(args["--before"]) : undefined,
-    project: args["--project"],
-    limit,
+    ...(args["--after"] && { after: parseDate(args["--after"]) }),
+    ...(args["--before"] && { before: parseDate(args["--before"]) }),
+    ...(args["--project"] && { project: args["--project"] }),
+    ...(limit !== undefined && { limit }),
   };
 
   const query = args._[0];

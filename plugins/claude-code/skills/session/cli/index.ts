@@ -75,6 +75,14 @@ function output<T>(data: T, format: "text" | "json", formatter: (data: T) => str
   console.log(format === "json" ? JSON.stringify(data, null, 2) : formatter(data));
 }
 
+function validateOrder(order: string | undefined): "asc" | "desc" {
+  const value = order ?? "desc";
+  if (value !== "asc" && value !== "desc") {
+    throw new Error('--order must be "asc" or "desc"');
+  }
+  return value;
+}
+
 async function runErrors(args: string[]): Promise<void> {
   const argv = cli({
     name: "errors",
@@ -122,10 +130,7 @@ async function runErrors(args: string[]): Promise<void> {
     throw new Error('--sort must be "timestamp" or "tool"');
   }
 
-  const order = argv.flags.order;
-  if (order !== "asc" && order !== "desc") {
-    throw new Error('--order must be "asc" or "desc"');
-  }
+  const order = validateOrder(argv.flags.order);
 
   const comparators: Record<string, (a: ToolError, b: ToolError) => number> = {
     timestamp: (a, b) => (a.timestamp?.getTime() ?? 0) - (b.timestamp?.getTime() ?? 0),
@@ -172,10 +177,7 @@ async function runStats(args: string[]): Promise<void> {
     throw new Error('--sort must be "uses", "errors", or "rate"');
   }
 
-  const order = argv.flags.order;
-  if (order !== "asc" && order !== "desc") {
-    throw new Error('--order must be "asc" or "desc"');
-  }
+  const order = validateOrder(argv.flags.order);
 
   const comparators: Record<string, (a: ToolStats, b: ToolStats) => number> = {
     uses: (a, b) => a.uses - b.uses,

@@ -59,25 +59,11 @@ export async function findSessionFile(
   sessionId: string,
   options: SearchOptions = {},
 ): Promise<string | null> {
-  const projectsDir = getProjectsDir(options);
-
-  let entries: Dirent[];
-  try {
-    entries = await fs.readdir(projectsDir, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-
-  for (const dir of entries) {
-    if (!dir.isDirectory()) continue;
-    const candidate = path.join(projectsDir, dir.name, `${sessionId}.jsonl`);
-    try {
-      await fs.access(candidate);
-      return candidate;
-    } catch {
-      continue;
+  const filename = `${sessionId}.jsonl`;
+  for await (const filePath of streamSessionFiles(options)) {
+    if (path.basename(filePath) === filename) {
+      return filePath;
     }
   }
-
   return null;
 }

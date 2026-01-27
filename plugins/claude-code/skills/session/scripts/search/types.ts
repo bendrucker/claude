@@ -1,12 +1,33 @@
 export interface ToolUse {
+  readonly id: string;
   readonly name: string;
   readonly input?: Record<string, unknown>;
+}
+
+export interface ToolResult {
+  readonly toolUseId: string;
+  readonly content: string;
+  readonly isError: boolean;
+}
+
+export interface ThinkingBlock {
+  readonly content: string;
+}
+
+export interface HookEvent {
+  readonly hookName: string;
+  readonly hookEvent: string;
+  readonly command: string;
+  readonly toolUseId: string;
+  readonly timestamp: Date | null;
 }
 
 export interface Message {
   readonly role: "user" | "assistant";
   readonly content: string;
   readonly toolUses: readonly ToolUse[];
+  readonly toolResults: readonly ToolResult[];
+  readonly thinking: readonly ThinkingBlock[];
   readonly timestamp?: string;
 }
 
@@ -16,6 +37,7 @@ export interface Conversation {
   readonly projectName: string | null;
   readonly filePath: string;
   readonly messages: readonly Message[];
+  readonly hookEvents: readonly HookEvent[];
   readonly summary: string | null;
   readonly startTime: Date | null;
   readonly endTime: Date | null;
@@ -44,15 +66,18 @@ export interface ProjectStats {
   readonly lastSession: Date | null;
 }
 
+export type ErrorType = "rejection" | "failure";
+
 export interface SearchOptions {
   projectsDir?: string;
   before?: Date;
   after?: Date;
   project?: string;
   limit?: number;
+  errorType?: ErrorType;
 }
 
-/** Minimum token length to include in search indexing */
+/** Minimum token length to match during search */
 export const MIN_TOKEN_LENGTH = 3;
 
 /** Relevance weight multipliers for different content sources */

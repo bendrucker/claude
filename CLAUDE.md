@@ -63,78 +63,7 @@ Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs
 
 ## Hooks
 
-Hooks intercept tool calls and can modify inputs, block execution, or request user confirmation. Define hooks in `hooks/hooks.json`:
-
-```json
-{
-  "description": "Sets default state for new issues",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "mcp__linear__create_issue",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/default-state.ts"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-The `matcher` field supports regex patterns (e.g., `Edit|MultiEdit|Write`). Hook scripts receive JSON on stdin with `tool_name` and `tool_input`.
-
-### PreToolUse Hook Outputs
-
-Hook scripts can output JSON to control behavior:
-
-- **Modify input**: Return `updatedInput` to merge fields into the tool input
-  ```json
-  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {"state": "Todo"}}}
-  ```
-- **Block execution**: Return `permissionDecision: "deny"` with a reason
-  ```json
-  {"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Use: gh repo view"}}
-  ```
-- **Request confirmation**: Return `permissionDecision: "ask"` with a reason
-- **Allow without modification**: Exit with no output
-
-See [plugins/linear/hooks/](plugins/linear/hooks/) for input modification and [plugins/github/scripts/](plugins/github/scripts/) for permission decisions.
-
-### PostToolUse Hook Outputs
-
-PostToolUse hooks run after a tool completes and can provide feedback to Claude:
-
-- **Add context**: Return `additionalContext` to inform Claude about the result
-  ```json
-  {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "Lint errors found..."}}
-  ```
-
-### Project-Level Hooks
-
-Hooks can also be defined at the project level in `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ./.claude/hooks/biome"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-This repository includes a Biome PostToolUse hook (`.claude/hooks/biome/`) that runs after file edits to check for lint errors. If errors are found, they're fed back to Claude for correction.
+See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. This repository includes a Biome PostToolUse hook (`.claude/hooks/biome/`) that runs after file edits to check for lint errors.
 
 ## Testing
 

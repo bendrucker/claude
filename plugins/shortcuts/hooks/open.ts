@@ -8,7 +8,7 @@ type BashInput = { command: string };
 
 function unquote(arg: string): string {
   const match = arg.match(/^(["'])(.+)\1$/);
-  return match ? match[2] : arg;
+  return match ? match[2]! : arg;
 }
 
 function extractTarget(command: string): string | null {
@@ -25,7 +25,7 @@ function extractTarget(command: string): string | null {
     return null;
   }
 
-  const lastToken = tokens[tokens.length - 1];
+  const lastToken = tokens[tokens.length - 1]!;
   return unquote(lastToken);
 }
 

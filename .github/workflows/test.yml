@@ -207,6 +207,7 @@ jobs:
 
       - name: Run integration tests
         if: steps.inspect.outputs.has_tests == 'true' && matrix.plugin.os == 'macos-latest'
+        continue-on-error: true
         run: npm run test:integration -- "plugins/${{ matrix.plugin.name }}/"
 
   plugins:

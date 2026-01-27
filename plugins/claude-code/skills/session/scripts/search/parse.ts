@@ -1,6 +1,7 @@
-import * as fs from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import * as path from "node:path";
-import type { Conversation, Message, ToolUse } from "./types";
+import { createInterface } from "node:readline";
+import type { Conversation, HookEvent, Message, ThinkingBlock, ToolResult, ToolUse } from "./types";
 
 function extractTextContent(content: unknown): string {
   if (typeof content === "string") return content;
@@ -19,20 +20,58 @@ function extractTextContent(content: unknown): string {
   return "";
 }
 
-export async function parseConversationFile(filePath: string): Promise<Conversation> {
-  const content = await fs.readFile(filePath, "utf-8");
-  const lines = content.split("\n").filter((line) => line.trim());
+function extractToolUses(contentArray: unknown[]): ToolUse[] {
+  return contentArray
+    .filter((c): c is Record<string, unknown> => c !== null && typeof c === "object")
+    .filter((c) => c.type === "tool_use")
+    .map((c) => ({
+      id: c.id as string,
+      name: c.name as string,
+      input: c.input as Record<string, unknown>,
+    }));
+}
 
+function extractToolResults(contentArray: unknown[]): ToolResult[] {
+  return contentArray
+    .filter((c): c is Record<string, unknown> => c !== null && typeof c === "object")
+    .filter((c) => c.type === "tool_result")
+    .map((c) => ({
+      toolUseId: c.tool_use_id as string,
+      content: typeof c.content === "string" ? c.content : JSON.stringify(c.content),
+      isError: c.is_error === true,
+    }));
+}
+
+function extractThinking(contentArray: unknown[]): ThinkingBlock[] {
+  return contentArray
+    .filter((c): c is Record<string, unknown> => c !== null && typeof c === "object")
+    .filter((c) => c.type === "thinking")
+    .map((c) => ({
+      content: c.thinking as string,
+    }));
+}
+
+export async function parseConversationFile(filePath: string): Promise<Conversation> {
   const messages: Message[] = [];
+  const hookEvents: HookEvent[] = [];
   let summary: string | null = null;
   let startTime: Date | null = null;
   let endTime: Date | null = null;
   let sessionId = path.basename(filePath, ".jsonl");
   let gitBranch: string | null = null;
   let projectPath: string | null = null;
+  let totalLines = 0;
   let parseErrors = 0;
 
-  for (const line of lines) {
+  const rl = createInterface({
+    input: createReadStream(filePath, { encoding: "utf-8" }),
+    crlfDelay: Number.POSITIVE_INFINITY,
+  });
+
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    totalLines++;
+
     let record: Record<string, unknown>;
     try {
       record = JSON.parse(line) as Record<string, unknown>;
@@ -56,14 +95,32 @@ export async function parseConversationFile(filePath: string): Promise<Conversat
       if (!endTime || ts > endTime) endTime = ts;
     }
 
+    if (record.type === "progress") {
+      const data = record.data as Record<string, unknown> | undefined;
+      if (data?.type === "hook" && data.hookName && data.hookEvent) {
+        hookEvents.push({
+          hookName: data.hookName as string,
+          hookEvent: data.hookEvent as string,
+          command: (data.command as string) || "",
+          toolUseId: (record.toolUseID as string) || "",
+          timestamp: record.timestamp ? new Date(record.timestamp as string) : null,
+        });
+      }
+      continue;
+    }
+
     if (record.type === "user" && !record.isMeta) {
       const message = record.message as Record<string, unknown> | undefined;
       if (message?.content) {
+        const contentArray = Array.isArray(message.content) ? message.content : [message.content];
         const timestamp = record.timestamp as string | undefined;
+
         messages.push({
           role: "user",
           content: extractTextContent(message.content),
           toolUses: [],
+          toolResults: extractToolResults(contentArray),
+          thinking: [],
           ...(timestamp && { timestamp }),
         });
       }
@@ -73,26 +130,21 @@ export async function parseConversationFile(filePath: string): Promise<Conversat
       const message = record.message as Record<string, unknown> | undefined;
       if (message?.content) {
         const contentArray = Array.isArray(message.content) ? message.content : [message.content];
-
-        const toolUses: ToolUse[] = contentArray
-          .filter((c: Record<string, unknown>) => c.type === "tool_use")
-          .map((c: Record<string, unknown>) => ({
-            name: c.name as string,
-            input: c.input as Record<string, unknown>,
-          }));
-
         const timestamp = record.timestamp as string | undefined;
+
         messages.push({
           role: "assistant",
           content: extractTextContent(message.content),
-          toolUses,
+          toolUses: extractToolUses(contentArray),
+          toolResults: [],
+          thinking: extractThinking(contentArray),
           ...(timestamp && { timestamp }),
         });
       }
     }
   }
 
-  if (parseErrors > 0 && parseErrors === lines.length) {
+  if (parseErrors > 0 && parseErrors === totalLines) {
     console.error(`Warning: Failed to parse any lines in ${filePath}`);
   }
 
@@ -106,6 +158,7 @@ export async function parseConversationFile(filePath: string): Promise<Conversat
     projectName,
     filePath,
     messages,
+    hookEvents,
     summary,
     startTime,
     endTime,

@@ -1,29 +1,27 @@
-import { DISPLAY_LIMITS, type DigestResult, type ProjectStats, type SearchResult } from "./types";
-
-const TIMESTAMP_FORMAT = "YYYY-MM-DD HH:MM";
+import { table } from "table";
+import type { ErrorAggregate, ToolError } from "./errors";
+import type { UsageStats } from "./stats";
+import { DISPLAY_LIMITS, type DigestResult, type SearchResult } from "./types";
 
 function formatTimestamp(date: Date | null): string {
   if (!date) return "unknown";
-  return date.toISOString().replace("T", " ").slice(0, TIMESTAMP_FORMAT.length);
+  return date.toISOString().replace("T", " ").slice(0, 16);
 }
 
 export function formatDigest(result: DigestResult): string {
-  const { conversations, totalCount, truncated } = result;
-
-  if (conversations.length === 0) {
+  if (result.conversations.length === 0) {
     return "No conversations found.";
   }
 
   const lines: string[] = [];
 
-  if (truncated) {
+  if (result.truncated) {
     lines.push(
-      `Warning: Showing ${conversations.length} of ${totalCount} sessions. Use --limit ${totalCount} to see all.`,
+      `Warning: Showing ${result.conversations.length} of ${result.totalCount} sessions\n`,
     );
-    lines.push("");
   }
 
-  for (const conv of conversations) {
+  for (const conv of result.conversations) {
     const timestamp = formatTimestamp(conv.startTime);
     const project = conv.projectPath || "unknown";
 
@@ -34,31 +32,6 @@ export function formatDigest(result: DigestResult): string {
     }
     lines.push("");
   }
-
-  return lines.join("\n");
-}
-
-export function formatStats(stats: ProjectStats[]): string {
-  if (stats.length === 0) {
-    return "No sessions found.";
-  }
-
-  const lines: string[] = [];
-  lines.push("Project                                  Sessions    Minutes");
-  lines.push("─".repeat(60));
-
-  for (const stat of stats) {
-    const name = stat.projectName.slice(0, 38).padEnd(38);
-    const sessions = stat.sessionCount.toString().padStart(8);
-    const minutes = stat.totalMinutes.toString().padStart(10);
-    lines.push(`${name} ${sessions} ${minutes}`);
-  }
-
-  lines.push("─".repeat(60));
-  const totalSessions = stats.reduce((sum, s) => sum + s.sessionCount, 0);
-  const totalMinutes = stats.reduce((sum, s) => sum + s.totalMinutes, 0);
-  const totalLine = `${"Total".padEnd(38)} ${totalSessions.toString().padStart(8)} ${totalMinutes.toString().padStart(10)}`;
-  lines.push(totalLine);
 
   return lines.join("\n");
 }
@@ -86,4 +59,68 @@ export function formatSearchResults(results: SearchResult[]): string {
   }
 
   return lines.join("\n");
+}
+
+export function formatErrors(errors: ToolError[]): string {
+  if (errors.length === 0) {
+    return "No tool errors found.";
+  }
+
+  const lines: string[] = [];
+  lines.push(`Found ${errors.length} error${errors.length === 1 ? "" : "s"}:\n`);
+
+  for (const error of errors) {
+    const timestamp = formatTimestamp(error.timestamp);
+    const preview = error.content.slice(0, 100).replace(/\n/g, " ");
+    lines.push(`[${timestamp}] ${error.toolName}`);
+    lines.push(`  ${preview}${error.content.length > 100 ? "..." : ""}`);
+    lines.push(`  Session: ${error.sessionId}`);
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+export function formatErrorAggregates(aggregates: ErrorAggregate[]): string {
+  if (aggregates.length === 0) {
+    return "No tool errors found.";
+  }
+
+  const total = aggregates.reduce((sum, a) => sum + a.count, 0);
+  const lines: string[] = [];
+  lines.push(
+    `Found ${total} error${total === 1 ? "" : "s"} in ${aggregates.length} unique patterns:\n`,
+  );
+
+  for (const aggregate of aggregates) {
+    const preview = aggregate.content.slice(0, 80).replace(/\n/g, " ");
+    lines.push(`${aggregate.count}x: ${preview}${aggregate.content.length > 80 ? "..." : ""}`);
+    const tools = [...new Set(aggregate.examples.map((e) => e.toolName))].join(", ");
+    lines.push(`   Tools: ${tools}`);
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+export function formatStats(stats: UsageStats): string {
+  if (stats.totalSessions === 0) {
+    return "No sessions found.";
+  }
+
+  const sections: string[] = [];
+
+  sections.push(
+    `${stats.totalSessions} sessions, ${stats.totalToolUses} tool uses, ${stats.totalErrors} errors\n`,
+  );
+
+  if (stats.tools.length > 0) {
+    const toolData = [
+      ["Tool", "Uses", "Errors", "Error Rate"],
+      ...stats.tools.map((t) => [t.name, t.uses, t.errors, `${(t.errorRate * 100).toFixed(1)}%`]),
+    ];
+    sections.push(table(toolData));
+  }
+
+  return sections.join("\n");
 }

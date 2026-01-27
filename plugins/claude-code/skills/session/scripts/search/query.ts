@@ -1,42 +1,28 @@
 import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
+import {
+  compareTimestampsDesc,
+  getProjectsDir,
+  isWithinDateRange,
+  matchesProjectFilter,
+} from "./files";
 import { parseConversationFile } from "./parse";
 import { calculateRelevanceScore } from "./score";
 import {
   type Conversation,
   DEFAULT_LIMITS,
   type DigestResult,
-  type ProjectStats,
   type SearchOptions,
   type SearchResult,
 } from "./types";
-
-const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
-
-function matchesProjectFilter(projectDir: string, filter: string): boolean {
-  const normalizedFilter = filter.replace(/\//g, "-");
-  return projectDir.includes(normalizedFilter) || projectDir.includes(filter);
-}
-
-function isWithinDateRange(conversation: Conversation, options: SearchOptions): boolean {
-  if (options.after && conversation.startTime && conversation.startTime < options.after) {
-    return false;
-  }
-  if (options.before && conversation.endTime && conversation.endTime > options.before) {
-    return false;
-  }
-  return true;
-}
 
 function hasContent(conversation: Conversation): boolean {
   return conversation.messages.length > 0;
 }
 
 async function loadConversations(options: SearchOptions): Promise<Conversation[]> {
-  const projectsDir =
-    options.projectsDir || process.env.CLAUDE_PROJECTS_DIR || DEFAULT_PROJECTS_DIR;
+  const projectsDir = getProjectsDir(options);
 
   let entries: Dirent[];
   try {
@@ -67,7 +53,9 @@ async function loadConversations(options: SearchOptions): Promise<Conversation[]
   }
 
   const conversations = await Promise.all(parsePromises);
-  return conversations.filter((conv) => hasContent(conv) && isWithinDateRange(conv, options));
+  return conversations.filter(
+    (conv) => hasContent(conv) && isWithinDateRange(conv.startTime, options),
+  );
 }
 
 export async function searchConversations(
@@ -93,11 +81,7 @@ export async function searchConversations(
 export async function getDigest(options: SearchOptions = {}): Promise<DigestResult> {
   const conversations = await loadConversations(options);
 
-  conversations.sort((a, b) => {
-    if (!a.startTime) return 1;
-    if (!b.startTime) return -1;
-    return b.startTime.getTime() - a.startTime.getTime();
-  });
+  conversations.sort((a, b) => compareTimestampsDesc(a.startTime, b.startTime));
 
   const limit = options.limit ?? DEFAULT_LIMITS.digest;
   const totalCount = conversations.length;
@@ -108,54 +92,4 @@ export async function getDigest(options: SearchOptions = {}): Promise<DigestResu
     totalCount,
     truncated,
   };
-}
-
-export async function getStats(options: SearchOptions = {}): Promise<ProjectStats[]> {
-  const conversations = await loadConversations(options);
-
-  const statsMap = new Map<
-    string,
-    {
-      projectPath: string;
-      projectName: string;
-      sessionCount: number;
-      totalMinutes: number;
-      firstSession: Date | null;
-      lastSession: Date | null;
-    }
-  >();
-
-  for (const conv of conversations) {
-    const key = conv.projectPath ?? "unknown";
-    const existing = statsMap.get(key);
-
-    if (existing) {
-      existing.sessionCount++;
-      if (conv.durationMinutes !== null) {
-        existing.totalMinutes += conv.durationMinutes;
-      }
-      if (conv.startTime) {
-        if (!existing.firstSession || conv.startTime < existing.firstSession) {
-          existing.firstSession = conv.startTime;
-        }
-        if (!existing.lastSession || conv.startTime > existing.lastSession) {
-          existing.lastSession = conv.startTime;
-        }
-      }
-    } else {
-      statsMap.set(key, {
-        projectPath: key,
-        projectName: conv.projectName ?? path.basename(key),
-        sessionCount: 1,
-        totalMinutes: conv.durationMinutes ?? 0,
-        firstSession: conv.startTime,
-        lastSession: conv.startTime,
-      });
-    }
-  }
-
-  const stats = Array.from(statsMap.values());
-  stats.sort((a, b) => b.totalMinutes - a.totalMinutes);
-
-  return stats;
 }

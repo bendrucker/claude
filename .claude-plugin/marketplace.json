@@ -114,9 +114,19 @@
       "source": "./plugins/interview"
     },
     {
+      "name": "calendar",
+      "description": "Reading and managing macOS Calendar events",
+      "source": "./plugins/calendar"
+    },
+    {
       "name": "research",
       "description": "Research existing solutions when exploring a new problem space",
       "source": "./plugins/research"
+    },
+    {
+      "name": "type-ignore",
+      "description": "Detects and eliminates type ignores across your codebase",
+      "source": "./plugins/type-ignore"
     },
     {
       "name": "agents-md",

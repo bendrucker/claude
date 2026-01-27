@@ -1,0 +1,8 @@
+{
+  "name": "calendar",
+  "description": "Reading and managing macOS Calendar events",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

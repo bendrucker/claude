@@ -55,8 +55,10 @@
     "code-simplifier@claude-plugins-official": true,
     "github@claude-plugins-official": true,
     "astral@astral-sh": true,
+    "calendar@bendrucker": true,
     "research@bendrucker": true,
     "style@bendrucker": true,
+    "type-ignore@bendrucker": true,
     "agents-md@bendrucker": true,
     "ast-grep@ast-grep": true,
     "worktrunk@worktrunk": true
@@ -120,6 +122,17 @@
   },
   "alwaysThinkingEnabled": true,
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx hooks/worktree"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

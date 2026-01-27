@@ -1,55 +1,49 @@
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import {
-  calculateRelevanceScore,
-  formatDigest,
-  formatSearchResults,
-  formatStats,
-  getDigest,
-  getStats,
-  parseConversationFile,
-  parseDate,
-  searchConversations,
-} from "./search.js";
+import { parseDate } from "./search/date";
+import { formatDigest, formatSearchResults, formatStats } from "./search/format";
+import { parseConversationFile } from "./search/parse";
+import { getDigest, getStats, searchConversations } from "./search/query";
+import { calculateRelevanceScore } from "./search/score";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, "..", "fixtures", "sessions");
 const projectDir = path.join(fixturesDir, "-Users-test-project");
 
 describe("parseConversationFile", () => {
-  it("parses basic JSONL session", () => {
-    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("parses basic JSONL session", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
     expect(conv.sessionId).toBe("basic-session");
     expect(conv.messages).toHaveLength(2);
     expect(conv.messages[0]?.role).toBe("user");
     expect(conv.messages[1]?.role).toBe("assistant");
   });
 
-  it("extracts project metadata", () => {
-    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("extracts project metadata", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
     expect(conv.projectPath).toBe("/Users/test/project");
     expect(conv.gitBranch).toBe("main");
   });
 
-  it("extracts timestamps", () => {
-    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("extracts timestamps", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
     expect(conv.startTime).toEqual(new Date("2024-01-15T10:00:00.000Z"));
     expect(conv.endTime).toEqual(new Date("2024-01-15T10:01:00.000Z"));
   });
 
-  it("computes durationMinutes from timestamps", () => {
-    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("computes durationMinutes from timestamps", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
     expect(conv.durationMinutes).toBe(1);
   });
 
-  it("extracts projectName from projectPath", () => {
-    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("extracts projectName from projectPath", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
     expect(conv.projectName).toBe("project");
   });
 
-  it("extracts tool uses from assistant messages", () => {
-    const conv = parseConversationFile(path.join(projectDir, "tools.jsonl"));
+  it("extracts tool uses from assistant messages", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "tools.jsonl"));
     const toolUses = conv.messages.flatMap((m) => m.toolUses);
     expect(toolUses).toHaveLength(3);
     expect(toolUses.some((t) => t.name === "Bash")).toBe(true);
@@ -57,40 +51,40 @@ describe("parseConversationFile", () => {
     expect(toolUses.some((t) => t.name === "Edit")).toBe(true);
   });
 
-  it("extracts summary when present", () => {
-    const conv = parseConversationFile(path.join(projectDir, "summary.jsonl"));
+  it("extracts summary when present", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "summary.jsonl"));
     expect(conv.summary).toBe(
       "Fixed database connection pooling issue causing timeouts under load",
     );
   });
 
-  it("handles sessions without summary", () => {
-    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("handles sessions without summary", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
     expect(conv.summary).toBeNull();
   });
 
-  it("skips malformed JSON lines and parses valid ones", () => {
-    const conv = parseConversationFile(path.join(projectDir, "malformed.jsonl"));
+  it("skips malformed JSON lines and parses valid ones", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "malformed.jsonl"));
     expect(conv.messages).toHaveLength(2);
     expect(conv.messages[0]?.content).toContain("Valid message");
   });
 
-  it("returns null projectPath when not present", () => {
-    const conv = parseConversationFile(path.join(projectDir, "malformed.jsonl"));
+  it("returns null projectPath when not present", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "malformed.jsonl"));
     expect(conv.projectPath).toBe("/Users/test/malformed");
   });
 });
 
 describe("calculateRelevanceScore", () => {
-  it("returns zero for empty query", () => {
-    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("returns zero for empty query", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
     const { score } = calculateRelevanceScore("", conv);
     expect(score).toBe(0);
   });
 
-  it("weights summaries 3x higher", () => {
-    const convWithSummary = parseConversationFile(path.join(projectDir, "summary.jsonl"));
-    const convWithoutSummary = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("weights summaries 3x higher", async () => {
+    const convWithSummary = await parseConversationFile(path.join(projectDir, "summary.jsonl"));
+    const convWithoutSummary = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
 
     const summaryScore = calculateRelevanceScore("database", convWithSummary);
     const noSummaryScore = calculateRelevanceScore("database", convWithoutSummary);
@@ -98,22 +92,22 @@ describe("calculateRelevanceScore", () => {
     expect(summaryScore.score).toBeGreaterThan(noSummaryScore.score);
   });
 
-  it("boosts user messages over assistant messages", () => {
-    const conv = parseConversationFile(path.join(projectDir, "multiple.jsonl"));
+  it("boosts user messages over assistant messages", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "multiple.jsonl"));
     // "refactor" appears in user message
     const { score } = calculateRelevanceScore("refactor", conv);
     expect(score).toBeGreaterThan(0);
   });
 
-  it("includes tool uses in scoring", () => {
-    const conv = parseConversationFile(path.join(projectDir, "tools.jsonl"));
+  it("includes tool uses in scoring", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "tools.jsonl"));
     const { score, matchedContent } = calculateRelevanceScore("Bash npm", conv);
     expect(score).toBeGreaterThan(0);
     expect(matchedContent.some((m) => m.includes("Tool:"))).toBe(true);
   });
 
-  it("returns matched content previews", () => {
-    const conv = parseConversationFile(path.join(projectDir, "basic.jsonl"));
+  it("returns matched content previews", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "basic.jsonl"));
     const { matchedContent } = calculateRelevanceScore("error", conv);
     expect(matchedContent.length).toBeGreaterThan(0);
     expect(matchedContent.some((m) => m.includes("user:") || m.includes("assistant:"))).toBe(true);

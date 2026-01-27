@@ -15,7 +15,7 @@ Access details about the current Claude Code session or search past conversation
 Run the info script to get full session details:
 
 ```bash
-scripts/info.sh "${CLAUDE_SESSION_ID}"
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/info.ts "${CLAUDE_SESSION_ID}"
 ```
 
 ## Search History
@@ -24,16 +24,16 @@ Search past conversations or get a digest of recent work:
 
 ```bash
 # Search for specific topics
-npx tsx scripts/search.ts "error handling"
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts "error handling"
 
 # Get today's conversation digest
-npx tsx scripts/search.ts --digest --after today
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts --digest --after today
 
 # Search with date filters
-npx tsx scripts/search.ts "auth" --after yesterday
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts "auth" --after yesterday
 
 # Get stats by project for the week
-npx tsx scripts/search.ts --stats --after "last week"
+bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/search.ts --stats --after "last week"
 ```
 
 See [search.md](search.md) for filtering and JSON output options.

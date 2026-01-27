@@ -1,0 +1,8 @@
+{
+  "name": "type-ignore",
+  "description": "Detects newly added type ignores and attempts automatic fixes",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

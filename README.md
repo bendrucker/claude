@@ -12,6 +12,16 @@ It also contains my `settings.json` to synchronize my shared settings across mac
 
 Browse the [`plugins/`](plugins/) directory to see available plugins. Each plugin has its own README describing its contents.
 
+## Development
+
+To test a plugin locally without publishing:
+
+```bash
+claude --plugin-dir ./plugins/<name> --setting-sources local
+```
+
+This isolates the session from user/project settings, loading only the specified plugin. Use this to verify changes before committing.
+
 ## License
 
 MIT © [Ben Drucker](http://bendrucker.me)

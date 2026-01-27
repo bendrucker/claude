@@ -1,0 +1,16 @@
+{
+  "description": "Detects type ignores in edits",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx ${CLAUDE_PLUGIN_ROOT}/hooks/detect.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

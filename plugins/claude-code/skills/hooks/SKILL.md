@@ -1,6 +1,6 @@
 ---
 name: hooks
-description: Use this skill when you need to configure, create, or troubleshoot Claude Code hooks. This includes setting up PreToolUse hooks, PostToolUse hooks, UserPromptSubmit hooks, or any automation within Claude Code. Examples include "I want to run tests before every file edit", "My hook isn't firing", or "How do I create a hook that formats JSON output with jq?"
+description: Use this skill when you need to configure, create, or troubleshoot Claude Code hooks. This includes setting up PreToolUse hooks, PostToolUse hooks, UserPromptSubmit hooks, debugging hook failures, or any automation within Claude Code. Examples include "I want to run tests before every file edit", "My hook isn't firing", "1 out of 2 hooks ran", or "How do I create a hook that formats JSON output with jq?"
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, WebFetch(domain:docs.anthropic.com)]
 ---
 
@@ -122,3 +122,7 @@ See these repositories for hook implementations:
 - Input modification: [plugins/linear/hooks/](plugins/linear/hooks/)
 - Permission decisions: [plugins/github/scripts/](plugins/github/scripts/)
 - PostToolUse feedback: [hooks/biome/](hooks/biome/)
+
+## Debugging
+
+For troubleshooting hook failures, see [debugging](references/debugging.md).

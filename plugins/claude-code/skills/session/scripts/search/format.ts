@@ -3,11 +3,9 @@ import type { ErrorAggregate, ToolError } from "./errors";
 import type { UsageStats } from "./stats";
 import { DISPLAY_LIMITS, type DigestResult, type SearchResult } from "./types";
 
-const TIMESTAMP_FORMAT = "YYYY-MM-DD HH:MM";
-
 function formatTimestamp(date: Date | null): string {
   if (!date) return "unknown";
-  return date.toISOString().replace("T", " ").slice(0, TIMESTAMP_FORMAT.length);
+  return date.toISOString().replace("T", " ").slice(0, 16);
 }
 
 export function formatDigest(result: DigestResult): string {

@@ -18,6 +18,12 @@ export function isWithinDateRange(timestamp: Date | null, options: SearchOptions
   return true;
 }
 
+export function compareTimestampsDesc(a: Date | null, b: Date | null): number {
+  if (!a) return 1;
+  if (!b) return -1;
+  return b.getTime() - a.getTime();
+}
+
 export function getProjectsDir(options: SearchOptions): string {
   return options.projectsDir || process.env.CLAUDE_PROJECTS_DIR || DEFAULT_PROJECTS_DIR;
 }

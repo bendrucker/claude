@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import * as path from "node:path";
 import { createInterface } from "node:readline";
-import { isWithinDateRange, streamSessionFiles } from "./files";
+import { compareTimestampsDesc, isWithinDateRange, streamSessionFiles } from "./files";
 import type { ErrorType, SearchOptions } from "./types";
 
 const REJECTION_PATTERNS = [
@@ -131,11 +131,7 @@ export async function getErrors(options: SearchOptions = {}): Promise<ToolError[
     allErrors.push(...errors);
   }
 
-  allErrors.sort((a, b) => {
-    if (!a.timestamp) return 1;
-    if (!b.timestamp) return -1;
-    return b.timestamp.getTime() - a.timestamp.getTime();
-  });
+  allErrors.sort((a, b) => compareTimestampsDesc(a.timestamp, b.timestamp));
 
   const limit = options.limit ?? 50;
   return allErrors.slice(0, limit);

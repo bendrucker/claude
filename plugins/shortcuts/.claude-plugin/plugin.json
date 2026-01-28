@@ -1,0 +1,8 @@
+{
+  "name": "shortcuts",
+  "description": "Creating and running macOS Shortcuts programmatically",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

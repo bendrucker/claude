@@ -106,7 +106,7 @@ jobs:
           $output
           \`\`\`
 
-          Consider adding these to \`enabledPlugins\` if they should be active."
+          Consider adding these to \`enabledPlugins\` if they should be active." || true
           fi
 
       - name: List local plugins

@@ -4,7 +4,9 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
 
 ## Contents
 
-- **Skill**: Best practices for GitHub CLI and MCP tool selection
+- **Skills**:
+  - `gh`: Best practices for GitHub CLI and MCP tool selection
+  - `notifications`: Inbox management (list, filter, mark read/done, unsubscribe)
 - **Agents**:
   - `github-actions-monitor`: Track workflow runs and retrieve failure logs
   - `github-rulesets-manager`: Configure repository rulesets and branch protection

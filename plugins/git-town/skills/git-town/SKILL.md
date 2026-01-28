@@ -166,6 +166,22 @@ git town sync
 
 This detects the merge and cleans up the local branch.
 
+## Worktrees
+
+git-town works with git worktrees. Branch metadata is stored in git config, which is shared across all worktrees. Commands like `switch`, `sync`, and `walk` are worktree-aware and handle branches checked out elsewhere.
+
+### Limitations
+
+- `git town hack --beam` may not prompt for commits when using worktrees ([#5690](https://github.com/git-town/git-town/issues/5690))
+- Use `git town hack` without `--beam`, then cherry-pick or rebase commits manually
+
+### Workflow
+
+1. Create branch: `git town hack feature` or `git town append child`
+2. Create worktree for the branch using your worktree tool
+3. Work in the worktree, commit changes
+4. Sync from any worktree: `git town sync --stack`
+
 ## Reference Documentation
 
 - [stacking.md](references/stacking.md) - Complete stacked changes workflow

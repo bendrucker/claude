@@ -1,98 +1,53 @@
 # Branch Types
 
-git-town categorizes branches to determine how they sync and interact. Understanding branch types helps you configure git-town for your workflow.
+git-town categorizes branches to determine sync behavior.
 
 ## Feature Branches
 
-**Default type for new branches.**
-
-- Created with `git town hack` or `git town append`
-- Have a parent branch (usually `main` or another feature)
-- Sync by rebasing onto parent, then pushing
-- Deleted locally after their PR merges
-
-```bash
-git town hack my-feature  # Creates a feature branch
-```
+Default type. Created with `git town hack` or `git town append`. Rebase onto parent, push, deleted after PR merges.
 
 ## Perennial Branches
 
-**Long-lived branches that never get deleted.**
-
-Examples: `main`, `master`, `develop`, `staging`, `production`
-
-- No parent branch
-- Sync by pulling from remote (no rebase)
-- Never deleted by git-town
-- Can be parents for feature branches
-
-Configure during `git town init` or:
+Long-lived branches (`main`, `develop`, `staging`). Pull from remote, never rebase or delete.
 
 ```bash
 git town config perennial-branches add staging
-git town config perennial-branches remove staging
 ```
 
 ## Contribution Branches
 
-**Branches in repos you don't own.**
-
-When you clone someone else's repo and create branches:
-
-- Sync by rebasing onto the tracking branch
-- Don't push automatically (you may not have permission)
-- Useful for contributing to open source
+For repos you don't own. Rebase onto tracking branch but don't push automatically.
 
 ```bash
-git town contribute  # Mark current branch as contribution
+git town contribute  # Mark current branch
 ```
 
 ## Observed Branches
 
-**Branches you watch but don't modify.**
-
-Track branches from other contributors:
-
-- Sync by pulling from remote only
-- Never push
-- Never deleted
+Branches you watch but don't modify. Pull only, never push or delete.
 
 ```bash
-git town observe  # Mark current branch as observed
-git town observe feature-x  # Mark specific branch
+git town observe feature-x
 ```
 
 ## Parked Branches
 
-**Branches temporarily excluded from sync.**
-
-When you need to pause work on a branch:
-
-- Skipped during `git town sync --all`
-- Not deleted even if remote is gone
-- Useful for work-in-progress you'll return to
+Temporarily excluded from sync. Useful for pausing work-in-progress.
 
 ```bash
-git town park           # Park current branch
-git town unpark         # Resume syncing
+git town park     # Exclude from sync
+git town unpark   # Resume syncing
 ```
 
 ## Prototype Branches
 
-**Branches not yet ready to push.**
-
-For experimental work:
-
-- Sync locally (rebase onto parent)
-- Don't push to remote
-- Useful for trying ideas before sharing
+Local-only branches not ready to push. `git town propose` automatically un-prototypes.
 
 ```bash
-git town prototype      # Mark as prototype
-git town propose        # Automatically un-prototypes and pushes
+git town prototype
 ```
 
-## How Syncing Differs by Type
+## Sync Behavior Summary
 
 | Branch Type  | Rebase | Push | Delete After Merge |
 |--------------|--------|------|-------------------|
@@ -105,28 +60,11 @@ git town propose        # Automatically un-prototypes and pushes
 
 ## Changing Branch Type
 
-Most type commands toggle:
+Type commands toggle on/off: `git town contribute`, `git town observe`, `git town park`, `git town prototype`
+
+## Viewing Branches
 
 ```bash
-git town contribute  # Toggle contribution status
-git town observe     # Toggle observed status
-git town park        # Toggle parked status
-git town prototype   # Toggle prototype status
+git town branch     # Current branch info
+git town branches   # All branches with types
 ```
-
-## Viewing Branch Configuration
-
-```bash
-git town branch     # Show current branch info
-git town branches   # Show all branches with types
-```
-
-## Configuration Storage
-
-Branch types are stored in git config:
-
-```
-git-town-branch.<name>.branchtype = contribution|observed|parked|prototype
-```
-
-This travels with the repository when cloned.

@@ -1,227 +1,96 @@
 # Configuration
 
-git-town configuration controls sync behavior, hosting platform integration, and branch management preferences.
-
 ## Initial Setup
-
-Run in any repository:
 
 ```bash
 git town init
 ```
 
-Interactive prompts cover:
-1. Main branch name
-2. Perennial branches (if any)
-3. Hosting platform
-4. Sync strategy preferences
+Interactive prompts cover main branch, perennial branches, hosting platform, and sync strategy.
 
 ## Configuration Hierarchy
 
-Settings are checked in order:
-
-1. **Repository config** (`git config --local`) - per-repo settings
-2. **Global config** (`git config --global`) - user defaults
-3. **Environment variables** - override for CI/scripts
+1. Repository config (`git config --local`)
+2. Global config (`git config --global`)
+3. Environment variables
 
 ## Key Preferences
 
-### sync-feature-strategy
-
-How feature branches sync with their parent:
-
 ```bash
-git town config sync-feature-strategy rebase   # Default: rebase onto parent
-git town config sync-feature-strategy merge    # Merge parent into branch
-```
+# Sync strategy: rebase (default) or merge
+git town config sync-feature-strategy rebase
 
-**Rebase** (recommended): Clean linear history, but rewrites commits.
-**Merge**: Preserves original commits, creates merge commits.
+# Push branches on creation
+git town config push-new-branches true
 
-### push-new-branches
+# Run pre-push hooks
+git town config push-hook true
 
-Whether to push branches immediately after creation:
+# Ship strategy: api, squash-merge, or fast-forward
+git town config ship-strategy api
 
-```bash
-git town config push-new-branches true    # Push on hack/append
-git town config push-new-branches false   # Don't auto-push
-```
-
-### push-hook
-
-Whether to run Git push hooks:
-
-```bash
-git town config push-hook true    # Run pre-push hooks
-git town config push-hook false   # Skip hooks
-```
-
-### ship-strategy
-
-How branches are merged when shipped:
-
-```bash
-git town config ship-strategy api           # Use platform's merge API
-git town config ship-strategy squash-merge  # Squash via API
-git town config ship-strategy fast-forward  # Local fast-forward
-```
-
-### ship-delete-tracking-branch
-
-Whether to delete remote branch after shipping:
-
-```bash
-git town config ship-delete-tracking-branch true   # Delete remote
-git town config ship-delete-tracking-branch false  # Keep remote
+# Delete remote branch after shipping
+git town config ship-delete-tracking-branch true
 ```
 
 ## Platform Configuration
 
-### GitHub
-
-git-town uses the `gh` CLI or a token:
-
 ```bash
-# Using gh CLI (recommended)
+# GitHub - use gh CLI (recommended) or token
 gh auth login
-
-# Using token directly
 git town config github-token <token>
-```
 
-### GitLab
-
-git-town uses the `glab` CLI or a token:
-
-```bash
-# Using glab CLI (recommended)
+# GitLab - use glab CLI (recommended) or token
 glab auth login
-
-# Using token directly
 git town config gitlab-token <token>
-```
 
-### Bitbucket
-
-```bash
+# Bitbucket - uses git credentials
 git town config hosting-platform bitbucket
-```
 
-Uses git credentials for authentication.
-
-### Gitea / Forgejo
-
-```bash
+# Gitea / Forgejo
 git town config hosting-platform gitea
 git town config gitea-token <token>
-```
 
-### Hosting Origin Hostname
-
-For self-hosted platforms:
-
-```bash
+# Self-hosted platforms
 git town config hosting-origin-hostname git.example.com
 ```
 
 ## Branch Configuration
 
-### Perennial Branches
-
-Long-lived branches that never get deleted:
-
 ```bash
-git town config perennial-branches                    # List current
-git town config perennial-branches add develop        # Add branch
-git town config perennial-branches remove develop     # Remove branch
-```
+# Perennial branches
+git town config perennial-branches add develop
+git town config perennial-branches remove develop
 
-### Default Branch Type
-
-Set the default type for new branches:
-
-```bash
-git town config default-branch-type feature     # Default
-git town config default-branch-type prototype   # Start as prototype
+# Default type for new branches
+git town config default-branch-type feature    # or prototype
 ```
 
 ## Viewing Configuration
 
-Show all settings:
-
 ```bash
-git town config
-```
-
-Show specific setting:
-
-```bash
-git town config sync-feature-strategy
+git town config                        # Show all
+git town config sync-feature-strategy  # Show specific setting
 ```
 
 ## Environment Variables
 
-Override any setting via environment:
+Override settings via `GIT_TOWN_<SETTING_NAME>`:
 
 ```bash
 GIT_TOWN_SYNC_FEATURE_STRATEGY=merge git town sync
 ```
 
-Pattern: `GIT_TOWN_<SETTING_NAME>` with underscores and uppercase.
-
-## Configuration Storage
-
-Settings stored in git config:
-
-```
-git-town.sync-feature-strategy = rebase
-git-town.push-new-branches = true
-git-town-branch.main.branchtype = perennial
-git-town-branch.feature-x.parent = main
-```
-
-Branch metadata travels with the repository.
-
-## Resetting Configuration
-
-Remove all git-town config:
+## CI/CD
 
 ```bash
-git town config reset
+GIT_TOWN_CI=true git town sync   # Disable prompts
+git town sync --no-push          # Skip pushing
+git town offline true            # No network
 ```
 
-This removes git-town settings but preserves branch parent relationships.
-
-## CI/CD Configuration
-
-For automated environments:
+## Reset
 
 ```bash
-# Disable interactive prompts
-GIT_TOWN_CI=true git town sync
-
-# Skip push operations
-git town sync --no-push
-
-# Offline mode (no network)
-git town offline true
-```
-
-## Example: Full Setup
-
-```bash
-# Initialize
-git town init
-
-# Set preferences
-git town config sync-feature-strategy rebase
-git town config push-new-branches true
-git town config ship-strategy api
-
-# Add perennial branches
-git town config perennial-branches add develop
-git town config perennial-branches add staging
-
-# Verify
-git town config
+git town config reset  # Remove settings, preserve branch parents
 ```

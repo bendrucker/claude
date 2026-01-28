@@ -29,158 +29,39 @@ This walks through configuration: main branch, perennial branches, hosting platf
 
 ## Basic Workflow
 
-### Create a Feature Branch
-
 ```bash
-git town hack feature-name
+git town hack feature-name  # Create feature branch from main
+git town sync               # Rebase onto parent, push
+git town propose            # Open PR targeting parent branch
+git town switch             # Interactive branch switcher
 ```
-
-Creates `feature-name` from `main`, tracks the parent relationship.
-
-### Sync Your Branch
-
-```bash
-git town sync
-```
-
-Pulls changes from the parent branch, rebases your work on top, and pushes. Run this frequently to stay current.
-
-### Propose a PR
-
-```bash
-git town propose
-```
-
-Opens your browser to create a PR targeting the parent branch. Works across all supported platforms.
-
-### Switch Between Branches
-
-```bash
-git town switch
-```
-
-Interactive branch switcher showing the branch hierarchy.
 
 ## Stacked Branches
 
-Create a child branch that builds on current work:
-
 ```bash
-git town append child-name
-```
-
-Creates `child-name` as a child of the current branch. When you sync, changes flow down the stack.
-
-Navigate the stack:
-
-```bash
-git town up      # Move to child branch
-git town down    # Move to parent branch
-```
-
-Sync the entire stack:
-
-```bash
-git town sync --stack
-```
-
-Propose all branches in the stack:
-
-```bash
-git town propose --stack
+git town append child-name   # Create child of current branch
+git town up                  # Move to child branch
+git town down                # Move to parent branch
+git town sync --stack        # Sync current branch and descendants
+git town propose --stack     # Propose PRs for entire stack
 ```
 
 See [stacking.md](references/stacking.md) for complete stacked workflow documentation.
 
 ## Error Recovery
 
-### Undo Any Command
-
 ```bash
-git town undo
+git town undo      # Reverse last git-town command
+git town continue  # Resume after resolving conflicts (git add first)
+git town skip      # Skip problematic commit during rebase
+git town abort     # Cancel operation and restore previous state
 ```
-
-Reverses the last git-town command. Works for any operation.
-
-### Continue After Conflicts
-
-When sync encounters conflicts:
-
-1. Resolve conflicts in your editor
-2. Stage resolved files: `git add <files>`
-3. Continue: `git town continue`
-
-### Skip a Problematic Commit
-
-If a commit can't be cleanly rebased:
-
-```bash
-git town skip
-```
-
-Skips the current commit and continues with the rest.
-
-### Abort an Operation
-
-```bash
-git town abort
-```
-
-Cancels the in-progress operation and restores the previous state.
-
-## Common Patterns
-
-### Start work on a new feature
-
-```bash
-git town hack my-feature
-# ... make changes, commit ...
-git town sync
-git town propose
-```
-
-### Update a feature with upstream changes
-
-```bash
-git town sync
-```
-
-### Create a stack of related changes
-
-```bash
-git town hack base-feature
-# ... implement base ...
-git town append enhancement
-# ... implement enhancement ...
-git town sync --stack
-git town propose --stack
-```
-
-### Ship a merged branch
-
-After a PR merges:
-
-```bash
-git town sync
-```
-
-This detects the merge and cleans up the local branch.
 
 ## Worktrees
 
-git-town works with git worktrees. Branch metadata is stored in git config, which is shared across all worktrees. Commands like `switch`, `sync`, and `walk` are worktree-aware and handle branches checked out elsewhere.
+git-town works with git worktrees. Branch metadata is stored in git config, shared across all worktrees.
 
-### Limitations
-
-- `git town hack --beam` may not prompt for commits when using worktrees ([#5690](https://github.com/git-town/git-town/issues/5690))
-- Use `git town hack` without `--beam`, then cherry-pick or rebase commits manually
-
-### Workflow
-
-1. Create branch: `git town hack feature` or `git town append child`
-2. Create worktree for the branch using your worktree tool
-3. Work in the worktree, commit changes
-4. Sync from any worktree: `git town sync --stack`
+**Limitation**: `git town hack --beam` may not prompt for commits when using worktrees ([#5690](https://github.com/git-town/git-town/issues/5690)). Use `git town hack` without `--beam`, then cherry-pick manually.
 
 ## Reference Documentation
 

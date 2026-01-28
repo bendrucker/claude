@@ -1,9 +1,9 @@
 # pull-request
 
-Create pull requests with proper formatting and content guidelines.
+Create and update pull requests with proper formatting and content guidelines.
 
 ## Contents
 
-- **Skill**: Guidelines for creating PRs with proper title formatting, body structure, and section organization
-- **Command**: `/pull-request:create` to create a PR for the current branch (supports background execution)
-- **Hook**: Validates PR body content before creation
+- **Skill**: `pull-request:create` — Guidelines for creating PRs with proper title formatting, body structure, and section organization
+- **Skill**: `pull-request:update` — Update a PR body to reflect the current state of changes
+- **Hook**: Validates PR body content before creation or edit

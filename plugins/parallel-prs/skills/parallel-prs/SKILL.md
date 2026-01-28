@@ -18,7 +18,7 @@ allowed-tools: Bash(git:*), Bash(gh:*), Bash(wt:*)
 2. Ask user to clarify ambiguities upfront
 3. Plan agents verify paths/line numbers in parallel
 4. Create worktrees with `wt switch --create`
-5. Implementation agents commit, push, load `pull-request` skill, create PR
+5. Implementation agents commit, push, load `pull-request:create` skill, create PR
 6. Monitor CI for failures
 
 See [workflow.md](workflow.md) and [agents.md](agents.md).

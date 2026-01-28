@@ -1,6 +1,6 @@
 {
   "name": "pull-request",
-  "description": "Create pull requests with proper formatting",
+  "description": "Create and update pull requests with proper formatting",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

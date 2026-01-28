@@ -29,4 +29,4 @@ If we're working on a PR:
 - Note any requirements not implemented exactly as described.
 - Create branch with concise descriptive name.
 - Commit with concise message emphasizing the diff, not the plan.
-- Push and create PR following the `pull-request` skill.
+- Push and create PR following the `pull-request:create` skill.

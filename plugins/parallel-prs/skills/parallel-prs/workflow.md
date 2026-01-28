@@ -26,7 +26,7 @@ Worktrunk handles branch creation and worktree placement automatically based on 
 
 Implementation agents work in assigned worktree, then:
 1. Commit and push
-2. Load `pull-request` skill and create PR (write body to `tmp/{branch}/pr-body.md` first)
+2. Load `pull-request:create` skill and create PR (write body to `tmp/{branch}/pr-body.md` first)
 
 ## Monitor CI
 

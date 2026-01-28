@@ -8,6 +8,8 @@ hooks:
       hooks:
         - type: command
           command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-namespace.ts"
+        - type: command
+          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-structure.ts"
 ---
 
 # Claude Code Skills Development
@@ -83,19 +85,35 @@ This is preprocessing, not something Claude executes. Use this to inject live da
 
 See [references/patterns.md](references/patterns.md) for detailed patterns and guidance.
 
-## Bundled Resources
+## Directory Structure
+
+Skills follow the [Agent Skills](https://agentskills.io/specification#optional-directories) directory convention. Only `SKILL.md` is required; all directories are optional.
 
 ```
 skill-name/
-├── SKILL.md (required - overview, navigation)
-├── references/ (documentation loaded as needed)
-├── scripts/ (executable utilities)
-└── assets/ (templates, images for output)
+├── SKILL.md        # Required: instructions and frontmatter
+├── scripts/        # Executable code agents can run
+├── references/     # Documentation loaded on demand
+└── assets/         # Static resources (templates, images, data files)
 ```
 
-**File Naming**: Reserve ALL CAPS for files with special meaning (SKILL.md, README.md). Use lowercase for all other files (setup.md, examples.md).
+A PostToolUse hook validates writes to skill directories against this structure.
 
-Keep references one level deep. For files >100 lines, include a table of contents.
+### `scripts/`
+
+Executable code that agents run. Scripts should be self-contained, document dependencies, and include error messages.
+
+### `references/`
+
+Additional documentation loaded when needed. Keep files focused — smaller files mean less context usage. Use descriptive names matching the domain (`finance.md`, `api.md`).
+
+### `assets/`
+
+Static resources: templates, images, diagrams, lookup tables, schemas.
+
+### File Naming
+
+Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use lowercase for all other files. Keep references one level deep. For files >100 lines, include a table of contents.
 
 ## Development Process
 
@@ -126,5 +144,6 @@ Load detailed guides as needed:
 
 ## Resources
 
+- [Agent Skills Specification](https://agentskills.io/specification)
 - [Claude Code Skills](https://code.claude.com/docs/en/skills)
 - [Agent Skills Best Practices](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills/best-practices)

@@ -1,0 +1,10 @@
+Please install my Claude Code plugins by running:
+
+curl -fsSL https://raw.githubusercontent.com/bendrucker/claude/main/scripts/bootstrap-remote.sh | bash
+
+This will:
+- Clone my marketplace from github.com/bendrucker/claude
+- Register it in ~/.claude/plugins/known_marketplaces.json
+- Enable core plugins: github, git, typescript, python, go, shell, claude-code
+
+After completion, I'll need to restart this session to activate the plugins.

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/marketplace.schema.json",
+  "name": "reload-test",
+  "version": "1.0.0",
+  "description": "Test marketplace for plugin reload experiment",
+  "owner": {
+    "name": "bendrucker"
+  },
+  "plugins": [
+    {
+      "name": "canary",
+      "description": "Canary plugin to test mid-session discovery",
+      "source": "./plugins/canary"
+    }
+  ]
+}

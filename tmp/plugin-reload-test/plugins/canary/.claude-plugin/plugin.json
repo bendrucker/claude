@@ -1,0 +1,7 @@
+{
+  "name": "canary",
+  "description": "Canary plugin to test mid-session plugin discovery",
+  "author": {
+    "name": "bendrucker"
+  }
+}

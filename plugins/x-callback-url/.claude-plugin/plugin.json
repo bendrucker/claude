@@ -1,0 +1,8 @@
+{
+  "name": "x-callback-url",
+  "description": "Call x-callback-url schemes from the CLI and receive responses",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

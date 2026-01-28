@@ -6,7 +6,7 @@
     "packages/skill-lint",
     "plugins/claude-code/skills/session",
     "plugins/style",
-    "plugins/things/skills/things",
+    "plugins/things",
     "plugins/type-ignore"
   ],
   "scripts": {

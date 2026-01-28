@@ -1,6 +1,6 @@
 ---
 name: url
-description: Things 3 URL scheme operations for creating, updating, and managing tasks and projects. Use for write operations including add, update, json, show, and search commands.
+description: Create, update, and manage Things 3 tasks and projects. Not for reads — use things:jxa to query data. For simple inbox captures, use things:inbox.
 allowed-tools: [Bash(osascript:*), Bash(open:*), Bash, Read]
 hooks:
   PreToolUse:
@@ -23,153 +23,43 @@ Write operations for Things 3 via the `things:///` URL scheme.
 
 ## Quick Start
 
-Use the `url.js` wrapper for most operations — it handles auth tokens and URL encoding:
+Use `url.js` for most operations — it handles auth tokens and URL encoding:
 
 ```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js add title="Buy milk" when=today
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js update id=ABC-123 append-notes="Done!"
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js show id=today
+osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js <command> [key=value ...]
 ```
 
-For raw URL scheme access:
-
-```bash
-open -g "things:///add?title=Buy%20milk&when=today"
-```
+For raw URL scheme access: `open -g "things:///add?title=Buy%20milk&when=today"`
 
 Use `-g` for data commands (add, update, json) to run in background. Omit `-g` for `show`/`search` to foreground Things.
 
 ## Commands
 
-### Create Todos
+| Command | Description | Auth required |
+|---------|-------------|:---:|
+| `add` | Create a todo | No |
+| `add-project` | Create a project with optional todos | No |
+| `update` | Modify a todo's properties | Yes |
+| `update-project` | Modify a project's properties | Yes |
+| `show` | Navigate to a list, todo, or project | No |
+| `search` | Open search with optional query | No |
+| `json` | Batch create/update via JSON payload | Yes (for updates) |
+
+See [examples.md](examples.md) for detailed usage of each command.
+
+## Reorder Items
 
 ```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js add title="Task name" when=today tags=Work
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js add title="Full details" notes="Review goals" when=2025-11-01 deadline=2025-11-07 tags=Work,Planning
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js add titles="Buy milk
-Pick up dry cleaning
-Walk dog" when=today
-```
-
-### Create with Checklist (JSON)
-
-```bash
-data='[{
-  "type": "to-do",
-  "attributes": {
-    "title": "Prepare presentation",
-    "when": "today",
-    "tags": ["Work"],
-    "checklist-items": [
-      {"type": "checklist-item", "attributes": {"title": "Create slides"}},
-      {"type": "checklist-item", "attributes": {"title": "Prepare talking points"}}
-    ]
-  }
-}]'
-open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
-```
-
-### Create in Project
-
-```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js add title="Write chapter 3" list="Book Writing" when=anytime
-```
-
-### Create Projects
-
-```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js add-project title="Website Redesign" when=today tags=Work
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js add-project title="Plan vacation" when=tomorrow to-dos="Research destinations
-Book flights
-Book hotel"
-```
-
-### Complex Projects (JSON)
-
-```bash
-data='[{
-  "type": "project",
-  "attributes": {
-    "title": "Launch New Feature",
-    "when": "today",
-    "deadline": "2025-11-30",
-    "tags": ["Work"],
-    "area": "Engineering",
-    "items": [
-      {"type": "heading", "attributes": {"title": "Planning"}},
-      {"type": "to-do", "attributes": {"title": "Write spec"}},
-      {"type": "to-do", "attributes": {"title": "Review with team"}},
-      {"type": "heading", "attributes": {"title": "Implementation"}},
-      {"type": "to-do", "attributes": {"title": "Build backend"}},
-      {"type": "to-do", "attributes": {"title": "Build frontend"}}
-    ]
-  }
-}]'
-open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
-```
-
-### Update Todos
-
-Auth token is fetched automatically by `url.js` (see [1password.md](1password.md) for setup).
-
-```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js update id=ABC-123 append-notes="Additional info"
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js update id=ABC-123 add-tags=Urgent,Important
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js update id=ABC-123 when=tomorrow
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js update id=ABC-123 completed=true
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js update id=ABC-123 list="New Project"
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js update id=ABC-123 append-checklist-items="Item 1
-Item 2"
-```
-
-### Navigate and Search
-
-```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js show id=today
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js show id=inbox
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js show id=ABC-123
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js search query="meeting notes"
-```
-
-### Reorder Items
-
-```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.js <id1> <id2> <id3> ...
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.js --list anytime <id1> <id2> <id3>
+osascript ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.js [--list today|anytime|someday] <id1> <id2> <id3> ...
 ```
 
 Items appear at the top of the list in the order specified. Default list is `today`. Also works for items within a project — use the `--list` value matching the items' current scheduling state.
 
-### Link Tasks
-
-```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js add title="Follow up: Review proposal" notes="Original task: things:///show?id=ABC-123" when=tomorrow
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/url.js update id=ABC-123 append-notes="Related: things:///show?id=DEF-456"
-```
-
 ## Verification with xcall
 
-Things supports [x-callback-url](https://culturedcode.com/things/support/articles/2803573/): all commands accept `x-success`, `x-error`, and `x-cancel` callbacks. On success, Things returns `x-things-id` (or `x-things-ids` for the `json` command).
+Things supports [x-callback-url](https://culturedcode.com/things/support/articles/2803573/): all commands accept `x-success`, `x-error`, and `x-cancel` callbacks. On success, Things returns `x-things-id` (or `x-things-ids` for `json`).
 
-Load the `x-callback-url:xcall` skill for the `xcall` CLI bridge. It sends the URL with callbacks and blocks until Things responds, outputting the result to stdout.
-
-```bash
-# xcall run.sh path comes from the x-callback-url plugin
-xcall_run="${CLAUDE_PLUGIN_ROOT}/../x-callback-url/scripts/run.sh"
-
-$xcall_run "things:///add?title=Buy%20milk"
-# stdout: x-things-id=<id>
-```
-
-Use xcall when you need confirmation that an operation succeeded, especially for updates:
-
-```bash
-$xcall_run \
-  "things:///update?id=ABC-123&auth-token=$(security find-generic-password -a "$USER" -s "things-auth-token" -w)&completed=true"
-# stdout: x-things-id=ABC-123 (confirms update applied)
-```
-
-This eliminates the need for JXA read-back verification after URL scheme operations.
+Load the `x-callback-url:xcall` skill for the CLI bridge. It sends the URL with callbacks and blocks until Things responds, outputting the result to stdout. This eliminates the need for JXA read-back verification after URL scheme operations.
 
 ## Built-in List IDs (URL Scheme)
 
@@ -177,11 +67,7 @@ For `show` command: `inbox`, `today`, `anytime`, `upcoming`, `someday`, `logbook
 
 ## Lookup Area IDs
 
-The `list` parameter only works with project names. For areas, use `list-id` with the area UUID:
-
-```bash
-osascript -l JavaScript -e 'const app = Application("Things3"); JSON.stringify(app.areas().map(a => ({name: a.name(), id: a.id()})), null, 2);'
-```
+The `list` parameter only works with project names. For areas, use `list-id` with the area UUID (query area IDs via the `things:jxa` skill).
 
 ## When Values
 
@@ -203,8 +89,7 @@ Things supports [Markdown in notes](https://culturedcode.com/things/support/arti
 
 ## Documentation
 
-Load detailed guides as needed:
-
+- **[examples.md](examples.md)** — Detailed usage examples for all commands
 - **[url-scheme.md](url-scheme.md)** — Complete URL scheme commands and parameters
 - **[1password.md](1password.md)** — Auth token setup and keychain configuration
 

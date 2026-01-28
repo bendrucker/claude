@@ -1,6 +1,6 @@
 ---
 name: inbox
-description: Creating inbox todos in Things 3. Use when delegating tasks, capturing quick reminders, or adding items to inbox from a coding session.
+description: Quick fire-and-forget captures to the Things 3 inbox. Not for reads (things:jxa), scheduled tasks, updates, or projects (things:url).
 allowed-tools: [Bash(open:*)]
 hooks:
   PreToolUse:

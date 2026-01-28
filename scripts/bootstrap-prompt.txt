@@ -1,10 +1,11 @@
-Please install my Claude Code plugins by running:
+Please install my complete Claude Code configuration by running:
 
 curl -fsSL https://raw.githubusercontent.com/bendrucker/claude/main/scripts/bootstrap-remote.sh | bash
 
 This will:
-- Clone my marketplace from github.com/bendrucker/claude
-- Register it in ~/.claude/plugins/known_marketplaces.json
-- Enable core plugins: github, git, typescript, python, go, shell, claude-code
+- Install my marketplace (bendrucker) and external marketplaces (astral-sh, ast-grep, worktrunk)
+- Copy my full user configuration (permissions, sandbox settings, all enabled plugins)
+- Install user-level instructions (CLAUDE.md)
+- Filter out macOS-specific settings on Linux/remote platforms
 
-After completion, I'll need to restart this session to activate the plugins.
+After completion, settings will take effect on the next user message (Agent SDK) or session restart (CLI).

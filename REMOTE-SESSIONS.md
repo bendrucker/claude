@@ -1,53 +1,129 @@
-# Using Plugins in Remote Claude Code Sessions
+# Remote Session Configuration
 
-## The Problem
+## Problem
 
-When using Claude Code on the web or in remote VMs, your local `~/.claude` configuration and plugins aren't available. Project-level skills (`.claude/skills/`) work, but user-level plugins and marketplace installations don't transfer.
+Remote Claude Code sessions (web, VMs) don't have access to local `~/.claude` configuration. Remote environments receive project-level configuration (`.claude/`) from the repository but lack user-level settings, plugins, and marketplace registrations that exist on your local machine.
 
-## Solutions
+## Bootstrap Solution
 
-### 🚀 Quick Start: One-Liner Bootstrap (Recommended)
-
-Paste this at the start of any Claude Code session:
+Use the bootstrap script to install your complete user configuration in remote sessions:
 
 ```
-Run this command to install my plugins: curl -fsSL https://raw.githubusercontent.com/bendrucker/claude/main/scripts/bootstrap-remote.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bendrucker/claude/main/scripts/bootstrap-remote.sh | bash
 ```
 
-After Claude runs it, restart the session to activate plugins.
+The script installs:
+- Marketplace registrations (bendrucker, astral-sh, ast-grep, worktrunk)
+- All enabled plugins from your user configuration
+- User-level instructions (CLAUDE.md)
+- Permission and sandbox settings
 
-### 📋 Manual Commands (More Control)
+Platform-specific settings (macOS statusLine, hooks requiring local tools) are filtered out automatically on Linux/remote platforms.
 
-If you prefer step-by-step control:
+### Installation Methods
 
-```bash
-# 1. Clone marketplace
-git clone --depth 1 https://github.com/bendrucker/claude.git \
-  ~/.claude/plugins/marketplaces/bendrucker
+**From any remote session:**
+```
+Run this command: curl -fsSL https://raw.githubusercontent.com/bendrucker/claude/main/scripts/bootstrap-remote.sh | bash
+```
 
-# 2. Register marketplace
-jq '. + {
-  "bendrucker": {
-    "source": {"source": "git", "url": "https://github.com/bendrucker/claude.git"},
-    "installLocation": "'$HOME'/.claude/plugins/marketplaces/bendrucker",
-    "lastUpdated": "'$(date -Iseconds)'"
+**Using SessionStart hooks:**
+Add to `.claude/settings.json` in repositories where you want automatic plugin installation:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -fsSL https://raw.githubusercontent.com/bendrucker/claude/main/scripts/bootstrap-remote.sh | bash"
+          }
+        ]
+      }
+    ]
   }
-}' ~/.claude/plugins/known_marketplaces.json > /tmp/known.json
-mv /tmp/known.json ~/.claude/plugins/known_marketplaces.json
-
-# 3. Enable plugins
-jq '.enabledPlugins = (.enabledPlugins // {}) + {
-  "github@bendrucker": true,
-  "git@bendrucker": true,
-  "typescript@bendrucker": true,
-  "shell@bendrucker": true
-}' ~/.claude/settings.json > /tmp/settings.json
-mv /tmp/settings.json ~/.claude/settings.json
+}
 ```
 
-### 🎯 Project-Specific Plugins
+This approach installs plugins automatically when remote sessions start, though the installation happens every session since remote VMs don't persist `~/.claude` between sessions.
 
-For projects that need specific plugins, add `.claude/settings.json`:
+## How Remote Configuration Works
+
+Claude Code in remote environments:
+1. Clones the repository
+2. Reads project-level `.claude/settings.json` and `.claude/CLAUDE.md`
+3. Executes SessionStart hooks if configured
+4. Starts with an empty or default `~/.claude` directory
+
+User-level configuration (`~/.claude/settings.json`, `~/.claude/plugins/`) from your local machine is not available. The bootstrap script populates this directory in the remote VM, but it doesn't persist between sessions.
+
+Settings load at session initialization. Changes to settings files during a session take effect on the next user message in Agent SDK environments, or on session restart in CLI environments.
+
+## Plugin Loading
+
+Claude Code loads plugins from these locations in priority order:
+
+1. Project plugins: `.claude/plugins/{plugin}`
+2. Marketplace plugins: `~/.claude/plugins/marketplaces/{marketplace}/plugins/{plugin}`
+3. Built-in plugins: Bundled with Claude Code
+
+The bootstrap script installs marketplace plugins to location 2, making them available alongside project-specific and built-in plugins.
+
+## Available Plugins
+
+Core plugins from the bendrucker marketplace:
+
+- **github** - GitHub CLI patterns and workflows
+- **git** - Git workflow best practices
+- **typescript** - TypeScript standards
+- **python** - Python best practices
+- **go** - Go language support
+- **shell** - Shell scripting conventions
+- **claude-code** - Claude Code configuration patterns
+- **gitlab** - GitLab workflow and glab CLI
+- **linear** - Linear issue management
+- **terraform** - Terraform configuration
+
+See [marketplace.json](.claude-plugin/marketplace.json) for the complete list.
+
+## Troubleshooting
+
+**Plugins not available after bootstrap:**
+
+Check marketplace installation:
+```bash
+ls -la ~/.claude/plugins/marketplaces/bendrucker
+```
+
+Check marketplace registration:
+```bash
+jq '.bendrucker' ~/.claude/plugins/known_marketplaces.json
+```
+
+Check enabled plugins:
+```bash
+jq '.enabledPlugins' ~/.claude/settings.json
+```
+
+**Wrong plugin version:**
+
+Update the marketplace:
+```bash
+cd ~/.claude/plugins/marketplaces/bendrucker && git pull origin main
+```
+
+**Settings don't take effect:**
+
+Agent SDK environments: Settings reload on next user message
+CLI environments: Restart the session with `claude --resume`
+
+## Alternatives to Bootstrap Script
+
+**Project-level marketplace configuration:**
+
+Instead of bootstrapping user settings, configure marketplaces at the project level:
 
 ```json
 {
@@ -67,157 +143,8 @@ For projects that need specific plugins, add `.claude/settings.json`:
 }
 ```
 
-Then install at session start:
-```
-Install my plugins: bash ~/.claude/plugins/marketplaces/bendrucker/scripts/bootstrap-remote.sh
-```
+Commit this to `.claude/settings.json` in repositories. Plugins are available in all sessions (local and remote) without manual bootstrap.
 
-### 🔧 In-Repo Bootstrap
+**Template repositories:**
 
-When working in the `bendrucker/claude` repo itself (like this session), you can use the local copy:
-
-```bash
-# Create symlink to local repo
-ln -s /home/user/claude ~/.claude/plugins/marketplaces/bendrucker
-
-# Register it
-jq '. + {
-  "bendrucker": {
-    "source": {"source": "git", "url": "file:///home/user/claude"},
-    "installLocation": "'$HOME'/.claude/plugins/marketplaces/bendrucker",
-    "lastUpdated": "'$(date -Iseconds)'"
-  }
-}' ~/.claude/plugins/known_marketplaces.json > /tmp/known.json
-mv /tmp/known.json ~/.claude/plugins/known_marketplaces.json
-
-# Enable plugins
-jq '.enabledPlugins = {"github@bendrucker": true}' ~/.claude/settings.json > /tmp/settings.json
-mv /tmp/settings.json ~/.claude/settings.json
-```
-
-## How It Works
-
-Claude Code loads plugins from three locations (in priority order):
-
-1. **Project plugins**: `.claude/plugins/{plugin}`
-2. **Marketplace plugins**: `~/.claude/plugins/marketplaces/{marketplace}/plugins/{plugin}`
-3. **Built-in plugins**: Bundled with Claude Code
-
-The bootstrap process:
-1. Clones your marketplace repo to `~/.claude/plugins/marketplaces/bendrucker`
-2. Registers it in `~/.claude/plugins/known_marketplaces.json`
-3. Enables specific plugins in `~/.claude/settings.json`
-
-**Important**: Settings are loaded at session start, so you must restart after bootstrapping.
-
-## Available Plugins
-
-See [marketplace.json](.claude-plugin/marketplace.json) for the full list. Core plugins:
-
-- **github** - GitHub CLI patterns and workflows
-- **git** - Git workflow best practices
-- **typescript** - TypeScript standards
-- **python** - Python best practices
-- **go** - Go language support
-- **shell** - Shell scripting conventions
-- **claude-code** - Meta-tools for Claude Code configuration
-- **gitlab** - GitLab workflow and glab CLI
-- **linear** - Linear issue management
-- **terraform** - Terraform configuration and providers
-
-## Workflow Examples
-
-### Starting a New Remote Project
-
-```
-1. Start Claude Code session
-2. Paste: "Run: curl -fsSL https://raw.githubusercontent.com/bendrucker/claude/main/scripts/bootstrap-remote.sh | bash"
-3. Wait for installation
-4. Restart session
-5. Verify: Check that skills are available
-```
-
-### Working in an Existing Project
-
-If the project has `.claude/settings.json` with marketplace config:
-
-```
-1. Start session
-2. Paste: "Install plugins from .claude/settings.json"
-3. Restart session
-```
-
-### One-Off Plugin Use
-
-Don't need plugins permanently? Use project-level config:
-
-```bash
-mkdir -p .claude
-cat > .claude/settings.json <<EOF
-{
-  "extraKnownMarketplaces": {
-    "bendrucker": {"source": {"source": "github", "repo": "bendrucker/claude"}}
-  },
-  "enabledPlugins": {"typescript@bendrucker": true}
-}
-EOF
-```
-
-## Troubleshooting
-
-### Plugins Not Available
-
-Check each step:
-
-```bash
-# 1. Marketplace cloned?
-ls -la ~/.claude/plugins/marketplaces/bendrucker
-
-# 2. Marketplace registered?
-jq '.bendrucker' ~/.claude/plugins/known_marketplaces.json
-
-# 3. Plugins enabled?
-jq '.enabledPlugins' ~/.claude/settings.json
-
-# 4. Did you restart the session?
-```
-
-### Wrong Plugin Version
-
-Update the marketplace:
-
-```bash
-cd ~/.claude/plugins/marketplaces/bendrucker
-git pull origin main
-```
-
-### Conflicts with Local Plugins
-
-Project settings override user settings. Check `.claude/settings.json` for conflicting config.
-
-## Future Improvements
-
-Ideas for making this smoother:
-
-1. **Session init hook**: Auto-run bootstrap on session start if `.claude/bootstrap.sh` exists
-2. **Built-in marketplace**: Include `bendrucker` marketplace in Claude Code defaults
-3. **Settings inheritance**: Allow user settings to be stored in a gist/repo and auto-loaded
-4. **One-command install**: `claude bootstrap bendrucker` to install marketplace + core plugins
-5. **Session templates**: Save/restore complete session configurations
-
-## Template: Bootstrap Prompt
-
-Save this as a snippet for quick pasting:
-
-```
-Please install my Claude Code plugins by running:
-
-curl -fsSL https://raw.githubusercontent.com/bendrucker/claude/main/scripts/bootstrap-remote.sh | bash
-
-This will:
-- Clone my marketplace from github.com/bendrucker/claude
-- Register it in ~/.claude/plugins/known_marketplaces.json
-- Enable core plugins (github, git, typescript, python, go, shell, claude-code)
-
-After it completes, I'll restart the session to activate the plugins.
-```
+Create template repositories with pre-configured `.claude/settings.json` including marketplace sources and enabled plugins. Clone or fork these templates to inherit the configuration.

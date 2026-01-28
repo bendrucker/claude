@@ -58,6 +58,31 @@ hooks:                                    # Optional: skill-scoped hooks
 
 **Storage**: `~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
 
+## Content Features
+
+### String Substitutions
+
+| Variable               | Description                                                                      |
+| :---------------------- | :------------------------------------------------------------------------------- |
+| `$ARGUMENTS`           | All arguments passed when invoking the skill. Appended automatically if absent.  |
+| `$ARGUMENTS[N]` / `$N` | Access a specific argument by 0-based index.                                     |
+| `${CLAUDE_SESSION_ID}` | Current session ID.                                                              |
+| `${CLAUDE_SKILL_ROOT}` | Absolute path to the skill's directory. Use in hooks and script references.      |
+
+### Dynamic Context Injection
+
+The `!`command`` syntax runs shell commands **before** the skill content is sent to Claude. The command output replaces the placeholder — Claude only sees the final result, not the command.
+
+```markdown
+- PR diff: !`gh pr diff`
+- Branch: !`git branch --show-current`
+- Changed files: !`git diff --name-only HEAD~1`
+```
+
+This is preprocessing, not something Claude executes. Use this to inject live data (git state, CLI output, file contents) so the application harness extracts and runs the commands without waiting on the model.
+
+See [references/patterns.md](references/patterns.md) for detailed patterns and guidance.
+
 ## Bundled Resources
 
 ```
@@ -88,16 +113,18 @@ Run `bunx skill-lint path/to/skill/` to check for issues before committing. CI r
 
 Load detailed guides as needed:
 
-- **[references/patterns.md](references/patterns.md)** - Progressive disclosure, templates, workflows, subagent integration
+- **[references/patterns.md](references/patterns.md)** - Dynamic context injection, argument substitutions, progressive disclosure, workflows, subagent integration
 - **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, YAML errors, plugin cache, checklist
 
 ## Quick Reference
 
 **Common Patterns**: Read-only (`[Read, Grep, Glob]`), Script-based (`[Read, Bash, Write]`), Template-based (`[Read, Write, Edit]`)
 
+**Content Features**: `$ARGUMENTS` / `$N` for arguments, `!`command`` for dynamic context injection
+
 **Anti-Patterns**: Windows paths, too many options, vague descriptions, nested references, scripts that punt errors
 
 ## Resources
 
-- [Claude Code Skills](https://docs.claude.com/en/docs/claude-code/skills)
+- [Claude Code Skills](https://code.claude.com/docs/en/skills)
 - [Agent Skills Best Practices](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills/best-practices)

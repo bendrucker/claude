@@ -150,6 +150,11 @@
       "name": "x-callback-url",
       "description": "Call x-callback-url schemes from the CLI and receive responses",
       "source": "./plugins/x-callback-url"
+    },
+    {
+      "name": "git-town",
+      "description": "Branch workflow automation with git-town",
+      "source": "./plugins/git-town"
     }
   ]
 }

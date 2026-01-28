@@ -41,6 +41,145 @@ For simple edits, modify XML directly.
 **For tracked changes**: See [references/redlining.md](references/redlining.md)
 ```
 
+## Dynamic Context Injection
+
+The `!`command`` syntax runs shell commands as preprocessing before Claude sees the skill content. The output replaces the placeholder inline, so Claude receives rendered data.
+
+### Syntax
+
+```markdown
+- Current branch: !`git branch --show-current`
+- Recent commits: !`git log --oneline -5`
+```
+
+When the skill runs, each `!`command`` executes immediately and its stdout replaces the placeholder. Claude never sees the command — only the output.
+
+### When to Use
+
+Prefer `!`command`` over asking Claude to run the same command with Bash when:
+
+- The data is **always needed** — every invocation requires it, so there's no decision for Claude to make
+- The data **shapes the task** — Claude needs the output to understand what to do, not just as supplementary info
+- **Latency matters** — preprocessing runs before the model prompt, avoiding a round-trip
+
+Keep using `allowed-tools` with Bash for commands Claude should decide whether/when to run.
+
+### Examples
+
+#### PR Review
+
+Fetch all PR context upfront:
+
+```yaml
+---
+name: review-pr
+description: Review the current pull request
+context: fork
+agent: general-purpose
+allowed-tools: [Read, Grep, Glob, Bash(gh *)]
+---
+
+## Context
+- Diff: !`gh pr diff`
+- PR description: !`gh pr view`
+- Changed files: !`gh pr diff --name-only`
+
+## Task
+Review this PR for correctness, style, and test coverage.
+```
+
+#### Deploy
+
+Inject environment state:
+
+```yaml
+---
+name: deploy
+description: Deploy the current branch
+disable-model-invocation: true
+---
+
+## Current state
+- Branch: !`git branch --show-current`
+- Unpushed commits: !`git log @{u}..HEAD --oneline 2>/dev/null || echo "no upstream"`
+- Dirty files: !`git status --porcelain`
+
+## Deploy $ARGUMENTS
+```
+
+#### Context-Aware Commit
+
+Combine with `$ARGUMENTS`:
+
+```yaml
+---
+name: commit
+description: Create a commit with context-aware message
+disable-model-invocation: true
+---
+
+## Changes
+!`git diff --cached`
+
+## Recent commit style
+!`git log --oneline -5`
+
+## Instructions
+Write a commit message for the staged changes. $ARGUMENTS
+```
+
+### Combining with Other Features
+
+Dynamic context works alongside other skill features:
+
+- `$ARGUMENTS` is substituted separately from `!`command``. Both can appear in the same skill.
+- `context: fork` — commands run in the current working directory before the subagent starts. The subagent receives the rendered output.
+- Supporting files — commands only run in `SKILL.md` content, not in referenced files.
+
+### Gotchas
+
+- Commands run in the **project root**, not the skill directory. Use `${CLAUDE_SKILL_ROOT}` to reference skill-local scripts.
+- **stderr is discarded** — only stdout replaces the placeholder.
+- Failed commands produce empty output. Handle this in the command itself: `!`some-cmd 2>/dev/null || echo "unavailable"``
+- Commands run **synchronously and sequentially**. Avoid slow commands that would delay skill loading.
+
+## Argument Substitutions
+
+### All Arguments
+
+`$ARGUMENTS` expands to the full argument string:
+
+```yaml
+---
+name: fix-issue
+description: Fix a GitHub issue
+---
+
+Fix GitHub issue $ARGUMENTS following our coding standards.
+```
+
+`/fix-issue 123` → Claude sees "Fix GitHub issue 123 following our coding standards."
+
+If `$ARGUMENTS` is absent from the content, arguments are appended as `ARGUMENTS: <value>`.
+
+### Positional Arguments
+
+`$ARGUMENTS[N]` or `$N` accesses arguments by 0-based index:
+
+```yaml
+---
+name: migrate-component
+description: Migrate a component between frameworks
+---
+
+Migrate the $0 component from $1 to $2.
+Preserve all existing behavior and tests.
+```
+
+`/migrate-component SearchBar React Vue` → `$0` = SearchBar, `$1` = React, `$2` = Vue.
+
+`$ARGUMENTS[0]` and `$0` are equivalent. Use whichever is more readable in context.
+
 ## Output Patterns
 
 ### Template Pattern

@@ -1,6 +1,6 @@
 # Plugin Reload Experiment
 
-## Web quick start
+## Web quick start: manual bootstrap (experiment 1)
 
 Local setup (run once before starting the web session):
 
@@ -23,6 +23,36 @@ Answer these three questions and report the result of each:
 3. Say "canary user check". Did you see an instruction to respond with CANARY_USER_MD_ALIVE?
 ```
 
+**Result:** All frozen. Plugins and CLAUDE.md written mid-session are not picked up.
+
+## Web quick start: SessionStart hook (experiment 2)
+
+Local setup (run from repo root, commits to `.claude/settings.json`):
+
+```bash
+./tmp/plugin-reload-test/scripts/reset-session-start.sh
+```
+
+Then commit and push this branch. The SessionStart hook is baked into `.claude/settings.json` and will fire automatically when the web session starts.
+
+**Turn 1** (the only turn needed):
+
+```
+Answer these questions and report the result of each:
+1. Read tmp/plugin-reload-test/.session-start.log. Did the SessionStart hook fire?
+2. Read ~/.claude/CLAUDE.md. Was it written by the hook?
+3. Try to invoke the "canary" skill using the Skill tool. What happened?
+4. Say "canary check". Did any skill activate automatically?
+5. Say "canary user check". Did you see an instruction to respond with CANARY_USER_MD_ALIVE?
+6. Run: echo $CANARY_BOOTSTRAP — was the env var persisted via CLAUDE_ENV_FILE?
+```
+
+After the experiment, restore repo settings locally:
+
+```bash
+./tmp/plugin-reload-test/scripts/restore-repo-settings.sh
+```
+
 ## Question
 
 Does configuration written during a Claude Code session affect plugin availability and `CLAUDE.md` visibility in subsequent turns of the same session? Or is everything resolved once at process startup?
@@ -36,23 +66,28 @@ Plugin resolution and `CLAUDE.md` loading happen at startup. Mid-session changes
 ```
 tmp/plugin-reload-test/
 ├── .claude/
-│   └── settings.json              # starts empty, bootstrap populates it
+│   └── settings.json                   # experiment 1: empty; experiment 2: SessionStart hook
 ├── .claude-plugin/
-│   └── marketplace.json           # local marketplace with "canary" plugin
+│   └── marketplace.json                # local marketplace with "canary" plugin
 ├── plugins/canary/
 │   ├── .claude-plugin/plugin.json
-│   └── skills/canary/SKILL.md     # responds CANARY_ALIVE
+│   └── skills/canary/SKILL.md          # responds CANARY_ALIVE
 ├── scripts/
-│   ├── bootstrap.sh               # installs config mid-session
-│   └── reset.sh                   # restores clean state
+│   ├── bootstrap.sh                    # experiment 1: manual mid-session install
+│   ├── reset.sh                        # experiment 1: restore clean state
+│   ├── session-start-bootstrap.sh      # experiment 2: SessionStart hook script
+│   ├── reset-session-start.sh          # experiment 2: install hook + clear user config
+│   └── restore-repo-settings.sh        # experiment 2: restore repo .claude/settings.json
 ├── CLAUDE.md
 └── EXPERIMENT.md
 ```
 
-The canary plugin defines one skill that responds with `CANARY_ALIVE` when asked "canary check". The bootstrap script writes:
+The canary plugin has one skill that responds `CANARY_ALIVE` to "canary check". Both experiments write:
 
-- `.claude/settings.json` — enables `canary@reload-test` plugin
-- `~/.claude/CLAUDE.md` — instructs Claude to respond `CANARY_USER_MD_ALIVE` to "canary user check"
+- `~/.claude/settings.json` — enables `canary@reload-test` plugin
+- `~/.claude/CLAUDE.md` — instructs `CANARY_USER_MD_ALIVE` response to "canary user check"
+
+The difference is **when**: experiment 1 writes during a user turn, experiment 2 writes via a SessionStart hook before the first turn.
 
 ## Procedure
 
@@ -92,19 +127,27 @@ claude --setting-sources local
 
 Same procedure but in a Claude Code web session against this repo. The web session has no `~/.claude/` at boot, making it the realistic target environment.
 
-## Expected results
+## Results: experiment 1 (manual bootstrap)
 
-| Probe | Expected | What it tells us |
-|---|---|---|
-| Baseline (`--plugin-dir`) | `CANARY_ALIVE` | Plugin files are valid |
-| Turn 2: Skill tool | Skill not found | Plugins frozen at startup |
-| Turn 2: "canary check" | No auto-match | Skill descriptions frozen at startup |
-| Turn 2: "canary user check" | No special response | `~/.claude/CLAUDE.md` frozen at startup |
+All frozen. Mid-session writes to `.claude/settings.json` and `~/.claude/CLAUDE.md` are not picked up. The Skill tool itself was not even available — it's only injected when plugins are loaded at init.
+
+## Expected results: experiment 2 (SessionStart hook)
+
+| Probe | If frozen | If dynamic | What it tells us |
+|---|---|---|---|
+| `.session-start.log` exists | Hook fired | Hook fired | Hook timing |
+| `~/.claude/CLAUDE.md` written | File exists | File exists | Hook ran successfully |
+| Skill tool invocation | Skill not found | `CANARY_ALIVE` | Plugin resolution timing |
+| "canary check" auto-match | No skill fires | Skill auto-invokes | Skill description timing |
+| "canary user check" | Generic response | `CANARY_USER_MD_ALIVE` | CLAUDE.md load timing |
+| `$CANARY_BOOTSTRAP` | Empty or unset | `true` | CLAUDE_ENV_FILE works |
 
 ## Interpreting results
 
-**All frozen**: SessionStart hooks cannot bootstrap plugins. A feature request for user-level settings sync (like Codespaces dotfiles) is the only viable path.
+**Hook fires but plugins/CLAUDE.md frozen**: SessionStart hooks run after plugin resolution and CLAUDE.md loading. Writing user config in a SessionStart hook is too late. The only viable path is a feature request for user-level settings sync (like Codespaces dotfiles).
 
-**CLAUDE.md reloads, plugins don't**: Partial win. User instructions and style preferences can be bootstrapped, but skills/hooks/agents cannot.
+**CLAUDE.md reloads but plugins don't**: Partial win. User instructions and style preferences can be bootstrapped via SessionStart, but skills/hooks/agents cannot.
 
-**Everything reloads**: SessionStart hook cloning `bendrucker/claude` and running `install.sh` would fully work. This would be the solution for web sessions.
+**Everything reloads**: A SessionStart hook that clones `bendrucker/claude` and runs `install.sh` would fully work for web sessions.
+
+**CLAUDE_ENV_FILE works but nothing else**: Environment variables can be bootstrapped, which enables a workaround for some use cases but not plugin loading.

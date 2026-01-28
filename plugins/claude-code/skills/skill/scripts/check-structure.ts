@@ -4,31 +4,24 @@ import { relative } from "node:path";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
 import { readStdinJson } from "@constellos/claude-code-kit/runners";
 
-const SPEC_URL =
-  "https://agentskills.io/specification#optional-directories";
+const SPEC_URL = "https://agentskills.io/specification#optional-directories";
 
 const ALLOWED_DIRECTORIES = ["scripts", "references", "assets"] as const;
 
 const SKILL_MD = "SKILL.md";
 
 export function extractSkillRoot(filePath: string): string | null {
-  const patterns = [
-    /(.+\/skills\/[^/]+)\//,
-    /(.+\/commands)\//,
-  ];
+  const patterns = [/(.+\/skills\/[^/]+)\//, /(.+\/commands)\//];
 
   for (const pattern of patterns) {
     const match = filePath.match(pattern);
-    if (match) return match[1];
+    if (match) return match[1] ?? null;
   }
 
   return null;
 }
 
-export function validateSkillPath(
-  filePath: string,
-  skillRoot: string,
-): string | null {
+export function validateSkillPath(filePath: string, skillRoot: string): string | null {
   const rel = relative(skillRoot, filePath);
 
   if (rel === SKILL_MD) return null;
@@ -38,9 +31,7 @@ export function validateSkillPath(
     return null;
   }
 
-  const allowed = [SKILL_MD, ...ALLOWED_DIRECTORIES.map((d) => `${d}/`)].join(
-    ", ",
-  );
+  const allowed = [SKILL_MD, ...ALLOWED_DIRECTORIES.map((d) => `${d}/`)].join(", ");
   return `'${rel}' is outside the standard skill structure. Allowed paths: ${allowed}. See ${SPEC_URL}`;
 }
 

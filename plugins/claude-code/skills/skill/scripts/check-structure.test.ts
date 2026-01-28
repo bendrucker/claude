@@ -1,10 +1,6 @@
-import { describe, it, expect } from "vitest";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
-import {
-  extractSkillRoot,
-  validateSkillPath,
-  processHookInput,
-} from "./check-structure";
+import { describe, expect, it } from "vitest";
+import { extractSkillRoot, processHookInput, validateSkillPath } from "./check-structure";
 
 function mockWriteInput(filePath: string): PostToolUseInput {
   return {
@@ -22,21 +18,21 @@ function mockWriteInput(filePath: string): PostToolUseInput {
 
 describe("extractSkillRoot", () => {
   it("extracts root from plugin skill paths", () => {
-    expect(
-      extractSkillRoot("/path/to/plugins/gitlab/skills/ci/SKILL.md"),
-    ).toBe("/path/to/plugins/gitlab/skills/ci");
+    expect(extractSkillRoot("/path/to/plugins/gitlab/skills/ci/SKILL.md")).toBe(
+      "/path/to/plugins/gitlab/skills/ci",
+    );
   });
 
   it("extracts root from personal skill paths", () => {
-    expect(
-      extractSkillRoot("/Users/ben/.claude/skills/my-skill/SKILL.md"),
-    ).toBe("/Users/ben/.claude/skills/my-skill");
+    expect(extractSkillRoot("/Users/ben/.claude/skills/my-skill/SKILL.md")).toBe(
+      "/Users/ben/.claude/skills/my-skill",
+    );
   });
 
   it("extracts root from project skill paths", () => {
-    expect(
-      extractSkillRoot("/project/.claude/skills/review/scripts/lint.sh"),
-    ).toBe("/project/.claude/skills/review");
+    expect(extractSkillRoot("/project/.claude/skills/review/scripts/lint.sh")).toBe(
+      "/project/.claude/skills/review",
+    );
   });
 
   it("returns null for non-skill paths", () => {
@@ -57,21 +53,15 @@ describe("validateSkillPath", () => {
   });
 
   it("allows files in references/", () => {
-    expect(
-      validateSkillPath(`${root}/references/api.md`, root),
-    ).toBeNull();
+    expect(validateSkillPath(`${root}/references/api.md`, root)).toBeNull();
   });
 
   it("allows files in assets/", () => {
-    expect(
-      validateSkillPath(`${root}/assets/template.html`, root),
-    ).toBeNull();
+    expect(validateSkillPath(`${root}/assets/template.html`, root)).toBeNull();
   });
 
   it("allows nested files within allowed directories", () => {
-    expect(
-      validateSkillPath(`${root}/scripts/lib/helpers.ts`, root),
-    ).toBeNull();
+    expect(validateSkillPath(`${root}/scripts/lib/helpers.ts`, root)).toBeNull();
   });
 
   it("rejects files in non-standard directories", () => {
@@ -95,42 +85,30 @@ describe("validateSkillPath", () => {
 
 describe("processHookInput", () => {
   it("warns on writes to non-standard paths", () => {
-    const warnings = processHookInput(
-      mockWriteInput("/plugins/gitlab/skills/ci/lib/utils.ts"),
-    );
+    const warnings = processHookInput(mockWriteInput("/plugins/gitlab/skills/ci/lib/utils.ts"));
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("outside the standard skill structure");
   });
 
   it("allows writes to SKILL.md", () => {
-    const warnings = processHookInput(
-      mockWriteInput("/plugins/gitlab/skills/ci/SKILL.md"),
-    );
+    const warnings = processHookInput(mockWriteInput("/plugins/gitlab/skills/ci/SKILL.md"));
     expect(warnings).toEqual([]);
   });
 
   it("allows writes to standard directories", () => {
-    expect(
-      processHookInput(
-        mockWriteInput("/plugins/gitlab/skills/ci/scripts/run.sh"),
-      ),
-    ).toEqual([]);
-    expect(
-      processHookInput(
-        mockWriteInput("/plugins/gitlab/skills/ci/references/api.md"),
-      ),
-    ).toEqual([]);
-    expect(
-      processHookInput(
-        mockWriteInput("/plugins/gitlab/skills/ci/assets/logo.png"),
-      ),
-    ).toEqual([]);
+    expect(processHookInput(mockWriteInput("/plugins/gitlab/skills/ci/scripts/run.sh"))).toEqual(
+      [],
+    );
+    expect(processHookInput(mockWriteInput("/plugins/gitlab/skills/ci/references/api.md"))).toEqual(
+      [],
+    );
+    expect(processHookInput(mockWriteInput("/plugins/gitlab/skills/ci/assets/logo.png"))).toEqual(
+      [],
+    );
   });
 
   it("ignores non-skill paths", () => {
-    const warnings = processHookInput(
-      mockWriteInput("/Users/ben/src/project/utils/helper.ts"),
-    );
+    const warnings = processHookInput(mockWriteInput("/Users/ben/src/project/utils/helper.ts"));
     expect(warnings).toEqual([]);
   });
 

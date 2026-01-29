@@ -201,6 +201,13 @@ jobs:
         if: steps.inspect.outputs.has_package == 'true'
         run: npm run build --prefix "plugins/${{ matrix.plugin }}" --if-present
 
+      - name: Install Playwright browsers
+        if: steps.inspect.outputs.has_tests == 'true'
+        run: |
+          if [[ -d "node_modules/playwright" ]]; then
+            npx playwright install chromium --with-deps
+          fi
+
       - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
         run: npm run test:unit -- "plugins/${{ matrix.plugin }}/"

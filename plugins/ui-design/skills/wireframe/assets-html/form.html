@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="m-0 p-0">
+  <div class="w-[375px] h-[667px] border border-dashed border-black bg-white flex flex-col p-6">
+    <h1 class="text-xl font-bold mb-6">Contact Form</h1>
+
+    <div class="space-y-4 flex-1">
+      <div>
+        <label class="block text-sm mb-1">Name</label>
+        <input type="text" class="w-full border border-black px-3 py-2 outline-none" placeholder="John Doe">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Email</label>
+        <input type="email" class="w-full border border-black px-3 py-2 outline-none" placeholder="you@example.com">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Phone</label>
+        <input type="tel" class="w-full border border-black px-3 py-2 outline-none" placeholder="(555) 123-4567">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Category</label>
+        <select class="w-full border border-black px-3 py-2 outline-none bg-white">
+          <option>Select an option</option>
+          <option>General Inquiry</option>
+          <option>Support</option>
+          <option>Sales</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Message</label>
+        <textarea class="w-full border border-black px-3 py-2 outline-none h-24 resize-none" placeholder="Your message..."></textarea>
+      </div>
+    </div>
+
+    <button class="w-full border border-black py-2 font-medium mt-4">Submit</button>
+  </div>
+</body>
+</html>

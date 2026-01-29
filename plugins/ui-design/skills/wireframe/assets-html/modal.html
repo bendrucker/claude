@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="m-0 p-0">
+  <div class="w-[375px] h-[667px] border border-dashed border-black bg-white relative">
+    <!-- Background content -->
+    <div class="p-4">
+      <h1 class="text-xl font-bold mb-4">Page Title</h1>
+      <div class="h-3 bg-gray-100 mb-2"></div>
+      <div class="h-3 bg-gray-100 mb-2 w-3/4"></div>
+      <div class="h-3 bg-gray-100 w-1/2"></div>
+    </div>
+
+    <!-- Modal backdrop -->
+    <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6">
+      <!-- Modal -->
+      <div class="bg-white border border-black w-full">
+        <div class="border-b border-black p-4">
+          <h2 class="text-lg font-bold">Confirm Action</h2>
+        </div>
+
+        <div class="p-4">
+          <p class="text-sm mb-2">Are you sure you want to proceed with this action?</p>
+          <p class="text-sm text-gray-500">This cannot be undone.</p>
+        </div>
+
+        <div class="border-t border-black p-4 flex gap-3">
+          <button class="flex-1 border border-black py-2 text-sm">Cancel</button>
+          <button class="flex-1 border border-black py-2 text-sm bg-black text-white">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

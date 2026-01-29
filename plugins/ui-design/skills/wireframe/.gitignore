@@ -1,1 +1,3 @@
+.bun-cache/
+node_modules/
 tmp/

@@ -103,10 +103,13 @@ Reference examples in `{SKILL_DIR}/assets-html/`:
 
 | File | Layout Pattern |
 |------|----------------|
-| `login-form.html` | Form with inputs and buttons |
-| `dashboard.html` | Sidebar + main content grid |
-| `card-grid.html` | Responsive card layout |
-| `data-table.html` | Table with pagination |
+| `login-screen.html` | Login form with inputs and buttons |
+| `form.html` | Multi-field form layout |
+| `two-column.html` | Sidebar + main content grid |
+| `grid.html` | Responsive card layout |
+| `table.html` | Table with headers |
+| `modal.html` | Modal dialog overlay |
+| `nested-groups.html` | Complex nested containers |
 
 Read these files for reference when creating similar layouts.
 
@@ -116,7 +119,7 @@ Read these files for reference when creating similar layouts.
 bun {SKILL_DIR}/scripts/render-html.ts [--scale N] <html-file> [output.png]
 ```
 
-Renders HTML to PNG using Puppeteer. Output path defaults to same name with `.png` extension.
+Renders HTML to PNG using Playwright. Output path defaults to same name with `.png` extension.
 
 **Scale options:**
 - `--scale 1` (default): 1x resolution for quick verification

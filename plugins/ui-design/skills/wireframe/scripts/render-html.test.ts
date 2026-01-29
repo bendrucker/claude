@@ -49,4 +49,11 @@ describe("render-html", () => {
 
     await expect(renderFile(inputPath, outputPath)).rejects.toThrow("No root div found in HTML");
   });
+
+  it("throws when bounding box is null", async () => {
+    const inputPath = path.join(fixturesDir, "hidden-div.html");
+    const outputPath = path.join(tmpDir, "hidden-div.png");
+
+    await expect(renderFile(inputPath, outputPath)).rejects.toThrow("Could not get bounding box");
+  });
 });

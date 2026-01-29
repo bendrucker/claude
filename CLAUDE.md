@@ -61,6 +61,13 @@ This preserves platform-specific optional dependencies (Linux, Windows, etc.) th
 
 Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing dependencies on first run, eliminating the need to run `npm install` before executing scripts. This simplifies hook execution since hooks run in isolated contexts where `node_modules` may not be readily available.
 
+### Scripts
+
+When writing scripts (hooks, skill CLIs, etc.) that accept arguments:
+
+- **Argument parsing**: Use [cleye](https://github.com/privatenumber/cleye) for type-safe argument parsing with automatic `--help` generation
+- **Ancestor paths**: Use `join(import.meta.dirname, "..")` to resolve parent directories. Avoid `dirname()` on a dirname—explicit `".."` is clearer.
+
 ## Hooks
 
 See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. This repository includes a Biome PostToolUse hook (`.claude/hooks/biome/`) that runs after file edits to check for lint errors.

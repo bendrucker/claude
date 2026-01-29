@@ -1,5 +1,6 @@
 import { extname, resolve } from "node:path";
 
+import { cli } from "cleye";
 import { chromium } from "playwright";
 
 export interface RenderOptions {
@@ -54,24 +55,33 @@ export async function renderFile(
 }
 
 if (import.meta.main) {
-  const args = process.argv.slice(2);
-  let scale = 1;
-  const files: string[] = [];
-  let outputPath: string | undefined;
+  const argv = cli({
+    name: "render-html",
+    parameters: ["<files...>"],
+    flags: {
+      scale: {
+        type: Number,
+        description: "Scale factor for rendering",
+        default: 1,
+      },
+    },
+  });
 
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--scale" && args[i + 1]) {
-      scale = parseInt(args[i + 1], 10);
-      i++;
-    } else if (extname(args[i] as string) === ".html") {
-      files.push(args[i] as string);
-    } else if (extname(args[i] as string) === ".png") {
-      outputPath = args[i];
-    }
-  }
+  const args = argv._.files;
+  const scale = argv.flags.scale;
+
+  const lastArg = args[args.length - 1];
+  const hasOutputPath = lastArg && extname(lastArg) === ".png";
+  const outputPath = hasOutputPath ? lastArg : undefined;
+  const files = hasOutputPath ? args.slice(0, -1) : args;
 
   if (files.length === 0) {
-    console.error("Usage: render-html.ts [--scale N] <html-file> [output.png]");
+    console.error("No HTML files provided");
+    process.exit(1);
+  }
+
+  if (hasOutputPath && files.length > 1) {
+    console.error("Cannot specify output path with multiple input files");
     process.exit(1);
   }
 

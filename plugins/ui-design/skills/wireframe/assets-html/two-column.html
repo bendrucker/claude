@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="m-0 p-0">
+  <div class="w-[375px] h-[667px] border border-dashed border-black bg-white flex">
+    <!-- Sidebar -->
+    <div class="w-24 border-r border-dashed border-black flex flex-col">
+      <div class="border-b border-dashed border-black p-3">
+        <div class="font-bold text-sm">Menu</div>
+      </div>
+      <nav class="flex-1 p-2">
+        <ul class="space-y-1">
+          <li>
+            <a href="#" class="block border border-black p-2 text-xs bg-black text-white">Home</a>
+          </li>
+          <li>
+            <a href="#" class="block border border-black p-2 text-xs">Profile</a>
+          </li>
+          <li>
+            <a href="#" class="block border border-black p-2 text-xs">Messages</a>
+          </li>
+          <li>
+            <a href="#" class="block border border-black p-2 text-xs">Settings</a>
+          </li>
+          <li>
+            <a href="#" class="block border border-black p-2 text-xs">Help</a>
+          </li>
+        </ul>
+      </nav>
+      <div class="border-t border-dashed border-black p-2">
+        <a href="#" class="block border border-black p-2 text-xs text-center">Log Out</a>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="flex-1 flex flex-col">
+      <div class="border-b border-dashed border-black p-4">
+        <h1 class="text-lg font-bold">Dashboard</h1>
+      </div>
+
+      <div class="flex-1 p-4 space-y-4">
+        <div class="border border-dashed border-black p-3">
+          <h2 class="text-sm font-bold mb-2">Recent Activity</h2>
+          <div class="space-y-2">
+            <div class="h-3 bg-gray-100"></div>
+            <div class="h-3 bg-gray-100 w-3/4"></div>
+            <div class="h-3 bg-gray-100 w-1/2"></div>
+          </div>
+        </div>
+
+        <div class="border border-dashed border-black p-3">
+          <h2 class="text-sm font-bold mb-2">Statistics</h2>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="border border-dashed border-black p-2 text-center">
+              <div class="text-lg font-bold">42</div>
+              <div class="text-xs text-gray-500">Posts</div>
+            </div>
+            <div class="border border-dashed border-black p-2 text-center">
+              <div class="text-lg font-bold">128</div>
+              <div class="text-xs text-gray-500">Followers</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="border border-dashed border-black p-3">
+          <h2 class="text-sm font-bold mb-2">Quick Actions</h2>
+          <div class="space-y-2">
+            <button class="w-full border border-black py-2 text-xs">New Post</button>
+            <button class="w-full border border-black py-2 text-xs">View Reports</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

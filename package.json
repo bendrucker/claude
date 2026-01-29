@@ -8,7 +8,7 @@
     "plugins/style",
     "plugins/things",
     "plugins/type-ignore",
-    "plugins/ui-design"
+    "plugins/ui-design/skills/wireframe"
   ],
   "scripts": {
     "build": "tsc --noEmit",

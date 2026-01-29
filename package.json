@@ -7,7 +7,8 @@
     "plugins/claude-code/skills/session",
     "plugins/style",
     "plugins/things",
-    "plugins/type-ignore"
+    "plugins/type-ignore",
+    "plugins/ui-design"
   ],
   "scripts": {
     "build": "tsc --noEmit",

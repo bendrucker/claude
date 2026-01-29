@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <!-- Page border -->
+  <rect width="800" height="500" fill="white" stroke="black" stroke-dasharray="4"/>
+
+  <!-- Header -->
+  <g transform="translate(0,0)">
+    <rect width="800" height="48" fill="none" stroke="black" stroke-dasharray="4"/>
+    <text font-family="sans-serif" x="20" y="30" font-size="16" fill="black">Dashboard</text>
+  </g>
+
+  <!-- Left column - sidebar -->
+  <g transform="translate(20,68)">
+    <rect width="200" height="400" fill="none" stroke="black" stroke-dasharray="4"/>
+    <text font-family="sans-serif" x="16" y="28" font-size="14" fill="black">Navigation</text>
+
+    <!-- Nav items -->
+    <g transform="translate(16,48)">
+      <text font-family="sans-serif" x="0" y="0" font-size="12" fill="black">Home</text>
+      <text font-family="sans-serif" x="0" y="28" font-size="12" fill="black">Projects</text>
+      <text font-family="sans-serif" x="0" y="56" font-size="12" fill="black">Settings</text>
+      <text font-family="sans-serif" x="0" y="84" font-size="12" fill="black">Help</text>
+    </g>
+  </g>
+
+  <!-- Right column - main content -->
+  <g transform="translate(240,68)">
+    <rect width="540" height="400" fill="none" stroke="black" stroke-dasharray="4"/>
+    <text font-family="sans-serif" x="16" y="28" font-size="14" fill="black">Main Content</text>
+
+    <!-- Content lines -->
+    <g transform="translate(16,52)">
+      <line x1="0" y1="0" x2="480" y2="0" stroke="black"/>
+      <line x1="0" y1="20" x2="460" y2="20" stroke="black"/>
+      <line x1="0" y1="40" x2="500" y2="40" stroke="black"/>
+      <line x1="0" y1="60" x2="300" y2="60" stroke="black"/>
+    </g>
+
+    <!-- Action button -->
+    <g transform="translate(16,340)">
+      <rect width="120" height="40" fill="none" stroke="black"/>
+      <text font-family="sans-serif" x="60" y="26" text-anchor="middle" font-size="12" fill="black">Action</text>
+    </g>
+  </g>
+</svg>

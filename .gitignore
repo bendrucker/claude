@@ -1,3 +1,4 @@
 .claude/settings.local.json
 .claude/hooks/logs/
 node_modules/
+.DS_Store

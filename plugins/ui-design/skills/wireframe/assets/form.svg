@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="620" viewBox="0 0 500 620">
+  <!-- Page border -->
+  <rect width="500" height="620" fill="white" stroke="black" stroke-dasharray="4"/>
+
+  <!-- Header -->
+  <g transform="translate(0,0)">
+    <rect width="500" height="48" fill="none" stroke="black" stroke-dasharray="4"/>
+    <text font-family="sans-serif" x="20" y="30" font-size="16" fill="black">Contact Form</text>
+  </g>
+
+  <!-- Form -->
+  <g transform="translate(20,68)">
+    <!-- Name field -->
+    <g transform="translate(0,0)">
+      <text font-family="sans-serif" x="0" y="16" font-size="12" fill="black">Name</text>
+      <rect y="24" width="460" height="40" fill="none" stroke="black"/>
+    </g>
+
+    <!-- Email field -->
+    <g transform="translate(0,84)">
+      <text font-family="sans-serif" x="0" y="16" font-size="12" fill="black">Email</text>
+      <rect y="24" width="460" height="40" fill="none" stroke="black"/>
+    </g>
+
+    <!-- Two-column: Phone + Company -->
+    <g transform="translate(0,168)">
+      <g transform="translate(0,0)">
+        <text font-family="sans-serif" x="0" y="16" font-size="12" fill="black">Phone</text>
+        <rect y="24" width="220" height="40" fill="none" stroke="black"/>
+      </g>
+      <g transform="translate(240,0)">
+        <text font-family="sans-serif" x="0" y="16" font-size="12" fill="black">Company</text>
+        <rect y="24" width="220" height="40" fill="none" stroke="black"/>
+      </g>
+    </g>
+
+    <!-- Subject dropdown -->
+    <g transform="translate(0,252)">
+      <text font-family="sans-serif" x="0" y="16" font-size="12" fill="black">Subject</text>
+      <rect y="24" width="460" height="40" fill="none" stroke="black"/>
+      <text font-family="sans-serif" x="16" y="50" font-size="12" fill="black">Select...</text>
+      <text font-family="sans-serif" x="430" y="50" font-size="14" fill="black">▼</text>
+    </g>
+
+    <!-- Message textarea -->
+    <g transform="translate(0,336)">
+      <text font-family="sans-serif" x="0" y="16" font-size="12" fill="black">Message</text>
+      <rect y="24" width="460" height="120" fill="none" stroke="black"/>
+    </g>
+
+    <!-- Submit button -->
+    <g transform="translate(0,496)">
+      <rect width="120" height="44" fill="none" stroke="black"/>
+      <text font-family="sans-serif" x="60" y="28" text-anchor="middle" font-size="14" fill="black">Submit</text>
+    </g>
+  </g>
+</svg>

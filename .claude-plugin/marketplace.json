@@ -155,6 +155,11 @@
       "name": "git-town",
       "description": "Branch workflow automation with git-town",
       "source": "./plugins/git-town"
+    },
+    {
+      "name": "ui-design",
+      "description": "UI design tools including wireframing with layout validation",
+      "source": "./plugins/ui-design"
     }
   ]
 }

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="375" height="667" viewBox="0 0 375 667">
+  <!-- Page border -->
+  <rect width="375" height="667" fill="white" stroke="black" stroke-dasharray="4"/>
+
+  <!-- Header -->
+  <g transform="translate(0,0)">
+    <rect width="375" height="56" fill="none" stroke="black" stroke-dasharray="4"/>
+    <text font-family="sans-serif" x="187" y="34" text-anchor="middle" font-size="18" fill="black">Login</text>
+  </g>
+
+  <!-- Email field -->
+  <g transform="translate(16,80)">
+    <rect width="343" height="44" fill="none" stroke="black"/>
+    <text font-family="sans-serif" x="12" y="28" font-size="14" fill="black">Email</text>
+  </g>
+
+  <!-- Password field -->
+  <g transform="translate(16,140)">
+    <rect width="343" height="44" fill="none" stroke="black"/>
+    <text font-family="sans-serif" x="12" y="28" font-size="14" fill="black">Password</text>
+  </g>
+
+  <!-- Forgot password link -->
+  <g transform="translate(16,196)">
+    <text font-family="sans-serif" x="0" y="14" font-size="12" fill="black" text-decoration="underline">Forgot password?</text>
+  </g>
+
+  <!-- Sign in button -->
+  <g transform="translate(16,240)">
+    <rect width="343" height="44" fill="none" stroke="black"/>
+    <text font-family="sans-serif" x="171" y="28" text-anchor="middle" font-size="14" fill="black">Sign In</text>
+  </g>
+
+  <!-- Divider -->
+  <g transform="translate(16,320)">
+    <line x1="0" y1="0" x2="140" y2="0" stroke="black"/>
+    <text font-family="sans-serif" x="171" y="4" text-anchor="middle" font-size="12" fill="black">or</text>
+    <line x1="203" y1="0" x2="343" y2="0" stroke="black"/>
+  </g>
+
+  <!-- Create account button -->
+  <g transform="translate(16,356)">
+    <rect width="343" height="44" fill="none" stroke="black"/>
+    <text font-family="sans-serif" x="171" y="28" text-anchor="middle" font-size="14" fill="black">Create Account</text>
+  </g>
+</svg>

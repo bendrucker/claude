@@ -1,9 +1,10 @@
 ---
 name: update
 description: |
-  Update a pull request body to reflect the current state of changes. Use when a PR has evolved
-  through additional commits and the body needs to reflect what will be merged.
-allowed-tools: Bash(gh:*), Bash(git:*), mcp__github
+  Update a pull request or merge request body to reflect the current state of changes.
+  Use when a PR/MR has evolved through additional commits and the body needs to reflect what will be merged.
+
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
 ---
 
 # Update Pull Request

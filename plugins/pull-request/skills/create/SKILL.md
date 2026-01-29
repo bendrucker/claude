@@ -1,8 +1,9 @@
 ---
 name: create
 description: |
-  Create a GitHub pull request (PR) with proper formatting and content guidelines.
-  Invoke this skill whenever the user wants to create, open, or submit a PR (or GitLab MR, Gerrit CR).
+  Create a pull request, merge request, or change request with proper formatting and content guidelines.
+  Invoke when the user wants to create, open, or submit a PR, MR, or CR—including after committing changes.
+
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
 ---
 

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="375" height="200" viewBox="0 0 375 200">
+  <rect width="375" height="200" fill="white" stroke="black" stroke-dasharray="4"/>
+
+  <!-- Button positioned too far right, extending outside canvas -->
+  <g transform="translate(200,80)">
+    <rect width="200" height="44" fill="none" stroke="black"/>
+    <text font-family="sans-serif" x="100" y="28" text-anchor="middle" font-size="14" fill="black">Submit</text>
+  </g>
+</svg>

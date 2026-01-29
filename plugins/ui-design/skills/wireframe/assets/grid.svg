@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="500" viewBox="0 0 600 500">
+  <!-- Page border -->
+  <rect width="600" height="500" fill="white" stroke="black" stroke-dasharray="4"/>
+
+  <!-- Header -->
+  <g transform="translate(0,0)">
+    <rect width="600" height="48" fill="none" stroke="black" stroke-dasharray="4"/>
+    <text font-family="sans-serif" x="20" y="30" font-size="16" fill="black">Gallery</text>
+  </g>
+
+  <!-- Grid: 3 columns x 2 rows -->
+  <!-- Row 1 -->
+  <g transform="translate(20,68)">
+    <!-- Card 1 -->
+    <g transform="translate(0,0)">
+      <rect width="176" height="180" fill="none" stroke="black"/>
+      <line x1="0" y1="0" x2="176" y2="120" stroke="black"/>
+      <line x1="176" y1="0" x2="0" y2="120" stroke="black"/>
+      <rect y="120" width="176" height="60" fill="none" stroke="black" stroke-dasharray="4"/>
+      <text font-family="sans-serif" x="12" y="144" font-size="12" fill="black">Item Title</text>
+      <line x1="12" y1="160" x2="140" y2="160" stroke="black"/>
+    </g>
+
+    <!-- Card 2 -->
+    <g transform="translate(192,0)">
+      <rect width="176" height="180" fill="none" stroke="black"/>
+      <line x1="0" y1="0" x2="176" y2="120" stroke="black"/>
+      <line x1="176" y1="0" x2="0" y2="120" stroke="black"/>
+      <rect y="120" width="176" height="60" fill="none" stroke="black" stroke-dasharray="4"/>
+      <text font-family="sans-serif" x="12" y="144" font-size="12" fill="black">Item Title</text>
+      <line x1="12" y1="160" x2="140" y2="160" stroke="black"/>
+    </g>
+
+    <!-- Card 3 -->
+    <g transform="translate(384,0)">
+      <rect width="176" height="180" fill="none" stroke="black"/>
+      <line x1="0" y1="0" x2="176" y2="120" stroke="black"/>
+      <line x1="176" y1="0" x2="0" y2="120" stroke="black"/>
+      <rect y="120" width="176" height="60" fill="none" stroke="black" stroke-dasharray="4"/>
+      <text font-family="sans-serif" x="12" y="144" font-size="12" fill="black">Item Title</text>
+      <line x1="12" y1="160" x2="140" y2="160" stroke="black"/>
+    </g>
+  </g>
+
+  <!-- Row 2 -->
+  <g transform="translate(20,268)">
+    <!-- Card 4 -->
+    <g transform="translate(0,0)">
+      <rect width="176" height="180" fill="none" stroke="black"/>
+      <line x1="0" y1="0" x2="176" y2="120" stroke="black"/>
+      <line x1="176" y1="0" x2="0" y2="120" stroke="black"/>
+      <rect y="120" width="176" height="60" fill="none" stroke="black" stroke-dasharray="4"/>
+      <text font-family="sans-serif" x="12" y="144" font-size="12" fill="black">Item Title</text>
+      <line x1="12" y1="160" x2="140" y2="160" stroke="black"/>
+    </g>
+
+    <!-- Card 5 -->
+    <g transform="translate(192,0)">
+      <rect width="176" height="180" fill="none" stroke="black"/>
+      <line x1="0" y1="0" x2="176" y2="120" stroke="black"/>
+      <line x1="176" y1="0" x2="0" y2="120" stroke="black"/>
+      <rect y="120" width="176" height="60" fill="none" stroke="black" stroke-dasharray="4"/>
+      <text font-family="sans-serif" x="12" y="144" font-size="12" fill="black">Item Title</text>
+      <line x1="12" y1="160" x2="140" y2="160" stroke="black"/>
+    </g>
+
+    <!-- Card 6 -->
+    <g transform="translate(384,0)">
+      <rect width="176" height="180" fill="none" stroke="black"/>
+      <line x1="0" y1="0" x2="176" y2="120" stroke="black"/>
+      <line x1="176" y1="0" x2="0" y2="120" stroke="black"/>
+      <rect y="120" width="176" height="60" fill="none" stroke="black" stroke-dasharray="4"/>
+      <text font-family="sans-serif" x="12" y="144" font-size="12" fill="black">Item Title</text>
+      <line x1="12" y1="160" x2="140" y2="160" stroke="black"/>
+    </g>
+  </g>
+</svg>

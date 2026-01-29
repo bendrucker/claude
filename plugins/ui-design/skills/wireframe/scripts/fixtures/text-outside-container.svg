@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100" viewBox="0 0 300 100">
+  <rect width="300" height="100" fill="white" stroke="black" stroke-dasharray="4"/>
+
+  <!-- Small container with text that extends beyond it -->
+  <g transform="translate(20,30)">
+    <rect width="80" height="40" fill="none" stroke="black"/>
+    <text font-family="sans-serif" x="40" y="26" text-anchor="middle" font-size="14" fill="black">This label is way too long</text>
+  </g>
+</svg>

@@ -1,72 +1,91 @@
 ---
 name: review
-description: Interactive daily review workflow for inbox, today, and priorities across Things and Calendar. Use when the user asks for a daily review, morning review, or evening review.
+description: Interactive daily review workflow across Calendar, Things, GitHub, and Linear. Use when the user asks for a daily review, morning review, evening review, or weekly review.
 ---
 
 # Daily Review
 
-Interactive process for clearing inbox, reviewing today, and planning ahead. Orchestrates across Things and Calendar.
+Process four inboxes in fixed order: Calendar → Things → GitHub → Linear.
 
 ## Variants
 
-**Morning Review**: Planning-focused. Process inbox, review today's calendar and tasks, set priorities.
+| Variant | Calendar | Things | GitHub | Linear |
+|---------|----------|--------|--------|--------|
+| Morning | Full scan + prep | Full processing | Full triage | Full review |
+| Evening | Tomorrow preview | Quick triage | Mark read, defer | Skip |
 
-**Evening Review**: Shutdown-focused. Capture loose ends, prepare tomorrow, clear mental load.
+Ask which variant if not specified.
 
 ## Workflow
 
-### Process Inbox
+### 1. Calendar Scan
 
-Load the `things:jxa` skill. Read all inbox items and batch by pattern (project hints, tags, keywords). For each batch, use `AskUserQuestion`:
+See [calendar.md](calendar.md).
 
-- **Schedule**: today, tomorrow, next week, someday
-- **Assign**: to project, area, or standalone
-- **Tag**: add relevant tags
-- **Do it now**: complete quick tasks (1-2 min) immediately
-- **Delete**: if no longer relevant (confirm first)
+Calculate time budget:
+- Available hours (workday minus meetings)
+- Focus windows (90+ min gaps)
+- Meetings needing prep tasks
 
-Process until inbox is empty.
+### 2. Things Inbox
 
-### Review Calendar
+See [things.md](things.md).
 
-Load the `calendar` skill. Check today's events. Surface scheduling conflicts with today's task list. Note any meetings that need preparation tasks.
+Batch items by pattern, ask user for each batch:
+- Schedule (today/tomorrow/next week/someday)
+- Assign (project/area/standalone)
+- Quick do (< 2 min)
+- Delete
 
-### Review Today
+Goal: inbox count = 0
 
-Load the `things:jxa` skill. Read today's tasks, filtering out repeating instances. For stale or unclear items, use `AskUserQuestion`:
+### 3. GitHub Notifications
 
-- **Keep**: remains on today
-- **Defer**: move to tomorrow or upcoming
-- **Clarify**: break into smaller tasks
-- **Complete/Delete**: if done or irrelevant
+See [github.md](github.md).
 
-### Set Priorities (Morning Only)
+Group by reason, typical actions:
 
-Present today's tasks and let the user select priority order. Reorder using the `things:url` skill's reorder script.
+| Reason | Actions |
+|--------|---------|
+| `REVIEW_REQUESTED` | Review now, defer to Things |
+| `ASSIGN` | Review now, defer to Things |
+| `CI_ACTIVITY` | Check status, mark done |
+| `MENTION`/`COMMENT` | Read, respond, mark done |
 
-### Create Follow-ups
+### 4. Linear Inbox
 
-When deferring or breaking down tasks, use `things:url` to create linked follow-ups:
+See [linear.md](linear.md).
 
-```
-things:///show?id=ORIGINAL_ID
-```
+Review assigned issues:
+- **Todo** — start now, keep on radar, defer to Things
+- **In Progress** — check for blockers
 
-### Summary
+### 5. Summary
 
-Display:
-- Items processed from inbox
-- Calendar highlights
+Present progress:
+- Time budget from Calendar
+- Things items processed (inbox now at 0)
+- GitHub notifications triaged (done/deferred)
+- Linear issues reviewed
 - Today's plan in priority order
-- Items deferred
 
-## Evening Variant
+## Defer-to-Things Format
 
-Skip priority setting. Focus on:
+Items deferred from GitHub/Linear:
 
-1. Quick inbox scan (capture remaining thoughts)
-2. Review incomplete today items → defer to tomorrow
-3. Preview tomorrow's calendar and tasks
-4. Confirm tomorrow looks achievable
+- **Title**: `{Source}: {identifier} - {summary}`
+- **Notes**: Markdown link to source
+- **Tags**: Source name (GitHub, Linear)
 
-End with: "Your system is clear. Tomorrow's plan is ready."
+## Skills Used
+
+- `calendar:calendar` — Event queries
+- `things:jxa` — Read Things data
+- `things:url` — Update Things items
+- `things:inbox` — Quick captures
+- `github:notifications` — Notification triage
+- `linear:linear` — Issue queries
+
+## Future
+
+See [automation.md](automation.md) for planned auto-handling patterns.

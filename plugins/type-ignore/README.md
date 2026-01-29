@@ -4,11 +4,14 @@ Detects and eliminates type ignores across your codebase.
 
 ## Contents
 
+- **Skills**
+  - `fix` — Discovers and fixes type ignores across files, directories, or codebase
+
 - **Hooks**
   - `detect.ts` — PostToolUse hook that detects new type/lint ignores in edits
 
 - **Agents**
-  - `fixer` — Fixes type errors instead of ignoring them
+  - `fixer` — Fixes type errors in a single file (spawned by hook or skill)
 
 ## Patterns Detected
 
@@ -20,13 +23,14 @@ Detects and eliminates type ignores across your codebase.
 
 ## Usage
 
-The fixer agent runs automatically when Claude adds a type ignore. You can also invoke it directly:
+The fixer agent runs automatically when Claude adds a type ignore.
 
-- **Single file**: "Run type-ignore:fixer on src/utils.ts"
-- **Directory**: "Run type-ignore:fixer on all files in src/"
-- **Codebase-wide**: "Run type-ignore:fixer across the codebase"
+For broader cleanup, use the `/fix` skill:
 
-When unable to fix an ignore, the agent replaces it with a TODO comment explaining why.
+- **Directory**: `/type-ignore:fix src/`
+- **Codebase-wide**: `/type-ignore:fix`
+
+The skill discovers files with ignores and spawns parallel fixer agents. When unable to fix an ignore, agents replace it with a TODO comment explaining why.
 
 ## Testing
 

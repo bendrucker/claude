@@ -43,7 +43,7 @@ For simple edits, modify XML directly.
 
 ## Dynamic Context Injection
 
-The `!`command`` syntax runs shell commands as preprocessing before Claude sees the skill content. The output replaces the placeholder inline, so Claude receives rendered data.
+The bang-backtick syntax runs shell commands as preprocessing before Claude sees the skill content. The output replaces the placeholder inline, so Claude receives rendered data.
 
 ### Syntax
 
@@ -52,11 +52,11 @@ The `!`command`` syntax runs shell commands as preprocessing before Claude sees 
 - Recent commits: !`git log --oneline -5`
 ```
 
-When the skill runs, each `!`command`` executes immediately and its stdout replaces the placeholder. Claude never sees the command — only the output.
+When the skill runs, each bang-backtick expression executes immediately and its stdout replaces the placeholder. Claude never sees the command — only the output.
 
 ### When to Use
 
-Prefer `!`command`` over asking Claude to run the same command with Bash when:
+Prefer bang-backtick over asking Claude to run the same command with Bash when:
 
 - The data is **always needed** — every invocation requires it, so there's no decision for Claude to make
 - The data **shapes the task** — Claude needs the output to understand what to do, not just as supplementary info
@@ -132,7 +132,7 @@ Write a commit message for the staged changes. $ARGUMENTS
 
 Dynamic context works alongside other skill features:
 
-- `$ARGUMENTS` is substituted separately from `!`command``. Both can appear in the same skill.
+- `$ARGUMENTS` is substituted separately from bang-backtick expressions. Both can appear in the same skill.
 - `context: fork` — commands run in the current working directory before the subagent starts. The subagent receives the rendered output.
 - Supporting files — commands only run in `SKILL.md` content, not in referenced files.
 
@@ -140,7 +140,7 @@ Dynamic context works alongside other skill features:
 
 - Commands run in the **project root**, not the skill directory. Use `${CLAUDE_SKILL_ROOT}` to reference skill-local scripts.
 - **stderr is discarded** — only stdout replaces the placeholder.
-- Failed commands produce empty output. Handle this in the command itself: `!`some-cmd 2>/dev/null || echo "unavailable"``
+- Failed commands produce empty output. Handle this in the command itself with a fallback (e.g., `some-cmd 2>/dev/null || echo "unavailable"`).
 - Commands run **synchronously and sequentially**. Avoid slow commands that would delay skill loading.
 
 ## Argument Substitutions

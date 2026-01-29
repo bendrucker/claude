@@ -73,7 +73,7 @@ hooks:                                    # Optional: skill-scoped hooks
 
 ### Dynamic Context Injection
 
-The `!`command`` syntax runs shell commands **before** the skill content is sent to Claude. The command output replaces the placeholder — Claude only sees the final result, not the command.
+The bang-backtick syntax (see examples below) runs shell commands **before** the skill content is sent to Claude. The command output replaces the placeholder — Claude only sees the final result, not the command.
 
 ```markdown
 - PR diff: !`gh pr diff`
@@ -138,7 +138,7 @@ Load detailed guides as needed:
 
 **Common Patterns**: Read-only (`[Read, Grep, Glob]`), Script-based (`[Read, Bash, Write]`), Template-based (`[Read, Write, Edit]`)
 
-**Content Features**: `$ARGUMENTS` / `$N` for arguments, `!`command`` for dynamic context injection
+**Content Features**: `$ARGUMENTS` / `$N` for arguments, bang-backtick for dynamic context injection
 
 **Anti-Patterns**: Windows paths, too many options, vague descriptions, nested references, scripts that punt errors
 

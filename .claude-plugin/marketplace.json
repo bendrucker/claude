@@ -160,6 +160,11 @@
       "name": "ui-design",
       "description": "UI design tools including wireframing with layout validation",
       "source": "./plugins/ui-design"
+    },
+    {
+      "name": "mermaid",
+      "description": "Create, validate, and render Mermaid diagrams",
+      "source": "./plugins/mermaid"
     }
   ]
 }

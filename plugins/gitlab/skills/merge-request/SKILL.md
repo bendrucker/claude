@@ -31,6 +31,12 @@ git push -u origin feature-branch && glab mr create --fill
 
 **Body from file:** No `--body-file` flag; use `--description "$(cat file.md)"`.
 
+**Username resolution:** Flags like `--reviewer` and `--assignee` require exact usernames. Invalid names are silently ignored. Look up users first:
+
+```bash
+glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<name>"; "i")) | {name, username}'
+```
+
 ## Stacking
 
 `glab stack` manages stacked diffs—small changes that build on each other. See [stack.md](stack.md).

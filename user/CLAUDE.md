@@ -25,6 +25,18 @@
 - Store temporary files in `tmp/` directory.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
 
+## Stacked PRs
+
+I use git-town for stacked branch workflows combined with worktrunk:
+
+1. Create base branch: `wt switch --create feature/base`
+2. Work, commit, then append: `git town append child-name`
+3. Create worktree for child: `wt switch child-name`
+4. Sync entire stack: `git town sync --stack`
+5. Propose all PRs: `git town propose --stack`
+
+Ship branches oldest-first. After a stack branch merges, `git town sync` rebases remaining branches.
+
 ## Personal Details
 
 - Standard username: `@bendrucker`. Refer to any actions performed by this user as "you."

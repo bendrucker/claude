@@ -64,8 +64,6 @@
     "parallel-prs@bendrucker": true,
     "interview@bendrucker": true,
     "linear@claude-plugins-official": true,
-    "ralph-wiggum@claude-code-plugins": true,
-    "code-simplifier@claude-plugins-official": true,
     "github@claude-plugins-official": true,
     "astral@astral-sh": true,
     "personal-review@bendrucker": true,

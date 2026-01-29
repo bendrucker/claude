@@ -1,0 +1,13 @@
+{
+  "name": "mermaid-diagram",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "jsdom": "^26.1.0",
+    "mermaid": "^11.4.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7"
+  }
+}

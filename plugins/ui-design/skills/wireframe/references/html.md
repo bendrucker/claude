@@ -99,7 +99,7 @@ Use a bordered div with centered placeholder text (not X-pattern):
 
 ## Example Assets
 
-Reference examples in `{SKILL_DIR}/assets-html/`:
+Reference examples in `{SKILL_DIR}/assets/`:
 
 | File | Layout Pattern |
 |------|----------------|

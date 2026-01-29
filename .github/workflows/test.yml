@@ -169,6 +169,15 @@ jobs:
         if: steps.inspect.outputs.has_plugin_json == 'true'
         run: node scripts/validate-plugin.mjs "plugins/${{ matrix.plugin }}"
 
+      - name: Check for hardcoded version
+        if: steps.inspect.outputs.has_plugin_json == 'true'
+        run: |
+          if jq -e '.version' "plugins/${{ matrix.plugin }}/.claude-plugin/plugin.json" > /dev/null; then
+            echo "Error: plugin.json should not contain a version field"
+            echo "Hardcoded versions prevent plugin updates from propagating"
+            exit 1
+          fi
+
       - name: Validate hooks.json
         if: steps.inspect.outputs.has_hooks == 'true'
         run: node scripts/validate-hooks.mjs "plugins/${{ matrix.plugin }}"

@@ -29,15 +29,26 @@ Wireframes are skeletal, black-and-white representations of UI layout. They focu
 
 ## Choose Your Approach
 
-| Use | When |
-|-----|------|
-| **SVG** | Precise positioning, overlapping elements, custom shapes, artistic layouts |
-| **HTML/Tailwind** | Standard UI patterns (forms, grids, navigation, modals), flexbox layouts |
+| Use | When | Render Script |
+|-----|------|---------------|
+| **SVG** | Precise positioning, overlapping elements, custom shapes, artistic layouts | `render.ts` |
+| **HTML/Tailwind** | Standard UI patterns (forms, grids, navigation, modals), flexbox layouts | `render-html.ts` |
+
+**Before creating any wireframe**: Read the reference file for your chosen approach. The references contain required patterns, component examples, and the exact rendering workflow.
 
 ## References
 
 - [SVG Reference](./references/svg.md) — Absolute positioning with validation
 - [HTML Reference](./references/html.md) — Tailwind/flexbox patterns
+
+## Rendering
+
+Use ONLY the provided render scripts. Do not improvise alternative methods (Chrome headless, third-party CLI tools, etc.).
+
+| Format | Command |
+|--------|---------|
+| SVG | `bun {SKILL_DIR}/scripts/render.ts [--scale N] <file.svg> [output.png]` |
+| HTML | `bun {SKILL_DIR}/scripts/render-html.ts [--scale N] <file.html> [output.png]` |
 
 ## Common Sizes
 

@@ -5,6 +5,6 @@ marker="$dir/plan-injected"
 
 mode=$(jq -r .permission_mode)
 if [ "$mode" = "plan" ] && [ ! -f "$marker" ]; then
-  cat "$(dirname "$0")/planning.md"
+  cat "$(dirname "$0")/../references/guidelines.md"
   touch "$marker"
 fi

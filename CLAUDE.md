@@ -123,3 +123,11 @@ Run `scripts/check-marketplace.sh` to verify all plugin directories are listed i
 ## Settings
 
 User-level settings live in `user/settings.json` (plugins, permissions, sandbox). Project-level settings live in `.claude/settings.json` (biome hook). See the [settings documentation](https://docs.anthropic.com/en/docs/claude-code/settings) for available options.
+
+### Permission Paths
+
+Permission patterns starting with `/` are relative to the settings file, not absolute filesystem paths. Use `//` for absolute paths:
+
+- `Edit(tmp/**)` → `<cwd>/tmp/**` (relative to current directory)
+- `Edit(//tmp/**)` → `/tmp/**` (absolute)
+- `Edit(~/.config/**)` → home directory (tilde expansion works)

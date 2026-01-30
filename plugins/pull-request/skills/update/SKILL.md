@@ -13,9 +13,13 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Context
 
-- Branch: !`git branch --show-current`
-- PR: !`gh api graphql -F owner="$(gh repo view --json owner --jq '.owner.login')" -F repo="$(gh repo view --json name --jq '.name')" -F number="$(gh pr view --json number --jq '.number')" -f query="$(cat ${CLAUDE_SKILL_ROOT}/assets/pr-context.graphql)" 2>/dev/null || echo "No PR found for current branch"`
-- Diff: !`gh pr diff 2>/dev/null`
+- Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" branch --show-current`
+- PR: !`"${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.sh" "$0" "${CLAUDE_SKILL_ROOT}/assets/pr-context.graphql" 2>/dev/null || echo "No PR found for current branch"`
+- Diff: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-gh.sh" "$0" pr diff 2>/dev/null`
+
+## Workflow
+
+1. **Branch validation**: If on a default branch (main/master) and no `$0` argument was provided, stop and tell the user to specify the target branch: `/pull-request:update <branch>`. When a branch argument is provided, all git/gh commands must run in that branch's worktree using the wrapper scripts.
 
 ## Analysis
 

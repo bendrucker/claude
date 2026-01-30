@@ -11,10 +11,10 @@ allowed-tools: Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
 
 ## Context
 
-- Status: !`git status --short`
-- Branch: !`git branch --show-current`
-- Log: !`git log --oneline -20`
-- Diff: !`git diff HEAD`
+- Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" branch --show-current`
+- Status: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" status --short`
+- Log: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" log --oneline -20`
+- Diff: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" diff HEAD`
 
 ## Title
 
@@ -43,10 +43,7 @@ When an issue is referenced:
 
 ## Workflow
 
-1. If on a default branch, create a branch first, named based on the subject/type of changes:
-   - Example: `fix/add-timeout-to-request`
-   - Example: `aws-provider-v6`
-   - Example: `refactor-user-service`
+1. **Branch validation**: If the context shows you're on a default branch (main/master) and no `$0` argument was provided, stop and tell the user to specify the target branch: `/pull-request:create <branch>`. When a branch argument is provided, all git/gh commands must run in that branch's worktree using the wrapper scripts.
 2. Stage changes if not already staged.
 3. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard).
 4. Push the branch to remote.

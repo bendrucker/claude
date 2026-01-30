@@ -11,10 +11,11 @@ allowed-tools: Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
 
 ## Context
 
-- Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" branch --show-current`
-- Status: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" status --short`
-- Log: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" log --oneline -20`
-- Diff: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" diff HEAD`
+- Provider: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts"`
+- Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
+- Status: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" status --short`
+- Log: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" log --oneline -20`
+- Diff: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" diff HEAD`
 
 ## Title
 
@@ -47,8 +48,12 @@ When an issue is referenced:
 2. Stage changes if not already staged.
 3. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard).
 4. Push the branch to remote.
-5. Create the pull request:
-   - Write the PR body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
-   - Use `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
+5. Create the PR/MR:
+   - Write the body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
    - Include the branch name in the filename to avoid conflicts with concurrent agents
-   - This avoids escaping issues with heredocs in shell commands
+   - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
+   - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
+
+## GitLab Notes
+
+For advanced GitLab features (stacking, username lookup), load `gitlab:merge-request`.

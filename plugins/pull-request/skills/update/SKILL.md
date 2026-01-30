@@ -13,9 +13,11 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Context
 
-- Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-git.sh" "$0" branch --show-current`
-- PR: !`"${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.sh" "$0" "${CLAUDE_SKILL_ROOT}/assets/pr-context.graphql" 2>/dev/null || echo "No PR found for current branch"`
-- Diff: !`"${CLAUDE_PLUGIN_ROOT}/scripts/wt-gh.sh" "$0" pr diff 2>/dev/null`
+- Provider: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts"`
+- Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
+- PR: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts" "$0" "${CLAUDE_SKILL_ROOT}/assets/pr-context.graphql" 2>/dev/null || echo "No PR found for current branch"`
+- Diff (GitHub): !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/gh.sh" "$0" pr diff 2>/dev/null`
+- Diff (GitLab): !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/glab.sh" "$0" mr diff 2>/dev/null`
 
 ## Workflow
 
@@ -29,4 +31,10 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 ## Writing
 
 1. Rewrite the PR body following the same title and body rules as the create skill. See [`sections.md`](sections.md) for section guidance.
-2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply with `gh pr edit --body-file`.
+2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply:
+   - **GitHub**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
+   - **GitLab**: `glab mr update --description "$(cat tmp/pr-body-<branch>.md)"`
+
+## GitLab Notes
+
+For advanced GitLab features (stacking, username lookup), load `gitlab:merge-request`.

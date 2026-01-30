@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/validate-pr.sh"
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/scripts/validate.ts"
           }
         ]
       }

@@ -3,9 +3,9 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createRunner, createTestRepo, type TestRepo } from "./test-utils";
 
-const runScript = createRunner(path.join(import.meta.dirname, "wt-git.sh"));
+const runScript = createRunner(path.join(import.meta.dirname, "git.sh"));
 
-describe("wt-git.sh", () => {
+describe("git.sh", () => {
   let repo: TestRepo;
 
   beforeEach(() => {

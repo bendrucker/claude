@@ -1,11 +1,20 @@
 import { execSync } from "node:child_process";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createRunner, createTestRepo, type TestRepo } from "./test-utils";
+import { createTestRepo, type TestRepo } from "./test-utils";
 
-const runScript = createRunner(path.join(import.meta.dirname, "wt-resolve.sh"));
+const scriptPath = path.join(import.meta.dirname, "resolve.ts");
 
-describe("wt-resolve.sh", () => {
+function runScript(args: string[], cwd?: string): string {
+  const quotedArgs = args.map((a) => `"${a}"`).join(" ");
+  return execSync(`bun "${scriptPath}" ${quotedArgs}`, {
+    encoding: "utf-8",
+    cwd,
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+}
+
+describe("resolve.ts", () => {
   let repo: TestRepo;
 
   beforeEach(() => {

@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/plan-mode-context"
+            "command": "~/.claude/hooks/plan-mode-context.sh"
           }
         ]
       }

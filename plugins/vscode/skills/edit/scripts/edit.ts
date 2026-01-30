@@ -56,7 +56,11 @@ async function main() {
   if (file) {
     openInEditor(file, argv.flags.wait);
   } else {
-    const stdinContent = await Bun.stdin.text();
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk as Buffer);
+    }
+    const stdinContent = Buffer.concat(chunks).toString();
 
     const tempPath = await createTempFile(stdinContent, argv.flags.ext);
     openInEditor(tempPath, argv.flags.wait);

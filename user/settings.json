@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "dir=/tmp/claude/${CLAUDE_SESSION_ID}; mkdir -p \"$dir\"; marker=\"$dir/plan-injected\"; [ \"$(jq -r .permission_mode)\" = plan ] && [ ! -f \"$marker\" ] && cat ~/.claude/hooks/planning.md && touch \"$marker\"; true"
+            "command": "~/.claude/hooks/plan-mode-context"
           }
         ]
       }

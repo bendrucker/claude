@@ -25,6 +25,13 @@
         "$ref": "#/$defs/hookEntry"
       },
       "description": "Hooks that run when the agent stops"
+    },
+    "UserPromptSubmit": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookEntry"
+      },
+      "description": "Hooks that run when the user submits a prompt"
     }
   },
   "additionalProperties": false,

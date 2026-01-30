@@ -95,8 +95,8 @@ export async function getStats(options: SearchOptions = {}): Promise<UsageStats>
 
   const filePromises: Promise<SessionData>[] = [];
 
-  for await (const filePath of streamSessionFiles(options)) {
-    filePromises.push(collectSessionData(filePath));
+  for await (const file of streamSessionFiles(options)) {
+    filePromises.push(collectSessionData(file.path));
   }
 
   const sessions = await Promise.all(filePromises);

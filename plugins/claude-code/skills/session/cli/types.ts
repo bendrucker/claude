@@ -66,6 +66,8 @@ export interface ProjectStats {
   readonly lastSession: Date | null;
 }
 
+import type { DebugContext } from "./debug";
+
 export type ErrorType = "rejection" | "failure";
 
 export interface SearchOptions {
@@ -75,6 +77,7 @@ export interface SearchOptions {
   project?: string;
   limit?: number;
   errorType?: ErrorType;
+  ctx?: DebugContext;
 }
 
 /** Minimum token length to match during search */

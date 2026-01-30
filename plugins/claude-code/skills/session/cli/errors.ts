@@ -122,8 +122,8 @@ export async function getErrors(options: SearchOptions = {}): Promise<ToolError[
   const allErrors: ToolError[] = [];
   const filePromises: Promise<ToolError[]>[] = [];
 
-  for await (const filePath of streamSessionFiles(options)) {
-    filePromises.push(extractErrorsFromFile(filePath, options));
+  for await (const file of streamSessionFiles(options)) {
+    filePromises.push(extractErrorsFromFile(file.path, options));
   }
 
   const results = await Promise.all(filePromises);

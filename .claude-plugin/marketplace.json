@@ -175,6 +175,11 @@
       "name": "vscode",
       "description": "VS Code editor integration for interactive content editing",
       "source": "./plugins/vscode"
+    },
+    {
+      "name": "plan",
+      "description": "Planning mode guidelines and context injection",
+      "source": "./plugins/plan"
     }
   ]
 }

@@ -1,0 +1,11 @@
+{
+  "description": "Inject planning guidelines when entering plan mode",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "${CLAUDE_PLUGIN_ROOT}/scripts/context.sh"
+      }
+    ]
+  }
+}

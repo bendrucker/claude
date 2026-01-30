@@ -75,7 +75,8 @@
     "agents-md@bendrucker": true,
     "ast-grep@ast-grep": true,
     "worktrunk@worktrunk": true,
-    "vscode@bendrucker": true
+    "vscode@bendrucker": true,
+    "plan@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

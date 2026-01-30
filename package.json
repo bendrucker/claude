@@ -9,7 +9,8 @@
     "plugins/style",
     "plugins/things",
     "plugins/type-ignore",
-    "plugins/ui-design/skills/wireframe"
+    "plugins/ui-design/skills/wireframe",
+    "plugins/vscode"
   ],
   "scripts": {
     "build": "tsc --noEmit",

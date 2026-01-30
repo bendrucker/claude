@@ -170,6 +170,11 @@
       "name": "tech-spec",
       "description": "Create and review technical specifications",
       "source": "./plugins/tech-spec"
+    },
+    {
+      "name": "vscode",
+      "description": "VS Code editor integration for interactive content editing",
+      "source": "./plugins/vscode"
     }
   ]
 }

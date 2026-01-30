@@ -165,6 +165,11 @@
       "name": "mermaid",
       "description": "Create, validate, and render Mermaid diagrams",
       "source": "./plugins/mermaid"
+    },
+    {
+      "name": "tech-spec",
+      "description": "Create and review technical specifications",
+      "source": "./plugins/tech-spec"
     }
   ]
 }

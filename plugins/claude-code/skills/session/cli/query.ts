@@ -33,7 +33,7 @@ async function loadConversations(options: SearchOptions): Promise<Conversation[]
       }
       return parseConversationFile(file.path);
     },
-    { ctx },
+    ctx ? { ctx } : {},
   );
   stopParsing?.();
 

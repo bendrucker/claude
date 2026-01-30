@@ -35,6 +35,16 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"$(jq -r .permission_mode)\" = plan ] && cat ~/.claude/hooks/planning.md; true"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {

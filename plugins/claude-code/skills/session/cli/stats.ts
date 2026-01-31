@@ -1,5 +1,7 @@
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
+import { collectConcurrent } from "./concurrent";
+import { incrementCount, startTiming } from "./debug";
 import { isWithinDateRange, streamSessionFiles } from "./files";
 import type { SearchOptions } from "./types";
 
@@ -90,16 +92,20 @@ async function collectSessionData(filePath: string): Promise<SessionData> {
 }
 
 export async function getStats(options: SearchOptions = {}): Promise<UsageStats> {
+  const { ctx } = options;
   const toolsMap = new Map<string, { uses: number; errors: number }>();
   let totalSessions = 0;
 
-  const filePromises: Promise<SessionData>[] = [];
-
-  for await (const file of streamSessionFiles(options)) {
-    filePromises.push(collectSessionData(file.path));
-  }
-
-  const sessions = await Promise.all(filePromises);
+  const stopParsing = ctx ? startTiming(ctx, "file_parsing") : undefined;
+  const sessions = await collectConcurrent(
+    streamSessionFiles(options),
+    async (file) => {
+      if (ctx) incrementCount(ctx, "files_found");
+      return collectSessionData(file.path);
+    },
+    ctx ? { ctx } : {},
+  );
+  stopParsing?.();
 
   for (const session of sessions) {
     if (!isWithinDateRange(session.startTime, options)) continue;

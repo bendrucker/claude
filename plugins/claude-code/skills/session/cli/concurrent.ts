@@ -30,26 +30,33 @@ export async function* mapConcurrent<T, U>(
     if (!(await startNext())) break;
   }
 
-  while (pending.size > 0) {
-    const { index, result } = await Promise.race(pending.values());
-    pending.delete(index);
-    results.set(index, result);
+  try {
+    while (pending.size > 0) {
+      const { index, result } = await Promise.race(pending.values());
+      pending.delete(index);
+      results.set(index, result);
 
-    if (ctx) {
-      incrementCount(ctx, "items_processed");
-      if (results.size % 50 === 0) {
-        debug(ctx, `Processed ${results.size} items...`);
+      if (ctx) {
+        incrementCount(ctx, "items_processed");
+        const processed = ctx.counts.get("items_processed") ?? 0;
+        if (processed % 50 === 0) {
+          debug(ctx, `Processed ${processed} items...`);
+        }
+      }
+
+      // Start next item
+      await startNext();
+
+      // Yield in order
+      while (results.has(nextYield)) {
+        yield results.get(nextYield)!;
+        results.delete(nextYield);
+        nextYield++;
       }
     }
-
-    // Start next item
-    await startNext();
-
-    // Yield in order
-    while (results.has(nextYield)) {
-      yield results.get(nextYield)!;
-      results.delete(nextYield);
-      nextYield++;
+  } finally {
+    for (const promise of pending.values()) {
+      promise.catch(() => {});
     }
   }
 }

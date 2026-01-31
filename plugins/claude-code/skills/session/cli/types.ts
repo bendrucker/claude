@@ -57,6 +57,8 @@ export interface DigestResult {
   truncated: boolean;
 }
 
+import type { DebugContext } from "./debug";
+
 export interface ProjectStats {
   readonly projectPath: string;
   readonly projectName: string;
@@ -65,8 +67,6 @@ export interface ProjectStats {
   readonly firstSession: Date | null;
   readonly lastSession: Date | null;
 }
-
-import type { DebugContext } from "./debug";
 
 export type ErrorType = "rejection" | "failure";
 

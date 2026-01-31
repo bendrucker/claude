@@ -27,7 +27,7 @@
     "test:integration": "vitest --project integration"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.20",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.25",
     "@biomejs/biome": "^2.3.13",
     "@constellos/claude-code-kit": "^0.4.0",
     "@linear/sdk": "^72.0.0",

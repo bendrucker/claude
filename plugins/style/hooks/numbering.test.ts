@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { execSync } from "node:child_process";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { processInput, checkMarkdown, checkCode, formatOutput } from "./numbering";
+import { checkCode, checkMarkdown, formatOutput, processInput } from "./numbering";
 
 function hasSg(): boolean {
   try {

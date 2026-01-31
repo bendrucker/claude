@@ -22,9 +22,8 @@
     "lint:md:agents": "remark plugins/*/agents/*.md",
     "lint:md:commands": "remark .claude/commands/*.md plugins/*/commands/*.md",
     "lint:md:skills": "remark plugins/*/skills/*/SKILL.md",
-    "test": "vitest",
-    "test:unit": "vitest --project unit",
-    "test:integration": "vitest --project integration"
+    "test": "bun test",
+    "test:unit": "bun test"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.25",
@@ -38,8 +37,7 @@
     "remark-cli": "^12.0.1",
     "remark-frontmatter": "^5.0.0",
     "remark-lint": "^10.0.1",
-    "remark-lint-frontmatter-schema": "^3.15.4",
-    "vitest": "^4.0.18"
+    "remark-lint-frontmatter-schema": "^3.15.4"
   },
   "dependencies": {
     "typescript": "^5.9.3",

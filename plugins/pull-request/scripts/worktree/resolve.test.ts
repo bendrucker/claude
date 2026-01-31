@@ -1,6 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execSync } from "node:child_process";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestRepo, type TestRepo } from "./test-utils";
 
 const scriptPath = path.join(import.meta.dirname, "resolve.ts");

@@ -1,7 +1,7 @@
+import { afterEach, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import { dirname, extname } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
 import { createTempFile, readAndCleanup } from "./edit";
 
 const tempPaths: string[] = [];

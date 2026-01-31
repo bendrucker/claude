@@ -1,6 +1,6 @@
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { renderFile } from "./render-html";
 

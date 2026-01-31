@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest"
+    "test": "bun test"
   },
   "dependencies": {
     "yaml": "^2.7.1"

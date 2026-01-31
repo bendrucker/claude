@@ -1,8 +1,8 @@
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mapConcurrent } from "./concurrent";
 import { parseDate } from "./date";
 import { createDebugContext, printTimingSummary } from "./debug";
@@ -447,7 +447,7 @@ describe("mtime-based file filtering", () => {
 
 describe("debug output", () => {
   it("outputs timing summary to stderr when enabled", () => {
-    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stderrSpy = spyOn(console, "error").mockImplementation(() => {});
 
     const ctx = createDebugContext(true);
     ctx.timings.set("test_phase", 100);
@@ -467,7 +467,7 @@ describe("debug output", () => {
   });
 
   it("outputs nothing when debug is disabled", () => {
-    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stderrSpy = spyOn(console, "error").mockImplementation(() => {});
 
     const ctx = createDebugContext(false);
     ctx.timings.set("test_phase", 100);

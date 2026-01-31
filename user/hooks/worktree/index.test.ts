@@ -1,5 +1,5 @@
+import { describe, expect, it } from "bun:test";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { describe, expect, it } from "vitest";
 import { formatAskOutput, formatDenyOutput, processInput } from "./index";
 
 function bashInput(command: string): PreToolUseHookInput {

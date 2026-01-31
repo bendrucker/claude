@@ -1,6 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execSync } from "node:child_process";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createRunner, createTestRepo, type TestRepo } from "./test-utils";
 
 const runScript = createRunner(path.join(import.meta.dirname, "gh.sh"));

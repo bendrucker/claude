@@ -40,7 +40,7 @@ Do not include installation instructions or skill activation details—the READM
 
 ### Dependencies
 
-The root `package.json` contains shared tooling (vitest, typescript) and dependencies used across multiple plugins (e.g., `url-pattern`). Plugin-specific dependencies belong in their own `package.json`:
+The root `package.json` contains shared tooling (typescript) and dependencies used across multiple plugins (e.g., `url-pattern`). Plugin-specific dependencies belong in their own `package.json`:
 
 - Create `plugins/<name>/package.json` for plugin-specific dependencies
 - Add the plugin to the root `workspaces` array
@@ -74,7 +74,7 @@ See the `claude-code:hook` skill for hook documentation. Plugin hooks are define
 
 ## Testing
 
-Plugins use [Vitest](https://vitest.dev/) for tests. Run all tests with `npm test` or filter by plugin with `npm test -- plugins/<name>`.
+Plugins use `bun test` for tests. Run all tests with `bun test` or filter by plugin with `bun test plugins/<name>`.
 
 ### CI Structure
 
@@ -86,8 +86,7 @@ Root-level tests (e.g., `hooks/`) run in a dedicated job since they're not part 
 
 ### Conventions
 
-- **`npm test` runs all tests**: Use specific scripts like `test:unit` or `test:integration` for subsets. Never make the default `npm test` run only a subset.
-- **Use file patterns for test separation**: Vitest projects separate `*.test.ts` (unit) from `*.integration.ts` (integration) via include/exclude patterns. Don't use environment variables to conditionally skip tests.
+- **`bun test` runs all unit tests**: Bun auto-discovers `*.test.ts` files. Integration tests (`*.integration.ts`) are not auto-discovered and can be run by passing paths explicitly (e.g., `bun test plugins/<name>/tests/file.integration.ts`).
 - **No `.js` imports in TypeScript**: Import from `./module` not `./module.js`. The bundler/runtime handles resolution.
 - **Prefer skills over agents**: Skills are invocable via the Skill tool. Agents require the Task tool. If something should be directly invocable, make it a skill.
 

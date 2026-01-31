@@ -62,11 +62,14 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
-        run: npm test -- ".claude/hooks" "user/hooks"
+        run: bun test .claude/hooks user/hooks
 
   validate:
     runs-on: ubuntu-latest
@@ -187,7 +190,6 @@ jobs:
         run: npx remark "plugins/${{ matrix.plugin }}/skills/*/SKILL.md"
 
       - name: Setup Bun
-        if: steps.inspect.outputs.has_skills == 'true'
         uses: oven-sh/setup-bun@v2
 
       - name: Lint skills
@@ -219,7 +221,7 @@ jobs:
 
       - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
-        run: npm run test:unit -- "plugins/${{ matrix.plugin }}/"
+        run: bun test "plugins/${{ matrix.plugin }}/"
 
   plugins:
     needs: [validate, plugin]

@@ -1,8 +1,8 @@
+import { describe, expect, it } from "bun:test";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { describe, expect, it } from "vitest";
 import { processInput } from "./open";
 
 function mockInput(command: string): PreToolUseHookInput {

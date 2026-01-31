@@ -1,3 +1,5 @@
+import { collectConcurrent } from "./concurrent";
+import { debug, incrementCount, startTiming } from "./debug";
 import {
   compareTimestampsDesc,
   findSessionFile,
@@ -19,16 +21,41 @@ function hasContent(conversation: Conversation): boolean {
 }
 
 async function loadConversations(options: SearchOptions): Promise<Conversation[]> {
-  const parsePromises: Promise<Conversation>[] = [];
+  const { ctx } = options;
 
-  for await (const filePath of streamSessionFiles(options)) {
-    parsePromises.push(parseConversationFile(filePath));
+  const stopParsing = ctx ? startTiming(ctx, "file_parsing") : undefined;
+  const parsed = await collectConcurrent(
+    streamSessionFiles(options),
+    async (file) => {
+      if (ctx) {
+        incrementCount(ctx, "files_found");
+        debug(ctx, `Parsing ${file.path}`);
+      }
+      return parseConversationFile(file.path);
+    },
+    ctx ? { ctx } : {},
+  );
+  stopParsing?.();
+
+  const stopFiltering = ctx ? startTiming(ctx, "filtering") : undefined;
+  const conversations = parsed.filter((conv) => {
+    if (!hasContent(conv)) {
+      if (ctx) incrementCount(ctx, "empty_sessions");
+      return false;
+    }
+    if (!isWithinDateRange(conv.startTime, options)) {
+      if (ctx) incrementCount(ctx, "date_filtered");
+      return false;
+    }
+    return true;
+  });
+  stopFiltering?.();
+
+  if (ctx) {
+    incrementCount(ctx, "conversations_loaded", conversations.length);
   }
 
-  const conversations = await Promise.all(parsePromises);
-  return conversations.filter(
-    (conv) => hasContent(conv) && isWithinDateRange(conv.startTime, options),
-  );
+  return conversations;
 }
 
 export async function searchConversations(

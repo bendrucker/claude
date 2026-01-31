@@ -6,6 +6,11 @@ import type { SearchOptions } from "./types";
 
 const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 
+export interface SessionFile {
+  path: string;
+  mtime: Date;
+}
+
 export function matchesProjectFilter(projectDir: string, filter: string): boolean {
   const normalizedFilter = filter.replace(/\//g, "-");
   return projectDir.includes(normalizedFilter) || projectDir.includes(filter);
@@ -28,7 +33,7 @@ export function getProjectsDir(options: SearchOptions): string {
   return options.projectsDir || process.env.CLAUDE_PROJECTS_DIR || DEFAULT_PROJECTS_DIR;
 }
 
-export async function* streamSessionFiles(options: SearchOptions): AsyncGenerator<string> {
+export async function* streamSessionFiles(options: SearchOptions): AsyncGenerator<SessionFile> {
   const projectsDir = getProjectsDir(options);
 
   let entries: Dirent[];
@@ -49,7 +54,17 @@ export async function* streamSessionFiles(options: SearchOptions): AsyncGenerato
     const files = await fs.readdir(projectDir);
     for (const file of files) {
       if (file.endsWith(".jsonl")) {
-        yield path.join(projectDir, file);
+        const filePath = path.join(projectDir, file);
+        const stat = await fs.stat(filePath);
+
+        if (options.after && stat.mtime < options.after) {
+          continue;
+        }
+        if (options.before && stat.mtime > options.before) {
+          continue;
+        }
+
+        yield { path: filePath, mtime: stat.mtime };
       }
     }
   }
@@ -59,11 +74,32 @@ export async function findSessionFile(
   sessionId: string,
   options: SearchOptions = {},
 ): Promise<string | null> {
+  const projectsDir = getProjectsDir(options);
   const filename = `${sessionId}.jsonl`;
-  for await (const filePath of streamSessionFiles(options)) {
-    if (path.basename(filePath) === filename) {
+
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(projectsDir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const projectDir = path.join(projectsDir, entry.name);
+
+    if (options.project && !matchesProjectFilter(projectDir, options.project)) {
+      continue;
+    }
+
+    const filePath = path.join(projectDir, filename);
+    try {
+      await fs.access(filePath);
       return filePath;
+    } catch {
+      continue;
     }
   }
+
   return null;
 }

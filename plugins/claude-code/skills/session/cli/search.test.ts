@@ -1,7 +1,12 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mapConcurrent } from "./concurrent";
 import { parseDate } from "./date";
+import { createDebugContext, printTimingSummary } from "./debug";
+import { streamSessionFiles } from "./files";
 import { formatDigest, formatSearchResults, formatStats } from "./format";
 import { parseConversationFile } from "./parse";
 import { getDigest, searchConversations } from "./query";
@@ -357,5 +362,200 @@ describe("parseDate", () => {
     const yesterday = parseDate("Yesterday");
     expect(today.getHours()).toBe(0);
     expect(yesterday.getHours()).toBe(0);
+  });
+});
+
+describe("mtime-based file filtering", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "session-test-"));
+    const projectDir = path.join(tempDir, "-Users-test-project");
+    await fs.mkdir(projectDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("skips files with mtime before --after date", async () => {
+    const projectDir = path.join(tempDir, "-Users-test-project");
+
+    const oldFile = path.join(projectDir, "old-session.jsonl");
+    const newFile = path.join(projectDir, "new-session.jsonl");
+
+    const sessionContent = JSON.stringify({
+      type: "user",
+      message: { role: "user", content: "test" },
+      sessionId: "test",
+      cwd: "/test",
+      timestamp: "2024-01-15T10:00:00.000Z",
+    });
+
+    await fs.writeFile(oldFile, sessionContent);
+    await fs.writeFile(newFile, sessionContent);
+
+    const oldDate = new Date("2024-01-01T00:00:00.000Z");
+    const newDate = new Date("2024-06-01T00:00:00.000Z");
+
+    await fs.utimes(oldFile, oldDate, oldDate);
+    await fs.utimes(newFile, newDate, newDate);
+
+    const afterDate = new Date("2024-03-01T00:00:00.000Z");
+    const files: string[] = [];
+    for await (const file of streamSessionFiles({ projectsDir: tempDir, after: afterDate })) {
+      files.push(path.basename(file.path));
+    }
+
+    expect(files).toContain("new-session.jsonl");
+    expect(files).not.toContain("old-session.jsonl");
+  });
+
+  it("skips files with mtime after --before date", async () => {
+    const projectDir = path.join(tempDir, "-Users-test-project");
+
+    const oldFile = path.join(projectDir, "old-session.jsonl");
+    const newFile = path.join(projectDir, "new-session.jsonl");
+
+    const sessionContent = JSON.stringify({
+      type: "user",
+      message: { role: "user", content: "test" },
+      sessionId: "test",
+      cwd: "/test",
+      timestamp: "2024-01-15T10:00:00.000Z",
+    });
+
+    await fs.writeFile(oldFile, sessionContent);
+    await fs.writeFile(newFile, sessionContent);
+
+    const oldDate = new Date("2024-01-01T00:00:00.000Z");
+    const newDate = new Date("2024-06-01T00:00:00.000Z");
+
+    await fs.utimes(oldFile, oldDate, oldDate);
+    await fs.utimes(newFile, newDate, newDate);
+
+    const beforeDate = new Date("2024-03-01T00:00:00.000Z");
+    const files: string[] = [];
+    for await (const file of streamSessionFiles({ projectsDir: tempDir, before: beforeDate })) {
+      files.push(path.basename(file.path));
+    }
+
+    expect(files).toContain("old-session.jsonl");
+    expect(files).not.toContain("new-session.jsonl");
+  });
+});
+
+describe("debug output", () => {
+  it("outputs timing summary to stderr when enabled", () => {
+    const stderrSpy = spyOn(console, "error").mockImplementation(() => {});
+
+    const ctx = createDebugContext(true);
+    ctx.timings.set("test_phase", 100);
+    ctx.counts.set("items", 5);
+
+    printTimingSummary(ctx);
+
+    expect(stderrSpy).toHaveBeenCalled();
+    const output = stderrSpy.mock.calls.map((call) => call[0]).join("\n");
+    expect(output).toContain("[debug]");
+    expect(output).toContain("test_phase");
+    expect(output).toContain("100ms");
+    expect(output).toContain("items");
+    expect(output).toContain("5");
+
+    stderrSpy.mockRestore();
+  });
+
+  it("outputs nothing when debug is disabled", () => {
+    const stderrSpy = spyOn(console, "error").mockImplementation(() => {});
+
+    const ctx = createDebugContext(false);
+    ctx.timings.set("test_phase", 100);
+
+    printTimingSummary(ctx);
+
+    expect(stderrSpy).not.toHaveBeenCalled();
+
+    stderrSpy.mockRestore();
+  });
+});
+
+describe("bounded concurrency", () => {
+  it("processes items without exceeding concurrency limit", async () => {
+    let maxConcurrent = 0;
+    let currentConcurrent = 0;
+    const concurrencyLimit = 3;
+
+    async function* generateItems() {
+      for (let i = 0; i < 10; i++) {
+        yield i;
+      }
+    }
+
+    const results: number[] = [];
+    for await (const result of mapConcurrent(
+      generateItems(),
+      async (item) => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        currentConcurrent--;
+        return item * 2;
+      },
+      { concurrency: concurrencyLimit },
+    )) {
+      results.push(result);
+    }
+
+    expect(maxConcurrent).toBeLessThanOrEqual(concurrencyLimit);
+    expect(results).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
+  });
+
+  it("handles large numbers of files without resource exhaustion", async () => {
+    const itemCount = 100;
+
+    async function* generateItems() {
+      for (let i = 0; i < itemCount; i++) {
+        yield i;
+      }
+    }
+
+    const results: number[] = [];
+    for await (const result of mapConcurrent(
+      generateItems(),
+      async (item) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return item;
+      },
+      { concurrency: 20 },
+    )) {
+      results.push(result);
+    }
+
+    expect(results).toHaveLength(itemCount);
+    expect(results).toEqual([...Array(itemCount).keys()]);
+  });
+
+  it("preserves order of results", async () => {
+    async function* generateItems() {
+      for (let i = 0; i < 20; i++) {
+        yield i;
+      }
+    }
+
+    const results: number[] = [];
+    for await (const result of mapConcurrent(
+      generateItems(),
+      async (item) => {
+        const delay = Math.random() * 20;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return item;
+      },
+      { concurrency: 5 },
+    )) {
+      results.push(result);
+    }
+
+    expect(results).toEqual([...Array(20).keys()]);
   });
 });

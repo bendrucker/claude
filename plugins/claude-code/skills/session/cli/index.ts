@@ -2,6 +2,7 @@
 
 import { cli } from "cleye";
 import { parseDate } from "./date";
+import { createDebugContext, type DebugContext, printTimingSummary } from "./debug";
 import { aggregateErrors, getErrors, type ToolError } from "./errors";
 import {
   formatDigest,
@@ -36,6 +37,11 @@ const commonFlags = {
     description: "Output format: text or json",
     default: "text",
   },
+  debug: {
+    type: Boolean,
+    description: "Enable debug output to stderr",
+    default: false,
+  },
 } as const;
 
 function parseCommonOptions(flags: {
@@ -44,8 +50,10 @@ function parseCommonOptions(flags: {
   project?: string | undefined;
   limit?: number | undefined;
   format?: string | undefined;
-}): { options: SearchOptions; format: "text" | "json" } {
-  const options: SearchOptions = {};
+  debug?: boolean | undefined;
+}): { options: SearchOptions; format: "text" | "json"; ctx: DebugContext } {
+  const ctx = createDebugContext(flags.debug ?? false);
+  const options: SearchOptions = { ctx };
 
   if (flags.after) {
     options.after = parseDate(flags.after);
@@ -68,7 +76,7 @@ function parseCommonOptions(flags: {
     throw new Error('--format must be "text" or "json"');
   }
 
-  return { options, format };
+  return { options, format, ctx };
 }
 
 function output<T>(data: T, format: "text" | "json", formatter: (data: T) => string): void {
@@ -113,7 +121,7 @@ async function runErrors(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format } = parseCommonOptions(argv.flags);
+  const { options, format, ctx } = parseCommonOptions(argv.flags);
 
   if (argv.flags.type) {
     if (argv.flags.type !== "rejection" && argv.flags.type !== "failure") {
@@ -150,6 +158,7 @@ async function runErrors(args: string[]): Promise<void> {
   } else {
     output(errors, format, formatErrors);
   }
+  printTimingSummary(ctx);
 }
 
 async function runStats(args: string[]): Promise<void> {
@@ -174,7 +183,7 @@ async function runStats(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format } = parseCommonOptions(argv.flags);
+  const { options, format, ctx } = parseCommonOptions(argv.flags);
 
   const stats = await getStats(options);
 
@@ -197,6 +206,7 @@ async function runStats(args: string[]): Promise<void> {
   }
 
   output(stats, format, formatStats);
+  printTimingSummary(ctx);
 }
 
 async function runDigest(args: string[]): Promise<void> {
@@ -215,7 +225,7 @@ async function runDigest(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format } = parseCommonOptions(argv.flags);
+  const { options, format, ctx } = parseCommonOptions(argv.flags);
 
   if (argv.flags.session) {
     const conversation = await getSession(argv.flags.session, options);
@@ -224,11 +234,13 @@ async function runDigest(args: string[]): Promise<void> {
     }
     const result = { conversations: [conversation], totalCount: 1, truncated: false };
     output(result, format, formatDigest);
+    printTimingSummary(ctx);
     return;
   }
 
   const result = await getDigest(options);
   output(result, format, formatDigest);
+  printTimingSummary(ctx);
 }
 
 async function runSearch(args: string[]): Promise<void> {
@@ -242,9 +254,10 @@ async function runSearch(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format } = parseCommonOptions(argv.flags);
+  const { options, format, ctx } = parseCommonOptions(argv.flags);
   const results = await searchConversations(argv._.query, options);
   output(results, format, formatSearchResults);
+  printTimingSummary(ctx);
 }
 
 const subcommands: Record<string, (args: string[]) => Promise<void>> = {

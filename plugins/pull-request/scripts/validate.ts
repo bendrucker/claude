@@ -82,8 +82,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`[pull-request/validate] Unexpected error: ${message}`);
-  denyWithError(`Validation hook encountered an error: ${message}`);
-});
+if (import.meta.main) {
+  main().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[pull-request/validate] Unexpected error: ${message}`);
+    denyWithError(`Validation hook encountered an error: ${message}`);
+  });
+}

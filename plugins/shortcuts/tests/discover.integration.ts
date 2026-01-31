@@ -1,6 +1,6 @@
+import { describe, expect, it } from "bun:test";
 import { type ExecFileSyncOptions, execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
 
 const script = join(import.meta.dirname, "../skills/shortcut/scripts/discover.swift");
 const opts: ExecFileSyncOptions = { encoding: "utf-8", timeout: 60000 };

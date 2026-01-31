@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
-  PreToolUseHookInput,
   PostToolUseHookInput,
   PostToolUseHookSpecificOutput,
+  PreToolUseHookInput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { hasTrailingNewline, processInput as checkInput } from "./check";
-import { ensureTrailingNewline, processInput as ensureInput } from "./ensure";
-import { preserveNewlineState, processInput as preserveInput } from "./preserve";
-import { getState, setState, clearState, clearAllState } from "./state";
+import { processInput as checkInput, hasTrailingNewline } from "./check";
+import { processInput as ensureInput, ensureTrailingNewline } from "./ensure";
+import { processInput as preserveInput, preserveNewlineState } from "./preserve";
+import { clearAllState, clearState, getState, setState } from "./state";
 
 const testDir = join(tmpdir(), "newline-test");
 

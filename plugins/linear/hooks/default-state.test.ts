@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { getDefaultState, processInput } from "./default-state";
 

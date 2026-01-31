@@ -1,5 +1,5 @@
+import { describe, expect, it } from "bun:test";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
 
 import { extractMermaidBlocks, validateContent, validateFile } from "./validate";
 

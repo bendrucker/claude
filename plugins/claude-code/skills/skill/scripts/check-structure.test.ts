@@ -1,5 +1,5 @@
+import { describe, expect, it } from "bun:test";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
-import { describe, expect, it } from "vitest";
 import { extractSkillRoot, processHookInput, validateSkillPath } from "./check-structure";
 
 function mockWriteInput(filePath: string): PostToolUseInput {

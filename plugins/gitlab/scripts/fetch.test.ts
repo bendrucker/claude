@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { isGitLabUrl, parseGitLabUrl, formatOutput, processInput } from "./fetch";
+import { formatOutput, isGitLabUrl, parseGitLabUrl, processInput } from "./fetch";
 
 function mockInput(url: string): PreToolUseHookInput {
   return {

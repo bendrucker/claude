@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
 import {
-  extractPluginName,
-  getResourceType,
-  getResourceName,
   checkStuttering,
+  extractPluginName,
+  getResourceName,
+  getResourceType,
   processHookInput,
 } from "./check-namespace";
 

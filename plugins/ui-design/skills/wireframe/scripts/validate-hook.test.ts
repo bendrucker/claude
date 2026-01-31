@@ -1,9 +1,9 @@
+import { describe, expect, it } from "bun:test";
 import path from "node:path";
 import type {
   PostToolUseHookInput,
   PostToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { describe, expect, it } from "vitest";
 
 import { isSvgFile, processInput } from "./validate-hook";
 

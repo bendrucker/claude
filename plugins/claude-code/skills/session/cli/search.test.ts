@@ -1,6 +1,6 @@
+import { describe, expect, it } from "bun:test";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
 import { parseDate } from "./date";
 import { formatDigest, formatSearchResults, formatStats } from "./format";
 import { parseConversationFile } from "./parse";

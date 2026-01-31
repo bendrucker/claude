@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { formatOutput, isCleanupAgentActive, processInput } from "../hooks/detect";
 
 const MARKER_DIR = "/tmp/claude/type-ignore-active";

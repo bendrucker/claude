@@ -180,6 +180,11 @@
       "name": "plan",
       "description": "Planning mode guidelines and context injection",
       "source": "./plugins/plan"
+    },
+    {
+      "name": "webfetch-auth",
+      "description": "Blocks WebFetch for authenticated URLs and suggests MCP alternatives",
+      "source": "./plugins/webfetch-auth"
     }
   ]
 }

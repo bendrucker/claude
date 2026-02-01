@@ -187,18 +187,9 @@ jobs:
             bun run --cwd "plugins/${{ matrix.plugin }}" build
           fi
 
-      - name: Install system dependencies
+      - name: Install Playwright browsers
         if: steps.inspect.outputs.has_tests == 'true'
         run: |
-          needs_vips=false
-          if [[ -f "plugins/${{ matrix.plugin }}/package.json" ]]; then
-            if jq -e '.dependencies.sharp // .devDependencies.sharp' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
-              needs_vips=true
-            fi
-          fi
-          if [[ "$needs_vips" == "true" ]]; then
-            sudo apt-get update && sudo apt-get install -y libvips-dev
-          fi
           if [[ -f "plugins/${{ matrix.plugin }}/package.json" ]]; then
             if jq -e '.dependencies.playwright // .devDependencies.playwright' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
               bunx playwright install chromium --with-deps

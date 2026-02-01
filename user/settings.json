@@ -114,6 +114,8 @@
       ]
     },
     "excludedCommands": [
+      "bun:*",
+      "bunx:*",
       "code:*",
       "docker:*",
       "pbcopy:*",

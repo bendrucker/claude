@@ -19,7 +19,7 @@ const argv = cli({
 
 function buildAttribution(sessionId: string): string {
   const dir = process.cwd();
-  return `---\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\ncd ${dir} && claude --resume ${sessionId}\n\`\`\``;
+  return `---\n\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\ncd ${dir} && claude --resume ${sessionId}\n\`\`\``;
 }
 
 function mergeTags(existing: string | undefined): string {

@@ -81,7 +81,8 @@
     "ast-grep@ast-grep": true,
     "worktrunk@worktrunk": true,
     "vscode@bendrucker": true,
-    "plan@bendrucker": true
+    "plan@bendrucker": true,
+    "playground@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

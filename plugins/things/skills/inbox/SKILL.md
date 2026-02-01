@@ -24,7 +24,7 @@ Add todos to the Things 3 inbox. Fire-and-forget — no verification needed for 
 ## Add a Todo
 
 ```bash
-open -g "things:///add?title=Buy%20milk&tags=Claude&notes=Claude%20Session%20ID%3A%20$CLAUDE_SESSION_ID%0a%0a%60%60%60sh%0aclaude%20--resume%20$CLAUDE_SESSION_ID%0a%60%60%60"
+open -g "things:///add?title=Buy%20milk&tags=Claude&notes=Claude%20Session%20ID%3A%20${CLAUDE_SESSION_ID}%0a%0a%60%60%60sh%0aclaude%20--resume%20${CLAUDE_SESSION_ID}%0a%60%60%60"
 ```
 
 The `-g` flag runs in the background without foregrounding Things.
@@ -43,7 +43,7 @@ The `-g` flag runs in the background without foregrounding Things.
    ```
    ```
 
-The session ID is available via `$CLAUDE_SESSION_ID`. Append any additional notes after the attribution block.
+The session ID is available via `${CLAUDE_SESSION_ID}`. Append any additional notes after the attribution block.
 
 ## Parameters
 
@@ -61,16 +61,16 @@ No auth token is required for `add`.
 
 ```bash
 # Simple inbox item
-open -g "things:///add?title=Call%20dentist&tags=Claude&notes=Claude%20Session%20ID%3A%20$CLAUDE_SESSION_ID%0a%0a%60%60%60sh%0aclaude%20--resume%20$CLAUDE_SESSION_ID%0a%60%60%60"
+open -g "things:///add?title=Call%20dentist&tags=Claude&notes=Claude%20Session%20ID%3A%20${CLAUDE_SESSION_ID}%0a%0a%60%60%60sh%0aclaude%20--resume%20${CLAUDE_SESSION_ID}%0a%60%60%60"
 
 # With additional notes
-open -g "things:///add?title=Review%20PR%20%23456&tags=Claude,Work&notes=Claude%20Session%20ID%3A%20$CLAUDE_SESSION_ID%0a%0a%60%60%60sh%0aclaude%20--resume%20$CLAUDE_SESSION_ID%0a%60%60%60%0a%0aCheck%20error%20handling"
+open -g "things:///add?title=Review%20PR%20%23456&tags=Claude,Work&notes=Claude%20Session%20ID%3A%20${CLAUDE_SESSION_ID}%0a%0a%60%60%60sh%0aclaude%20--resume%20${CLAUDE_SESSION_ID}%0a%60%60%60%0a%0aCheck%20error%20handling"
 
 # Multiple items at once (each gets same attribution)
-open -g "things:///add?titles=Buy%20milk%0aPick%20up%20dry%20cleaning%0aWalk%20dog&tags=Claude&notes=Claude%20Session%20ID%3A%20$CLAUDE_SESSION_ID%0a%0a%60%60%60sh%0aclaude%20--resume%20$CLAUDE_SESSION_ID%0a%60%60%60"
+open -g "things:///add?titles=Buy%20milk%0aPick%20up%20dry%20cleaning%0aWalk%20dog&tags=Claude&notes=Claude%20Session%20ID%3A%20${CLAUDE_SESSION_ID}%0a%0a%60%60%60sh%0aclaude%20--resume%20${CLAUDE_SESSION_ID}%0a%60%60%60"
 
 # With checklist
-open -g "things:///add?title=Prepare%20presentation&tags=Claude&notes=Claude%20Session%20ID%3A%20$CLAUDE_SESSION_ID%0a%0a%60%60%60sh%0aclaude%20--resume%20$CLAUDE_SESSION_ID%0a%60%60%60&checklist-items=Create%20slides%0aPrepare%20talking%20points%0aPractice%20delivery"
+open -g "things:///add?title=Prepare%20presentation&tags=Claude&notes=Claude%20Session%20ID%3A%20${CLAUDE_SESSION_ID}%0a%0a%60%60%60sh%0aclaude%20--resume%20${CLAUDE_SESSION_ID}%0a%60%60%60&checklist-items=Create%20slides%0aPrepare%20talking%20points%0aPractice%20delivery"
 ```
 
 ## Notes Formatting

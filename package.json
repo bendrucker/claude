@@ -22,6 +22,7 @@
     "lint:md:agents": "remark plugins/*/agents/*.md",
     "lint:md:commands": "remark .claude/commands/*.md plugins/*/commands/*.md",
     "lint:md:skills": "remark plugins/*/skills/*/SKILL.md",
+    "skill-lint": "skill-lint",
     "test": "bun test",
     "test:unit": "bun test"
   },

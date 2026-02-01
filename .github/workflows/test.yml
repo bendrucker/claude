@@ -170,7 +170,7 @@ jobs:
 
       - name: Lint skills
         if: steps.inspect.outputs.has_skills == 'true'
-        run: bun packages/skill-lint/src/cli.ts "plugins/${{ matrix.plugin }}/skills/*"
+        run: bun run skill-lint "plugins/${{ matrix.plugin }}/skills/*"
 
       - name: Validate agent frontmatter
         if: steps.inspect.outputs.has_agents == 'true'

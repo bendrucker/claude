@@ -117,7 +117,7 @@ function formatPostToolUseOutput(filePath: string, errors: string): SyncHookJSON
   return {
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
-      additionalContext: `Biome found issues in ${filePath}:\n\n${errors}\n\nFix these issues.`,
+      additionalContext: `⚠️ Biome found issues in ${filePath}:\n\n${errors}\n\nThese will be checked again before the session ends.`,
     },
   };
 }
@@ -127,7 +127,7 @@ function formatStopOutput(issues: Map<string, string>): SyncHookJSONOutput {
 
   return {
     decision: "block",
-    reason: `Biome found issues that could not be auto-fixed:\n\n${details}\n\nFix these issues before stopping.`,
+    reason: `❌ Biome check failed. Auto-fix was attempted but issues remain:\n\n${details}\n\nFix these issues before stopping.`,
   };
 }
 

@@ -180,17 +180,25 @@ jobs:
         if: steps.inspect.outputs.has_commands == 'true'
         run: bunx remark "plugins/${{ matrix.plugin }}/commands/*.md"
 
-      - name: Install package dependencies
-        if: steps.inspect.outputs.has_package == 'true'
-        run: bun install --frozen-lockfile --cwd "plugins/${{ matrix.plugin }}"
-
       - name: Build TypeScript
         if: steps.inspect.outputs.has_package == 'true'
-        run: bun run build --cwd "plugins/${{ matrix.plugin }}" --if-present
+        run: |
+          if jq -e '.scripts.build' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
+            bun run --cwd "plugins/${{ matrix.plugin }}" build
+          fi
 
-      - name: Install Playwright browsers
+      - name: Install system dependencies
         if: steps.inspect.outputs.has_tests == 'true'
         run: |
+          needs_vips=false
+          if [[ -f "plugins/${{ matrix.plugin }}/package.json" ]]; then
+            if jq -e '.dependencies.sharp // .devDependencies.sharp' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
+              needs_vips=true
+            fi
+          fi
+          if [[ "$needs_vips" == "true" ]]; then
+            sudo apt-get update && sudo apt-get install -y libvips-dev
+          fi
           if [[ -d "node_modules/playwright" ]]; then
             bunx playwright install chromium --with-deps
           fi

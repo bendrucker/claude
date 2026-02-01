@@ -1,8 +1,8 @@
 ---
-name: python
-description: Python coding standards, best practices, type hints, and testing patterns. Use when writing or reviewing Python code, implementing tests, or discussing Python language features.
-user-invocable: false
+paths:
+  - "**/*.py"
 ---
+
 # Python
 
 - Use the latest Python language features appropriate for the project's minimum supported version.

@@ -68,6 +68,12 @@ When writing scripts (hooks, skill CLIs, etc.) that accept arguments:
 - **Argument parsing**: Use [cleye](https://github.com/privatenumber/cleye) for type-safe argument parsing with automatic `--help` generation
 - **Ancestor paths**: Use `join(import.meta.dirname, "..")` to resolve parent directories. Avoid `dirname()` on a dirname—explicit `".."` is clearer.
 
+## Rules
+
+The `user/rules/` directory contains rule files that auto-inject based on file extension matching via `paths` frontmatter. Rules are symlinked to `~/.claude/rules/` alongside the rest of `user/`.
+
+Use rules for language/file-type guidance that Claude should always have when working with matching files (e.g., Go testing patterns, Python type hints). Use skills for workflow-specific knowledge that requires explicit activation (e.g., Linear issue management, Things task creation).
+
 ## Hooks
 
 See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. This repository includes a Biome PostToolUse hook (`.claude/hooks/biome/`) that runs after file edits to check for lint errors.

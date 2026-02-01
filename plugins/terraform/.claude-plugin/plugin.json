@@ -1,8 +1,0 @@
-{
-  "name": "terraform",
-  "description": "Terraform configuration, CLI, modules, and providers",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  }
-}

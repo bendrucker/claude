@@ -55,12 +55,6 @@
   "enabledPlugins": {
     "pr-review-toolkit@claude-plugins-official": true,
     "go@bendrucker": true,
-    "terraform@bendrucker": true,
-    "python@bendrucker": true,
-    "shell@bendrucker": true,
-    "typescript@bendrucker": true,
-    "javascript@bendrucker": true,
-    "json@bendrucker": true,
     "git@bendrucker": true,
     "gitlab@bendrucker": true,
     "linear@bendrucker": true,

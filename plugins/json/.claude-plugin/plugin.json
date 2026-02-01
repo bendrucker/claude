@@ -1,8 +1,0 @@
-{
-  "name": "json",
-  "description": "JSON processing and handling best practices using jq",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  }
-}

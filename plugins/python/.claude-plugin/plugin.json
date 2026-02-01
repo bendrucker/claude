@@ -1,8 +1,0 @@
-{
-  "name": "python",
-  "description": "Python coding standards, best practices, type hints, and testing patterns",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  }
-}

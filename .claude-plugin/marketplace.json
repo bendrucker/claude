@@ -14,36 +14,6 @@
       "source": "./plugins/go"
     },
     {
-      "name": "terraform",
-      "description": "Terraform configuration, CLI, modules, and providers",
-      "source": "./plugins/terraform"
-    },
-    {
-      "name": "python",
-      "description": "Python coding standards, best practices, type hints, and testing patterns",
-      "source": "./plugins/python"
-    },
-    {
-      "name": "shell",
-      "description": "Shell scripting best practices and conventions for Bash commands",
-      "source": "./plugins/shell"
-    },
-    {
-      "name": "typescript",
-      "description": "TypeScript coding standards and best practices",
-      "source": "./plugins/typescript"
-    },
-    {
-      "name": "javascript",
-      "description": "JavaScript coding standards and best practices",
-      "source": "./plugins/javascript"
-    },
-    {
-      "name": "json",
-      "description": "JSON processing and handling best practices using jq",
-      "source": "./plugins/json"
-    },
-    {
       "name": "git",
       "description": "Git workflow and branching best practices",
       "source": "./plugins/git"

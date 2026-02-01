@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { lintSkill } from "../src/index";
-import { parseSkill } from "../src/parse";
+import { lintSkill } from "../index";
+import { parseSkill } from "../parse";
 import {
   descriptionLength,
   descriptionRequired,
@@ -9,8 +9,8 @@ import {
   nameEdgeHyphens,
   nameFormat,
   nameLength,
-} from "../src/rules/frontmatter";
-import type { RuleResult } from "../src/types";
+} from "../rules/frontmatter";
+import type { RuleResult } from "../types";
 
 const fixturesDir = path.join(import.meta.dirname, "fixtures");
 

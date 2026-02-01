@@ -17,20 +17,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Check formatting
-        run: npm run format:check
+        run: bun run format:check
 
       - name: Lint
-        run: npm run lint
+        run: bun run lint
 
   build:
     runs-on: ubuntu-latest
@@ -38,17 +35,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: TypeScript build
-        run: npm run build
+        run: bun run build
 
   hooks:
     runs-on: ubuntu-latest
@@ -56,17 +50,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Run tests
         run: bun test .claude/hooks user/hooks
@@ -79,20 +67,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Validate shared files
-        run: node scripts/validate-shared.mjs
+        run: bun scripts/validate-shared.mjs
 
       - name: Check marketplace completeness
         run: ./scripts/check-marketplace.sh
@@ -159,18 +141,15 @@ jobs:
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_tests=$(find "plugins/$plugin" \( -name '*.test.ts' -o -name '*.integration.ts' \) | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Validate plugin.json
         if: steps.inspect.outputs.has_plugin_json == 'true'
-        run: node scripts/validate-plugin.mjs "plugins/${{ matrix.plugin }}"
+        run: bun scripts/validate-plugin.mjs "plugins/${{ matrix.plugin }}"
 
       - name: Check for hardcoded version
         if: steps.inspect.outputs.has_plugin_json == 'true'
@@ -183,40 +162,41 @@ jobs:
 
       - name: Validate hooks.json
         if: steps.inspect.outputs.has_hooks == 'true'
-        run: node scripts/validate-hooks.mjs "plugins/${{ matrix.plugin }}"
+        run: bun scripts/validate-hooks.mjs "plugins/${{ matrix.plugin }}"
 
       - name: Validate skill frontmatter
         if: steps.inspect.outputs.has_skills == 'true'
-        run: npx remark "plugins/${{ matrix.plugin }}/skills/*/SKILL.md"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        run: bunx remark "plugins/${{ matrix.plugin }}/skills/*/SKILL.md"
 
       - name: Lint skills
         if: steps.inspect.outputs.has_skills == 'true'
-        run: bunx skill-lint "plugins/${{ matrix.plugin }}/skills/*"
+        run: bun run skill-lint "plugins/${{ matrix.plugin }}/skills/*"
 
       - name: Validate agent frontmatter
         if: steps.inspect.outputs.has_agents == 'true'
-        run: npx remark "plugins/${{ matrix.plugin }}/agents/*.md"
+        run: bunx remark "plugins/${{ matrix.plugin }}/agents/*.md"
 
       - name: Validate command frontmatter
         if: steps.inspect.outputs.has_commands == 'true'
-        run: npx remark "plugins/${{ matrix.plugin }}/commands/*.md"
-
-      - name: Install package dependencies
-        if: steps.inspect.outputs.has_package == 'true' && hashFiles(format('plugins/{0}/package-lock.json', matrix.plugin)) != ''
-        run: npm ci --prefix "plugins/${{ matrix.plugin }}"
+        run: bunx remark "plugins/${{ matrix.plugin }}/commands/*.md"
 
       - name: Build TypeScript
         if: steps.inspect.outputs.has_package == 'true'
-        run: npm run build --prefix "plugins/${{ matrix.plugin }}" --if-present
+        run: |
+          if jq -e '.scripts.build' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
+            bun run --cwd "plugins/${{ matrix.plugin }}" build
+          fi
 
-      - name: Install Playwright browsers
+      - name: Install system dependencies
         if: steps.inspect.outputs.has_tests == 'true'
         run: |
-          if [[ -d "node_modules/playwright" ]]; then
-            npx playwright install chromium --with-deps
+          if [[ -f "plugins/${{ matrix.plugin }}/package.json" ]]; then
+            if jq -e '.dependencies.sharp // .devDependencies.sharp' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
+              sudo apt-get update && sudo apt-get install -y libvips-dev
+            fi
+            if jq -e '.dependencies.playwright // .devDependencies.playwright' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
+              bunx playwright install chromium --with-deps
+            fi
           fi
 
       - name: Run tests
@@ -261,8 +241,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install Claude Code CLI
-        run: npm install -g @anthropic-ai/claude-code@latest
+        run: bun install -g @anthropic-ai/claude-code@latest
 
       - name: Setup Claude configuration
         run: CLAUDE_REPO_HOME="$GITHUB_WORKSPACE" ./scripts/install.sh

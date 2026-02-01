@@ -9,7 +9,7 @@
     "plugins/style",
     "plugins/things",
     "plugins/type-ignore",
-    "plugins/ui-design/skills/wireframe",
+    "plugins/ui-design",
     "plugins/vscode"
   ],
   "scripts": {
@@ -22,6 +22,7 @@
     "lint:md:agents": "remark plugins/*/agents/*.md",
     "lint:md:commands": "remark .claude/commands/*.md plugins/*/commands/*.md",
     "lint:md:skills": "remark plugins/*/skills/*/SKILL.md",
+    "skill-lint": "bun ./packages/skill-lint/cli.ts",
     "test": "bun test",
     "test:unit": "bun test"
   },

@@ -3,10 +3,10 @@
   "version": "0.0.1",
   "type": "module",
   "bin": {
-    "skill-lint": "./src/cli.ts"
+    "skill-lint": "./cli.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./index.ts"
   },
   "scripts": {
     "test": "bun test"

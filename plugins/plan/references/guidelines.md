@@ -24,3 +24,13 @@ Before presenting a plan, verify:
 - Don't add abstractions, utilities, or "improvements" beyond the request
 - Don't include time estimates
 - Don't number steps in a way that implies rigid ordering unless order matters
+
+## Skills
+
+Plans should mention which skills to activate at appropriate points in the execution lifecycle. Rather than a dedicated "Skills" section, reference skills inline where they're needed:
+
+- "Use `pull-request:create` after committing changes"
+- "Activate `typescript:typescript` for type-aware refactoring"
+- "Load `git:git` before branch operations"
+
+This helps ensure consistent skill activation during implementation.

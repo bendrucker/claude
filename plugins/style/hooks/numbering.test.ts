@@ -4,7 +4,8 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { checkCode, checkMarkdown, formatOutput, processInput } from "./numbering";
+import { formatDecision } from "./markdown";
+import { checkCode, checkMarkdown, processInput } from "./numbering";
 
 function hasSg(): boolean {
   try {
@@ -49,9 +50,9 @@ function getOutput(
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
 
-describe("formatOutput", () => {
+describe("formatDecision", () => {
   it("formats deny decision", () => {
-    const output = formatOutput("deny", "Test reason");
+    const output = formatDecision("deny", "Test reason");
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -62,7 +63,7 @@ describe("formatOutput", () => {
   });
 
   it("formats ask decision", () => {
-    const output = formatOutput("ask", "Test reason");
+    const output = formatDecision("ask", "Test reason");
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",

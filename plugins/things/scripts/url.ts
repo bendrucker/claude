@@ -43,10 +43,7 @@ export interface OpenUrlOptions {
   background?: boolean;
 }
 
-export async function buildUrl(
-  command: string,
-  params: Map<string, string>,
-): Promise<string> {
+export async function buildUrl(command: string, params: Map<string, string>): Promise<string> {
   if (!isValidCommand(command)) {
     throw new Error(`Invalid command: ${command}`);
   }

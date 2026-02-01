@@ -30,7 +30,7 @@ function mergeTags(existing: string | undefined): string {
 
 function parseThingsId(xcallOutput: string): string | null {
   const match = xcallOutput.match(/x-things-id=([^&\s]+)/);
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 if (!argv.flags.sessionId) {

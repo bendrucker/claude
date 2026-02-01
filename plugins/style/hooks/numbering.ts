@@ -5,14 +5,19 @@ import { unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type { Heading, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-
-export type WriteInput = { file_path: string; content: string };
-export type EditInput = { file_path: string; new_string: string };
+import {
+  type EditInput,
+  formatDecision,
+  getExtension,
+  isMarkdownFile,
+  type SyncHookJSONOutput,
+  type WriteInput,
+} from "./markdown";
 
 type Mode = "write" | "edit";
 
@@ -27,15 +32,6 @@ type AstGrepMatch = {
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-function getExtension(filePath: string): string {
-  const parts = filePath.split(".");
-  return parts.length > 1 ? (parts.at(-1) ?? "") : "";
-}
-
-function isMarkdownFile(ext: string): boolean {
-  return ext === "md" || ext === "markdown";
-}
 
 export function checkMarkdown(content: string): string | null {
   const ast = fromMarkdown(content);
@@ -110,16 +106,6 @@ export function checkCode(content: string, ext: string): string | null {
   return null;
 }
 
-export function formatOutput(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: decision,
-      permissionDecisionReason: reason,
-    },
-  };
-}
-
 export function processInput(input: PreToolUseHookInput, mode: Mode): SyncHookJSONOutput | null {
   const toolName = input.tool_name;
 
@@ -157,9 +143,9 @@ ${match}
 Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
 
   if (mode === "write") {
-    return formatOutput("deny", reason);
+    return formatDecision("deny", reason);
   } else {
-    return formatOutput("ask", `This edit introduces numbered sequences. ${reason}`);
+    return formatDecision("ask", `This edit introduces numbered sequences. ${reason}`);
   }
 }
 

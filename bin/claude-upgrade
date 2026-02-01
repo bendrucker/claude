@@ -104,17 +104,23 @@ update_marketplaces() {
 update_plugins() {
   log "Updating plugins..."
 
-  local settings_file="$CLAUDE_REPO_HOME/.claude/settings.json"
+  local marketplace_file="$CLAUDE_REPO_HOME/.claude-plugin/marketplace.json"
+  local marketplace_name
+  marketplace_name=$(jq -r '.name' "$marketplace_file")
+
+  local settings_file="$HOME/.claude/settings.json"
   if [[ ! -f "$settings_file" ]]; then
     log "WARNING: settings.json not found at $settings_file"
     return 0
   fi
 
   local plugins
-  plugins=$(jq -r '.enabledPlugins // {} | keys[]' "$settings_file" 2>/dev/null)
+  plugins=$(jq -r --arg m "$marketplace_name" \
+    '.enabledPlugins // {} | keys[] | select(endswith("@" + $m))' \
+    "$settings_file" 2>/dev/null)
 
   if [[ -z "$plugins" ]]; then
-    log "No enabled plugins found"
+    log "No first-party plugins found"
     return 0
   fi
 

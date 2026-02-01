@@ -53,7 +53,7 @@
     "command": "wt list statusline --claude-code"
   },
   "enabledPlugins": {
-    "pr-review-toolkit@claude-code-plugins": true,
+    "pr-review-toolkit@claude-plugins-official": true,
     "go@bendrucker": true,
     "terraform@bendrucker": true,
     "python@bendrucker": true,
@@ -96,22 +96,32 @@
         "repo": "bendrucker/claude"
       }
     },
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official",
+        "sha": "27d2b86d72da27c64585150857cee8472ad47abb"
+      }
+    },
     "astral-sh": {
       "source": {
         "source": "github",
-        "repo": "astral-sh/claude-code-plugins"
+        "repo": "astral-sh/claude-code-plugins",
+        "sha": "f8034678a15ad751aae6a2b684daebac416267a1"
       }
     },
     "ast-grep": {
       "source": {
         "source": "github",
-        "repo": "ast-grep/claude-skill"
+        "repo": "ast-grep/claude-skill",
+        "sha": "577f4d4507678f2c8cee150fae25e6ce309f70b1"
       }
     },
     "worktrunk": {
       "source": {
         "source": "github",
-        "repo": "max-sixty/worktrunk"
+        "repo": "max-sixty/worktrunk",
+        "ref": "v0.21.0"
       }
     }
   },

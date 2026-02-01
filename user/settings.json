@@ -35,6 +35,15 @@
             "command": "bun ~/.claude/hooks/worktree"
           }
         ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ~/.claude/hooks/webfetch-block"
+          }
+        ]
       }
     ]
   },

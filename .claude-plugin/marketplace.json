@@ -114,6 +114,11 @@
       "source": "./plugins/interview"
     },
     {
+      "name": "bun",
+      "description": "Bun runtime patterns, bunx, shell scripting, lockfile, and testing",
+      "source": "./plugins/bun"
+    },
+    {
       "name": "calendar",
       "description": "Reading and managing macOS Calendar events",
       "source": "./plugins/calendar"

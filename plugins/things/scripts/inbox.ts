@@ -28,6 +28,11 @@ function mergeTags(existing: string | undefined): string {
   return `Claude,${existing}`;
 }
 
+if (!argv.flags.sessionId) {
+  console.error("--session-id is required for session attribution");
+  process.exit(1);
+}
+
 const params = new Map<string, string>();
 
 for (const arg of argv._.params) {
@@ -42,10 +47,8 @@ for (const arg of argv._.params) {
 
 params.set("tags", mergeTags(params.get("tags")));
 
-if (argv.flags.sessionId) {
-  const attribution = buildAttribution(argv.flags.sessionId);
-  const existing = params.get("notes");
-  params.set("notes", existing ? `${attribution}\n\n${existing}` : attribution);
-}
+const attribution = buildAttribution(argv.flags.sessionId);
+const existing = params.get("notes");
+params.set("notes", existing ? `${attribution}\n\n${existing}` : attribution);
 
 await openUrl("add", params);

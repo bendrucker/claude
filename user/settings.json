@@ -21,7 +21,8 @@
       "Edit(~/.cache/uv/**)",
       "Edit(~/Library/Caches/go-build/**)",
       "Edit(~/src/go/pkg/mod/**)",
-      "Edit(~/src/go/pkg/sumdb/**)"
+      "Edit(~/src/go/pkg/sumdb/**)",
+      "Edit(~/.bun/**)"
     ],
     "deny": []
   },

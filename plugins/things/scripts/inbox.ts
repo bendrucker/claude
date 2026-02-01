@@ -18,7 +18,8 @@ const argv = cli({
 });
 
 function buildAttribution(sessionId: string): string {
-  return `Claude Session ID: ${sessionId}\n\n\`\`\`sh\nclaude --resume ${sessionId}\n\`\`\``;
+  const dir = process.cwd();
+  return `---\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\ncd ${dir} && claude --resume ${sessionId}\n\`\`\``;
 }
 
 function mergeTags(existing: string | undefined): string {
@@ -54,7 +55,7 @@ params.set("tags", mergeTags(params.get("tags")));
 
 const attribution = buildAttribution(argv.flags.sessionId);
 const existing = params.get("notes");
-params.set("notes", existing ? `${attribution}\n\n${existing}` : attribution);
+params.set("notes", existing ? `${existing}\n\n${attribution}` : attribution);
 
 if (findXcallRunner()) {
   const url = await buildUrl("add", params);

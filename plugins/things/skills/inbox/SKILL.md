@@ -35,7 +35,7 @@ When the `x-callback-url` plugin is installed, the script uses xcall to get the 
 
 - `title` (string) — todo title
 - `titles` (newline-separated) — multiple todos
-- `notes` (string, max 10,000 chars) — additional notes (prepended with session attribution)
+- `notes` (string, max 10,000 chars) — additional notes (session attribution appended as footer)
 - `tags` (comma-separated) — extra tag names (`Claude` is always included)
 - `checklist-items` (newline-separated, max 100) — checklist items
 

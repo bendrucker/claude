@@ -1,6 +1,6 @@
 /**
  * Things URL Scheme type definitions
- * Used for validating url.js via TypeScript
+ * Used for validating url.ts and reorder.js via TypeScript
  */
 
 /** Commands that require auth-token */
@@ -110,7 +110,7 @@ export interface CommandParamsMap {
   version: Record<string, never>;
 }
 
-/** JXA Application with standard additions */
+/** JXA Application with standard additions (used by reorder.js) */
 export interface JXAApplication {
   includeStandardAdditions: boolean;
   doShellScript(command: string): string;

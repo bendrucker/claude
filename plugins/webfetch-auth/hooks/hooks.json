@@ -1,0 +1,16 @@
+{
+  "description": "Blocks WebFetch for authenticated URLs and suggests MCP alternatives",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/scripts/check.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

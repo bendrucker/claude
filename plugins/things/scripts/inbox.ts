@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { openUrl } from "./url";
+import { buildUrl, findXcallRunner, openUrl, xcall } from "./url";
 
 const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-items"]);
 
@@ -28,6 +28,11 @@ function mergeTags(existing: string | undefined): string {
   return `Claude,${existing}`;
 }
 
+function parseThingsId(xcallOutput: string): string | null {
+  const match = xcallOutput.match(/x-things-id=([^&\s]+)/);
+  return match ? match[1] : null;
+}
+
 if (!argv.flags.sessionId) {
   console.error("--session-id is required for session attribution");
   process.exit(1);
@@ -51,4 +56,17 @@ const attribution = buildAttribution(argv.flags.sessionId);
 const existing = params.get("notes");
 params.set("notes", existing ? `${attribution}\n\n${existing}` : attribution);
 
-await openUrl("add", params);
+if (findXcallRunner()) {
+  const url = await buildUrl("add", params);
+  try {
+    const result = await xcall(url);
+    const id = parseThingsId(result);
+    if (id) {
+      console.log(`things:///show?id=${id}`);
+    }
+  } catch {
+    await openUrl("add", params);
+  }
+} else {
+  await openUrl("add", params);
+}

@@ -1,6 +1,6 @@
 ---
 name: inbox
-description: Quick fire-and-forget captures to the Things 3 inbox. Not for reads (things:jxa), scheduled tasks, updates, or projects (things:url).
+description: Quick captures to the Things 3 inbox. Not for reads (things:jxa), scheduled tasks, updates, or projects (things:url).
 allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"]
 hooks:
   PreToolUse:
@@ -19,7 +19,7 @@ hooks:
 
 # Things Inbox
 
-Add todos to the Things 3 inbox. Fire-and-forget — no verification needed for quick captures.
+Add todos to the Things 3 inbox.
 
 ## Add a Todo
 
@@ -28,6 +28,8 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} tit
 ```
 
 The script handles URL encoding, session attribution, and the `Claude` tag automatically.
+
+When the `x-callback-url` plugin is installed, the script uses xcall to get the todo ID back from Things and outputs a `things:///show?id=...` URL. Present this URL to the user so they can click to open the todo. If xcall is unavailable, the script falls back to fire-and-forget.
 
 ## Parameters
 

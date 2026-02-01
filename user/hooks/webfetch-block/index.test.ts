@@ -50,8 +50,13 @@ describe("formatOutput", () => {
 describe("processInput", () => {
   it("returns null for non-authenticated URLs", () => {
     expect(processInput(mockInput("https://example.com"))).toBeNull();
-    expect(processInput(mockInput("https://github.com/owner/repo"))).toBeNull();
     expect(processInput(mockInput("https://docs.anthropic.com/en/api"))).toBeNull();
+  });
+
+  it("returns null for URLs handled by dedicated plugins", () => {
+    expect(processInput(mockInput("https://github.com/owner/repo"))).toBeNull();
+    expect(processInput(mockInput("https://gitlab.com/owner/repo"))).toBeNull();
+    expect(processInput(mockInput("https://linear.app/myteam/issue/ABC-123"))).toBeNull();
   });
 
   it("denies Google Docs URLs", () => {
@@ -96,19 +101,5 @@ describe("processInput", () => {
     const output = getOutput(mockInput("https://myworkspace.notion.so/doc/abc123"));
     expect(output?.permissionDecision).toBe("deny");
     expect(output?.permissionDecisionReason).toContain("Notion");
-  });
-
-  it("denies Linear URLs", () => {
-    const output = getOutput(mockInput("https://linear.app/myteam/issue/ABC-123"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe(
-      "Linear requires authentication. Use Linear MCP or load `linear:linear` skill.",
-    );
-  });
-
-  it("denies Linear project URLs", () => {
-    const output = getOutput(mockInput("https://linear.app/myteam/project/abc123"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toContain("Linear");
   });
 });

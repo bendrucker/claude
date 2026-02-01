@@ -114,6 +114,16 @@ This disables the installed user settings and loads `user/settings.json` from th
 
 Run `scripts/check-marketplace.sh` to verify all plugin directories are listed in `marketplace.json`. This check runs in CI and should pass before merging.
 
+### Skill Linting
+
+Skills are validated with `bunx skill-lint`:
+
+```bash
+bunx skill-lint "plugins/<name>/skills/*"
+```
+
+This validates SKILL.md frontmatter (name, description) and checks reference depth. There is no `@constellos/skill-linter` or similar package—use `skill-lint` only.
+
 ## Workflow
 
 - The `user/` directory is symlinked to `~/.claude/`. New files are immediately available without re-running `scripts/install.sh`.

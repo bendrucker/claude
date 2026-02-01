@@ -295,7 +295,7 @@ describe("biome hook", () => {
 
       expect(result).not.toBeNull();
       expect(result?.decision).toBe("block");
-      expect(result?.reason).toContain("Biome found issues");
+      expect(result?.reason).toContain("Biome check failed");
       expect(result?.reason).toContain("noDuplicateObjectKeys");
     });
 

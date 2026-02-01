@@ -261,7 +261,11 @@ agent: Explore
 ---
 ```
 
-The skill runs with its own conversation history, avoiding clutter in the main conversation.
+The sub-agent starts with a **clean context** — it does not inherit the parent conversation. It only sees the skill content (with `!`shell`` injections expanded) and `CLAUDE.md`. Results are summarized and returned to the main conversation.
+
+### When Not to Fork
+
+`context: fork` loses all conversation history. If the skill needs awareness of what the user has been working on, run it inline instead and use Task agents to offload verbose work. The inline skill retains full context while keeping the heavy lifting out of the main conversation.
 
 ## Skill-Scoped Hooks
 

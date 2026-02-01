@@ -1,7 +1,16 @@
 {
-  "description": "Sets default state for new issues based on assignee",
+  "description": "Linear plugin hooks for WebFetch blocking and issue defaults",
   "hooks": {
     "PreToolUse": [
+      {
+        "matcher": "WebFetch(domain:linear.app)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/scripts/fetch.ts"
+          }
+        ]
+      },
       {
         "matcher": "mcp__linear__create_issue",
         "hooks": [

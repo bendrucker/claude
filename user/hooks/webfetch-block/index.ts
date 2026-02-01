@@ -10,6 +10,8 @@ type AuthenticatedDomain = {
   suggestion: string;
 };
 
+// Catch-all for authenticated services without dedicated plugins.
+// Services with plugins (GitHub, GitLab, Linear) handle blocking in their own hooks.
 const authenticatedDomains: AuthenticatedDomain[] = [
   {
     pattern: /^https:\/\/docs\.google\.com\//,
@@ -22,10 +24,6 @@ const authenticatedDomains: AuthenticatedDomain[] = [
   {
     pattern: /^https:\/\/[^/]+\.notion\.so\//,
     suggestion: "Notion requires authentication. Use Notion MCP.",
-  },
-  {
-    pattern: /^https:\/\/linear\.app\//,
-    suggestion: "Linear requires authentication. Use Linear MCP or load `linear:linear` skill.",
   },
 ];
 

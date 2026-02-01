@@ -20,6 +20,7 @@
       matchStrings: [
         '"repo":\\s*"(?<depName>[^"]+/[^"]+)"[^}]*"sha":\\s*"(?<currentDigest>[0-9a-f]{40})"',
       ],
+      packageNameTemplate: "https://github.com/{{{depName}}}",
       currentValueTemplate: "main",
       datasourceTemplate: "git-refs",
       versioningTemplate: "git",

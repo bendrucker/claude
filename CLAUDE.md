@@ -44,22 +44,22 @@ The root `package.json` contains shared tooling (typescript) and dependencies us
 
 - Create `plugins/<name>/package.json` for plugin-specific dependencies
 - Add the plugin to the root `workspaces` array
-- Run `npm install` to link the workspace
+- Run `bun install` to link the workspace
 
 Avoid collecting all dependencies in the root package.json. Each plugin should be self-contained where practical.
 
-### Lockfile Conflicts
-
-When resolving `package-lock.json` conflicts during rebase, don't regenerate from scratch—this loses cross-platform optional dependencies. Instead:
-
-1. Accept the lockfile from the base branch: `git checkout origin/main -- package-lock.json`
-2. Run `npm install` to apply your `package.json` changes
-
-This preserves platform-specific optional dependencies (Linux, Windows, etc.) that CI requires.
-
 ### Bun
 
-Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing dependencies on first run, eliminating the need to run `npm install` before executing scripts. This simplifies hook execution since hooks run in isolated contexts where `node_modules` may not be readily available.
+Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing dependencies on first run, eliminating the need to run `bun install` before executing scripts. This simplifies hook execution since hooks run in isolated contexts where `node_modules` may not be readily available.
+
+### Lockfile Conflicts
+
+When resolving `bun.lock` conflicts, regenerate from scratch:
+
+1. Delete the lockfile: `rm bun.lock`
+2. Run `bun install` to generate a fresh lockfile
+
+Unlike npm's `package-lock.json`, bun populates integrity hashes for all platforms from the registry, even for packages not downloaded locally. Regenerating from scratch is safe and avoids stale or empty hashes. Do **not** use `git checkout origin/main -- bun.lock && bun install` — this produces empty integrity hashes for platform-specific packages (e.g., `@img/sharp-libvips-linux-x64`), breaking CI on Linux.
 
 ### Scripts
 

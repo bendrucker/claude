@@ -84,8 +84,7 @@ function parseArgs(argv: string[]): { command: string; params: Map<string, strin
   }
 
   const params = new Map<string, string>();
-  for (let i = 1; i < argv.length; i++) {
-    const arg = argv[i];
+  for (const arg of argv.slice(1)) {
     const eqIndex = arg.indexOf("=");
     if (eqIndex === -1) continue;
     params.set(arg.substring(0, eqIndex), arg.substring(eqIndex + 1));

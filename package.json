@@ -5,6 +5,7 @@
   "workspaces": [
     "packages/skill-lint",
     "plugins/claude-code/skills/session",
+    "plugins/github",
     "plugins/mermaid/skills/diagram",
     "plugins/style",
     "plugins/things",

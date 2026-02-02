@@ -55,11 +55,14 @@ osascript ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.js [--list today|anytime|someday
 
 Items appear at the top of the list in the order specified. Default list is `today`. Also works for items within a project — use the `--list` value matching the items' current scheduling state.
 
-## Verification with xcall
+## Callback
 
-Things supports [x-callback-url](https://culturedcode.com/things/support/articles/2803573/): all commands accept `x-success`, `x-error`, and `x-cancel` callbacks. On success, Things returns `x-things-id` (or `x-things-ids` for `json`).
+When the `x-callback-url` plugin is installed, `url.ts` automatically uses xcall to get a response from Things on stdout. Present the result to the user as clickable `things:///show?id=<id>` links:
 
-Load the `x-callback-url:xcall` skill for the CLI bridge. It sends the URL with callbacks and blocks until Things responds, outputting the result to stdout. This eliminates the need for JXA read-back verification after URL scheme operations.
+- **Single todo** (`add`, `update`): returns `x-things-id=<id>` — present one link
+- **Batch** (`json`): returns `x-things-ids=["id1","id2"]` — present a bulleted list with each todo's title and link
+
+Callback is enabled by default. Disable with `--callback=false` to fall back to fire-and-forget via `open -g`. If xcall is unavailable, the script falls back silently.
 
 ## Built-in List IDs (URL Scheme)
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { existsSync, readdirSync } from "fs";
+import { join } from "path";
 import { $ } from "bun";
 
 const AUTH_REQUIRED_COMMANDS = ["update", "update-project", "json"] as const;
@@ -41,11 +43,7 @@ export interface OpenUrlOptions {
   background?: boolean;
 }
 
-export async function openUrl(
-  command: string,
-  params: Map<string, string>,
-  options?: OpenUrlOptions,
-): Promise<void> {
+export async function buildUrl(command: string, params: Map<string, string>): Promise<string> {
   if (!isValidCommand(command)) {
     throw new Error(`Invalid command: ${command}`);
   }
@@ -66,6 +64,15 @@ export async function openUrl(
     url += `?${parts.join("&")}`;
   }
 
+  return url;
+}
+
+export async function openUrl(
+  command: string,
+  params: Map<string, string>,
+  options?: OpenUrlOptions,
+): Promise<void> {
+  const url = await buildUrl(command, params);
   const background = options?.background ?? (command !== "show" && command !== "search");
 
   if (background) {
@@ -75,25 +82,65 @@ export async function openUrl(
   }
 }
 
-function parseArgs(argv: string[]): { command: string; params: Map<string, string> } {
-  const command = argv[0];
-  if (!command) {
-    console.error("Usage: bun scripts/url.ts <command> [key=value ...]");
-    console.error("Commands: add, add-project, update, update-project, show, search, json");
-    process.exit(1);
+export function findXcallRunner(): string | null {
+  const pluginRoot = join(import.meta.dirname, "..");
+
+  // Dev layout: sibling plugin directory
+  const devPath = join(pluginRoot, "..", "x-callback-url", "scripts", "run.sh");
+  if (existsSync(devPath)) return devPath;
+
+  // Prod layout: up 2 levels to marketplace root, then into x-callback-url/<version>/
+  const marketplaceDir = join(pluginRoot, "..", "..", "x-callback-url");
+  if (existsSync(marketplaceDir)) {
+    for (const entry of readdirSync(marketplaceDir)) {
+      const candidate = join(marketplaceDir, entry, "scripts", "run.sh");
+      if (existsSync(candidate)) return candidate;
+    }
   }
 
+  return null;
+}
+
+export async function xcall(url: string): Promise<string> {
+  const runner = findXcallRunner();
+  if (!runner) {
+    throw new Error("xcall not found — x-callback-url plugin not installed");
+  }
+  return (await $`${runner} ${url}`.text()).trim();
+}
+
+if (import.meta.main) {
+  const { cli } = await import("cleye");
+
+  const argv = cli({
+    name: "url",
+    parameters: ["<command>", "[params...]"],
+    flags: {
+      callback: {
+        type: Boolean,
+        default: true,
+        description: "Use xcall to get response from Things (disable with --callback=false)",
+      },
+    },
+  });
+
+  const command = argv._.command;
   const params = new Map<string, string>();
-  for (const arg of argv.slice(1)) {
+  for (const arg of argv._.params) {
     const eqIndex = arg.indexOf("=");
     if (eqIndex === -1) continue;
     params.set(arg.substring(0, eqIndex), arg.substring(eqIndex + 1));
   }
 
-  return { command, params };
-}
-
-if (import.meta.main) {
-  const { command, params } = parseArgs(process.argv.slice(2));
-  await openUrl(command, params);
+  if (argv.flags.callback && findXcallRunner()) {
+    const url = await buildUrl(command, params);
+    try {
+      const result = await xcall(url);
+      console.log(result);
+    } catch {
+      await openUrl(command, params);
+    }
+  } else {
+    await openUrl(command, params);
+  }
 }

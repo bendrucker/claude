@@ -23,11 +23,47 @@ guard CommandLine.arguments.count >= 2 else {
 
 let baseURL = CommandLine.arguments[1]
 
-class CallbackHandler: NSObject {
-    var result: String?
-    var isError = false
+class AppDelegate: NSObject, NSApplicationDelegate {
     var exitCode: Int32 = 1
-    var done = false
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURL(_:withReply:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+
+        let successCB = "\(callbackScheme)://x-callback-url/success"
+        let errorCB = "\(callbackScheme)://x-callback-url/error"
+        let cancelCB = "\(callbackScheme)://x-callback-url/cancel"
+
+        var urlString = baseURL
+        let sep = urlString.contains("?") ? "&" : "?"
+        urlString += "\(sep)x-success=\(successCB.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
+        urlString += "&x-error=\(errorCB.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
+        urlString += "&x-cancel=\(cancelCB.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
+
+        guard let url = URL(string: urlString) else {
+            fputs("Invalid URL: \(urlString)\n", stderr)
+            exit(1)
+        }
+
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = false
+
+        NSWorkspace.shared.open(url, configuration: config) { _, error in
+            if let error = error {
+                fputs("Failed to open URL: \(error.localizedDescription)\n", stderr)
+                exit(1)
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+            fputs("Timeout waiting for callback\n", stderr)
+            NSApp.terminate(nil)
+        }
+    }
 
     @objc func handleGetURL(_ event: NSAppleEventDescriptor, withReply _: NSAppleEventDescriptor) {
         guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
@@ -41,76 +77,27 @@ class CallbackHandler: NSObject {
 
         switch path {
         case "success":
-            result = query
-            isError = false
+            print(query)
             exitCode = 0
         case "error":
-            result = query
-            isError = true
+            fputs(query + "\n", stderr)
             exitCode = 1
         case "cancel":
-            result = "canceled"
-            isError = true
+            fputs("canceled\n", stderr)
             exitCode = 2
         default:
             return
         }
 
-        done = true
-        CFRunLoopStop(CFRunLoopGetMain())
+        NSApp.terminate(nil)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        exit(exitCode)
     }
 }
 
-let handler = CallbackHandler()
-
-NSAppleEventManager.shared().setEventHandler(
-    handler,
-    andSelector: #selector(CallbackHandler.handleGetURL(_:withReply:)),
-    forEventClass: AEEventClass(kInternetEventClass),
-    andEventID: AEEventID(kAEGetURL)
-)
-
-// Build the full URL with callback parameters
-let successCB = "\(callbackScheme)://x-callback-url/success"
-let errorCB = "\(callbackScheme)://x-callback-url/error"
-let cancelCB = "\(callbackScheme)://x-callback-url/cancel"
-
-var urlString = baseURL
-let sep = urlString.contains("?") ? "&" : "?"
-urlString += "\(sep)x-success=\(successCB.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
-urlString += "&x-error=\(errorCB.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
-urlString += "&x-cancel=\(cancelCB.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
-
-guard let url = URL(string: urlString) else {
-    fputs("Invalid URL: \(urlString)\n", stderr)
-    exit(1)
-}
-
-// Open the URL without activating the target app
-let config = NSWorkspace.OpenConfiguration()
-config.activates = false
-
-NSWorkspace.shared.open(url, configuration: config) { _, error in
-    if let error = error {
-        fputs("Failed to open URL: \(error.localizedDescription)\n", stderr)
-        exit(1)
-    }
-}
-
-// Timeout after 10 seconds
-DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-    fputs("Timeout waiting for callback\n", stderr)
-    exit(1)
-}
-
-// Run the event loop to receive callbacks
-NSApplication.shared.run()
-
-// Output result
-if handler.isError {
-    fputs((handler.result ?? "Unknown error") + "\n", stderr)
-} else {
-    print(handler.result ?? "")
-}
-
-exit(handler.exitCode)
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.run()

@@ -73,17 +73,9 @@ hooks:                                    # Optional: skill-scoped hooks
 
 ### Dynamic Context Injection
 
-The bang-backtick syntax (see examples below) runs shell commands **before** the skill content is sent to Claude. The command output replaces the placeholder — Claude only sees the final result, not the command.
+The bang-backtick syntax runs shell commands **before** the skill content is sent to Claude. The command output replaces the placeholder — Claude only sees the final result, not the command. This is preprocessing, not something Claude executes. Use this to inject live data (git state, CLI output, file contents) so the application harness extracts and runs the commands without waiting on the model.
 
-```markdown
-- PR diff: !`gh pr diff`
-- Branch: !`git branch --show-current`
-- Changed files: !`git diff --name-only HEAD~1`
-```
-
-This is preprocessing, not something Claude executes. Use this to inject live data (git state, CLI output, file contents) so the application harness extracts and runs the commands without waiting on the model.
-
-See [references/patterns.md](references/patterns.md) for detailed patterns and guidance.
+See [references/patterns.md](references/patterns.md) for syntax, examples, and gotchas.
 
 ## Directory Structure
 

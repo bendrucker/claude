@@ -12,7 +12,7 @@
 /**
  * @param {string[]} argv
  */
-function _run(argv) {
+function run(argv) {
   const listId = argv[0] || "TMTodayListSource";
 
   const app = Application("Things3");

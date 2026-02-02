@@ -13,7 +13,7 @@
 /**
  * @param {string[]} argv
  */
-function _run(argv) {
+function run(argv) {
   const listId = argv[0];
   if (!listId) {
     console.log("Usage: osascript scripts/query-list.js <list-id>");

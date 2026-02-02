@@ -11,7 +11,7 @@
 /**
  * @param {string[]} argv
  */
-function _run(argv) {
+function run(argv) {
   let mode = null;
   let value = null;
 

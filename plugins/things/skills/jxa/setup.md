@@ -17,6 +17,18 @@ osascript -l JavaScript -e 'const app = Application("Things3"); const tags = app
 osascript -l JavaScript -e 'const app = Application("Things3"); const inbox = app.lists.byId("TMInboxListSource"); const todos = []; const items = inbox.toDos(); for (let i = 0; i < items.length; i++) { todos.push({id: items[i].id(), name: items[i].name()}); } JSON.stringify(todos, null, 2);'
 ```
 
+For script files, define a `run(argv)` function. `osascript` calls it automatically and prints the return value:
+
+```javascript
+#!/usr/bin/env osascript -l JavaScript
+function run(argv) {
+  const app = Application("Things3");
+  return JSON.stringify({ count: app.toDos().length });
+}
+```
+
+**Important**: The function must be named `run`, not `_run`. `osascript` does not call `_run`.
+
 ## JXA Arrays vs JavaScript Arrays
 
 **CRITICAL**: JXA arrays (from methods like `list.toDos()`) are NOT JavaScript arrays.

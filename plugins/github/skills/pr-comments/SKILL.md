@@ -19,7 +19,7 @@ hooks:
 
 # PR Review Comments
 
-Fetch unresolved review threads from a GitHub pull request, filtered for context efficiency. Avoids flooding the context with resolved or outdated threads.
+Fetch unresolved review threads from a GitHub pull request, filtered for context efficiency. Avoids flooding the context with resolved threads. Outdated threads are included but marked.
 
 ## Usage
 
@@ -41,7 +41,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts <pr-url> [--role author|reviewe
 ## Since
 
 - `last-review`: Scopes to threads with activity since the last relevant review.
-  - As author: since the most recent review by someone other than you
+  - As author: since the most recent review by a human other than you (bot reviews are excluded)
   - As reviewer: since your most recent submitted review
 - ISO date: Explicit cutoff (e.g., `2025-01-15`)
 

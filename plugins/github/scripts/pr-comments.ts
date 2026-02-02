@@ -92,7 +92,7 @@ export function filterThreads(
   options: {
     role: Role;
     viewer: string;
-    since?: Date;
+    since?: Date | undefined;
   },
 ): Thread[] {
   let filtered = threads.filter((t) => !t.isResolved);
@@ -119,7 +119,8 @@ export function findLastReviewDate(reviews: Review[], viewer: string, role: Role
     (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
   );
 
-  return sorted.length > 0 ? new Date(sorted[0]!.submittedAt) : null;
+  const latest = sorted[0];
+  return latest ? new Date(latest.submittedAt) : null;
 }
 
 export function formatThreads(
@@ -153,11 +154,14 @@ export function formatThreads(
     lines.push("");
 
     for (const thread of fileThreads) {
-      const lineInfo = thread.startLine
-        ? `Lines ${thread.startLine}\u2013${thread.line}`
-        : thread.line
-          ? `Line ${thread.line}`
-          : "File-level";
+      let lineInfo: string;
+      if (thread.startLine) {
+        lineInfo = `Lines ${thread.startLine}\u2013${thread.line}`;
+      } else if (thread.line) {
+        lineInfo = `Line ${thread.line}`;
+      } else {
+        lineInfo = "File-level";
+      }
 
       const outdated = thread.isOutdated ? " (outdated)" : "";
       lines.push(`### ${lineInfo}${outdated}`);
@@ -169,10 +173,10 @@ export function formatThreads(
         lines.push(`**@${author}** (${date}):`);
         const body = comment.body.trim();
         lines.push(
-          `${body
+          body
             .split("\n")
             .map((l) => `> ${l}`)
-            .join("\n")}`,
+            .join("\n"),
         );
         lines.push("");
       }
@@ -224,7 +228,11 @@ async function fetchGraphQL(
     throw new Error(`gh api graphql failed: ${stderr}`);
   }
 
-  return JSON.parse(stdout);
+  try {
+    return JSON.parse(stdout);
+  } catch {
+    throw new Error(`Failed to parse GraphQL response: ${stdout.slice(0, 200)}`);
+  }
 }
 
 async function main(): Promise<void> {
@@ -274,7 +282,12 @@ async function main(): Promise<void> {
     cursor = pageInfo.hasNextPage ? pageInfo.endCursor : undefined;
   } while (cursor);
 
-  const role: Role = (argv.flags.role as Role) ?? detectRole(viewer, prAuthor);
+  const roleFlag = argv.flags.role;
+  if (roleFlag && roleFlag !== "author" && roleFlag !== "reviewer") {
+    console.error(`Invalid --role: ${roleFlag} (must be "author" or "reviewer")`);
+    process.exit(1);
+  }
+  const role: Role = (roleFlag as Role) ?? detectRole(viewer, prAuthor);
 
   let since: Date | undefined;
   if (argv.flags.since) {
@@ -287,10 +300,14 @@ async function main(): Promise<void> {
       since = date;
     } else {
       since = new Date(argv.flags.since);
+      if (Number.isNaN(since.getTime())) {
+        console.error(`Invalid --since date: ${argv.flags.since}`);
+        process.exit(1);
+      }
     }
   }
 
-  const filtered = filterThreads(allThreads, { role, viewer, ...(since && { since }) });
+  const filtered = filterThreads(allThreads, { role, viewer, since });
   const output = formatThreads(filtered, totalCount, {
     title: prTitle,
     role,

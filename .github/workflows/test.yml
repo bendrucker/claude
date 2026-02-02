@@ -140,6 +140,7 @@ jobs:
           echo "has_commands=$([[ -d "plugins/$plugin/commands" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_tests=$(find "plugins/$plugin" \( -name '*.test.ts' -o -name '*.integration.ts' \) | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_swift=$(find "plugins/$plugin" -name '*.swift' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -171,6 +172,14 @@ jobs:
       - name: Lint skills
         if: steps.inspect.outputs.has_skills == 'true'
         run: bun run skill-lint "plugins/${{ matrix.plugin }}/skills/*"
+
+      - name: Setup Swift
+        if: steps.inspect.outputs.has_swift == 'true'
+        uses: swift-actions/setup-swift@v2
+
+      - name: Validate Swift syntax
+        if: steps.inspect.outputs.has_swift == 'true'
+        run: find "plugins/${{ matrix.plugin }}" -name "*.swift" -exec swiftc -parse {} +
 
       - name: Validate agent frontmatter
         if: steps.inspect.outputs.has_agents == 'true'

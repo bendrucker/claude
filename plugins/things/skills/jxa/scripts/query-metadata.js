@@ -10,7 +10,7 @@
 /**
  * @param {string[]} argv
  */
-function _run(argv) {
+function run(argv) {
   const type = argv[0];
   if (!type || !["projects", "areas", "tags"].includes(type)) {
     console.log("Usage: osascript scripts/query-metadata.js projects|areas|tags");

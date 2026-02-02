@@ -14,7 +14,7 @@
 /**
  * @param {string[]} argv
  */
-function _run(argv) {
+function run(argv) {
   let days = null;
   let startDate = null;
   let endDate = null;

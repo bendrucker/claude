@@ -45,7 +45,7 @@ function executeJsonUpdate(app, token, data) {
 /**
  * @param {string[]} argv
  */
-function _run(argv) {
+function run(argv) {
   let targetList = "today";
   const ids = [];
 

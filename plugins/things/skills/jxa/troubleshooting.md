@@ -75,6 +75,7 @@ scripts/run-jxa.sh 'const app = Application("Things3"); const todo = app.toDos.b
 **Missing auth token**: All updates require `auth-token` parameter
 **URL encoding**: Notes with special characters must be URL-encoded
 **Rate limiting**: Max 250 operations per 10 seconds
+**Completed items**: Setting `list-id` (area) on a completed item silently fails — the item moves to Logbook instead. Assign areas before completing.
 **Moving to area**: Use `list-id` (not `area-id`) when moving a todo to an area:
 ```bash
 # Does NOT work:

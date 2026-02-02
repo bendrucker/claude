@@ -98,6 +98,7 @@ export function filterThreads(
   let filtered = threads.filter((t) => !t.isResolved);
 
   if (options.role === "reviewer") {
+    // First comment is the thread opener
     filtered = filtered.filter((t) => t.comments.nodes[0]?.author?.login === options.viewer);
   }
 
@@ -214,6 +215,7 @@ async function fetchGraphQL(
   const args = ["gh", "api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(variables)) {
     if (value != null) {
+      // -F sends typed values (numbers), -f sends strings
       const flag = typeof value === "number" ? "-F" : "-f";
       args.push(flag, `${key}=${value}`);
     }

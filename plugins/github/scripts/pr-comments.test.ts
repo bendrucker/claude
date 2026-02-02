@@ -48,6 +48,11 @@ describe("parseUrl", () => {
     expect(result).toEqual({ owner: "pydantic", repo: "pydantic-ai", number: 3772 });
   });
 
+  it("parses PR URL with trailing path segments", () => {
+    const result = parseUrl("https://github.com/owner/repo/pull/123/files");
+    expect(result).toEqual({ owner: "owner", repo: "repo", number: 123 });
+  });
+
   it("throws on non-PR GitHub URL", () => {
     expect(() => parseUrl("https://github.com/owner/repo/issues/123")).toThrow("Invalid PR URL");
   });
@@ -117,6 +122,28 @@ describe("filterThreads", () => {
     expect(result[0]!.comments.nodes[0]!.createdAt).toBe("2025-01-20T00:00:00Z");
   });
 
+  it("excludes threads with null author in reviewer role", () => {
+    const threads = [
+      makeThread({
+        comments: [{ author: null, body: "comment", createdAt: "2025-01-15T00:00:00Z" }],
+      }),
+    ];
+    const result = filterThreads(threads, {
+      role: "reviewer",
+      viewer: "DouweM",
+    });
+    expect(result).toHaveLength(0);
+  });
+
+  it("excludes threads with empty comments array", () => {
+    const threads = [makeThread({ comments: [] })];
+    const result = filterThreads(threads, {
+      role: "reviewer",
+      viewer: "DouweM",
+    });
+    expect(result).toHaveLength(0);
+  });
+
   it("includes thread if any comment is after since date", () => {
     const threads = [
       makeThread({
@@ -163,6 +190,15 @@ describe("findLastReviewDate", () => {
       makeReview("bendrucker", "2025-01-25"),
     ];
     const date = findLastReviewDate(reviews, "DouweM", "reviewer");
+    expect(date).toEqual(new Date("2025-01-20T00:00:00Z"));
+  });
+
+  it("excludes reviews with null author", () => {
+    const reviews: Review[] = [
+      { author: null, submittedAt: "2025-01-25T00:00:00Z", state: "COMMENTED" },
+      makeReview("DouweM", "2025-01-20"),
+    ];
+    const date = findLastReviewDate(reviews, "bendrucker", "author");
     expect(date).toEqual(new Date("2025-01-20T00:00:00Z"));
   });
 
@@ -227,6 +263,22 @@ describe("formatThreads", () => {
     ];
     const output = formatThreads(threads, 1, baseOptions);
     expect(output).toContain("> Fix this\n> and that");
+  });
+
+  it("renders file-level thread", () => {
+    const threads = [makeThread({ line: null, startLine: null })];
+    const output = formatThreads(threads, 1, baseOptions);
+    expect(output).toContain("### File-level");
+  });
+
+  it("renders null author as ghost", () => {
+    const threads = [
+      makeThread({
+        comments: [{ author: null, body: "feedback", createdAt: "2025-01-15T00:00:00Z" }],
+      }),
+    ];
+    const output = formatThreads(threads, 1, baseOptions);
+    expect(output).toContain("**@ghost**");
   });
 
   it("includes author and date on comments", () => {

@@ -4,7 +4,7 @@ description: |
   Update a pull request or merge request body to reflect the current state of changes.
   Use when a PR/MR has evolved through additional commits and the body needs to reflect what will be merged.
 
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
+allowed-tools: Bash(bun:${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
 ---
 
 # Update Pull Request

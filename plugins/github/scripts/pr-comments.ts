@@ -74,7 +74,7 @@ export function parseUrl(url: string): {
   const parts = parsed.pathname.split("/").filter(Boolean);
   const owner = parts[0];
   const repo = parts[1];
-  const number = Number.parseInt(parts[3], 10);
+  const number = Number.parseInt(parts[3] ?? "", 10);
 
   if (!owner || !repo || parts[2] !== "pull" || Number.isNaN(number)) {
     throw new Error(`Invalid PR URL: ${url}`);
@@ -119,7 +119,7 @@ export function findLastReviewDate(reviews: Review[], viewer: string, role: Role
     (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
   );
 
-  return sorted.length > 0 ? new Date(sorted[0].submittedAt) : null;
+  return sorted.length > 0 ? new Date(sorted[0]!.submittedAt) : null;
 }
 
 export function formatThreads(
@@ -290,7 +290,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const filtered = filterThreads(allThreads, { role, viewer, since });
+  const filtered = filterThreads(allThreads, { role, viewer, ...(since && { since }) });
   const output = formatThreads(filtered, totalCount, {
     title: prTitle,
     role,

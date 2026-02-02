@@ -19,7 +19,9 @@ function makeComment(login: string, date: string, body = "comment"): Comment {
   };
 }
 
-function makeThread(overrides: Partial<Thread> & { comments?: Comment[] } = {}): Thread {
+function makeThread(
+  overrides: Omit<Partial<Thread>, "comments"> & { comments?: Comment[] } = {},
+): Thread {
   const { comments, ...rest } = overrides;
   return {
     isResolved: false,
@@ -73,7 +75,7 @@ describe("filterThreads", () => {
       viewer: "bendrucker",
     });
     expect(result).toHaveLength(1);
-    expect(result[0].isResolved).toBe(false);
+    expect(result[0]!.isResolved).toBe(false);
   });
 
   it("filters to viewer's threads in reviewer role", () => {
@@ -86,7 +88,7 @@ describe("filterThreads", () => {
       viewer: "DouweM",
     });
     expect(result).toHaveLength(1);
-    expect(result[0].comments.nodes[0].author?.login).toBe("DouweM");
+    expect(result[0]!.comments.nodes[0]!.author?.login).toBe("DouweM");
   });
 
   it("shows all unresolved threads in author role", () => {
@@ -112,7 +114,7 @@ describe("filterThreads", () => {
       since: new Date("2025-01-15T00:00:00Z"),
     });
     expect(result).toHaveLength(1);
-    expect(result[0].comments.nodes[0].createdAt).toBe("2025-01-20T00:00:00Z");
+    expect(result[0]!.comments.nodes[0]!.createdAt).toBe("2025-01-20T00:00:00Z");
   });
 
   it("includes thread if any comment is after since date", () => {

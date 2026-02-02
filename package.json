@@ -10,6 +10,7 @@
     "plugins/things",
     "plugins/type-ignore",
     "plugins/ui-design",
+    "plugins/github",
     "plugins/vscode"
   ],
   "scripts": {

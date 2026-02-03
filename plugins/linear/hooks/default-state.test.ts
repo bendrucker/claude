@@ -2,13 +2,16 @@ import { describe, expect, it } from "bun:test";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { getDefaultState, processInput } from "./default-state";
 
-function mockInput(toolInput: Record<string, unknown>): PreToolUseHookInput {
+function mockInput(
+  toolInput: Record<string, unknown>,
+  toolName = "mcp__linear__create_issue",
+): PreToolUseHookInput {
   return {
     hook_event_name: "PreToolUse",
     session_id: "test",
     transcript_path: "/tmp/test",
     cwd: "/tmp",
-    tool_name: "mcp__linear__create_issue",
+    tool_name: toolName,
     tool_input: toolInput,
     tool_use_id: "test",
   };
@@ -82,5 +85,19 @@ describe("processInput", () => {
       }),
     );
     expect(output).toBeNull();
+  });
+
+  it("works with plugin MCP tool name pattern", () => {
+    const output = processInput(
+      mockInput({ title: "Test issue", team: "ENG" }, "mcp__plugin_linear_linear__create_issue"),
+    );
+    expect(output).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        updatedInput: {
+          state: "Backlog",
+        },
+      },
+    });
   });
 });

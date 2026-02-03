@@ -12,7 +12,7 @@
         ]
       },
       {
-        "matcher": "mcp__linear__create_issue",
+        "matcher": "mcp__linear__create_issue|mcp__plugin_linear_linear__create_issue",
         "hooks": [
           {
             "type": "command",

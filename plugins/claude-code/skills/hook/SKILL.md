@@ -52,6 +52,8 @@ Reference for creating and configuring Claude Code hooks. When uncertain about s
 - Multiple: `"Edit|Write|MultiEdit"`
 - With args: `"Bash(npm:*)"`, `"Bash(osascript:*)|Bash(open:*)"`
 - MCP tools: `"mcp__linear__create_issue"`
+- Plugin MCP tools: `"mcp__plugin_<plugin>_<namespace>__<tool>"`
+- Both patterns: `"mcp__linear__create_issue|mcp__plugin_linear_linear__create_issue"`
 
 ## Hook Input
 

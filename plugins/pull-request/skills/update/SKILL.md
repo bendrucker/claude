@@ -15,7 +15,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 - Provider: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts"`
 - Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
-- PR: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts" "$0" "${CLAUDE_SKILL_ROOT}/assets/pr-context.graphql" 2>/dev/null || echo "No PR found for current branch"`
+- PR: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts" "$0" "${CLAUDE_PLUGIN_ROOT}/skills/update/assets/pr-context.graphql" 2>/dev/null || echo "No PR found for current branch"`
 - Diff (GitHub): !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/gh.sh" "$0" pr diff 2>/dev/null`
 - Diff (GitLab): !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/glab.sh" "$0" mr diff 2>/dev/null`
 

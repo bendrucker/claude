@@ -82,7 +82,8 @@
     "worktrunk@worktrunk": true,
     "vscode@bendrucker": true,
     "plan@bendrucker": true,
-    "playground@claude-plugins-official": true
+    "playground@claude-plugins-official": true,
+    "linear-cli@schpet": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -117,6 +118,13 @@
         "source": "github",
         "repo": "max-sixty/worktrunk",
         "ref": "v0.22.0"
+      }
+    },
+    "schpet": {
+      "source": {
+        "source": "github",
+        "repo": "schpet/linear-cli",
+        "ref": "v1.9.1"
       }
     }
   },

@@ -69,7 +69,7 @@ hooks:                                    # Optional: skill-scoped hooks
 | `$ARGUMENTS`           | All arguments passed when invoking the skill. Appended automatically if absent.  |
 | `$ARGUMENTS[N]` / `$N` | Access a specific argument by 0-based index.                                     |
 | `${CLAUDE_SESSION_ID}` | Current session ID.                                                              |
-| `${CLAUDE_SKILL_ROOT}` | Absolute path to the skill's directory. Use in hooks and script references.      |
+| `${CLAUDE_SKILL_ROOT}` | Absolute path to the skill's directory. Works in hooks and allowed-tools, but NOT in `!` context. |
 
 ### Dynamic Context Injection
 

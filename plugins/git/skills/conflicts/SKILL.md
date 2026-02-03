@@ -15,24 +15,24 @@ allowed-tools:
   - Bash(git merge:*)
   - Bash(git cherry-pick:*)
   - Bash(git rerere:*)
-  - Bash(bun ${CLAUDE_SKILL_ROOT}/scripts/*:*)
+  - Bash(bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/*:*)
 hooks:
   PreToolUse:
     - matcher: "Bash(git commit:*)|Bash(git rebase --continue:*)|Bash(git merge --continue:*)|Bash(git cherry-pick --continue:*)"
       hooks:
         - type: command
-          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-markers.ts"
+          command: "bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/check-markers.ts"
 ---
 
 # Git Conflicts
 
 ## Status
 
-!`bun ${CLAUDE_SKILL_ROOT}/scripts/status.ts 2>/dev/null || echo "Run status.ts manually"`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts 2>/dev/null || echo "Run status.ts manually"`
 
 ## Context
 
-!`bun ${CLAUDE_SKILL_ROOT}/scripts/context.ts 2>/dev/null || echo "Run context.ts manually"`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/context.ts 2>/dev/null || echo "Run context.ts manually"`
 
 ## Three-Way Access
 

@@ -4,7 +4,7 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR—including after committing changes.
 
-allowed-tools: Bash(bun:${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
+allowed-tools: Bash(bun:${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(${CLAUDE_PLUGIN_ROOT}/scripts/worktree/*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
 ---
 
 # Create Pull Request

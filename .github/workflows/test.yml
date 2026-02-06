@@ -175,7 +175,7 @@ jobs:
 
       - name: Setup Swift
         if: steps.inspect.outputs.has_swift == 'true'
-        uses: swift-actions/setup-swift@v2
+        uses: swift-actions/setup-swift@v3
 
       - name: Validate Swift syntax
         if: steps.inspect.outputs.has_swift == 'true'

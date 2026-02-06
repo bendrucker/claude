@@ -24,10 +24,10 @@ if (!TYPES.includes(type as MetadataType)) {
   process.exit(1);
 }
 
-const items: Record<string, unknown>[] = await runJxa(
+const items = (await runJxa(
   (t: string) => {
     const app = Application("Things3");
-    const result: Record<string, unknown>[] = [];
+    const result: Record<string, string | number | null>[] = [];
 
     if (t === "projects") {
       const projects = app.projects();
@@ -70,7 +70,7 @@ const items: Record<string, unknown>[] = await runJxa(
     return result;
   },
   [type],
-);
+)) as Record<string, unknown>[];
 
 if (argv.flags.json) {
   console.log(JSON.stringify(items, null, 2));

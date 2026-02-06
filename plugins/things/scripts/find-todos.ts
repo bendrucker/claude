@@ -38,7 +38,9 @@ interface Todo {
   notes?: string;
 }
 
-const items: Todo[] = await runJxa(
+type Result = { error: string } | Todo[];
+
+const result = (await runJxa(
   (m: string, v: string) => {
     const app = Application("Things3");
 
@@ -46,42 +48,44 @@ const items: Todo[] = await runJxa(
       const tag = app.tags.whose({ name: v })[0];
       if (!tag) return { error: `Tag not found: ${v}` };
       const todos = tag.toDos();
-      const result = [];
+      const items = [];
       for (let i = 0; i < todos.length; i++) {
         const t = todos[i];
         const project = t.project();
-        result.push({
+        items.push({
           id: t.id(),
           name: t.name(),
           status: t.status().toString(),
           project: project ? project.name() : null,
         });
       }
-      return result;
+      return items;
     }
 
     const project = app.projects.whose({ name: v })[0];
     if (!project) return { error: `Project not found: ${v}` };
     const todos = project.toDos();
-    const result = [];
+    const items = [];
     for (let i = 0; i < todos.length; i++) {
       const t = todos[i];
-      result.push({
+      items.push({
         id: t.id(),
         name: t.name(),
         status: t.status().toString(),
         notes: t.notes() || "",
       });
     }
-    return result;
+    return items;
   },
   [mode, value],
-);
+)) as Result;
 
-if ("error" in items) {
-  console.error((items as unknown as { error: string }).error);
+if ("error" in result) {
+  console.error(result.error);
   process.exit(1);
 }
+
+const items = result;
 
 if (argv.flags.json) {
   console.log(JSON.stringify(items, null, 2));

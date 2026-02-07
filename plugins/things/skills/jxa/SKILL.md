@@ -45,7 +45,7 @@ Read and query Things 3 data via JXA (JavaScript for Automation).
 
 ## Scripts
 
-Scripts output formatted tables by default. Pass `--json` for raw JSON output. Path: `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+Scripts output formatted tables by default. Pass `--json` for raw JSON output. Use `--columns` to select specific columns (comma-separated, case-insensitive, e.g. `--columns name,status`). `--columns` is ignored when `--json` is used. Path: `${CLAUDE_PLUGIN_ROOT}/scripts/`.
 
 | Script | Usage | Description |
 |--------|-------|-------------|

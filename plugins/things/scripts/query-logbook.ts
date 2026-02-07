@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { runJxa } from "run-jxa";
-import { formatDate, table } from "./format";
+import { formatDate, selectColumns, table } from "./format";
 
 const argv = cli({
   name: "query-logbook",
@@ -22,6 +22,10 @@ const argv = cli({
     json: {
       type: Boolean,
       description: "Output as JSON",
+    },
+    columns: {
+      type: String,
+      description: "Columns to include (comma-separated)",
     },
   },
 });
@@ -90,12 +94,15 @@ const result: LogbookResult = await runJxa(
 if (argv.flags.json) {
   console.log(JSON.stringify(result, null, 2));
 } else {
+  const columns = argv.flags.columns?.split(",");
   console.log(`${result.count} completed items\n`);
-  const rows = result.items.map((t) => [
+  let headers = ["Name", "Completion Date", "Status", "Project"];
+  let rows = result.items.map((t) => [
     t.name,
     formatDate(t.completionDate),
     t.status,
     t.project ?? "",
   ]);
-  process.stdout.write(table([["Name", "Completion Date", "Status", "Project"], ...rows]));
+  [headers, rows] = selectColumns(headers, rows, columns);
+  process.stdout.write(table([headers, ...rows]));
 }

@@ -8,12 +8,11 @@ export type IssueTarget = {
   number: number;
 };
 
-const githubIssuePattern =
-  /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
+const githubIssuePattern = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
 
 export function parseIssueUrl(input: string): IssueTarget | null {
   const match = input.match(githubIssuePattern);
-  if (!match) return null;
+  if (!match?.[1] || !match[2] || !match[3]) return null;
 
   return {
     service: "github",

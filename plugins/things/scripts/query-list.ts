@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { runJxa } from "run-jxa";
-import { formatDate, table } from "./format";
+import { formatDate, selectColumns, table } from "./format";
 
 const argv = cli({
   name: "query-list",
@@ -11,6 +11,10 @@ const argv = cli({
     json: {
       type: Boolean,
       description: "Output as JSON",
+    },
+    columns: {
+      type: String,
+      description: "Columns to include (comma-separated)",
     },
   },
 });
@@ -60,6 +64,9 @@ const items: Todo[] = await runJxa(
 if (argv.flags.json) {
   console.log(JSON.stringify(items, null, 2));
 } else {
-  const rows = items.map((t) => [t.name, t.status, formatDate(t.dueDate), t.project ?? "", t.tags]);
-  process.stdout.write(table([["Name", "Status", "Due Date", "Project", "Tags"], ...rows]));
+  const columns = argv.flags.columns?.split(",");
+  let headers = ["Name", "Status", "Due Date", "Project", "Tags"];
+  let rows = items.map((t) => [t.name, t.status, formatDate(t.dueDate), t.project ?? "", t.tags]);
+  [headers, rows] = selectColumns(headers, rows, columns);
+  process.stdout.write(table([headers, ...rows]));
 }

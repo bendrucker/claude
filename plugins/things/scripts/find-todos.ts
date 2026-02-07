@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { runJxa } from "run-jxa";
-import { table } from "./format";
+import { selectColumns, table } from "./format";
 
 const argv = cli({
   name: "find-todos",
@@ -18,6 +18,10 @@ const argv = cli({
     json: {
       type: Boolean,
       description: "Output as JSON",
+    },
+    columns: {
+      type: String,
+      description: "Columns to include (comma-separated)",
     },
   },
 });
@@ -90,6 +94,7 @@ const items = result;
 if (argv.flags.json) {
   console.log(JSON.stringify(items, null, 2));
 } else {
+  const columns = argv.flags.columns?.split(",");
   let headers: string[];
   let rows: string[][];
 
@@ -101,5 +106,6 @@ if (argv.flags.json) {
     rows = items.map((t) => [t.name, t.status]);
   }
 
+  [headers, rows] = selectColumns(headers, rows, columns);
   process.stdout.write(table([headers, ...rows]));
 }

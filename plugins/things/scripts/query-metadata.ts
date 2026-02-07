@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { runJxa } from "run-jxa";
-import { table } from "./format";
+import { selectColumns, table } from "./format";
 
 const TYPES = ["projects", "areas", "tags"] as const;
 type MetadataType = (typeof TYPES)[number];
@@ -14,6 +14,10 @@ const argv = cli({
     json: {
       type: Boolean,
       description: "Output as JSON",
+    },
+    columns: {
+      type: String,
+      description: "Columns to include (comma-separated)",
     },
   },
 });
@@ -75,6 +79,7 @@ const items = (await runJxa(
 if (argv.flags.json) {
   console.log(JSON.stringify(items, null, 2));
 } else {
+  const columns = argv.flags.columns?.split(",");
   let headers: string[];
   let rows: string[][];
 
@@ -98,5 +103,6 @@ if (argv.flags.json) {
     ]);
   }
 
+  [headers, rows] = selectColumns(headers, rows, columns);
   process.stdout.write(table([headers, ...rows]));
 }

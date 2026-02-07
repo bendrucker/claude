@@ -13,11 +13,11 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Context
 
-- Provider: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts"`
+- Provider: !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"}`
 - Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
 - PR: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts" "$0" "${CLAUDE_PLUGIN_ROOT}/skills/update/assets/pr-context.graphql" 2>/dev/null || echo "No PR found for current branch"`
-- Diff (GitHub): !`[ "$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts")" = github ] && "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/gh.sh" "$0" pr diff 2>/dev/null || true`
-- Diff (GitLab): !`[ "$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts")" = gitlab ] && "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/glab.sh" "$0" mr diff 2>/dev/null || true`
+- Diff (GitHub): !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); [ "$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"})" = github ] && "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/gh.sh" "$0" pr diff 2>/dev/null || true`
+- Diff (GitLab): !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); [ "$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"})" = gitlab ] && "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/glab.sh" "$0" mr diff 2>/dev/null || true`
 
 ## Workflow
 
@@ -32,8 +32,10 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 1. Rewrite the PR body following the same title and body rules as the create skill. See [`sections.md`](sections.md) for section guidance.
 2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply:
-   - **GitHub**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
-   - **GitLab**: `glab mr update --description "$(cat tmp/pr-body-<branch>.md)"`
+   - **GitHub with `$0`**: `"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/gh.sh" "$0" pr edit --body-file tmp/pr-body-<branch>.md`
+   - **GitHub without `$0`**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
+   - **GitLab with `$0`**: `"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/glab.sh" "$0" mr update --description "$(cat tmp/pr-body-<branch>.md)"`
+   - **GitLab without `$0`**: `glab mr update --description "$(cat tmp/pr-body-<branch>.md)"`
 
 ## GitLab Notes
 

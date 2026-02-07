@@ -80,7 +80,7 @@ jobs:
         run: ./scripts/check-marketplace.sh
 
       - name: Check MCP hook matchers
-        run: ./scripts/check-mcp-matchers.sh
+        run: bun scripts/check-mcp-matchers.ts
 
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'

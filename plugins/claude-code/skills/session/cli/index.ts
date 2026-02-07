@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { parseDate } from "./date";
-import { createDebugContext, type DebugContext, printTimingSummary } from "./debug";
+import { type LogLevel, setupTelemetry, shutdownTelemetry } from "./debug";
 import { aggregateErrors, getErrors, type ToolError } from "./errors";
 import {
   formatDigest,
@@ -37,10 +37,13 @@ const commonFlags = {
     description: "Output format: text or json",
     default: "text",
   },
-  debug: {
-    type: Boolean,
-    description: "Enable debug output to stderr",
-    default: false,
+  "log-level": {
+    type: String,
+    description: "Log level: trace, debug, info, warn, error",
+  },
+  "log-file": {
+    type: String,
+    description: "Write traces and logs to a JSONL file",
   },
 } as const;
 
@@ -50,10 +53,27 @@ function parseCommonOptions(flags: {
   project?: string | undefined;
   limit?: number | undefined;
   format?: string | undefined;
-  debug?: boolean | undefined;
-}): { options: SearchOptions; format: "text" | "json"; ctx: DebugContext } {
-  const ctx = createDebugContext(flags.debug ?? false);
-  const options: SearchOptions = { ctx };
+  "log-level"?: string | undefined;
+  "log-file"?: string | undefined;
+}): { options: SearchOptions; format: "text" | "json" } {
+  const options: SearchOptions = {};
+  const logLevel = flags["log-level"];
+  const logFile = flags["log-file"];
+
+  if (logLevel) {
+    const valid: LogLevel[] = ["trace", "debug", "info", "warn", "error"];
+    if (!valid.includes(logLevel as LogLevel)) {
+      throw new Error(`--log-level must be one of: ${valid.join(", ")}`);
+    }
+  }
+
+  const hasOtelEnv =
+    Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT) ||
+    process.env.OTEL_TRACES_EXPORTER === "console";
+
+  if (logLevel || logFile || hasOtelEnv) {
+    setupTelemetry({ logLevel: (logLevel as LogLevel) ?? "error", ...(logFile && { logFile }) });
+  }
 
   if (flags.after) {
     options.after = parseDate(flags.after);
@@ -76,7 +96,7 @@ function parseCommonOptions(flags: {
     throw new Error('--format must be "text" or "json"');
   }
 
-  return { options, format, ctx };
+  return { options, format };
 }
 
 function output<T>(data: T, format: "text" | "json", formatter: (data: T) => string): void {
@@ -121,7 +141,7 @@ async function runErrors(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format, ctx } = parseCommonOptions(argv.flags);
+  const { options, format } = parseCommonOptions(argv.flags);
 
   if (argv.flags.type) {
     if (argv.flags.type !== "rejection" && argv.flags.type !== "failure") {
@@ -158,7 +178,6 @@ async function runErrors(args: string[]): Promise<void> {
   } else {
     output(errors, format, formatErrors);
   }
-  printTimingSummary(ctx);
 }
 
 async function runStats(args: string[]): Promise<void> {
@@ -183,7 +202,7 @@ async function runStats(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format, ctx } = parseCommonOptions(argv.flags);
+  const { options, format } = parseCommonOptions(argv.flags);
 
   const stats = await getStats(options);
 
@@ -206,7 +225,6 @@ async function runStats(args: string[]): Promise<void> {
   }
 
   output(stats, format, formatStats);
-  printTimingSummary(ctx);
 }
 
 async function runDigest(args: string[]): Promise<void> {
@@ -225,7 +243,7 @@ async function runDigest(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format, ctx } = parseCommonOptions(argv.flags);
+  const { options, format } = parseCommonOptions(argv.flags);
 
   if (argv.flags.session) {
     const conversation = await getSession(argv.flags.session, options);
@@ -234,13 +252,11 @@ async function runDigest(args: string[]): Promise<void> {
     }
     const result = { conversations: [conversation], totalCount: 1, truncated: false };
     output(result, format, formatDigest);
-    printTimingSummary(ctx);
     return;
   }
 
   const result = await getDigest(options);
   output(result, format, formatDigest);
-  printTimingSummary(ctx);
 }
 
 async function runSearch(args: string[]): Promise<void> {
@@ -254,10 +270,9 @@ async function runSearch(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format, ctx } = parseCommonOptions(argv.flags);
+  const { options, format } = parseCommonOptions(argv.flags);
   const results = await searchConversations(argv._.query, options);
   output(results, format, formatSearchResults);
-  printTimingSummary(ctx);
 }
 
 const subcommands: Record<string, (args: string[]) => Promise<void>> = {
@@ -295,7 +310,11 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  await handler(args.slice(1));
+  try {
+    await handler(args.slice(1));
+  } finally {
+    await shutdownTelemetry();
+  }
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;

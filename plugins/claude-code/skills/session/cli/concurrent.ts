@@ -1,13 +1,13 @@
-import { type DebugContext, debug, incrementCount } from "./debug";
+import { log } from "./debug";
 
 const DEFAULT_CONCURRENCY = 20;
 
 export async function* mapConcurrent<T, U>(
   items: AsyncIterable<T>,
   fn: (item: T) => Promise<U>,
-  options: { concurrency?: number; ctx?: DebugContext } = {},
+  options: { concurrency?: number } = {},
 ): AsyncGenerator<U> {
-  const { concurrency = DEFAULT_CONCURRENCY, ctx } = options;
+  const { concurrency = DEFAULT_CONCURRENCY } = options;
   const pending = new Map<number, Promise<{ index: number; result: U }>>();
   let nextIndex = 0;
   let nextYield = 0;
@@ -31,17 +31,15 @@ export async function* mapConcurrent<T, U>(
   }
 
   try {
+    let processed = 0;
     while (pending.size > 0) {
       const { index, result } = await Promise.race(pending.values());
       pending.delete(index);
       results.set(index, result);
 
-      if (ctx) {
-        incrementCount(ctx, "items_processed");
-        const processed = ctx.counts.get("items_processed") ?? 0;
-        if (processed % 50 === 0) {
-          debug(ctx, `Processed ${processed} items...`);
-        }
+      processed++;
+      if (processed % 50 === 0) {
+        log(`Processed ${processed} items...`);
       }
 
       // Start next item
@@ -64,7 +62,7 @@ export async function* mapConcurrent<T, U>(
 export async function collectConcurrent<T, U>(
   items: AsyncIterable<T>,
   fn: (item: T) => Promise<U>,
-  options: { concurrency?: number; ctx?: DebugContext } = {},
+  options: { concurrency?: number } = {},
 ): Promise<U[]> {
   const results: U[] = [];
   for await (const result of mapConcurrent(items, fn, options)) {

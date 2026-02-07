@@ -57,8 +57,6 @@ export interface DigestResult {
   truncated: boolean;
 }
 
-import type { DebugContext } from "./debug";
-
 export interface ProjectStats {
   readonly projectPath: string;
   readonly projectName: string;
@@ -77,7 +75,6 @@ export interface SearchOptions {
   project?: string;
   limit?: number;
   errorType?: ErrorType;
-  ctx?: DebugContext;
 }
 
 /** Minimum token length to match during search */

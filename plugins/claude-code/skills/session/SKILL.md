@@ -66,6 +66,8 @@ bun $CLI errors --aggregate     # Group by error message
 - `--project PATH` - Filter by project path
 - `--limit N` - Maximum results
 - `--format FORMAT` - Output format: `text` (default) or `json`
+- `--log-level LEVEL` - Telemetry output: `debug` (logs) or `trace` (logs + spans)
+- `--log-file PATH` - Write traces and logs to a JSONL file
 
 ## Direct Session Inspection
 

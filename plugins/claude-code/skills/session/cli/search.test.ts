@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mapConcurrent } from "./concurrent";
 import { parseDate } from "./date";
-import { createDebugContext, printTimingSummary } from "./debug";
 import { streamSessionFiles } from "./files";
 import { formatDigest, formatSearchResults, formatStats } from "./format";
 import { parseConversationFile } from "./parse";
@@ -442,41 +441,6 @@ describe("mtime-based file filtering", () => {
 
     expect(files).toContain("old-session.jsonl");
     expect(files).not.toContain("new-session.jsonl");
-  });
-});
-
-describe("debug output", () => {
-  it("outputs timing summary to stderr when enabled", () => {
-    const stderrSpy = spyOn(console, "error").mockImplementation(() => {});
-
-    const ctx = createDebugContext(true);
-    ctx.timings.set("test_phase", 100);
-    ctx.counts.set("items", 5);
-
-    printTimingSummary(ctx);
-
-    expect(stderrSpy).toHaveBeenCalled();
-    const output = stderrSpy.mock.calls.map((call) => call[0]).join("\n");
-    expect(output).toContain("[debug]");
-    expect(output).toContain("test_phase");
-    expect(output).toContain("100ms");
-    expect(output).toContain("items");
-    expect(output).toContain("5");
-
-    stderrSpy.mockRestore();
-  });
-
-  it("outputs nothing when debug is disabled", () => {
-    const stderrSpy = spyOn(console, "error").mockImplementation(() => {});
-
-    const ctx = createDebugContext(false);
-    ctx.timings.set("test_phase", 100);
-
-    printTimingSummary(ctx);
-
-    expect(stderrSpy).not.toHaveBeenCalled();
-
-    stderrSpy.mockRestore();
   });
 });
 

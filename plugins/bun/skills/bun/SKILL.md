@@ -1,8 +1,12 @@
 ---
 name: bun
 description: >-
-  Bun runtime patterns and best practices. Use when running scripts with bun,
-  using bunx, writing Bun shell scripts, managing bun.lock, or running bun test.
+  Bun runtime patterns and best practices. Use when running bun commands (bun run, bun test, bunx),
+  working with package.json or bun.lock, writing TypeScript scripts that run under Bun,
+  developing Claude Code skills/hooks/scripts (which use Bun as their runtime),
+  or working in projects that use Bun as their package manager.
+  Covers bunx execution, lockfile handling, module resolution, shell scripting with Bun.$,
+  subprocess spawning, file I/O, and testing with bun test.
 user-invocable: false
 ---
 
@@ -28,12 +32,24 @@ See [references/resolution.md](references/resolution.md)
 
 ## Shell
 
-`Bun.$` is a tagged template for shell execution. Use `.text()` for string output, `.nothrow()` to handle failures without exceptions.
+`Bun.$` is a tagged template for shell execution. Use response methods (`.text()`, `.json()`, `.lines()`) to extract output, `.nothrow()` to handle failures without exceptions, and pipe/redirect syntax for composing commands.
 
 See [references/shell.md](references/shell.md)
 
+## Subprocess
+
+`Bun.spawn` spawns subprocesses with streaming I/O. Use `Bun.spawnSync` for synchronous execution. Configure stdin/stdout/stderr, environment variables, and working directory. Check `exitCode` for error handling.
+
+See [references/spawn.md](references/spawn.md)
+
+## File I/O
+
+`Bun.file()` creates file handles with `.text()`, `.json()`, `.arrayBuffer()`, and `.stream()` methods. `Bun.write()` writes content to files or stdout/stderr. Both support streaming for large files.
+
+See [references/file-io.md](references/file-io.md)
+
 ## Testing
 
-Bun runs tests in a single process. Set `AGENT=1` to suppress passing test output. Use `--bail` to stop after first failure, `-t` for name filtering.
+Bun runs tests in a single process. Use `describe`/`it`/`test` for structure, `expect` matchers for assertions, lifecycle hooks (`beforeEach`, `afterEach`) for setup/teardown, `mock()` for function mocking, and `.toMatchSnapshot()` for snapshot testing. Set `AGENT=1` to suppress passing test output.
 
 See [references/testing.md](references/testing.md)

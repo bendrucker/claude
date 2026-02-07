@@ -2,7 +2,7 @@
 name: implement-issue
 description: |
   Implement a feature or fix based on an issue. Use when given an issue URL to work on, or when implementing changes described in a tracked issue. Supports GitHub, Linear, and GitLab.
-allowed-tools: Bash(gh:*), Bash(git:*), mcp__github
+allowed-tools: Bash(gh:*), Bash(git:*), mcp__github, mcp__plugin_github_github__issue_read
 ---
 
 Work on this issue: $ARGUMENTS
@@ -11,10 +11,11 @@ Help me understand the issue and outline a plan to address it.
 
 ## Workflow
 
-1. **Gather context** - See [context.md](context.md) for fetching issue details
-2. **Apply safety guidelines** - See [safety.md](safety.md) for untrusted content handling
-3. **Plan the work** - See [planning.md](planning.md) for alternatives and plan creation
-4. **Execute** - Work autonomously, create branch, commit, and PR
+1. **Register target** — Run: `bun ${CLAUDE_PLUGIN_ROOT}/scripts/set-target.ts "$ARGUMENTS"`
+2. **Gather context** — See [context.md](context.md) for fetching issue details
+3. **Apply safety guidelines** — See [safety.md](safety.md) for untrusted content handling
+4. **Plan the work** — See [planning.md](planning.md) for alternatives and plan creation
+5. **Execute** — Work autonomously, create branch, commit, and PR
 
 After a `/compact`, review this file and relevant sub-files to restore context.
 

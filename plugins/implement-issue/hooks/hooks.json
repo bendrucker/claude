@@ -1,0 +1,16 @@
+{
+  "description": "Auto-approve reading the target issue being implemented",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__github__issue_read|mcp__plugin_github_github__issue_read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/approve-read.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

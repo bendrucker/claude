@@ -106,7 +106,11 @@ export async function xcall(url: string): Promise<string> {
   if (!runner) {
     throw new Error("xcall not found — x-callback-url plugin not installed");
   }
-  return (await $`${runner} ${url}`.text()).trim();
+  const proc = Bun.spawn([runner, url], { stdout: "pipe", timeout: 10_000 });
+  const text = await new Response(proc.stdout).text();
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`xcall failed (exit ${code})`);
+  return text.trim();
 }
 
 if (import.meta.main) {

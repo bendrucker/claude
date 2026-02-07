@@ -11,6 +11,7 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 - **ci**: CI/CD pipelines and jobs
 - **api**: REST and GraphQL API access
 - **docs**: Navigating GitLab documentation
+- **todos**: Managing GitLab todos inbox (notifications)
 
 ### Agents
 

@@ -14,10 +14,15 @@ Patterns that could be handled without user input:
 - **Read mentions**: Auto-mark done (already seen)
 - **Already-reviewed PRs**: Auto-mark done when user has submitted a review
 
+### GitLab
+
+- **Build passed on my MR**: Mark todo done automatically
+- **MR merged**: Mark todo done automatically
+
 ### Linear
 
-- **Blocked issues**: Auto-defer to Things with blocker context
-- **Stale in-progress**: Flag for review if no activity in N days
+- **Stale assignments**: Auto-defer to Things if unread for N days
+- **Resolved status changes**: Auto-archive when issue is done/canceled
 
 ### Things
 

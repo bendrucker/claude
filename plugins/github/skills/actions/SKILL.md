@@ -1,5 +1,5 @@
 ---
-name: actions
+name: github-actions
 description: GitHub Actions CI/CD management via gh CLI
 user-invocable: true
 ---

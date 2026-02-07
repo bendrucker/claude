@@ -34,6 +34,15 @@ Present:
 - Focus windows (start time and duration)
 - Meetings needing prep → suggest creating Things tasks
 
+## Re-Check (Post-Inbox)
+
+After Things inbox processing, re-query today's events:
+
+- Use the same query as the initial scan
+- Compare with the initial results
+- Note any new events (e.g., work calendar additions during personal triage)
+- Update the time budget if new meetings were added
+
 ## Evening Variant
 
 Preview tomorrow only:

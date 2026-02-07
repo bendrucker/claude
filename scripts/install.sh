@@ -37,7 +37,7 @@ link_item() {
     fi
   fi
 
-  ln -sf "$source" "$target"
+  ln -sfn "$source" "$target"
   echo "  - ~/.claude/$item -> $source"
 }
 

@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Add the feature branch changes"},"sessionId":"feature-session","cwd":"/Users/test/project-feature","gitBranch":"feature","timestamp":"2024-01-18T10:00:00.000Z","uuid":"uuid-f1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll add the feature branch changes now."}]},"sessionId":"feature-session","timestamp":"2024-01-18T10:01:00.000Z","uuid":"uuid-f2"}

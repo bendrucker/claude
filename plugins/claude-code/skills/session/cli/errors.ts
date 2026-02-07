@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import * as path from "node:path";
 import { createInterface } from "node:readline";
 import { collectConcurrent } from "./concurrent";
-import { incrementCount, startTiming } from "./debug";
+import { log, tracer } from "./debug";
 import { compareTimestampsDesc, isWithinDateRange, streamSessionFiles } from "./files";
 import type { ErrorType, SearchOptions } from "./types";
 
@@ -121,18 +121,12 @@ async function extractErrorsFromFile(
 }
 
 export async function getErrors(options: SearchOptions = {}): Promise<ToolError[]> {
-  const { ctx } = options;
-
-  const stopParsing = ctx ? startTiming(ctx, "file_parsing") : undefined;
-  const results = await collectConcurrent(
-    streamSessionFiles(options),
-    async (file) => {
-      if (ctx) incrementCount(ctx, "files_found");
-      return extractErrorsFromFile(file.path, options);
-    },
-    ctx ? { ctx } : {},
-  );
-  stopParsing?.();
+  const span = tracer().startSpan("file_parsing");
+  const results = await collectConcurrent(streamSessionFiles(options), async (file) => {
+    log(`Processing ${file.path}`);
+    return extractErrorsFromFile(file.path, options);
+  });
+  span.end();
 
   const allErrors: ToolError[] = [];
   for (const errors of results) {

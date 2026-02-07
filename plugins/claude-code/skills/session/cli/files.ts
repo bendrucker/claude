@@ -96,9 +96,7 @@ export async function findSessionFile(
     try {
       await fs.access(filePath);
       return filePath;
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return null;

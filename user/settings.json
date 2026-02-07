@@ -27,7 +27,13 @@
       "Edit(~/Library/Caches/go-build/**)",
       "Edit(~/src/go/pkg/mod/**)",
       "Edit(~/src/go/pkg/sumdb/**)",
-      "Edit(~/.bun/**)"
+      "Edit(~/.bun/**)",
+      "Bash(wt list:*)",
+      "Bash(wt switch:*)",
+      "Bash(wt config:*)",
+      "Bash(wt hook:*)",
+      "Bash(wt step commit:*)",
+      "Bash(wt step copy-ignored:*)"
     ],
     "deny": []
   },

@@ -11,6 +11,8 @@ Patterns that could be handled without user input:
 - **CI passed on my PR**: Mark done automatically
 - **PR merged**: Mark done automatically
 - **Stale subscription**: Auto-unsubscribe after N ignores
+- **Read mentions**: Auto-mark done (already seen)
+- **Already-reviewed PRs**: Auto-mark done when user has submitted a review
 
 ### Linear
 

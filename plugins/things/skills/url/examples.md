@@ -102,6 +102,15 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts update id=ABC-123 append-checklist-item
 Item 2"
 ```
 
+## Bulk Updating Todos
+
+Pass multiple `id=` params to batch updates into a single JSON command:
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts update id=ABC-123 id=DEF-456 id=GHI-789 when=tomorrow
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts update id=ABC-123 id=DEF-456 add-tags=Urgent completed=true
+```
+
 ## Navigation and Search
 
 ```bash

@@ -14,7 +14,7 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 
 ### Scripts
 
-- `scripts/url.js` — URL scheme wrapper with auth token and encoding
+- `scripts/url.ts` — URL scheme wrapper with auth token, encoding, and bulk update via JSON command
 - `scripts/reorder.js` — List reordering without SQLite writes
 
 Write verification uses the `x-callback-url` plugin's `xcall` skill.

@@ -72,7 +72,7 @@ function parseCommonOptions(flags: {
     process.env.OTEL_TRACES_EXPORTER === "console";
 
   if (logLevel || logFile || hasOtelEnv) {
-    setupTelemetry({ logLevel: (logLevel as LogLevel) ?? "error", logFile });
+    setupTelemetry({ logLevel: (logLevel as LogLevel) ?? "error", ...(logFile && { logFile }) });
   }
 
   if (flags.after) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { runJxa } from "run-jxa";
+import { debug, runJxa } from "./debug";
 import { formatDate, selectColumns, table } from "./format";
 
 const argv = cli({
@@ -30,6 +30,8 @@ interface Todo {
   project: string | null;
   area: string | null;
 }
+
+debug(`querying list: ${argv._.listId}`);
 
 const items: Todo[] = await runJxa(
   (listId: string) => {
@@ -60,6 +62,8 @@ const items: Todo[] = await runJxa(
   },
   [argv._.listId],
 );
+
+debug(`received ${items.length} items`);
 
 if (argv.flags.json) {
   console.log(JSON.stringify(items, null, 2));

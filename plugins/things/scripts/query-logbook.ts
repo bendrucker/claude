@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { runJxa } from "run-jxa";
+import { debug, runJxa } from "./debug";
 import { formatDate, selectColumns, table } from "./format";
 
 const argv = cli({
@@ -61,6 +61,8 @@ interface LogbookResult {
   items: LogbookEntry[];
 }
 
+debug(`querying logbook: ${startIso} to ${endIso}`);
+
 const result: LogbookResult = await runJxa(
   (startStr: string, endStr: string) => {
     const startDate = new Date(startStr);
@@ -90,6 +92,8 @@ const result: LogbookResult = await runJxa(
   },
   [startIso, endIso],
 );
+
+debug(`received ${result.count} items`);
 
 if (argv.flags.json) {
   console.log(JSON.stringify(result, null, 2));

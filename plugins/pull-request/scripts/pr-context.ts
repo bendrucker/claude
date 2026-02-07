@@ -29,8 +29,7 @@ interface GitHubCommit {
 async function fetchGitHubContext(cwd?: string): Promise<PRContext> {
   const shell = cwd ? $.cwd(cwd) : $;
 
-  const result =
-    await shell`gh pr view --json title,body,updatedAt,commits`.text();
+  const result = await shell`gh pr view --json title,body,updatedAt,commits`.text();
 
   const pr = JSON.parse(result);
 

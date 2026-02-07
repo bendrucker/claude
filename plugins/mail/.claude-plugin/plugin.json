@@ -1,0 +1,8 @@
+{
+  "name": "mail",
+  "description": "Apple Mail integration for reading and managing email via JXA",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

@@ -103,4 +103,5 @@ Items deferred from GitHub/Linear:
 
 ## Future
 
-See [automation.md](automation.md) for planned auto-handling patterns.
+- **Mail inbox**: Add `mail:archive` for account-aware email archiving
+- See [automation.md](automation.md) for planned auto-handling patterns.

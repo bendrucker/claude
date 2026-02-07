@@ -29,6 +29,7 @@ interface Todo {
   tags: string;
   project: string | null;
   area: string | null;
+  creationDate: string | null;
 }
 
 debug(`querying list: ${argv._.listId}`);
@@ -55,6 +56,7 @@ const items: Todo[] = await runJxa(
         tags: props.tagNames || "",
         project: project ? project.name() : null,
         area: area ? area.name() : null,
+        creationDate: props.creationDate ? props.creationDate.toISOString() : null,
       });
     }
 

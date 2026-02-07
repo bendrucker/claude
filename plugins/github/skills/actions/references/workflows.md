@@ -1,108 +1,68 @@
 # Workflow Development
 
-## Conditionals
+## Triggers
 
 ```yaml
-steps:
-  - run: echo "deploying"
-    if: github.ref == 'refs/heads/main'
-
-  - run: echo "PR only"
-    if: github.event_name == 'pull_request'
-
-  - run: echo "previous step failed"
-    if: failure()
+on:
+  push:
+    branches: [main]
+    paths: ['src/**']              # only run when src changes
+  pull_request:                    # all PRs, any branch
+  workflow_dispatch:               # manual trigger from UI
+    inputs:
+      environment:
+        type: choice
+        options: [staging, production]
+  schedule:
+    - cron: '0 6 * * 1'           # weekly Monday 6am UTC
 ```
 
-Job-level conditionals:
+Use `paths-ignore` for exclusion-only patterns. For per-job path filtering, use `dorny/paths-filter`.
+
+## Caching
 
 ```yaml
-jobs:
-  deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: [test, lint]
+- uses: actions/cache@v4
+  with:
+    path: ~/.bun/install/cache
+    key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+    restore-keys: ${{ runner.os }}-bun-
 ```
 
-## Secrets and Variables
+Most setup actions (`actions/setup-node`, `oven-sh/setup-bun`) have built-in caching via a `cache` input — prefer that over manual `actions/cache` when available.
+
+## Artifacts
 
 ```yaml
-env:
-  NODE_ENV: production
-steps:
-  - run: echo "${{ secrets.API_KEY }}"
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-  - run: echo "${{ vars.ENVIRONMENT }}"
+- uses: actions/upload-artifact@v4
+  with:
+    name: coverage
+    path: coverage/
+    retention-days: 7
 ```
 
-Never echo secrets directly — use them only in `env` blocks or action inputs.
+## Secrets
+
+Pass secrets via `env`, never interpolate them directly in `run` commands:
+
+```yaml
+- run: ./deploy.sh
+  env:
+    API_KEY: ${{ secrets.API_KEY }}
+```
+
+Use `${{ vars.NAME }}` for non-sensitive configuration variables.
 
 ## Environments
 
 ```yaml
-jobs:
-  deploy:
-    environment:
-      name: production
-      url: https://example.com
-    steps:
-      - run: deploy.sh
+deploy:
+  environment:
+    name: production
+    url: https://example.com
 ```
 
-Environments support required reviewers, wait timers, and deployment branch rules configured in repo settings.
-
-## Concurrency
-
-```yaml
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-```
-
-Cancels redundant runs when new commits push to the same branch.
-
-## Reusable Workflows
-
-Caller:
-
-```yaml
-jobs:
-  test:
-    uses: ./.github/workflows/test.yml
-    with:
-      node-version: 22
-    secrets: inherit
-```
-
-Reusable workflow:
-
-```yaml
-on:
-  workflow_call:
-    inputs:
-      node-version:
-        type: number
-        default: 22
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node-version }}
-```
-
-## Permissions
-
-```yaml
-permissions:
-  contents: read
-  pull-requests: write
-```
-
-Set at workflow or job level. Use least privilege — only grant what's needed.
+Configure required reviewers, wait timers, and branch restrictions in repo settings.
 
 ## Services
 
@@ -121,33 +81,48 @@ services:
       --health-retries 5
 ```
 
-## Path Filtering
+## Reusable Workflows
 
-```yaml
-on:
-  pull_request:
-    paths:
-      - 'src/**'
-      - '!src/**/*.test.ts'
-```
-
-Use `paths-ignore` for exclusion-only patterns. Combine with `dorny/paths-filter` action for per-job path filtering.
-
-## Outputs
-
-Pass data between jobs:
+Caller:
 
 ```yaml
 jobs:
-  build:
+  test:
+    uses: ./.github/workflows/test.yml
+    with:
+      node-version: 22
+    secrets: inherit
+```
+
+Callee declares `workflow_call` with typed inputs:
+
+```yaml
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: number
+        default: 22
+```
+
+## Outputs
+
+Pass data between jobs via `$GITHUB_OUTPUT`:
+
+```yaml
+jobs:
+  version:
+    runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.value }}
+      tag: ${{ steps.tag.outputs.value }}
     steps:
-      - id: version
-        run: echo "value=1.2.3" >> "$GITHUB_OUTPUT"
+      - id: tag
+        run: echo "value=$(git describe --tags)" >> "$GITHUB_OUTPUT"
+
 
   deploy:
-    needs: build
+    needs: version
+    runs-on: ubuntu-latest
     steps:
-      - run: echo "Deploying ${{ needs.build.outputs.version }}"
+      - run: echo "Deploying ${{ needs.version.outputs.tag }}"
 ```

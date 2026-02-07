@@ -13,6 +13,8 @@ user-invocable: true
 
 Separate jobs with a double blank line. Annotate non-obvious configuration with inline comments. Omit boilerplate that's clear from context.
 
+### Example
+
 ```yaml
 name: CI
 
@@ -62,7 +64,7 @@ jobs:
       - run: ./deploy.sh
 ```
 
-## Key Patterns
+### Key Patterns
 
 - **`concurrency`** at workflow level cancels stale runs on the same branch
 - **`permissions`** — always set explicitly, least privilege
@@ -74,10 +76,16 @@ See [references/workflows.md](references/workflows.md) for triggers, caching, ar
 
 ## Monitoring Runs
 
+### Quick Reference
+
 ```bash
 gh run list --branch $(git branch --show-current) --limit 5  # check CI
 gh run watch <run-id>                                         # wait for completion
 gh run view <run-id> --log-failed                             # debug failures
 ```
 
-The `actions-monitor` agent automates failure monitoring. See [references/cli.md](references/cli.md) for the full command reference.
+### Automated Monitoring
+
+The `actions-monitor` agent automates failure monitoring and log extraction.
+
+See [references/cli.md](references/cli.md) for the full command reference.

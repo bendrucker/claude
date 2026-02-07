@@ -17,6 +17,8 @@ on:
     - cron: '0 6 * * 1'           # weekly Monday 6am UTC
 ```
 
+### Path Filtering
+
 Use `paths-ignore` for exclusion-only patterns. For per-job path filtering, use `dorny/paths-filter`.
 
 ## Caching
@@ -28,6 +30,8 @@ Use `paths-ignore` for exclusion-only patterns. For per-job path filtering, use 
     key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
     restore-keys: ${{ runner.os }}-bun-
 ```
+
+### Built-In Caching
 
 Most setup actions (`actions/setup-node`, `oven-sh/setup-bun`) have built-in caching via a `cache` input — prefer that over manual `actions/cache` when available.
 
@@ -41,7 +45,9 @@ Most setup actions (`actions/setup-node`, `oven-sh/setup-bun`) have built-in cac
     retention-days: 7
 ```
 
-## Secrets
+## Secrets and Variables
+
+### Secrets
 
 Pass secrets via `env`, never interpolate them directly in `run` commands:
 
@@ -50,6 +56,8 @@ Pass secrets via `env`, never interpolate them directly in `run` commands:
   env:
     API_KEY: ${{ secrets.API_KEY }}
 ```
+
+### Variables
 
 Use `${{ vars.NAME }}` for non-sensitive configuration variables.
 
@@ -83,7 +91,7 @@ services:
 
 ## Reusable Workflows
 
-Caller:
+### Caller
 
 ```yaml
 jobs:
@@ -94,7 +102,9 @@ jobs:
     secrets: inherit
 ```
 
-Callee declares `workflow_call` with typed inputs:
+### Callee
+
+Declare `workflow_call` with typed inputs:
 
 ```yaml
 on:

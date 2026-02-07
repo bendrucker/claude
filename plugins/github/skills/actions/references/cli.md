@@ -16,7 +16,7 @@
 | `gh run rerun <run-id> --failed` | Re-run failed jobs only |
 | `gh run cancel <run-id>` | Cancel a running workflow |
 
-## Workflows
+## Workflow Management
 
 | Command | Description |
 |---------|-------------|
@@ -28,7 +28,7 @@
 
 ## Common Patterns
 
-### Monitor CI after push
+### Monitor CI After Push
 
 ```bash
 git push
@@ -36,14 +36,14 @@ run_id=$(gh run list --branch $(git branch --show-current) --limit 1 --json data
 gh run watch "$run_id"
 ```
 
-### View logs for most recent failed run
+### View Logs for Most Recent Failed Run
 
 ```bash
 run_id=$(gh run list --status failure --limit 1 --json databaseId -q '.[0].databaseId')
 gh run view "$run_id" --log-failed
 ```
 
-### Finding flaky tests
+### Finding Flaky Tests
 
 ```bash
 gh run view <run-id> --log-failed | grep -A 10 "FAIL"
@@ -51,6 +51,6 @@ gh run view <run-id> --log-failed | grep -A 10 "FAIL"
 
 ## Tips
 
-- Run IDs are displayed in `gh run list` output and can be copied from GitHub URLs
+- Run IDs appear in `gh run list` output and in GitHub URLs
 - Use `--json` with `--jq` for programmatic access: `gh run list --json databaseId,status,conclusion`
 - Workflow names match the `name:` field in `.github/workflows/*.yml` files

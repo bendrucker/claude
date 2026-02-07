@@ -1,36 +1,42 @@
-# Linear Inbox
+# Linear Notifications
 
-Review issues assigned to me.
+Triage Linear notifications inbox by type.
 
 ## Query
 
-Load the `linear:linear` skill. Query issues with `assignee: "me"`.
+Load the `linear:notifications` skill. Query unread notifications.
 
-Filter by state:
-- **Todo** — Ready to start
-- **In Progress** — Check for blockers
+## Group by Type
 
-## Review
+Present groups in priority order:
 
-For each issue, use `AskUserQuestion`:
+| Priority | Type | Typical Actions |
+|----------|------|-----------------|
+| 1 | `IssueAssignedToYou` | Review issue, start now, defer to Things |
+| 2 | `IssueCommentMention` | Read, respond, archive |
+| 3 | `IssueStatusChanged` | Acknowledge, archive |
+| 4 | `IssuePriorityUrgent` | Review urgency, start now, defer to Things |
 
-| Action | Description |
-|--------|-------------|
-| Start now | Begin working on this issue |
-| Keep on radar | Leave in current state, no action needed |
-| Defer to Things | Create tracking task in Things |
-| Unassign | Remove self, return to backlog |
+## Actions
+
+For each notification, use `AskUserQuestion`:
+
+| Action | GraphQL |
+|--------|---------|
+| Archive | `notificationArchive(input: { id: "..." })` |
+| Mark read | `notificationMarkAsRead(input: { id: "..." })` |
+| Defer to Things | Create task, then archive |
 
 ## Defer to Things
 
 Load the `things:inbox` skill. Create task with:
 
 - **Title**: `Linear: {identifier} - {title}`
-- **Notes**: Markdown link (MCP tools return full URLs)
+- **Notes**: Markdown link to issue URL
 - **Tags**: `Linear`
 
 Example: `Linear: ENG-123 - Implement user authentication`
 
 ## Evening Variant
 
-Skip entirely. Linear issues are for focused work, not evening triage.
+Skip entirely. Linear notifications are for focused work, not evening triage.

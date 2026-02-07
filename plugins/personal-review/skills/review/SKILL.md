@@ -5,20 +5,20 @@ description: Interactive daily review workflow across Calendar, Things, GitHub, 
 
 # Daily Review
 
-Process four inboxes in fixed order: Calendar → Things → GitHub → Linear.
+Process five inboxes in fixed order: Calendar → Things → GitHub → GitLab → Linear.
 
 ## Variants
 
-| Variant | Calendar | Things | GitHub | Linear |
-|---------|----------|--------|--------|--------|
-| Morning | Full scan + prep | Full processing | Full triage | Full review |
-| Evening | Tomorrow preview | Quick triage | Mark read, defer | Skip |
+| Variant | Calendar | Things | GitHub | GitLab | Linear |
+|---------|----------|--------|--------|--------|--------|
+| Morning | Full scan + prep | Full processing | Full triage | Full triage | Full review |
+| Evening | Tomorrow preview | Quick triage | Mark read, defer | Defer reviews | Skip |
 
 Ask which variant if not specified.
 
 ## Workflow
 
-### 1. Calendar Scan
+### Calendar Scan
 
 See [calendar.md](calendar.md).
 
@@ -27,7 +27,7 @@ Calculate time budget:
 - Focus windows (90+ min gaps)
 - Meetings needing prep tasks
 
-### 2. Things Inbox
+### Things Inbox
 
 See [things.md](things.md).
 
@@ -39,7 +39,7 @@ Batch items by pattern, ask user for each batch:
 
 Goal: inbox count = 0
 
-### 3. GitHub Notifications
+### GitHub Notifications
 
 See [github.md](github.md).
 
@@ -52,15 +52,29 @@ Group by reason, typical actions:
 | `CI_ACTIVITY` | Check status, mark done |
 | `MENTION`/`COMMENT` | Read, respond, mark done |
 
-### 4. Linear Inbox
+### GitLab Todos
+
+See [gitlab.md](gitlab.md).
+
+Group by action, typical actions:
+
+| Action | Actions |
+|--------|---------|
+| `review_requested` / `approval_required` | Review now, defer to Things |
+| `assigned` | Review now, defer to Things |
+| `mentioned` | Read, respond, mark done |
+| `build_failed` | Check CI, mark done |
+
+### Linear Notifications
 
 See [linear.md](linear.md).
 
-Review assigned issues:
-- **Todo** — start now, keep on radar, defer to Things
-- **In Progress** — check for blockers
+Review unread notifications:
+- **Assignments** — start now, keep on radar, defer to Things
+- **Mentions** — read, respond, archive
+- **Status changes** — acknowledge, archive
 
-### 5. Summary
+### Summary
 
 Present progress:
 - Time budget from Calendar
@@ -75,7 +89,7 @@ Items deferred from GitHub/Linear:
 
 - **Title**: `{Source}: {identifier} - {summary}`
 - **Notes**: Markdown link to source
-- **Tags**: Source name (GitHub, Linear)
+- **Tags**: Source name (GitHub, GitLab, Linear)
 
 ## Skills Used
 
@@ -84,7 +98,8 @@ Items deferred from GitHub/Linear:
 - `things:url` — Update Things items
 - `things:inbox` — Quick captures
 - `github:notifications` — Notification triage
-- `linear:linear` — Issue queries
+- `gitlab:todos` — Todo triage
+- `linear:notifications` — Notification triage
 
 ## Future
 

@@ -15,7 +15,19 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 
 ### Scripts
 
+- `scripts/jxa/` — JXA query scripts (`osascript`) returning JSON: `find-todos.js`, `query-list.js`, `query-logbook.js`, `query-metadata.js`
+- `scripts/format-output.ts` — Generic stdin JSON → table formatter with `--json`, `--columns`, `--count-prefix`
 - `scripts/url.ts` — URL scheme wrapper with auth token, encoding, and bulk update via JSON command
 - `scripts/reorder.js` — List reordering without SQLite writes
 
+### Hooks
+
+- `hooks/validate-jxa.ts` — PreToolUse hook: validates `osascript` commands target Things3 plugin scripts or inline Things3 queries
+
 Write verification uses the `x-callback-url` plugin's `xcall` skill.
+
+## Testing
+
+```bash
+bun test plugins/things
+```

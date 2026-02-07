@@ -66,7 +66,7 @@ ALWAYS read the todo back with JXA after updating to confirm changes applied:
 open "things:///update?id=ABC-123&auth-token=$auth_token&append-notes=New%20info"
 
 # Verify (read back the same todo)
-scripts/run-jxa.sh 'const app = Application("Things3"); const todo = app.toDos.byId("ABC-123"); console.log(JSON.stringify({id: todo.id(), name: todo.name(), notes: todo.notes()}, null, 2));'
+osascript -l JavaScript -e 'var app = Application("Things3"); var todo = app.toDos.byId("ABC-123"); JSON.stringify({id: todo.id(), name: todo.name(), notes: todo.notes()}, null, 2)'
 ```
 
 ### 3. Common Update Issues
@@ -100,20 +100,16 @@ When Things auto-generates a task from a repeating template:
 ### How to Detect
 
 ```bash
-scripts/run-jxa.sh '
-const app = Application("Things3");
-const today = app.lists.byId("TMTodayListSource");
-
-// Check if a task is a repeating instance
-const todo = today.toDos()[0];
-const props = todo.properties();
-
-const isRepeatingInstance = props.creationDate &&
+osascript -l JavaScript -e '
+var app = Application("Things3");
+var today = app.lists.byId("TMTodayListSource");
+var todo = today.toDos()[0];
+var props = todo.properties();
+var isRepeating = props.creationDate &&
   props.creationDate.getHours() === 0 &&
   props.creationDate.getMinutes() === 0 &&
   props.creationDate.getSeconds() === 0;
-
-console.log(isRepeatingInstance ? "Repeating instance" : "Manual task");
+isRepeating ? "Repeating instance" : "Manual task"
 '
 ```
 
@@ -122,30 +118,19 @@ console.log(isRepeatingInstance ? "Repeating instance" : "Manual task");
 Exclude repeating instances from processing:
 
 ```bash
-scripts/run-jxa.sh '
-const app = Application("Things3");
-const today = app.lists.byId("TMTodayListSource");
-
-const nonRepeating = today.toDos().filter(todo => {
-  const props = todo.properties();
-
-  // Keep tasks with missing dates
-  if (!props.creationDate) return true;
-
-  // Filter out repeating instances (created at midnight)
-  return props.creationDate.getHours() !== 0 ||
-         props.creationDate.getMinutes() !== 0 ||
-         props.creationDate.getSeconds() !== 0;
-}).map(todo => {
-  const props = todo.properties();
-  return {
-    id: props.id,
-    name: props.name,
-    notes: props.notes || ""
-  };
-});
-
-JSON.stringify(nonRepeating, null, 2);
+osascript -l JavaScript -e '
+var app = Application("Things3");
+var today = app.lists.byId("TMTodayListSource");
+var todos = today.toDos();
+var result = [];
+for (var i = 0; i < todos.length; i++) {
+  var props = todos[i].properties();
+  if (!props.creationDate) { result.push({id: props.id, name: props.name}); continue; }
+  if (props.creationDate.getHours() !== 0 || props.creationDate.getMinutes() !== 0 || props.creationDate.getSeconds() !== 0) {
+    result.push({id: props.id, name: props.name, notes: props.notes || ""});
+  }
+}
+JSON.stringify(result, null, 2)
 '
 ```
 
@@ -154,23 +139,17 @@ JSON.stringify(nonRepeating, null, 2);
 Templates are todos with `activationDate: null`:
 
 ```bash
-scripts/run-jxa.sh '
-const app = Application("Things3");
-
-// Get all repeating templates
-const templates = app.toDos().filter(todo => {
-  const props = todo.properties();
-  return props.activationDate === null && props.status === "open";
-}).map(todo => {
-  const props = todo.properties();
-  return {
-    id: props.id,
-    name: props.name,
-    creationDate: props.creationDate
-  };
-});
-
-JSON.stringify(templates, null, 2);
+osascript -l JavaScript -e '
+var app = Application("Things3");
+var todos = app.toDos();
+var templates = [];
+for (var i = 0; i < todos.length; i++) {
+  var props = todos[i].properties();
+  if (props.activationDate === null && props.status === "open") {
+    templates.push({id: props.id, name: props.name, creationDate: props.creationDate});
+  }
+}
+JSON.stringify(templates, null, 2)
 '
 ```
 
@@ -179,31 +158,20 @@ JSON.stringify(templates, null, 2);
 Find the template for a specific instance:
 
 ```bash
-scripts/run-jxa.sh '
-const app = Application("Things3");
-
-function findRepeatingTemplate(taskName) {
-  return app.toDos().filter(todo => {
-    const props = todo.properties();
-    return props.name === taskName &&
-           props.activationDate === null &&
-           props.status === "open";
-  })[0];
+osascript -l JavaScript -e '
+var app = Application("Things3");
+var today = app.lists.byId("TMTodayListSource");
+var task = today.toDos()[0];
+var taskName = task.name();
+var todos = app.toDos();
+var template = null;
+for (var i = 0; i < todos.length; i++) {
+  var props = todos[i].properties();
+  if (props.name === taskName && props.activationDate === null && props.status === "open") {
+    template = todos[i]; break;
+  }
 }
-
-// Check if task is repeating
-const today = app.lists.byId("TMTodayListSource");
-const task = today.toDos()[0];
-const taskProps = task.properties();
-
-const template = findRepeatingTemplate(taskProps.name);
-
-if (template) {
-  console.log(`${taskProps.name} is a repeating task`);
-  console.log(`Template ID: ${template.id()}`);
-} else {
-  console.log(`${taskProps.name} is NOT repeating`);
-}
+template ? taskName + " is a repeating task (template: " + template.id() + ")" : taskName + " is NOT repeating"
 '
 ```
 
@@ -225,7 +193,7 @@ open "things:///update?id=ABC-123&auth-token=$auth_token&completed=true"
 
 # GOOD: Update and verify
 open "things:///update?id=ABC-123&auth-token=$auth_token&completed=true"
-scripts/run-jxa.sh 'const app = Application("Things3"); const todo = app.toDos.byId("ABC-123"); console.log(todo.status().toString());'
+osascript -l JavaScript -e 'var app = Application("Things3"); app.toDos.byId("ABC-123").status().toString()'
 ```
 
 ### Retrieve Auth Token Per Session

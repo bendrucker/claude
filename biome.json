@@ -51,6 +51,12 @@
       "linter": {
         "enabled": false
       }
+    },
+    {
+      "includes": ["**/scripts/jxa/**/*.js"],
+      "linter": {
+        "enabled": false
+      }
     }
   ]
 }

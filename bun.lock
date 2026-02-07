@@ -49,6 +49,13 @@
         "cleye": "^1.3.2",
       },
     },
+    "plugins/implement-issue": {
+      "name": "implement-issue",
+      "version": "1.0.0",
+      "dependencies": {
+        "url-pattern": "^1.0.3",
+      },
+    },
     "plugins/mermaid/skills/diagram": {
       "name": "mermaid-diagram",
       "version": "0.1.0",
@@ -728,6 +735,8 @@
     "iconv-lite": ["iconv-lite@0.6.3", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw=="],
 
     "ignore": ["ignore@6.0.2", "", {}, "sha512-InwqeHHN2XpumIkMvpl/DCJVrAHgCsG5+cn1XlnLWGwtZBm8QJfSusItfrwx81CTp5agNZqpKU2J/ccC5nGT4A=="],
+
+    "implement-issue": ["implement-issue@workspace:plugins/implement-issue"],
 
     "import-meta-resolve": ["import-meta-resolve@4.2.0", "", {}, "sha512-Iqv2fzaTQN28s/FwZAoFq0ZSs/7hMAHJVX+w8PZl3cY19Pxk6jFFalxQoIfW2826i/fDLXv8IiEZRIT0lDuWcg=="],
 

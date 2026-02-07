@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import UrlPattern from "url-pattern";
 
 export type IssueTarget = {
   service: "github";
@@ -8,17 +9,19 @@ export type IssueTarget = {
   number: number;
 };
 
-const githubIssuePattern = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
+const issuePattern = new UrlPattern(":owner/:repo/issues/:number");
 
 export function parseIssueUrl(input: string): IssueTarget | null {
-  const match = input.match(githubIssuePattern);
-  if (!match?.[1] || !match[2] || !match[3]) return null;
+  if (!input.startsWith("https://github.com/")) return null;
+  const path = input.slice("https://github.com/".length).replace(/\/$/, "");
+  const match = issuePattern.match(path);
+  if (!match) return null;
 
   return {
     service: "github",
-    owner: match[1],
-    repo: match[2],
-    number: Number.parseInt(match[3], 10),
+    owner: match.owner,
+    repo: match.repo,
+    number: Number.parseInt(match.number, 10),
   };
 }
 

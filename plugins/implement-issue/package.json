@@ -1,0 +1,9 @@
+{
+  "name": "implement-issue",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "url-pattern": "^1.0.3"
+  }
+}

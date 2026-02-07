@@ -11,6 +11,7 @@
     "plugins/things",
     "plugins/type-ignore",
     "plugins/ui-design",
+    "plugins/implement-issue",
     "plugins/vscode"
   ],
   "scripts": {

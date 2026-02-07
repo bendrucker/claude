@@ -6,4 +6,4 @@ Cross-tool daily review workflow for Calendar, Things, GitHub, and Linear.
 
 ### Skills
 
-- **review** — Interactive daily/weekly review orchestrating five inboxes: Calendar → Things → GitHub → GitLab → Linear
+- **review** — Daily review: gather data from five inboxes (Calendar, Things, GitHub, GitLab, Linear), then triage interactively

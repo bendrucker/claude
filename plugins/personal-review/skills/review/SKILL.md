@@ -5,7 +5,7 @@ description: Interactive daily review workflow across Calendar, Things, GitHub, 
 
 # Daily Review
 
-Process five inboxes in fixed order: Calendar → Things → GitHub → GitLab → Linear.
+Two-phase workflow: **gather** data from all inboxes, then **triage** interactively.
 
 ## Variants
 
@@ -16,16 +16,29 @@ Process five inboxes in fixed order: Calendar → Things → GitHub → GitLab �
 
 Ask which variant if not specified.
 
-## Workflow
+## Gather Phase
 
-### Calendar Scan
+Dispatch read-only sub-agents (via the Task tool) to collect data from each inbox in parallel. Each agent returns structured output — no writes, no user interaction.
 
-See [calendar.md](calendar.md).
+### Sub-Agents
 
-Calculate time budget:
-- Available hours (workday minus meetings)
-- Focus windows (90+ min gaps)
-- Meetings needing prep tasks
+**Calendar:** Load `calendar:calendar`. Query today's events. Return event list, time budget (available hours, focus windows, meetings needing prep).
+
+**Things Inbox:** Load `things:jxa`. Run `query-list.ts TMInboxListSource --json`. Return inbox items with names, notes (first line), tags, project.
+
+**GitHub Notifications:** Load `github:notifications`. Query active notifications (not done). Return notifications grouped by reason with summaryId, URL, title, isUnread.
+
+**GitLab Todos:** Load `gitlab:todos`. Query pending todos. Return todos grouped by action_name with id, target URL, title, project.
+
+**Linear Inbox:** Load `linear:notifications`. Query unread notifications. Return notifications with type, issue identifier, title, URL.
+
+### Output
+
+Combine all sub-agent results into a single gathering summary. Present to the user before starting triage.
+
+## Triage Phase
+
+Work through each inbox interactively using the gathered data. No need to re-query — all data is already available.
 
 ### Things Inbox
 
@@ -81,7 +94,7 @@ Present progress:
 - Things items processed (inbox now at 0)
 - GitHub notifications triaged (done/deferred)
 - Linear issues reviewed
-- Today's plan in priority order
+- Suggest `things:triage` in a fresh session for Today list prioritization
 
 ## Defer-to-Things Format
 

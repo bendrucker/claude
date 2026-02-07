@@ -79,6 +79,9 @@ jobs:
       - name: Check marketplace completeness
         run: ./scripts/check-marketplace.sh
 
+      - name: Check MCP hook matchers
+        run: ./scripts/check-mcp-matchers.sh
+
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'
         env:

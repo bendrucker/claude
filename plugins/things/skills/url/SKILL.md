@@ -27,6 +27,9 @@ Use `url.ts` for most operations — it handles auth tokens and URL encoding:
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts <command> [key=value ...]
+
+# Bulk update: pass multiple id= params to batch via JSON command
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts update id=X id=Y id=Z when=tomorrow
 ```
 
 For raw URL scheme access: `open -g "things:///add?title=Buy%20milk&when=today"`
@@ -100,5 +103,5 @@ Things supports [Markdown in notes](https://culturedcode.com/things/support/arti
 
 - **Moving out of inbox**: Set `when=anytime` to move a todo out of inbox without assigning an area
 - **Moving to area**: Use `list-id` with the area UUID (not `area-id`)
-- **Rate limiting**: Max 250 operations per 10 seconds. Add `sleep 0.1` between batch operations.
+- **Rate limiting**: Max 250 operations per 10 seconds. For 3+ items, use multi-ID syntax (`id=X id=Y id=Z`) to batch into a single JSON command instead of individual calls.
 - **Repeating todos**: Cannot update `when` or `deadline` on repeating to-dos

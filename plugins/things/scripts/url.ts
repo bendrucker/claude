@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { existsSync, readdirSync } from "fs";
-import { join } from "path";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { $ } from "bun";
 
 const AUTH_REQUIRED_COMMANDS = ["update", "update-project", "json"] as const;
@@ -101,6 +101,24 @@ export function findXcallRunner(): string | null {
   return null;
 }
 
+export function buildJsonPayload(ids: string[], attributes: Record<string, string>): string {
+  if (ids.length === 0) {
+    throw new Error("At least one ID is required");
+  }
+  if (Object.keys(attributes).length === 0) {
+    throw new Error("At least one attribute is required");
+  }
+
+  const data = ids.map((id) => ({
+    type: "to-do" as const,
+    operation: "update" as const,
+    id,
+    attributes,
+  }));
+
+  return JSON.stringify(data);
+}
+
 export async function xcall(url: string): Promise<string> {
   const runner = findXcallRunner();
   if (!runner) {
@@ -129,22 +147,56 @@ if (import.meta.main) {
   });
 
   const command = argv._.command;
+  const ids: string[] = [];
   const params = new Map<string, string>();
   for (const arg of argv._.params) {
     const eqIndex = arg.indexOf("=");
     if (eqIndex === -1) continue;
-    params.set(arg.substring(0, eqIndex), arg.substring(eqIndex + 1));
+    const key = arg.substring(0, eqIndex);
+    const value = arg.substring(eqIndex + 1);
+    if (key === "id") {
+      ids.push(value);
+    } else {
+      params.set(key, value);
+    }
   }
 
-  if (argv.flags.callback && findXcallRunner()) {
-    const url = await buildUrl(command, params);
-    try {
-      const result = await xcall(url);
-      console.log(result);
-    } catch {
-      await openUrl(command, params);
+  const useBulkJson = command === "update" && ids.length > 1;
+
+  if (useBulkJson) {
+    const attributes: Record<string, string> = {};
+    for (const [key, value] of params) {
+      attributes[key] = value;
+    }
+    const payload = buildJsonPayload(ids, attributes);
+    const jsonParams = new Map<string, string>();
+    jsonParams.set("data", payload);
+    if (argv.flags.callback && findXcallRunner()) {
+      const url = await buildUrl("json", jsonParams);
+      try {
+        const result = await xcall(url);
+        console.log(result);
+      } catch {
+        await openUrl("json", jsonParams);
+      }
+    } else {
+      await openUrl("json", jsonParams);
     }
   } else {
-    await openUrl(command, params);
+    const singleId = ids[0];
+    if (singleId) {
+      params.set("id", singleId);
+    }
+    if (argv.flags.callback && findXcallRunner()) {
+      const url = await buildUrl(command, params);
+      try {
+        const result = await xcall(url);
+        console.log(result);
+      } catch {
+        await openUrl(command, params);
+      }
+    } else {
+      await openUrl(command, params);
+    }
   }
 }

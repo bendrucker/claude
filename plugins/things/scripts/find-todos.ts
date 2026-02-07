@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { runJxa } from "run-jxa";
+import { debug, runJxa } from "./debug";
 import { selectColumns, table } from "./format";
 
 const argv = cli({
@@ -43,6 +43,8 @@ interface Todo {
 }
 
 type Result = { error: string } | Todo[];
+
+debug(`finding todos by ${mode}: ${value}`);
 
 const result = (await runJxa(
   (m: string, v: string) => {
@@ -90,6 +92,7 @@ if ("error" in result) {
 }
 
 const items = result;
+debug(`received ${items.length} items`);
 
 if (argv.flags.json) {
   console.log(JSON.stringify(items, null, 2));

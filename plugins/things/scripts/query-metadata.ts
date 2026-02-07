@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { runJxa } from "run-jxa";
+import { debug, runJxa } from "./debug";
 import { selectColumns, table } from "./format";
 
 const TYPES = ["projects", "areas", "tags"] as const;
@@ -27,6 +27,8 @@ if (!TYPES.includes(type as MetadataType)) {
   console.error(`Invalid type: ${type}. Use: projects, areas, or tags`);
   process.exit(1);
 }
+
+debug(`querying metadata: ${type}`);
 
 const items = (await runJxa(
   (t: string) => {
@@ -75,6 +77,8 @@ const items = (await runJxa(
   },
   [type],
 )) as Record<string, unknown>[];
+
+debug(`received ${items.length} items`);
 
 if (argv.flags.json) {
   console.log(JSON.stringify(items, null, 2));

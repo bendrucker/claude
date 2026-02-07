@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
 // Fetch PR/MR context for update skill
-// Args: <branch> <graphql-query-file>
+// Args: <branch>
 // Detects provider and uses gh (GitHub) or glab (GitLab)
 
-import { readFile } from "node:fs/promises";
 import { $ } from "bun";
 import { detectProvider } from "./detect-provider";
 import { resolveWorktree } from "./worktree/resolve";
@@ -17,38 +16,33 @@ interface Commit {
 interface PRContext {
   title: string;
   body: string;
-  lastEditedAt: string | null;
+  updatedAt: string;
   commits: Commit[];
 }
 
-async function fetchGitHubContext(queryFile: string, cwd?: string): Promise<PRContext> {
+interface GitHubCommit {
+  oid: string;
+  messageHeadline: string;
+  committedDate: string;
+}
+
+async function fetchGitHubContext(cwd?: string): Promise<PRContext> {
   const shell = cwd ? $.cwd(cwd) : $;
 
-  const [owner, repo, number, query] = await Promise.all([
-    shell`gh repo view --json owner --jq '.owner.login'`.text(),
-    shell`gh repo view --json name --jq '.name'`.text(),
-    shell`gh pr view --json number --jq '.number'`.text(),
-    readFile(queryFile, "utf-8"),
-  ]);
-
   const result =
-    await shell`gh api graphql -F owner=${owner.trim()} -F repo=${repo.trim()} -F number=${number.trim()} -f query=${query}`.text();
+    await shell`gh pr view --json title,body,updatedAt,commits`.text();
 
-  const data = JSON.parse(result);
-  const pr = data?.data?.repository?.pullRequest;
-  if (!pr) {
-    const errors = data?.errors;
-    if (errors?.length) {
-      throw new Error(`GraphQL error: ${errors[0].message}`);
-    }
-    throw new Error("Unexpected GraphQL response: missing pullRequest data");
-  }
+  const pr = JSON.parse(result);
 
   return {
     title: pr.title,
     body: pr.body,
-    lastEditedAt: pr.lastEditedAt,
-    commits: (pr.commits?.nodes ?? []).map((n: { commit: Commit }) => n.commit),
+    updatedAt: pr.updatedAt,
+    commits: (pr.commits ?? []).map((c: GitHubCommit) => ({
+      oid: c.oid,
+      message: c.messageHeadline,
+      committedDate: c.committedDate,
+    })),
   };
 }
 
@@ -68,13 +62,13 @@ async function fetchGitLabContext(cwd?: string): Promise<PRContext> {
   return {
     title: mr.title,
     body: mr.description || "",
-    lastEditedAt: mr.updated_at,
+    updatedAt: mr.updated_at,
     commits: [],
   };
 }
 
 if (import.meta.main) {
-  const [branch = "", queryFile] = process.argv.slice(2);
+  const [branch = ""] = process.argv.slice(2);
   const provider = detectProvider();
   const cwd = (await resolveWorktree(branch)) || undefined;
 
@@ -82,11 +76,7 @@ if (import.meta.main) {
     let context: PRContext;
 
     if (provider === "github") {
-      if (!queryFile) {
-        console.error("Usage: pr-context.ts <branch> <graphql-query-file>");
-        process.exit(1);
-      }
-      context = await fetchGitHubContext(queryFile, cwd);
+      context = await fetchGitHubContext(cwd);
     } else if (provider === "gitlab") {
       context = await fetchGitLabContext(cwd);
     } else {

@@ -15,7 +15,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 - Provider: !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"}`
 - Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
-- PR: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts" "$0" "${CLAUDE_PLUGIN_ROOT}/skills/update/assets/pr-context.graphql" 2>/dev/null || echo "No PR found for current branch"`
+- PR: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts" "$0" 2>/dev/null || echo "No PR found for current branch"`
 - Diff (GitHub): !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); [ "$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"})" = github ] && "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/gh.sh" "$0" pr diff 2>/dev/null || true`
 - Diff (GitLab): !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); [ "$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"})" = gitlab ] && "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/glab.sh" "$0" mr diff 2>/dev/null || true`
 
@@ -25,7 +25,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Analysis
 
-1. Filter commits after `lastEditedAt` to identify new work since the body was last written. If `lastEditedAt` is `null` (never edited), treat all commits as new work.
+1. Filter commits after `updatedAt` to identify new work since the body was last written.
 2. Analyze the changes introduced by those commits.
 
 ## Writing

@@ -1,9 +1,31 @@
 ---
 name: jxa
 description: Read and query Things 3 data (lists, todos, projects, tags, logbook). Not for writes — use things:url to create/update, things:inbox for quick captures.
-allowed-tools: [Bash(osascript:*), Read]
+allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/query-*:*)", "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/find-*:*)", "Bash(osascript:*)", Read]
 hooks:
   PreToolUse:
+    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/query-*:*)"
+      hooks:
+        - type: command
+          command: |
+            jq -n '{
+              hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                permissionDecision: "allow",
+                updatedInput: { dangerouslyDisableSandbox: true }
+              }
+            }'
+    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/find-*:*)"
+      hooks:
+        - type: command
+          command: |
+            jq -n '{
+              hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                permissionDecision: "allow",
+                updatedInput: { dangerouslyDisableSandbox: true }
+              }
+            }'
     - matcher: "Bash(osascript:*)"
       hooks:
         - type: command
@@ -23,15 +45,15 @@ Read and query Things 3 data via JXA (JavaScript for Automation).
 
 ## Scripts
 
-All scripts output JSON (except `export-markdown.js` which outputs markdown). Path: `${CLAUDE_PLUGIN_ROOT}/skills/jxa/scripts/`.
+Scripts output formatted tables by default. Pass `--json` for raw JSON output. Path: `${CLAUDE_PLUGIN_ROOT}/scripts/`.
 
 | Script | Usage | Description |
 |--------|-------|-------------|
-| `query-list.js` | `osascript <path>/query-list.js <list-id>` | Query todos from any built-in list |
-| `query-metadata.js` | `osascript <path>/query-metadata.js projects\|areas\|tags` | List projects, areas, or tags |
-| `find-todos.js` | `osascript <path>/find-todos.js --tag "Work"` | Find todos by tag or project |
-| `export-markdown.js` | `osascript <path>/export-markdown.js [list-id]` | Export a list to markdown |
-| `query-logbook.js` | `osascript <path>/query-logbook.js --days 7` | Query logbook with date filtering |
+| `query-list.ts` | `bun <path>/query-list.ts <list-id>` | Query todos from any built-in list |
+| `query-metadata.ts` | `bun <path>/query-metadata.ts projects\|areas\|tags` | List projects, areas, or tags |
+| `find-todos.ts` | `bun <path>/find-todos.ts --tag "Work"` | Find todos by tag or project |
+| `query-logbook.ts` | `bun <path>/query-logbook.ts --days 7` | Query logbook with date filtering |
+| `export-markdown.js` | `osascript <root>/skills/jxa/scripts/export-markdown.js [list-id]` | Export a list to markdown checklist |
 
 ## Built-in List IDs
 
@@ -44,7 +66,7 @@ All scripts output JSON (except `export-markdown.js` which outputs markdown). Pa
 
 ## Logbook Performance
 
-The logbook can contain thousands of items sorted by completion date (most recent first). `query-logbook.js` uses early termination — recent queries are fast, but full scans of 10k+ items take ~15-20 minutes (~70-80ms per `properties()` call).
+The logbook can contain thousands of items sorted by completion date (most recent first). `query-logbook.ts` uses early termination — recent queries are fast, but full scans of 10k+ items take ~15-20 minutes (~70-80ms per `properties()` call).
 
 `--days N` queries recent completions. `--start/--end` queries a date range.
 
@@ -56,7 +78,7 @@ Templates have `activationDate: null` and share the same `name` as their instanc
 
 ## Inline JXA
 
-For one-off queries not covered by the scripts, use `osascript -l JavaScript -e '...'` with inline code. Return JSON via `JSON.stringify(result, null, 2)`.
+For one-off queries not covered by the scripts, use `osascript -l JavaScript -e '...'` with inline code. Return JSON via `JSON.stringify(result, null, 2)`. Alternatively, use `run-jxa` in a Bun script to pass typed args and get parsed results back.
 
 **JXA arrays** (from `list.toDos()`, `app.projects()`, etc.) have `.length` and `[i]` but may lack `.map()/.filter()`. Use for-loops or `Array.from()`.
 

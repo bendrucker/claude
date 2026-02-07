@@ -25,8 +25,5 @@ export function selectColumns(
     indices.push(idx);
   }
 
-  return [
-    indices.map((i) => headers[i]),
-    rows.map((row) => indices.map((i) => row[i])),
-  ];
+  return [indices.map((i) => headers[i]!), rows.map((row) => indices.map((i) => row[i]!))];
 }

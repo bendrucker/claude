@@ -6,16 +6,36 @@ Triage notifications inbox by reason.
 
 Load the `github:notifications` skill. Query active notifications (not done).
 
+## Pre-Triage Auto-Handling
+
+Before presenting notifications for triage, auto-handle these patterns and report counts.
+
+**Read mentions:** Filter notifications where `reason == "MENTION"` and `isUnread == false`. Bulk mark done:
+
+```bash
+... --jq '[... | select(.reason == "MENTION" and .isUnread == false)] | .[].summaryId' | \
+  xargs -I {} gh api -X DELETE /notifications/threads/{}
+```
+
+Report: "Auto-marked N read mentions as done"
+
+**Already-reviewed PRs:** For each `REVIEW_REQUESTED` notification, check if the user already submitted a review:
+
+```bash
+gh pr view {url} --json reviews --jq '[.reviews[] | select(.author.login == "bendrucker")] | length'
+```
+
+If count > 0, auto-mark the notification done. Report: "Auto-marked N already-reviewed PRs as done"
+
 ## Group by Reason
 
-| Reason | Typical Actions |
-|--------|-----------------|
-| `REVIEW_REQUESTED` | Review now, defer to Things |
-| `ASSIGN` | Review now, defer to Things |
-| `CI_ACTIVITY` | Check status, mark done |
-| `MENTION` / `COMMENT` | Read, respond, mark done |
-| `STATE_CHANGE` | Acknowledge, mark done |
-| `SUBSCRIBED` | Read if relevant, unsubscribe if noisy |
+Present groups in priority order — action needed first, then engagement, then informational.
+
+| Priority | Reason | Typical Actions |
+|----------|--------|-----------------|
+| 1 | `REVIEW_REQUESTED` / `ASSIGN` | Review now, defer to Things |
+| 2 | `MENTION` / `COMMENT` | Read, respond, mark done |
+| 3 | `CI_ACTIVITY` / `STATE_CHANGE` / `SUBSCRIBED` | Check status, acknowledge, mark done |
 
 ## Actions
 

@@ -18,22 +18,23 @@ describe("buildJsonPayload", () => {
     const result = JSON.parse(
       buildJsonPayload(["A", "B", "C"], { when: "today", "add-tags": "Urgent" }),
     );
+    const expected = {
+      type: "to-do",
+      operation: "update",
+      attributes: { when: "today", "add-tags": "Urgent" },
+    };
     expect(result).toEqual([
-      { type: "to-do", operation: "update", id: "A", attributes: { when: "today", "add-tags": "Urgent" } },
-      { type: "to-do", operation: "update", id: "B", attributes: { when: "today", "add-tags": "Urgent" } },
-      { type: "to-do", operation: "update", id: "C", attributes: { when: "today", "add-tags": "Urgent" } },
+      { ...expected, id: "A" },
+      { ...expected, id: "B" },
+      { ...expected, id: "C" },
     ]);
   });
 
   test("empty ID list throws", () => {
-    expect(() => buildJsonPayload([], { when: "today" })).toThrow(
-      "At least one ID is required",
-    );
+    expect(() => buildJsonPayload([], { when: "today" })).toThrow("At least one ID is required");
   });
 
   test("empty attributes throws", () => {
-    expect(() => buildJsonPayload(["ABC"], {})).toThrow(
-      "At least one attribute is required",
-    );
+    expect(() => buildJsonPayload(["ABC"], {})).toThrow("At least one attribute is required");
   });
 });

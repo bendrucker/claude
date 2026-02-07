@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { existsSync, readdirSync } from "fs";
-import { join } from "path";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { $ } from "bun";
 
 const AUTH_REQUIRED_COMMANDS = ["update", "update-project", "json"] as const;
@@ -101,10 +101,7 @@ export function findXcallRunner(): string | null {
   return null;
 }
 
-export function buildJsonPayload(
-  ids: string[],
-  attributes: Record<string, string>,
-): string {
+export function buildJsonPayload(ids: string[], attributes: Record<string, string>): string {
   if (ids.length === 0) {
     throw new Error("At least one ID is required");
   }
@@ -186,8 +183,9 @@ if (import.meta.main) {
       await openUrl("json", jsonParams);
     }
   } else {
-    if (ids.length === 1) {
-      params.set("id", ids[0]);
+    const singleId = ids[0];
+    if (singleId) {
+      params.set("id", singleId);
     }
     if (argv.flags.callback && findXcallRunner()) {
       const url = await buildUrl(command, params);

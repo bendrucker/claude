@@ -9,7 +9,13 @@ Group, prioritize, defer, and reorder the Things Today list.
 
 ## Query
 
-Load the `things:jxa` skill. Run `query-list.ts TMTodayListSource --json` to get all Today items. Filter to open items.
+Load the `things:jxa` skill. Run the pipeline to get all Today items as JSON:
+
+```bash
+osascript -l JavaScript ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts --json
+```
+
+Filter to open items.
 
 ## Repeating Task Detection
 

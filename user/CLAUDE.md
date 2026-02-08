@@ -38,6 +38,20 @@ I use git-town for stacked branch workflows combined with worktrunk:
 
 Ship branches oldest-first. After a stack branch merges, `git town sync` rebases remaining branches.
 
+## Worktree Dispatch
+
+Task tool subagents can't write to worktree directories — the sandbox scopes `.` to the orchestrator's cwd, not the worktree path. Two approaches depending on context:
+
+- **Parallel work**: Dispatch `claude -p` CLI subprocesses with the worktree as cwd. Run as background Bash commands and poll with `TaskOutput`.
+- **Single task**: Ask the user to start a new Claude session in the worktree directory.
+
+Best practices for `claude -p` dispatch:
+
+- Scope `--allowedTools` to exactly the tools needed. Never use `--dangerously-skip-permissions`.
+- Do not pass `--model` — let the user's default apply.
+- Run via `Bash(run_in_background: true)` for parallelism.
+- Check exit codes and output. Report errors rather than retrying blindly.
+
 ## Personal Details
 
 - Standard username: `@bendrucker`. Refer to any actions performed by this user as "you."

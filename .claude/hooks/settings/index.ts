@@ -77,14 +77,12 @@ async function main(): Promise<void> {
     .map(([file, errs]) => `${file}:\n${errs.map((e) => `  - ${e}`).join("\n")}`)
     .join("\n\n");
 
-  const output: SyncHookJSONOutput = {
+  writeStdoutJson({
     hookSpecificOutput: {
       hookEventName: "Stop",
       additionalContext: `Settings validation errors:\n\n${details}`,
     },
-  };
-
-  writeStdoutJson(output);
+  } as SyncHookJSONOutput);
 }
 
 if (import.meta.main) {

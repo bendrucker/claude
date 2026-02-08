@@ -1,5 +1,5 @@
 ---
-name: docs
+name: gitlab:docs
 description: Browsing GitLab documentation efficiently. Use when you need to look up GitLab features, configuration, API details, or CI/CD syntax.
 ---
 # GitLab Docs

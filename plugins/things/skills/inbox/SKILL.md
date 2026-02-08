@@ -1,5 +1,5 @@
 ---
-name: inbox
+name: things:inbox
 description: Quick captures to the Things 3 inbox. Not for reads (things:jxa), scheduled tasks, updates, or projects (things:url).
 allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"]
 hooks:

@@ -1,5 +1,5 @@
 ---
-name: todos
+name: gitlab:todos
 description: Managing GitLab todos inbox. Use when listing, filtering, or triaging GitLab todos (mark done, mark pending).
 ---
 

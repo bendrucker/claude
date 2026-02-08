@@ -1,5 +1,5 @@
 ---
-name: github-actions
+name: github:actions
 description: >-
   GitHub Actions CI/CD workflow development and run monitoring. Use when creating
   or editing .github/workflows YAML files, configuring triggers, jobs, matrix strategies,

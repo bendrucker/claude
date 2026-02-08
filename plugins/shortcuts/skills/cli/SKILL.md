@@ -1,5 +1,5 @@
 ---
-name: cli
+name: shortcuts:cli
 description: Running and managing Apple Shortcuts via the macOS shortcuts CLI. Use when the user wants to run, list, or inspect shortcuts.
 allowed-tools: [Bash(shortcuts:*), Bash(open:*)]
 hooks:

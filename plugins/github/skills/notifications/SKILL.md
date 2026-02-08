@@ -1,5 +1,5 @@
 ---
-name: notifications
+name: github:notifications
 description: Managing GitHub notifications inbox. Use when listing, filtering, or triaging notifications (mark read, done, unsubscribe).
 ---
 

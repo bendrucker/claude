@@ -1,5 +1,5 @@
 ---
-name: conflicts
+name: git:conflicts
 description: Resolving git merge conflicts. Use when rebasing, merging, or cherry-picking results in conflicts.
 allowed-tools:
   - Read

@@ -1,5 +1,5 @@
 ---
-name: ci
+name: gitlab:ci
 description: Working with GitLab CI/CD pipelines and jobs. Use when viewing pipelines, debugging jobs, or validating CI configuration.
 ---
 # GitLab CI/CD

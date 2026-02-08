@@ -1,5 +1,5 @@
 ---
-name: update
+name: pull-request:update
 description: |
   Update a pull request or merge request body to reflect the current state of changes.
   Use when a PR/MR has evolved through additional commits and the body needs to reflect what will be merged.

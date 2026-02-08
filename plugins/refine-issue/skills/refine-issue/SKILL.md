@@ -1,5 +1,5 @@
 ---
-name: refine-issue
+name: issue:refine
 description: Refining issues with technical context and structured details. Use when expanding a brief bug, feature, or refactor description into a detailed issue suitable for developers and AI agents.
 ---
 

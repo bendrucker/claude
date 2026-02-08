@@ -1,5 +1,5 @@
 ---
-name: shortcut
+name: shortcuts:shortcut
 description: Creating Apple Shortcuts programmatically as plist XML files. Use when the user wants to build, generate, or author Apple Shortcuts without the GUI app.
 allowed-tools: [Read, Write, Edit, "Bash(swift ${CLAUDE_SKILL_ROOT}/scripts/discover.swift:*)", Bash(plutil:*), Bash(shortcuts:*), Bash(open:*), Bash(jq:*), Bash(uname:*), Bash(which:*), Glob, Grep]
 hooks:

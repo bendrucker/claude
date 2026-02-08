@@ -1,5 +1,5 @@
 ---
-name: guidelines
+name: plan:guidelines
 description: |
   Detailed planning guidelines and best practices. Use when you want explicit guidance on creating high-quality implementation plans, or when a plan was rejected and you need to understand why.
 ---

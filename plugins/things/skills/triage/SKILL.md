@@ -1,5 +1,5 @@
 ---
-name: triage
+name: things:triage
 description: Triage and prioritize the Things Today list. Use when the user wants to review, prioritize, or reorder their Today list.
 ---
 

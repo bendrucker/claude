@@ -6,7 +6,7 @@
 
 This repository provides plugins for Claude Code, organized as a plugin marketplace. Plugins extend Claude Code with language conventions, workflow automation, service integrations, and custom behaviors.
 
-It also contains my user configuration to synchronize settings across machines.
+It also contains my user configuration.
 
 ## Prerequisites
 

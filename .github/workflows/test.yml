@@ -127,7 +127,6 @@ jobs:
         plugin: ${{ fromJson(needs.validate.outputs.plugins) }}
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      CLAUDE_REPO_HOME: ${{ github.workspace }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -248,7 +247,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      CLAUDE_REPO_HOME: ${{ github.workspace }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -260,7 +258,10 @@ jobs:
         run: bun install -g @anthropic-ai/claude-code@latest
 
       - name: Setup Claude configuration
-        run: CLAUDE_REPO_HOME="$GITHUB_WORKSPACE" ./scripts/install.sh
+        run: |
+          for item in user/*; do
+            ln -sfn "$GITHUB_WORKSPACE/$item" "$HOME/.claude/$(basename "$item")"
+          done
 
       - name: Generate context report
         run: |

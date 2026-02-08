@@ -82,7 +82,7 @@ async function main(): Promise<void> {
       hookEventName: "Stop",
       additionalContext: `Settings validation errors:\n\n${details}`,
     },
-  } as SyncHookJSONOutput);
+  } as unknown as SyncHookJSONOutput);
 }
 
 if (import.meta.main) {

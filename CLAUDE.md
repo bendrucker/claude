@@ -9,11 +9,10 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `schemas/`: JSON Schema definitions for `plugin.schema.json` and `marketplace.schema.json`
 - `user/`: User-level configuration, symlinked to `~/.claude`
 - `.claude/`: Project-level configuration for this repository
-- `scripts/install.sh`: Setup script that creates symlinks from `user/` to `~/.claude`
 
 ## User
 
-The [`user/`](user/) directory contains user-level Claude Code configuration that gets symlinked to `~/.claude`. This includes global instructions (`CLAUDE.md`), settings (plugins, permissions, sandbox), and hooks that apply across all projects.
+The [`user/`](user/) directory contains user-level Claude Code configuration that gets symlinked to `~/.claude`. This includes global instructions (`CLAUDE.md`), settings (plugins, permissions, sandbox), and hooks that apply across all projects. Symlinks and other system setup are managed by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles.
 
 ## Plugin Architecture
 
@@ -137,7 +136,7 @@ This validates SKILL.md frontmatter (name, description) and checks reference dep
 
 ## Workflow
 
-- The `user/` directory is symlinked to `~/.claude/`. New files are immediately available without re-running `scripts/install.sh`.
+- The `user/` directory is symlinked to `~/.claude/`. New files are immediately available.
 - Plugin changes take effect immediately in new Claude sessions.
 
 ## Settings

@@ -47,10 +47,17 @@ Task tool subagents can't write to worktree directories — the sandbox scopes `
 
 Best practices for `claude -p` dispatch:
 
-- Scope `--allowedTools` to exactly the tools needed. Never use `--dangerously-skip-permissions`.
+- **`--allowedTools` is mandatory.** Non-interactive `claude -p` cannot prompt for permissions — missing tools fail silently with no useful output. Over-permissioning is better than under-permissioning since the orchestrator has already validated the task scope.
+- Common tool sets to include:
+  - File ops: `Read`, `Edit`, `Write`, `Glob`, `Grep` (always include — subprocesses need to explore)
+  - Git: `Bash(git add:*)`, `Bash(git commit:*)`, `Bash(git status:*)`, `Bash(git diff:*)`, `Bash(git log:*)`
+  - File mgmt: `Bash(rm:*)`, `Bash(rmdir:*)`, `Bash(mv:*)`, `Bash(mkdir:*)`, `Bash(ls:*)`, `Bash(chmod:*)`
+- Never use `--dangerously-skip-permissions`.
 - Do not pass `--model` — let the user's default apply.
+- Use `--verbose` for implementation tasks where you want to monitor progress. Reserve plain `-p` (no verbose) for programmatic use where you'll parse the output (e.g., `--output-format json`).
 - Run via `Bash(run_in_background: true)` for parallelism.
 - Check exit codes and output. Report errors rather than retrying blindly.
+- Avoid heredocs in Bash calls that dispatch `claude -p` — the sandbox blocks temp file creation. Write prompts to `/tmp/claude/` first, then pipe: `cat /tmp/claude/prompt.md | claude -p ...`
 
 ## Personal Details
 

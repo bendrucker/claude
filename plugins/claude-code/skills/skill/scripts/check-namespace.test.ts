@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
 import {
+  checkSkillNamespace,
   checkStuttering,
   extractPluginName,
   getResourceName,
@@ -111,6 +112,38 @@ describe("checkStuttering", () => {
   });
 });
 
+describe("checkSkillNamespace", () => {
+  it("allows name matching plugin name (primary skill)", () => {
+    expect(checkSkillNamespace("git", "git")).toEqual([]);
+  });
+
+  it("allows properly prefixed names", () => {
+    expect(checkSkillNamespace("gitlab:ci", "gitlab")).toEqual([]);
+    expect(checkSkillNamespace("claude-code:hook", "claude-code")).toEqual([]);
+  });
+
+  it("allows plugin:plugin (primary skill with prefix)", () => {
+    expect(checkSkillNamespace("git:git", "git")).toEqual([]);
+  });
+
+  it("warns on missing prefix", () => {
+    const warnings = checkSkillNamespace("ci", "gitlab");
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toContain("should be prefixed");
+    expect(warnings[1]).toContain("gitlab:ci");
+  });
+
+  it("detects stuttering after prefix", () => {
+    const warnings = checkSkillNamespace("gitlab:gitlab-ci", "gitlab");
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toContain("stutters");
+  });
+
+  it("allows plugin:plugin without stuttering warning", () => {
+    expect(checkSkillNamespace("gitlab:gitlab", "gitlab")).toEqual([]);
+  });
+});
+
 describe("processHookInput", () => {
   let testDir: string;
 
@@ -125,14 +158,23 @@ describe("processHookInput", () => {
     rmSync(testDir, { recursive: true, force: true });
   });
 
-  it("warns on stuttering skill name", () => {
+  it("warns on missing skill prefix", () => {
     const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
-    writeFileSync(skillPath, "name: gitlab-ci\n");
+    writeFileSync(skillPath, "name: ci\n");
 
     const warnings = processHookInput(mockWriteInput(skillPath));
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("Warning");
-    expect(warnings[0]).toContain("skill name");
+    expect(warnings[0]).toContain("should be prefixed");
+  });
+
+  it("warns on stuttering skill name after prefix", () => {
+    const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
+    writeFileSync(skillPath, "name: gitlab:gitlab-ci\n");
+
+    const warnings = processHookInput(mockWriteInput(skillPath));
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toContain("stutters");
   });
 
   it("warns on stuttering agent name", () => {
@@ -153,9 +195,17 @@ describe("processHookInput", () => {
     expect(warnings[0]).toContain("command name");
   });
 
-  it("returns empty for proper names", () => {
+  it("returns empty for properly namespaced skill", () => {
     const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
-    writeFileSync(skillPath, "name: ci\n");
+    writeFileSync(skillPath, "name: gitlab:ci\n");
+
+    const warnings = processHookInput(mockWriteInput(skillPath));
+    expect(warnings).toEqual([]);
+  });
+
+  it("returns empty for primary skill (name matches plugin)", () => {
+    const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
+    writeFileSync(skillPath, "name: gitlab\n");
 
     const warnings = processHookInput(mockWriteInput(skillPath));
     expect(warnings).toEqual([]);

@@ -1,5 +1,5 @@
 ---
-name: skill
+name: claude-code:skill
 description: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows. Use when creating new skills, converting memory files to skills, debugging skill activation, or understanding skill architecture and best practices.
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, WebFetch(domain:docs.claude.com)]
 hooks:
@@ -26,7 +26,7 @@ Reference for developing effective skills. The context window is a public good -
 
 ```yaml
 ---
-name: skill-name
+name: plugin-name:skill-name
 description: Third-person capability description with trigger terms
 allowed-tools: [Read, Grep, Glob]         # Optional: tool restrictions
 model: claude-sonnet-4-20250514           # Optional: override model
@@ -44,7 +44,7 @@ hooks:                                    # Optional: skill-scoped hooks
 ```
 
 **Required Fields**:
-- `name`: Lowercase letters, numbers, hyphens only (max 64 chars). Match directory name.
+- `name`: Lowercase letters, numbers, hyphens only (max 64 chars). Plugin skills use `plugin-name:skill-name` prefix for disambiguation. Skip the prefix when name equals plugin name.
 - `description`: Third-person, includes trigger terms and use cases (max 1024 chars).
 
 **Optional Fields**:
@@ -56,7 +56,7 @@ hooks:                                    # Optional: skill-scoped hooks
 - `disable-model-invocation`: Block programmatic invocation via Skill tool
 - `hooks`: Skill-scoped hooks (`PreToolUse`, `PostToolUse`, `Stop`)
 
-**Naming**: Use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`, `managing-databases`. Avoid vague names like `helper`, `utils`.
+**Naming**: Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab:ci`, `things:inbox`). The part after the colon should not repeat the plugin name. For standalone skills, use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`. Avoid vague names like `helper`, `utils`.
 
 **Storage**: `~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
 

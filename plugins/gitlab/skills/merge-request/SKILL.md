@@ -1,5 +1,5 @@
 ---
-name: merge-request
+name: gitlab:merge-request
 description: Working with GitLab merge requests via glab. Use when creating, updating, reviewing, or merging MRs.
 ---
 # Merge Requests

@@ -2,7 +2,7 @@ import type { Rule, RuleResult, SkillContent } from "../types";
 
 const SPEC_URL = "https://agentskills.io/specification";
 
-const NAME_PATTERN = /^[a-z0-9-]+$/;
+const NAME_PATTERN = /^([a-z0-9-]+:)?[a-z0-9-]+$/;
 const MAX_NAME_LENGTH = 64;
 const MAX_DESCRIPTION_LENGTH = 1024;
 
@@ -87,7 +87,8 @@ export const nameEdgeHyphens: Rule = {
       };
     }
 
-    if (name.startsWith("-") || name.endsWith("-")) {
+    const segments = name.split(":");
+    if (segments.some((s) => s.startsWith("-") || s.endsWith("-"))) {
       return {
         rule: "name-edge-hyphens",
         severity: "error",
@@ -120,7 +121,8 @@ export const nameConsecutiveHyphens: Rule = {
       };
     }
 
-    if (name.includes("--")) {
+    const segments = name.split(":");
+    if (segments.some((s) => s.includes("--"))) {
       return {
         rule: "name-consecutive-hyphens",
         severity: "error",

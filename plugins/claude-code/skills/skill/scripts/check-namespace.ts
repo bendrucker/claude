@@ -40,6 +40,34 @@ export function checkStuttering(name: string, pluginName: string): string | null
   return null;
 }
 
+export function checkSkillNamespace(name: string, pluginName: string): string[] {
+  const warnings: string[] = [];
+
+  if (name === pluginName) return warnings;
+
+  const prefix = `${pluginName}:`;
+  if (!name.startsWith(prefix)) {
+    warnings.push(
+      `Warning: skill name '${name}' should be prefixed with '${prefix}' for disambiguation`,
+    );
+    warnings.push(`  Expected: '${prefix}${name}'`);
+    return warnings;
+  }
+
+  const localName = name.slice(prefix.length);
+  if (localName === pluginName) return warnings;
+
+  const stutterWarning = checkStuttering(localName, pluginName);
+  if (stutterWarning) {
+    warnings.push(`Warning: skill name after prefix ${stutterWarning}`);
+    warnings.push(
+      `  Consider renaming to avoid repetition (e.g., ${prefix}${pluginName}-foo -> ${prefix}foo)`,
+    );
+  }
+
+  return warnings;
+}
+
 export function processHookInput(input: PostToolUseInput): string[] {
   const warnings: string[] = [];
 
@@ -53,6 +81,10 @@ export function processHookInput(input: PostToolUseInput): string[] {
   const type = getResourceType(filePath);
   const name = getResourceName(filePath, type);
   if (!name) return warnings;
+
+  if (type === "skill") {
+    return checkSkillNamespace(name, pluginName);
+  }
 
   const stutterWarning = checkStuttering(name, pluginName);
   if (stutterWarning) {

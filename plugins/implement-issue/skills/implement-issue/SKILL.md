@@ -1,5 +1,5 @@
 ---
-name: implement-issue
+name: issue:implement
 description: |
   Implement a feature or fix based on an issue. Use when given an issue URL to work on, or when implementing changes described in a tracked issue. Supports GitHub, Linear, and GitLab.
 allowed-tools: Bash(gh:*), Bash(git:*), mcp__github, mcp__plugin_github_github__issue_read

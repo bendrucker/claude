@@ -1,5 +1,5 @@
 ---
-name: diagram
+name: mermaid
 description: Create and validate Mermaid diagrams. Use when creating, editing, or reviewing Mermaid diagrams in markdown files.
 user-invocable: true
 ---

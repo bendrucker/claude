@@ -26,7 +26,11 @@ Each plugin in `plugins/` contains:
 
 ### Naming
 
-The plugin name forms a namespace for its contents (e.g., `gitlab:ci-monitor`). Avoid repeating the plugin name in skill, agent, or command names to prevent stuttering like `gitlab:gitlab-ci`.
+The plugin name forms a namespace for its contents (e.g., `gitlab:ci-monitor`). Commands and agents are auto-namespaced by the plugin system — the filename becomes the qualified name (e.g., `ci-monitor.md` in the `gitlab` plugin becomes `gitlab:ci-monitor`). Skills are **not** auto-namespaced — the `name` in YAML frontmatter is used as-is.
+
+Skills where the name differs from the plugin name must include the `plugin-name:` prefix in frontmatter (e.g., `gitlab:ci`, `things:inbox`). Skip the prefix when name equals plugin name (the primary skill) — `bun:bun` adds no information.
+
+Anti-stuttering applies to the part after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right.
 
 ### Plugin READMEs
 

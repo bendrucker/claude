@@ -1,5 +1,5 @@
 ---
-name: prior-art
+name: research:prior-art
 description: |
   Research existing solutions when exploring a new problem space. Use when the user mentions "prior art", "existing solutions", "what libraries exist for", or wants to understand the landscape before building.
 ---

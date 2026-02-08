@@ -1,5 +1,5 @@
 ---
-name: edit
+name: vscode:edit
 description: Open content in VS Code for interactive editing before using it in the next step.
 user-invocable: true
 allowed-tools:

@@ -70,6 +70,18 @@ describe("frontmatter rules", () => {
       const result = single(nameFormat.check(content, ""));
       expect(result.passed).toBe(true);
     });
+
+    it("allows namespaced names", () => {
+      const content = parseSkill("---\nname: github:actions\n---\n");
+      const result = single(nameFormat.check(content, ""));
+      expect(result.passed).toBe(true);
+    });
+
+    it("allows same-name namespace", () => {
+      const content = parseSkill("---\nname: git:git\n---\n");
+      const result = single(nameFormat.check(content, ""));
+      expect(result.passed).toBe(true);
+    });
   });
 
   describe("nameLength", () => {
@@ -104,6 +116,24 @@ describe("frontmatter rules", () => {
       const content = parseSkill("---\nname: invalid-\n---\n");
       const result = single(nameEdgeHyphens.check(content, ""));
       expect(result.passed).toBe(false);
+    });
+
+    it("fails for leading hyphen in namespace prefix", () => {
+      const content = parseSkill("---\nname: -github:actions\n---\n");
+      const result = single(nameEdgeHyphens.check(content, ""));
+      expect(result.passed).toBe(false);
+    });
+
+    it("fails for trailing hyphen in namespaced part", () => {
+      const content = parseSkill("---\nname: github:actions-\n---\n");
+      const result = single(nameEdgeHyphens.check(content, ""));
+      expect(result.passed).toBe(false);
+    });
+
+    it("passes for valid namespaced names", () => {
+      const content = parseSkill("---\nname: github:actions\n---\n");
+      const result = single(nameEdgeHyphens.check(content, ""));
+      expect(result.passed).toBe(true);
     });
   });
 

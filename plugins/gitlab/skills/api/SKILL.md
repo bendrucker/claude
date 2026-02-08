@@ -1,5 +1,5 @@
 ---
-name: api
+name: gitlab:api
 description: GitLab REST and GraphQL API access via glab. Use when making API requests, querying project data, or automating GitLab operations.
 ---
 # GitLab API

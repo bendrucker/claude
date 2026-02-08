@@ -1,5 +1,5 @@
 ---
-name: pr-comments
+name: github:pr-comments
 description: Fetch unresolved review comments from a GitHub pull request. Use when checking what review feedback needs to be addressed, whether review comments have been resolved, or resuming work on a PR with outstanding feedback.
 allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts:*)"]
 hooks:

@@ -1,5 +1,5 @@
 ---
-name: glab
+name: gitlab:glab
 description: glab CLI basics and GitLab workflow overview. Use when working with GitLab repositories or adapting GitHub patterns to GitLab.
 ---
 # glab

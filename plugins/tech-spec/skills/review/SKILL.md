@@ -1,5 +1,5 @@
 ---
-name: review
+name: tech-spec:review
 description: |
   Review a technical specification through expert lenses. Use to identify gaps, risks, and missing considerations in an existing spec. Works on any tech spec, not just those created with tech-spec:create.
 ---

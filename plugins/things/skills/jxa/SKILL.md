@@ -1,5 +1,5 @@
 ---
-name: jxa
+name: things:jxa
 description: Read and query Things 3 data (lists, todos, projects, tags, logbook). Not for writes — use things:url to create/update, things:inbox for quick captures.
 allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/query-*:*)", "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/find-*:*)", "Bash(osascript:*)", Read]
 hooks:

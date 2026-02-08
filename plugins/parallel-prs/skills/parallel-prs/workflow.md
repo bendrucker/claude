@@ -24,9 +24,9 @@ Worktrunk handles branch creation and worktree placement automatically based on 
 
 ## Implement in Parallel
 
-Implementation agents work in assigned worktree, then:
-1. Commit and push
-2. Load `pull-request:create` skill and create PR (write body to `tmp/{branch}/pr-body.md` first)
+Dispatch a `claude -p` CLI subprocess to each worktree (see "Worktree Dispatch" in user CLAUDE.md). Each agent:
+1. Implements the plan, commits, and pushes
+2. Loads `pull-request:create` skill and creates PR (writes body to `tmp/{branch}/pr-body.md` first)
 
 ## Monitor CI
 

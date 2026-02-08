@@ -44,18 +44,7 @@ Derive `{slug}` from the todo title: lowercase, replace spaces/special chars wit
 
 ### Implement in Parallel
 
-Task tool subagents cannot write to worktree directories (permissions are scoped to the orchestrator's cwd). Use `claude -p` CLI processes instead — each gets the worktree as its cwd with full local file access.
-
-For each worktree, write the implementation plan to a temp file, then dispatch:
-
-```bash
-cd <worktree-path> && claude -p \
-  --allowedTools "Read Write Edit Glob Grep Bash(git:*) Bash(bun:*) Bash(bunx:*)" \
-  --output-format text \
-  "<implementation-plan>" 2>&1
-```
-
-Run all dispatches as background Bash commands for parallelism. The prompt should include:
+Dispatch a `claude -p` CLI subprocess to each worktree (see "Worktree Dispatch" in user CLAUDE.md). Each subprocess receives:
 
 - The full approved implementation plan
 - Instruction to commit changes with a descriptive message
@@ -63,16 +52,9 @@ Run all dispatches as background Bash commands for parallelism. The prompt shoul
 
 ### Create PRs
 
-After all implementations complete, dispatch `claude -p` from each worktree to create PRs:
+After all implementations complete, dispatch `claude -p` from each worktree to create PRs using the `pull-request:create` skill.
 
-```bash
-cd <worktree-path> && claude -p \
-  --allowedTools "Bash Read Write Edit Glob Grep Skill" \
-  --output-format text \
-  "Use the pull-request:create skill to create a PR. <context about the changes>" 2>&1
-```
-
-PR body includes a `Original Task` section:
+PR body includes an `Original Task` section:
 
 ```
 Original Task: [<todo-title>](things:///show?id=<todo-id>)
@@ -94,11 +76,3 @@ Output a final bulleted list — one entry per todo:
 - Things URL: `things:///show?id=<todo-id>`
 - Todo title
 
-## Dispatching CLI Agents
-
-When using `claude -p` for worktree work:
-
-- **Least privilege**: Use `--allowedTools` to scope to exactly the tools needed. Never use `--dangerously-skip-permissions`.
-- **No model override**: Let the user's default model apply. Do not pass `--model`.
-- **Background execution**: Run via `Bash(run_in_background: true)` and poll with `TaskOutput` for parallelism.
-- **Error handling**: Check exit codes and read output files. If an agent fails, report the error rather than retrying blindly.

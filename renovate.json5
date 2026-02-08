@@ -15,10 +15,10 @@
     },
     {
       customType: "regex",
-      description: "Third-party marketplaces pinned to commit digests via sha",
+      description: "Third-party marketplaces pinned to commit digests via ref",
       managerFilePatterns: ["user/settings.json"],
       matchStrings: [
-        '"repo":\\s*"(?<depName>[^"]+/[^"]+)"[^}]*"sha":\\s*"(?<currentDigest>[0-9a-f]{40})"',
+        '"repo":\\s*"(?<depName>[^"]+/[^"]+)"[^}]*"ref":\\s*"(?<currentDigest>[0-9a-f]{40})"',
       ],
       currentValueTemplate: "main",
       datasourceTemplate: "git-refs",

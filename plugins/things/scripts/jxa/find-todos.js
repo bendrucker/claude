@@ -17,27 +17,31 @@ function run(argv) {
       return JSON.stringify({ error: "Tag not found: " + value });
     }
 
-    var listIds = [
-      "TMInboxListSource",
-      "TMTodayListSource",
-      "TMNextListSource",
-      "TMCalendarListSource",
-      "TMSomedayListSource",
+    var lists = [
+      ["TMInboxListSource", "inbox"],
+      ["TMTodayListSource", "today"],
+      ["TMNextListSource", "anytime"],
+      ["TMCalendarListSource", "upcoming"],
+      ["TMSomedayListSource", "someday"],
     ];
     if (includeLogbook) {
-      listIds.push("TMLogbookListSource");
+      lists.push(["TMLogbookListSource", "logbook"]);
     }
 
     var items = [];
-    for (var li = 0; li < listIds.length; li++) {
-      var todos = app.lists.byId(listIds[li]).toDos.whose({ tagNames: { _contains: value } })();
+    for (var li = 0; li < lists.length; li++) {
+      var listId = lists[li][0];
+      var listName = lists[li][1];
+      var todos = app.lists.byId(listId).toDos.whose({ tagNames: { _contains: value } })();
       for (var i = 0; i < todos.length; i++) {
         var t = todos[i];
         var project = t.project();
         items.push({
           id: t.id(),
           name: t.name(),
+          notes: t.notes() || "",
           status: t.status().toString(),
+          list: listName,
           project: project ? project.name() : null,
         });
       }

@@ -15,7 +15,7 @@ Triage and batch-implement Claude-tagged Things todos as PRs for the claude conf
 
 ### Fetch Todos
 
-Query Things inbox (`TMInboxListSource`), anytime (`TMNextListSource`), and someday (`TMSomedayListSource`) lists. Filter for items tagged `Claude` with `open` status. Track which list each item came from.
+Load the `things:jxa` skill. Find all open todos tagged `claude`. Track which list each item came from.
 
 ### Present for Triage
 

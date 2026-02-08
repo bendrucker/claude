@@ -5,42 +5,24 @@ description: Interactive daily review workflow across Calendar, Things, GitHub, 
 
 # Daily Review
 
-Two-phase workflow: **gather** data from all inboxes, then **triage** interactively.
+Multi-phase workflow with checkpoints between phases. Each phase ends with a summary before proceeding.
 
 ## Variants
 
-| Variant | Calendar | Things | GitHub | GitLab | Linear |
-|---------|----------|--------|--------|--------|--------|
-| Morning | Full scan + prep | Full processing | Full triage | Full triage | Full review |
-| Evening | Tomorrow preview | Quick triage | Mark read, defer | Defer reviews | Skip |
+| Variant | Calendar | Things | GitHub | GitLab | Linear | Today Triage |
+|---------|----------|--------|--------|--------|--------|--------------|
+| Morning | Full scan + prep | Full processing | Full triage | Full triage | Full review | Full triage |
+| Evening | Tomorrow preview | Quick triage | Mark read, defer | Defer reviews | Skip | Skip |
 
 Ask which variant if not specified.
 
-## Gather Phase
+## Phase: Calendar
 
-Dispatch read-only sub-agents (via the Task tool) to collect data from each inbox in parallel. Each agent returns structured output — no writes, no user interaction.
+Dispatch a read-only sub-agent (Task tool) to scan today's events. See [calendar.md](calendar.md).
 
-### Sub-Agents
+Present time budget (available hours, focus windows, meetings needing prep). Ask user to proceed.
 
-**Calendar:** Load `calendar:calendar`. Query today's events. Return event list, time budget (available hours, focus windows, meetings needing prep).
-
-**Things Inbox:** Load `things:jxa`. Run `query-list.ts TMInboxListSource --json`. Return inbox items with names, notes (first line), tags, project.
-
-**GitHub Notifications:** Load `github:notifications`. Query active notifications (not done). Return notifications grouped by reason with summaryId, URL, title, isUnread.
-
-**GitLab Todos:** Load `gitlab:todos`. Query pending todos. Return todos grouped by action_name with id, target URL, title, project.
-
-**Linear Inbox:** Load `linear:notifications`. Query unread notifications. Return notifications with type, issue identifier, title, URL.
-
-### Output
-
-Combine all sub-agent results into a single gathering summary. Present to the user before starting triage.
-
-## Triage Phase
-
-Work through each inbox interactively using the gathered data. No need to re-query — all data is already available.
-
-### Things Inbox
+## Phase: Things Inbox
 
 See [things.md](things.md).
 
@@ -50,7 +32,13 @@ Batch items by pattern, ask user for each batch:
 - Quick do (< 2 min)
 - Delete
 
-Goal: inbox count = 0
+Goal: inbox count = 0.
+
+After inbox processing, re-query calendar (see Re-Check in [calendar.md](calendar.md)). Present any new events and updated time budget. Ask user to proceed.
+
+## Phase: Notifications
+
+Dispatch read-only sub-agents in parallel (Task tool) for GitHub, GitLab, and Linear. Then triage each interactively.
 
 ### GitHub Notifications
 
@@ -87,14 +75,21 @@ Review unread notifications:
 - **Mentions** — read, respond, archive
 - **Status changes** — acknowledge, archive
 
-### Summary
+After all notification inboxes are processed, ask user to proceed.
 
-Present progress:
+## Phase: Today Triage
+
+See [triage.md](triage.md).
+
+Group, prioritize, defer, and reorder the Today list. Present final order for confirmation.
+
+## Summary
+
+Present progress across all phases:
 - Time budget from Calendar
-- Things items processed (inbox now at 0)
-- GitHub notifications triaged (done/deferred)
-- Linear issues reviewed
-- Suggest `things:triage` in a fresh session for Today list prioritization
+- Things inbox processed (count = 0)
+- GitHub/GitLab/Linear notifications triaged (done/deferred counts)
+- Today list ordered (final count)
 
 ## Defer-to-Things Format
 
@@ -108,7 +103,7 @@ Items deferred from GitHub/Linear:
 
 - `calendar:calendar` — Event queries
 - `things:jxa` — Read Things data
-- `things:url` — Update Things items
+- `things:url` — Update Things items, reorder Today list
 - `things:inbox` — Quick captures
 - `github:notifications` — Notification triage
 - `gitlab:todos` — Todo triage
@@ -116,5 +111,5 @@ Items deferred from GitHub/Linear:
 
 ## Future
 
-- **Mail inbox**: Add `mail:archive` for account-aware email archiving
+- **Mail inbox**: Add `mail` skill for account-aware email archiving
 - See [automation.md](automation.md) for planned auto-handling patterns.

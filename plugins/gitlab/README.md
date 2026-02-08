@@ -20,9 +20,10 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 ### Hooks
 
 - Transforms GitLab URLs into API requests for better content fetching
+- Detects glab OAuth token expiration and provides recovery guidance
 
 ## Testing
 
 ```bash
-npm test -- plugins/gitlab
+bun test plugins/gitlab
 ```

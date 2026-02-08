@@ -165,6 +165,11 @@
       "name": "mail",
       "description": "Apple Mail integration for reading and managing email via JXA",
       "source": "./plugins/mail"
+    },
+    {
+      "name": "opentelemetry",
+      "description": "OpenTelemetry instrumentation patterns, semantic conventions, and testing",
+      "source": "./plugins/opentelemetry"
     }
   ]
 }

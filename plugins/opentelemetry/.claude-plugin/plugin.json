@@ -1,0 +1,8 @@
+{
+  "name": "opentelemetry",
+  "description": "OpenTelemetry instrumentation patterns, semantic conventions, and testing",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

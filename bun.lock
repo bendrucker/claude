@@ -33,6 +33,13 @@
         "yaml": "^2.7.1",
       },
     },
+    "packages/validate": {
+      "name": "@bendrucker/claude-validate",
+      "dependencies": {
+        "ajv": "^8.17.1",
+        "ajv-formats": "^3.0.1",
+      },
+    },
     "plugins/claude-code/skills/session": {
       "name": "session",
       "version": "1.0.0",
@@ -139,6 +146,8 @@
     "@babel/helper-validator-identifier": ["@babel/helper-validator-identifier@7.28.5", "", {}, "sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q=="],
 
     "@bendrucker/claude-style": ["@bendrucker/claude-style@workspace:plugins/style"],
+
+    "@bendrucker/claude-validate": ["@bendrucker/claude-validate@workspace:packages/validate"],
 
     "@bendrucker/type-ignore": ["@bendrucker/type-ignore@workspace:plugins/type-ignore"],
 

@@ -259,6 +259,7 @@ jobs:
 
       - name: Setup Claude configuration
         run: |
+          mkdir -p "$HOME/.claude"
           for item in user/*; do
             ln -sfn "$GITHUB_WORKSPACE/$item" "$HOME/.claude/$(basename "$item")"
           done

@@ -1,5 +1,6 @@
 ---
 name: actions-monitor
+model: haiku
 description: Use this agent when you need to monitor GitHub Actions workflow runs after pushing changes to a pull request. The agent will track the workflow status, wait for completion, and retrieve logs from any failed steps. Perfect for continuous integration monitoring and getting quick feedback on build/test results.\n\nExamples:\n- <example>\n  Context: User has just pushed code changes to a PR and wants to monitor the CI pipeline.\n  user: "I just pushed my changes, can you watch the GitHub Actions and let me know if they pass?"\n  assistant: "I'll use the github-actions-monitor agent to track your workflow runs."\n  <commentary>\n  Since the user wants to monitor GitHub Actions after a push, use the github-actions-monitor agent to watch the workflows and report results.\n  </commentary>\n  </example>\n- <example>\n  Context: User is waiting for CI checks to complete on their PR.\n  user: "Check if my Actions are done running on PR #123"\n  assistant: "Let me launch the github-actions-monitor agent to check the status of your workflows on PR #123."\n  <commentary>\n  The user wants to check GitHub Actions status, so use the github-actions-monitor agent to inspect the workflow runs.\n  </commentary>\n  </example>
 ---
 

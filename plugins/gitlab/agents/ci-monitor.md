@@ -1,5 +1,6 @@
 ---
 name: ci-monitor
+model: haiku
 skills: gitlab:ci
 description: |
   Use this agent when you need to investigate GitLab CI pipeline failures for a merge request or branch. The agent identifies failing jobs, retrieves relevant log snippets, and filters signal from noise. It does NOT perform root cause analysis—it extracts the diagnostic information needed for the main agent to investigate.

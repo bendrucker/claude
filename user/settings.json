@@ -107,21 +107,21 @@
       "source": {
         "source": "github",
         "repo": "anthropics/claude-plugins-official",
-        "sha": "27d2b86d72da27c64585150857cee8472ad47abb"
+        "ref": "27d2b86d72da27c64585150857cee8472ad47abb"
       }
     },
     "astral-sh": {
       "source": {
         "source": "github",
         "repo": "astral-sh/claude-code-plugins",
-        "sha": "f8034678a15ad751aae6a2b684daebac416267a1"
+        "ref": "f8034678a15ad751aae6a2b684daebac416267a1"
       }
     },
     "ast-grep": {
       "source": {
         "source": "github",
         "repo": "ast-grep/claude-skill",
-        "sha": "577f4d4507678f2c8cee150fae25e6ce309f70b1"
+        "ref": "577f4d4507678f2c8cee150fae25e6ce309f70b1"
       }
     },
     "worktrunk": {
@@ -168,7 +168,8 @@
       "afplay:*",
       "diskutil:*",
       "networksetup:*",
-      "wt:*"
+      "wt:*",
+      "gh:*"
     ]
   },
   "alwaysThinkingEnabled": true,

@@ -73,8 +73,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Validate shared files
-        run: bun scripts/validate-shared.mjs
+      - name: Validate settings
+        run: bun packages/validate/settings.ts
+
+      - name: Validate marketplace
+        run: bun packages/validate/marketplace.ts
 
       - name: Check marketplace completeness
         run: ./scripts/check-marketplace.sh
@@ -152,7 +155,7 @@ jobs:
 
       - name: Validate plugin.json
         if: steps.inspect.outputs.has_plugin_json == 'true'
-        run: bun scripts/validate-plugin.mjs "plugins/${{ matrix.plugin }}"
+        run: bun packages/validate/plugin.ts "plugins/${{ matrix.plugin }}"
 
       - name: Check for hardcoded version
         if: steps.inspect.outputs.has_plugin_json == 'true'
@@ -165,7 +168,7 @@ jobs:
 
       - name: Validate hooks.json
         if: steps.inspect.outputs.has_hooks == 'true'
-        run: bun scripts/validate-hooks.mjs "plugins/${{ matrix.plugin }}"
+        run: bun packages/validate/hooks.ts "plugins/${{ matrix.plugin }}"
 
       - name: Validate skill frontmatter
         if: steps.inspect.outputs.has_skills == 'true'

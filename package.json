@@ -11,7 +11,8 @@
     "plugins/things",
     "plugins/type-ignore",
     "plugins/ui-design",
-    "plugins/vscode"
+    "plugins/vscode",
+    "packages/validate"
   ],
   "scripts": {
     "build": "tsc --noEmit",

@@ -2,7 +2,18 @@
 name: review:self
 description: |
   Self-review your own code changes using a visual diff viewer. Opens a GitHub-style web UI where you can add comments on changed lines. Comments are returned to Claude for action.
-allowed-tools: Bash(npx:*)
+allowed-tools: ["Bash(bunx difit:*)", "Bash(git diff:*)"]
+hooks:
+  PreToolUse:
+    - matcher: "Bash(bunx difit:*)|Bash(git diff:*)"
+      hooks:
+        - type: command
+          command: |
+            cat | jq '
+              if (.tool_input.command | test("bunx difit"))
+              then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {dangerouslyDisableSandbox: true}}}
+              else {}
+              end'
 ---
 
 # Self Review
@@ -11,17 +22,27 @@ Review your own code changes before committing or requesting peer review.
 
 ## Usage
 
-Run `difit` to open the diff viewer:
+### Direct mode
 
 ```bash
-npx difit $ARGUMENTS
+bunx difit $ARGUMENTS
 ```
 
-Default targets:
-- `.` - All uncommitted changes (staged + unstaged)
-- `staged` - Staged changes only
-- `working` - Unstaged changes only
-- `@ main` - Compare HEAD with main branch
+Common arguments:
+- `.` — All uncommitted changes (staged + unstaged)
+- `staged` — Staged changes only
+- `working` — Unstaged changes only
+- `@ main` — Compare HEAD with main branch
+
+### Stdin mode
+
+Pipe a git diff for full control over the diff content:
+
+```bash
+git diff $ARGUMENTS | bunx difit
+```
+
+Use stdin mode when `$ARGUMENTS` contains git diff flags (e.g., `--merge-base`, revision ranges).
 
 ## Workflow
 

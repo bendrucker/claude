@@ -1,5 +1,5 @@
 {
-  "description": "Transforms GitLab URLs into API requests for better content fetching",
+  "description": "GitLab URL transforms and auth expiration recovery",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,17 @@
           {
             "type": "command",
             "command": "bun ${CLAUDE_PLUGIN_ROOT}/scripts/fetch.ts"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/auth.ts"
           }
         ]
       }

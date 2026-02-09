@@ -170,6 +170,11 @@
       "name": "opentelemetry",
       "description": "OpenTelemetry instrumentation patterns, semantic conventions, and testing",
       "source": "./plugins/opentelemetry"
+    },
+    {
+      "name": "terraform",
+      "description": "Terraform Cloud workspace management, run monitoring, and registry lookups",
+      "source": "./plugins/terraform"
     }
   ]
 }

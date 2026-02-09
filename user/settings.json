@@ -169,7 +169,8 @@
       "diskutil:*",
       "networksetup:*",
       "wt:*",
-      "gh:*"
+      "gh:*",
+      "claude:*"
     ]
   },
   "alwaysThinkingEnabled": true,

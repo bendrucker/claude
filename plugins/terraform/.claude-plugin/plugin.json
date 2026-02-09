@@ -4,14 +4,5 @@
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
-  },
-  "mcpServers": {
-    "terraform": {
-      "command": "npx",
-      "args": ["-y", "terraform-mcp-server@latest", "--toolsets=registry,terraform"],
-      "env": {
-        "TFE_TOKEN": "${TFE_TOKEN}"
-      }
-    }
   }
 }

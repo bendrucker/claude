@@ -63,7 +63,7 @@ if (findXcallRunner()) {
     const result = await xcall(url);
     const id = parseThingsId(result);
     if (id) {
-      console.log(`things:///show?id=${id}`);
+      console.log(`https://things.bendrucker.me/show?id=${id}`);
     }
   } catch {
     await openUrl("add", params);

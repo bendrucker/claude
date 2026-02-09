@@ -60,7 +60,7 @@ Items appear at the top of the list in the order specified. Default list is `tod
 
 ## Callback
 
-When the `x-callback-url` plugin is installed, `url.ts` automatically uses xcall to get a response from Things on stdout. Present the result to the user as clickable `things:///show?id=<id>` links:
+When the `x-callback-url` plugin is installed, `url.ts` automatically uses xcall to get a response from Things on stdout. Present the result to the user as clickable `https://things.bendrucker.me/show?id=<id>` links:
 
 - **Single todo** (`add`, `update`): returns `x-things-id=<id>` — present one link
 - **Batch** (`json`): returns `x-things-ids=["id1","id2"]` — present a bulleted list with each todo's title and link

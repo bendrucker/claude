@@ -29,9 +29,13 @@ Fix all merge conflicts in the working tree, then commit and push the result.
    - `git add` the resolved file.
    - For generated files (lockfiles, build artifacts), prefer deleting and regenerating over manual merge.
 
-4. **Continue the operation.** Run the appropriate continuation command (`git rebase --continue`, `git merge --continue`, or `git cherry-pick --continue`).
+4. **Stash unrelated dirty files.** Before continuing, check for unstaged changes unrelated to the conflicts via `git status --porcelain`.
+   - If dirty files exist beyond the resolved conflicts, try `git stash push -m "fix-conflicts: temp" -- <file1> <file2>` with all unrelated dirty files.
+   - If stash fails (the sandbox may block unlinking protected files like `.mcp.json`), stash files individually and skip failures. For files that cannot be stashed, hide them temporarily with `git update-index --assume-unchanged <file>`.
 
-5. **Push.** Run `git push` to update the remote branch.
+5. **Continue the operation.** Run the appropriate continuation command (`git rebase --continue`, `git merge --continue`, or `git cherry-pick --continue`).
+
+6. **Push and restore.** Run `git push` to update the remote branch. Then restore any hidden files with `git update-index --no-assume-unchanged <file>` and run `git stash pop` if anything was stashed.
 
 ## Notes
 

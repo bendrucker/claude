@@ -15,6 +15,8 @@ allowed-tools:
   - Bash(git merge:*)
   - Bash(git cherry-pick:*)
   - Bash(git rerere:*)
+  - Bash(git stash:*)
+  - Bash(git update-index:*)
   - Bash(bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/*:*)
 hooks:
   PreToolUse:

@@ -57,7 +57,7 @@ After all implementations complete, dispatch `claude -p` from each worktree to c
 PR body includes an `Original Task` section:
 
 ```
-Original Task: [<todo-title>](things:///show?id=<todo-id>)
+Original Task: [<todo-title>](https://things.bendrucker.me/show?id=<todo-id>)
 ```
 
 ### Monitor CI
@@ -73,6 +73,6 @@ For each passing PR, update the Things todo notes with the PR link and mark the 
 Output a final bulleted list — one entry per todo:
 
 - PR link (with pass/fail status)
-- Things URL: `things:///show?id=<todo-id>`
+- Things URL: `https://things.bendrucker.me/show?id=<todo-id>`
 - Todo title
 

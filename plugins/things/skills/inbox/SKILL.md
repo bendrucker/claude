@@ -29,7 +29,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} tit
 
 The script handles URL encoding, session attribution, and the `Claude` tag automatically.
 
-When the `x-callback-url` plugin is installed, the script uses xcall to get the todo ID back from Things and outputs a `things:///show?id=...` URL. Present this URL to the user so they can click to open the todo. If xcall is unavailable, the script falls back to fire-and-forget.
+When the `x-callback-url` plugin is installed, the script uses xcall to get the todo ID back from Things and outputs a `https://things.bendrucker.me/show?id=...` URL. Present this URL to the user so they can click to open the todo. If xcall is unavailable, the script falls back to fire-and-forget.
 
 ## Parameters
 

@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan Visualization</title>
+<style>
+  :root {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --bg-card: #1e2a4a;
+    --bg-hover: #253a5e;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0b0;
+    --text-muted: #707088;
+    --border: #2a3a5e;
+    --accent: #4a9eff;
+    --accent-hover: #6ab0ff;
+    --danger: #e74c3c;
+    --danger-hover: #c0392b;
+    --success: #2ecc71;
+    --p1: #e74c3c;
+    --p2: #e67e22;
+    --p3: #f1c40f;
+    --p4: #95a5a6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .tab:hover { color: var(--text-primary); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+  }
+
+  .btn:hover { background: var(--bg-hover); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .btn-danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+  }
+
+  .btn-danger:hover { background: var(--danger-hover); }
+
+  .btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* Main content */
+  .content {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  .view { display: none; height: 100%; }
+  .view.active { display: block; }
+
+  /* Validation errors banner */
+  .errors-banner {
+    background: #3a1a1a;
+    border-bottom: 1px solid #5a2a2a;
+    padding: 10px 20px;
+    font-size: 13px;
+    color: #f0a0a0;
+    flex-shrink: 0;
+  }
+
+  .errors-banner ul {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+  }
+
+  .errors-banner li::before {
+    content: "\26A0";
+    margin-right: 4px;
+  }
+
+  /* Graph view */
+  #graph-view {
+    overflow: auto;
+  }
+
+  #graph-view svg {
+    display: block;
+    min-width: 100%;
+    min-height: 100%;
+  }
+
+  .graph-node {
+    cursor: pointer;
+  }
+
+  .graph-node rect {
+    rx: 6;
+    ry: 6;
+    stroke-width: 1.5;
+    transition: filter 0.15s;
+  }
+
+  .graph-node:hover rect {
+    filter: brightness(1.2);
+  }
+
+  .graph-node text {
+    fill: #fff;
+    font-size: 12px;
+    font-family: inherit;
+    pointer-events: none;
+  }
+
+  .graph-edge {
+    fill: none;
+    stroke: #4a5a7e;
+    stroke-width: 1.5;
+  }
+
+  /* Table view */
+  #table-view {
+    padding: 16px;
+    overflow: auto;
+  }
+
+  .table-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .table-filters select,
+  .table-filters input {
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 13px;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 2px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .data-table th:hover { color: var(--text-primary); }
+
+  .data-table th .sort-indicator {
+    margin-left: 4px;
+    opacity: 0.5;
+  }
+
+  .data-table th .sort-indicator.active { opacity: 1; }
+
+  .data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table tr {
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .data-table tbody tr:hover { background: var(--bg-hover); }
+
+  /* Kanban view */
+  #kanban-view {
+    padding: 16px;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+
+  .kanban-board {
+    display: flex;
+    gap: 16px;
+    min-height: calc(100vh - 160px);
+    align-items: flex-start;
+  }
+
+  .kanban-column {
+    min-width: 260px;
+    max-width: 300px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .kanban-column-header {
+    padding: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .kanban-column-header .count {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: normal;
+  }
+
+  .kanban-cards {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 60px;
+  }
+
+  .kanban-cards.drag-over {
+    background: rgba(74, 158, 255, 0.05);
+    border-radius: 0 0 8px 8px;
+  }
+
+  .kanban-card {
+    padding: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: grab;
+    transition: transform 0.1s, box-shadow 0.1s;
+    font-size: 13px;
+  }
+
+  .kanban-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  .kanban-card.dragging {
+    opacity: 0.5;
+  }
+
+  .kanban-card-title {
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .kanban-card-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* Priority badge */
+  .priority-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .priority-badge.p1 { background: var(--p1); }
+  .priority-badge.p2 { background: var(--p2); }
+  .priority-badge.p3 { background: var(--p3); color: #222; }
+  .priority-badge.p4 { background: var(--p4); }
+
+  /* Milestone color dot */
+  .milestone-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  /* Editor panel */
+  .editor-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+  }
+
+  .editor-overlay.open { display: flex; }
+
+  .editor-backdrop {
+    flex: 1;
+    background: rgba(0,0,0,0.4);
+  }
+
+  .editor-panel {
+    width: 480px;
+    max-width: 100%;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .editor-header h2 {
+    font-size: 16px;
+  }
+
+  .editor-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+  }
+
+  .editor-close:hover { color: var(--text-primary); }
+
+  .editor-body {
+    padding: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .field-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .field-group input,
+  .field-group select,
+  .field-group textarea {
+    padding: 8px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+  }
+
+  .field-group textarea {
+    min-height: 120px;
+    resize: vertical;
+  }
+
+  .field-group input:focus,
+  .field-group select:focus,
+  .field-group textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .blocked-by-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 6px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .blocked-by-list label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    text-transform: none;
+    font-weight: normal;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  .editor-actions {
+    display: flex;
+    gap: 8px;
+    padding: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .editor-actions .btn { flex: 1; }
+
+  /* Type selector in editor for new items */
+  .type-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .type-selector .btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <h1 id="plan-title">Plan</h1>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-sm" onclick="copyPrompt()">Copy Prompt</button>
+    <button class="btn btn-sm" onclick="openNewMilestone()">New Milestone</button>
+    <button class="btn btn-sm btn-primary" onclick="openNewIssue()">New Issue</button>
+  </div>
+</div>
+
+<div id="errors-banner" class="errors-banner" style="display:none">
+  <ul id="errors-list"></ul>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-view="graph">Graph</div>
+  <div class="tab" data-view="table">Table</div>
+  <div class="tab" data-view="kanban">Kanban</div>
+</div>
+
+<div class="content">
+  <div id="graph-view" class="view active"></div>
+  <div id="table-view" class="view"></div>
+  <div id="kanban-view" class="view"></div>
+</div>
+
+<div id="editor-overlay" class="editor-overlay">
+  <div class="editor-backdrop" onclick="closeEditor()"></div>
+  <div class="editor-panel">
+    <div class="editor-header">
+      <h2 id="editor-title">Edit Issue</h2>
+      <button class="editor-close" onclick="closeEditor()">&times;</button>
+    </div>
+    <div class="editor-body" id="editor-body"></div>
+    <div class="editor-actions" id="editor-actions"></div>
+  </div>
+</div>
+
+<script>
+const MILESTONE_COLORS = [
+  '#4a9eff', '#e67e22', '#2ecc71', '#9b59b6',
+  '#1abc9c', '#e74c3c', '#f39c12', '#3498db',
+  '#e84393', '#00cec9', '#6c5ce7', '#fd79a8',
+];
+
+const GRAPH = {
+  nodeWidth: 280,
+  charsPerLine: 34,
+  maxTitleChars: 120,
+  minNodeHeight: 40,
+  lineHeight: 18,
+  nodePaddingY: 16,
+  layerGap: 60,
+  nodeGap: 24,
+  pad: 60,
+  subgraphPad: 20,
+  subgraphLabelHeight: 28,
+  subgraphGap: 40,
+};
+
+let state = { plan: null, errors: [], layers: {}, milestoneColors: {} };
+let currentView = 'graph';
+let tableSort = { column: 'title', direction: 'ascending' };
+let tableFilters = { milestone: '', label: '' };
+
+// Fetch plan data
+async function fetchPlan() {
+  const res = await fetch('/api/plan');
+  const data = await res.json();
+  state.plan = data.plan;
+  state.errors = data.errors || [];
+  state.layers = data.layers || {};
+  assignMilestoneColors();
+  render();
+}
+
+function assignMilestoneColors() {
+  state.milestoneColors = {};
+  if (!state.plan) return;
+  const names = state.plan.milestones.map(m => m.frontmatter.title);
+  names.forEach((name, i) => {
+    state.milestoneColors[name] = MILESTONE_COLORS[i % MILESTONE_COLORS.length];
+  });
+}
+
+function getMilestoneColor(name) {
+  return state.milestoneColors[name] || '#555';
+}
+
+function resolveRef(ref) {
+  return ref.split('/').pop();
+}
+
+function resolveMilestoneName(path) {
+  if (!path || !state.plan) return '';
+  const basename = resolveRef(path);
+  const ms = state.plan.milestones.find(m => m.filename === basename);
+  if (ms) return ms.frontmatter.title;
+  return basename.replace(/\.md$/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function priorityLabel(p) {
+  return p ? `P${p}` : '';
+}
+
+function priorityClass(p) {
+  return p ? `p${p}` : '';
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    tab.classList.add('active');
+    currentView = tab.dataset.view;
+    document.getElementById(`${currentView}-view`).classList.add('active');
+    render();
+  });
+});
+
+// Render
+function render() {
+  if (!state.plan) return;
+  document.getElementById('plan-title').textContent = state.plan.name || 'Plan';
+  renderErrors();
+  if (currentView === 'graph') renderGraph();
+  else if (currentView === 'table') renderTable();
+  else if (currentView === 'kanban') renderKanban();
+}
+
+function renderErrors() {
+  const banner = document.getElementById('errors-banner');
+  const list = document.getElementById('errors-list');
+  if (!state.errors.length) {
+    banner.style.display = 'none';
+    return;
+  }
+  banner.style.display = 'block';
+  list.innerHTML = state.errors.map(e =>
+    `<li>${esc(e.file)}${e.field ? ` (${esc(e.field)})` : ''}: ${esc(e.message)}</li>`
+  ).join('');
+}
+
+function esc(str) {
+  const el = document.createElement('span');
+  el.textContent = str || '';
+  return el.innerHTML;
+}
+
+// Graph view
+function nodeHeight(title) {
+  const lines = Math.ceil(title.length / GRAPH.charsPerLine);
+  return Math.max(GRAPH.minNodeHeight, lines * GRAPH.lineHeight + GRAPH.nodePaddingY);
+}
+
+function renderGraph() {
+  const container = document.getElementById('graph-view');
+  const issues = state.plan.issues;
+  if (!issues.length) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">No issues to display</div>';
+    return;
+  }
+
+  const { nodeWidth, maxTitleChars, layerGap, nodeGap, pad: padX, subgraphPad, subgraphLabelHeight, subgraphGap } = GRAPH;
+  const padY = padX;
+  const layers = state.layers;
+
+  // Pre-compute node heights
+  const nodeHeights = {};
+  issues.forEach(issue => {
+    const title = issue.frontmatter.title || issue.filename;
+    const display = title.length > maxTitleChars ? title.slice(0, maxTitleChars - 3) + '...' : title;
+    nodeHeights[issue.filename] = nodeHeight(display);
+  });
+
+  // Group issues by milestone
+  const milestoneGroups = {};
+  issues.forEach(issue => {
+    const msName = resolveMilestoneName(issue.frontmatter.milestone) || 'Unassigned';
+    if (!milestoneGroups[msName]) milestoneGroups[msName] = [];
+    milestoneGroups[msName].push(issue);
+  });
+
+  // Order milestones by cross-milestone dependencies
+  const issueMilestone = {};
+  issues.forEach(issue => {
+    issueMilestone[issue.filename] = resolveMilestoneName(issue.frontmatter.milestone) || 'Unassigned';
+  });
+  const msDepEdges = new Set();
+  issues.forEach(issue => {
+    const toMs = issueMilestone[issue.filename];
+    (issue.frontmatter.blocked_by || []).forEach(rawDep => {
+      const fromMs = issueMilestone[resolveRef(rawDep)];
+      if (fromMs && fromMs !== toMs) msDepEdges.add(`${fromMs}\t${toMs}`);
+    });
+  });
+  const allMs = Object.keys(milestoneGroups);
+  const msInDegree = Object.fromEntries(allMs.map(m => [m, 0]));
+  const msAdj = Object.fromEntries(allMs.map(m => [m, []]));
+  for (const edge of msDepEdges) {
+    const [from, to] = edge.split('\t');
+    if (msInDegree[to] !== undefined && msAdj[from]) {
+      msInDegree[to]++;
+      msAdj[from].push(to);
+    }
+  }
+  const milestoneNames = [];
+  const msQueue = allMs.filter(m => msInDegree[m] === 0);
+  while (msQueue.length) {
+    const m = msQueue.shift();
+    milestoneNames.push(m);
+    for (const neighbor of msAdj[m]) {
+      msInDegree[neighbor]--;
+      if (msInDegree[neighbor] === 0) msQueue.push(neighbor);
+    }
+  }
+  // Append any remaining (cycles) at the end
+  for (const m of allMs) {
+    if (!milestoneNames.includes(m)) milestoneNames.push(m);
+  }
+  const milestoneLayerGroups = {};
+  for (const msName of milestoneNames) {
+    const lg = {};
+    milestoneGroups[msName].forEach(issue => {
+      const layer = layers[issue.filename] ?? 0;
+      if (!lg[layer]) lg[layer] = [];
+      lg[layer].push(issue);
+    });
+    milestoneLayerGroups[msName] = lg;
+  }
+
+  // Compute max node height per layer globally (for consistent row heights)
+  const globalLayerMaxHeight = {};
+  for (const msName of milestoneNames) {
+    const lg = milestoneLayerGroups[msName];
+    for (const [layer, group] of Object.entries(lg)) {
+      const maxH = Math.max(...group.map(i => nodeHeights[i.filename]));
+      globalLayerMaxHeight[layer] = Math.max(globalLayerMaxHeight[layer] || 0, maxH);
+    }
+  }
+
+  // Layout milestones horizontally, layers vertically
+  const positions = {};
+  const subgraphBounds = {};
+  let currentX = padX;
+
+  for (const msName of milestoneNames) {
+    const lg = milestoneLayerGroups[msName];
+    const layerKeys = Object.keys(lg).map(Number).sort((a, b) => a - b);
+    const maxInLayer = Math.max(...layerKeys.map(k => lg[k].length));
+    const subWidth = Math.max(nodeWidth + subgraphPad * 2, maxInLayer * (nodeWidth + nodeGap) - nodeGap + subgraphPad * 2);
+
+    let subContentHeight = 0;
+    layerKeys.forEach((layer, li) => {
+      const group = lg[layer];
+      const rowHeight = globalLayerMaxHeight[layer];
+      const totalWidth = group.length * (nodeWidth + nodeGap) - nodeGap;
+      const startX = currentX + (subWidth - totalWidth) / 2;
+      const y = padY + subgraphLabelHeight + subgraphPad + subContentHeight;
+      group.forEach((issue, i) => {
+        positions[issue.filename] = {
+          x: startX + i * (nodeWidth + nodeGap),
+          y,
+        };
+      });
+      subContentHeight += rowHeight + layerGap;
+    });
+    subContentHeight -= layerGap; // remove trailing gap
+
+    const subHeight = subContentHeight + subgraphPad * 2 + subgraphLabelHeight;
+    subgraphBounds[msName] = { x: currentX, y: padY, width: subWidth, height: subHeight };
+    currentX += subWidth + subgraphGap;
+  }
+
+  const svgWidth = Math.max(600, currentX - subgraphGap + padX);
+  const maxSubHeight = Math.max(...Object.values(subgraphBounds).map(b => b.height));
+  const svgHeight = padY * 2 + maxSubHeight;
+
+  // Draw subgraph backgrounds
+  let subgraphsHtml = '';
+  for (const msName of milestoneNames) {
+    const b = subgraphBounds[msName];
+    const color = getMilestoneColor(msName);
+    subgraphsHtml += `<g>
+      <rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" rx="10" ry="10" fill="${color}" opacity="0.08" stroke="${color}" stroke-opacity="0.3" stroke-width="1.5"/>
+      <text x="${b.x + subgraphPad}" y="${b.y + 20}" fill="${color}" font-size="13" font-weight="600" font-family="inherit">${esc(msName)}</text>
+    </g>`;
+  }
+
+  // Draw edges
+  const filenameSet = new Set(issues.map(i => i.filename));
+  let edgesHtml = '';
+  issues.forEach(issue => {
+    (issue.frontmatter.blocked_by || []).forEach(rawDep => {
+      const dep = resolveRef(rawDep);
+      if (!filenameSet.has(dep)) return;
+      const from = positions[dep];
+      const to = positions[issue.filename];
+      if (!from || !to) return;
+      const fromHeight = nodeHeights[dep];
+      const x1 = from.x + nodeWidth / 2;
+      const y1 = from.y + fromHeight;
+      const x2 = to.x + nodeWidth / 2;
+      const y2 = to.y;
+      const midY = (y1 + y2) / 2;
+      edgesHtml += `<path class="graph-edge" d="M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}"/>`;
+    });
+  });
+
+  // Draw nodes with text wrapping via foreignObject
+  let nodesHtml = '';
+  issues.forEach(issue => {
+    const pos = positions[issue.filename];
+    if (!pos) return;
+    const color = getMilestoneColor(resolveMilestoneName(issue.frontmatter.milestone));
+    const title = issue.frontmatter.title || issue.filename;
+    const display = title.length > maxTitleChars ? title.slice(0, maxTitleChars - 3) + '...' : title;
+    const h = nodeHeights[issue.filename];
+    nodesHtml += `<g class="graph-node" data-filename="${esc(issue.filename)}" transform="translate(${pos.x},${pos.y})">
+      <rect width="${nodeWidth}" height="${h}" fill="${color}" stroke="${color}" opacity="0.85"/>
+      <foreignObject x="0" y="0" width="${nodeWidth}" height="${h}">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:${nodeWidth}px;height:${h}px;display:flex;align-items:center;justify-content:center;padding:4px 10px;box-sizing:border-box;color:#fff;font-size:12px;font-family:inherit;text-align:center;line-height:1.4;overflow:hidden">${esc(display)}</div>
+      </foreignObject>
+    </g>`;
+  });
+
+  container.innerHTML = `<svg width="${svgWidth}" height="${svgHeight}">
+    ${subgraphsHtml}
+    ${edgesHtml}
+    ${nodesHtml}
+  </svg>`;
+
+  container.querySelectorAll('.graph-node').forEach(node => {
+    node.addEventListener('click', () => {
+      const filename = node.dataset.filename;
+      const issue = state.plan.issues.find(i => i.filename === filename);
+      if (issue) openIssueEditor(issue);
+    });
+  });
+}
+
+// Table view
+function renderTable() {
+  const container = document.getElementById('table-view');
+  const issues = state.plan.issues;
+
+  const milestones = [...new Set(state.plan.milestones.map(m => m.frontmatter.title))];
+  const labels = [...new Set(issues.map(i => i.frontmatter.label).filter(Boolean))];
+
+  let filtered = issues.filter(issue => {
+    if (tableFilters.milestone && resolveMilestoneName(issue.frontmatter.milestone) !== tableFilters.milestone) return false;
+    if (tableFilters.label && issue.frontmatter.label !== tableFilters.label) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    let va, vb;
+    switch (tableSort.column) {
+      case 'title': va = a.frontmatter.title || ''; vb = b.frontmatter.title || ''; break;
+      case 'priority': va = a.frontmatter.priority || 99; vb = b.frontmatter.priority || 99; break;
+      case 'label': va = a.frontmatter.label || ''; vb = b.frontmatter.label || ''; break;
+      case 'milestone': va = resolveMilestoneName(a.frontmatter.milestone); vb = resolveMilestoneName(b.frontmatter.milestone); break;
+      case 'dependencies': va = (a.frontmatter.blocked_by || []).length; vb = (b.frontmatter.blocked_by || []).length; break;
+      default: va = ''; vb = '';
+    }
+    if (typeof va === 'string') {
+      const cmp = va.localeCompare(vb);
+      return tableSort.direction === 'ascending' ? cmp : -cmp;
+    }
+    return tableSort.direction === 'ascending' ? va - vb : vb - va;
+  });
+
+  function sortIcon(col) {
+    if (tableSort.column !== col) return '<span class="sort-indicator">\u2195</span>';
+    const arrow = tableSort.direction === 'ascending' ? '\u2191' : '\u2193';
+    return `<span class="sort-indicator active">${arrow}</span>`;
+  }
+
+  container.innerHTML = `
+    <div class="table-filters">
+      <select id="filter-milestone">
+        <option value="">All Milestones</option>
+        ${milestones.map(m => `<option value="${esc(m)}" ${tableFilters.milestone === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}
+      </select>
+      <select id="filter-label">
+        <option value="">All Labels</option>
+        ${labels.map(l => `<option value="${esc(l)}" ${tableFilters.label === l ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+      </select>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th data-col="title">Title ${sortIcon('title')}</th>
+          <th data-col="priority">Priority ${sortIcon('priority')}</th>
+          <th data-col="label">Label ${sortIcon('label')}</th>
+          <th data-col="milestone">Milestone ${sortIcon('milestone')}</th>
+          <th data-col="dependencies">Dependencies ${sortIcon('dependencies')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filtered.map(issue => {
+          const fm = issue.frontmatter;
+          const depCount = (fm.blocked_by || []).length;
+          const msName = resolveMilestoneName(fm.milestone);
+          const color = getMilestoneColor(msName);
+          return `<tr data-filename="${esc(issue.filename)}">
+            <td>${esc(fm.title || issue.filename)}</td>
+            <td>${fm.priority ? `<span class="priority-badge ${priorityClass(fm.priority)}">${priorityLabel(fm.priority)}</span>` : ''}</td>
+            <td>${esc(fm.label || '')}</td>
+            <td>${msName ? `<span class="milestone-dot" style="background:${color}"></span>${esc(msName)}` : ''}</td>
+            <td>${depCount || ''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+  container.querySelectorAll('.data-table th').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (tableSort.column === col) {
+        tableSort.direction = tableSort.direction === 'ascending' ? 'descending' : 'ascending';
+      } else {
+        tableSort.column = col;
+        tableSort.direction = 'ascending';
+      }
+      renderTable();
+    });
+  });
+
+  container.querySelectorAll('.data-table tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const issue = state.plan.issues.find(i => i.filename === tr.dataset.filename);
+      if (issue) openIssueEditor(issue);
+    });
+  });
+
+  document.getElementById('filter-milestone').addEventListener('change', e => {
+    tableFilters.milestone = e.target.value;
+    renderTable();
+  });
+
+  document.getElementById('filter-label').addEventListener('change', e => {
+    tableFilters.label = e.target.value;
+    renderTable();
+  });
+}
+
+// Kanban view
+function renderKanban() {
+  const container = document.getElementById('kanban-view');
+  const issues = state.plan.issues;
+  const milestones = state.plan.milestones.map(m => m.frontmatter.title);
+
+  const columns = {};
+  milestones.forEach(m => { columns[m] = []; });
+  columns['Unassigned'] = [];
+
+  issues.forEach(issue => {
+    const msName = resolveMilestoneName(issue.frontmatter.milestone);
+    if (msName && columns[msName]) columns[msName].push(issue);
+    else columns['Unassigned'].push(issue);
+  });
+
+  const columnOrder = [...milestones];
+  if (columns['Unassigned'].length) columnOrder.push('Unassigned');
+
+  container.innerHTML = `<div class="kanban-board">${columnOrder.map(colName => {
+    const cards = columns[colName];
+    const color = colName === 'Unassigned' ? '#555' : getMilestoneColor(colName);
+    return `<div class="kanban-column" data-milestone="${esc(colName)}">
+      <div class="kanban-column-header">
+        <span><span class="milestone-dot" style="background:${color}"></span>${esc(colName)}</span>
+        <span class="count">${cards.length}</span>
+      </div>
+      <div class="kanban-cards" data-milestone="${esc(colName)}">
+        ${cards.map(issue => {
+          const fm = issue.frontmatter;
+          const depCount = (fm.blocked_by || []).length;
+          return `<div class="kanban-card" draggable="true" data-filename="${esc(issue.filename)}">
+            <div class="kanban-card-title">${esc(fm.title || issue.filename)}</div>
+            <div class="kanban-card-meta">
+              ${fm.priority ? `<span class="priority-badge ${priorityClass(fm.priority)}">${priorityLabel(fm.priority)}</span>` : ''}
+              ${depCount ? `<span>${depCount} dep${depCount > 1 ? 's' : ''}</span>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+
+  setupDragAndDrop();
+}
+
+function setupDragAndDrop() {
+  let draggedFilename = null;
+
+  document.querySelectorAll('.kanban-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      draggedFilename = card.dataset.filename;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggedFilename = null;
+      document.querySelectorAll('.kanban-cards').forEach(c => c.classList.remove('drag-over'));
+    });
+
+    card.addEventListener('click', () => {
+      const issue = state.plan.issues.find(i => i.filename === card.dataset.filename);
+      if (issue) openIssueEditor(issue);
+    });
+  });
+
+  document.querySelectorAll('.kanban-cards').forEach(zone => {
+    zone.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      zone.classList.add('drag-over');
+    });
+
+    zone.addEventListener('dragleave', () => {
+      zone.classList.remove('drag-over');
+    });
+
+    zone.addEventListener('drop', async e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      if (!draggedFilename) return;
+
+      const newMilestone = zone.dataset.milestone;
+      const issue = state.plan.issues.find(i => i.filename === draggedFilename);
+      if (!issue) return;
+
+      const milestone = newMilestone === 'Unassigned' ? undefined : newMilestone;
+      issue.frontmatter.milestone = milestone;
+
+      await fetch(`/api/issues/${encodeURIComponent(issue.filename)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frontmatter: issue.frontmatter, body: issue.body }),
+      });
+
+      renderKanban();
+    });
+  });
+}
+
+// Editor
+function openIssueEditor(issue) {
+  const overlay = document.getElementById('editor-overlay');
+  const titleEl = document.getElementById('editor-title');
+  const body = document.getElementById('editor-body');
+  const actions = document.getElementById('editor-actions');
+
+  titleEl.textContent = 'Edit Issue';
+  const fm = issue.frontmatter;
+  const milestones = state.plan.milestones.map(m => m.frontmatter.title);
+  const otherIssues = state.plan.issues.filter(i => i.filename !== issue.filename);
+  const blockedBy = new Set(fm.blocked_by || []);
+
+  body.innerHTML = `
+    ${field('Title', `<input type="text" id="ed-title" value="${attr(fm.title || '')}">`)}
+    ${field('Priority', `<select id="ed-priority">
+      <option value="">None</option>
+      ${[1,2,3,4].map(p => `<option value="${p}" ${fm.priority === p ? 'selected' : ''}>P${p}</option>`).join('')}
+    </select>`)}
+    ${field('Label', `<input type="text" id="ed-label" value="${attr(fm.label || '')}">`)}
+    ${field('Milestone', `<select id="ed-milestone">
+      <option value="">None</option>
+      ${milestones.map(m => `<option value="${attr(m)}" ${fm.milestone === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}
+    </select>`)}
+    ${field('Estimate', `<input type="number" id="ed-estimate" value="${fm.estimate || ''}" min="0">`)}
+    ${field('Assignee', `<input type="text" id="ed-assignee" value="${attr(fm.assignee || '')}">`)}
+    ${field('Blocked By', `<div class="blocked-by-list">
+      ${otherIssues.map(i => `<label><input type="checkbox" value="${attr(i.filename)}" ${blockedBy.has(i.filename) ? 'checked' : ''}> ${esc(i.frontmatter.title || i.filename)}</label>`).join('')}
+    </div>`)}
+    ${field('Body', `<textarea id="ed-body">${esc(issue.body || '')}</textarea>`)}`;
+
+  actions.innerHTML = `
+    <button class="btn btn-danger" onclick="deleteIssue('${attr(issue.filename)}')">Delete</button>
+    <button class="btn btn-primary" onclick="saveIssue('${attr(issue.filename)}')">Save</button>`;
+
+  overlay.classList.add('open');
+}
+
+function openMilestoneEditor(milestone) {
+  const overlay = document.getElementById('editor-overlay');
+  const titleEl = document.getElementById('editor-title');
+  const body = document.getElementById('editor-body');
+  const actions = document.getElementById('editor-actions');
+
+  titleEl.textContent = 'Edit Milestone';
+  const fm = milestone.frontmatter;
+
+  body.innerHTML = `
+    ${field('Title', `<input type="text" id="ed-title" value="${attr(fm.title || '')}">`)}
+    ${field('Description', `<input type="text" id="ed-description" value="${attr(fm.description || '')}">`)}
+    ${field('Body', `<textarea id="ed-body">${esc(milestone.body || '')}</textarea>`)}`;
+
+  actions.innerHTML = `
+    <button class="btn btn-primary" onclick="saveMilestone('${attr(milestone.filename)}')">Save</button>`;
+
+  overlay.classList.add('open');
+}
+
+function openNewIssue() {
+  const overlay = document.getElementById('editor-overlay');
+  const titleEl = document.getElementById('editor-title');
+  const body = document.getElementById('editor-body');
+  const actions = document.getElementById('editor-actions');
+
+  titleEl.textContent = 'New Issue';
+  const milestones = state.plan.milestones.map(m => m.frontmatter.title);
+  const allIssues = state.plan.issues;
+
+  body.innerHTML = `
+    ${field('Filename', `<input type="text" id="ed-filename" placeholder="my-issue.md">`)}
+    ${field('Title', `<input type="text" id="ed-title">`)}
+    ${field('Priority', `<select id="ed-priority">
+      <option value="">None</option>
+      ${[1,2,3,4].map(p => `<option value="${p}">P${p}</option>`).join('')}
+    </select>`)}
+    ${field('Label', `<input type="text" id="ed-label">`)}
+    ${field('Milestone', `<select id="ed-milestone">
+      <option value="">None</option>
+      ${milestones.map(m => `<option value="${attr(m)}">${esc(m)}</option>`).join('')}
+    </select>`)}
+    ${field('Estimate', `<input type="number" id="ed-estimate" min="0">`)}
+    ${field('Assignee', `<input type="text" id="ed-assignee">`)}
+    ${field('Blocked By', `<div class="blocked-by-list">
+      ${allIssues.map(i => `<label><input type="checkbox" value="${attr(i.filename)}"> ${esc(i.frontmatter.title || i.filename)}</label>`).join('')}
+    </div>`)}
+    ${field('Body', `<textarea id="ed-body"></textarea>`)}`;
+
+  actions.innerHTML = `
+    <button class="btn btn-primary" onclick="createIssue()">Create</button>`;
+
+  overlay.classList.add('open');
+}
+
+function openNewMilestone() {
+  const overlay = document.getElementById('editor-overlay');
+  const titleEl = document.getElementById('editor-title');
+  const body = document.getElementById('editor-body');
+  const actions = document.getElementById('editor-actions');
+
+  titleEl.textContent = 'New Milestone';
+
+  body.innerHTML = `
+    ${field('Filename', `<input type="text" id="ed-filename" placeholder="my-milestone.md">`)}
+    ${field('Title', `<input type="text" id="ed-title">`)}
+    ${field('Description', `<input type="text" id="ed-description">`)}
+    ${field('Body', `<textarea id="ed-body"></textarea>`)}`;
+
+  actions.innerHTML = `
+    <button class="btn btn-primary" onclick="createMilestone()">Create</button>`;
+
+  overlay.classList.add('open');
+}
+
+function closeEditor() {
+  document.getElementById('editor-overlay').classList.remove('open');
+}
+
+function field(label, content) {
+  return `<div class="field-group"><label>${esc(label)}</label>${content}</div>`;
+}
+
+function attr(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function readIssueFrontmatter() {
+  const blockedBy = [];
+  document.querySelectorAll('.blocked-by-list input[type="checkbox"]:checked').forEach(cb => {
+    blockedBy.push(cb.value);
+  });
+
+  const fm = { title: document.getElementById('ed-title').value };
+  const priority = document.getElementById('ed-priority').value;
+  if (priority) fm.priority = parseInt(priority);
+  const label = document.getElementById('ed-label').value;
+  if (label) fm.label = label;
+  const milestone = document.getElementById('ed-milestone').value;
+  if (milestone) fm.milestone = milestone;
+  const estimate = document.getElementById('ed-estimate').value;
+  if (estimate) fm.estimate = parseInt(estimate);
+  const assignee = document.getElementById('ed-assignee').value;
+  if (assignee) fm.assignee = assignee;
+  if (blockedBy.length) fm.blocked_by = blockedBy;
+
+  return fm;
+}
+
+async function saveIssue(filename) {
+  const fm = readIssueFrontmatter();
+  const body = document.getElementById('ed-body').value;
+
+  await fetch(`/api/issues/${encodeURIComponent(filename)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ frontmatter: fm, body }),
+  });
+
+  closeEditor();
+  await fetchPlan();
+}
+
+async function createIssue() {
+  const filename = document.getElementById('ed-filename').value;
+  if (!filename) return;
+  const fm = readIssueFrontmatter();
+  const body = document.getElementById('ed-body').value;
+
+  await fetch('/api/issues', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, frontmatter: fm, body }),
+  });
+
+  closeEditor();
+  await fetchPlan();
+}
+
+async function saveMilestone(filename) {
+  const fm = {
+    title: document.getElementById('ed-title').value,
+  };
+  const desc = document.getElementById('ed-description').value;
+  if (desc) fm.description = desc;
+  const body = document.getElementById('ed-body').value;
+
+  await fetch(`/api/milestones/${encodeURIComponent(filename)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ frontmatter: fm, body }),
+  });
+
+  closeEditor();
+  await fetchPlan();
+}
+
+async function createMilestone() {
+  const filename = document.getElementById('ed-filename').value;
+  if (!filename) return;
+  const fm = {
+    title: document.getElementById('ed-title').value,
+  };
+  const desc = document.getElementById('ed-description').value;
+  if (desc) fm.description = desc;
+  const body = document.getElementById('ed-body').value;
+
+  await fetch('/api/milestones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, frontmatter: fm, body }),
+  });
+
+  closeEditor();
+  await fetchPlan();
+}
+
+async function deleteIssue(filename) {
+  if (!confirm(`Delete ${filename}?`)) return;
+
+  await fetch(`/api/issues/${encodeURIComponent(filename)}`, {
+    method: 'DELETE',
+  });
+
+  closeEditor();
+  await fetchPlan();
+}
+
+// Copy prompt
+function copyPrompt() {
+  if (!state.plan) return;
+  const lines = [`# Plan: ${state.plan.name}`, ''];
+
+  if (state.plan.milestones.length) {
+    lines.push('## Milestones', '');
+    state.plan.milestones.forEach(m => {
+      lines.push(`### ${m.frontmatter.title} (${m.filename})`);
+      if (m.frontmatter.description) lines.push(`Description: ${m.frontmatter.description}`);
+      if (m.body) lines.push('', m.body);
+      lines.push('');
+    });
+  }
+
+  lines.push('## Issues', '');
+  state.plan.issues.forEach(issue => {
+    const fm = issue.frontmatter;
+    lines.push(`### ${fm.title} (${issue.filename})`);
+    if (fm.priority) lines.push(`Priority: P${fm.priority}`);
+    if (fm.label) lines.push(`Label: ${fm.label}`);
+    if (fm.milestone) lines.push(`Milestone: ${fm.milestone}`);
+    if (fm.estimate) lines.push(`Estimate: ${fm.estimate}`);
+    if (fm.assignee) lines.push(`Assignee: ${fm.assignee}`);
+    if (fm.blocked_by?.length) lines.push(`Blocked by: ${fm.blocked_by.join(', ')}`);
+    if (issue.body) lines.push('', issue.body);
+    lines.push('');
+  });
+
+  navigator.clipboard.writeText(lines.join('\n'));
+}
+
+// SSE live reload
+function connectSSE() {
+  const evtSource = new EventSource('/events');
+  evtSource.addEventListener('reload', () => {
+    fetchPlan();
+  });
+  evtSource.onerror = () => {
+    evtSource.close();
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+// Init
+fetchPlan();
+connectSSE();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "linear-plan",
+  "private": true,
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "gray-matter": "^4.0.3"
+  }
+}

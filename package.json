@@ -12,7 +12,8 @@
     "plugins/type-ignore",
     "plugins/ui-design",
     "plugins/vscode",
-    "packages/validate"
+    "packages/validate",
+    "plugins/linear/skills/plan"
   ],
   "scripts": {
     "build": "tsc --noEmit",

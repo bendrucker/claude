@@ -10,6 +10,7 @@
     "plugins/style",
     "plugins/things",
     "plugins/type-ignore",
+    "plugins/implement-issue",
     "plugins/ui-design",
     "plugins/vscode",
     "packages/validate"

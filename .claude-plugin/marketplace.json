@@ -175,6 +175,11 @@
       "name": "terraform",
       "description": "Terraform Cloud workspace management, run monitoring, and registry lookups",
       "source": "./plugins/terraform"
+    },
+    {
+      "name": "reminders",
+      "description": "Apple Reminders integration for reading and managing via JXA",
+      "source": "./plugins/reminders"
     }
   ]
 }

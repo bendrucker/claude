@@ -1,0 +1,8 @@
+{
+  "name": "reminders",
+  "description": "Apple Reminders integration for reading and managing via JXA",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

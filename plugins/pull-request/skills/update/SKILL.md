@@ -13,11 +13,10 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Context
 
-- Provider: !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"}`
+- Provider: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" "$0"`
 - Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
 - PR: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts" "$0" 2>/dev/null || echo "No PR found for current branch"`
-- Diff (GitHub): !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); [ "$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"})" = github ] && "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/gh.sh" "$0" pr diff 2>/dev/null || true`
-- Diff (GitLab): !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); [ "$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"})" = gitlab ] && "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/glab.sh" "$0" mr diff 2>/dev/null || true`
+- Diff: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-diff.ts" "$0"`
 
 ## Workflow
 

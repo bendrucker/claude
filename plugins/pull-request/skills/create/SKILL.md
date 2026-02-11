@@ -11,7 +11,7 @@ allowed-tools: Bash(bun:${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(${CLAUDE_PLUGIN_R
 
 ## Context
 
-- Provider: !`wt_path=$(bun "${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts" "$0"); bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" ${wt_path:+"$wt_path"}`
+- Provider: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" "$0"`
 - Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
 - Status: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" status --short`
 - Log: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" log --oneline -20`

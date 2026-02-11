@@ -40,24 +40,13 @@ Ship branches oldest-first. After a stack branch merges, `git town sync` rebases
 
 ## Worktree Dispatch
 
-Task tool subagents can't write to worktree directories — the sandbox scopes `.` to the orchestrator's cwd, not the worktree path. Two approaches depending on context:
+When creating worktrees that Task subagents will work in, set `WORKTRUNK_WORKTREE_PATH` so worktrees land under the project directory. This keeps them within the sandbox's `.` write scope, allowing subagents to write directly:
 
-- **Parallel work**: Dispatch `claude -p` CLI subprocesses with the worktree as cwd. Run as background Bash commands and poll with `TaskOutput`.
-- **Single task**: Ask the user to start a new Claude session in the worktree directory.
+```bash
+WORKTRUNK_WORKTREE_PATH='.worktrees/{{ branch | sanitize }}' wt switch --create feature/foo
+```
 
-Best practices for `claude -p` dispatch:
-
-- **`--allowedTools` is mandatory.** Non-interactive `claude -p` cannot prompt for permissions — missing tools fail silently with no useful output. Over-permissioning is better than under-permissioning since the orchestrator has already validated the task scope.
-- Common tool sets to include:
-  - File ops: `Read`, `Edit`, `Write`, `Glob`, `Grep` (always include — subprocesses need to explore)
-  - Git: `Bash(git add:*)`, `Bash(git commit:*)`, `Bash(git status:*)`, `Bash(git diff:*)`, `Bash(git log:*)`
-  - File mgmt: `Bash(rm:*)`, `Bash(rmdir:*)`, `Bash(mv:*)`, `Bash(mkdir:*)`, `Bash(ls:*)`, `Bash(chmod:*)`
-- Never use `--dangerously-skip-permissions`.
-- Do not pass `--model` — let the user's default apply.
-- Use `--verbose` for implementation tasks where you want to monitor progress. Reserve plain `-p` (no verbose) for programmatic use where you'll parse the output (e.g., `--output-format json`).
-- Run via `Bash(run_in_background: true)` for parallelism.
-- Check exit codes and output. Report errors rather than retrying blindly.
-- Avoid heredocs in Bash calls that dispatch `claude -p` — the sandbox blocks temp file creation. Write prompts to `/tmp/claude/` first, then pipe: `cat /tmp/claude/prompt.md | claude -p ...`
+Only use this override when dispatching work to subagents. For worktrees the user will work in manually, let Worktrunk use its default location.
 
 ## Personal Details
 

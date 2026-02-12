@@ -74,11 +74,6 @@
       "source": "./plugins/pull-request"
     },
     {
-      "name": "parallel-prs",
-      "description": "Batch-process multiple issues into draft PRs",
-      "source": "./plugins/parallel-prs"
-    },
-    {
       "name": "interview",
       "description": "Interview-driven planning and clarification",
       "source": "./plugins/interview"

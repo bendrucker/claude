@@ -77,7 +77,6 @@
     "github@bendrucker": true,
     "claude-code@bendrucker": true,
     "pull-request@bendrucker": true,
-    "parallel-prs@bendrucker": true,
     "interview@bendrucker": true,
     "linear@claude-plugins-official": true,
     "github@claude-plugins-official": true,

@@ -117,7 +117,7 @@ Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use l
 
 ## Validation
 
-Run `bunx skill-lint path/to/skill/` to check for issues before committing. CI runs this automatically.
+Run `bun run skill-lint path/to/skill/` to check for issues before committing. CI runs this automatically.
 
 ## References
 

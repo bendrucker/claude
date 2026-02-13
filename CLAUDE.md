@@ -126,13 +126,13 @@ Run `scripts/check-marketplace.sh` to verify all plugin directories are listed i
 
 ### Skill Linting
 
-Skills are validated with `bunx skill-lint`:
+Skills are validated with `bun run skill-lint`:
 
 ```bash
-bunx skill-lint "plugins/<name>/skills/*"
+bun run skill-lint "plugins/<name>/skills/*"
 ```
 
-This validates SKILL.md frontmatter (name, description) and checks reference depth. There is no `@constellos/skill-linter` or similar package—use `skill-lint` only.
+This validates SKILL.md frontmatter (name, description) and checks reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 
 ## Workflow
 

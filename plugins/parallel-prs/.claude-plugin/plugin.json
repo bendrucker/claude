@@ -1,8 +1,0 @@
-{
-  "name": "parallel-prs",
-  "description": "Batch-process multiple issues into draft PRs using parallel worktrees",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  }
-}

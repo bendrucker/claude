@@ -170,6 +170,14 @@
       "name": "terraform",
       "description": "Terraform Cloud workspace management, run monitoring, and registry lookups",
       "source": "./plugins/terraform"
+    },
+    {
+      "name": "honeycomb",
+      "description": "Honeycomb CLI and MCP server for observability",
+      "source": {
+        "source": "github",
+        "repo": "bendrucker/honeycomb-cli"
+      }
     }
   ]
 }

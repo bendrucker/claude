@@ -17,6 +17,8 @@ allowed-tools:
   - Bash(git rerere:*)
   - Bash(git stash:*)
   - Bash(git update-index:*)
+  - Bash(git fetch:*)
+  - Bash(git push:*)
   - Bash(bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/*:*)
 hooks:
   PreToolUse:
@@ -35,6 +37,10 @@ hooks:
 ## Context
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/context.ts 2>/dev/null || echo "Run context.ts manually"`
+
+## Upstream
+
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/upstream.ts 2>/dev/null || echo "Run upstream.ts manually"`
 
 ## Three-Way Access
 

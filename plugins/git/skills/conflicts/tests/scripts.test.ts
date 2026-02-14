@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { $ } from "bun";
-import { createConflictFixture, type Fixture } from "./fixtures/setup";
+import {
+  createConflictFixture,
+  createDivergenceFixture,
+  type DivergenceFixture,
+  type Fixture,
+} from "./fixtures/setup";
 
 const scriptsDir = join(import.meta.dirname, "..", "scripts");
 
@@ -58,6 +63,65 @@ describe("conflicts scripts", () => {
         .text();
 
       expect(result.trim()).toBe("");
+    });
+  });
+});
+
+describe("upstream.ts", () => {
+  describe("up to date", () => {
+    let fixture: Fixture;
+
+    beforeAll(async () => {
+      fixture = await createDivergenceFixture();
+      await $`git fetch origin`.cwd(fixture.path).quiet();
+      await $`git merge origin/main`.cwd(fixture.path).quiet().nothrow();
+    });
+
+    afterAll(async () => {
+      await fixture.cleanup();
+    });
+
+    test("reports up to date when not diverged", async () => {
+      const result = await $`bun ${join(scriptsDir, "upstream.ts")}`.cwd(fixture.path).text();
+      expect(result).toContain("up to date");
+    });
+  });
+
+  describe("diverged without overlap", () => {
+    let fixture: DivergenceFixture;
+
+    beforeAll(async () => {
+      fixture = await createDivergenceFixture();
+    });
+
+    afterAll(async () => {
+      await fixture.cleanup();
+    });
+
+    test("reports divergence with commit count", async () => {
+      const result = await $`bun ${join(scriptsDir, "upstream.ts")}`.cwd(fixture.path).text();
+      expect(result).toContain("Default branch: main");
+      expect(result).toContain("Commits behind origin/main:");
+      expect(result).toContain("No overlapping file changes");
+    });
+  });
+
+  describe("diverged with overlapping files", () => {
+    let fixture: DivergenceFixture;
+
+    beforeAll(async () => {
+      fixture = await createDivergenceFixture({ overlapping: true });
+    });
+
+    afterAll(async () => {
+      await fixture.cleanup();
+    });
+
+    test("reports overlapping files", async () => {
+      const result = await $`bun ${join(scriptsDir, "upstream.ts")}`.cwd(fixture.path).text();
+      expect(result).toContain("Default branch: main");
+      expect(result).toContain("Files modified on both sides");
+      expect(result).toContain("shared.txt");
     });
   });
 });

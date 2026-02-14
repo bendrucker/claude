@@ -178,6 +178,11 @@
         "source": "github",
         "repo": "bendrucker/honeycomb-cli"
       }
+    },
+    {
+      "name": "raycast",
+      "description": "Raycast extension development patterns, API, and Store publishing",
+      "source": "./plugins/raycast"
     }
   ]
 }

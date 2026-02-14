@@ -26,9 +26,7 @@ if (mergeBase === upstreamTip) {
   process.exit(0);
 }
 
-const commitsBehind = (
-  await $`git rev-list --count ${mergeBase}..${remote}`.quiet().nothrow()
-)
+const commitsBehind = (await $`git rev-list --count ${mergeBase}..${remote}`.quiet().nothrow())
   .text()
   .trim();
 

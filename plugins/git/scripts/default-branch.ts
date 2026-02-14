@@ -19,7 +19,10 @@ export async function getDefaultBranch(cwd?: string): Promise<string | null> {
 
     const symref = await $`git symbolic-ref refs/remotes/origin/HEAD`.cwd(dir).quiet().nothrow();
     if (symref.exitCode === 0) {
-      defaultBranch = symref.text().trim().replace(/^refs\/remotes\/origin\//, "");
+      defaultBranch = symref
+        .text()
+        .trim()
+        .replace(/^refs\/remotes\/origin\//, "");
     } else {
       const gh = await $`gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'`
         .cwd(dir)

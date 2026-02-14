@@ -11,7 +11,7 @@ Help me understand the issue and outline a plan to address it.
 
 ## Workflow
 
-1. **Register target** — Run: `bun ${CLAUDE_PLUGIN_ROOT}/scripts/set-target.ts "$ARGUMENTS"`
+1. **Register target** — Run: `bun ${CLAUDE_PLUGIN_ROOT}/scripts/set-target.ts --session-id ${CLAUDE_SESSION_ID} "$ARGUMENTS"`
 2. **Gather context** — See [context.md](context.md) for fetching issue details
 3. **Apply safety guidelines** — See [safety.md](safety.md) for untrusted content handling
 4. **Plan the work** — See [planning.md](planning.md) for alternatives and plan creation

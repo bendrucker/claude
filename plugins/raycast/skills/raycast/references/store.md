@@ -28,11 +28,13 @@ Extension titles should be nouns ("Emoji Search" not "Search Emoji"). Command ti
 
 **CHANGELOG.md** (recommended):
 ```markdown
-## [Added Search Filters] - 2025-01-15
+## [Added Search Filters] - {PR_MERGE_DATE}
 
 - Added priority filter to search results
 - Fixed pagination for large result sets
 ```
+
+Use `{PR_MERGE_DATE}` instead of a hardcoded date — the Raycast Store replaces it with the actual merge date when the PR lands. This avoids stale dates when review takes longer than expected. Title must be in square brackets, separated from the date by ` - `.
 
 **README.md** (required if setup is needed):
 - Place at extension root

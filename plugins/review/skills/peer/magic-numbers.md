@@ -31,4 +31,4 @@ For Go, suggest package-level constants. For Python, suggest module-level consta
 
 ## Severity
 
-Magic numbers are a **Style** concern. Use `Nit:` prefix for isolated cases. Escalate to **Should** when multiple unexplained literals appear in the same function or when the value is non-obvious (e.g., `if size > 8192`).
+Magic numbers are an **Anti-pattern**. Use `Nit:` prefix for isolated cases. Escalate to **Should** when multiple unexplained literals appear in the same function or when the value is non-obvious (e.g., `if size > 8192`).

@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { execSync } from "node:child_process";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
+import { $ } from "bun";
 import { formatDenyOutput, processInput } from "./block-default-branch-commit";
 
 function mockInput(command: string): PreToolUseHookInput {
@@ -21,8 +21,11 @@ function mockInput(command: string): PreToolUseHookInput {
   };
 }
 
-function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = processInput(input);
+async function getOutput(
+  input: PreToolUseHookInput,
+  cwd: string,
+): Promise<PreToolUseHookSpecificOutput | null> {
+  const result = await processInput(input, cwd);
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
@@ -43,63 +46,57 @@ describe("formatDenyOutput", () => {
 
 describe("processInput", () => {
   let testRepo: string;
-  let originalCwd: string;
 
-  beforeEach(() => {
-    originalCwd = process.cwd();
-    testRepo = fs.mkdtempSync(path.join(os.tmpdir(), "git-hook-test-"));
-    process.chdir(testRepo);
+  beforeEach(async () => {
+    testRepo = await mkdtemp(join(tmpdir(), "git-hook-test-"));
 
-    execSync("git init -q -b main", { stdio: "pipe" });
-    execSync('git config user.email "test@example.com"', { stdio: "pipe" });
-    execSync('git config user.name "Test User"', { stdio: "pipe" });
-    fs.writeFileSync(path.join(testRepo, "README.md"), "");
-    execSync("git add README.md", { stdio: "pipe" });
-    execSync('git commit -q -m "Initial commit"', { stdio: "pipe" });
-    execSync("git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main", {
-      stdio: "pipe",
-    });
+    await $`git init -q -b main`.cwd(testRepo).quiet();
+    await $`git config user.email test@example.com`.cwd(testRepo).quiet();
+    await $`git config user.name "Test User"`.cwd(testRepo).quiet();
+    await writeFile(join(testRepo, "README.md"), "");
+    await $`git add README.md`.cwd(testRepo).quiet();
+    await $`git commit -q -m initial`.cwd(testRepo).quiet();
+    await $`git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main`
+      .cwd(testRepo)
+      .quiet();
   });
 
-  afterEach(() => {
-    process.chdir(originalCwd);
-    fs.rmSync(testRepo, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(testRepo, { recursive: true, force: true });
   });
 
-  it("allows commit on feature branch", () => {
-    execSync("git checkout -q -b feature-branch", { stdio: "pipe" });
-    const output = processInput(mockInput('git commit -m "test"'));
+  it("allows commit on feature branch", async () => {
+    await $`git checkout -q -b feature-branch`.cwd(testRepo).quiet();
+    const output = await processInput(mockInput('git commit -m "test"'), testRepo);
     expect(output).toBeNull();
   });
 
-  it("blocks commit on main branch", () => {
-    const output = getOutput(mockInput('git commit -m "test"'));
+  it("blocks commit on main branch", async () => {
+    const output = await getOutput(mockInput('git commit -m "test"'), testRepo);
     expect(output?.permissionDecision).toBe("deny");
     expect(output?.permissionDecisionReason).toContain("Cannot commit directly to main");
     expect(output?.permissionDecisionReason).toContain("Create a topic branch first");
   });
 
-  it("blocks commit with additional flags", () => {
-    const output = getOutput(mockInput('git commit -a -m "test"'));
+  it("blocks commit with additional flags", async () => {
+    const output = await getOutput(mockInput('git commit -a -m "test"'), testRepo);
     expect(output?.permissionDecision).toBe("deny");
   });
 
-  it("allows commit in detached HEAD state", () => {
-    execSync("git checkout -q --detach HEAD", { stdio: "pipe" });
-    const output = processInput(mockInput('git commit -m "test"'));
+  it("allows commit in detached HEAD state", async () => {
+    await $`git checkout -q --detach HEAD`.cwd(testRepo).quiet();
+    const output = await processInput(mockInput('git commit -m "test"'), testRepo);
     expect(output).toBeNull();
   });
 
-  it("allows commit outside git repo", () => {
-    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "outside-git-"));
-    process.chdir(outsideDir);
+  it("allows commit outside git repo", async () => {
+    const outsideDir = await mkdtemp(join(tmpdir(), "outside-git-"));
 
     try {
-      const output = processInput(mockInput('git commit -m "test"'));
+      const output = await processInput(mockInput('git commit -m "test"'), outsideDir);
       expect(output).toBeNull();
     } finally {
-      process.chdir(testRepo);
-      fs.rmSync(outsideDir, { recursive: true, force: true });
+      await rm(outsideDir, { recursive: true, force: true });
     }
   });
 });

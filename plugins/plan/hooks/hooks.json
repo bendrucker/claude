@@ -3,8 +3,12 @@
   "hooks": {
     "UserPromptSubmit": [
       {
-        "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/scripts/context.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/context.sh"
+          }
+        ]
       }
     ]
   }

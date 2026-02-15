@@ -95,3 +95,15 @@ Assigning tests to the same agent that writes the feature creates tight coupling
 - **Post-completion verification**: Lead runs tests and verification after feature agents complete.
 
 This is an evolving area — no single approach dominates yet.
+
+## Worktree Dispatch
+
+When teammates need isolated worktrees, use `WORKTRUNK_WORKTREE_PATH` to place them under the project directory:
+
+```bash
+WORKTRUNK_WORKTREE_PATH='.worktrees/{{ branch | sanitize }}' wt switch --create feature/foo
+```
+
+This keeps worktrees within the sandbox's `.` write scope. Requires `Edit(.worktrees/**)` in `permissions.allow`.
+
+Create all worktrees and spawn all agents from the project root before switching into any worktree. If the lead switches into a worktree first, agents spawned afterward inherit that worktree as their sandbox root — they won't be able to write to other worktrees.

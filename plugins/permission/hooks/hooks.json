@@ -1,0 +1,15 @@
+{
+  "description": "Auto-approve known-safe operations",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/approve.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

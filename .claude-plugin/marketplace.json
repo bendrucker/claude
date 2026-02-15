@@ -183,6 +183,11 @@
       "name": "raycast",
       "description": "Raycast extension development patterns, API, and Store publishing",
       "source": "./plugins/raycast"
+    },
+    {
+      "name": "permission",
+      "description": "Auto-approve known-safe tool operations",
+      "source": "./plugins/permission"
     }
   ]
 }

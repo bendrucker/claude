@@ -49,3 +49,49 @@ Check in on progress, redirect failing approaches, synthesize findings as they c
 **Cross-layer implementation** — one teammate per layer:
 
 > Create a team: one for the API endpoint, one for the React component, one for integration tests.
+
+## When to Use Teams
+
+Teams add coordination overhead. Use them when parallelism savings exceed that cost.
+
+**Good fits:**
+- Independent features across different files/directories
+- Multi-plugin or multi-package changes with clear boundaries
+- Research tasks that can fan out (multiple codebases, docs, APIs)
+
+**Poor fits:**
+- Sequential tasks where each step depends on the previous
+- Changes to a single file or tightly coupled file group
+- Quick fixes, typos, or small enhancements
+
+## Team Sizing
+
+- **2-3 agents**: most common, manageable coordination
+- **4-5 agents**: large independent workstreams
+- **6+**: diminishing returns, coordination overhead dominates
+
+Each agent consumes a full context window. Prefer fewer agents with well-scoped tasks over many agents with thin tasks.
+
+## Task Decomposition
+
+Decompose by **independence**, not by phase or layer.
+
+**By feature/component** (preferred): each agent owns a complete vertical slice. Minimal cross-agent file conflicts.
+
+**By file group**: each agent owns a set of files. Works when files are independent but the feature is shared.
+
+**Avoid decomposing by phase**: "Agent A writes code, Agent B writes tests" creates dependencies and tight coupling between test and source code logic. "Agent A does research, Agent B implements" wastes the researcher's context.
+
+## Sub-Agent Limitations
+
+Teammates cannot spawn sub-agents. Code review, linting, and other verification tasks must be performed by the lead after teammates complete their work, or by assigning a dedicated reviewer teammate that receives work output via task descriptions.
+
+## Testing Strategy
+
+Assigning tests to the same agent that writes the feature creates tight coupling. Strategies:
+
+- **Lead-defined specifications**: Lead writes test specifications or acceptance criteria upfront; teammates implement against them.
+- **Dedicated test teammate**: A test teammate works from acceptance criteria, not source code.
+- **Post-completion verification**: Lead runs tests and verification after feature agents complete.
+
+This is an evolving area — no single approach dominates yet.

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  PreToolUseHookInput,
+  PreToolUseHookSpecificOutput,
+} from "@anthropic-ai/claude-agent-sdk";
 import { processInput } from "./approve";
 
 function mockInput(toolName: string, toolInput: Record<string, unknown> = {}): PreToolUseHookInput {
@@ -16,7 +19,9 @@ function mockInput(toolName: string, toolInput: Record<string, unknown> = {}): P
 
 function isApproved(input: PreToolUseHookInput): boolean {
   const result = processInput(input);
-  return result?.hookSpecificOutput?.permissionDecision === "allow";
+  return (
+    (result?.hookSpecificOutput as PreToolUseHookSpecificOutput)?.permissionDecision === "allow"
+  );
 }
 
 describe("read-only tools", () => {

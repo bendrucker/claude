@@ -183,6 +183,11 @@
       "name": "raycast",
       "description": "Raycast extension development patterns, API, and Store publishing",
       "source": "./plugins/raycast"
+    },
+    {
+      "name": "tmux",
+      "description": "tmux integration for bell notifications, status updates, and session context",
+      "source": "./plugins/tmux"
     }
   ]
 }

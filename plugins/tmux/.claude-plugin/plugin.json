@@ -1,0 +1,8 @@
+{
+  "name": "tmux",
+  "description": "tmux integration for bell notifications, status updates, and session context",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

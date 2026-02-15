@@ -13,7 +13,9 @@
     "plugins/implement-issue",
     "plugins/ui-design",
     "plugins/vscode",
-    "packages/validate"
+    "packages/validate",
+    "packages/launch",
+    "packages/claude-tool"
   ],
   "scripts": {
     "build": "tsc --noEmit",

@@ -1,0 +1,8 @@
+{
+  "name": "claude-tool",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "claude-tool": "./cli.ts"
+  }
+}

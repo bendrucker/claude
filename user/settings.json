@@ -27,6 +27,7 @@
       "Edit(tmp/**)",
       "Edit(.git/config)",
       "Edit(.git/config.lock)",
+      "Edit(.worktrees/**)",
       "Edit(~/.npm/**)",
       "Edit(~/.terraform.d/plugin-cache/**)",
       "Edit(~/.cache/uv/**)",

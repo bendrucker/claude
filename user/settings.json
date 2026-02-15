@@ -139,9 +139,10 @@
     }
   },
   "sandbox": {
-    "enabled": true,
+    "enabled": false,
     "autoAllowBashIfSandboxed": true,
     "network": {
+      "allowLocalBinding": true,
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
       ]

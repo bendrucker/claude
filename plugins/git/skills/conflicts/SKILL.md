@@ -32,15 +32,15 @@ hooks:
 
 ## Status
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts 2>/dev/null || echo "Run status.ts manually"`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts 2>/dev/null`
 
 ## Context
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/context.ts 2>/dev/null || echo "Run context.ts manually"`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/context.ts 2>/dev/null`
 
 ## Upstream
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/upstream.ts 2>/dev/null || echo "Run upstream.ts manually"`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/upstream.ts 2>/dev/null`
 
 ## Three-Way Access
 

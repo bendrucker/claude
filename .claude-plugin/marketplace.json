@@ -183,6 +183,11 @@
       "name": "raycast",
       "description": "Raycast extension development patterns, API, and Store publishing",
       "source": "./plugins/raycast"
+    },
+    {
+      "name": "ntfy",
+      "description": "Push notifications via ntfy for remote Claude Code sessions",
+      "source": "./plugins/ntfy"
     }
   ]
 }

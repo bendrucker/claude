@@ -1,0 +1,5 @@
+{
+  "name": "ntfy",
+  "description": "Push notifications via ntfy for remote Claude Code sessions",
+  "author": { "name": "Ben Drucker", "email": "bvdrucker@gmail.com" }
+}

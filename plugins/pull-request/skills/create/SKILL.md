@@ -4,18 +4,18 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR—including after committing changes.
 
-allowed-tools: Bash(bun:${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(${CLAUDE_PLUGIN_ROOT}/scripts/worktree/*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
+allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(${CLAUDE_PLUGIN_ROOT}/scripts/worktree/*:*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
 ---
 
 # Create Pull Request
 
 ## Context
 
-- Provider: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" "$0"`
-- Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
-- Status: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" status --short`
-- Log: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" log --oneline -20`
-- Diff: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" diff HEAD`
+- Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts $0`
+- Branch: !`${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh $0 branch --show-current`
+- Status: !`${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh $0 status --short`
+- Log: !`${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh $0 log --oneline -20`
+- Diff: !`${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh $0 diff HEAD`
 
 ## Title
 

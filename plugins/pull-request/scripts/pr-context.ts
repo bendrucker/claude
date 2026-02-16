@@ -85,7 +85,7 @@ if (import.meta.main) {
 
     console.log(JSON.stringify(context, null, 2));
   } catch (error) {
-    console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
+    console.log("No PR found for current branch");
+    process.exit(0);
   }
 }

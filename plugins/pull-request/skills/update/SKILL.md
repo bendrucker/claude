@@ -4,7 +4,7 @@ description: |
   Update a pull request or merge request body to reflect the current state of changes.
   Use when a PR/MR has evolved through additional commits and the body needs to reflect what will be merged.
 
-allowed-tools: Bash(bun:${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(${CLAUDE_PLUGIN_ROOT}/scripts/worktree/*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
+allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(${CLAUDE_PLUGIN_ROOT}/scripts/worktree/*:*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
 ---
 
 # Update Pull Request
@@ -13,10 +13,10 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Context
 
-- Provider: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts" "$0"`
-- Branch: !`"${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh" "$0" branch --show-current`
-- PR: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts" "$0" 2>/dev/null || echo "No PR found for current branch"`
-- Diff: !`bun "${CLAUDE_PLUGIN_ROOT}/scripts/pr-diff.ts" "$0"`
+- Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts $0`
+- Branch: !`${CLAUDE_PLUGIN_ROOT}/scripts/worktree/git.sh $0 branch --show-current`
+- PR: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts $0`
+- Diff: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-diff.ts $0`
 
 ## Workflow
 

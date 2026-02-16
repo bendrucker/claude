@@ -32,15 +32,15 @@ hooks:
 
 ## Status
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts 2>/dev/null`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts`
 
 ## Context
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/context.ts 2>/dev/null`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/context.ts`
 
 ## Upstream
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/upstream.ts 2>/dev/null`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/upstream.ts`
 
 ## Three-Way Access
 

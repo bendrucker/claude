@@ -38,16 +38,6 @@ I use git-town for stacked branch workflows combined with worktrunk:
 
 Ship branches oldest-first. After a stack branch merges, `git town sync` rebases remaining branches.
 
-## Worktree Dispatch
-
-When creating worktrees that Task subagents will work in, set `WORKTRUNK_WORKTREE_PATH` so worktrees land under the project directory. This keeps them within the sandbox's `.` write scope, allowing subagents to write directly:
-
-```bash
-WORKTRUNK_WORKTREE_PATH='.worktrees/{{ branch | sanitize }}' wt switch --create feature/foo
-```
-
-Only use this override when dispatching work to subagents. For worktrees the user will work in manually, let Worktrunk use its default location.
-
 ## Personal Details
 
 - Standard username: `@bendrucker`. Refer to any actions performed by this user as "you."

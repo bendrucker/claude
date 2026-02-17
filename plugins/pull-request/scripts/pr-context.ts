@@ -72,6 +72,9 @@ if (import.meta.main) {
   const cwd = (await resolveWorktree(branch)) || undefined;
 
   try {
+    const shell = cwd ? $.cwd(cwd) : $;
+    const branch = (await shell`git branch --show-current`.text()).trim();
+
     let context: PRContext;
 
     if (provider === "github") {
@@ -83,7 +86,7 @@ if (import.meta.main) {
       process.exit(1);
     }
 
-    console.log(JSON.stringify(context, null, 2));
+    console.log(JSON.stringify({ branch, ...context }, null, 2));
   } catch (error) {
     console.log("No PR found for current branch");
     process.exit(0);

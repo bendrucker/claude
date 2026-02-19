@@ -37,6 +37,21 @@ git push -u origin feature-branch && glab mr create --fill
 glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<name>"; "i")) | {name, username}'
 ```
 
+## Blocking
+
+Prevent an MR from merging until another MR merges first. Uses the REST API directly since `glab mr` has no blocking subcommand.
+
+```bash
+# Block MR !10 until MR !5 merges
+glab api projects/:id/merge_requests/10/blocks -X POST -f blocking_merge_request_iid=5
+
+# List blocks on an MR
+glab api projects/:id/merge_requests/10/blocks
+
+# Remove a block
+glab api projects/:id/merge_requests/10/blocks/<block-id> -X DELETE
+```
+
 ## Stacking
 
 `glab stack` manages stacked diffs—small changes that build on each other. See [stack.md](stack.md).

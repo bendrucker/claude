@@ -183,6 +183,11 @@
       "name": "raycast",
       "description": "Raycast extension development patterns, API, and Store publishing",
       "source": "./plugins/raycast"
+    },
+    {
+      "name": "tmux",
+      "description": "Tmux session awareness and pane interaction",
+      "source": "./plugins/tmux"
     }
   ]
 }

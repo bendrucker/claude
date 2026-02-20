@@ -11,17 +11,11 @@
       "Bash(wt --help:*)",
       "Bash(wt --version:*)",
       "Bash(wt config:*)",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:modelcontextprotocol.io)",
       "WebFetch(domain:docs.anthropic.com)",
-      "WebFetch(domain:proxy.golang.org)",
-      "WebFetch(domain:sum.golang.org)",
-      "WebFetch(domain:api.github.com)",
       "WebFetch(domain:registry.npmjs.org)",
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:pypi.org)",
-      "WebFetch(domain:pkg.go.dev)",
       "WebFetch(domain:rubygems.org)",
       "Edit(//tmp/**)",
       "Edit(tmp/**)",
@@ -150,12 +144,9 @@
       ]
     },
     "excludedCommands": [
-      "code:*",
       "docker:*",
       "pbcopy:*",
       "pbpaste:*",
-      "open:*",
-      "osascript:*",
       "ssh:*",
       "scp:*",
       "security:*",
@@ -171,7 +162,6 @@
       "diskutil:*",
       "networksetup:*",
       "wt:*",
-      "gh:*",
       "claude:*"
     ]
   },

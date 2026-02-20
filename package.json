@@ -12,6 +12,7 @@
     "plugins/type-ignore",
     "plugins/implement-issue",
     "plugins/ui-design",
+    "plugins/gitlab",
     "plugins/vscode",
     "packages/validate"
   ],

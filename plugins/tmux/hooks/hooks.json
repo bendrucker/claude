@@ -1,0 +1,15 @@
+{
+  "description": "Inject tmux context at session start",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/context.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

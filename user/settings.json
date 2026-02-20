@@ -94,7 +94,8 @@
     "vscode@bendrucker": true,
     "plan@bendrucker": true,
     "playground@claude-plugins-official": true,
-    "linear-cli@schpet": true
+    "linear-cli@schpet": true,
+    "tmux@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

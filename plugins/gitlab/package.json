@@ -1,0 +1,9 @@
+{
+  "name": "gitlab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "cleye": "^1.3.2"
+  }
+}

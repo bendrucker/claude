@@ -31,4 +31,4 @@ See [tone.md](tone.md) for comment style guidelines.
 
 ## Service Support
 
-This skill assumes GitHub. For GitLab merge requests, load the `gitlab` skill.
+This skill assumes GitHub. For GitLab merge requests, load `gitlab:merge-request` for the review submission workflow (draft notes + bulk publish).

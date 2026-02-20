@@ -52,10 +52,15 @@ glab api projects/:id/merge_requests/10/blocks
 glab api projects/:id/merge_requests/10/blocks/<block-id> -X DELETE
 ```
 
+## Reviews
+
+Submit review feedback as draft notes that accumulate before publishing. See [review.md](review.md) for the draft notes workflow, code suggestions, and approvals.
+
 ## Stacking
 
 `glab stack` manages stacked diffs—small changes that build on each other. See [stack.md](stack.md).
 
 ## Reference Files
 
+- [review.md](review.md) - Draft notes review workflow
 - [stack.md](stack.md) - Stacked diff workflow

@@ -17,13 +17,11 @@ async function readBody(file: string | undefined): Promise<string> {
   return await Bun.file(file).text();
 }
 
-async function getDiffRefs(
-  mr: number,
-): Promise<{ base_sha: string; head_sha: string; start_sha: string }> {
-  const result =
-    await $`glab api projects/:id/merge_requests/${mr} | jq -r '.diff_refs | "\(.base_sha)\n\(.head_sha)\n\(.start_sha)"'`.text();
-  const [base_sha, head_sha, start_sha] = result.trim().split("\n");
-  return { base_sha, head_sha, start_sha };
+type DiffRefs = { base_sha: string; head_sha: string; start_sha: string };
+
+async function getDiffRefs(mr: number): Promise<DiffRefs> {
+  const result = await $`glab api projects/:id/merge_requests/${mr} | jq '.diff_refs'`.json();
+  return result as DiffRefs;
 }
 
 type Position = {
@@ -45,10 +43,10 @@ function buildPosition(
   refs: { base_sha: string; head_sha: string; start_sha: string },
   path: string,
   opts: {
-    line?: number;
-    oldLine?: number;
-    lineStart?: number;
-    lineEnd?: number;
+    line?: number | undefined;
+    oldLine?: number | undefined;
+    lineStart?: number | undefined;
+    lineEnd?: number | undefined;
   },
 ): Position {
   const position: Position = {

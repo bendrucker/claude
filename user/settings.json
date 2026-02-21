@@ -28,7 +28,8 @@
       "Edit(~/Library/Caches/go-build/**)",
       "Edit(~/src/go/pkg/mod/**)",
       "Edit(~/src/go/pkg/sumdb/**)",
-      "Edit(~/.bun/**)"
+      "Edit(~/.bun/**)",
+      "Read(~/.claude/plugins/**)"
     ],
     "deny": []
   },

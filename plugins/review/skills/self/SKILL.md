@@ -29,7 +29,6 @@ bunx difit $ARGUMENTS
 ```
 
 Common arguments:
-- `.` — All uncommitted changes (staged + unstaged)
 - `staged` — Staged changes only
 - `working` — Unstaged changes only
 - `@ main` — Compare HEAD with main branch
@@ -42,7 +41,11 @@ Pipe a git diff for full control over the diff content:
 git diff $ARGUMENTS | bunx difit
 ```
 
-Use stdin mode when `$ARGUMENTS` contains git diff flags (e.g., `--merge-base`, revision ranges).
+Common arguments:
+- `HEAD` — All uncommitted changes (staged + unstaged)
+- `--merge-base main` — Changes since diverging from main
+
+Use stdin mode for all uncommitted changes (`git diff HEAD`) or when using git diff flags (e.g., `--merge-base`, revision ranges).
 
 ## Workflow
 

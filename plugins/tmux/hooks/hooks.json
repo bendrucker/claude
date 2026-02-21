@@ -1,5 +1,5 @@
 {
-  "description": "Inject tmux context at session start",
+  "description": "Inject tmux context and ring terminal bell for notifications",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,26 @@
           {
             "type": "command",
             "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/context.ts"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '\\a' > /dev/tty"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '\\a' > /dev/tty"
           }
         ]
       }

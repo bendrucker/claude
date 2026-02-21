@@ -14,6 +14,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 ## Context
 
 - Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts $0`
+- PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts $0`
 - PR: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts $0`
 - Diff: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-diff.ts $0`
 
@@ -28,7 +29,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Writing
 
-1. Rewrite the PR body following the same title and body rules as the create skill. See [`sections.md`](sections.md) for section guidance.
+1. Rewrite the PR body following the same title and body rules as the create skill. If a PR template is provided in context, preserve its structure. See [`sections.md`](sections.md) for section guidance.
 2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply:
    - **GitHub**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr update --description "$(cat tmp/pr-body-<branch>.md)"`

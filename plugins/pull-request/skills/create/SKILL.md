@@ -12,6 +12,7 @@ allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(bun ${CLAUDE_PL
 ## Context
 
 - Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts $0`
+- PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts $0`
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts $0`
 
@@ -32,6 +33,24 @@ allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(bun ${CLAUDE_PL
   - `## Changes` - High-level description of changes
   - `## Testing` - Test coverage insights
   - `## References` - Related links and issues
+
+## Template
+
+When a PR template is provided in context above, follow its structure instead of the default body format:
+
+- Preserve all template sections, even if some are left empty
+- Fill checkboxes and prompts based on the changes
+- Remove HTML comments (`<!-- ... -->`) that serve as placeholder instructions
+- Map skill-generated content into corresponding template sections:
+  - Description/summary sections: use the opening summary sentences
+  - Changes/what sections: use `## Changes` content from `sections.md`
+  - Testing/verification sections: use `## Testing` content from `sections.md`
+  - Issue/references sections: use `## Issue` and `## References` content
+- For template sections with no skill equivalent (e.g., checklists, type-of-change), fill them based on the diff context
+- Within each template section, follow the style rules from `sections.md`
+- If the template has a free-form description section, place the summary sentences there and add skill subsections within it as needed
+
+When no template is detected, use the default body format from the Body section above.
 
 ## Issue Handling
 

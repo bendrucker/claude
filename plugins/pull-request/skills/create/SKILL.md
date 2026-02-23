@@ -39,14 +39,14 @@ allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(bun ${CLAUDE_PL
 When a PR template is provided in context above, follow its structure instead of the default body format:
 
 - Preserve all template sections, even if some are left empty
-- Fill checkboxes and prompts based on the changes
+- Leave checklists (checkbox items) untouched for the user to complete manually
 - Remove HTML comments (`<!-- ... -->`) that serve as placeholder instructions
 - Map skill-generated content into corresponding template sections:
   - Description/summary sections: use the opening summary sentences
   - Changes/what sections: use `## Changes` content from `sections.md`
   - Testing/verification sections: use `## Testing` content from `sections.md`
   - Issue/references sections: use `## Issue` and `## References` content
-- For template sections with no skill equivalent (e.g., checklists, type-of-change), fill them based on the diff context
+- For template sections with no skill equivalent (e.g., type-of-change dropdowns), fill them based on the diff context
 - Within each template section, follow the style rules from `sections.md`
 - If the template has a free-form description section, place the summary sentences there and add skill subsections within it as needed
 

@@ -1,0 +1,8 @@
+{
+  "name": "@bendrucker/shell-extract",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "sh-syntax": "^0.5.8"
+  }
+}

@@ -17,8 +17,8 @@ function mockWriteInput(filePath: string, content: string): PreToolUseHookInput 
   };
 }
 
-function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = processInput(input);
+async function getOutput(input: PreToolUseHookInput): Promise<PreToolUseHookSpecificOutput | null> {
+  const result = await processInput(input);
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
@@ -50,7 +50,7 @@ const titleCaseCases: { description: string; content: string; match: boolean }[]
 
 describe("checkTitleCase", () => {
   for (const { description, content, match } of titleCaseCases) {
-    it(description, () => {
+    it(description, async () => {
       const result = checkTitleCase(content);
       if (match) {
         expect(result).not.toBeNull();
@@ -79,7 +79,7 @@ const boldAsHeadingCases: { description: string; content: string; match: boolean
 
 describe("checkBoldAsHeading", () => {
   for (const { description, content, match } of boldAsHeadingCases) {
-    it(description, () => {
+    it(description, async () => {
       const result = checkBoldAsHeading(content);
       if (match) {
         expect(result).not.toBeNull();
@@ -91,21 +91,49 @@ describe("checkBoldAsHeading", () => {
 });
 
 describe("processInput", () => {
-  it("returns title case guidance", () => {
-    const output = getOutput(mockWriteInput("README.md", "# introduction"));
+  it("returns title case guidance", async () => {
+    const output = await getOutput(mockWriteInput("README.md", "# introduction"));
     expect(output?.additionalContext).toContain("AP-style title case");
   });
 
-  it("returns bold-as-heading guidance", () => {
-    const output = getOutput(mockWriteInput("README.md", "**Configuration:**\nSome text"));
+  it("returns bold-as-heading guidance", async () => {
+    const output = await getOutput(mockWriteInput("README.md", "**Configuration:**\nSome text"));
     expect(output?.additionalContext).toContain("markdown heading");
   });
 
-  it("skips non-markdown files", () => {
-    expect(getOutput(mockWriteInput("app.ts", "# introduction"))).toBeNull();
+  it("skips non-markdown files", async () => {
+    expect(await getOutput(mockWriteInput("app.ts", "# introduction"))).toBeNull();
   });
 
-  it("returns null for unknown tool", () => {
+  it("detects title case issue from MCP body", async () => {
+    const input: PreToolUseHookInput = {
+      hook_event_name: "PreToolUse",
+      session_id: "test",
+      transcript_path: "/tmp/test",
+      cwd: "/tmp",
+      tool_name: "mcp__plugin_github_github__create_pull_request",
+      tool_input: { body: "# introduction" },
+      tool_use_id: "test",
+    };
+    const output = await getOutput(input);
+    expect(output?.additionalContext).toContain("AP-style title case");
+  });
+
+  it("allows correct title case from MCP body", async () => {
+    const input: PreToolUseHookInput = {
+      hook_event_name: "PreToolUse",
+      session_id: "test",
+      transcript_path: "/tmp/test",
+      cwd: "/tmp",
+      tool_name: "mcp__plugin_github_github__create_pull_request",
+      tool_input: { body: "# Introduction" },
+      tool_use_id: "test",
+    };
+    const output = await getOutput(input);
+    expect(output).toBeNull();
+  });
+
+  it("returns null for non-PR Bash command", async () => {
     const input: PreToolUseHookInput = {
       hook_event_name: "PreToolUse",
       session_id: "test",
@@ -115,6 +143,6 @@ describe("processInput", () => {
       tool_input: { command: "echo hello" },
       tool_use_id: "test",
     };
-    expect(getOutput(input)).toBeNull();
+    expect(await getOutput(input)).toBeNull();
   });
 });

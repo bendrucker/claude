@@ -1,5 +1,10 @@
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 export type { SyncHookJSONOutput };
+export {
+  extractMarkdownFromBash,
+  extractMarkdownFromMcp,
+  hasBashCommand,
+} from "@bendrucker/shell-extract";
 
 export type WriteInput = { file_path: string; content: string };
 export type EditInput = { file_path: string; new_string: string };

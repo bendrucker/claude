@@ -8,8 +8,11 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import {
   type EditInput,
+  extractMarkdownFromBash,
+  extractMarkdownFromMcp,
   formatContext,
   getExtension,
+  hasBashCommand,
   isMarkdownFile,
   type SyncHookJSONOutput,
   type WriteInput,
@@ -81,26 +84,26 @@ export function checkBoldAsHeading(content: string): string | null {
   return result;
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
+export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   const toolName = input.tool_name;
 
-  let content: string;
-  let filePath: string;
+  let content: string | null = null;
 
   if (toolName === "Write") {
     const toolInput = input.tool_input as WriteInput;
+    if (!isMarkdownFile(getExtension(toolInput.file_path))) return null;
     content = toolInput.content;
-    filePath = toolInput.file_path;
   } else if (toolName === "Edit") {
     const toolInput = input.tool_input as EditInput;
+    if (!isMarkdownFile(getExtension(toolInput.file_path))) return null;
     content = toolInput.new_string;
-    filePath = toolInput.file_path;
+  } else if (hasBashCommand(input.tool_input)) {
+    content = await extractMarkdownFromBash(input.tool_input.command, "style/headings");
   } else {
-    return null;
+    content = extractMarkdownFromMcp(input.tool_input);
   }
 
-  const ext = getExtension(filePath);
-  if (!isMarkdownFile(ext)) return null;
+  if (!content) return null;
 
   const titleCase = checkTitleCase(content);
   if (titleCase) {
@@ -130,7 +133,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processInput(input);
+  const output = await processInput(input);
   if (output) {
     writeStdoutJson(output);
   }

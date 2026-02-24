@@ -28,7 +28,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Writing
 
-1. Rewrite the PR body following the same title and body rules as the create skill. See [`sections.md`](sections.md) for section guidance.
+1. Rewrite the PR body following the same title and body rules as the create skill. Describe _what_ is tested, not _how many_ — never mention test counts or summarize by counting items. See [`sections.md`](sections.md) for section guidance.
 2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply:
    - **GitHub**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr update --description "$(cat tmp/pr-body-<branch>.md)"`

@@ -11,12 +11,23 @@
         ]
       }
     ],
-    "Notification": [
+    "PreToolUse": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a' > /dev/tty"
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts --clear"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts"
           }
         ]
       }
@@ -26,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '\\a' > /dev/tty"
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts --background-only"
           }
         ]
       }

@@ -74,7 +74,8 @@ async function glabApiPost(path: string, payload: Record<string, unknown>): Prom
   const tmpFile = join(tmpdir(), `draft-note-${randomUUID()}.json`);
   await Bun.write(tmpFile, JSON.stringify(payload));
   try {
-    const result = await $`glab api ${path} -X POST --input ${tmpFile}`.text();
+    const result =
+      await $`glab api ${path} -X POST -H "Content-Type: application/json" --input ${tmpFile}`.text();
     console.log(result);
   } finally {
     await Bun.file(tmpFile).unlink();
@@ -157,6 +158,79 @@ const publishCmd = command(
   },
 );
 
+const submitCmd = command(
+  {
+    name: "submit",
+    parameters: ["<mr>"],
+    flags: {
+      approve: {
+        type: Boolean,
+        default: false,
+        description: "Approve the MR after publishing",
+      },
+      requestChanges: {
+        type: Boolean,
+        alias: "request-changes",
+        default: false,
+        description: "Request changes after publishing (Premium+, GraphQL)",
+      },
+      summary: {
+        type: String,
+        description: "Review summary comment text",
+      },
+      summaryFile: {
+        type: String,
+        alias: "summary-file",
+        description: "Read review summary from file",
+      },
+    },
+  },
+  async (parsed) => {
+    const mr = Number(parsed._.mr);
+
+    if (parsed.flags.approve && parsed.flags.requestChanges) {
+      console.error("Cannot both --approve and --request-changes");
+      process.exit(1);
+    }
+
+    const summaryText = parsed.flags.summaryFile
+      ? await Bun.file(parsed.flags.summaryFile).text()
+      : parsed.flags.summary;
+
+    const result = await $`glab api ${apiPath(mr)}/bulk_publish -X POST`.text();
+    console.log(result);
+    console.error("Published draft notes");
+
+    if (summaryText) {
+      const notePath = `projects/:id/merge_requests/${mr}/notes`;
+      await glabApiPost(notePath, { body: summaryText });
+      console.error("Posted summary comment");
+    }
+
+    if (parsed.flags.approve) {
+      const refs = await getDiffRefs(mr);
+      await $`glab api projects/:id/merge_requests/${mr}/approve -X POST -f sha=${refs.head_sha}`.text();
+      console.error("Approved MR");
+    } else if (parsed.flags.requestChanges) {
+      const projectPath = (await $`glab repo view --output json | jq -r '.fullPath'`.text()).trim();
+      const query = `mutation($projectPath: String!, $iid: String!) {
+        mergeRequestRequestChanges(input: { projectPath: $projectPath, iid: $iid }) {
+          mergeRequest { iid }
+          errors
+        }
+      }`;
+      const gqlResult =
+        await $`glab api graphql -f query=${query} -F projectPath=${projectPath} -F iid=${String(mr)}`.json();
+      const payload = gqlResult?.data?.mergeRequestRequestChanges;
+      if (payload?.errors?.length) {
+        console.error(`Request changes failed: ${payload.errors.join(", ")}`);
+        process.exit(1);
+      }
+      console.error("Requested changes");
+    }
+  },
+);
+
 const listCmd = command(
   {
     name: "list",
@@ -172,7 +246,7 @@ const listCmd = command(
 cli(
   {
     name: "draft-note",
-    commands: [createCmd, publishCmd, listCmd],
+    commands: [createCmd, publishCmd, submitCmd, listCmd],
   },
   (parsed) => {
     parsed.showHelp();

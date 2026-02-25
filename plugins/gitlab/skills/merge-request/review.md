@@ -30,10 +30,36 @@ bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --reply-to <discussi
 bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> --resolve --body-file tmp/note.md
 ```
 
-### List and Publish
+### List
 
 ```bash
 bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts list <iid>
+```
+
+### Submit Review
+
+Publish all draft notes and optionally set a review decision. GitLab's REST API has no atomic "submit review" endpoint, so this runs up to three sequential calls: bulk publish, summary comment, and decision.
+
+```bash
+# Publish only (equivalent to "Comment" in web UI)
+bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid>
+
+# Publish with summary comment
+bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid> --summary "LGTM, minor nits"
+
+# Publish and approve
+bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid> --approve
+
+# Publish and request changes (Premium+, uses GraphQL)
+bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid> --request-changes
+
+# Full review: summary + approve
+bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid> --approve --summary-file tmp/review-summary.md
+```
+
+The older `publish` command is still available for quick draft publishing without a review decision:
+
+```bash
 bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts publish <iid>
 ```
 
@@ -56,6 +82,15 @@ second line
 third line
 ```
 ````
+
+## API Pitfalls
+
+- **Content-Type required**: `glab api --input <file>` requires `-H "Content-Type: application/json"`. Without it, GitLab returns HTTP 415.
+- **No nested `-f` fields**: `glab api -f "position[base_sha]=..."` silently fails. Nested objects must be sent as JSON via `--input`.
+- **Reply field**: Use `in_reply_to_discussion_id`, not `discussion_id`.
+- **Don't update positioned notes**: PUT to update a draft note strips the position. Delete and recreate instead.
+- **No atomic review submit**: The REST API's `bulk_publish` only publishes drafts — no summary comment or review decision. The web UI uses an internal controller that combines all three, but it's session-authenticated only. The `submit` command above sequences the calls separately.
+- **Request changes is GraphQL-only**: `mergeRequestRequestChanges` mutation, requires Premium/Ultimate.
 
 ## Discussions
 

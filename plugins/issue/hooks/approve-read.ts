@@ -41,7 +41,7 @@ if (import.meta.main) {
       input = await readStdinJson<PreToolUseHookInput>();
     } catch (error) {
       console.error(
-        `[implement-issue/approve-read] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
+        `[issue/approve-read] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
       );
       return;
     }

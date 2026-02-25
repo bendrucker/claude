@@ -1,0 +1,8 @@
+{
+  "name": "issue",
+  "description": "Work on issues from GitHub, Linear, or GitLab",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

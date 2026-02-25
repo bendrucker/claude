@@ -22,8 +22,8 @@ if (!argv.flags.sessionId) {
 
 const target = parseIssueUrl(argv._.url);
 if (!target) {
-  console.error(`Unrecognized issue URL: ${argv._.url}`);
-  process.exit(1);
+  console.warn(`Unrecognized issue URL: ${argv._.url}`);
+  process.exit(0);
 }
 
 writeTarget(argv.flags.sessionId, target);

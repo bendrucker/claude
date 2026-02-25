@@ -34,14 +34,9 @@
       "source": "./plugins/things"
     },
     {
-      "name": "refine-issue",
-      "description": "Refining issues with technical context and structured details",
-      "source": "./plugins/refine-issue"
-    },
-    {
-      "name": "implement-issue",
-      "description": "Implement a feature or fix based on an issue",
-      "source": "./plugins/implement-issue"
+      "name": "issue",
+      "description": "Work on issues from GitHub, Linear, or GitLab",
+      "source": "./plugins/issue"
     },
     {
       "name": "review",

@@ -12,14 +12,17 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import {
   type EditInput,
+  extractMarkdownFromBash,
+  extractMarkdownFromMcp,
   formatDecision,
   getExtension,
+  hasBashCommand,
   isMarkdownFile,
   type SyncHookJSONOutput,
   type WriteInput,
 } from "./markdown";
 
-type Mode = "write" | "edit";
+type Mode = "write" | "edit" | "external";
 
 type MarkdownMatch = {
   text: string;
@@ -106,11 +109,14 @@ export function checkCode(content: string, ext: string): string | null {
   return null;
 }
 
-export function processInput(input: PreToolUseHookInput, mode: Mode): SyncHookJSONOutput | null {
+export async function processInput(
+  input: PreToolUseHookInput,
+  mode: Mode,
+): Promise<SyncHookJSONOutput | null> {
   const toolName = input.tool_name;
 
-  let content: string;
-  let filePath: string;
+  let content: string | null = null;
+  let filePath: string | undefined;
 
   if (toolName === "Write") {
     const toolInput = input.tool_input as WriteInput;
@@ -120,22 +126,25 @@ export function processInput(input: PreToolUseHookInput, mode: Mode): SyncHookJS
     const toolInput = input.tool_input as EditInput;
     content = toolInput.new_string;
     filePath = toolInput.file_path;
-  } else {
-    return null;
+  } else if (mode === "external") {
+    if (hasBashCommand(input.tool_input)) {
+      content = await extractMarkdownFromBash(input.tool_input.command, "style/numbering");
+    } else {
+      content = extractMarkdownFromMcp(input.tool_input);
+    }
   }
 
-  const ext = getExtension(filePath);
+  if (!content) return null;
+
   let match: string | null = null;
 
-  if (isMarkdownFile(ext)) {
+  if (mode === "external" || (filePath && isMarkdownFile(getExtension(filePath)))) {
     match = checkMarkdown(content);
-  } else {
-    match = checkCode(content, ext);
+  } else if (filePath) {
+    match = checkCode(content, getExtension(filePath));
   }
 
-  if (!match) {
-    return null;
-  }
+  if (!match) return null;
 
   const reason = `Detected numbered sequences that create tight coupling.
 ${match}
@@ -144,9 +153,8 @@ Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
 
   if (mode === "write") {
     return formatDecision("deny", reason);
-  } else {
-    return formatDecision("ask", `This edit introduces numbered sequences. ${reason}`);
   }
+  return formatDecision("ask", `This edit introduces numbered sequences. ${reason}`);
 }
 
 async function main(): Promise<void> {
@@ -162,7 +170,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processInput(input, mode);
+  const output = await processInput(input, mode);
   if (output) {
     writeStdoutJson(output);
   }

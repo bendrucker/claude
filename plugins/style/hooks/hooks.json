@@ -12,6 +12,10 @@
           {
             "type": "command",
             "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/test-counts.ts"
           }
         ]
       },
@@ -25,6 +29,44 @@
           {
             "type": "command",
             "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/test-counts.ts"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(gh pr create:*)|Bash(gh pr edit:*)|Bash(glab mr create:*)|Bash(glab mr update:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts external"
+          },
+          {
+            "type": "command",
+            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/test-counts.ts"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__plugin_github_github__create_pull_request|mcp__plugin_github_github__update_pull_request|mcp__claude_ai_Linear__create_issue|mcp__claude_ai_Linear__create_comment|mcp__claude_ai_Linear__create_document",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts external"
+          },
+          {
+            "type": "command",
+            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/test-counts.ts"
           }
         ]
       }

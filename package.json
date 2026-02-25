@@ -14,6 +14,7 @@
     "plugins/ui-design",
     "plugins/gitlab",
     "plugins/vscode",
+    "packages/shell-extract",
     "packages/validate"
   ],
   "scripts": {

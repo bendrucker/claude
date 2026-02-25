@@ -86,6 +86,6 @@ gh run view <run-id> --log-failed                             # debug failures
 
 ### Automated Monitoring
 
-The `actions-monitor` agent automates failure monitoring and log extraction.
+Use `/github:actions-monitor` to automate failure monitoring and log extraction.
 
 See [references/cli.md](references/cli.md) for the full command reference.

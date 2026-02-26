@@ -4,12 +4,13 @@ description: |
   Investigate GitLab CI pipeline failures and extract diagnostic information. Use when checking pipeline status, debugging failed jobs, or monitoring CI after a push. Identifies failing jobs, extracts relevant error output, and returns a concise summary.
 context: fork
 agent: general-purpose
-allowed-tools: [Bash(glab:*)]
+model: haiku
+allowed-tools: [Bash(glab ci:*), Bash(glab api:*)]
 ---
 
 # CI Monitor
 
-Investigate GitLab CI pipeline failures and extract diagnostic information. Your job is extraction only — find the failures and present them concisely. Do not analyze root causes or suggest fixes.
+Investigate GitLab CI pipeline failures and extract diagnostic information. Extract only: find the failures and present them concisely. Do not analyze root causes or suggest fixes.
 
 ## Target
 
@@ -43,7 +44,7 @@ For each failing job, fetch its log:
 glab ci trace <job-id>
 ```
 
-Parse the log output for failure-relevant sections. See [references/log-parsing.md](references/log-parsing.md) for patterns by language and framework.
+Parse the log output for failure-relevant sections. See [references/log-parsing.md](references/log-parsing.md) for CI-specific log structure.
 
 When multiple jobs fail, fetch logs for each job in separate parallel Bash calls.
 

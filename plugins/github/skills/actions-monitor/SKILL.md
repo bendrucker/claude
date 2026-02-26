@@ -4,12 +4,13 @@ description: |
   Monitor GitHub Actions workflow runs and extract failure diagnostics. Use when watching CI after a push, checking workflow status, or investigating failed runs. Identifies failing jobs, extracts relevant error output, and returns a concise summary.
 context: fork
 agent: general-purpose
-allowed-tools: [Bash(gh:*)]
+model: haiku
+allowed-tools: [Bash(gh run:*)]
 ---
 
 # Actions Monitor
 
-Monitor GitHub Actions and extract failure diagnostics. Your job is extraction only — find the failures and present them concisely. Do not analyze root causes or suggest fixes.
+Monitor GitHub Actions and extract failure diagnostics. Extract only: find the failures and present them concisely. Do not analyze root causes or suggest fixes.
 
 ## Target
 
@@ -41,7 +42,7 @@ For each failing job, fetch its log:
 gh run view --log --job <job-id>
 ```
 
-Parse the log output for failure-relevant sections. See [references/log-parsing.md](references/log-parsing.md) for patterns by language and framework.
+Parse the log output for failure-relevant sections. See [references/log-parsing.md](references/log-parsing.md) for CI-specific log structure.
 
 If the full job log is still too large, try `--log-failed` on the specific job:
 

@@ -1,41 +1,11 @@
-# Log Parsing Patterns
+# Log Parsing
 
-Language-agnostic strategies for extracting failure details from CI logs.
+## CI Log Structure
 
-## General Strategy
+CI logs are step-annotated: each step has a start marker and exit code. When a step exits non-zero, the relevant output is between that step's start marker and the exit. GitLab job logs use ANSI section markers (`section_start`/`section_end`) to delimit steps.
 
-Search from the **bottom of the log upward** — failure summaries are almost always at the end. Use `tail` to get the last N lines as a fallback when no structured pattern matches.
+## Narrowing Large Output
 
-## By Framework
-
-### Python (pytest)
-
-- Look for `= FAILURES =` or `= short test summary info =` sections (between `═══` delimiter lines)
-- With pytest-xdist, parallel output interleaves but the summary section is always consolidated at the end
-- For doc/example tests, look for diff output between `--- before` and `+++ after`
-
-### Go
-
-- Look for `--- FAIL:` lines and subsequent output until the next `---` or `FAIL` line
-- `go build` errors: `file.go:line:col: error message`
-
-### Node (Jest / Vitest)
-
-- Look for `FAIL` prefix lines, assertion errors, or `Expected`/`Received` blocks
-- Summary section starts with `Tests:` showing pass/fail counts
-
-### Rust
-
-- Look for `error[E####]:` lines with file:line references
-- Test failures: `---- test_name stdout ----` sections
-
-### Build / Lint Errors
-
-- Look for `error:`, `Error:`, `FATAL`, or non-zero exit codes
-- Compiler errors typically include `file:line:col` references
-
-### Diff Output
-
-For tests that compare expected vs actual output:
-- Unified diff markers: `---`, `+++`, `@@`
-- Inline diff: `-expected` / `+actual` lines
+Job logs can be tens of thousands of lines. If per-job output is still too large:
+1. Take the last 100-200 lines. Most tools print a summary section at the end, even with parallel/interleaved output.
+2. Search for structural delimiters (repeated `=`, `-`, `*` characters) that bound failure sections

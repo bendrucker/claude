@@ -55,10 +55,6 @@
       }
     ]
   },
-  "statusLine": {
-    "type": "command",
-    "command": "wt list statusline --claude-code"
-  },
   "enabledPlugins": {
     "pr-review-toolkit@claude-plugins-official": true,
     "go@bendrucker": true,
@@ -124,14 +120,14 @@
       "source": {
         "source": "github",
         "repo": "max-sixty/worktrunk",
-        "ref": "v0.24.0"
+        "ref": "v0.27.0"
       }
     },
     "schpet": {
       "source": {
         "source": "github",
         "repo": "schpet/linear-cli",
-        "ref": "v1.9.1"
+        "ref": "v1.10.0"
       }
     }
   },

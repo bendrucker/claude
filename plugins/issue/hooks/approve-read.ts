@@ -11,6 +11,7 @@ type IssueReadInput = {
 };
 
 function matchesTarget(input: IssueReadInput, target: IssueTarget): boolean {
+  if (target.service !== "github") return false;
   return (
     input.owner === target.owner &&
     input.repo === target.repo &&

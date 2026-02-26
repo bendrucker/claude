@@ -11,6 +11,7 @@ type IssueReadInput = {
 };
 
 function matchesTarget(input: IssueReadInput, target: IssueTarget): boolean {
+  if (target.service !== "github") return false;
   return (
     input.owner === target.owner &&
     input.repo === target.repo &&
@@ -41,7 +42,7 @@ if (import.meta.main) {
       input = await readStdinJson<PreToolUseHookInput>();
     } catch (error) {
       console.error(
-        `[implement-issue/approve-read] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
+        `[issue/approve-read] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
       );
       return;
     }

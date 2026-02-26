@@ -127,7 +127,7 @@
       "source": {
         "source": "github",
         "repo": "schpet/linear-cli",
-        "ref": "v1.9.1"
+        "ref": "v1.10.0"
       }
     }
   },

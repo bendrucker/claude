@@ -1,5 +1,16 @@
+import Darwin
 import EventKit
 import Foundation
+
+@_silgen_name("responsibility_get_pid_responsible_for_pid")
+func responsibility_get_pid_responsible_for_pid(_ pid: pid_t) -> pid_t
+
+func hasAppBundleContext() -> Bool {
+    let pid = responsibility_get_pid_responsible_for_pid(getpid())
+    var buf = [CChar](repeating: 0, count: Int(PROC_PIDPATHINFO_MAXSIZE))
+    proc_pidpath(pid, &buf, UInt32(buf.count))
+    return String(cString: buf).contains(".app/")
+}
 
 let store = EKEventStore()
 
@@ -207,7 +218,11 @@ func deleteEvent(id: String) {
 }
 
 guard requestAccess() else {
-    print("{\"error\": \"Calendar access denied\"}")
+    if hasAppBundleContext() {
+        print("{\"error\": \"Calendar access denied\"}")
+    } else {
+        print("{\"error\": \"Calendar access denied\", \"reason\": \"no-app-bundle\", \"detail\": \"EventKit requires a bundle ID for TCC — the responsible process has no app bundle context.\"}")
+    }
     exit(1)
 }
 

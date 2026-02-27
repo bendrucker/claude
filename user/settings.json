@@ -85,7 +85,8 @@
     "plan@bendrucker": true,
     "playground@claude-plugins-official": true,
     "linear-cli@schpet": true,
-    "tmux@bendrucker": true
+    "tmux@bendrucker": true,
+    "agent-browser@agent-browser": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -127,6 +128,13 @@
         "source": "github",
         "repo": "schpet/linear-cli",
         "ref": "v1.10.0"
+      }
+    },
+    "agent-browser": {
+      "source": {
+        "source": "github",
+        "repo": "vercel-labs/agent-browser",
+        "ref": "v0.15.1"
       }
     }
   },

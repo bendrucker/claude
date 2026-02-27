@@ -16,8 +16,7 @@ Tools and workflows for managing issues, projects, and teams in Linear.
 Choose the right tool for the task:
 
 1. **MCP tools** - Use for simple operations (create/update/query single issues, basic filters)
-2. **SDK scripts** - Use for complex operations (loops, bulk updates, conditional logic, data transformations)
-3. **GraphQL API** - Fallback for operations not supported by MCP or SDK
+2. **`linear api` CLI** - Use for complex queries, bulk operations, or anything not supported by MCP tools
 
 ## Conventions
 
@@ -77,29 +76,25 @@ await linear.create_issue({
 
 If a label isn't found at the workspace level, check the team before concluding it doesn't exist.
 
-## SDK Automation Scripts
-
-**Use only when MCP tools are insufficient.** For complex operations involving loops, mapping, or bulk updates, write TypeScript scripts using `@linear/sdk`. See `sdk.md` for:
-
-- Complete script patterns and templates
-- Common automation examples (bulk updates, filtering, reporting)
-- Tool selection criteria
-
-Scripts provide full type hints and are easier to debug than raw GraphQL for multi-step operations.
-
 ## GraphQL API
 
-**Fallback only.** Use when operations aren't supported by MCP or SDK. See `api.md` for documentation on using the Linear GraphQL API directly.
-
-### Ad-Hoc Queries
-
-Use `scripts/query.ts` to execute GraphQL queries:
+Use `linear api` for queries and mutations not supported by MCP tools. See `api.md` for full documentation.
 
 ```bash
-LINEAR_API_KEY=lin_api_xxx node scripts/query.ts "query { viewer { id name } }"
+linear api 'query { viewer { id name } }'
 ```
 
-If `LINEAR_API_KEY` is not provided to the Claude process, inform the user that GraphQL queries cannot be executed without an API key.
+With variables:
+
+```bash
+linear api 'query($id: String!) { issue(id: $id) { title } }' --variable id=ISSUE_ID
+```
+
+Pipe output through `jq` for formatting:
+
+```bash
+linear api 'query { viewer { assignedIssues { nodes { identifier title } } } }' | jq '.data.viewer.assignedIssues.nodes'
+```
 
 ## Opening Issues in the Desktop App
 

@@ -10,8 +10,6 @@ Authenticate interactively (persists credentials):
 linear auth login
 ```
 
-Or set the `LINEAR_API_KEY` environment variable for non-interactive use.
-
 ## Usage
 
 Pass a query as an argument:

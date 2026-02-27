@@ -101,6 +101,25 @@ export function findXcallRunner(): string | null {
   return null;
 }
 
+const BOOLEAN_ATTRIBUTES = ["completed", "canceled", "reveal", "duplicate"] as const;
+
+export function coerceBooleanAttributes(
+  attributes: Record<string, string>,
+): Record<string, string | boolean> {
+  const result: Record<string, string | boolean> = {};
+  for (const [key, value] of Object.entries(attributes)) {
+    if (
+      (BOOLEAN_ATTRIBUTES as readonly string[]).includes(key) &&
+      (value === "true" || value === "false")
+    ) {
+      result[key] = value === "true";
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 export function buildJsonPayload(ids: string[], attributes: Record<string, string>): string {
   if (ids.length === 0) {
     throw new Error("At least one ID is required");
@@ -109,11 +128,12 @@ export function buildJsonPayload(ids: string[], attributes: Record<string, strin
     throw new Error("At least one attribute is required");
   }
 
+  const coerced = coerceBooleanAttributes(attributes);
   const data = ids.map((id) => ({
     type: "to-do" as const,
     operation: "update" as const,
     id,
-    attributes,
+    attributes: coerced,
   }));
 
   return JSON.stringify(data);
@@ -176,7 +196,8 @@ if (import.meta.main) {
       try {
         const result = await xcall(url);
         console.log(result);
-      } catch {
+      } catch (error) {
+        console.error("xcall failed, falling back to open", error);
         await openUrl("json", jsonParams);
       }
     } else {
@@ -192,7 +213,8 @@ if (import.meta.main) {
       try {
         const result = await xcall(url);
         console.log(result);
-      } catch {
+      } catch (error) {
+        console.error("xcall failed, falling back to open", error);
         await openUrl(command, params);
       }
     } else {

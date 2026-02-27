@@ -89,7 +89,7 @@ function execCheck(command: string, cwd: string): Promise<string | null> {
 
 function extractPluginName(relativePath: string): string | null {
   const match = relativePath.match(/^plugins\/([^/]+)\//);
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 export function categorizeChecks(relativePaths: string[], cwd: string): Check[] {
@@ -215,9 +215,8 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
   const results = await Promise.allSettled(checks.map((c) => c.run()));
   const failures: string[] = [];
 
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    const check = checks[i];
+  for (const [i, result] of results.entries()) {
+    const check = checks[i]!;
     if (result.status === "rejected") {
       failures.push(`${check.name}: ${result.reason}`);
     } else if (result.value) {

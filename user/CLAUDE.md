@@ -28,13 +28,11 @@
 
 ## Stacked PRs
 
-I use git-town for stacked branch workflows combined with worktrunk:
+I use git-town for stacked branch workflows:
 
-1. Create base branch: `wt switch --create feature/base`
-2. Work, commit, then append: `git town append child-name`
-3. Create worktree for child: `wt switch child-name`
-4. Sync entire stack: `git town sync --stack`
-5. Propose all PRs: `git town propose --stack`
+- Append a child branch: `git town append child-name`
+- Sync the stack: `git town sync --stack`
+- Propose all PRs: `git town propose --stack`
 
 Ship branches oldest-first. After a stack branch merges, `git town sync` rebases remaining branches.
 

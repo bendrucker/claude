@@ -8,14 +8,12 @@ allowed-tools:
 
 # Linear Notifications
 
-<!-- TODO: Switch to `linear api` when the CLI api subcommand lands (https://github.com/bendrucker/claude/issues/353) -->
-
-Manage the Linear notifications inbox via GraphQL. Use `query.ts` from the `linear:linear` skill for ad-hoc queries until the Linear CLI gains an `api` subcommand.
+Manage the Linear notifications inbox via `linear api`.
 
 ## Listing
 
 ```bash
-bun ${SCRIPTS}/query.ts 'query {
+linear api 'query {
   notifications(first: 50, filter: { readAt: { null: true } }) {
     nodes {
       id type readAt archivedAt
@@ -27,8 +25,6 @@ bun ${SCRIPTS}/query.ts 'query {
   }
 }'
 ```
-
-Where `${SCRIPTS}` is the `scripts/` directory from the `linear:linear` skill.
 
 ### Notification Types
 
@@ -43,14 +39,14 @@ Where `${SCRIPTS}` is the `scripts/` directory from the `linear:linear` skill.
 
 Archive:
 
-```graphql
-mutation { notificationArchive(input: { id: "..." }) { success } }
+```bash
+linear api 'mutation($id: String!) { notificationArchive(input: { id: $id }) { success } }' --variable id=NOTIFICATION_ID
 ```
 
 Mark all read:
 
-```graphql
-mutation { notificationMarkAllAsRead(input: {}) { success } }
+```bash
+linear api 'mutation { notificationMarkAllAsRead(input: {}) { success } }'
 ```
 
 ## Filtering

@@ -4,7 +4,7 @@ MR discussions (threaded comments) via `glab api` and the discussions script.
 
 ## Discussions Script
 
-`${CLAUDE_SKILL_ROOT}/scripts/discussions.ts` handles fetching, filtering, resolving, and summarizing discussions.
+`${CLAUDE_SKILL_ROOT}/scripts/discussions.ts` handles creating, fetching, filtering, resolving, and summarizing discussions. It fetches diff refs automatically for positioned comments.
 
 ### List
 
@@ -53,51 +53,27 @@ Shows resolution counts grouped by author:
 bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts summary <iid>
 ```
 
-## Creating Discussions
+### Create
 
-Create positioned discussions via the API. Requires diff refs (`base_sha`, `start_sha`, `head_sha`) from `glab api projects/:id/merge_requests/<iid>/versions`.
-
-### Single-line comment
+Write body to a file or pipe via stdin:
 
 ```bash
-glab api projects/:id/merge_requests/<iid>/discussions -X POST \
-  --input <(jq -n '{
-    body: "Comment text",
-    position: {
-      base_sha: "<base>", start_sha: "<start>", head_sha: "<head>",
-      position_type: "text",
-      new_path: "src/app.ts",
-      new_line: 42
-    }
-  }') -H "Content-Type: application/json"
+# General discussion (no position)
+echo "Looks good overall" | bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid>
+
+# Inline comment on a new line
+bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/note.md
+
+# Comment on a deleted line
+bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --old-line 10 --body-file tmp/note.md
+
+# Multi-line comment (range)
+bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line-start 10 --line-end 15 --body-file tmp/note.md
 ```
 
-Use `old_line` instead of `new_line` for deleted lines. Use `old_path` for renamed files.
+Diff refs are fetched automatically — no manual SHA management needed.
 
-### Multi-line comment
-
-Add `line_range` to span multiple lines:
-
-```bash
-glab api projects/:id/merge_requests/<iid>/discussions -X POST \
-  --input <(jq -n '{
-    body: "This block needs work",
-    position: {
-      base_sha: "<base>", start_sha: "<start>", head_sha: "<head>",
-      position_type: "text",
-      new_path: "src/app.ts",
-      new_line: 15,
-      line_range: {
-        start: {type: "new", new_line: 10},
-        end: {type: "new", new_line: 15}
-      }
-    }
-  }') -H "Content-Type: application/json"
-```
-
-`line_range.start/end.type` is `"new"` for added lines or `"old"` for removed lines.
-
-### Suggestion
+### Suggestions
 
 Use GitLab's suggestion syntax in the body. The `-N+M` offset replaces N lines above and M lines below the commented line:
 
@@ -116,6 +92,14 @@ second line
 third line
 ```
 ````
+
+Combine with the `create` command:
+
+```bash
+echo '```suggestion:-0+0
+new code here
+```' | bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line 42
+```
 
 ## Pitfalls
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { $ } from "bun";
 import { cli, command } from "cleye";
 import { table } from "table";
@@ -50,14 +52,12 @@ export function parseGlabPaginated(raw: string): unknown[] {
 function summarize(d: Discussion): DiscussionSummary | null {
   const note = d.notes[0];
   if (!note) return null;
-  return {
+  const result: DiscussionSummary = {
     id: d.id,
     author: note.author.username,
     body: note.body,
     resolved: note.resolved ?? false,
     resolvable: note.resolvable ?? false,
-    file: note.position?.new_path ?? note.position?.old_path,
-    line: note.position?.new_line ?? note.position?.old_line,
     lineRange: note.position?.line_range
       ? {
           start:
@@ -66,6 +66,11 @@ function summarize(d: Discussion): DiscussionSummary | null {
         }
       : null,
   };
+  const file = note.position?.new_path ?? note.position?.old_path;
+  if (file) result.file = file;
+  const line = note.position?.new_line ?? note.position?.old_line;
+  if (line) result.line = line;
+  return result;
 }
 
 export type FilterOptions = {
@@ -100,6 +105,139 @@ export function deduplicateDiscussions(discussions: Discussion[]): Discussion[] 
   return [...seen.values()];
 }
 
+function buildFilterOptions(flags: {
+  author: string | undefined;
+  resolvable: boolean;
+  unresolved: boolean;
+}): FilterOptions {
+  const opts: FilterOptions = {};
+  if (flags.author) opts.author = flags.author;
+  if (flags.resolvable) opts.resolvable = true;
+  if (flags.unresolved) opts.unresolved = true;
+  return opts;
+}
+
+type DiffRefs = { base_sha: string; head_sha: string; start_sha: string };
+
+async function getDiffRefs(iid: string): Promise<DiffRefs> {
+  const result = await $`glab api projects/:id/merge_requests/${iid} | jq '.diff_refs'`.json();
+  return result as DiffRefs;
+}
+
+type CreatePosition = {
+  base_sha: string;
+  head_sha: string;
+  start_sha: string;
+  old_path: string;
+  new_path: string;
+  position_type: "text";
+  old_line?: number;
+  new_line?: number;
+  line_range?: {
+    start: { new_line: number; type: "new" };
+    end: { new_line: number; type: "new" };
+  };
+};
+
+function buildPosition(
+  refs: DiffRefs,
+  path: string,
+  opts: {
+    line?: number | undefined;
+    oldLine?: number | undefined;
+    lineStart?: number | undefined;
+    lineEnd?: number | undefined;
+  },
+): CreatePosition {
+  const position: CreatePosition = {
+    ...refs,
+    old_path: path,
+    new_path: path,
+    position_type: "text",
+  };
+
+  if (opts.lineStart !== undefined && opts.lineEnd !== undefined) {
+    position.line_range = {
+      start: { new_line: opts.lineStart, type: "new" },
+      end: { new_line: opts.lineEnd, type: "new" },
+    };
+  } else if (opts.oldLine !== undefined) {
+    position.old_line = opts.oldLine;
+  } else if (opts.line !== undefined) {
+    position.new_line = opts.line;
+  }
+
+  return position;
+}
+
+async function readBody(file: string | undefined): Promise<string> {
+  if (file === "-" || !file) {
+    return await Bun.stdin.text();
+  }
+  return await Bun.file(file).text();
+}
+
+async function glabApiPost(path: string, payload: Record<string, unknown>): Promise<void> {
+  const tmpFile = `${tmpdir()}/discussions-${randomUUID()}.json`;
+  await Bun.write(tmpFile, JSON.stringify(payload));
+  try {
+    const result =
+      await $`glab api ${path} -X POST -H "Content-Type: application/json" --input ${tmpFile}`.text();
+    console.log(result);
+  } finally {
+    await Bun.file(tmpFile).unlink();
+  }
+}
+
+const createCmd = command(
+  {
+    name: "create",
+    parameters: ["<iid>"],
+    flags: {
+      file: { type: String, description: "File path for inline comment" },
+      line: { type: Number, description: "New line number" },
+      oldLine: {
+        type: Number,
+        alias: "old-line",
+        description: "Old line number (deleted lines)",
+      },
+      lineStart: {
+        type: Number,
+        alias: "line-start",
+        description: "Multi-line range start",
+      },
+      lineEnd: {
+        type: Number,
+        alias: "line-end",
+        description: "Multi-line range end",
+      },
+      bodyFile: {
+        type: String,
+        alias: "body-file",
+        description: "Read body from file (default: stdin)",
+      },
+    },
+  },
+  async (parsed) => {
+    const iid = parsed._.iid;
+    const body = await readBody(parsed.flags.bodyFile);
+
+    const payload: Record<string, unknown> = { body };
+
+    if (parsed.flags.file) {
+      const refs = await getDiffRefs(iid);
+      payload.position = buildPosition(refs, parsed.flags.file, {
+        line: parsed.flags.line,
+        oldLine: parsed.flags.oldLine,
+        lineStart: parsed.flags.lineStart,
+        lineEnd: parsed.flags.lineEnd,
+      });
+    }
+
+    await glabApiPost(`projects/:id/merge_requests/${iid}/discussions`, payload);
+  },
+);
+
 const listCmd = command(
   {
     name: "list",
@@ -125,11 +263,7 @@ const listCmd = command(
     const raw = await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
     let discussions = parseGlabPaginated(raw) as Discussion[];
 
-    discussions = filterDiscussions(discussions, {
-      author: parsed.flags.author,
-      resolvable: parsed.flags.resolvable || undefined,
-      unresolved: parsed.flags.unresolved || undefined,
-    });
+    discussions = filterDiscussions(discussions, buildFilterOptions(parsed.flags));
 
     if (parsed.flags.dedupe) {
       discussions = deduplicateDiscussions(discussions);
@@ -245,7 +379,7 @@ const summaryCmd = command(
 cli(
   {
     name: "discussions",
-    commands: [listCmd, resolveCmd, summaryCmd],
+    commands: [createCmd, listCmd, resolveCmd, summaryCmd],
   },
   (parsed) => {
     parsed.showHelp();

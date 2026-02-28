@@ -52,3 +52,32 @@ tmux capture-pane -t $TARGET -p -S -100
 ```
 
 `-S -100` includes 100 lines of scrollback above the visible area.
+
+## Agent Handoffs
+
+Launch a `claude` CLI instance in a new tmux window or session to hand off work.
+
+### new-window
+
+Spawns a window in the current session. Visible in the status bar tab list.
+
+```bash
+tmux new-window -d -n task-name -t "$TMUX_SESSION_NAME" 'claude -p "prompt here"'
+```
+
+- `-d` keeps focus on the current window
+- `-n task-name` labels the window in the status bar
+- `-t "$TMUX_SESSION_NAME"` targets the current session
+
+This is the common case — the agent runs alongside the user's current work and is easy to switch to.
+
+### new-session
+
+Spawns a detached session. Use for isolated or long-lived tasks.
+
+```bash
+tmux new-session -d -s task-name 'claude -p "prompt here"'
+```
+
+- `-d` creates the session without attaching
+- `-s task-name` names the session for `tmux attach -t task-name`

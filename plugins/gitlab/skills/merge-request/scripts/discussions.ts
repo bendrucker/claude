@@ -4,11 +4,18 @@ import { $ } from "bun";
 import { cli, command } from "cleye";
 import { table } from "table";
 
+type LineRange = {
+  start: { type: "new" | "old"; new_line?: number; old_line?: number };
+  end: { type: "new" | "old"; new_line?: number; old_line?: number };
+};
+
 type Position = {
   new_path?: string;
   old_path?: string;
   new_line?: number;
   old_line?: number;
+  position_type?: string;
+  line_range?: LineRange | null;
 };
 
 type Note = {
@@ -32,6 +39,7 @@ type DiscussionSummary = {
   resolvable: boolean;
   file?: string;
   line?: number;
+  lineRange?: { start: number; end: number } | null;
 };
 
 export function parseGlabPaginated(raw: string): unknown[] {
@@ -50,6 +58,13 @@ function summarize(d: Discussion): DiscussionSummary | null {
     resolvable: note.resolvable ?? false,
     file: note.position?.new_path ?? note.position?.old_path,
     line: note.position?.new_line ?? note.position?.old_line,
+    lineRange: note.position?.line_range
+      ? {
+          start:
+            note.position.line_range.start.new_line ?? note.position.line_range.start.old_line ?? 0,
+          end: note.position.line_range.end.new_line ?? note.position.line_range.end.old_line ?? 0,
+        }
+      : null,
   };
 }
 
@@ -123,14 +138,19 @@ const listCmd = command(
     const summaries = discussions.map(summarize).filter((s): s is DiscussionSummary => s !== null);
 
     if (parsed.flags.format === "table") {
+      const formatLocation = (s: DiscussionSummary) => {
+        if (!s.file) return "";
+        const loc = s.lineRange ? `${s.lineRange.start}-${s.lineRange.end}` : String(s.line ?? "");
+        return loc ? `${s.file}:${loc}` : s.file;
+      };
       const rows = summaries.map((s) => [
         s.id.slice(0, 12),
         s.author,
         s.resolved ? "yes" : "no",
-        s.file ?? "",
+        formatLocation(s),
         s.body.slice(0, 60),
       ]);
-      console.log(table([["ID", "Author", "Resolved", "File", "Body"], ...rows]));
+      console.log(table([["ID", "Author", "Resolved", "Location", "Body"], ...rows]));
     } else {
       console.log(JSON.stringify(summaries, null, 2));
     }

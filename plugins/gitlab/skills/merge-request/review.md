@@ -94,14 +94,7 @@ third line
 
 ## Discussions
 
-```bash
-# List all discussions
-glab api projects/:id/merge_requests/<iid>/discussions --paginate
-
-# Resolve/unresolve a thread
-glab api projects/:id/merge_requests/<iid>/discussions/<id> -X PUT -f resolved=true
-glab api projects/:id/merge_requests/<iid>/discussions/<id> -X PUT -f resolved=false
-```
+See [discussions.md](discussions.md) for fetching, filtering, resolving, and summarizing MR discussion threads.
 
 ## Approvals
 

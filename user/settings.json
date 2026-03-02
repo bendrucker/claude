@@ -166,7 +166,8 @@
       "diskutil:*",
       "networksetup:*",
       "wt:*",
-      "claude:*"
+      "claude:*",
+      "open:*"
     ]
   },
   "alwaysThinkingEnabled": true,

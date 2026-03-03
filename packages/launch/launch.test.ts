@@ -11,6 +11,7 @@ describe("buildCommand", () => {
       disablePlugins: [],
       allowedTools: [],
       permissionMode: "default",
+      branchName: "fix/test",
       reasoning: "Standard task",
     };
 
@@ -30,6 +31,7 @@ describe("buildCommand", () => {
       disablePlugins: ["gitlab@bendrucker", "terraform@bendrucker"],
       allowedTools: ["Bash(git:*)", "Bash(go:*)"],
       permissionMode: "plan",
+      branchName: "refactor/arch",
       systemPrompt: "Focus on test coverage",
       reasoning: "Complex architectural refactor",
     };
@@ -69,6 +71,7 @@ describe("buildCommand", () => {
       disablePlugins: [],
       allowedTools: [],
       permissionMode: "default",
+      branchName: "fix/lookup",
       reasoning: "Quick lookup",
     };
 
@@ -84,6 +87,7 @@ describe("buildCommand", () => {
       disablePlugins: [],
       allowedTools: [],
       permissionMode: "default",
+      branchName: "fix/trivial",
       reasoning: "Trivial fix",
     };
 

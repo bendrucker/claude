@@ -96,9 +96,9 @@ export async function presentConfig(
       disablePlugins,
       allowedTools,
       branchName: worktree ?? aiConfig.branchName,
-      systemPrompt: systemPrompt || undefined,
+      ...(systemPrompt ? { systemPrompt } : {}),
       reasoning: aiConfig.reasoning,
     },
-    worktree,
+    ...(worktree ? { worktree } : {}),
   };
 }

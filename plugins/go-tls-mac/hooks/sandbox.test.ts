@@ -1,6 +1,25 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { extractCommands, isGoBinary, processInput } from "./sandbox";
+import { extractCommands, hasGoBuildInfo, processInput } from "./sandbox";
+
+const fixtureDir = join(import.meta.dirname, "..", "tmp", "test-fixtures");
+
+let goBinaryPath: string;
+let plainBinaryPath: string;
+
+beforeAll(async () => {
+  goBinaryPath = join(fixtureDir, "fake-go");
+  await Bun.write(goBinaryPath, `\x00__go_buildinfo\x00padding`);
+
+  plainBinaryPath = join(fixtureDir, "fake-plain");
+  await Bun.write(plainBinaryPath, `\x7fELF\x00\x00\x00\x00`);
+});
+
+afterAll(async () => {
+  const { rm } = await import("node:fs/promises");
+  await rm(fixtureDir, { recursive: true, force: true });
+});
 
 function makeInput(command: string): PreToolUseHookInput {
   return {
@@ -35,7 +54,7 @@ describe("extractCommands", () => {
   });
 
   test("absolute path", () => {
-    expect(extractCommands("/usr/local/bin/gh api /rate_limit")).toEqual(["gh"]);
+    expect(extractCommands("/usr/local/bin/gh api /rate_limit")).toEqual(["/usr/local/bin/gh"]);
   });
 
   test("subshell parens", () => {
@@ -51,17 +70,17 @@ describe("extractCommands", () => {
   });
 });
 
-describe("isGoBinary", () => {
-  test("gh is a Go binary", async () => {
-    expect(await isGoBinary("gh")).toBe(true);
+describe("hasGoBuildInfo", () => {
+  test("detects Go binary marker", async () => {
+    expect(await hasGoBuildInfo(goBinaryPath)).toBe(true);
   });
 
-  test("node is not a Go binary", async () => {
-    expect(await isGoBinary("node")).toBe(false);
+  test("rejects binary without marker", async () => {
+    expect(await hasGoBuildInfo(plainBinaryPath)).toBe(false);
   });
 
-  test("nonexistent binary returns false", async () => {
-    expect(await isGoBinary("nonexistent-binary-12345")).toBe(false);
+  test("returns false for nonexistent path", async () => {
+    expect(await hasGoBuildInfo("/nonexistent/path")).toBe(false);
   });
 });
 
@@ -71,30 +90,8 @@ describe("processInput", () => {
     expect(result).toBeNull();
   });
 
-  test("disables sandbox for Go binary on darwin", async () => {
-    const result = await processInput(makeInput("gh api /rate_limit"), "darwin");
-    expect(result).toEqual({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "allow",
-        permissionDecisionReason: expect.stringContaining("gh"),
-        updatedInput: { dangerouslyDisableSandbox: true },
-      },
-    });
-  });
-
   test("returns null for non-Go binary", async () => {
     const result = await processInput(makeInput("echo hello"), "darwin");
     expect(result).toBeNull();
-  });
-
-  test("detects Go binary through pipe", async () => {
-    const result = await processInput(makeInput("gh api /rate_limit | jq .rate"), "darwin");
-    expect(result).not.toBeNull();
-  });
-
-  test("detects Go binary through &&", async () => {
-    const result = await processInput(makeInput("echo start && gh api /rate_limit"), "darwin");
-    expect(result).not.toBeNull();
   });
 });

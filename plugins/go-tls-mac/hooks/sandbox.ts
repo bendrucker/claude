@@ -11,6 +11,7 @@ const SHELL_OPERATORS = /\s*(?:&&|\|\||[|;])\s*/;
 export function extractCommands(command: string): string[] {
   const segments = command.split(SHELL_OPERATORS);
   const seen = new Set<string>();
+  const result: string[] = [];
 
   for (const segment of segments) {
     const trimmed = segment.trim().replace(/^[()]+|[()]+$/g, "");
@@ -27,24 +28,31 @@ export function extractCommands(command: string): string[] {
     const cmd = tokens[i];
     if (!cmd) continue;
 
-    seen.add(basename(cmd));
+    const name = basename(cmd);
+    if (!seen.has(name)) {
+      seen.add(name);
+      result.push(cmd);
+    }
   }
 
-  return [...seen];
+  return result;
 }
 
-export async function isGoBinary(command: string): Promise<boolean> {
+export async function hasGoBuildInfo(path: string): Promise<boolean> {
   try {
-    const resolved = Bun.which(command);
-    if (!resolved) return false;
-
-    const file = Bun.file(resolved);
+    const file = Bun.file(path);
     const slice = file.slice(0, 65536);
     const bytes = Buffer.from(await slice.arrayBuffer());
     return bytes.includes("__go_buildinfo");
   } catch {
     return false;
   }
+}
+
+export async function isGoBinary(command: string): Promise<boolean> {
+  const resolved = command.startsWith("/") ? command : Bun.which(command);
+  if (!resolved) return false;
+  return hasGoBuildInfo(resolved);
 }
 
 export async function processInput(

@@ -1,0 +1,8 @@
+{
+  "name": "go-tls-mac",
+  "description": "Disable sandbox for Go binaries on macOS to fix TLS certificate verification",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

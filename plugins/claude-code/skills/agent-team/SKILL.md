@@ -47,6 +47,10 @@ Teammates inherit the lead's permission settings at spawn. Each teammate loads p
 - One team per session, no nested teams
 - Lead is fixed for the team's lifetime
 
+## Known Issues
+
+- **tmux backend**: teammates spawned in tmux panes may never receive their initial prompt or poll their inbox, causing them to idle indefinitely ([#23415](https://github.com/anthropics/claude-code/issues/23415)). A separate race condition between pane creation and shell initialization can prevent the `claude` command from executing at all ([#25315](https://github.com/anthropics/claude-code/issues/25315)). Use `in-process` backend (the default) as a workaround.
+
 ## References
 
 - [references/hooks.md](references/hooks.md) — `TeammateIdle` and `TaskCompleted` quality gate hooks

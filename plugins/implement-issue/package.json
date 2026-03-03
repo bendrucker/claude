@@ -1,7 +1,0 @@
-{
-  "name": "implement-issue",
-  "private": true,
-  "dependencies": {
-    "cleye": "^1.3.2"
-  }
-}

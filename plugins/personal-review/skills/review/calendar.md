@@ -43,6 +43,16 @@ After Things inbox processing, re-query today's events:
 - Note any new events (e.g., work calendar additions during personal triage)
 - Update the time budget if new meetings were added
 
+## Access Denied
+
+When the calendar sub-agent reports `"reason": "no-app-bundle"`, EventKit cannot obtain TCC permissions. This happens in tmux, SSH, or any context where the responsible process lacks an app bundle. The review workflow skips calendar silently:
+
+- Initial scan: note "Calendar: skipped (access denied)" and proceed
+- Post-inbox re-check: skip entirely
+- Summary: report calendar as skipped
+
+Do not prompt the user to fix permissions — the environment does not support EventKit.
+
 ## Evening Variant
 
 Preview tomorrow only:

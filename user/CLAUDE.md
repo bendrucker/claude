@@ -28,25 +28,13 @@
 
 ## Stacked PRs
 
-I use git-town for stacked branch workflows combined with worktrunk:
+I use git-town for stacked branch workflows:
 
-1. Create base branch: `wt switch --create feature/base`
-2. Work, commit, then append: `git town append child-name`
-3. Create worktree for child: `wt switch child-name`
-4. Sync entire stack: `git town sync --stack`
-5. Propose all PRs: `git town propose --stack`
+- Append a child branch: `git town append child-name`
+- Sync the stack: `git town sync --stack`
+- Propose all PRs: `git town propose --stack`
 
 Ship branches oldest-first. After a stack branch merges, `git town sync` rebases remaining branches.
-
-## Worktree Dispatch
-
-When creating worktrees that Task subagents will work in, set `WORKTRUNK_WORKTREE_PATH` so worktrees land under the project directory. This keeps them within the sandbox's `.` write scope, allowing subagents to write directly:
-
-```bash
-WORKTRUNK_WORKTREE_PATH='.worktrees/{{ branch | sanitize }}' wt switch --create feature/foo
-```
-
-Only use this override when dispatching work to subagents. For worktrees the user will work in manually, let Worktrunk use its default location.
 
 ## Personal Details
 

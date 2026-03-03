@@ -5,12 +5,33 @@
   "description": "Schema for Claude Code lifecycle hooks - https://code.claude.com/docs/en/hooks",
   "type": "object",
   "properties": {
+    "SessionStart": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a session begins or resumes"
+    },
+    "UserPromptSubmit": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when the user submits a prompt"
+    },
     "PreToolUse": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/hookMatcher"
       },
       "description": "Hooks that run before a tool is executed"
+    },
+    "PermissionRequest": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a permission dialog appears"
     },
     "PostToolUse": {
       "type": "array",
@@ -19,36 +40,85 @@
       },
       "description": "Hooks that run after a tool is executed"
     },
+    "PostToolUseFailure": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run after a tool call fails"
+    },
+    "Notification": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a notification is triggered"
+    },
+    "SubagentStart": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a subagent is spawned"
+    },
+    "SubagentStop": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a subagent finishes"
+    },
     "Stop": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/hookEntry"
+        "$ref": "#/$defs/hookMatcher"
       },
       "description": "Hooks that run when the agent stops"
     },
-    "UserPromptSubmit": {
+    "TeammateIdle": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/hookEntry"
+        "$ref": "#/$defs/hookMatcher"
       },
-      "description": "Hooks that run when the user submits a prompt"
+      "description": "Hooks that run when a teammate is about to go idle"
+    },
+    "TaskCompleted": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a task is being marked as completed"
+    },
+    "PreCompact": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run before context compaction"
+    },
+    "SessionEnd": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a session terminates"
     }
   },
   "additionalProperties": false,
   "$defs": {
     "hookMatcher": {
       "type": "object",
-      "description": "Hook matcher configuration with multiple hooks",
+      "description": "Hook matcher group with optional pattern filter and one or more hook handlers",
       "additionalProperties": false,
       "required": ["hooks"],
       "properties": {
         "matcher": {
           "type": "string",
-          "description": "Pattern to match tool names, case-sensitive (only for PreToolUse and PostToolUse)"
+          "description": "Regex pattern to filter when the hook fires. What it matches depends on the event: tool name, session source, notification type, agent type, etc. Omit or use '*' to match all occurrences."
         },
         "hooks": {
           "type": "array",
-          "description": "Array of hooks to execute",
+          "description": "Array of hook handlers to execute when the matcher matches",
           "items": {
             "$ref": "#/$defs/hookEntry"
           }
@@ -59,7 +129,7 @@
       "anyOf": [
         {
           "type": "object",
-          "description": "Bash command hook",
+          "description": "Shell command hook",
           "additionalProperties": false,
           "required": ["type", "command"],
           "properties": {
@@ -74,13 +144,22 @@
             },
             "timeout": {
               "type": "number",
-              "description": "Timeout in seconds",
+              "description": "Timeout in seconds (default: 600)",
               "exclusiveMinimum": 0
+            },
+            "statusMessage": {
+              "type": "string",
+              "description": "Custom spinner message displayed while the hook runs"
             },
             "once": {
               "type": "boolean",
               "default": false,
-              "description": "Run the hook only once per session"
+              "description": "Run the hook only once per session (skills only)"
+            },
+            "async": {
+              "type": "boolean",
+              "default": false,
+              "description": "Run the hook in the background without blocking"
             }
           }
         },
@@ -101,13 +180,51 @@
             },
             "timeout": {
               "type": "number",
-              "description": "Timeout in seconds",
+              "description": "Timeout in seconds (default: 30)",
               "exclusiveMinimum": 0
+            },
+            "statusMessage": {
+              "type": "string",
+              "description": "Custom spinner message displayed while the hook runs"
             },
             "once": {
               "type": "boolean",
               "default": false,
-              "description": "Run the hook only once per session"
+              "description": "Run the hook only once per session (skills only)"
+            },
+            "model": {
+              "type": "string",
+              "description": "Model to use for evaluation (defaults to a fast model)"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Agent hook that spawns a subagent with tool access to verify conditions",
+          "additionalProperties": false,
+          "required": ["type", "prompt"],
+          "properties": {
+            "type": {
+              "const": "agent",
+              "description": "Hook type"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Prompt describing what to verify. Use $ARGUMENTS placeholder for hook input JSON.",
+              "minLength": 1
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Timeout in seconds (default: 60)",
+              "exclusiveMinimum": 0
+            },
+            "statusMessage": {
+              "type": "string",
+              "description": "Custom spinner message displayed while the hook runs"
+            },
+            "model": {
+              "type": "string",
+              "description": "Model to use for evaluation (defaults to a fast model)"
             }
           }
         }

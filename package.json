@@ -17,7 +17,8 @@
     "packages/validate",
     "packages/launch",
     "packages/claude-tool",
-    "plugins/tmux"
+    "plugins/tmux",
+    "plugins/mac"
   ],
   "scripts": {
     "build": "tsc --noEmit",

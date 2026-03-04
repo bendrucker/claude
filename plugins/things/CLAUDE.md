@@ -2,12 +2,15 @@
 
 ## JXA/Bun Pipeline Architecture
 
-JXA scripts run via `osascript`, which requires Apple Events mach-lookup services (`com.apple.CoreServices.coreservicesd`, `com.apple.tccd.system`). Claude Code's seatbelt sandbox blocks these when `osascript` runs as a child of `bun` (via `run-jxa`). Since `osascript:*` is in `sandbox.excludedCommands`, making `osascript` the top-level command bypasses the sandbox naturally.
+JXA scripts run via `osascript`, which requires Apple Events mach-lookup services. The mac plugin's `jxa.ts` wrapper validates that scripts only target the allowed application via AST parsing, then spawns `osascript` directly. The Things plugin's `run-jxa.ts` shim discovers and delegates to the mac plugin wrapper.
 
-**Pipeline pattern**: `osascript -l JavaScript <jxa-script> <args> | bun <formatter> <flags>`
+**Pipeline pattern**: `bun <root>/scripts/run-jxa.ts Things3 <root>/scripts/jxa/<script> <args> | bun <root>/scripts/format-output.ts <flags>`
 
 - JXA scripts (`scripts/jxa/*.js`) — pure data queries, return JSON via `JSON.stringify`
 - Formatter (`scripts/format-output.ts`) — reads JSON from stdin, outputs tables or passes through `--json`
+- `run-jxa.ts` — discovers mac plugin's `jxa.ts`, validates `Application("Things3")` scope via AST
+
+Sandbox bypass is handled by inline PreToolUse hooks in each skill's frontmatter, setting `dangerouslyDisableSandbox: true` for trusted command patterns.
 
 ## JXA Script Conventions
 
@@ -22,8 +25,10 @@ JXA runs on JavaScriptCore (ES5). Scripts must:
 
 Biome linting is disabled for `scripts/jxa/` files via the root `biome.json` override.
 
+## Reorder Script
+
+`scripts/reorder.ts` is a bun TypeScript script that reuses `url.ts` exports (`getAuthToken`, `buildUrl`). It opens Things URLs via `open -g` to reorder items. Unlike the JXA scripts, it does not use `osascript` — sandbox bypass comes from the `things:url` skill's inline hook.
+
 ## What NOT to Do
 
-- **Don't use `run-jxa`** — spawns `osascript` as a child of `bun`, inheriting the sandbox
-- **Don't spawn `osascript` from Bun/Node** — same sandbox inheritance problem
 - **Don't use `tag.toDos().length`** for tag metadata — includes logbook items (13K+), extremely slow

@@ -96,13 +96,23 @@ describe("processInput", () => {
   });
 
   test("disables sandbox for Go binary on darwin", async () => {
-    const result = await processInput(makeInput(`${goBinaryPath} api /rate_limit`), "darwin");
+    const input = makeInput(`${goBinaryPath} api /rate_limit`);
+    const result = await processInput(input, "darwin");
     expect(result).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        updatedInput: { dangerouslyDisableSandbox: true },
+        updatedInput: {
+          ...(input.tool_input as Record<string, unknown>),
+          dangerouslyDisableSandbox: true,
+        },
       },
     });
+  });
+
+  test("returns null when command is undefined", async () => {
+    const input = { tool_name: "Bash", tool_input: {} } as PreToolUseHookInput;
+    const result = await processInput(input, "darwin");
+    expect(result).toBeNull();
   });
 
   test("detects Go binary through pipe", async () => {

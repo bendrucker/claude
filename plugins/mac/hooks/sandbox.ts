@@ -55,11 +55,11 @@ export async function isGoBinary(command: string): Promise<boolean> {
   return hasGoBuildInfo(resolved);
 }
 
-function disableSandbox(): SyncHookJSONOutput {
+function disableSandbox(toolInput: Record<string, unknown>): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      updatedInput: { dangerouslyDisableSandbox: true },
+      updatedInput: { ...toolInput, dangerouslyDisableSandbox: true },
     },
   };
 }
@@ -70,12 +70,15 @@ export async function processInput(
 ): Promise<SyncHookJSONOutput | null> {
   if (platform !== "darwin") return null;
 
-  const { command } = input.tool_input as BashInput;
+  const toolInput = input.tool_input as Record<string, unknown>;
+  const { command } = toolInput as BashInput;
+  if (!command) return null;
+
   const commands = extractCommands(command);
 
   for (const cmd of commands) {
     if (await isGoBinary(cmd)) {
-      return disableSandbox();
+      return disableSandbox(toolInput);
     }
   }
 

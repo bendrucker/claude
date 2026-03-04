@@ -25,13 +25,15 @@ describe("isGoBinary", () => {
 
 describe("processInput", () => {
   test("disables sandbox for Go binary on darwin", async () => {
-    const result = await processInput(makeInput("gh api /rate_limit"), "darwin");
+    const input = makeInput("gh api /rate_limit");
+    const result = await processInput(input, "darwin");
     expect(result).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        permissionDecision: "allow",
-        permissionDecisionReason: expect.stringContaining("gh"),
-        updatedInput: { dangerouslyDisableSandbox: true },
+        updatedInput: {
+          ...(input.tool_input as Record<string, unknown>),
+          dangerouslyDisableSandbox: true,
+        },
       },
     });
   });

@@ -67,10 +67,10 @@ export function validateAppScope(source: string, app: string): ValidationResult 
     // Application("SomeApp")
     if (callee.type === "Identifier" && callee.name === "Application") {
       const args = node.arguments as Node[];
-      if (args.length > 0 && args[0].type === "Literal" && typeof args[0].value === "string") {
-        const appName = args[0].value as string;
-        if (appName !== app) {
-          violations.push(appName);
+      const firstArg = args[0];
+      if (firstArg?.type === "Literal" && typeof firstArg.value === "string") {
+        if (firstArg.value !== app) {
+          violations.push(firstArg.value);
         }
       }
     }

@@ -56,6 +56,7 @@
   "enabledPlugins": {
     "pr-review-toolkit@claude-plugins-official": true,
     "go@bendrucker": true,
+    "mac@bendrucker": true,
     "git@bendrucker": true,
     "gitlab@bendrucker": true,
     "linear@bendrucker": true,

@@ -12,7 +12,7 @@ Group, prioritize, defer, and reorder the Things Today list.
 Load the `things:jxa` skill. Run the pipeline to get all Today items as JSON:
 
 ```bash
-osascript -l JavaScript ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts --json
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts --json
 ```
 
 Filter to open items.
@@ -50,7 +50,7 @@ Present proposed order for user confirmation.
 Load the `things:url` skill. Use the reorder script:
 
 ```bash
-osascript ${PLUGIN_ROOT}/scripts/reorder.js <id1> <id2> <id3> ...
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3> ...
 ```
 
 Pass IDs in the confirmed priority order.

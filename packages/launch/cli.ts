@@ -2,11 +2,10 @@
 
 import * as p from "@clack/prompts";
 import { cli } from "cleye";
+import { analyze } from "./analyze";
 import { buildCommand } from "./command";
+import { exec } from "./exec";
 import { defaultPaths, loadPluginCatalog } from "./plugins";
-import { buildPrompt } from "./prompt";
-import type { LaunchConfig } from "./schema";
-import { schema } from "./schema";
 import type { TuiResult } from "./tui";
 import { presentConfig } from "./tui";
 
@@ -30,48 +29,10 @@ const task = argv._.task;
 const { settingsPath, marketplacePath } = defaultPaths();
 const plugins = loadPluginCatalog(settingsPath, marketplacePath);
 
-async function analyze(task: string, followUp?: string): Promise<LaunchConfig> {
-  const prompt = followUp
-    ? `${buildPrompt(task, plugins)}\n\n## Follow-up\n\n${followUp}`
-    : buildPrompt(task, plugins);
-
-  const s = p.spinner();
-  s.start("Analyzing task...");
-
-  const result = Bun.spawnSync(
-    [
-      "claude",
-      "-p",
-      "--model",
-      "haiku",
-      "--output-format",
-      "json",
-      "--no-session-persistence",
-      "--json-schema",
-      JSON.stringify(schema),
-      prompt,
-    ],
-    { stdout: "pipe", stderr: "pipe" },
-  );
-
-  s.stop("Analysis complete");
-
-  if (result.exitCode !== 0) {
-    p.cancel("claude -p failed");
-    console.error(result.stderr.toString());
-    process.exit(1);
-  }
-
-  const output = JSON.parse(result.stdout.toString());
-  return {
-    ...output,
-    ...(argv.flags.model ? { model: argv.flags.model } : {}),
-  };
-}
-
 p.intro("claude-launch");
 
-let aiConfig = await analyze(task);
+const modelFlag = argv.flags.model;
+let aiConfig = await analyze(task, plugins, modelFlag ? { model: modelFlag } : undefined);
 p.note(aiConfig.reasoning, "AI reasoning");
 
 let tuiResult: TuiResult;
@@ -96,7 +57,7 @@ while (true) {
 
   if (!followUp) break;
 
-  aiConfig = await analyze(task, followUp);
+  aiConfig = await analyze(task, plugins, { ...(modelFlag ? { model: modelFlag } : {}), followUp });
   p.note(aiConfig.reasoning, "Updated reasoning");
 }
 
@@ -118,29 +79,4 @@ if (p.isCancel(shouldExec) || !shouldExec) {
   process.exit(0);
 }
 
-const env = { ...process.env, ...command.env };
-
-if (tuiResult.worktree) {
-  const execCmd = command.args
-    .map((a) => (a.includes(" ") || a.includes("{") ? `'${a}'` : a))
-    .join(" ");
-  const envPrefix = Object.entries(command.env)
-    .map(([k, v]) => `${k}=${v}`)
-    .join(" ");
-  const fullExec = envPrefix ? `${envPrefix} ${execCmd}` : execCmd;
-
-  const child = Bun.spawn(["wt", "switch", "--create", tuiResult.worktree, "--execute", fullExec], {
-    env,
-    stdio: ["inherit", "inherit", "inherit"],
-  });
-  const exitCode = await child.exited;
-  process.exit(exitCode);
-}
-
-const [cmd = "claude", ...args] = command.args;
-const child = Bun.spawn([cmd, ...args], {
-  env,
-  stdio: ["inherit", "inherit", "inherit"],
-});
-const exitCode = await child.exited;
-process.exit(exitCode);
+await exec({ command, tuiResult });

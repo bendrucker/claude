@@ -18,11 +18,17 @@ const toolPatterns = [
 export type TuiResult = {
   config: LaunchConfig;
   worktree?: string;
+  createBranch: boolean;
+};
+
+export type PresentConfigOptions = {
+  existingRef?: string;
 };
 
 export async function presentConfig(
   aiConfig: LaunchConfig,
   plugins: PluginEntry[],
+  options?: PresentConfigOptions,
 ): Promise<TuiResult | symbol> {
   const model = await p.select({
     message: "Model",
@@ -72,6 +78,23 @@ export async function presentConfig(
   });
   if (p.isCancel(systemPrompt)) return systemPrompt;
 
+  if (options?.existingRef) {
+    return {
+      config: {
+        model,
+        effort,
+        permissionMode,
+        disablePlugins,
+        allowedTools,
+        branchName: options.existingRef,
+        ...(systemPrompt ? { systemPrompt } : {}),
+        reasoning: aiConfig.reasoning,
+      },
+      worktree: options.existingRef,
+      createBranch: false,
+    };
+  }
+
   const useWorktree = await p.confirm({
     message: "Create worktree?",
     initialValue: true,
@@ -100,5 +123,6 @@ export async function presentConfig(
       reasoning: aiConfig.reasoning,
     },
     ...(worktree ? { worktree } : {}),
+    createBranch: true,
   };
 }

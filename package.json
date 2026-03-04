@@ -16,6 +16,7 @@
     "plugins/vscode",
     "packages/validate",
     "packages/launch",
+    "packages/dispatch",
     "packages/claude-tool",
     "plugins/tmux",
     "plugins/mac"

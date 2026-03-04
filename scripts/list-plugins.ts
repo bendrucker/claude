@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 interface PluginEntry {
@@ -10,12 +10,32 @@ interface Marketplace {
   plugins: PluginEntry[];
 }
 
+interface CiConfig {
+  runner?: string;
+}
+
+interface PluginMatrix {
+  name: string;
+  runner: string;
+}
+
 function getLocalPlugins(): string[] {
   const content = readFileSync(".claude-plugin/marketplace.json", "utf8");
   const marketplace: Marketplace = JSON.parse(content);
   return marketplace.plugins
     .filter((p): p is PluginEntry & { source: string } => typeof p.source === "string")
     .map((p) => p.name);
+}
+
+function readCiConfig(plugin: string): CiConfig {
+  const path = `plugins/${plugin}/.ci.json`;
+  if (!existsSync(path)) return {};
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function toMatrixEntry(name: string): PluginMatrix {
+  const ci = readCiConfig(name);
+  return { name, runner: ci.runner ?? "ubuntu-latest" };
 }
 
 function extractPluginNames(files: string[]): string[] {
@@ -55,7 +75,7 @@ function main(): void {
     plugins = allPlugins;
   }
 
-  console.log(JSON.stringify(plugins));
+  console.log(JSON.stringify(plugins.map(toMatrixEntry)));
 }
 
 main();

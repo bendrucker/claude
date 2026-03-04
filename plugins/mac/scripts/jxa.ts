@@ -86,8 +86,9 @@ if (import.meta.main) {
     name: "jxa",
     parameters: ["<app>"],
     flags: {
-      e: {
+      expression: {
         type: String,
+        alias: "e",
         description: "Inline JXA expression",
       },
     },
@@ -99,8 +100,8 @@ if (import.meta.main) {
   let source: string;
   let osascriptArgs: string[];
 
-  if (argv.flags.e) {
-    source = argv.flags.e;
+  if (argv.flags.expression) {
+    source = argv.flags.expression;
     osascriptArgs = ["-l", "JavaScript", "-e", source, ...args];
   } else {
     const scriptPath = args[0];

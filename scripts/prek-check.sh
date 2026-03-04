@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+extract_dirs() {
+  local depth=$1
+  shift
+  printf '%s\n' "$@" | cut -d/ -f1-"$depth" | sort -u
+}
+
+case "${1:-}" in
+  plugin-test)
+    shift
+    for dir in $(extract_dirs 2 "$@"); do
+      bun test "$dir/"
+    done
+    ;;
+  plugin-validate)
+    shift
+    for dir in $(extract_dirs 2 "$@"); do
+      bun packages/validate/plugin.ts "$dir"
+    done
+    ;;
+  hooks-validate)
+    shift
+    for dir in $(extract_dirs 2 "$@"); do
+      bun packages/validate/hooks.ts "$dir"
+    done
+    ;;
+  skill-lint)
+    shift
+    dirs=$(extract_dirs 4 "$@")
+    # shellcheck disable=SC2086
+    bun run skill-lint $dirs
+    ;;
+  *)
+    echo "Unknown subcommand: ${1:-}" >&2
+    exit 1
+    ;;
+esac

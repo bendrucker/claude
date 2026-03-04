@@ -1,4 +1,5 @@
 .claude/settings.local.json
 .claude/hooks/logs/
+.prek/
 node_modules/
 .DS_Store

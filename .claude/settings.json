@@ -32,7 +32,7 @@
           },
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop\""
+            "command": "PREK_HOME=\"$CLAUDE_PROJECT_DIR/.prek\" bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop\""
           }
         ]
       }

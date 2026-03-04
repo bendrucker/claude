@@ -1,15 +1,14 @@
 #!/usr/bin/env bun
 
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import { relative } from "node:path";
 import { promisify } from "node:util";
 import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import { validate as validateSettings } from "../settings";
 
-const execAsync = promisify(exec);
-const CHECK_TIMEOUT = 30_000;
+const execFileAsync = promisify(execFile);
+const PREK_TIMEOUT = 120_000;
 
 interface TranscriptEntry {
   type?: string;
@@ -69,132 +68,6 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   return [...files];
 }
 
-export interface Check {
-  name: string;
-  run: () => Promise<string | null>;
-}
-
-function execCheck(command: string, cwd: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    exec(command, { cwd, timeout: CHECK_TIMEOUT }, (error, stdout, stderr) => {
-      if (error) {
-        const output = (stdout || "") + (stderr || "");
-        resolve(output.trim() || error.message);
-      } else {
-        resolve(null);
-      }
-    });
-  });
-}
-
-function extractPluginName(relativePath: string): string | null {
-  const match = relativePath.match(/^plugins\/([^/]+)\//);
-  return match?.[1] ?? null;
-}
-
-export function categorizeChecks(relativePaths: string[], cwd: string): Check[] {
-  const checks = new Map<string, Check>();
-
-  const pluginsWithTests = new Set<string>();
-  const pluginsToValidate = new Set<string>();
-  const pluginsWithHooksToValidate = new Set<string>();
-  const pluginsWithSkillsToLint = new Set<string>();
-  let needsHookTests = false;
-  let needsSettingsValidation = false;
-  let needsMarketplaceCheck = false;
-
-  for (const path of relativePaths) {
-    const pluginName = extractPluginName(path);
-
-    if (pluginName) {
-      pluginsWithTests.add(pluginName);
-
-      if (path === `plugins/${pluginName}/.claude-plugin/plugin.json`) {
-        pluginsToValidate.add(pluginName);
-      }
-
-      if (path.startsWith(`plugins/${pluginName}/hooks/`)) {
-        pluginsWithHooksToValidate.add(pluginName);
-      }
-
-      if (path.startsWith(`plugins/${pluginName}/skills/`)) {
-        pluginsWithSkillsToLint.add(pluginName);
-      }
-
-      needsMarketplaceCheck = true;
-    }
-
-    if (path.startsWith(".claude/hooks/") || path.startsWith("user/hooks/")) {
-      needsHookTests = true;
-    }
-
-    if (path === ".claude/settings.json" || path === "user/settings.json") {
-      needsSettingsValidation = true;
-    }
-
-    if (path === ".claude-plugin/marketplace.json") {
-      needsMarketplaceCheck = true;
-    }
-  }
-
-  for (const name of pluginsWithTests) {
-    checks.set(`test:${name}`, {
-      name: `Plugin tests: ${name}`,
-      run: () => execCheck(`bun test plugins/${name}/`, cwd),
-    });
-  }
-
-  for (const name of pluginsToValidate) {
-    checks.set(`validate-plugin:${name}`, {
-      name: `Plugin validation: ${name}`,
-      run: () => execCheck(`bun packages/validate/plugin.ts plugins/${name}`, cwd),
-    });
-  }
-
-  for (const name of pluginsWithHooksToValidate) {
-    checks.set(`validate-hooks:${name}`, {
-      name: `Hooks validation: ${name}`,
-      run: () => execCheck(`bun packages/validate/hooks.ts plugins/${name}`, cwd),
-    });
-  }
-
-  for (const name of pluginsWithSkillsToLint) {
-    checks.set(`skill-lint:${name}`, {
-      name: `Skill lint: ${name}`,
-      run: () => execCheck(`bun run skill-lint "plugins/${name}/skills/*"`, cwd),
-    });
-  }
-
-  if (needsHookTests) {
-    checks.set("test:hooks", {
-      name: "Hook tests",
-      run: () => execCheck("bun test .claude/hooks user/hooks", cwd),
-    });
-  }
-
-  if (needsSettingsValidation) {
-    checks.set("validate:settings", {
-      name: "Settings validation",
-      run: async () => {
-        const errors = await validateSettings(cwd);
-        if (errors.size === 0) return null;
-        return [...errors.entries()]
-          .map(([file, errs]) => `${file}:\n${errs.map((e) => `  - ${e}`).join("\n")}`)
-          .join("\n\n");
-      },
-    });
-  }
-
-  if (needsMarketplaceCheck) {
-    checks.set("marketplace", {
-      name: "Marketplace completeness",
-      run: () => execCheck("./scripts/check-marketplace.sh", cwd),
-    });
-  }
-
-  return [...checks.values()];
-}
-
 export async function processStop(input: StopHookInput): Promise<SyncHookJSONOutput | null> {
   if (input.stop_hook_active) {
     return null;
@@ -206,34 +79,38 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
   }
 
   const relativePaths = files.map((f) => relative(input.cwd, f));
-  const checks = categorizeChecks(relativePaths, input.cwd);
 
-  if (checks.length === 0) {
+  try {
+    await execFileAsync("prek", ["run", "--files", ...relativePaths], {
+      cwd: input.cwd,
+      timeout: PREK_TIMEOUT,
+    });
     return null;
-  }
+  } catch (error) {
+    const execError = error as {
+      code?: string;
+      killed?: boolean;
+      stdout?: string;
+      stderr?: string;
+    };
+    const output = ((execError.stdout || "") + (execError.stderr || "")).trim();
 
-  const results = await Promise.allSettled(checks.map((c) => c.run()));
-  const failures: string[] = [];
-
-  for (const [i, result] of results.entries()) {
-    const check = checks[i]!;
-    if (result.status === "rejected") {
-      failures.push(`${check.name}: ${result.reason}`);
-    } else if (result.value) {
-      failures.push(`${check.name}:\n${result.value}`);
+    let context: string;
+    if (execError.code === "ENOENT") {
+      context = "prek is not installed or not in PATH";
+    } else if (execError.killed) {
+      context = `Checks timed out after ${PREK_TIMEOUT / 1000}s. Partial output:\n\n${output}`;
+    } else {
+      context = `Check failures:\n\n${output || (error as Error).message}`;
     }
-  }
 
-  if (failures.length === 0) {
-    return null;
+    return {
+      hookSpecificOutput: {
+        hookEventName: "Stop",
+        additionalContext: context,
+      },
+    } as unknown as SyncHookJSONOutput;
   }
-
-  return {
-    hookSpecificOutput: {
-      hookEventName: "Stop",
-      additionalContext: `Check failures:\n\n${failures.join("\n\n")}`,
-    },
-  } as unknown as SyncHookJSONOutput;
 }
 
 async function main(): Promise<void> {

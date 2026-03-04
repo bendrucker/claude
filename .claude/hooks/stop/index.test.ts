@@ -2,8 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { StopHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { type Check, categorizeChecks, parseTranscript } from ".";
+import { parseTranscript } from ".";
 
 let tempDir: string;
 
@@ -32,10 +31,6 @@ function createTranscriptContent(files: Array<{ path: string; tool: string }>): 
       }),
     )
     .join("\n");
-}
-
-function checkNames(checks: Check[]): string[] {
-  return checks.map((c) => c.name);
 }
 
 describe("parseTranscript", () => {
@@ -97,88 +92,5 @@ describe("parseTranscript", () => {
     );
 
     expect(await parseTranscript(transcriptPath)).toEqual([]);
-  });
-});
-
-describe("categorizeChecks", () => {
-  const cwd = "/project";
-
-  it("returns no checks for irrelevant paths", () => {
-    const checks = categorizeChecks(["README.md", "package.json"], cwd);
-    expect(checks).toEqual([]);
-  });
-
-  it("triggers plugin tests for plugin files", () => {
-    const checks = categorizeChecks(["plugins/gitlab/skills/ci.md"], cwd);
-    const names = checkNames(checks);
-    expect(names).toContain("Plugin tests: gitlab");
-    expect(names).toContain("Skill lint: gitlab");
-    expect(names).toContain("Marketplace completeness");
-  });
-
-  it("triggers plugin validation for plugin.json", () => {
-    const checks = categorizeChecks(["plugins/gitlab/.claude-plugin/plugin.json"], cwd);
-    const names = checkNames(checks);
-    expect(names).toContain("Plugin tests: gitlab");
-    expect(names).toContain("Plugin validation: gitlab");
-  });
-
-  it("triggers hooks validation for plugin hooks", () => {
-    const checks = categorizeChecks(["plugins/gitlab/hooks/hooks.json"], cwd);
-    const names = checkNames(checks);
-    expect(names).toContain("Plugin tests: gitlab");
-    expect(names).toContain("Hooks validation: gitlab");
-  });
-
-  it("triggers hook tests for .claude/hooks changes", () => {
-    const checks = categorizeChecks([".claude/hooks/stop/index.ts"], cwd);
-    const names = checkNames(checks);
-    expect(names).toContain("Hook tests");
-  });
-
-  it("triggers hook tests for user/hooks changes", () => {
-    const checks = categorizeChecks(["user/hooks/foo.ts"], cwd);
-    const names = checkNames(checks);
-    expect(names).toContain("Hook tests");
-  });
-
-  it("triggers settings validation for settings files", () => {
-    const checks = categorizeChecks([".claude/settings.json"], cwd);
-    const names = checkNames(checks);
-    expect(names).toContain("Settings validation");
-  });
-
-  it("triggers marketplace check for marketplace.json", () => {
-    const checks = categorizeChecks([".claude-plugin/marketplace.json"], cwd);
-    const names = checkNames(checks);
-    expect(names).toContain("Marketplace completeness");
-  });
-
-  it("deduplicates checks across multiple files in same plugin", () => {
-    const checks = categorizeChecks(
-      [
-        "plugins/gitlab/skills/ci.md",
-        "plugins/gitlab/skills/docs.md",
-        "plugins/gitlab/hooks/hooks.json",
-      ],
-      cwd,
-    );
-    const names = checkNames(checks);
-    const testChecks = names.filter((n) => n === "Plugin tests: gitlab");
-    expect(testChecks).toHaveLength(1);
-    const lintChecks = names.filter((n) => n === "Skill lint: gitlab");
-    expect(lintChecks).toHaveLength(1);
-  });
-
-  it("creates separate checks for different plugins", () => {
-    const checks = categorizeChecks(
-      ["plugins/gitlab/skills/ci.md", "plugins/github/skills/gh.md"],
-      cwd,
-    );
-    const names = checkNames(checks);
-    expect(names).toContain("Plugin tests: gitlab");
-    expect(names).toContain("Plugin tests: github");
-    expect(names).toContain("Skill lint: gitlab");
-    expect(names).toContain("Skill lint: github");
   });
 });

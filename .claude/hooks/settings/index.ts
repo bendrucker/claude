@@ -1,9 +1,5 @@
-#!/usr/bin/env bun
-
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
 
@@ -58,33 +54,4 @@ export async function validate(cwd: string): Promise<Map<string, string[]>> {
   }
 
   return errors;
-}
-
-async function main(): Promise<void> {
-  let input: StopHookInput;
-  try {
-    input = await readStdinJson<StopHookInput>();
-  } catch {
-    return;
-  }
-
-  if (input.hook_event_name !== "Stop") return;
-
-  const errors = await validate(input.cwd);
-  if (errors.size === 0) return;
-
-  const details = [...errors.entries()]
-    .map(([file, errs]) => `${file}:\n${errs.map((e) => `  - ${e}`).join("\n")}`)
-    .join("\n\n");
-
-  writeStdoutJson({
-    hookSpecificOutput: {
-      hookEventName: "Stop",
-      additionalContext: `Settings validation errors:\n\n${details}`,
-    },
-  } as unknown as SyncHookJSONOutput);
-}
-
-if (import.meta.main) {
-  main().catch(console.error);
 }

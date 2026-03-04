@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     input = await readStdinJson<PreToolUseHookInput>();
   } catch (error) {
     console.error(
-      `[go-tls-mac/sandbox] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
+      `[mac/sandbox] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

@@ -30,7 +30,10 @@ describe("processInput", () => {
     expect(result).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        updatedInput: { ...input.tool_input, dangerouslyDisableSandbox: true },
+        updatedInput: {
+          ...(input.tool_input as Record<string, unknown>),
+          dangerouslyDisableSandbox: true,
+        },
       },
     });
   });

@@ -55,6 +55,17 @@ export async function isGoBinary(command: string): Promise<boolean> {
   return hasGoBuildInfo(resolved);
 }
 
+function allow(reason: string): SyncHookJSONOutput {
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "allow",
+      permissionDecisionReason: reason,
+      updatedInput: { dangerouslyDisableSandbox: true },
+    },
+  };
+}
+
 export async function processInput(
   input: PreToolUseHookInput,
   platform = process.platform,
@@ -66,14 +77,9 @@ export async function processInput(
 
   for (const cmd of commands) {
     if (await isGoBinary(cmd)) {
-      return {
-        hookSpecificOutput: {
-          hookEventName: "PreToolUse",
-          permissionDecision: "allow",
-          permissionDecisionReason: `Go binary "${cmd}" needs unsandboxed access for TLS cert verification on macOS`,
-          updatedInput: { dangerouslyDisableSandbox: true },
-        },
-      };
+      return allow(
+        `Go binary "${basename(cmd)}" needs unsandboxed access for TLS cert verification on macOS`,
+      );
     }
   }
 

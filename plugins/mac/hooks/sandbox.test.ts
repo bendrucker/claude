@@ -86,12 +86,40 @@ describe("hasGoBuildInfo", () => {
 
 describe("processInput", () => {
   test("returns null on non-darwin", async () => {
-    const result = await processInput(makeInput("gh api /rate_limit"), "linux");
+    const result = await processInput(makeInput(`${goBinaryPath} api /rate_limit`), "linux");
     expect(result).toBeNull();
   });
 
   test("returns null for non-Go binary", async () => {
     const result = await processInput(makeInput("echo hello"), "darwin");
     expect(result).toBeNull();
+  });
+
+  test("disables sandbox for Go binary on darwin", async () => {
+    const result = await processInput(makeInput(`${goBinaryPath} api /rate_limit`), "darwin");
+    expect(result).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        permissionDecisionReason: expect.stringContaining("fake-go"),
+        updatedInput: { dangerouslyDisableSandbox: true },
+      },
+    });
+  });
+
+  test("detects Go binary through pipe", async () => {
+    const result = await processInput(
+      makeInput(`${goBinaryPath} api /rate_limit | jq .rate`),
+      "darwin",
+    );
+    expect(result).not.toBeNull();
+  });
+
+  test("detects Go binary through &&", async () => {
+    const result = await processInput(
+      makeInput(`echo start && ${goBinaryPath} api /rate_limit`),
+      "darwin",
+    );
+    expect(result).not.toBeNull();
   });
 });

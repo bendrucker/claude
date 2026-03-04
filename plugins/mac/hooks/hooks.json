@@ -1,5 +1,5 @@
 {
-  "description": "macOS sandbox workarounds for Go TLS certificate verification",
+  "description": "Detects Go binaries and disables sandbox for TLS cert verification",
   "hooks": {
     "PreToolUse": [
       {

@@ -86,7 +86,12 @@
     "playground@claude-plugins-official": true,
     "linear-cli@schpet": true,
     "tmux@bendrucker": true,
-    "agent-browser@agent-browser": true
+    "agent-browser@agent-browser": true,
+    "bun@bendrucker": true,
+    "git-town@bendrucker": true,
+    "webfetch-auth@bendrucker": true,
+    "mermaid@bendrucker": true,
+    "tech-spec@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

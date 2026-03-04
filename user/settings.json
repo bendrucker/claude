@@ -5,8 +5,6 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(man:*)",
-      "Bash(pbcopy:*)",
-      "Bash(pbpaste:*)",
       "Bash(wt list:*)",
       "Bash(wt --help:*)",
       "Bash(wt --version:*)",
@@ -58,6 +56,7 @@
   "enabledPlugins": {
     "pr-review-toolkit@claude-plugins-official": true,
     "go@bendrucker": true,
+    "mac@bendrucker": true,
     "git@bendrucker": true,
     "gitlab@bendrucker": true,
     "linear@bendrucker": true,
@@ -147,32 +146,18 @@
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
     "network": {
-      "allowLocalBinding": true,
-      "allowUnixSockets": [
-        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
-      ]
+      "allowLocalBinding": true
     },
     "excludedCommands": [
       "docker:*",
-      "pbcopy:*",
-      "pbpaste:*",
       "ssh:*",
       "scp:*",
-      "security:*",
-      "defaults:*",
-      "launchctl:*",
       "rsync:*",
-      "screencapture:*",
       "aws:*",
       "gcloud:*",
       "az:*",
-      "say:*",
-      "afplay:*",
-      "diskutil:*",
-      "networksetup:*",
       "wt:*",
-      "claude:*",
-      "open:*"
+      "claude:*"
     ]
   },
   "alwaysThinkingEnabled": true,

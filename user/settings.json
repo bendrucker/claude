@@ -157,7 +157,8 @@
       "gcloud:*",
       "az:*",
       "wt:*",
-      "claude:*"
+      "claude:*",
+      "agent-browser:*"
     ]
   },
   "alwaysThinkingEnabled": true,

@@ -100,8 +100,6 @@ describe("processInput", () => {
     expect(result).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        permissionDecision: "allow",
-        permissionDecisionReason: expect.stringContaining("fake-go"),
         updatedInput: { dangerouslyDisableSandbox: true },
       },
     });

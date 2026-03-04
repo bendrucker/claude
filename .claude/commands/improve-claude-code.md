@@ -63,7 +63,7 @@ For failing PRs, dispatch `general-purpose` agents to the worktree branch to fix
 
 ### Annotate and Complete
 
-Load the `things:url` skill. For each passing PR, update the Things todo notes with the PR link and mark the todo complete.
+Load the `things:url` skill. For each passing PR, update the Things todo notes with the PR link and tag the todo with `review`. Move the todo to Anytime.
 
 ### Present Summary
 

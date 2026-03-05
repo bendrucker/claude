@@ -198,22 +198,18 @@ const createCmd = command(
       line: { type: Number, description: "New line number" },
       oldLine: {
         type: Number,
-        alias: "old-line",
         description: "Old line number (deleted lines)",
       },
       lineStart: {
         type: Number,
-        alias: "line-start",
         description: "Multi-line range start",
       },
       lineEnd: {
         type: Number,
-        alias: "line-end",
         description: "Multi-line range end",
       },
       bodyFile: {
         type: String,
-        alias: "body-file",
         description: "Read body from file (default: stdin)",
       },
     },
@@ -298,7 +294,6 @@ const resolveCmd = command(
     flags: {
       allBy: {
         type: String,
-        alias: "all-by",
         description: "Resolve all discussions by this author",
       },
       unresolve: {

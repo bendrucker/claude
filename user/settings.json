@@ -32,20 +32,14 @@
     "deny": []
   },
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -n \"$CLAUDE_ENV_FILE\" ] && echo 'setopt nobanghist' >> \"$CLAUDE_ENV_FILE\""
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
+          {
+            "type": "command",
+            "command": "bun ~/.claude/hooks/bang-escape"
+          },
           {
             "type": "command",
             "command": "bun ~/.claude/hooks/worktree"

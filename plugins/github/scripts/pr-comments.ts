@@ -104,7 +104,7 @@ export function filterThreads(
 
   if (options.since) {
     const since = options.since;
-    filtered = filtered.filter((t) => t.comments.nodes.some((c) => new Date(c.createdAt) > since));
+    filtered = filtered.filter((t) => t.comments.nodes.some((c) => new Date(c.createdAt) >= since));
   }
 
   return filtered;

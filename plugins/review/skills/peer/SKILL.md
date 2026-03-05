@@ -21,11 +21,12 @@ If not on the branch, first run `gh pr checkout` to switch.
 ## Workflow
 
 1. **Research** - Gather context (see [research.md](research.md))
-2. **Review** - Examine changed files and existing comments
-3. **Think** - Evaluate against priorities (see [priorities.md](priorities.md))
-4. **Suggest** - Propose comments with revisions or issues
-5. **Comment** - Add approved comments to PR review
-6. **Submit** - Approve / Comment / Request Changes based on severity
+2. **Context** - Determine review context by checking the repository type. Apply [corporate](references/corporate.md) defaults for internal/company repos or [open-source](references/open-source.md) defaults for public community projects.
+3. **Review** - Examine changed files and existing comments
+4. **Think** - Evaluate against priorities (see [priorities.md](priorities.md))
+5. **Suggest** - Propose comments with revisions or issues
+6. **Comment** - Add approved comments to PR review
+7. **Submit** - Approve / Comment / Request Changes based on severity
 
 See [tone.md](tone.md) for comment style guidelines.
 

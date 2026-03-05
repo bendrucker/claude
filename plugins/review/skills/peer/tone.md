@@ -2,13 +2,21 @@
 
 Comments should be friendly, concise, and instructive. Help the author understand why a suggestion was made. Provide inline links to relevant sources.
 
-## RFC Keywords
+## Severity
 
-Express importance with standard keywords:
+Use RFC keywords (must, should, may) naturally within sentences to convey importance. Do not use them as labels or prefixes.
 
-- **Must** - Required change for successful functionality
-- **Should** - Recommendation, likely applicable but may have valid exceptions
-- **May** - Optional recommendation
+**Good** — keywords flow naturally in the sentence:
+- "The error response should include the status code so callers can distinguish transient failures."
+- "This must validate the input before writing to the database."
+- "You may want to extract this into a helper if it gets reused."
+
+**Bad** — keywords used as formal labels:
+- "**Must**: Add input validation"
+- "**Should**: Include error codes in response"
+- "Must — required change for functionality"
+
+The keyword conveys severity without drawing attention to itself.
 
 ## Nitpicks
 

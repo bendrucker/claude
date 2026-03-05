@@ -8,4 +8,6 @@ Prioritize in order when making comments:
 4. **Anti-patterns** - Flag magic numbers (see [magic-numbers.md](magic-numbers.md)) and other code smells that hurt readability or maintainability.
 5. **Style** - Note deviations from project/language style, but limit these. Prefer automated linting. Suggest enforcement to *me* instead of commenting on PR.
 
+Priority weighting shifts by context. See [corporate](references/corporate.md) and [open-source](references/open-source.md) references for how disposition and thresholds differ.
+
 Think hard about the problem the PR solves and whether the approach is optimal.

@@ -26,19 +26,6 @@
 - Store temporary files in `tmp/` directory.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
 
-### Bash `!` Escaping Bug
-
-Claude Code's Bash tool incorrectly escapes `!` to `\!` at the JS level, breaking operators like jq `!=` and awk `!~` ([#2941](https://github.com/anthropics/claude-code/issues/2941), [#10335](https://github.com/anthropics/claude-code/issues/10335)). Workarounds:
-
-- **jq**: Use `| not` instead of `!=` (e.g., `select(.x == null | not)` instead of `select(.x != null)`)
-- **General**: Use heredoc syntax to pass scripts, bypassing inline escaping:
-  ```sh
-  jq "$(cat <<'JQ'
-  select(.x != null)
-  JQ
-  )"
-  ```
-
 ## Stacked PRs
 
 I use git-town for stacked branch workflows:

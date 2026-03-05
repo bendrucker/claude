@@ -220,7 +220,7 @@ jobs:
 
       - name: Run integration tests
         if: steps.inspect.outputs.has_integration_tests == 'true'
-        run: find "plugins/${{ matrix.plugin.name }}" -name '*.integration.ts' -exec bun test ./{} +
+        run: find "plugins/${{ matrix.plugin.name }}" -name '*.integration.ts' -exec bun test {} +
 
   plugins:
     needs: [validate, plugin]

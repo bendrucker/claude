@@ -32,16 +32,6 @@
     "deny": []
   },
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -n \"$CLAUDE_ENV_FILE\" ] && echo 'setopt nobanghist' >> \"$CLAUDE_ENV_FILE\""
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -168,7 +158,8 @@
       "az:*",
       "wt:*",
       "claude:*",
-      "agent-browser:*"
+      "agent-browser:*",
+      "bun link:*"
     ]
   },
   "alwaysThinkingEnabled": true,

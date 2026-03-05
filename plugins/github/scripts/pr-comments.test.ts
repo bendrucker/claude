@@ -144,6 +144,16 @@ describe("filterThreads", () => {
     expect(result).toHaveLength(0);
   });
 
+  it("includes thread with comment at exactly the since date", () => {
+    const threads = [makeThread({ comments: [makeComment("DouweM", "2025-01-15")] })];
+    const result = filterThreads(threads, {
+      role: "author",
+      viewer: "bendrucker",
+      since: new Date("2025-01-15T00:00:00Z"),
+    });
+    expect(result).toHaveLength(1);
+  });
+
   it("includes thread if any comment is after since date", () => {
     const threads = [
       makeThread({
@@ -206,6 +216,28 @@ describe("findLastReviewDate", () => {
     const reviews = [makeReview("bendrucker", "2025-01-15")];
     const date = findLastReviewDate(reviews, "bendrucker", "author");
     expect(date).toBeNull();
+  });
+});
+
+describe("findLastReviewDate + filterThreads", () => {
+  it("includes threads from the review that defines the since cutoff", () => {
+    const reviewDate = "2025-01-20";
+    const reviews = [makeReview("DouweM", reviewDate)];
+    const since = findLastReviewDate(reviews, "bendrucker", "author");
+
+    const threads = [
+      makeThread({ comments: [makeComment("DouweM", reviewDate)] }),
+      makeThread({ comments: [makeComment("DouweM", "2025-01-10")] }),
+    ];
+
+    const result = filterThreads(threads, {
+      role: "author",
+      viewer: "bendrucker",
+      since: since!,
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.comments.nodes[0]!.createdAt).toBe(`${reviewDate}T00:00:00Z`);
   });
 });
 

@@ -27,7 +27,8 @@
       "Edit(~/src/go/pkg/mod/**)",
       "Edit(~/src/go/pkg/sumdb/**)",
       "Edit(~/.bun/**)",
-      "Read(~/.claude/plugins/**)"
+      "Read(~/.claude/plugins/**)",
+      "Edit(~/.claude/plugins/cache/**/node_modules/**)"
     ],
     "deny": []
   },

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import type { Discussion } from "./discussions";
-import { deduplicateDiscussions, filterDiscussions, parseGlabPaginated } from "./discussions";
+import {
+  buildPosition,
+  deduplicateDiscussions,
+  filterDiscussions,
+  parseGlabPaginated,
+} from "./discussions";
 
 function makeNote(overrides: Record<string, unknown> = {}) {
   return {
@@ -15,6 +20,40 @@ function makeNote(overrides: Record<string, unknown> = {}) {
 function makeDiscussion(id: string, noteOverrides: Record<string, unknown> = {}): Discussion {
   return { id, notes: [makeNote(noteOverrides)] };
 }
+
+const refs = { base_sha: "aaa", head_sha: "bbb", start_sha: "ccc" };
+
+describe("buildPosition", () => {
+  it("sets new_line for a single line", () => {
+    const pos = buildPosition(refs, "src/app.ts", { line: 42 });
+    expect(pos.new_line).toBe(42);
+    expect(pos.old_line).toBeUndefined();
+    expect(pos.line_range).toBeUndefined();
+  });
+
+  it("sets old_line for a deleted line", () => {
+    const pos = buildPosition(refs, "src/app.ts", { oldLine: 10 });
+    expect(pos.old_line).toBe(10);
+    expect(pos.new_line).toBeUndefined();
+    expect(pos.line_range).toBeUndefined();
+  });
+
+  it("sets new_line and line_range for a range", () => {
+    const pos = buildPosition(refs, "src/app.ts", { lineStart: 2, lineEnd: 4 });
+    expect(pos.new_line).toBe(4);
+    expect(pos.line_range).toEqual({
+      start: { new_line: 2, type: "new" },
+      end: { new_line: 4, type: "new" },
+    });
+  });
+
+  it("sets no line fields when no options given", () => {
+    const pos = buildPosition(refs, "src/app.ts", {});
+    expect(pos.new_line).toBeUndefined();
+    expect(pos.old_line).toBeUndefined();
+    expect(pos.line_range).toBeUndefined();
+  });
+});
 
 describe("parseGlabPaginated", () => {
   it("parses a single page", () => {

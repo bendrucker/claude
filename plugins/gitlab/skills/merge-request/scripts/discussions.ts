@@ -139,7 +139,7 @@ type CreatePosition = {
   };
 };
 
-function buildPosition(
+export function buildPosition(
   refs: DiffRefs,
   path: string,
   opts: {
@@ -157,6 +157,7 @@ function buildPosition(
   };
 
   if (opts.lineStart !== undefined && opts.lineEnd !== undefined) {
+    position.new_line = opts.lineEnd;
     position.line_range = {
       start: { new_line: opts.lineStart, type: "new" },
       end: { new_line: opts.lineEnd, type: "new" },

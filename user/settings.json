@@ -147,7 +147,10 @@
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
     "network": {
-      "allowLocalBinding": true
+      "allowLocalBinding": true,
+      "allowUnixSockets": [
+        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+      ]
     },
     "excludedCommands": [
       "docker:*",
@@ -160,7 +163,27 @@
       "wt:*",
       "claude:*",
       "agent-browser:*",
-      "bun link:*"
+      "bun link:*",
+      "pbcopy:*",
+      "pbpaste:*",
+      "security:*",
+      "defaults:*",
+      "launchctl:*",
+      "screencapture:*",
+      "say:*",
+      "afplay:*",
+      "diskutil:*",
+      "networksetup:*",
+      "open:*",
+      "osascript:*",
+      "shortcuts:*",
+      "swift:*",
+      "xcrun:*",
+      "mdfind:*",
+      "mdls:*",
+      "xattr:*",
+      "dscl:*",
+      "plutil:*"
     ]
   },
   "alwaysThinkingEnabled": true,

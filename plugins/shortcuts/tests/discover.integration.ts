@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { type ExecFileSyncOptions, execFileSync } from "node:child_process";
 import { join } from "node:path";
 
@@ -12,7 +12,11 @@ function run(command: string): string {
 const ci = !!process.env.CI;
 
 describe.skipIf(ci)("discover.swift actions", () => {
-  const actions = JSON.parse(run("actions")) as Record<string, unknown>[];
+  let actions: Record<string, unknown>[];
+
+  beforeAll(() => {
+    actions = JSON.parse(run("actions")) as Record<string, unknown>[];
+  });
 
   it("returns a large array of built-in actions", () => {
     expect(Array.isArray(actions)).toBe(true);
@@ -47,7 +51,11 @@ describe.skipIf(ci)("discover.swift actions", () => {
 });
 
 describe.skipIf(ci)("discover.swift apps", () => {
-  const apps = JSON.parse(run("apps")) as Record<string, unknown>[];
+  let apps: Record<string, unknown>[];
+
+  beforeAll(() => {
+    apps = JSON.parse(run("apps")) as Record<string, unknown>[];
+  });
 
   it("returns an array of apps", () => {
     expect(Array.isArray(apps)).toBe(true);

@@ -9,7 +9,9 @@ function run(command: string): string {
   return execFileSync("swift", [script, command], opts) as string;
 }
 
-describe("discover.swift actions", () => {
+const ci = !!process.env.CI;
+
+describe.skipIf(ci)("discover.swift actions", () => {
   const actions = JSON.parse(run("actions")) as Record<string, unknown>[];
 
   it("returns a large array of built-in actions", () => {
@@ -44,7 +46,7 @@ describe("discover.swift actions", () => {
   });
 });
 
-describe("discover.swift apps", () => {
+describe.skipIf(ci)("discover.swift apps", () => {
   const apps = JSON.parse(run("apps")) as Record<string, unknown>[];
 
   it("returns an array of apps", () => {

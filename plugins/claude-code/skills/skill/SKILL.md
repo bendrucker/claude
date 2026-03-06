@@ -109,11 +109,7 @@ Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use l
 
 ## Development Process
 
-- Define 3 test scenarios before documentation
-- Measure baseline without skill
-- Iterative: one instance creates, another tests
-- Observe navigation patterns
-- Refine based on behavior
+Use the `skill-creator` skill for interactive skill creation workflows — it drives the full lifecycle of drafting, testing with parallel subagents, benchmarking, and iterating. This skill provides the plugin-specific constraints (namespacing, structure, validation) that skill-creator applies during creation.
 
 ## Validation
 

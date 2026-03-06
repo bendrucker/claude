@@ -154,6 +154,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install Claude Code CLI
+        run: bun install -g @anthropic-ai/claude-code@latest
+
       - name: Validate plugin.json
         if: steps.inspect.outputs.has_plugin_json == 'true'
         run: bun packages/validate/plugin.ts "plugins/${{ matrix.plugin.name }}"

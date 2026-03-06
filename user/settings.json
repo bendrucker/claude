@@ -5,8 +5,6 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(man:*)",
-      "Bash(pbcopy:*)",
-      "Bash(pbpaste:*)",
       "Bash(wt list:*)",
       "Bash(wt --help:*)",
       "Bash(wt --version:*)",
@@ -29,7 +27,8 @@
       "Edit(~/src/go/pkg/mod/**)",
       "Edit(~/src/go/pkg/sumdb/**)",
       "Edit(~/.bun/**)",
-      "Read(~/.claude/plugins/**)"
+      "Read(~/.claude/plugins/**)",
+      "Edit(~/.claude/plugins/cache/**/node_modules/**)"
     ],
     "deny": []
   },
@@ -58,6 +57,7 @@
   "enabledPlugins": {
     "pr-review-toolkit@claude-plugins-official": true,
     "go@bendrucker": true,
+    "mac@bendrucker": true,
     "git@bendrucker": true,
     "gitlab@bendrucker": true,
     "linear@bendrucker": true,
@@ -85,7 +85,13 @@
     "plan@bendrucker": true,
     "playground@claude-plugins-official": true,
     "linear-cli@schpet": true,
-    "tmux@bendrucker": true
+    "tmux@bendrucker": true,
+    "agent-browser@agent-browser": true,
+    "bun@bendrucker": true,
+    "git-town@bendrucker": true,
+    "webfetch-auth@bendrucker": true,
+    "mermaid@bendrucker": true,
+    "tech-spec@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -119,7 +125,7 @@
       "source": {
         "source": "github",
         "repo": "max-sixty/worktrunk",
-        "ref": "v0.27.0"
+        "ref": "v0.28.2"
       }
     },
     "schpet": {
@@ -127,6 +133,13 @@
         "source": "github",
         "repo": "schpet/linear-cli",
         "ref": "v1.10.0"
+      }
+    },
+    "agent-browser": {
+      "source": {
+        "source": "github",
+        "repo": "vercel-labs/agent-browser",
+        "ref": "v0.15.1"
       }
     }
   },
@@ -141,24 +154,36 @@
     },
     "excludedCommands": [
       "docker:*",
-      "pbcopy:*",
-      "pbpaste:*",
       "ssh:*",
       "scp:*",
-      "security:*",
-      "defaults:*",
-      "launchctl:*",
       "rsync:*",
-      "screencapture:*",
       "aws:*",
       "gcloud:*",
       "az:*",
+      "wt:*",
+      "claude:*",
+      "agent-browser:*",
+      "bun link:*",
+      "pbcopy:*",
+      "pbpaste:*",
+      "security:*",
+      "defaults:*",
+      "launchctl:*",
+      "screencapture:*",
       "say:*",
       "afplay:*",
       "diskutil:*",
       "networksetup:*",
-      "wt:*",
-      "claude:*"
+      "open:*",
+      "osascript:*",
+      "shortcuts:*",
+      "swift:*",
+      "xcrun:*",
+      "mdfind:*",
+      "mdls:*",
+      "xattr:*",
+      "dscl:*",
+      "plutil:*"
     ]
   },
   "alwaysThinkingEnabled": true,

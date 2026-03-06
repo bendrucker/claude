@@ -91,22 +91,18 @@ const createCmd = command(
       line: { type: Number, description: "New line number" },
       oldLine: {
         type: Number,
-        alias: "old-line",
         description: "Old line number (deleted lines)",
       },
       lineStart: {
         type: Number,
-        alias: "line-start",
         description: "Multi-line range start",
       },
       lineEnd: {
         type: Number,
-        alias: "line-end",
         description: "Multi-line range end",
       },
       replyTo: {
         type: String,
-        alias: "reply-to",
         description: "Discussion ID to reply to",
       },
       resolve: {
@@ -116,7 +112,6 @@ const createCmd = command(
       },
       bodyFile: {
         type: String,
-        alias: "body-file",
         description: "Read body from file (default: stdin)",
       },
     },
@@ -170,7 +165,6 @@ const submitCmd = command(
       },
       requestChanges: {
         type: Boolean,
-        alias: "request-changes",
         default: false,
         description: "Request changes after publishing (Premium+, GraphQL)",
       },
@@ -180,7 +174,6 @@ const submitCmd = command(
       },
       summaryFile: {
         type: String,
-        alias: "summary-file",
         description: "Read review summary from file",
       },
     },

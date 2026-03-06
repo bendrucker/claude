@@ -36,9 +36,32 @@ Load the `things:inbox` skill. Create task with:
 
 Example: `GitLab: team/project!456 - Update CI pipeline config`
 
+## Open MRs
+
+Review open merge requests you authored at the group level.
+
+### Query
+
+Fetch your user ID first — `author_username` is silently ignored on group-level MR queries, returning unfiltered results.
+
+```sh
+glab api user | jq '.id'
+```
+
+Then query open MRs by `author_id`:
+
+```sh
+glab api groups/<group>/merge_requests --paginate -f state=opened -f author_id=<id>
+```
+
+### Triage
+
+For each MR, use `AskUserQuestion` to determine next steps (e.g., follow up on review, rebase, close).
+
 ## Evening Variant
 
 Simplified triage:
 - Defer review requests and approvals to Things
 - Mark done completed build notifications
 - Skip mentions
+- Skip open MRs

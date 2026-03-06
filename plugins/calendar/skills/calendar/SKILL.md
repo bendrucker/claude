@@ -28,7 +28,7 @@ The CLI lives at `@skills/calendar/scripts/cal.swift` and is invoked via `swift 
 
 Calendar access must be granted to the terminal app (Ghostty, Terminal.app, etc.) in **System Settings → Privacy & Security → Calendars**.
 
-Over SSH, EventKit permissions don't apply. Use a local terminal session.
+EventKit requires TCC permissions tied to an app bundle. Over SSH, in tmux, or in any context where the responsible process has no app bundle, EventKit access is unavailable. Use a local terminal session launched directly from an app (not through a multiplexer).
 
 ## Read Operations
 
@@ -122,6 +122,8 @@ For calendars with duplicate names (e.g., "Personal" on both Google and iCloud),
 ## Troubleshooting
 
 **"Calendar access denied"**: Grant access in System Settings → Privacy & Security → Calendars for your terminal app.
+
+**"Calendar access denied" with `"reason": "no-app-bundle"`**: The responsible process has no app bundle context. This occurs in tmux, SSH, or similar environments where macOS cannot identify a bundled app to associate TCC permissions with. Switch to a direct terminal session (e.g., Ghostty or Terminal.app, not inside tmux).
 
 **"Event not found"**: Event IDs are EventKit identifiers returned by `list` and `create`. IDs from other tools (icalBuddy, JXA) are incompatible.
 

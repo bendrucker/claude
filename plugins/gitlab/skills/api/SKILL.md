@@ -27,6 +27,8 @@ glab api projects/:id/issues -X POST -f title="..."   # POST with field
 glab api projects/:id/issues --paginate               # All pages
 ```
 
+**Pagination pitfall**: `--paginate` concatenates JSON arrays across pages as `][`, producing invalid JSON (e.g., `[{...}][{...}]`). Fix by replacing `][` with `,` before parsing: `.replace(/\]\s*\[/g, ",")`.
+
 ## GraphQL
 
 ```bash

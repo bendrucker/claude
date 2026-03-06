@@ -67,6 +67,13 @@
         "table": "^6.9.0",
       },
     },
+    "plugins/claude-code/skills/skill": {
+      "name": "skill",
+      "version": "1.0.0",
+      "dependencies": {
+        "yaml": "^2.7.1",
+      },
+    },
     "plugins/github": {
       "name": "github",
       "version": "1.0.0",
@@ -1156,6 +1163,8 @@
     "signal-exit": ["signal-exit@3.0.7", "", {}, "sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ=="],
 
     "sisteransi": ["sisteransi@1.0.5", "", {}, "sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg=="],
+
+    "skill": ["skill@workspace:plugins/claude-code/skills/skill"],
 
     "skill-lint": ["skill-lint@workspace:packages/skill-lint"],
 

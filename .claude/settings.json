@@ -19,10 +19,6 @@
           {
             "type": "command",
             "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\""
-          },
-          {
-            "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-lint\""
           }
         ]
       }

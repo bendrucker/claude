@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 
-mock.module("../../../packages/skill-lint", () => ({
+mock.module("./skill-lint", () => ({
   lintSkill: (dir: string) => {
     if (dir.includes("passing")) {
       return { errors: 0, warnings: 0, results: [] };
@@ -21,7 +21,7 @@ mock.module("../../../packages/skill-lint", () => ({
   },
 }));
 
-const { processPostToolUse } = await import("./index");
+const { processPostToolUse } = await import("./check-lint");
 
 function postToolUseInput(filePath: string) {
   return {

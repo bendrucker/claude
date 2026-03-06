@@ -3,7 +3,7 @@
 import { basename, dirname } from "node:path";
 import type { PostToolUseHookOutput, PostToolUseInput } from "@constellos/claude-code-kit";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import { lintSkill } from "../../../packages/skill-lint";
+import { lintSkill } from "./skill-lint";
 
 function lintMessages(skillDir: string): string[] {
   const result = lintSkill(skillDir);

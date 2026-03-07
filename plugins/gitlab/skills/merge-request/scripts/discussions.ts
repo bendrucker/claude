@@ -1,10 +1,16 @@
 #!/usr/bin/env bun
 
-import { randomUUID } from "node:crypto";
-import { tmpdir } from "node:os";
 import { $ } from "bun";
 import { cli, command } from "cleye";
 import { table } from "table";
+import {
+  buildPosition,
+  fetchMrDiffs,
+  getDiffRefs,
+  glabApiPost,
+  readBody,
+  validateLineInDiff,
+} from "./diff";
 
 type LineRange = {
   start: { type: "new" | "old"; new_line?: number; old_line?: number };
@@ -117,78 +123,6 @@ function buildFilterOptions(flags: {
   return opts;
 }
 
-type DiffRefs = { base_sha: string; head_sha: string; start_sha: string };
-
-async function getDiffRefs(iid: string): Promise<DiffRefs> {
-  const result = await $`glab api projects/:id/merge_requests/${iid} | jq '.diff_refs'`.json();
-  return result as DiffRefs;
-}
-
-type CreatePosition = {
-  base_sha: string;
-  head_sha: string;
-  start_sha: string;
-  old_path: string;
-  new_path: string;
-  position_type: "text";
-  old_line?: number;
-  new_line?: number;
-  line_range?: {
-    start: { new_line: number; type: "new" };
-    end: { new_line: number; type: "new" };
-  };
-};
-
-function buildPosition(
-  refs: DiffRefs,
-  path: string,
-  opts: {
-    line?: number | undefined;
-    oldLine?: number | undefined;
-    lineStart?: number | undefined;
-    lineEnd?: number | undefined;
-  },
-): CreatePosition {
-  const position: CreatePosition = {
-    ...refs,
-    old_path: path,
-    new_path: path,
-    position_type: "text",
-  };
-
-  if (opts.lineStart !== undefined && opts.lineEnd !== undefined) {
-    position.line_range = {
-      start: { new_line: opts.lineStart, type: "new" },
-      end: { new_line: opts.lineEnd, type: "new" },
-    };
-  } else if (opts.oldLine !== undefined) {
-    position.old_line = opts.oldLine;
-  } else if (opts.line !== undefined) {
-    position.new_line = opts.line;
-  }
-
-  return position;
-}
-
-async function readBody(file: string | undefined): Promise<string> {
-  if (file === "-" || !file) {
-    return await Bun.stdin.text();
-  }
-  return await Bun.file(file).text();
-}
-
-async function glabApiPost(path: string, payload: Record<string, unknown>): Promise<void> {
-  const tmpFile = `${tmpdir()}/discussions-${randomUUID()}.json`;
-  await Bun.write(tmpFile, JSON.stringify(payload));
-  try {
-    const result =
-      await $`glab api ${path} -X POST -H "Content-Type: application/json" --input ${tmpFile}`.text();
-    console.log(result);
-  } finally {
-    await Bun.file(tmpFile).unlink();
-  }
-}
-
 const createCmd = command(
   {
     name: "create",
@@ -199,14 +133,6 @@ const createCmd = command(
       oldLine: {
         type: Number,
         description: "Old line number (deleted lines)",
-      },
-      lineStart: {
-        type: Number,
-        description: "Multi-line range start",
-      },
-      lineEnd: {
-        type: Number,
-        description: "Multi-line range end",
       },
       bodyFile: {
         type: String,
@@ -221,12 +147,14 @@ const createCmd = command(
     const payload: Record<string, unknown> = { body };
 
     if (parsed.flags.file) {
-      const refs = await getDiffRefs(iid);
+      const [refs, diffs] = await Promise.all([getDiffRefs(iid), fetchMrDiffs(iid)]);
+      validateLineInDiff(diffs, parsed.flags.file, {
+        line: parsed.flags.line,
+        oldLine: parsed.flags.oldLine,
+      });
       payload.position = buildPosition(refs, parsed.flags.file, {
         line: parsed.flags.line,
         oldLine: parsed.flags.oldLine,
-        lineStart: parsed.flags.lineStart,
-        lineEnd: parsed.flags.lineEnd,
       });
     }
 
@@ -290,7 +218,7 @@ const listCmd = command(
 const resolveCmd = command(
   {
     name: "resolve",
-    parameters: ["<iid>"],
+    parameters: ["<iid>", "[ids...]"],
     flags: {
       allBy: {
         type: String,
@@ -306,8 +234,7 @@ const resolveCmd = command(
   async (parsed) => {
     const iid = parsed._.iid;
     const resolvedValue = parsed.flags.unresolve ? "false" : "true";
-    const extra = parsed._ as unknown as { _: string[] };
-    let ids = extra._ ?? [];
+    let ids = parsed._.ids ?? [];
 
     if (parsed.flags.allBy) {
       const raw =

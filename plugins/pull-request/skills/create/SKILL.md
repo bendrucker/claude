@@ -26,7 +26,9 @@ allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(bun ${CLAUDE_PL
 
 ## Body
 
-- Start with 1-3 sentences summarizing the change (no preceding header)
+- Start with 1-3 sentences summarizing the change (no preceding header). Use active voice and direct language
+  - Good: "Adds retry logic to the HTTP client and limits maximum attempts to 3."
+  - Bad: "Retry logic is added to the HTTP client and maximum attempts are limited to 3."
 - **Wrap all code identifiers with backticks**: function names, class names, file paths, endpoints, status codes, etc.
 - Use `##` sections for larger changes. See [`sections.md`](sections.md) for detailed guidance on:
   - `## Issue` - Root cause analysis and issue linking

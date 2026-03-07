@@ -105,8 +105,9 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
     }
 
     return {
-      stopReason: context,
-    } as SyncHookJSONOutput;
+      decision: "block",
+      reason: context,
+    };
   }
 }
 

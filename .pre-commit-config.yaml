@@ -39,6 +39,14 @@ repos:
         pass_filenames: false
         entry: bun .claude/hooks/settings/cli.ts
 
+      - id: no-double-assertion
+        name: No double type assertions
+        language: system
+        files: \.ts$
+        exclude: \.test\.ts$
+        pass_filenames: false
+        entry: ast-grep scan --rule rules/no-double-assertion.yaml
+
       - id: marketplace-check
         name: Marketplace completeness
         language: system

@@ -29,7 +29,8 @@ async function initMermaid() {
     pretendToBeVisual: true,
   });
 
-  globalThis.window = dom.window as unknown as Window & typeof globalThis;
+  // @ts-expect-error JSDOM's DOMWindow is structurally incompatible with Window
+  globalThis.window = dom.window;
   globalThis.document = dom.window.document;
   globalThis.DOMParser = dom.window.DOMParser;
 

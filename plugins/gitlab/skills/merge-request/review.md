@@ -8,20 +8,17 @@ Submit review feedback as draft notes that accumulate before publishing. Comment
 
 ### Create
 
-Write body to a file, then pipe or pass via `--body-file`:
+Always use `--body-file` for comment bodies. Piping through echo breaks backtick-heavy markdown due to shell expansion.
 
 ```bash
 # General comment
-echo "Looks good overall" | bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid>
+bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --body-file tmp/note.md
 
-# Inline comment on a new line
+# Inline comment on a new line (validated against diff hunks)
 bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --file src/app.go --line 42 --body-file tmp/note.md
 
 # Comment on a deleted line
 bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --file src/app.go --old-line 10 --body-file tmp/note.md
-
-# Multi-line comment
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --file src/app.go --line-start 10 --line-end 15 --body-file tmp/note.md
 
 # Reply to existing discussion
 bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> --body-file tmp/note.md
@@ -29,6 +26,31 @@ bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --reply-to <discussi
 # Reply and resolve
 bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> --resolve --body-file tmp/note.md
 ```
+
+Positioned comments are validated against the MR diff before posting. If a line is not within a diff hunk, the command exits with an error showing valid line ranges.
+
+### Batch Review
+
+Create multiple draft notes from a JSON file:
+
+```bash
+bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts review <iid> --input tmp/review.json
+
+# Create, publish, and approve
+bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts review <iid> --input tmp/review.json --submit --approve
+```
+
+Input JSON format:
+
+```json
+[
+  { "file": "src/app.ts", "line": 42, "body": "Consider extracting this." },
+  { "file": "src/db.ts", "oldLine": 10, "body": "This was handling errors." },
+  { "body": "Overall the approach looks good." }
+]
+```
+
+Each positioned entry is validated against diff hunks. Failures are reported per-entry without aborting the batch.
 
 ### List
 

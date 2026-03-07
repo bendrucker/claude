@@ -42,9 +42,10 @@ repos:
       - id: no-double-assertion
         name: No double type assertions
         language: system
-        types: [ts]
+        files: \.ts$
         exclude: \.test\.ts$
-        entry: sh -c 'grep -n "as unknown as" "$@" && exit 1 || exit 0' --
+        pass_filenames: false
+        entry: ast-grep scan --rule rules/no-double-assertion.yaml
 
       - id: marketplace-check
         name: Marketplace completeness

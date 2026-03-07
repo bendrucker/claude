@@ -16,7 +16,7 @@ Flag unexplained numeric literals in changed lines. A magic number is a bare num
 - **Exit codes** (0, 1) in process exit calls
 - **Math constants** (100 for percentages, 1000 for ms conversion) when the intent is clear from context
 - **Test assertions** where the literal is the expected value being verified
-- **Enum-like definitions** — the constant is being named, not used anonymously
+- **Enum-like definitions** where the constant is being named, not used anonymously
 
 ## Suggesting Fixes
 

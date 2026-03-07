@@ -105,11 +105,9 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
     }
 
     return {
-      hookSpecificOutput: {
-        hookEventName: "Stop",
-        additionalContext: context,
-      },
-    } as unknown as SyncHookJSONOutput;
+      decision: "block",
+      reason: context,
+    };
   }
 }
 

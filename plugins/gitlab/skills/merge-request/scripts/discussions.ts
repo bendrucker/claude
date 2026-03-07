@@ -218,7 +218,7 @@ const listCmd = command(
 const resolveCmd = command(
   {
     name: "resolve",
-    parameters: ["<iid>"],
+    parameters: ["<iid>", "[ids...]"],
     flags: {
       allBy: {
         type: String,
@@ -234,8 +234,7 @@ const resolveCmd = command(
   async (parsed) => {
     const iid = parsed._.iid;
     const resolvedValue = parsed.flags.unresolve ? "false" : "true";
-    const extra = parsed._ as unknown as { _: string[] };
-    let ids = extra._ ?? [];
+    let ids = parsed._.ids ?? [];
 
     if (parsed.flags.allBy) {
       const raw =

@@ -39,6 +39,13 @@ repos:
         pass_filenames: false
         entry: bun .claude/hooks/settings/cli.ts
 
+      - id: no-double-assertion
+        name: No double type assertions
+        language: system
+        types: [ts]
+        exclude: \.test\.ts$
+        entry: sh -c 'grep -n "as unknown as" "$@" && exit 1 || exit 0' --
+
       - id: marketplace-check
         name: Marketplace completeness
         language: system

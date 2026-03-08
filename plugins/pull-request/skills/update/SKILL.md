@@ -4,7 +4,14 @@ description: |
   Update a pull request or merge request body to reflect the current state of changes.
   Use when a PR/MR has evolved through additional commits and the body needs to reflect what will be merged.
 
-allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
+allowed-tools:
+  - mcp__github
+  - "Bash(gh pr:*)"
+  - "Bash(glab mr:*)"
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"
+  # workaround: inline skill execution (`!` backtick) includes syntax markers in the
+  # permission check pattern. Remove when the upstream bug is fixed. See #486.
+  - "Bash(!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/*`:*)"
 ---
 
 # Update Pull Request
@@ -16,14 +23,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 - Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts`
 - PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
 
-## Workflow
-
-1. **Fetch PR context**: Use `$0` (if provided) as a PR identifier (number or branch name). Fetch the current PR:
-   - **GitHub**: `gh pr view $0 --json title,body,updatedAt,commits`
-   - **GitLab**: `glab mr view $0`
-2. **Fetch PR diff**:
-   - **GitHub**: `gh pr diff $0`
-   - **GitLab**: `glab mr diff $0`
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts $0`
 
 ## Analysis
 

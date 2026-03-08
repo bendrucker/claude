@@ -4,7 +4,17 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR—including after committing changes.
 
-allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
+allowed-tools:
+  - mcp__github
+  - "Bash(git add:*)"
+  - "Bash(git commit:*)"
+  - "Bash(git push:*)"
+  - "Bash(gh pr:*)"
+  - "Bash(glab mr:*)"
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"
+  # workaround: inline skill execution (`!` backtick) includes syntax markers in the
+  # permission check pattern. Remove when the upstream bug is fixed. See #486.
+  - "Bash(!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/*`:*)"
 ---
 
 # Create Pull Request
@@ -14,9 +24,11 @@ allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(gh:*), Bash(git
 - Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts`
 - PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
 
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
+
 ## Title
 
-- Check the log above to determine the repo's commit style:
+- Check the log in the context above to determine the repo's commit style:
   - **subject** (default): `${subject}: ${summary}` (e.g., `api: add timeout to request`)
   - **conventional**: `${type}: ${summary}` (e.g., `fix: add timeout to request`)
 - Keep under 50 characters, max 100
@@ -61,9 +73,8 @@ When an issue is referenced:
 
 ## Workflow
 
-1. **Gather git context**: Run `git branch --show-current`, `git status --short`, `git log --oneline -20`, and `git diff HEAD` to understand the current state.
-2. **Branch validation**: If you're on a default branch (main/master), stop and ask the user to switch to a feature branch first.
-3. Stage changes if not already staged: `git add .`
+1. **Branch validation**: If the context above shows you're on a default branch (main/master), stop and ask the user to switch to a feature branch first.
+1. Stage changes if not already staged: `git add .`
 4. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
 5. Push the branch to remote: `git push -u origin HEAD`
 6. Create the PR/MR:

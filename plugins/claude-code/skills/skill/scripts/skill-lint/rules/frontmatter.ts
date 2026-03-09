@@ -197,6 +197,39 @@ export const descriptionLength: Rule = {
   },
 };
 
+export const allowedToolsFormat: Rule = {
+  name: "allowed-tools-format",
+  severity: "warn",
+  check(content: SkillContent): RuleResult {
+    const allowedTools = content.frontmatter["allowed-tools"];
+
+    if (allowedTools === undefined) {
+      return {
+        rule: "allowed-tools-format",
+        severity: "warn",
+        passed: true,
+        message: "allowed-tools not set",
+      };
+    }
+
+    if (typeof allowedTools === "string") {
+      return {
+        rule: "allowed-tools-format",
+        severity: "warn",
+        passed: false,
+        message: "allowed-tools should be a YAML array, not a comma-separated string",
+      };
+    }
+
+    return {
+      rule: "allowed-tools-format",
+      severity: "warn",
+      passed: true,
+      message: `${Array.isArray(allowedTools) ? allowedTools.length : 0} tools`,
+    };
+  },
+};
+
 export const frontmatterRules: Rule[] = [
   nameFormat,
   nameLength,
@@ -204,4 +237,5 @@ export const frontmatterRules: Rule[] = [
   nameConsecutiveHyphens,
   descriptionRequired,
   descriptionLength,
+  allowedToolsFormat,
 ];

@@ -1,7 +1,11 @@
 ---
 name: things:url
 description: Create, update, and manage Things 3 tasks and projects. Not for reads — use things:jxa to query data. For simple inbox captures, use things:inbox.
-allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)", "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)", Bash, Read]
+allowed-tools:
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)"
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
+  - Bash
+  - Read
 hooks:
   PreToolUse:
     - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)|Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"

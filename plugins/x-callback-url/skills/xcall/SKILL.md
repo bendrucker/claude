@@ -1,7 +1,9 @@
 ---
 name: x-callback-url:xcall
 description: Call x-callback-url schemes from the CLI and receive responses synchronously. Use when invoking macOS app URL schemes that have no CLI but support x-callback-url (Things, Bear, OmniFocus, etc.) and you need to capture the result.
-allowed-tools: [Bash, Read]
+allowed-tools:
+  - Bash
+  - Read
 ---
 
 # xcall

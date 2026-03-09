@@ -10,8 +10,5 @@
   },
   "scripts": {
     "test": "bun test"
-  },
-  "dependencies": {
-    "yaml": "^2.7.1"
   }
 }

@@ -10,6 +10,8 @@ hooks:
           command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-namespace.ts"
         - type: command
           command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-structure.ts"
+        - type: command
+          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-lint.ts"
 ---
 
 # Claude Code Skills Development
@@ -113,7 +115,7 @@ Use the `skill-creator` skill for interactive skill creation workflows — it dr
 
 ## Validation
 
-Run `bun run skill-lint path/to/skill/` to check for issues before committing. CI runs this automatically.
+A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md files are edited. For manual checks, run `bun run skill-lint path/to/skill/` from the project root.
 
 ## References
 

@@ -21,11 +21,17 @@ If not on the branch, first run `gh pr checkout` to switch.
 ## Workflow
 
 1. **Research** - Gather context (see [research.md](research.md))
-2. **Review** - Examine changed files and existing comments
-3. **Think** - Evaluate against priorities (see [priorities.md](priorities.md))
-4. **Suggest** - Propose comments with revisions or issues
-5. **Comment** - Add approved comments to PR review
-6. **Submit** - Approve / Comment / Request Changes based on severity
+2. **Context** - Determine review context using repository visibility. Private repositories use [corporate](references/corporate.md) defaults. Public repositories use [open-source](references/open-source.md) defaults. Check visibility via the platform API (`gh api repos/OWNER/REPO --jq .visibility` or `glab api projects/ENCODED_PATH | jq .visibility`). If ambiguous, ask me.
+3. **Review** - Examine changed files and existing comments
+4. **Delegate** - Selectively dispatch PR review toolkit agents in parallel based on what the diff touches:
+   - Error handling, catch blocks, fallback logic: `silent-failure-hunter`
+   - New type definitions: `type-design-analyzer`
+   - New or modified tests: `pr-test-analyzer`
+   - Skip delegation for trivial PRs (docs-only, config changes, dependency bumps).
+5. **Think** - Evaluate against priorities (see [priorities.md](priorities.md)), incorporating toolkit agent findings
+6. **Suggest** - Propose comments with revisions or issues
+7. **Comment** - Add approved comments to PR review
+8. **Submit** - Approve / Comment / Request Changes based on severity
 
 See [tone.md](tone.md) for comment style guidelines.
 

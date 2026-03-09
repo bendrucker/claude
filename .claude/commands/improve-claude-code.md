@@ -3,7 +3,6 @@ description: "Triage and batch-implement Claude-tagged Things todos as PRs"
 allowed-tools:
   - Skill(things:jxa)
   - Skill(things:url)
-  - Skill(things:inbox)
   - Skill(pull-request:create)
   - Skill(github:actions-monitor)
 ---
@@ -22,7 +21,7 @@ Triage and batch-implement Claude-tagged Things todos as PRs for the claude conf
 
 ### Fetch Todos
 
-Load the `things:jxa` skill. Find all open todos tagged `claude`. Track which list each item came from.
+Load the `things:jxa` skill. Find all open todos tagged `claude`. Track each item's ID, title, notes, and originating list.
 
 ### Present for Triage
 
@@ -36,6 +35,7 @@ Launch parallel `Plan` agents via the Task tool (one per selected todo). Each ag
 
 - Todo title and full notes
 - Instruction to explore the repo, identify files to modify, and produce a concrete implementation plan
+- Which skills to load for domain context (e.g., `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts)
 
 Collect all plans and present them to the user in a numbered list. User approves or rejects each. Only approved plans proceed.
 
@@ -44,8 +44,9 @@ Collect all plans and present them to the user in a numbered list. User approves
 For each approved plan, launch a `general-purpose` agent via the Agent tool with `isolation: "worktree"`. Each agent receives:
 
 - The full approved implementation plan
-- Instruction to implement changes, commit with a descriptive message, and create the PR using the `pull-request:create` skill
-- Relevant skill guidance (e.g., skill structure conventions from `claude-code:skill` when creating skills)
+- The todo ID and title for the `Original Task` link
+- Instruction to implement changes, run `bun test` to verify, commit with a descriptive message, and create the PR using the `pull-request:create` skill
+- Which skills to load for the domain (same as the planning step)
 
 PR body includes an `Original Task` section:
 
@@ -55,15 +56,24 @@ Original Task: [<todo-title>](https://things.bendrucker.me/show?id=<todo-id>)
 
 ### Monitor CI
 
-Load the `github:actions-monitor` skill for each PR. Wait for all to complete. Collect pass/fail status and failure logs.
+Launch parallel Task agents (one per PR) using the `github:actions-monitor` skill. Collect pass/fail status and failure logs from each.
 
 ### Fix Failures
 
-For failing PRs, dispatch `general-purpose` agents to the worktree branch to fix the issue. The agent receives the failure logs and instructions to fix, commit, and push.
+For each failing PR, launch a `general-purpose` agent via the Agent tool with `isolation: "worktree"`. The agent receives:
+
+- The failure logs from CI
+- The branch name to check out
+- Instruction to fix the issue, run `bun test`, commit, and push
+
+After all fix agents complete, re-monitor CI for the affected PRs.
 
 ### Annotate and Complete
 
-Load the `things:url` skill. For each passing PR, update the Things todo notes with the PR link and tag the todo with `review`. Move the todo to Anytime.
+Load the `things:url` skill.
+
+- **Passing PRs**: Append the PR link to the todo's notes, add the `review` tag, remove the `claude` tag, and move the todo to Anytime.
+- **Still-failing PRs**: Append the PR link and failure summary to the todo's notes. Leave the `claude` tag so the item surfaces in the next run.
 
 ### Present Summary
 

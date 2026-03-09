@@ -55,23 +55,20 @@ bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts summary <iid>
 
 ### Create
 
-Write body to a file or pipe via stdin:
+Always use `--body-file` for comment bodies. Piping through echo breaks backtick-heavy markdown due to shell expansion.
 
 ```bash
 # General discussion (no position)
-echo "Looks good overall" | bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid>
+bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --body-file tmp/note.md
 
-# Inline comment on a new line
+# Inline comment on a new line (validated against diff hunks)
 bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/note.md
 
 # Comment on a deleted line
 bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --old-line 10 --body-file tmp/note.md
-
-# Multi-line comment (range)
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line-start 10 --line-end 15 --body-file tmp/note.md
 ```
 
-Diff refs are fetched automatically — no manual SHA management needed.
+Diff refs are fetched automatically. Positioned comments are validated against diff hunks before posting — if a line is not in the diff, the command exits with valid line ranges.
 
 ### Suggestions
 
@@ -93,12 +90,10 @@ third line
 ```
 ````
 
-Combine with the `create` command:
+Combine with the `create` command by writing the suggestion to a file first:
 
 ```bash
-echo '```suggestion:-0+0
-new code here
-```' | bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line 42
+bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/suggestion.md
 ```
 
 ## Pitfalls

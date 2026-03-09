@@ -1,86 +1,18 @@
 #!/usr/bin/env bun
 
-import { randomUUID } from "node:crypto";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { $ } from "bun";
 import { cli, command } from "cleye";
+import {
+  buildPosition,
+  fetchMrDiffs,
+  getDiffRefs,
+  glabApiPost,
+  readBody,
+  validateLineInDiff,
+} from "./diff";
 
 function apiPath(mr: number): string {
   return `projects/:id/merge_requests/${mr}/draft_notes`;
-}
-
-async function readBody(file: string | undefined): Promise<string> {
-  if (file === "-" || !file) {
-    return await Bun.stdin.text();
-  }
-  return await Bun.file(file).text();
-}
-
-type DiffRefs = { base_sha: string; head_sha: string; start_sha: string };
-
-async function getDiffRefs(mr: number): Promise<DiffRefs> {
-  const result = await $`glab api projects/:id/merge_requests/${mr} | jq '.diff_refs'`.json();
-  return result as DiffRefs;
-}
-
-type Position = {
-  base_sha: string;
-  head_sha: string;
-  start_sha: string;
-  old_path: string;
-  new_path: string;
-  position_type: "text";
-  old_line?: number;
-  new_line?: number;
-  line_range?: {
-    start: { new_line: number; type: "new" };
-    end: { new_line: number; type: "new" };
-  };
-};
-
-function buildPosition(
-  refs: { base_sha: string; head_sha: string; start_sha: string },
-  path: string,
-  opts: {
-    line?: number | undefined;
-    oldLine?: number | undefined;
-    lineStart?: number | undefined;
-    lineEnd?: number | undefined;
-  },
-): Position {
-  const position: Position = {
-    ...refs,
-    old_path: path,
-    new_path: path,
-    position_type: "text",
-  };
-
-  if (opts.lineStart !== undefined && opts.lineEnd !== undefined) {
-    position.new_line = opts.lineEnd;
-    position.line_range = {
-      start: { new_line: opts.lineStart, type: "new" },
-      end: { new_line: opts.lineEnd, type: "new" },
-    };
-  } else if (opts.oldLine !== undefined) {
-    position.old_line = opts.oldLine;
-  } else if (opts.line !== undefined) {
-    position.new_line = opts.line;
-  }
-
-  return position;
-}
-
-async function glabApiPost(path: string, payload: Record<string, unknown>): Promise<void> {
-  const tmpFile = join(tmpdir(), `draft-note-${randomUUID()}.json`);
-  await Bun.write(tmpFile, JSON.stringify(payload));
-  try {
-    const result =
-      await $`glab api ${path} -X POST -H "Content-Type: application/json" --input ${tmpFile}`.text();
-    console.log(result);
-  } finally {
-    await Bun.file(tmpFile).unlink();
-  }
 }
 
 const createCmd = command(
@@ -93,14 +25,6 @@ const createCmd = command(
       oldLine: {
         type: Number,
         description: "Old line number (deleted lines)",
-      },
-      lineStart: {
-        type: Number,
-        description: "Multi-line range start",
-      },
-      lineEnd: {
-        type: Number,
-        description: "Multi-line range end",
       },
       replyTo: {
         type: String,
@@ -129,12 +53,14 @@ const createCmd = command(
         payload.resolve_discussion = true;
       }
     } else if (parsed.flags.file) {
-      const refs = await getDiffRefs(mr);
+      const [refs, diffs] = await Promise.all([getDiffRefs(mr), fetchMrDiffs(mr)]);
+      validateLineInDiff(diffs, parsed.flags.file, {
+        line: parsed.flags.line,
+        oldLine: parsed.flags.oldLine,
+      });
       payload.position = buildPosition(refs, parsed.flags.file, {
         line: parsed.flags.line,
         oldLine: parsed.flags.oldLine,
-        lineStart: parsed.flags.lineStart,
-        lineEnd: parsed.flags.lineEnd,
       });
     }
 
@@ -237,10 +163,96 @@ const listCmd = command(
   },
 );
 
+type ReviewEntry = {
+  file?: string;
+  line?: number;
+  oldLine?: number;
+  body: string;
+};
+
+const reviewCmd = command(
+  {
+    name: "review",
+    parameters: ["<mr>"],
+    flags: {
+      input: {
+        type: String,
+        description: "JSON file with review entries",
+      },
+      submit: {
+        type: Boolean,
+        default: false,
+        description: "Publish draft notes after creating",
+      },
+      approve: {
+        type: Boolean,
+        default: false,
+        description: "Approve MR after publishing",
+      },
+    },
+  },
+  async (parsed) => {
+    const mr = Number(parsed._.mr);
+
+    if (!parsed.flags.input) {
+      console.error("--input is required");
+      process.exit(1);
+    }
+
+    const entries: ReviewEntry[] = JSON.parse(await Bun.file(parsed.flags.input).text());
+    const hasPositioned = entries.some((e) => e.file);
+
+    const [refs, diffs] = hasPositioned
+      ? await Promise.all([getDiffRefs(mr), fetchMrDiffs(mr)])
+      : [null, null];
+
+    let created = 0;
+    let failed = 0;
+
+    for (const entry of entries) {
+      try {
+        const payload: Record<string, unknown> = { note: entry.body };
+
+        if (entry.file && refs && diffs) {
+          validateLineInDiff(diffs, entry.file, {
+            line: entry.line,
+            oldLine: entry.oldLine,
+          });
+          payload.position = buildPosition(refs, entry.file, {
+            line: entry.line,
+            oldLine: entry.oldLine,
+          });
+        }
+
+        await glabApiPost(apiPath(mr), payload);
+        created++;
+      } catch (err) {
+        console.error(
+          `Failed: ${entry.file ?? "general"}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        failed++;
+      }
+    }
+
+    console.error(`Created ${created} draft notes (${failed} failed)`);
+
+    if (parsed.flags.submit) {
+      await $`glab api ${apiPath(mr)}/bulk_publish -X POST`.text();
+      console.error("Published draft notes");
+
+      if (parsed.flags.approve) {
+        const approveRefs = refs ?? (await getDiffRefs(mr));
+        await $`glab api projects/:id/merge_requests/${mr}/approve -X POST -f sha=${approveRefs.head_sha}`.text();
+        console.error("Approved MR");
+      }
+    }
+  },
+);
+
 cli(
   {
     name: "draft-note",
-    commands: [createCmd, publishCmd, submitCmd, listCmd],
+    commands: [createCmd, publishCmd, submitCmd, listCmd, reviewCmd],
   },
   (parsed) => {
     parsed.showHelp();

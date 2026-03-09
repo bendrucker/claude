@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 // Detect and output PR/MR template content from the repository
-// Args: [branch] — resolves worktree path for branch if provided
 // Outputs: template content if found, nothing otherwise
 
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { detectProvider, type Provider } from "./detect-provider";
-import { resolveWorktree } from "./worktree/resolve";
 
 const GITHUB_PATHS = [
   ".github/PULL_REQUEST_TEMPLATE.md",
@@ -33,20 +31,16 @@ export function findTemplate(provider: Provider, repoRoot: string): string | nul
   return null;
 }
 
-function getRepoRoot(cwd?: string): string {
+function getRepoRoot(): string {
   return execSync("git rev-parse --show-toplevel", {
     encoding: "utf-8",
-    cwd,
     stdio: ["pipe", "pipe", "pipe"],
   }).trim();
 }
 
 if (import.meta.main) {
-  const branch = process.argv[2];
-  const worktreePath = branch ? await resolveWorktree(branch) : null;
-  const cwd = worktreePath ?? undefined;
-  const repoRoot = getRepoRoot(cwd);
-  const provider = detectProvider(cwd);
+  const repoRoot = getRepoRoot();
+  const provider = detectProvider();
   const template = findTemplate(provider, repoRoot);
   if (template) {
     process.stdout.write(template);

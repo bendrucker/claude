@@ -1,24 +1,29 @@
 #!/usr/bin/env bun
-// Gather git context for pull request skills
-// Args: [branch] — resolves worktree path if provided
-// Outputs labeled sections: Branch, Status, Log, Diff
 
-import { $ } from "bun";
-import { resolveWorktree } from "./worktree/resolve";
+import { type ExecSyncOptions, execSync } from "node:child_process";
 
-export async function gitContext(cwd?: string): Promise<string> {
-  const shell = cwd ? $.cwd(cwd) : $;
+const execOptions: ExecSyncOptions = { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] };
 
-  const branch = (await shell`git branch --show-current`.text()).trim();
-  const status = (await shell`git status --short`.text()).trim();
-  const log = (await shell`git log --oneline -20`.text()).trim();
+function exec(command: string): string {
+  return execSync(command, execOptions).toString().trim();
+}
 
-  let diff: string;
+function diff(): string {
   try {
-    diff = (await shell`git diff HEAD`.text()).trim();
+    return exec("git diff HEAD");
   } catch {
-    diff = (await shell`git diff --cached`.text()).trim();
+    try {
+      return exec("git diff --cached");
+    } catch {
+      return "";
+    }
   }
+}
+
+export function gitContext(): string {
+  const branch = exec("git branch --show-current");
+  const status = exec("git status --short");
+  const log = exec("git log --oneline -20");
 
   const sections = [`Branch: ${branch}`];
 
@@ -30,15 +35,14 @@ export async function gitContext(cwd?: string): Promise<string> {
     sections.push(`Log:\n${log}`);
   }
 
-  if (diff) {
-    sections.push(`Diff:\n${diff}`);
+  const d = diff();
+  if (d) {
+    sections.push(`Diff:\n${d}`);
   }
 
   return sections.join("\n\n");
 }
 
 if (import.meta.main) {
-  const branch = process.argv[2];
-  const worktreePath = branch ? await resolveWorktree(branch) : null;
-  console.log(await gitContext(worktreePath ?? undefined));
+  console.log(gitContext());
 }

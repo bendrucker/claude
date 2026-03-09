@@ -1,0 +1,8 @@
+{
+  "name": "@bendrucker/claude-pull-request",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@bendrucker/shell-extract": "workspace:*"
+  }
+}

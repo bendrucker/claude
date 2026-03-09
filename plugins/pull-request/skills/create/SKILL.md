@@ -28,6 +28,7 @@ allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(bun ${CLAUDE_PL
 
 - Start with 1-3 sentences summarizing the change (no preceding header)
 - **Wrap all code identifiers with backticks**: function names, class names, file paths, endpoints, status codes, etc.
+- **Testing section**: Describe _what_ is tested, not _how many_. Never mention test counts or summarize by counting items.
 - Use `##` sections for larger changes. See [`sections.md`](sections.md) for detailed guidance on:
   - `## Issue` - Root cause analysis and issue linking
   - `## Changes` - High-level description of changes

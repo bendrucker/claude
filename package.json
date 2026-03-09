@@ -16,7 +16,8 @@
     "plugins/vscode",
     "packages/shell-extract",
     "packages/validate",
-    "plugins/tmux"
+    "plugins/tmux",
+    "plugins/pull-request"
   ],
   "scripts": {
     "build": "tsc --noEmit",

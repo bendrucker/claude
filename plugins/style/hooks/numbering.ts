@@ -24,6 +24,12 @@ import {
 
 type Mode = "write" | "edit" | "external";
 
+function inferMode(toolName: string): Mode {
+  if (toolName === "Write") return "write";
+  if (toolName === "Edit") return "edit";
+  return "external";
+}
+
 type MarkdownMatch = {
   text: string;
   line: number;
@@ -63,7 +69,7 @@ export function checkMarkdown(content: string): string | null {
 }
 
 export function checkCode(content: string, ext: string): string | null {
-  // Check if sg is available
+  // sg (ast-grep) is optional; code-level checks are skipped when unavailable
   try {
     execSync("command -v sg", { stdio: ["pipe", "pipe", "pipe"] });
   } catch {
@@ -96,8 +102,10 @@ export function checkCode(content: string, ext: string): string | null {
         return matches[0]?.message ?? null;
       }
     }
-  } catch {
-    // sg failed or parse error
+  } catch (error) {
+    console.error(
+      `[style/numbering] sg scan failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   } finally {
     try {
       unlinkSync(tmpFile);
@@ -109,11 +117,9 @@ export function checkCode(content: string, ext: string): string | null {
   return null;
 }
 
-export async function processInput(
-  input: PreToolUseHookInput,
-  mode: Mode,
-): Promise<SyncHookJSONOutput | null> {
+export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   const toolName = input.tool_name;
+  const mode = inferMode(toolName);
 
   let content: string | null = null;
   let filePath: string | undefined;
@@ -126,12 +132,10 @@ export async function processInput(
     const toolInput = input.tool_input as EditInput;
     content = toolInput.new_string;
     filePath = toolInput.file_path;
-  } else if (mode === "external") {
-    if (hasBashCommand(input.tool_input)) {
-      content = await extractMarkdownFromBash(input.tool_input.command, "style/numbering");
-    } else {
-      content = extractMarkdownFromMcp(input.tool_input);
-    }
+  } else if (hasBashCommand(input.tool_input)) {
+    content = await extractMarkdownFromBash(input.tool_input.command, "style/numbering");
+  } else {
+    content = extractMarkdownFromMcp(input.tool_input);
   }
 
   if (!content) return null;
@@ -158,8 +162,6 @@ Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
 }
 
 async function main(): Promise<void> {
-  const mode = (process.argv[2] || "write") as Mode;
-
   let input: PreToolUseHookInput;
   try {
     input = await readStdinJson<PreToolUseHookInput>();
@@ -170,7 +172,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = await processInput(input, mode);
+  const output = await processInput(input);
   if (output) {
     writeStdoutJson(output);
   }

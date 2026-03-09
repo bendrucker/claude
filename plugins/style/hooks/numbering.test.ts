@@ -9,7 +9,6 @@ import { checkCode, checkMarkdown, processInput } from "./numbering";
 
 function hasSg(): boolean {
   try {
-    // Check if sg is ast-grep by verifying scan command works
     execSync("sg scan --help", { stdio: ["pipe", "pipe", "pipe"] });
     return true;
   } catch {
@@ -41,11 +40,20 @@ function mockEditInput(filePath: string, newString: string): PreToolUseHookInput
   };
 }
 
-async function getOutput(
-  input: PreToolUseHookInput,
-  mode: "write" | "edit" | "external" = "write",
-): Promise<PreToolUseHookSpecificOutput | null> {
-  const result = await processInput(input, mode);
+function mockMcpInput(toolName: string, toolInput: Record<string, unknown>): PreToolUseHookInput {
+  return {
+    hook_event_name: "PreToolUse",
+    session_id: "test",
+    transcript_path: "/tmp/test",
+    cwd: "/tmp",
+    tool_name: toolName,
+    tool_input: toolInput,
+    tool_use_id: "test",
+  };
+}
+
+async function getOutput(input: PreToolUseHookInput): Promise<PreToolUseHookSpecificOutput | null> {
+  const result = await processInput(input);
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
@@ -158,17 +166,13 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("detects func step1()", async () => {
       const output = await getOutput(
         mockWriteInput("main.go", 'package main\nfunc step1() { fmt.Println("test") }'),
-        "write",
       );
       expect(output?.permissionDecision).toBe("deny");
       expect(output?.permissionDecisionReason).toContain("step1");
     });
 
     it("detects func phase2()", async () => {
-      const output = await getOutput(
-        mockWriteInput("main.go", "package main\nfunc phase2() {}"),
-        "write",
-      );
+      const output = await getOutput(mockWriteInput("main.go", "package main\nfunc phase2() {}"));
       expect(output?.permissionDecision).toBe("deny");
       expect(output?.permissionDecisionReason).toContain("phase2");
     });
@@ -176,7 +180,6 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("allows descriptive function names", async () => {
       const output = await getOutput(
         mockWriteInput("main.go", 'package main\nfunc processItems() { fmt.Println("test") }'),
-        "write",
       );
       expect(output).toBeNull();
     });
@@ -186,20 +189,18 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     it("detects function step1()", async () => {
       const output = await getOutput(
         mockWriteInput("app.js", 'function step1() { console.log("test"); }'),
-        "write",
       );
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("detects const part3", async () => {
-      const output = await getOutput(mockWriteInput("app.js", "const part3 = () => {};"), "write");
+      const output = await getOutput(mockWriteInput("app.js", "const part3 = () => {};"));
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("allows descriptive names", async () => {
       const output = await getOutput(
         mockWriteInput("app.js", 'function handleSubmit() { console.log("test"); }'),
-        "write",
       );
       expect(output).toBeNull();
     });
@@ -207,78 +208,63 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
   describe("Python numbered identifiers", () => {
     it("detects def step1()", async () => {
-      const output = await getOutput(
-        mockWriteInput("script.py", "def step1():\n    pass"),
-        "write",
-      );
+      const output = await getOutput(mockWriteInput("script.py", "def step1():\n    pass"));
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("detects class Phase2", async () => {
-      const output = await getOutput(
-        mockWriteInput("script.py", "class Phase2:\n    pass"),
-        "write",
-      );
+      const output = await getOutput(mockWriteInput("script.py", "class Phase2:\n    pass"));
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("allows descriptive names", async () => {
-      const output = await getOutput(
-        mockWriteInput("script.py", "def process_items():\n    pass"),
-        "write",
-      );
+      const output = await getOutput(mockWriteInput("script.py", "def process_items():\n    pass"));
       expect(output).toBeNull();
     });
   });
 
   describe("Write vs Edit mode", () => {
     it("blocks Write tool with deny", async () => {
-      const output = await getOutput(
-        mockWriteInput("main.go", "package main\nfunc step1() {}"),
-        "write",
-      );
+      const output = await getOutput(mockWriteInput("main.go", "package main\nfunc step1() {}"));
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("asks for Edit tool instead of deny", async () => {
-      const output = await getOutput(mockEditInput("main.go", "func step1() {}"), "edit");
+      const output = await getOutput(mockEditInput("main.go", "func step1() {}"));
       expect(output?.permissionDecision).toBe("ask");
     });
   });
 
   describe("File type filtering", () => {
     it("checks Go files", async () => {
-      const output = await getOutput(mockWriteInput("main.go", "func step1() {}"), "write");
+      const output = await getOutput(mockWriteInput("main.go", "func step1() {}"));
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("checks TypeScript files", async () => {
-      const output = await getOutput(mockWriteInput("app.ts", "function step1() {}"), "write");
+      const output = await getOutput(mockWriteInput("app.ts", "function step1() {}"));
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("skips unsupported file types (JSON)", async () => {
-      const output = await getOutput(mockWriteInput("config.json", '{"step1": "value"}'), "write");
+      const output = await getOutput(mockWriteInput("config.json", '{"step1": "value"}'));
       expect(output).toBeNull();
     });
   });
 
   describe("Test files are NOT excluded", () => {
     it("checks *_test.go files", async () => {
-      const output = await getOutput(mockWriteInput("main_test.go", "func step1() {}"), "write");
+      const output = await getOutput(mockWriteInput("main_test.go", "func step1() {}"));
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("checks *.spec.ts files", async () => {
-      const output = await getOutput(mockWriteInput("app.spec.ts", "function step1() {}"), "write");
+      const output = await getOutput(mockWriteInput("app.spec.ts", "function step1() {}"));
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("checks test_*.py files", async () => {
-      const output = await getOutput(
-        mockWriteInput("test_utils.py", "def step1():\n    pass"),
-        "write",
-      );
+      const output = await getOutput(mockWriteInput("test_utils.py", "def step1():\n    pass"));
       expect(output?.permissionDecision).toBe("deny");
     });
   });
@@ -286,83 +272,89 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
 describe("processInput with markdown", () => {
   it('detects "# 1. Introduction"', async () => {
-    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
+    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"));
     expect(output?.permissionDecision).toBe("deny");
     expect(output?.permissionDecisionReason).toContain("1. Introduction");
   });
 
   it('detects "## Step 2: Setup"', async () => {
-    const output = await getOutput(mockWriteInput("docs.md", "## Step 2: Setup"), "write");
+    const output = await getOutput(mockWriteInput("docs.md", "## Step 2: Setup"));
     expect(output?.permissionDecision).toBe("deny");
     expect(output?.permissionDecisionReason).toContain("Step 2");
   });
 
   it('detects "### Phase 3"', async () => {
-    const output = await getOutput(mockWriteInput("guide.markdown", "### Phase 3"), "write");
+    const output = await getOutput(mockWriteInput("guide.markdown", "### Phase 3"));
     expect(output?.permissionDecision).toBe("deny");
     expect(output?.permissionDecisionReason).toContain("Phase 3");
   });
 
   it("allows descriptive headings", async () => {
-    const output = await getOutput(mockWriteInput("README.md", "# Introduction"), "write");
+    const output = await getOutput(mockWriteInput("README.md", "# Introduction"));
     expect(output).toBeNull();
   });
 
   it("allows headings with numbers mid-text", async () => {
     const output = await getOutput(
       mockWriteInput("README.md", "# Using OAuth2 for Authentication"),
-      "write",
     );
     expect(output).toBeNull();
   });
 });
 
-describe("processInput with external mode", () => {
+describe("processInput with MCP tools", () => {
   it("detects numbered heading from MCP body", async () => {
-    const input: PreToolUseHookInput = {
-      hook_event_name: "PreToolUse",
-      session_id: "test",
-      transcript_path: "/tmp/test",
-      cwd: "/tmp",
-      tool_name: "mcp__plugin_github_github__create_pull_request",
-      tool_input: { body: "## Step 1: Setup\nContent here" },
-      tool_use_id: "test",
-    };
-    const output = await getOutput(input, "external");
+    const output = await getOutput(
+      mockMcpInput("mcp__claude_ai_Linear__save_issue", {
+        title: "Add feature",
+        description: "## Step 1: Setup\nInstall dependencies and configure the environment",
+      }),
+    );
     expect(output?.permissionDecision).toBe("ask");
   });
 
   it("allows clean MCP body", async () => {
-    const input: PreToolUseHookInput = {
-      hook_event_name: "PreToolUse",
-      session_id: "test",
-      transcript_path: "/tmp/test",
-      cwd: "/tmp",
-      tool_name: "mcp__plugin_github_github__create_pull_request",
-      tool_input: { body: "## Summary\nClean content" },
-      tool_use_id: "test",
-    };
-    const output = await getOutput(input, "external");
+    const output = await getOutput(
+      mockMcpInput("mcp__plugin_github_github__create_pull_request", {
+        title: "Add feature",
+        body: "## Summary\nClean content with enough text to pass the length threshold for extraction",
+      }),
+    );
     expect(output).toBeNull();
   });
 
-  it("uses ask instead of deny for external mode", async () => {
-    const input: PreToolUseHookInput = {
-      hook_event_name: "PreToolUse",
-      session_id: "test",
-      transcript_path: "/tmp/test",
-      cwd: "/tmp",
-      tool_name: "mcp__plugin_github_github__create_pull_request",
-      tool_input: { body: "# 1. First Step" },
-      tool_use_id: "test",
-    };
-    const output = await getOutput(input, "external");
+  it("uses ask instead of deny for MCP tools", async () => {
+    const output = await getOutput(
+      mockMcpInput("mcp__plugin_github_github__create_pull_request", {
+        title: "Add feature",
+        body: "# 1. First Step\nThis body has enough content to be extracted as markdown",
+      }),
+    );
     expect(output?.permissionDecision).toBe("ask");
+  });
+
+  it("detects numbered heading from Bash heredoc", async () => {
+    const output = await getOutput(
+      mockMcpInput("Bash", {
+        command: `gh pr create --body "$(cat <<'EOF'\n## Step 1: Setup\nInstall dependencies\nEOF\n)"`,
+      }),
+    );
+    expect(output?.permissionDecision).toBe("ask");
+  });
+
+  it("skips MCP tools with no markdown content", async () => {
+    const output = await getOutput(
+      mockMcpInput("mcp__claude_ai_Linear__save_issue", {
+        title: "Short title",
+        team: "ENG",
+      }),
+    );
+    expect(output).toBeNull();
   });
 });
 
 describe("processInput edge cases", () => {
-  it("returns null for Bash tool in write mode", async () => {
+  it("returns null for Bash without markdown content", async () => {
     const input: PreToolUseHookInput = {
       hook_event_name: "PreToolUse",
       session_id: "test",
@@ -372,7 +364,7 @@ describe("processInput edge cases", () => {
       tool_input: { command: "echo hello" },
       tool_use_id: "test",
     };
-    expect(await getOutput(input, "write")).toBeNull();
+    expect(await getOutput(input)).toBeNull();
   });
 
   it("returns null for missing content", async () => {
@@ -385,6 +377,6 @@ describe("processInput edge cases", () => {
       tool_input: { file_path: "test.go" },
       tool_use_id: "test",
     };
-    expect(await getOutput(input, "write")).toBeNull();
+    expect(await getOutput(input)).toBeNull();
   });
 });

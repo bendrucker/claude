@@ -23,6 +23,7 @@ export async function extractMarkdownFromBash(
       return readFileSync(bodyFileMatch[1]!, "utf-8");
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
+      // ENOENT is expected when the hook fires before the file is written
       if (err.code !== "ENOENT") {
         console.error(`[${label}] Failed to read body file ${bodyFileMatch[1]}: ${err.message}`);
       }
@@ -40,11 +41,17 @@ export async function extractMarkdownFromBash(
   }
 }
 
+const MIN_CONTENT_LENGTH = 80;
+
 export function extractMarkdownFromMcp(input: unknown): string | null {
   if (typeof input !== "object" || input === null) return null;
   const obj = input as Record<string, unknown>;
-  if (typeof obj.body === "string") return obj.body;
-  if (typeof obj.description === "string") return obj.description;
+
+  for (const value of Object.values(obj)) {
+    if (typeof value !== "string") continue;
+    if (value.includes("\n") || value.length >= MIN_CONTENT_LENGTH) return value;
+  }
+
   return null;
 }
 

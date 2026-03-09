@@ -112,7 +112,7 @@ describe("processInput", () => {
       transcript_path: "/tmp/test",
       cwd: "/tmp",
       tool_name: "mcp__plugin_github_github__create_pull_request",
-      tool_input: { body: "# introduction" },
+      tool_input: { body: "# introduction\nThis PR adds support for the new authentication flow" },
       tool_use_id: "test",
     };
     const output = await getOutput(input);
@@ -126,11 +126,27 @@ describe("processInput", () => {
       transcript_path: "/tmp/test",
       cwd: "/tmp",
       tool_name: "mcp__plugin_github_github__create_pull_request",
-      tool_input: { body: "# Introduction" },
+      tool_input: { body: "# Introduction\nThis PR adds support for the new authentication flow" },
       tool_use_id: "test",
     };
     const output = await getOutput(input);
     expect(output).toBeNull();
+  });
+
+  it("detects title case issue from Bash heredoc", async () => {
+    const input: PreToolUseHookInput = {
+      hook_event_name: "PreToolUse",
+      session_id: "test",
+      transcript_path: "/tmp/test",
+      cwd: "/tmp",
+      tool_name: "Bash",
+      tool_input: {
+        command: `gh pr create --body "$(cat <<'EOF'\n# introduction\nSome content here\nEOF\n)"`,
+      },
+      tool_use_id: "test",
+    };
+    const output = await getOutput(input);
+    expect(output?.additionalContext).toContain("AP-style title case");
   });
 
   it("returns null for non-PR Bash command", async () => {

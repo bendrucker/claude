@@ -125,10 +125,30 @@ describe("processInput", () => {
       transcript_path: "/tmp/test",
       cwd: "/tmp",
       tool_name: "mcp__plugin_github_github__create_pull_request",
-      tool_input: { body: "Added 5 endpoints" },
+      tool_input: {
+        body: "Added 5 endpoints\nThis PR introduces new API routes for user management",
+      },
       tool_use_id: "mcp-test-id",
     };
     trackMarker(sid, "mcp:mcp-test-id");
+    const result = await processInput(input);
+    expect(getContext(result)).toContain("counting");
+  });
+
+  it("injects context for Bash heredoc with digits", async () => {
+    const sid = `tc-${Date.now()}-9`;
+    const input: PreToolUseHookInput = {
+      hook_event_name: "PreToolUse",
+      session_id: sid,
+      transcript_path: "/tmp/test",
+      cwd: "/tmp",
+      tool_name: "Bash",
+      tool_input: {
+        command: `gh pr create --body "$(cat <<'EOF'\nAdded 5 endpoints\nNew API routes\nEOF\n)"`,
+      },
+      tool_use_id: "bash-test-id",
+    };
+    trackMarker(sid, "bash:bash-test-id");
     const result = await processInput(input);
     expect(getContext(result)).toContain("counting");
   });
@@ -140,7 +160,7 @@ describe("processInput", () => {
       transcript_path: "/tmp/test",
       cwd: "/tmp",
       tool_name: "mcp__plugin_github_github__create_pull_request",
-      tool_input: { body: "No numbers here" },
+      tool_input: { body: "No numbers here\nThis PR refactors the authentication module" },
       tool_use_id: "mcp-test-id",
     };
     expect(await processInput(input)).toBeNull();

@@ -1,4 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
+import { unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { extractMarkdownFromBash, extractMarkdownFromMcp, hasBashCommand } from "./index";
 
 describe("hasBashCommand", () => {
@@ -24,20 +27,29 @@ describe("hasBashCommand", () => {
 });
 
 describe("extractMarkdownFromMcp", () => {
-  it("returns body field", () => {
-    expect(extractMarkdownFromMcp({ body: "content" })).toBe("content");
+  it("returns string field with newline", () => {
+    expect(extractMarkdownFromMcp({ body: "line1\nline2" })).toBe("line1\nline2");
   });
 
-  it("returns description field", () => {
-    expect(extractMarkdownFromMcp({ description: "content" })).toBe("content");
+  it("returns string field at length threshold", () => {
+    const long = "a".repeat(80);
+    expect(extractMarkdownFromMcp({ description: long })).toBe(long);
   });
 
-  it("prefers body over description", () => {
-    expect(extractMarkdownFromMcp({ body: "body", description: "desc" })).toBe("body");
+  it("skips string just below length threshold", () => {
+    expect(extractMarkdownFromMcp({ description: "a".repeat(79) })).toBeNull();
   });
 
-  it("returns null for no matching fields", () => {
+  it("skips short strings without newlines", () => {
     expect(extractMarkdownFromMcp({ title: "test" })).toBeNull();
+  });
+
+  it("skips non-string values", () => {
+    expect(extractMarkdownFromMcp({ count: 42, enabled: true })).toBeNull();
+  });
+
+  it("returns first qualifying field", () => {
+    expect(extractMarkdownFromMcp({ title: "short", body: "line1\nline2" })).toBe("line1\nline2");
   });
 
   it("returns null for null input", () => {
@@ -50,6 +62,14 @@ describe("extractMarkdownFromMcp", () => {
 });
 
 describe("extractMarkdownFromBash", () => {
+  const tmpFile = join(tmpdir(), "shell-extract-test.md");
+
+  afterEach(() => {
+    try {
+      unlinkSync(tmpFile);
+    } catch {}
+  });
+
   it("returns null for command without body", async () => {
     expect(await extractMarkdownFromBash("echo hello")).toBeNull();
   });
@@ -61,6 +81,13 @@ Hello
 EOF
 )"`;
     expect(await extractMarkdownFromBash(cmd)).toBe("## Summary\nHello\n");
+  });
+
+  it("reads --body-file content", async () => {
+    writeFileSync(tmpFile, "## Changes\nUpdated the API");
+    expect(await extractMarkdownFromBash(`gh pr create --body-file ${tmpFile}`)).toBe(
+      "## Changes\nUpdated the API",
+    );
   });
 
   it("returns null for nonexistent --body-file", async () => {

@@ -281,5 +281,5 @@ jobs:
           echo '## Claude Code Context Usage' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          claude --print '/context' --output-format json --verbose | jq -r '.[1].message.content' | awk '/<local-command-stdout>/{flag=1;next}/<\/local-command-stdout>/{flag=0}flag' >> $GITHUB_STEP_SUMMARY
+          claude --print '/context' --output-format json --verbose | jq -r '.[-1].result' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

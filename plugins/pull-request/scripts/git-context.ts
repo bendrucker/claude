@@ -1,18 +1,29 @@
 #!/usr/bin/env bun
 
-import { $ } from "bun";
+import { type ExecSyncOptions, execSync } from "node:child_process";
 
-export async function gitContext(): Promise<string> {
-  const branch = (await $`git branch --show-current`.text()).trim();
-  const status = (await $`git status --short`.text()).trim();
-  const log = (await $`git log --oneline -20`.text()).trim();
+const execOptions: ExecSyncOptions = { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] };
 
-  let diff: string;
+function exec(command: string): string {
+  return execSync(command, execOptions).toString().trim();
+}
+
+function diff(): string {
   try {
-    diff = (await $`git diff HEAD`.text()).trim();
+    return exec("git diff HEAD");
   } catch {
-    diff = (await $`git diff --cached`.text()).trim();
+    try {
+      return exec("git diff --cached");
+    } catch {
+      return "";
+    }
   }
+}
+
+export function gitContext(): string {
+  const branch = exec("git branch --show-current");
+  const status = exec("git status --short");
+  const log = exec("git log --oneline -20");
 
   const sections = [`Branch: ${branch}`];
 
@@ -24,13 +35,14 @@ export async function gitContext(): Promise<string> {
     sections.push(`Log:\n${log}`);
   }
 
-  if (diff) {
-    sections.push(`Diff:\n${diff}`);
+  const d = diff();
+  if (d) {
+    sections.push(`Diff:\n${d}`);
   }
 
   return sections.join("\n\n");
 }
 
 if (import.meta.main) {
-  console.log(await gitContext());
+  console.log(gitContext());
 }

@@ -12,8 +12,8 @@ allowed-tools:
   - "Bash(gh pr:*)"
   - "Bash(glab mr:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"
-  # workaround: inline skill execution (`!` backtick) includes syntax markers in the
-  # permission check pattern. Remove when the upstream bug is fixed. See #486.
+  # workaround: inline skill execution includes syntax markers in the permission
+  # check pattern, breaking allowed-tools matching. Tracked in #486.
   - "Bash(!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/*`:*)"
 ---
 

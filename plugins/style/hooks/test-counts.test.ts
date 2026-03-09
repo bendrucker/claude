@@ -144,7 +144,11 @@ describe("processInput", () => {
       cwd: "/tmp",
       tool_name: "Bash",
       tool_input: {
-        command: `gh pr create --body "$(cat <<'EOF'\nAdded 5 endpoints\nNew API routes\nEOF\n)"`,
+        command: `gh pr create --body "$(cat <<'EOF'
+Added 5 endpoints
+New API routes
+EOF
+)"`,
       },
       tool_use_id: "bash-test-id",
     };

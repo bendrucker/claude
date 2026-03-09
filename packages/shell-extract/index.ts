@@ -4,6 +4,10 @@ import { type File, parse } from "sh-syntax";
 // sh-syntax WASM bridge returns `Stmt` at runtime but TS types declare `Stmts`
 type RuntimeFile = Omit<File, "Stmts"> & { Stmt?: File["Stmts"] };
 
+function toRuntimeFile(parsed: File): RuntimeFile {
+  return parsed as RuntimeFile;
+}
+
 export function hasBashCommand(input: unknown): input is { command: string } {
   return (
     typeof input === "object" &&
@@ -56,7 +60,7 @@ export function extractMarkdownFromMcp(input: unknown): string | null {
 }
 
 async function extractHeredoc(command: string, label: string): Promise<string | null> {
-  const ast = (await parse(command)) as unknown as RuntimeFile;
+  const ast = toRuntimeFile(await parse(command));
 
   const topLevel = findHdocLit(ast);
   if (topLevel) return topLevel;
@@ -88,7 +92,7 @@ async function extractHeredoc(command: string, label: string): Promise<string | 
     const innerCmd = cmdText.slice(csStart + 2, csEnd);
 
     try {
-      const innerAst = (await parse(innerCmd)) as unknown as RuntimeFile;
+      const innerAst = toRuntimeFile(await parse(innerCmd));
       const nested = findHdocLit(innerAst);
       if (nested) return nested;
     } catch (error) {

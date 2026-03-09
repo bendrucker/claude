@@ -336,7 +336,11 @@ describe("processInput with MCP tools", () => {
   it("detects numbered heading from Bash heredoc", async () => {
     const output = await getOutput(
       mockMcpInput("Bash", {
-        command: `gh pr create --body "$(cat <<'EOF'\n## Step 1: Setup\nInstall dependencies\nEOF\n)"`,
+        command: `gh pr create --body "$(cat <<'EOF'
+## Step 1: Setup
+Install dependencies
+EOF
+)"`,
       }),
     );
     expect(output?.permissionDecision).toBe("ask");

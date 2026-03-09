@@ -141,7 +141,11 @@ describe("processInput", () => {
       cwd: "/tmp",
       tool_name: "Bash",
       tool_input: {
-        command: `gh pr create --body "$(cat <<'EOF'\n# introduction\nSome content here\nEOF\n)"`,
+        command: `gh pr create --body "$(cat <<'EOF'
+# introduction
+Some content here
+EOF
+)"`,
       },
       tool_use_id: "test",
     };

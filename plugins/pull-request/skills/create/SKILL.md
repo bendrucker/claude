@@ -13,7 +13,8 @@ allowed-tools:
   - "Bash(glab mr:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"
   # workaround: inline skill execution includes syntax markers in the permission
-  # check pattern, breaking allowed-tools matching. Tracked in #486.
+  # check pattern, breaking allowed-tools matching.
+  # https://github.com/bendrucker/claude/issues/486
   - "Bash(!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/*`:*)"
 ---
 

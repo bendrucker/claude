@@ -199,14 +199,14 @@ export const descriptionLength: Rule = {
 
 export const allowedToolsFormat: Rule = {
   name: "allowed-tools-format",
-  severity: "error",
+  severity: "warn",
   check(content: SkillContent): RuleResult {
     const allowedTools = content.frontmatter["allowed-tools"];
 
     if (allowedTools === undefined) {
       return {
         rule: "allowed-tools-format",
-        severity: "error",
+        severity: "warn",
         passed: true,
         message: "allowed-tools not set",
       };
@@ -215,15 +215,15 @@ export const allowedToolsFormat: Rule = {
     if (typeof allowedTools === "string") {
       return {
         rule: "allowed-tools-format",
-        severity: "error",
+        severity: "warn",
         passed: false,
-        message: "allowed-tools must be a YAML array, not a comma-separated string",
+        message: "allowed-tools should be a YAML array, not a comma-separated string",
       };
     }
 
     return {
       rule: "allowed-tools-format",
-      severity: "error",
+      severity: "warn",
       passed: true,
       message: `${Array.isArray(allowedTools) ? allowedTools.length : 0} tools`,
     };

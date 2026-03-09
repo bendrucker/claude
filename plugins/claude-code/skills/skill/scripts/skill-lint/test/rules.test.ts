@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { lintSkill } from "../index";
 import { parseSkill } from "../parse";
 import {
+  allowedToolsFormat,
   descriptionLength,
   descriptionRequired,
   nameConsecutiveHyphens,
@@ -182,6 +183,32 @@ describe("frontmatter rules", () => {
       const longDesc = "a".repeat(1025);
       const content = parseSkill(`---\ndescription: ${longDesc}\n---\n`);
       const result = single(descriptionLength.check(content, ""));
+      expect(result.passed).toBe(false);
+    });
+  });
+
+  describe("allowedToolsFormat", () => {
+    it("passes when allowed-tools is not set", () => {
+      const content = parseSkill("---\nname: test\n---\n");
+      const result = single(allowedToolsFormat.check(content, ""));
+      expect(result.passed).toBe(true);
+    });
+
+    it("passes when allowed-tools is an array", () => {
+      const content = parseSkill("---\nallowed-tools:\n  - Bash\n  - Read\n---\n");
+      const result = single(allowedToolsFormat.check(content, ""));
+      expect(result.passed).toBe(true);
+    });
+
+    it("passes when allowed-tools is an inline array", () => {
+      const content = parseSkill("---\nallowed-tools: [Bash, Read]\n---\n");
+      const result = single(allowedToolsFormat.check(content, ""));
+      expect(result.passed).toBe(true);
+    });
+
+    it("fails when allowed-tools is a comma-separated string", () => {
+      const content = parseSkill("---\nallowed-tools: Bash(gh:*), mcp__github\n---\n");
+      const result = single(allowedToolsFormat.check(content, ""));
       expect(result.passed).toBe(false);
     });
   });

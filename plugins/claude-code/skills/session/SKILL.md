@@ -1,7 +1,9 @@
 ---
 name: claude-code:session
 description: View current session info or search conversation history. Use when debugging sessions, reviewing activity, finding past discussions, or summarizing recent work.
-allowed-tools: [Bash, Read]
+allowed-tools:
+  - Bash
+  - Read
 ---
 
 # Session CLI

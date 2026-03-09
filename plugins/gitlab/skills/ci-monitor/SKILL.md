@@ -5,7 +5,9 @@ description: |
 context: fork
 agent: general-purpose
 model: haiku
-allowed-tools: [Bash(glab ci:*), Bash(glab api:*)]
+allowed-tools:
+  - Bash(glab ci:*)
+  - Bash(glab api:*)
 ---
 
 # CI Monitor

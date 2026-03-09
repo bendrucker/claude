@@ -2,7 +2,14 @@
 name: issue
 description: |
   Implement a feature or fix based on an issue. Use when given an issue URL to work on, or when implementing changes described in a tracked issue. Supports GitHub, Linear, and GitLab.
-allowed-tools: Bash(gh:*), Bash(glab:*), Bash(git:*), mcp__github, mcp__plugin_github_github__issue_read, mcp__linear, mcp__plugin_github_github__search_code
+allowed-tools:
+  - Bash(gh:*)
+  - Bash(glab:*)
+  - Bash(git:*)
+  - mcp__github
+  - mcp__plugin_github_github__issue_read
+  - mcp__linear
+  - mcp__plugin_github_github__search_code
 ---
 
 Work on this issue: $ARGUMENTS

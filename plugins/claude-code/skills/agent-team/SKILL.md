@@ -1,7 +1,14 @@
 ---
 name: claude-code:agent-team
 description: Orchestrating Claude Code agent teams. Use when creating teams, spawning teammates, assigning tasks, configuring teammate modes, or setting up team quality gate hooks.
-allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, WebFetch(domain:code.claude.com)]
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - Bash
+  - WebFetch(domain:code.claude.com)
 ---
 
 # Agent Teams

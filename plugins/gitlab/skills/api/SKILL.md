@@ -29,6 +29,13 @@ glab api projects/:id/issues --paginate               # All pages
 
 **Pagination pitfall**: `--paginate` concatenates JSON arrays across pages as `][`, producing invalid JSON (e.g., `[{...}][{...}]`). Fix by replacing `][` with `,` before parsing: `.replace(/\]\s*\[/g, ",")`.
 
+**Nested fields**: `-f` and `--raw-field` silently drop bracket-nested keys like `position[base_sha]=...`. For nested objects, write JSON to a file and use `--input`:
+
+```bash
+echo '{"position":{"base_sha":"abc","head_sha":"def","old_path":"file.ts","new_path":"file.ts","position_type":"text","new_line":10}}' > /tmp/payload.json
+glab api projects/:id/merge_requests/:iid/discussions -X POST -H "Content-Type: application/json" --input /tmp/payload.json
+```
+
 ## GraphQL
 
 ```bash

@@ -6,6 +6,7 @@ Create and update pull requests (PRs), merge requests (MRs), and change requests
 
 - **Skill**: `pull-request:create` — Create a PR/MR with proper title formatting, body structure, and section organization
 - **Skill**: `pull-request:update` — Update a PR/MR body to reflect the current state of changes
+- **Skill**: `pull-request:follow-up` — Follow up on review feedback you received: check resolution state, find silent resolves, draft replies
 - **Hook**: Validates PR body content before creation or edit
 
 ## Worktree Support

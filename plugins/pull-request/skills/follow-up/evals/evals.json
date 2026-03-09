@@ -1,0 +1,29 @@
+{
+  "skill_name": "pull-request:follow-up",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Check what review comments still need replies on https://github.com/acme/api-server/pull/247",
+      "expected_output": "Summary table of thread states with unresolved threads listed by file and line, plus identification of any silently resolved threads",
+      "files": [],
+      "expectations": [
+        "The skill fetches all resolvable threads (resolved and unresolved)",
+        "Threads are classified into the four buckets (unresolved/no reply, unresolved/replied, resolved/with reply, resolved/silent)",
+        "A summary table with counts per category is presented",
+        "Unresolved threads are listed with file, line, and feedback summary"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Help me draft replies for the outstanding feedback on https://gitlab.example.com/team/service/-/merge_requests/89",
+      "expected_output": "Draft replies for each unresolved thread that match the author's writing style and follow reply tone guidelines",
+      "files": [],
+      "expectations": [
+        "The skill detects GitLab from the URL and uses glab/discussions script",
+        "Unresolved threads are fetched and summarized before drafting",
+        "Draft replies follow the tone guidelines in replies.md",
+        "The skill asks for confirmation before posting any comments"
+      ]
+    }
+  ]
+}

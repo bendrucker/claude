@@ -3,9 +3,12 @@
 import { basename, dirname } from "node:path";
 import type { PostToolUseHookOutput, PostToolUseInput } from "@constellos/claude-code-kit";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import { lintSkill } from "./skill-lint";
+import { lintSkill as defaultLintSkill } from "./skill-lint";
+import type { SkillLintResult } from "./skill-lint/types";
 
-function lintMessages(skillDir: string): string[] {
+type LintSkillFn = (dir: string) => SkillLintResult;
+
+function lintMessages(skillDir: string, lintSkill: LintSkillFn): string[] {
   const result = lintSkill(skillDir);
   if (result.errors === 0 && result.warnings === 0) return [];
 
@@ -17,11 +20,14 @@ function lintMessages(skillDir: string): string[] {
   return messages;
 }
 
-export function processPostToolUse(input: PostToolUseInput): PostToolUseHookOutput | null {
+export function processPostToolUse(
+  input: PostToolUseInput,
+  lintSkill: LintSkillFn = defaultLintSkill,
+): PostToolUseHookOutput | null {
   const filePath = (input.tool_input as { file_path?: string }).file_path;
   if (!filePath || basename(filePath) !== "SKILL.md") return null;
 
-  const messages = lintMessages(dirname(filePath));
+  const messages = lintMessages(dirname(filePath), lintSkill);
   if (messages.length === 0) return null;
 
   return {

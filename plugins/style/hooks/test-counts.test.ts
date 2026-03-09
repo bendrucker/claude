@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -70,7 +70,7 @@ function trackMarker(sessionId: string, key: string) {
 
 describe("processInput", () => {
   it("injects context for markdown Write with digits", async () => {
-    const sid = `tc-${Date.now()}-1`;
+    const sid = `tc-${randomUUID()}-1`;
     trackMarker(sid, "README.md");
     const result = await processInput(mockWriteInput("README.md", "Added 5 endpoints", sid));
     expect(getContext(result)).toContain("counting");
@@ -78,27 +78,27 @@ describe("processInput", () => {
 
   it("returns null for markdown Write without digits", async () => {
     const result = await processInput(
-      mockWriteInput("README.md", "No numbers here", `tc-${Date.now()}-2`),
+      mockWriteInput("README.md", "No numbers here", `tc-${randomUUID()}-2`),
     );
     expect(result).toBeNull();
   });
 
   it("returns null for non-markdown files", async () => {
     const result = await processInput(
-      mockWriteInput("app.ts", "Added 5 tests", `tc-${Date.now()}-3`),
+      mockWriteInput("app.ts", "Added 5 tests", `tc-${randomUUID()}-3`),
     );
     expect(result).toBeNull();
   });
 
   it("injects context for markdown Edit with digits", async () => {
-    const sid = `tc-${Date.now()}-4`;
+    const sid = `tc-${randomUUID()}-4`;
     trackMarker(sid, "docs.md");
     const result = await processInput(mockEditInput("docs.md", "3 new features", sid));
     expect(getContext(result)).toContain("counting");
   });
 
   it("skips injection on second call for same file", async () => {
-    const sid = `tc-${Date.now()}-5`;
+    const sid = `tc-${randomUUID()}-5`;
     trackMarker(sid, "README.md");
     const first = await processInput(mockWriteInput("README.md", "5 items", sid));
     expect(first).not.toBeNull();
@@ -107,8 +107,8 @@ describe("processInput", () => {
   });
 
   it("injects again for different session", async () => {
-    const sid1 = `tc-${Date.now()}-6a`;
-    const sid2 = `tc-${Date.now()}-6b`;
+    const sid1 = `tc-${randomUUID()}-6a`;
+    const sid2 = `tc-${randomUUID()}-6b`;
     trackMarker(sid1, "README.md");
     trackMarker(sid2, "README.md");
     const first = await processInput(mockWriteInput("README.md", "5 items", sid1));
@@ -118,7 +118,7 @@ describe("processInput", () => {
   });
 
   it("injects context for MCP tool with body containing digits", async () => {
-    const sid = `tc-${Date.now()}-7`;
+    const sid = `tc-${randomUUID()}-7`;
     const input: PreToolUseHookInput = {
       hook_event_name: "PreToolUse",
       session_id: sid,
@@ -136,7 +136,7 @@ describe("processInput", () => {
   });
 
   it("injects context for Bash heredoc with digits", async () => {
-    const sid = `tc-${Date.now()}-9`;
+    const sid = `tc-${randomUUID()}-9`;
     const input: PreToolUseHookInput = {
       hook_event_name: "PreToolUse",
       session_id: sid,
@@ -160,7 +160,7 @@ EOF
   it("returns null for MCP tool with body without digits", async () => {
     const input: PreToolUseHookInput = {
       hook_event_name: "PreToolUse",
-      session_id: `tc-${Date.now()}-8`,
+      session_id: `tc-${randomUUID()}-8`,
       transcript_path: "/tmp/test",
       cwd: "/tmp",
       tool_name: "mcp__plugin_github_github__create_pull_request",

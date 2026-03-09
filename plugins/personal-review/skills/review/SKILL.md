@@ -20,7 +20,9 @@ Ask which variant if not specified.
 
 Dispatch a read-only sub-agent (Task tool) to scan today's events. See [calendar.md](calendar.md).
 
-Present time budget (available hours, focus windows, meetings needing prep). Ask user to proceed.
+If the sub-agent reports calendar access denied (the `"reason": "no-app-bundle"` error), skip silently. Do not prompt to fix permissions. Note "Calendar: skipped (access denied)" and proceed to the next phase.
+
+Otherwise, present time budget (available hours, focus windows, meetings needing prep). Ask user to proceed.
 
 ## Phase: Things Inbox
 
@@ -34,7 +36,7 @@ Batch items by pattern, ask user for each batch:
 
 Goal: inbox count = 0.
 
-After inbox processing, re-query calendar (see Re-Check in [calendar.md](calendar.md)). Present any new events and updated time budget. Ask user to proceed.
+After inbox processing, re-query calendar (see Re-Check in [calendar.md](calendar.md)). If calendar was skipped due to access denied in the initial phase, skip the re-check too. Otherwise, present any new events and updated time budget. Ask user to proceed.
 
 ## Phase: Notifications
 
@@ -86,7 +88,7 @@ Group, prioritize, defer, and reorder the Today list. Present final order for co
 ## Summary
 
 Present progress across all phases:
-- Time budget from Calendar
+- Time budget from Calendar (or "skipped — access denied" if calendar was unavailable)
 - Things inbox processed (count = 0)
 - GitHub/GitLab/Linear notifications triaged (done/deferred counts)
 - Today list ordered (final count)

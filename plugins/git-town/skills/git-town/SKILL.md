@@ -3,7 +3,7 @@ name: git-town
 description: >-
   Branch workflow automation with git-town. Use when creating feature branches,
   syncing with upstream, proposing PRs, or managing stacked branch workflows.
-allowed-tools: Bash(git town:*)
+allowed-tools: [Bash(git town:*)]
 ---
 
 # git-town

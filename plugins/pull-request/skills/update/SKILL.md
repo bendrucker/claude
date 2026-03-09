@@ -4,7 +4,15 @@ description: |
   Update a pull request or merge request body to reflect the current state of changes.
   Use when a PR/MR has evolved through additional commits and the body needs to reflect what will be merged.
 
-allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*), Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/worktree/*:*), Bash(gh:*), Bash(git:*), Bash(glab:*), mcp__github
+allowed-tools:
+  - mcp__github
+  - "Bash(gh pr:*)"
+  - "Bash(glab mr:*)"
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"
+  # workaround: inline skill execution includes syntax markers in the permission
+  # check pattern, breaking allowed-tools matching.
+  # https://github.com/bendrucker/claude/issues/486
+  - "Bash(!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/*`:*)"
 ---
 
 # Update Pull Request
@@ -13,14 +21,19 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Context
 
-- Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts $0`
-- PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts $0`
-- PR: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts $0`
-- Diff: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-diff.ts $0`
+- Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts`
+- PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
+
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
 
 ## Workflow
 
-1. **Branch validation**: If on a default branch (main/master) and no `$0` argument was provided, stop and tell the user to specify the target branch: `/pull-request:update <branch>`. When `$0` is provided, resolve the worktree path with `bun ${CLAUDE_PLUGIN_ROOT}/scripts/worktree/resolve.ts "$0"`. Use `git -C <path>` for git commands and `cd <path>` before gh/glab commands.
+1. **Fetch PR context**: Use `$0` (if provided) as a PR identifier (number or branch name). Fetch the current PR:
+   - **GitHub**: `gh pr view $0 --json title,body,updatedAt,commits`
+   - **GitLab**: `glab mr view $0`
+1. **Fetch PR diff**:
+   - **GitHub**: `gh pr diff $0`
+   - **GitLab**: `glab mr diff $0`
 
 ## Analysis
 

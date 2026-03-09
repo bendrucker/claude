@@ -1,10 +1,8 @@
 #!/usr/bin/env bun
 // Detect git hosting provider from remote URL
-// Args: [branch] — resolves worktree path for branch if provided
 // Outputs: github, gitlab, or unknown
 
 import { execSync } from "node:child_process";
-import { resolveWorktree } from "./worktree/resolve";
 
 export type Provider = "github" | "gitlab" | "unknown";
 
@@ -44,9 +42,6 @@ export function detectProvider(cwd?: string): Provider {
   return "unknown";
 }
 
-// Run as CLI
 if (import.meta.main) {
-  const branch = process.argv[2];
-  const worktreePath = branch ? await resolveWorktree(branch) : null;
-  console.log(detectProvider(worktreePath ?? undefined));
+  console.log(detectProvider());
 }

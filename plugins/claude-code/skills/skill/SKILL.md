@@ -1,7 +1,14 @@
 ---
 name: claude-code:skill
 description: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows. Use when creating new skills, converting memory files to skills, debugging skill activation, or understanding skill architecture and best practices.
-allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, WebFetch(domain:docs.claude.com)]
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - Bash
+  - WebFetch(domain:docs.claude.com)
 hooks:
   PostToolUse:
     - matcher: "Write|Edit"
@@ -10,6 +17,8 @@ hooks:
           command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-namespace.ts"
         - type: command
           command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-structure.ts"
+        - type: command
+          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-lint.ts"
 ---
 
 # Claude Code Skills Development
@@ -109,15 +118,11 @@ Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use l
 
 ## Development Process
 
-- Define 3 test scenarios before documentation
-- Measure baseline without skill
-- Iterative: one instance creates, another tests
-- Observe navigation patterns
-- Refine based on behavior
+Use the `skill-creator` skill for interactive skill creation workflows — it drives the full lifecycle of drafting, testing with parallel subagents, benchmarking, and iterating. This skill provides the plugin-specific constraints (namespacing, structure, validation) that skill-creator applies during creation.
 
 ## Validation
 
-Run `bun run skill-lint path/to/skill/` to check for issues before committing. CI runs this automatically.
+A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md files are edited. For manual checks, run `bun run skill-lint path/to/skill/` from the project root.
 
 ## References
 

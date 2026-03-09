@@ -4,7 +4,11 @@ description: |
   Fixes type ignores in a file, directory, or codebase by discovering ignores and dispatching parallel fixer agents. Use when cleaning up type ignores across multiple files, eliminating ignores before a release, or batch-fixing type errors.
 context: fork
 agent: general-purpose
-allowed-tools: [Read, Grep, Glob, Task]
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - Task
 ---
 
 # Type Ignore Fixer

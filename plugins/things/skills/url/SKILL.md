@@ -1,10 +1,14 @@
 ---
 name: things:url
 description: Create, update, and manage Things 3 tasks and projects. Not for reads — use things:jxa to query data. For simple inbox captures, use things:inbox.
-allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)", Bash(osascript:*), Bash(open:*), Bash, Read]
+allowed-tools:
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)"
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
+  - Bash
+  - Read
 hooks:
   PreToolUse:
-    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)|Bash(osascript:*)|Bash(open:*)"
+    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)|Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
       hooks:
         - type: command
           command: |
@@ -53,7 +57,7 @@ See [examples.md](examples.md) for detailed usage of each command.
 ## Reorder Items
 
 ```bash
-osascript ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.js [--list today|anytime|someday] <id1> <id2> <id3> ...
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3> ...
 ```
 
 Items appear at the top of the list in the order specified. Default list is `today`. Also works for items within a project — use the `--list` value matching the items' current scheduling state.

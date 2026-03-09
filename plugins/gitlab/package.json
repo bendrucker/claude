@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "cleye": "^1.3.2"
+    "@constellos/claude-code-kit": "^0.4.0",
+    "cleye": "^2.2.1",
+    "table": "^6.9.0"
   }
 }

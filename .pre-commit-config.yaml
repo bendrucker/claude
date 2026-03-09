@@ -1,0 +1,55 @@
+repos:
+  - repo: local
+    hooks:
+      - id: plugin-test
+        name: Plugin tests
+        language: system
+        files: ^plugins/
+        entry: scripts/prek-check.sh plugin-test
+
+      - id: plugin-validate
+        name: Plugin validation
+        language: system
+        files: \.claude-plugin/plugin\.json$
+        entry: scripts/prek-check.sh plugin-validate
+
+      - id: hooks-validate
+        name: Hooks validation
+        language: system
+        files: ^plugins/[^/]+/hooks/
+        entry: scripts/prek-check.sh hooks-validate
+
+      - id: skill-lint
+        name: Skill lint
+        language: system
+        files: ^plugins/[^/]+/skills/
+        entry: scripts/prek-check.sh skill-lint
+
+      - id: hook-test
+        name: Hook tests
+        language: system
+        files: ^(\.claude/hooks/|user/hooks/)
+        pass_filenames: false
+        entry: bun test .claude/hooks user/hooks
+
+      - id: settings-validate
+        name: Settings validation
+        language: system
+        files: ^(\.claude/settings\.json|user/settings\.json)$
+        pass_filenames: false
+        entry: bun .claude/hooks/settings/cli.ts
+
+      - id: no-double-assertion
+        name: No double type assertions
+        language: system
+        files: \.ts$
+        exclude: \.test\.ts$
+        pass_filenames: false
+        entry: ast-grep scan --rule rules/no-double-assertion.yaml
+
+      - id: marketplace-check
+        name: Marketplace completeness
+        language: system
+        files: ^(plugins/|\.claude-plugin/marketplace\.json)
+        pass_filenames: false
+        entry: scripts/check-marketplace.sh

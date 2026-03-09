@@ -17,7 +17,13 @@ hooks:
 
 # tmux
 
-The SessionStart hook injects `TMUX_SESSION_NAME`, `TMUX_WINDOW_INDEX`, `TMUX_WINDOW_NAME`, `TMUX_PANE_INDEX`, and `TMUX_PANE_ID` into the environment. Use `$TMUX_PANE_ID` to identify the current pane and target adjacent ones.
+## Current Pane
+
+!`tmux display-message -p '- Session: #{session_name}
+- Window: #{window_index} (#{window_name})
+- Pane: #{pane_index} (#{pane_id})' 2>/dev/null || echo 'not running in tmux'`
+
+Use `$TMUX_PANE_ID` to identify the current pane and target adjacent ones.
 
 ## Opening Panes
 

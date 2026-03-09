@@ -123,7 +123,7 @@ jobs:
   plugin:
     needs: validate
     if: needs.validate.outputs.plugins != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.plugin.runner }}
     strategy:
       fail-fast: false
       matrix:
@@ -137,14 +137,15 @@ jobs:
       - name: Inspect plugin
         id: inspect
         run: |
-          plugin="${{ matrix.plugin }}"
+          plugin="${{ matrix.plugin.name }}"
           echo "has_plugin_json=$([[ -f "plugins/$plugin/.claude-plugin/plugin.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_hooks=$([[ -f "plugins/$plugin/hooks/hooks.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_skills=$([[ -d "plugins/$plugin/skills" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_agents=$([[ -d "plugins/$plugin/agents" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_commands=$([[ -d "plugins/$plugin/commands" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "has_tests=$(find "plugins/$plugin" \( -name '*.test.ts' -o -name '*.integration.ts' \) | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_tests=$(find "plugins/$plugin" -name '*.test.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_integration_tests=$(find "plugins/$plugin" -name '*.integration.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_swift=$(find "plugins/$plugin" -name '*.swift' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
@@ -153,14 +154,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install Claude Code CLI
+        run: bun install -g @anthropic-ai/claude-code@latest
+
       - name: Validate plugin.json
         if: steps.inspect.outputs.has_plugin_json == 'true'
-        run: bun packages/validate/plugin.ts "plugins/${{ matrix.plugin }}"
+        run: bun packages/validate/plugin.ts "plugins/${{ matrix.plugin.name }}"
 
       - name: Check for hardcoded version
         if: steps.inspect.outputs.has_plugin_json == 'true'
         run: |
-          if jq -e '.version' "plugins/${{ matrix.plugin }}/.claude-plugin/plugin.json" > /dev/null; then
+          if jq -e '.version' "plugins/${{ matrix.plugin.name }}/.claude-plugin/plugin.json" > /dev/null; then
             echo "Error: plugin.json should not contain a version field"
             echo "Hardcoded versions prevent plugin updates from propagating"
             exit 1
@@ -168,15 +172,15 @@ jobs:
 
       - name: Validate hooks.json
         if: steps.inspect.outputs.has_hooks == 'true'
-        run: bun packages/validate/hooks.ts "plugins/${{ matrix.plugin }}"
+        run: bun packages/validate/hooks.ts "plugins/${{ matrix.plugin.name }}"
 
       - name: Validate skill frontmatter
         if: steps.inspect.outputs.has_skills == 'true'
-        run: bunx remark "plugins/${{ matrix.plugin }}/skills/*/SKILL.md"
+        run: bunx remark "plugins/${{ matrix.plugin.name }}/skills/*/SKILL.md"
 
       - name: Lint skills
         if: steps.inspect.outputs.has_skills == 'true'
-        run: bun run skill-lint "plugins/${{ matrix.plugin }}/skills/*"
+        run: bun run skill-lint "plugins/${{ matrix.plugin.name }}/skills/*"
 
       - name: Setup Swift
         if: steps.inspect.outputs.has_swift == 'true'
@@ -184,38 +188,42 @@ jobs:
 
       - name: Validate Swift syntax
         if: steps.inspect.outputs.has_swift == 'true'
-        run: find "plugins/${{ matrix.plugin }}" -name "*.swift" -exec swiftc -parse {} +
+        run: find "plugins/${{ matrix.plugin.name }}" -name "*.swift" -exec swiftc -parse {} +
 
       - name: Validate agent frontmatter
         if: steps.inspect.outputs.has_agents == 'true'
-        run: bunx remark "plugins/${{ matrix.plugin }}/agents/*.md"
+        run: bunx remark "plugins/${{ matrix.plugin.name }}/agents/*.md"
 
       - name: Validate command frontmatter
         if: steps.inspect.outputs.has_commands == 'true'
-        run: bunx remark "plugins/${{ matrix.plugin }}/commands/*.md"
+        run: bunx remark "plugins/${{ matrix.plugin.name }}/commands/*.md"
 
       - name: Build TypeScript
         if: steps.inspect.outputs.has_package == 'true'
         run: |
-          if jq -e '.scripts.build' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
-            bun run --cwd "plugins/${{ matrix.plugin }}" build
+          if jq -e '.scripts.build' "plugins/${{ matrix.plugin.name }}/package.json" > /dev/null 2>&1; then
+            bun run --cwd "plugins/${{ matrix.plugin.name }}" build
           fi
 
       - name: Install system dependencies
-        if: steps.inspect.outputs.has_tests == 'true'
+        if: steps.inspect.outputs.has_tests == 'true' && runner.os == 'Linux'
         run: |
-          if [[ -f "plugins/${{ matrix.plugin }}/package.json" ]]; then
-            if jq -e '.dependencies.sharp // .devDependencies.sharp' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
+          if [[ -f "plugins/${{ matrix.plugin.name }}/package.json" ]]; then
+            if jq -e '.dependencies.sharp // .devDependencies.sharp' "plugins/${{ matrix.plugin.name }}/package.json" > /dev/null 2>&1; then
               sudo apt-get update && sudo apt-get install -y libvips-dev
             fi
-            if jq -e '.dependencies.playwright // .devDependencies.playwright' "plugins/${{ matrix.plugin }}/package.json" > /dev/null 2>&1; then
+            if jq -e '.dependencies.playwright // .devDependencies.playwright' "plugins/${{ matrix.plugin.name }}/package.json" > /dev/null 2>&1; then
               bunx playwright install chromium --with-deps
             fi
           fi
 
       - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
-        run: bun test "plugins/${{ matrix.plugin }}/"
+        run: bun test "plugins/${{ matrix.plugin.name }}/"
+
+      - name: Run integration tests
+        if: steps.inspect.outputs.has_integration_tests == 'true'
+        run: find "./plugins/${{ matrix.plugin.name }}" -name '*.integration.ts' -exec bun test {} +
 
   plugins:
     needs: [validate, plugin]

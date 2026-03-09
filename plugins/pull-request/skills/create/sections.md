@@ -11,17 +11,25 @@ Use for bug fixes, which should include a related issue.
 
 ## Changes
 
-High-level bulleted description of changes made.
+High-level bulleted description of changes made, written for human reviewers.
 
+- Summarize user impact, don't narrate code
 - Emphasize API and interface changes first:
   - Adds `POST /users` endpoint to create users
   - Updates `User.create` to accept `email` parameter
   - Handles `404` errors in `GET /users/{id}`
-- Do not list modified files by path or line number
-- Summarize user impact, don't narrate code
 - Include refactoring as separate bullets:
-  - Refactors `UserService` to use dependency injection
   - Extracts repeated logic into `UserRepository`
+  - Refactors `UserService` to use dependency injection
+
+### Referencing code
+
+- Use the shortest unambiguous name: module name, filename, or component, not full paths
+  - `UserService`, not `src/services/UserService.ts`
+  - `discussions.ts`, not `plugins/gitlab/skills/merge-request/scripts/discussions.ts`
+  - The `diff` module, not `plugins/gitlab/scripts/diff.ts`
+- Never structure bullets as `**path**: description`. This reads like a file manifest, not a changelog
+- Reference identifiers only when they clarify the change. "Add `email` parameter to `User.create`" is useful. "Update `handleRequest` in `server.ts` to call `validateInput`" is noise
 
 ## Testing
 

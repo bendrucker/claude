@@ -6,6 +6,8 @@ Prioritize in order when making comments:
 2. **Performance** - Inefficient approaches consuming excess resources or adding latency
 3. **Architecture** - Module organization, interface design, separation of concerns. Avoid "utils" packages.
 4. **Anti-patterns** - Flag magic numbers (see [magic-numbers.md](magic-numbers.md)) and other code smells that hurt readability or maintainability.
-5. **Style** - Note deviations from project/language style, but limit these. Prefer automated linting. Suggest enforcement to *me* instead of commenting on PR.
+5. **Style** - Note deviations from project/language style, but limit these. Prefer automated linting. When you spot something automatable, file an issue in the project tracker to add the lint rule or CI check and link it in the review comment.
+
+Priority weighting shifts by context. See [corporate](references/corporate.md) and [open-source](references/open-source.md) references for how disposition and thresholds differ.
 
 Think hard about the problem the PR solves and whether the approach is optimal.

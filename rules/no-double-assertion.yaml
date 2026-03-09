@@ -1,0 +1,8 @@
+id: no-double-assertion
+language: TypeScript
+severity: error
+message: Avoid double type assertions (as unknown as). Fix the underlying type instead.
+rule:
+  pattern: $A as unknown as $B
+ignores:
+  - "**/*.test.ts"

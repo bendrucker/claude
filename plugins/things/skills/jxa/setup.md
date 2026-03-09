@@ -4,17 +4,17 @@ Guide for writing JXA (JavaScript for Automation) scripts for Things 3.
 
 ## Running JXA
 
-Use `osascript -l JavaScript -e '...'` for inline scripts:
+Use the `run-jxa.ts` wrapper with inline `-e` for one-off queries:
 
 ```bash
 # Get today's todo count
-osascript -l JavaScript -e 'const app = Application("Things3"); const list = app.lists.byId("TMTodayListSource"); list.toDos().length;'
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 -e 'const app = Application("Things3"); const list = app.lists.byId("TMTodayListSource"); list.toDos().length;'
 
 # List all tags
-osascript -l JavaScript -e 'const app = Application("Things3"); const tags = app.tags(); const names = []; for (let i = 0; i < tags.length; i++) { names.push(tags[i].name()); } JSON.stringify(names);'
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 -e 'const app = Application("Things3"); const tags = app.tags(); const names = []; for (let i = 0; i < tags.length; i++) { names.push(tags[i].name()); } JSON.stringify(names);'
 
 # Get inbox todos as JSON
-osascript -l JavaScript -e 'const app = Application("Things3"); const inbox = app.lists.byId("TMInboxListSource"); const todos = []; const items = inbox.toDos(); for (let i = 0; i < items.length; i++) { todos.push({id: items[i].id(), name: items[i].name()}); } JSON.stringify(todos, null, 2);'
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 -e 'const app = Application("Things3"); const inbox = app.lists.byId("TMInboxListSource"); const todos = []; const items = inbox.toDos(); for (let i = 0; i < items.length; i++) { todos.push({id: items[i].id(), name: items[i].name()}); } JSON.stringify(todos, null, 2);'
 ```
 
 For script files, define a `run(argv)` function. `osascript` calls it automatically and prints the return value:
@@ -26,6 +26,8 @@ function run(argv) {
   return JSON.stringify({ count: app.toDos().length });
 }
 ```
+
+Run script files via the wrapper: `bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 <script> [args...]`
 
 **Important**: The function must be named `run`, not `_run`. `osascript` does not call `_run`.
 

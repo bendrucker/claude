@@ -14,7 +14,7 @@ A Claude Code plugin for reading and managing macOS Calendar events via EventKit
 
 Grant Calendar access to your terminal app in **System Settings → Privacy & Security → Calendars**.
 
-EventKit permissions don't work over SSH. Use a local terminal session.
+EventKit requires an app bundle context for TCC permissions. It does not work in tmux, SSH, or other environments where the responsible process lacks a bundle ID. Use a direct local terminal session.
 
 ## How It Works
 

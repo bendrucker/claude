@@ -2,8 +2,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseArgs } from "node:util";
+import { lintSkill } from "../../plugins/claude-code/skills/skill/scripts/skill-lint/index";
 import { formatJson, formatText } from "./format";
-import { lintSkill } from "./index";
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),

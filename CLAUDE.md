@@ -86,6 +86,8 @@ See the `claude-code:hook` skill for hook documentation. Plugin hooks are define
 
 Plugins use `bun test` for tests. Run all tests with `bun test` or filter by plugin with `bun test plugins/<name>`.
 
+After making changes to plugin scripts, run them directly to verify they work end-to-end, not just via unit tests. For example, after editing `plugins/mac/scripts/jxa.ts`, run `bun plugins/mac/scripts/jxa.ts <app> <script>` with real arguments to confirm the CLI works. Unit tests alone may miss integration issues like argument parsing failures that only surface at runtime.
+
 ### CI Structure
 
 Tests run per-plugin in the CI matrix for:

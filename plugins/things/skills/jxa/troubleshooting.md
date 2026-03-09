@@ -27,7 +27,7 @@ Sandbox errors typically mention:
 - `Sandbox: deny`
 - File path access errors
 
-The skill's hook automatically runs osascript commands outside the sandbox. If you still see sandbox errors, verify the hook is active or run the command with `dangerouslyDisableSandbox: true`.
+The skill's inline hook automatically runs wrapper commands outside the sandbox. If you still see sandbox errors, verify the hook is active or run the command with `dangerouslyDisableSandbox: true`.
 
 ## Updates Not Working
 
@@ -256,15 +256,15 @@ done
 
 ## Reorder Script Issues
 
-The `scripts/reorder.js` script requires running outside the sandbox to access the keychain for auth tokens. The skill's hook automatically handles this for `osascript` commands.
+The `scripts/reorder.ts` script requires running outside the sandbox to access the keychain for auth tokens. The `things:url` skill's inline hook automatically handles this.
 
 If reorder fails with permission errors:
 1. Verify the hook is active (check skill frontmatter)
-2. Ensure the command starts with `osascript` (the hook matches `Bash(osascript:*)`)
+2. Ensure the command matches `Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)`
 
 **Correct invocation:**
 ```bash
-osascript scripts/reorder.js <id1> <id2> <id3>
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3>
 ```
 
 ## Error Messages

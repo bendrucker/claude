@@ -23,7 +23,16 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 - Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts`
 - PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-context.ts $0`
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
+
+## Workflow
+
+1. **Fetch PR context**: Use `$0` (if provided) as a PR identifier (number or branch name). Fetch the current PR:
+   - **GitHub**: `gh pr view $0 --json title,body,updatedAt,commits`
+   - **GitLab**: `glab mr view $0`
+1. **Fetch PR diff**:
+   - **GitHub**: `gh pr diff $0`
+   - **GitLab**: `glab mr diff $0`
 
 ## Analysis
 

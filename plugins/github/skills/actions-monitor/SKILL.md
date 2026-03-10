@@ -18,15 +18,23 @@ $ARGUMENTS
 
 If no run ID or PR is specified, use the current branch.
 
-## Recent Runs
+## Current Branch
 
-!`gh run list --branch $(git branch --show-current) --limit 5 --json databaseId,status,conclusion,displayTitle,workflowName 2>/dev/null || echo "[]"`
+!`git branch --show-current`
 
 ## Workflow
 
+### List recent runs
+
+Fetch recent runs for the current branch:
+
+```bash
+gh run list --branch <current-branch> --limit 5 --json databaseId,status,conclusion,displayTitle,workflowName
+```
+
 ### Identify the run
 
-From the recent runs above, identify the most relevant run (latest, or matching the target). If the run is still in progress, use `gh run watch <id>` to wait for completion.
+From the recent runs, identify the most relevant run (latest, or matching the target). If the run is still in progress, use `gh run watch <id>` to wait for completion.
 
 ### Enumerate failing jobs
 

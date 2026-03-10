@@ -1,0 +1,41 @@
+{
+  "skill_name": "review:follow-up",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Check if my review comments were addressed on https://github.com/acme/api-server/pull/247",
+      "expected_output": "Summary of the reviewer's threads with resolution state and whether the author replied or made code changes",
+      "files": [],
+      "expectations": [
+        "Uses --role reviewer to fetch only threads started by the authenticated user",
+        "Threads are classified into the four buckets from the reviewer's perspective",
+        "Silently resolved threads are flagged for attention",
+        "A re-review recommendation is presented based on thread states"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I reviewed https://gitlab.example.com/team/service/-/merge_requests/89 yesterday. Were my comments addressed?",
+      "expected_output": "Thread-by-thread status showing which reviewer comments have author replies, code fixes, or were silently resolved",
+      "files": [],
+      "expectations": [
+        "Detects GitLab from URL and uses glab/discussions script",
+        "Checks commits after the reviewer's last review for code changes addressing feedback",
+        "Distinguishes threads resolved with code fixes from those resolved without changes",
+        "Presents a re-review decision rather than draft replies"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Follow up on my feedback for https://github.com/org/repo/pull/55 -- some threads were resolved but I didn't see replies",
+      "expected_output": "Identification of silently resolved threads with analysis of whether corresponding code changes exist",
+      "files": [],
+      "expectations": [
+        "Fetches both resolved and unresolved threads started by the reviewer",
+        "Flags resolved threads that have no author reply",
+        "For silently resolved threads, checks if the diff shows changes addressing the feedback",
+        "Suggests reopening threads where feedback appears unaddressed"
+      ]
+    }
+  ]
+}

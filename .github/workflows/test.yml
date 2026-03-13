@@ -127,6 +127,7 @@ jobs:
     needs: validate
     if: needs.validate.outputs.plugins != '[]'
     runs-on: ${{ matrix.plugin.runner }}
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:

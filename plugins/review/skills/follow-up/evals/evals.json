@@ -19,10 +19,12 @@
       "expected_output": "Thread-by-thread status showing which reviewer comments have author replies, code fixes, or were silently resolved",
       "files": [],
       "expectations": [
-        "Detects GitLab from URL and uses glab/discussions script",
+        "Detects GitLab from URL and loads gitlab:api and gitlab:merge-request skills",
+        "Uses discussions.ts list with --resolvable --author to fetch reviewer threads",
         "Checks commits after the reviewer's last review for code changes addressing feedback",
         "Distinguishes threads resolved with code fixes from those resolved without changes",
-        "Presents a re-review decision rather than draft replies"
+        "Presents a re-review decision rather than draft replies",
+        "Does not load GitHub MCP tools for GitLab MRs"
       ]
     },
     {

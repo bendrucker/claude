@@ -102,17 +102,30 @@ export function findXcallRunner(): string | null {
 }
 
 const BOOLEAN_ATTRIBUTES = ["completed", "canceled", "reveal", "duplicate"] as const;
+const ARRAY_ATTRIBUTES = ["tags", "add-tags"] as const;
 
-export function coerceBooleanAttributes(
-  attributes: Record<string, string>,
-): Record<string, string | boolean> {
-  const result: Record<string, string | boolean> = {};
+interface ChecklistItem {
+  type: "checklist-item";
+  attributes: { title: string };
+}
+
+type CoercedValue = string | boolean | string[] | ChecklistItem[];
+
+export function coerceAttributes(attributes: Record<string, string>): Record<string, CoercedValue> {
+  const result: Record<string, CoercedValue> = {};
   for (const [key, value] of Object.entries(attributes)) {
     if (
       (BOOLEAN_ATTRIBUTES as readonly string[]).includes(key) &&
       (value === "true" || value === "false")
     ) {
       result[key] = value === "true";
+    } else if ((ARRAY_ATTRIBUTES as readonly string[]).includes(key)) {
+      result[key] = value.split(",").map((s) => s.trim());
+    } else if (key === "checklist-items") {
+      result[key] = value
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => ({ type: "checklist-item" as const, attributes: { title: line.trim() } }));
     } else {
       result[key] = value;
     }
@@ -128,7 +141,7 @@ export function buildJsonPayload(ids: string[], attributes: Record<string, strin
     throw new Error("At least one attribute is required");
   }
 
-  const coerced = coerceBooleanAttributes(attributes);
+  const coerced = coerceAttributes(attributes);
   const data = ids.map((id) => ({
     type: "to-do" as const,
     operation: "update" as const,

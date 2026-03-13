@@ -1,5 +1,5 @@
 {
-  "name": "@bendrucker/type-ignore",
+  "name": "linear",
   "private": true,
   "type": "module",
   "dependencies": {

@@ -1,5 +1,5 @@
 {
-  "name": "@bendrucker/type-ignore",
+  "name": "pull-request",
   "private": true,
   "type": "module",
   "dependencies": {

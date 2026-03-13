@@ -1,5 +1,5 @@
 {
-  "name": "@bendrucker/type-ignore",
+  "name": "shortcuts",
   "private": true,
   "type": "module",
   "dependencies": {

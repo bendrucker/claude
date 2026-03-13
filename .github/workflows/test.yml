@@ -85,6 +85,9 @@ jobs:
       - name: Check MCP hook matchers
         run: bun scripts/check-mcp-matchers.ts
 
+      - name: Check plugin dependencies
+        run: bun scripts/check-plugin-deps.ts
+
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'
         env:

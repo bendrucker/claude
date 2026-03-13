@@ -1,5 +1,5 @@
 {
-  "name": "@bendrucker/type-ignore",
+  "name": "claude-code",
   "private": true,
   "type": "module",
   "dependencies": {

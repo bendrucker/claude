@@ -17,9 +17,7 @@ async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
       for (const dep of Object.keys(pkg.dependencies ?? {})) {
         deps.add(dep);
       }
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return deps;

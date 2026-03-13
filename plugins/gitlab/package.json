@@ -6,6 +6,7 @@
   "dependencies": {
     "@constellos/claude-code-kit": "^0.4.0",
     "cleye": "^2.2.1",
-    "table": "^6.9.0"
+    "table": "^6.9.0",
+    "url-pattern": "^1.0.3"
   }
 }

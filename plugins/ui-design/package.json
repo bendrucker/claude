@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@constellos/claude-code-kit": "^0.4.0",
     "@xmldom/xmldom": "^0.9.8",
     "cleye": "^2.2.1",
     "playwright": "^1.50.1",

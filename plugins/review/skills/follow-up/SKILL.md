@@ -7,8 +7,6 @@ description: >
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)
-  - Skill(gitlab:*)
-  - Skill(github:*)
 ---
 
 # Review Follow-Up

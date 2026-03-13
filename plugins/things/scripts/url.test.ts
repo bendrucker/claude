@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildJsonPayload, coerceBooleanAttributes } from "./url";
+import { buildJsonPayload, coerceAttributes } from "./url";
 
 describe("buildJsonPayload", () => {
   test("single ID produces correct structure", () => {
@@ -21,7 +21,7 @@ describe("buildJsonPayload", () => {
     const expected = {
       type: "to-do",
       operation: "update",
-      attributes: { when: "today", "add-tags": "Urgent" },
+      attributes: { when: "today", "add-tags": ["Urgent"] },
     };
     expect(result).toEqual([
       { ...expected, id: "A" },
@@ -47,11 +47,28 @@ describe("buildJsonPayload", () => {
     const result = JSON.parse(buildJsonPayload(["ABC"], { when: "today", completed: "true" }));
     expect(result[0].attributes).toEqual({ when: "today", completed: true });
   });
+
+  test("coerces tags to string array", () => {
+    const result = JSON.parse(buildJsonPayload(["ABC"], { tags: "work,personal" }));
+    expect(result[0].attributes).toEqual({ tags: ["work", "personal"] });
+  });
+
+  test("coerces checklist-items to structured objects", () => {
+    const result = JSON.parse(
+      buildJsonPayload(["ABC"], { "checklist-items": "Buy milk\nWalk dog" }),
+    );
+    expect(result[0].attributes).toEqual({
+      "checklist-items": [
+        { type: "checklist-item", attributes: { title: "Buy milk" } },
+        { type: "checklist-item", attributes: { title: "Walk dog" } },
+      ],
+    });
+  });
 });
 
-describe("coerceBooleanAttributes", () => {
+describe("coerceAttributes", () => {
   test("coerces all known boolean attributes", () => {
-    const result = coerceBooleanAttributes({
+    const result = coerceAttributes({
       completed: "true",
       canceled: "false",
       reveal: "true",
@@ -66,12 +83,32 @@ describe("coerceBooleanAttributes", () => {
   });
 
   test("passes through string attributes unchanged", () => {
-    const result = coerceBooleanAttributes({ when: "today", "add-tags": "Urgent" });
-    expect(result).toEqual({ when: "today", "add-tags": "Urgent" });
+    const result = coerceAttributes({ when: "today" });
+    expect(result).toEqual({ when: "today" });
   });
 
   test("does not coerce non-boolean values for boolean attributes", () => {
-    const result = coerceBooleanAttributes({ completed: "yes" });
+    const result = coerceAttributes({ completed: "yes" });
     expect(result).toEqual({ completed: "yes" });
+  });
+
+  test("coerces tags to string array", () => {
+    const result = coerceAttributes({ tags: "tag1, tag2, tag3" });
+    expect(result).toEqual({ tags: ["tag1", "tag2", "tag3"] });
+  });
+
+  test("coerces add-tags to string array", () => {
+    const result = coerceAttributes({ "add-tags": "Urgent" });
+    expect(result).toEqual({ "add-tags": ["Urgent"] });
+  });
+
+  test("coerces checklist-items to structured objects", () => {
+    const result = coerceAttributes({ "checklist-items": "Item 1\nItem 2" });
+    expect(result).toEqual({
+      "checklist-items": [
+        { type: "checklist-item", attributes: { title: "Item 1" } },
+        { type: "checklist-item", attributes: { title: "Item 2" } },
+      ],
+    });
   });
 });

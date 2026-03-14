@@ -11,7 +11,9 @@ case "${1:-}" in
   plugin-test)
     shift
     for dir in $(extract_dirs 2 "$@"); do
-      bun test "$dir/"
+      if find "$dir" -name '*.test.ts' -print -quit | grep -q .; then
+        bun test "$dir/"
+      fi
     done
     ;;
   plugin-validate)

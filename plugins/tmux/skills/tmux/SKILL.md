@@ -81,12 +81,12 @@ Open with `$EDITOR` when set, otherwise fall back to read-only viewers:
 
 | Tool | Command | Notes |
 |---|---|---|
-| `$EDITOR` | `$EDITOR file.ts` | User's preferred editor; most auto-reload on external changes |
+| `$EDITOR` | `$EDITOR file.ts` | User's preferred editor, most auto-reload on external changes |
 | batwatch | `batwatch --watcher poll file.ts` | Syntax-highlighted with file watching |
 | bat | `bat --paging always file.ts` | Syntax-highlighted, read-only |
 | less | `less file.ts` | Plain text fallback |
 
-Use the first available option. If the pane exits immediately, the tool is missing; try the next.
+Use the first available option. If the pane exits immediately, the tool is missing, try the next.
 
 ## Capturing Pane Content
 

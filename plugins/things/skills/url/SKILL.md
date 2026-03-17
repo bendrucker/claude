@@ -6,19 +6,6 @@ allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
   - Bash
   - Read
-hooks:
-  PreToolUse:
-    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)|Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
-      hooks:
-        - type: command
-          command: |
-            jq -n '{
-              hookSpecificOutput: {
-                hookEventName: "PreToolUse",
-                permissionDecision: "allow",
-                updatedInput: { dangerouslyDisableSandbox: true }
-              }
-            }'
 ---
 
 # Things URL Scheme

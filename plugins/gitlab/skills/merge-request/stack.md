@@ -37,7 +37,7 @@ glab stack amend           # Modify existing stack commits
 bun plugins/gitlab/scripts/stack-merge.ts
 ```
 
-The script reads stack refs from `.git/stacked/<title>/*.json`, checks project approval settings, and runs `glab mr merge <branch> --auto-merge -y` for each entry.
+The script reads stack refs from `.git/stacked/<title>/*.json`, checks project approval settings, and merges each entry. It automatically detects merge trains and uses the correct API.
 
 ### How the cascade works
 

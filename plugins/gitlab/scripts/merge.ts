@@ -28,13 +28,13 @@ export async function getMrIid(branch: string): Promise<number> {
     throw new Error(`No open MR found for branch: ${branch}`);
   }
 
-  return mrs[0].iid;
+  return mrs[0]!.iid;
 }
 
 interface MergeTrainOptions {
   projectId: number;
   iid: number;
-  squash?: boolean;
+  squash?: boolean | undefined;
 }
 
 export async function addToMergeTrain(opts: MergeTrainOptions): Promise<void> {

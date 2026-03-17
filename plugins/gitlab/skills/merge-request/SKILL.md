@@ -3,6 +3,7 @@ name: gitlab:merge-request
 description: Working with GitLab merge requests via glab. Use when creating, updating, reviewing, or merging MRs.
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_ROOT}/scripts/*:*)
+  - Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts:*)
   - Bash(glab mr:*)
   - Bash(glab api:*)
 ---
@@ -55,6 +56,18 @@ glab api projects/:id/merge_requests/10/blocks
 # Remove a block
 glab api projects/:id/merge_requests/10/blocks/<block-id> -X DELETE
 ```
+
+## Merge Trains
+
+When a project has merge trains enabled, `glab mr merge --auto-merge` fails with 422. Use the merge script instead:
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge --squash
+```
+
+The script detects merge trains automatically and calls the correct API (`POST /merge_trains/merge_requests/:iid`). For projects without merge trains, it falls through to `glab mr merge`.
 
 ## Reviews
 

@@ -3,6 +3,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { $ } from "bun";
+import { merge } from "./merge";
 
 interface StackRef {
   prev: string;
@@ -69,7 +70,7 @@ if (refs.length === 0) {
 
 for (const ref of refs) {
   try {
-    await $`glab mr merge ${ref.branch} --auto-merge -y`;
+    await merge(ref.branch, { autoMerge: true });
     console.log(`auto-merge enabled: ${ref.branch}`);
   } catch {
     console.error(`failed: ${ref.branch}`);

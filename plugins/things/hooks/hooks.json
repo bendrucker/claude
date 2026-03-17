@@ -3,11 +3,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "jq '{hookSpecificOutput: {hookEventName: \"PreToolUse\", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'"
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts"
           }
         ]
       }

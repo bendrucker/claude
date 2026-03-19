@@ -1,4 +1,10 @@
-import { type Conversation, DISPLAY_LIMITS, MAX_TOKENIZE_LENGTH, MIN_TOKEN_LENGTH, RELEVANCE_WEIGHTS } from "./types";
+import {
+  type Conversation,
+  DISPLAY_LIMITS,
+  MAX_TOKENIZE_LENGTH,
+  MIN_TOKEN_LENGTH,
+  RELEVANCE_WEIGHTS,
+} from "./types";
 
 export function tokenize(text: string): string[] {
   return text

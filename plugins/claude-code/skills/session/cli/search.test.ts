@@ -104,6 +104,20 @@ describe("calculateRelevanceScore", () => {
     expect(score).toBeGreaterThan(0);
   });
 
+  it("includes tool results in scoring", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "tool-results.jsonl"));
+    const { score, matchedContent } = calculateRelevanceScore("OOMKilled", conv);
+    expect(score).toBeGreaterThan(0);
+    expect(matchedContent.some((m) => m.startsWith("Result:"))).toBe(true);
+  });
+
+  it("ranks tool result matches lower than user message matches", async () => {
+    const conv = await parseConversationFile(path.join(projectDir, "tool-results.jsonl"));
+    const resultScore = calculateRelevanceScore("OOMKilled", conv).score;
+    const userScore = calculateRelevanceScore("deployment", conv).score;
+    expect(userScore).toBeGreaterThan(resultScore);
+  });
+
   it("includes tool uses in scoring", async () => {
     const conv = await parseConversationFile(path.join(projectDir, "tools.jsonl"));
     const { score, matchedContent } = calculateRelevanceScore("Bash npm", conv);
@@ -173,6 +187,12 @@ describe("searchConversations", () => {
     for (const result of results) {
       expect(result.conversation.projectPath).toContain("webapp");
     }
+  });
+
+  it("finds matches in tool result content", async () => {
+    const results = await searchConversations("OOMKilled", { projectsDir: fixturesDir });
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]?.matchedContent.some((m) => m.startsWith("Result:"))).toBe(true);
   });
 
   it("filters by normalized project path", async () => {

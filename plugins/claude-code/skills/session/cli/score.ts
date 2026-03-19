@@ -52,5 +52,19 @@ export function calculateRelevanceScore(
     }
   }
 
+  for (const msg of conversation.messages) {
+    for (const result of msg.toolResults) {
+      const resultTokens = tokenize(result.content);
+      const matches = resultTokens.filter((t) => queryTokens.has(t));
+      if (matches.length > 0) {
+        score += (matches.length / queryTokens.size) * RELEVANCE_WEIGHTS.toolResult;
+        const maxLen = DISPLAY_LIMITS.contentPreview;
+        const preview =
+          result.content.slice(0, maxLen) + (result.content.length > maxLen ? "..." : "");
+        matchedContent.push(`Result: ${preview}`);
+      }
+    }
+  }
+
   return { score, matchedContent: matchedContent.slice(0, DISPLAY_LIMITS.matchedContent) };
 }

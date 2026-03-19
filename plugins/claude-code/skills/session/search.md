@@ -125,6 +125,7 @@ Search results are ranked by relevance with weighted scoring:
 | User messages | 1.5x |
 | Tool usage | 1.3x |
 | Assistant messages | 1.0x |
+| Tool results | 0.8x |
 
 This prioritizes conversations where your query matches the summary or your own prompts.
 

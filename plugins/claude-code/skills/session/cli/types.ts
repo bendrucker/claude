@@ -86,6 +86,7 @@ export const RELEVANCE_WEIGHTS = {
   userMessage: 1.5,
   toolUse: 1.3,
   assistantMessage: 1.0,
+  toolResult: 0.8,
 } as const;
 
 /** Content preview limits for search result display */

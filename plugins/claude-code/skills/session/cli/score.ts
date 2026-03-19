@@ -18,32 +18,26 @@ interface ConversationDocument {
 }
 
 function flattenConversation(conversation: Conversation): ConversationDocument {
-  const userMessages: string[] = [];
-  const assistantMessages: string[] = [];
-  const toolUses: string[] = [];
-  const toolResults: string[] = [];
-
-  for (const msg of conversation.messages) {
-    if (msg.role === "user") {
-      userMessages.push(msg.content);
-    } else {
-      assistantMessages.push(msg.content);
-    }
-    for (const tool of msg.toolUses) {
-      toolUses.push(`${tool.name} ${JSON.stringify(tool.input || {})}`);
-    }
-    for (const result of msg.toolResults) {
-      toolResults.push(result.content);
-    }
-  }
+  const { messages } = conversation;
+  const byRole = (role: string) =>
+    messages
+      .filter((m) => m.role === role)
+      .map((m) => m.content)
+      .join(" ");
 
   return {
     id: conversation.sessionId,
     summary: conversation.summary || "",
-    userMessages: userMessages.join(" "),
-    assistantMessages: assistantMessages.join(" "),
-    toolUses: toolUses.join(" "),
-    toolResults: toolResults.join(" "),
+    userMessages: byRole("user"),
+    assistantMessages: byRole("assistant"),
+    toolUses: messages
+      .flatMap((m) => m.toolUses)
+      .map((t) => `${t.name} ${JSON.stringify(t.input || {})}`)
+      .join(" "),
+    toolResults: messages
+      .flatMap((m) => m.toolResults)
+      .map((r) => r.content)
+      .join(" "),
   };
 }
 
@@ -77,36 +71,41 @@ export function calculateRelevanceScore(
   const results = index.search(query);
   if (results.length === 0) return { score: 0, matchedContent: [] };
 
-  const result = results[0]!;
-  const matchedContent: string[] = [];
+  const result = results[0];
+  if (!result) return { score: 0, matchedContent: [] };
+  const matchedTerms = new Set(Object.keys(result.match));
   const matchedFields = new Set(Object.values(result.match).flat());
+  const matchedContent: string[] = [];
   const maxLen = DISPLAY_LIMITS.contentPreview;
 
-  for (const field of matchedFields) {
-    if (field === "summary" && conversation.summary) {
-      matchedContent.push(`Summary: ${conversation.summary}`);
-    } else if (field === "userMessages") {
-      for (const msg of conversation.messages) {
-        if (msg.role === "user" && msg.content) {
-          matchedContent.push(`user: ${truncate(msg.content, maxLen)}`);
-        }
-      }
-    } else if (field === "assistantMessages") {
-      for (const msg of conversation.messages) {
-        if (msg.role === "assistant" && msg.content) {
-          matchedContent.push(`assistant: ${truncate(msg.content, maxLen)}`);
-        }
-      }
-    } else if (field === "toolUses") {
-      for (const msg of conversation.messages) {
-        for (const tool of msg.toolUses) {
+  const containsMatch = (text: string) => tokenize(text).some((t) => matchedTerms.has(t));
+
+  if (matchedFields.has("summary") && conversation.summary) {
+    matchedContent.push(`Summary: ${conversation.summary}`);
+  }
+
+  const messageFieldByRole = { user: "userMessages", assistant: "assistantMessages" } as const;
+
+  for (const msg of conversation.messages) {
+    if (
+      matchedFields.has(messageFieldByRole[msg.role]) &&
+      msg.content &&
+      containsMatch(msg.content)
+    ) {
+      matchedContent.push(`${msg.role}: ${truncate(msg.content, maxLen)}`);
+    }
+    if (matchedFields.has("toolUses")) {
+      for (const tool of msg.toolUses) {
+        const toolText = `${tool.name} ${JSON.stringify(tool.input || {})}`;
+        if (containsMatch(toolText)) {
           matchedContent.push(`Tool: ${tool.name}`);
         }
       }
-    } else if (field === "toolResults") {
-      for (const msg of conversation.messages) {
-        for (const result of msg.toolResults) {
-          matchedContent.push(`Result: ${truncate(result.content, maxLen)}`);
+    }
+    if (matchedFields.has("toolResults")) {
+      for (const toolResult of msg.toolResults) {
+        if (containsMatch(toolResult.content)) {
+          matchedContent.push(`Result: ${truncate(toolResult.content, maxLen)}`);
         }
       }
     }

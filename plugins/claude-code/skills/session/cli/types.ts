@@ -89,9 +89,6 @@ export const RELEVANCE_WEIGHTS = {
   toolResult: 0.8,
 } as const;
 
-/** Maximum characters to tokenize for relevance scoring */
-export const MAX_TOKENIZE_LENGTH = 2000;
-
 /** Content preview limits for search result display */
 export const DISPLAY_LIMITS = {
   contentPreview: 200,

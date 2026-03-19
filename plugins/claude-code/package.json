@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@constellos/claude-code-kit": "^0.4.0"
+    "@constellos/claude-code-kit": "^0.4.0",
+    "minisearch": "^7.2.0"
   }
 }

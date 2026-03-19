@@ -35,10 +35,6 @@
     "format:check": "biome format",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
-    "lint:md": "npm run lint:md:agents && npm run lint:md:commands && npm run lint:md:skills",
-    "lint:md:agents": "remark plugins/*/agents/*.md",
-    "lint:md:commands": "remark .claude/commands/*.md plugins/*/commands/*.md",
-    "lint:md:skills": "remark plugins/*/skills/*/SKILL.md",
     "skill-lint": "bun ./packages/skill-lint/cli.ts",
     "test": "bun test",
     "test:unit": "bun test"
@@ -49,12 +45,7 @@
     "@constellos/claude-code-kit": "^0.4.0",
     "@types/bun": "^1.3.8",
     "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1",
-    "remark": "^15.0.1",
-    "remark-cli": "^12.0.1",
-    "remark-frontmatter": "^5.0.0",
-    "remark-lint": "^10.0.1",
-    "remark-lint-frontmatter-schema": "^3.15.4"
+    "ajv-formats": "^3.0.1"
   },
   "dependencies": {
     "typescript": "^5.9.3",

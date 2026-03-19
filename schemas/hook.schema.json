@@ -75,6 +75,13 @@
       },
       "description": "Hooks that run when the agent stops"
     },
+    "StopFailure": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when the agent stops due to a failure"
+    },
     "TeammateIdle": {
       "type": "array",
       "items": {
@@ -89,12 +96,61 @@
       },
       "description": "Hooks that run when a task is being marked as completed"
     },
+    "InstructionsLoaded": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when instructions are loaded"
+    },
+    "ConfigChange": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when configuration changes"
+    },
+    "WorktreeCreate": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a worktree is created"
+    },
+    "WorktreeRemove": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when a worktree is removed"
+    },
     "PreCompact": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/hookMatcher"
       },
       "description": "Hooks that run before context compaction"
+    },
+    "PostCompact": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run after context compaction"
+    },
+    "Elicitation": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when an elicitation is triggered"
+    },
+    "ElicitationResult": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hookMatcher"
+      },
+      "description": "Hooks that run when an elicitation result is received"
     },
     "SessionEnd": {
       "type": "array",

@@ -143,10 +143,7 @@ jobs:
         run: |
           plugin="${{ matrix.plugin.name }}"
           echo "has_plugin_json=$([[ -f "plugins/$plugin/.claude-plugin/plugin.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "has_hooks=$([[ -f "plugins/$plugin/hooks/hooks.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_skills=$([[ -d "plugins/$plugin/skills" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "has_agents=$([[ -d "plugins/$plugin/agents" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "has_commands=$([[ -d "plugins/$plugin/commands" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_tests=$(find "plugins/$plugin" -name '*.test.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_integration_tests=$(find "plugins/$plugin" -name '*.integration.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -161,9 +158,8 @@ jobs:
       - name: Install Claude Code CLI
         run: bun install -g @anthropic-ai/claude-code@latest
 
-      - name: Validate plugin.json
-        if: steps.inspect.outputs.has_plugin_json == 'true'
-        run: bun packages/validate/plugin.ts "plugins/${{ matrix.plugin.name }}"
+      - name: Validate plugin
+        run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
 
       - name: Check for hardcoded version
         if: steps.inspect.outputs.has_plugin_json == 'true'
@@ -173,14 +169,6 @@ jobs:
             echo "Hardcoded versions prevent plugin updates from propagating"
             exit 1
           fi
-
-      - name: Validate hooks.json
-        if: steps.inspect.outputs.has_hooks == 'true'
-        run: bun packages/validate/hooks.ts "plugins/${{ matrix.plugin.name }}"
-
-      - name: Validate skill frontmatter
-        if: steps.inspect.outputs.has_skills == 'true'
-        run: bunx remark "plugins/${{ matrix.plugin.name }}/skills/*/SKILL.md"
 
       - name: Lint skills
         if: steps.inspect.outputs.has_skills == 'true'
@@ -193,14 +181,6 @@ jobs:
       - name: Validate Swift syntax
         if: steps.inspect.outputs.has_swift == 'true'
         run: find "plugins/${{ matrix.plugin.name }}" -name "*.swift" -exec swiftc -parse {} +
-
-      - name: Validate agent frontmatter
-        if: steps.inspect.outputs.has_agents == 'true'
-        run: bunx remark "plugins/${{ matrix.plugin.name }}/agents/*.md"
-
-      - name: Validate command frontmatter
-        if: steps.inspect.outputs.has_commands == 'true'
-        run: bunx remark "plugins/${{ matrix.plugin.name }}/commands/*.md"
 
       - name: Build TypeScript
         if: steps.inspect.outputs.has_package == 'true'

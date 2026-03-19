@@ -1,4 +1,4 @@
-import { type Conversation, DISPLAY_LIMITS, MIN_TOKEN_LENGTH, RELEVANCE_WEIGHTS } from "./types";
+import { type Conversation, DISPLAY_LIMITS, MAX_TOKENIZE_LENGTH, MIN_TOKEN_LENGTH, RELEVANCE_WEIGHTS } from "./types";
 
 export function tokenize(text: string): string[] {
   return text
@@ -54,7 +54,7 @@ export function calculateRelevanceScore(
 
   for (const msg of conversation.messages) {
     for (const result of msg.toolResults) {
-      const resultTokens = tokenize(result.content);
+      const resultTokens = tokenize(result.content.slice(0, MAX_TOKENIZE_LENGTH));
       const matches = resultTokens.filter((t) => queryTokens.has(t));
       if (matches.length > 0) {
         score += (matches.length / queryTokens.size) * RELEVANCE_WEIGHTS.toolResult;

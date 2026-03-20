@@ -23,6 +23,8 @@ Each plugin in `plugins/` contains:
 - `commands/`: Optional slash commands
 - `agents/`: Optional agent definitions
 
+When creating or modifying skills, load the `claude-code:skill` skill for authoring best practices, structure conventions, and content features.
+
 ### Naming
 
 The plugin name forms a namespace for its contents (e.g., `gitlab:ci-monitor`). Commands and agents are auto-namespaced by the plugin system — the filename becomes the qualified name (e.g., `ci-monitor.md` in the `gitlab` plugin becomes `gitlab:ci-monitor`). Skills are **not** auto-namespaced — the `name` in YAML frontmatter is used as-is.

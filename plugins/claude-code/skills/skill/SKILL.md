@@ -69,6 +69,44 @@ hooks:                                    # Optional: skill-scoped hooks
 
 **Storage**: `~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
 
+## Skill Authoring Best Practices
+
+#### Description Is a Trigger
+
+The description field is not a summary. It's what Claude scans to decide whether to activate the skill. Write it for the model: include trigger terms, use cases, and "Use when..." phrasing. Make it slightly pushy to combat under-triggering.
+
+#### Skip the Obvious
+
+The context window is a public good. Don't restate what Claude already knows about coding or the codebase. Focus on information that pushes Claude out of its defaults — gotchas, internal conventions, non-obvious constraints.
+
+#### Build a Gotchas Section
+
+The highest-signal content in any skill is a `## Gotchas` section documenting failure modes Claude hits in practice. Start small and grow it over time as new edge cases surface. Every skill that wraps a library, API, or workflow should have one.
+
+#### Progressive Disclosure
+
+A skill is a folder, not just a markdown file. Keep `SKILL.md` concise (~30 lines for the hub) and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. It will load them at appropriate times.
+
+#### Don't Railroad Claude
+
+Give Claude the information it needs but leave room to adapt. Prefer outcome-oriented instructions ("Cherry-pick the commit onto a clean branch. Resolve conflicts preserving intent.") over step-by-step scripts ("Step 1: Run git log. Step 2: Run git cherry-pick...").
+
+#### First-Run Setup
+
+Skills that depend on user-specific context should check for a `config.json` in `${CLAUDE_SKILL_DIR}` or `${CLAUDE_PLUGIN_DATA}`. If missing, prompt the user for setup (e.g., which Slack channel, which project). Store answers for future runs.
+
+#### Store Persistent Data in `${CLAUDE_PLUGIN_DATA}`
+
+Skills can maintain state across runs: append-only logs, JSON records, SQLite databases. Use `${CLAUDE_PLUGIN_DATA}` for storage that survives plugin upgrades. Example: a standup skill keeps a `standups.log` so Claude can diff against yesterday.
+
+#### Give Claude Code to Compose
+
+Include helper scripts and libraries that Claude can import and compose on the fly. This lets Claude spend turns on decisions, not reconstructing boilerplate. Document scripts with `"Run script.py"` (execute) vs `"See script.py"` (reference).
+
+#### On-Demand Hooks
+
+Skill-scoped hooks activate only when the skill is invoked and last for the session. Use these for opinionated guardrails that would be annoying globally but valuable in specific contexts (e.g., blocking destructive commands during prod operations).
+
 ## Content Features
 
 ### String Substitutions

@@ -10,8 +10,8 @@ hooks:
           command: |
             cat | jq '
               if (.tool_input.command | test("^tmux\\s+(display-message|display|list-sessions|ls|list-windows|lsw|list-panes|lsp|capture-pane|capturep|show-options|show|has-session|has)\\b"))
-              then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {dangerouslyDisableSandbox: true}}}
-              else {hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: {dangerouslyDisableSandbox: true}}}
+              then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}
+              else {hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}
               end'
 ---
 

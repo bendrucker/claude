@@ -1,0 +1,16 @@
+{
+  "description": "Disables sandbox for Things plugin scripts that invoke macOS automation (osascript, open)",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

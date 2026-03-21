@@ -2,19 +2,6 @@
 name: things:inbox
 description: Quick captures to the Things 3 inbox. Not for reads (things:jxa), scheduled tasks, updates, or projects (things:url).
 allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"]
-hooks:
-  PreToolUse:
-    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"
-      hooks:
-        - type: command
-          command: |
-            jq -n '{
-              hookSpecificOutput: {
-                hookEventName: "PreToolUse",
-                permissionDecision: "allow",
-                updatedInput: { dangerouslyDisableSandbox: true }
-              }
-            }'
 ---
 
 # Things Inbox

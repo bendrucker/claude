@@ -5,19 +5,6 @@ allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts:*)"
   - Read
-hooks:
-  PreToolUse:
-    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3:*)|Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts:*)"
-      hooks:
-        - type: command
-          command: |
-            jq -n '{
-              hookSpecificOutput: {
-                hookEventName: "PreToolUse",
-                permissionDecision: "allow",
-                updatedInput: { dangerouslyDisableSandbox: true }
-              }
-            }'
 ---
 
 # Things JXA

@@ -18,6 +18,12 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:pypi.org)",
       "WebFetch(domain:rubygems.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:proxy.golang.org)",
+      "WebFetch(domain:sum.golang.org)",
+      "WebFetch(domain:pkg.go.dev)",
       "Edit(//tmp/**)",
       "Edit(tmp/**)",
       "Edit(.git/config)",
@@ -159,6 +165,8 @@
       ]
     },
     "excludedCommands": [
+      "gh:*",
+      "code:*",
       "docker:*",
       "ssh:*",
       "scp:*",

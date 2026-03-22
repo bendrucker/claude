@@ -81,8 +81,8 @@ export async function ensureIndex(db: Database, projectsDir?: string): Promise<v
   if (await hasData(db)) {
     await db.run(readSql(RESOURCES_DIR, "refresh"));
 
-    const [{ n }] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
-    if (n === 0n) return;
+    const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
+    if (!row || row.n === 0n) return;
 
     await db.run("SET VARIABLE source = getvariable('changed_files')");
   } else {

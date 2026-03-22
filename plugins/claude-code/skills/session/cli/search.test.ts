@@ -186,7 +186,7 @@ describe("stats", () => {
       project: null,
     });
     for (let i = 1; i < rows.length; i++) {
-      expect(rows[i - 1]?.uses).toBeGreaterThanOrEqual(rows[i]?.uses);
+      expect(rows[i - 1]!.uses).toBeGreaterThanOrEqual(rows[i]!.uses);
     }
   });
 

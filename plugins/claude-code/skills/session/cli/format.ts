@@ -95,7 +95,9 @@ export function formatStats(rows: StatsRow[]): string {
     return "No sessions found.";
   }
 
-  const [first] = rows;
+  const first = rows[0];
+  if (!first) return "No sessions found.";
+
   const sections: string[] = [];
 
   sections.push(

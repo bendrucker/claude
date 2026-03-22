@@ -30,7 +30,7 @@ bun $CLI digest --after today
 bun $CLI digest --session $CLAUDE_SESSION_ID
 
 # JSON output for piping
-bun $CLI digest --after today --format json | jq '.[].sessionId'
+bun $CLI digest --after today --format json | jq '.rows[].session_id'
 ```
 
 ### search
@@ -48,7 +48,6 @@ Show tool usage statistics.
 
 ```bash
 bun $CLI stats --after "last week"
-bun $CLI stats --sort rate  # Sort by error rate
 ```
 
 ### errors
@@ -68,8 +67,6 @@ bun $CLI errors --aggregate     # Group by error message
 - `--project PATH` - Filter by project path
 - `--limit N` - Maximum results
 - `--format FORMAT` - Output format: `text` (default) or `json`
-- `--log-level LEVEL` - Telemetry output: `debug` (logs) or `trace` (logs + spans)
-- `--log-file PATH` - Write traces and logs to a JSONL file
 
 ## Direct Session Inspection
 
@@ -91,7 +88,7 @@ jq -r '.type' < "$FILE" | sort | uniq -c
 
 ## Session File Structure
 
-Session logs are stored in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`.
+Session logs are stored in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`. The CLI maintains a DuckDB index at `$CLAUDE_PLUGIN_DATA/session.duckdb` for fast queries, rebuilt incrementally on each invocation.
 
 Each line is a JSON object with a `type` field:
 

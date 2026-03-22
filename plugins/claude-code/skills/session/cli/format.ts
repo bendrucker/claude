@@ -1,34 +1,26 @@
 import { table } from "table";
-import type { ErrorAggregate, ToolError } from "./errors";
-import type { UsageStats } from "./stats";
-import { DISPLAY_LIMITS, type DigestResult, type SearchResult } from "./types";
+import type { DigestRow, ErrorAggregate, ErrorRow, SearchRow, StatsRow } from "./types";
 
-function formatTimestamp(date: Date | null): string {
-  if (!date) return "unknown";
-  return date.toISOString().replace("T", " ").slice(0, 16);
+function formatTimestamp(ts: string | null): string {
+  if (!ts) return "unknown";
+  return ts.replace("T", " ").slice(0, 16);
 }
 
-export function formatDigest(result: DigestResult): string {
-  if (result.conversations.length === 0) {
+export function formatDigest(rows: DigestRow[]): string {
+  if (rows.length === 0) {
     return "No conversations found.";
   }
 
   const lines: string[] = [];
 
-  if (result.truncated) {
-    lines.push(
-      `Warning: Showing ${result.conversations.length} of ${result.totalCount} sessions\n`,
-    );
-  }
-
-  for (const conv of result.conversations) {
-    const timestamp = formatTimestamp(conv.startTime);
-    const project = conv.projectPath || "unknown";
+  for (const row of rows) {
+    const timestamp = formatTimestamp(row.start_time);
+    const project = row.project_path || "unknown";
 
     lines.push(`[${timestamp}] ${project}`);
-    lines.push(`  ${conv.summary || "(no summary)"}`);
-    if (conv.gitBranch) {
-      lines.push(`  Branch: ${conv.gitBranch}`);
+    lines.push(`  ${row.summary || "(no summary)"}`);
+    if (row.git_branch) {
+      lines.push(`  Branch: ${row.git_branch}`);
     }
     lines.push("");
   }
@@ -36,24 +28,19 @@ export function formatDigest(result: DigestResult): string {
   return lines.join("\n");
 }
 
-export function formatSearchResults(results: SearchResult[]): string {
+export function formatSearchResults(results: SearchRow[]): string {
   if (results.length === 0) {
     return "No matching conversations found.";
   }
 
   const lines: string[] = [];
-  for (const result of results) {
-    const conv = result.conversation;
-    const timestamp = formatTimestamp(conv.startTime);
-    const project = conv.projectPath || "unknown";
+  for (const row of results) {
+    const timestamp = formatTimestamp(row.start_time);
+    const project = row.project_path || "unknown";
 
-    lines.push(`[${timestamp}] (score: ${result.score.toFixed(2)}) ${project}`);
-    if (conv.summary) {
-      lines.push(`  Summary: ${conv.summary}`);
-    }
-    for (const match of result.matchedContent.slice(0, DISPLAY_LIMITS.matchedContentDisplay)) {
-      const maxLen = DISPLAY_LIMITS.matchedLineLength;
-      lines.push(`  - ${match.slice(0, maxLen)}${match.length > maxLen ? "..." : ""}`);
+    lines.push(`[${timestamp}] ${project}`);
+    if (row.summary) {
+      lines.push(`  Summary: ${row.summary}`);
     }
     lines.push("");
   }
@@ -61,7 +48,7 @@ export function formatSearchResults(results: SearchResult[]): string {
   return lines.join("\n");
 }
 
-export function formatErrors(errors: ToolError[]): string {
+export function formatErrors(errors: ErrorRow[]): string {
   if (errors.length === 0) {
     return "No tool errors found.";
   }
@@ -71,10 +58,10 @@ export function formatErrors(errors: ToolError[]): string {
 
   for (const error of errors) {
     const timestamp = formatTimestamp(error.timestamp);
-    const preview = error.content.slice(0, 100).replace(/\n/g, " ");
-    lines.push(`[${timestamp}] ${error.toolName}`);
-    lines.push(`  ${preview}${error.content.length > 100 ? "..." : ""}`);
-    lines.push(`  Session: ${error.sessionId}`);
+    const preview = error.error_content.slice(0, 100).replace(/\n/g, " ");
+    lines.push(`[${timestamp}] ${error.tool_name}`);
+    lines.push(`  ${preview}${error.error_content.length > 100 ? "..." : ""}`);
+    lines.push(`  Session: ${error.session_id}`);
     lines.push("");
   }
 
@@ -95,7 +82,7 @@ export function formatErrorAggregates(aggregates: ErrorAggregate[]): string {
   for (const aggregate of aggregates) {
     const preview = aggregate.content.slice(0, 80).replace(/\n/g, " ");
     lines.push(`${aggregate.count}x: ${preview}${aggregate.content.length > 80 ? "..." : ""}`);
-    const tools = [...new Set(aggregate.examples.map((e) => e.toolName))].join(", ");
+    const tools = [...new Set(aggregate.examples.map((e) => e.tool_name))].join(", ");
     lines.push(`   Tools: ${tools}`);
     lines.push("");
   }
@@ -103,24 +90,23 @@ export function formatErrorAggregates(aggregates: ErrorAggregate[]): string {
   return lines.join("\n");
 }
 
-export function formatStats(stats: UsageStats): string {
-  if (stats.totalSessions === 0) {
+export function formatStats(rows: StatsRow[]): string {
+  if (rows.length === 0) {
     return "No sessions found.";
   }
 
+  const [first] = rows;
   const sections: string[] = [];
 
   sections.push(
-    `${stats.totalSessions} sessions, ${stats.totalToolUses} tool uses, ${stats.totalErrors} errors\n`,
+    `${first.total_sessions} sessions, ${first.total_tool_uses} tool uses, ${first.total_errors} errors\n`,
   );
 
-  if (stats.tools.length > 0) {
-    const toolData = [
-      ["Tool", "Uses", "Errors", "Error Rate"],
-      ...stats.tools.map((t) => [t.name, t.uses, t.errors, `${(t.errorRate * 100).toFixed(1)}%`]),
-    ];
-    sections.push(table(toolData));
-  }
+  const toolData = [
+    ["Tool", "Uses", "Errors", "Error Rate"],
+    ...rows.map((t) => [t.tool_name, t.uses, t.errors, `${t.error_rate_pct}%`]),
+  ];
+  sections.push(table(toolData));
 
   return sections.join("\n");
 }

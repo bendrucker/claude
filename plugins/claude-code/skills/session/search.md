@@ -70,9 +70,6 @@ bun cli stats --after "last week"
 
 # Stats for a specific project
 bun cli stats --project myproject
-
-# Sort by error rate
-bun cli stats --sort rate
 ```
 
 ## Errors
@@ -88,9 +85,6 @@ bun cli errors --type failure
 
 # Group by error message to find patterns
 bun cli errors --aggregate
-
-# Sort by tool name
-bun cli errors --sort tool --order asc
 ```
 
 ## JSON Output
@@ -99,37 +93,22 @@ Use `--format json` for programmatic access:
 
 ```bash
 # Pipe search results to jq
-bun cli search "auth" --format json | jq '.[] | .conversation.summary'
+bun cli search "auth" --format json | jq '.[].summary'
 
 # Get session IDs from digest
-bun cli digest --after today --format json | jq '.conversations[].sessionId'
+bun cli digest --after today --format json | jq '.rows[].session_id'
 
 # Filter errors by tool
-bun cli errors --format json | jq '[.[] | select(.toolName == "Bash")]'
+bun cli errors --format json | jq '[.[] | select(.tool_name == "Bash")]'
 ```
 
 ### JSON Fields
 
-The JSON output includes computed fields for convenience:
-
-- `projectName` - Last component of projectPath (e.g., "api" from "/Users/ben/src/api")
-- `durationMinutes` - Pre-computed session duration in minutes
-
-## Relevance Scoring
-
-Search results are ranked by relevance with weighted scoring:
-
-| Source | Weight |
-|--------|--------|
-| Summary | 3.0x |
-| User messages | 1.5x |
-| Tool usage | 1.3x |
-| Assistant messages | 1.0x |
-
-This prioritizes conversations where your query matches the summary or your own prompts.
+Column names use `snake_case` (e.g., `session_id`, `start_time`, `project_path`, `duration_minutes`).
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
 | `CLAUDE_PROJECTS_DIR` | Override default `~/.claude/projects/` path |
+| `CLAUDE_PLUGIN_DATA` | Directory for the DuckDB index file |

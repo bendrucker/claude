@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
 
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { cli } from "cleye";
 import { parseDate } from "./date";
-import { type LogLevel, setupTelemetry, shutdownTelemetry } from "./debug";
-import { aggregateErrors, getErrors, type ToolError } from "./errors";
+import { type Database, ensureIndex, getDb, runQuery } from "./db";
 import {
   formatDigest,
   formatErrorAggregates,
@@ -11,9 +13,7 @@ import {
   formatSearchResults,
   formatStats,
 } from "./format";
-import { getDigest, getSession, searchConversations } from "./query";
-import { getStats, type ToolStats } from "./stats";
-import type { ErrorType, SearchOptions } from "./types";
+import type { DigestRow, ErrorAggregate, ErrorRow, SearchRow, StatsRow } from "./types";
 
 const commonFlags = {
   after: {
@@ -37,58 +37,31 @@ const commonFlags = {
     description: "Output format: text or json",
     default: "text",
   },
-  "log-level": {
-    type: String,
-    description: "Log level: trace, debug, info, warn, error",
-  },
-  "log-file": {
-    type: String,
-    description: "Write traces and logs to a JSONL file",
-  },
 } as const;
 
-function parseCommonOptions(flags: {
+interface CommonFlags {
   after?: string | undefined;
   before?: string | undefined;
   project?: string | undefined;
   limit?: number | undefined;
   format?: string | undefined;
-  "log-level"?: string | undefined;
-  "log-file"?: string | undefined;
-}): { options: SearchOptions; format: "text" | "json" } {
-  const options: SearchOptions = {};
-  const logLevel = flags["log-level"];
-  const logFile = flags["log-file"];
+}
 
-  if (logLevel) {
-    const valid: LogLevel[] = ["trace", "debug", "info", "warn", "error"];
-    if (!valid.includes(logLevel as LogLevel)) {
-      throw new Error(`--log-level must be one of: ${valid.join(", ")}`);
-    }
-  }
+interface ParsedFlags {
+  filters: Record<string, string | null>;
+  limit: number;
+  format: "text" | "json";
+}
 
-  const hasOtelEnv =
-    Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT) ||
-    process.env.OTEL_TRACES_EXPORTER === "console";
+function parseCommonFlags(flags: CommonFlags): ParsedFlags {
+  const filters = {
+    after_date: flags.after ? parseDate(flags.after).toISOString() : null,
+    before_date: flags.before ? parseDate(flags.before).toISOString() : null,
+    project: flags.project ?? null,
+  };
 
-  if (logLevel || logFile || hasOtelEnv) {
-    setupTelemetry({ logLevel: (logLevel as LogLevel) ?? "error", ...(logFile && { logFile }) });
-  }
-
-  if (flags.after) {
-    options.after = parseDate(flags.after);
-  }
-  if (flags.before) {
-    options.before = parseDate(flags.before);
-  }
-  if (flags.project) {
-    options.project = flags.project;
-  }
-  if (flags.limit !== undefined) {
-    if (flags.limit < 1) {
-      throw new Error("--limit must be a positive integer");
-    }
-    options.limit = flags.limit;
+  if (flags.limit !== undefined && flags.limit < 1) {
+    throw new Error("--limit must be a positive integer");
   }
 
   const format = flags.format ?? "text";
@@ -96,22 +69,46 @@ function parseCommonOptions(flags: {
     throw new Error('--format must be "text" or "json"');
   }
 
-  return { options, format };
+  return { filters, limit: flags.limit ?? 20, format };
 }
 
 function output<T>(data: T, format: "text" | "json", formatter: (data: T) => string): void {
   console.log(format === "json" ? JSON.stringify(data, null, 2) : formatter(data));
 }
 
-function validateOrder(order: string | undefined): "asc" | "desc" {
-  const value = order ?? "desc";
-  if (value !== "asc" && value !== "desc") {
-    throw new Error('--order must be "asc" or "desc"');
+function aggregateErrors(errors: ErrorRow[]): ErrorAggregate[] {
+  const aggregates = new Map<string, { count: number; examples: ErrorRow[] }>();
+
+  for (const error of errors) {
+    const existing = aggregates.get(error.error_content);
+    if (existing) {
+      existing.count++;
+      if (existing.examples.length < 3) {
+        existing.examples.push(error);
+      }
+    } else {
+      aggregates.set(error.error_content, { count: 1, examples: [error] });
+    }
   }
-  return value;
+
+  const results: ErrorAggregate[] = [];
+  for (const [content, { count, examples }] of aggregates) {
+    results.push({
+      content,
+      count,
+      examples: examples.map((e) => ({
+        tool_name: e.tool_name,
+        session_id: e.session_id,
+        project_path: e.project_path,
+      })),
+    });
+  }
+
+  results.sort((a, b) => b.count - a.count);
+  return results;
 }
 
-async function runErrors(args: string[]): Promise<void> {
+async function runErrors(db: Database, args: string[]): Promise<void> {
   const argv = cli(
     {
       name: "errors",
@@ -125,53 +122,31 @@ async function runErrors(args: string[]): Promise<void> {
           type: Boolean,
           description: "Group by error message",
         },
-        sort: {
-          type: String,
-          description: "Sort by: timestamp (default) or tool",
-          default: "timestamp",
-        },
-        order: {
-          type: String,
-          description: "Sort order: asc or desc (default)",
-          default: "desc",
-        },
       },
     },
     undefined,
     args,
   );
 
-  const { options, format } = parseCommonOptions(argv.flags);
+  const { filters, limit, format } = parseCommonFlags(argv.flags);
 
+  let errorType: string | null = null;
   if (argv.flags.type) {
     if (argv.flags.type !== "rejection" && argv.flags.type !== "failure") {
       throw new Error('--type must be "rejection" or "failure"');
     }
-    options.errorType = argv.flags.type as ErrorType;
+    errorType = argv.flags.type;
   }
 
-  if (argv.flags.aggregate && options.limit !== undefined) {
+  if (argv.flags.aggregate && argv.flags.limit !== undefined) {
     throw new Error("--aggregate and --limit are mutually exclusive");
   }
 
-  let errors = await getErrors(options);
-
-  const sort = argv.flags.sort;
-  if (sort !== "timestamp" && sort !== "tool") {
-    throw new Error('--sort must be "timestamp" or "tool"');
-  }
-
-  const order = validateOrder(argv.flags.order);
-
-  const comparators: Record<string, (a: ToolError, b: ToolError) => number> = {
-    timestamp: (a, b) => (a.timestamp?.getTime() ?? 0) - (b.timestamp?.getTime() ?? 0),
-    tool: (a, b) => a.toolName.localeCompare(b.toolName),
-  };
-
-  errors = errors.sort(comparators[sort]);
-  if (order === "desc") {
-    errors = errors.reverse();
-  }
+  const errors = await runQuery<ErrorRow>(db, "errors", {
+    ...filters,
+    error_type: errorType,
+    limit: String(argv.flags.aggregate ? 1000 : limit),
+  });
 
   if (argv.flags.aggregate) {
     output(aggregateErrors(errors), format, formatErrorAggregates);
@@ -180,54 +155,22 @@ async function runErrors(args: string[]): Promise<void> {
   }
 }
 
-async function runStats(args: string[]): Promise<void> {
+async function runStats(db: Database, args: string[]): Promise<void> {
   const argv = cli(
     {
       name: "stats",
-      flags: {
-        ...commonFlags,
-        sort: {
-          type: String,
-          description: "Sort by: uses (default), errors, or rate",
-          default: "uses",
-        },
-        order: {
-          type: String,
-          description: "Sort order: asc or desc (default)",
-          default: "desc",
-        },
-      },
+      flags: commonFlags,
     },
     undefined,
     args,
   );
 
-  const { options, format } = parseCommonOptions(argv.flags);
-
-  const stats = await getStats(options);
-
-  const sort = argv.flags.sort;
-  if (sort !== "uses" && sort !== "errors" && sort !== "rate") {
-    throw new Error('--sort must be "uses", "errors", or "rate"');
-  }
-
-  const order = validateOrder(argv.flags.order);
-
-  const comparators: Record<string, (a: ToolStats, b: ToolStats) => number> = {
-    uses: (a, b) => a.uses - b.uses,
-    errors: (a, b) => a.errors - b.errors,
-    rate: (a, b) => a.errorRate - b.errorRate,
-  };
-
-  stats.tools.sort(comparators[sort]);
-  if (order === "desc") {
-    stats.tools.reverse();
-  }
-
-  output(stats, format, formatStats);
+  const { filters, format } = parseCommonFlags(argv.flags);
+  const rows = await runQuery<StatsRow>(db, "stats", filters);
+  output(rows, format, formatStats);
 }
 
-async function runDigest(args: string[]): Promise<void> {
+async function runDigest(db: Database, args: string[]): Promise<void> {
   const argv = cli(
     {
       name: "digest",
@@ -243,23 +186,22 @@ async function runDigest(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format } = parseCommonOptions(argv.flags);
+  const { filters, limit, format } = parseCommonFlags(argv.flags);
 
-  if (argv.flags.session) {
-    const conversation = await getSession(argv.flags.session, options);
-    if (!conversation) {
-      throw new Error(`Session not found: ${argv.flags.session}`);
-    }
-    const result = { conversations: [conversation], totalCount: 1, truncated: false };
-    output(result, format, formatDigest);
-    return;
+  const rows = await runQuery<DigestRow>(db, "digest", {
+    ...filters,
+    session_id: argv.flags.session ?? null,
+    limit: String(limit),
+  });
+
+  if (argv.flags.session && rows.length === 0) {
+    throw new Error(`Session not found: ${argv.flags.session}`);
   }
 
-  const result = await getDigest(options);
-  output(result, format, formatDigest);
+  output(rows, format, formatDigest);
 }
 
-async function runSearch(args: string[]): Promise<void> {
+async function runSearch(db: Database, args: string[]): Promise<void> {
   const argv = cli(
     {
       name: "search",
@@ -270,12 +212,22 @@ async function runSearch(args: string[]): Promise<void> {
     args,
   );
 
-  const { options, format } = parseCommonOptions(argv.flags);
-  const results = await searchConversations(argv._.query, options);
-  output(results, format, formatSearchResults);
+  const { filters, limit, format } = parseCommonFlags(argv.flags);
+  const rows = await runQuery<SearchRow>(db, "search", {
+    ...filters,
+    query: argv._.query,
+    limit: String(limit),
+  });
+  output(rows, format, formatSearchResults);
 }
 
-const subcommands: Record<string, (args: string[]) => Promise<void>> = {
+function getDataDir(): string {
+  const dir = process.env.CLAUDE_PLUGIN_DATA || path.join(os.tmpdir(), "claude-session");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+const subcommands: Record<string, (db: Database, args: string[]) => Promise<void>> = {
   search: runSearch,
   digest: runDigest,
   stats: runStats,
@@ -310,10 +262,12 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const db = await getDb(getDataDir());
   try {
-    await handler(args.slice(1));
+    await ensureIndex(db);
+    await handler(db, args.slice(1));
   } finally {
-    await shutdownTelemetry();
+    db.close();
   }
 }
 

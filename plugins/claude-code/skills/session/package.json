@@ -4,12 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/api-logs": "^0.57.0",
-    "@opentelemetry/exporter-logs-otlp-http": "^0.57.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
-    "@opentelemetry/sdk-logs": "^0.57.0",
-    "@opentelemetry/sdk-trace-base": "^1.30.0",
+    "@duckdb/node-api": "1.5.0-r.1",
     "chrono-node": "^2.7.7",
     "cleye": "^2.2.1",
     "table": "^6.9.0"

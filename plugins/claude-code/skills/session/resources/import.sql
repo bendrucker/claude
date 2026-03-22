@@ -1,6 +1,32 @@
-INSERT INTO messages
+INSERT INTO messages (
+  session_id,
+  type,
+  timestamp,
+  project_path,
+  git_branch,
+  is_meta,
+  content_text,
+  item_type,
+  tool_name,
+  tool_id,
+  tool_use_id,
+  result_content,
+  is_error,
+  model,
+  input_tokens,
+  output_tokens,
+  stop_reason,
+  duration_ms,
+  version,
+  is_sidechain,
+  source_file,
+  source_line,
+  summary
+)
 WITH raw AS (
-  SELECT *
+  SELECT
+    *,
+    ROW_NUMBER() OVER () as source_line
   FROM read_ndjson(
     getvariable('source'),
     ignore_errors=true,
@@ -12,9 +38,13 @@ WITH raw AS (
       cwd: 'VARCHAR',
       gitBranch: 'VARCHAR',
       isMeta: 'BOOLEAN',
+      isSidechain: 'BOOLEAN',
       summary: 'VARCHAR',
-      message: 'JSON'
-    }
+      message: 'JSON',
+      durationMs: 'BIGINT',
+      version: 'VARCHAR'
+    },
+    filename=true
   )
   WHERE type IN ('user', 'assistant', 'summary')
 ),
@@ -37,7 +67,16 @@ string_content AS (
     NULL as tool_id,
     NULL as tool_use_id,
     NULL as result_content,
-    false as is_error
+    false as is_error,
+    json_extract_string(r.message, '$.model') as model,
+    json_extract(r.message, '$.usage.input_tokens')::BIGINT as input_tokens,
+    json_extract(r.message, '$.usage.output_tokens')::BIGINT as output_tokens,
+    json_extract_string(r.message, '$.stop_reason') as stop_reason,
+    r.durationMs as duration_ms,
+    r.version,
+    COALESCE(r.isSidechain, false) as is_sidechain,
+    r.filename as source_file,
+    r.source_line
   FROM raw r
   WHERE r.type IN ('user', 'assistant')
     AND json_extract(r.message, '$.content') IS NOT NULL
@@ -60,7 +99,16 @@ array_content AS (
     COALESCE(
       json_extract(r.message, '$.content[' || s.idx || '].is_error')::BOOLEAN,
       false
-    ) as is_error
+    ) as is_error,
+    json_extract_string(r.message, '$.model') as model,
+    json_extract(r.message, '$.usage.input_tokens')::BIGINT as input_tokens,
+    json_extract(r.message, '$.usage.output_tokens')::BIGINT as output_tokens,
+    json_extract_string(r.message, '$.stop_reason') as stop_reason,
+    r.durationMs as duration_ms,
+    r.version,
+    COALESCE(r.isSidechain, false) as is_sidechain,
+    r.filename as source_file,
+    r.source_line
   FROM raw r,
   LATERAL (
     SELECT unnest(generate_series(

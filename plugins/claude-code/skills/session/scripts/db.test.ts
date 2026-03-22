@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseDate } from "./date";
 import { type Database, ensureIndex, getDb, runQuery } from "./db";
-import { formatDigest, formatErrors, formatSearchResults, formatStats } from "./format";
-import type { DigestRow, ErrorRow, SearchRow, StatsRow } from "./types";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -24,7 +21,7 @@ afterEach(() => {
 
 describe("digest", () => {
   it("returns sessions sorted by start time descending", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
+    const rows = await runQuery<{ start_time: string }>(db, "digest", {
       after_date: null,
       before_date: null,
       project: null,
@@ -40,7 +37,7 @@ describe("digest", () => {
   });
 
   it("respects limit", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
+    const rows = await runQuery(db, "digest", {
       after_date: null,
       before_date: null,
       project: null,
@@ -51,7 +48,7 @@ describe("digest", () => {
   });
 
   it("filters by date range", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
+    const rows = await runQuery<{ start_time: string }>(db, "digest", {
       after_date: "2024-01-17T00:00:00.000Z",
       before_date: null,
       project: null,
@@ -59,14 +56,14 @@ describe("digest", () => {
       limit: "20",
     });
     for (const row of rows) {
-      expect(new Date(row.start_time ?? "").getTime()).toBeGreaterThanOrEqual(
+      expect(new Date(row.start_time).getTime()).toBeGreaterThanOrEqual(
         new Date("2024-01-17T00:00:00.000Z").getTime(),
       );
     }
   });
 
   it("filters by session ID", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
+    const rows = await runQuery<{ session_id: string }>(db, "digest", {
       after_date: null,
       before_date: null,
       project: null,
@@ -78,7 +75,7 @@ describe("digest", () => {
   });
 
   it("includes summary when present", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
+    const rows = await runQuery<{ summary: string }>(db, "digest", {
       after_date: null,
       before_date: null,
       project: null,
@@ -92,7 +89,7 @@ describe("digest", () => {
   });
 
   it("includes project metadata", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
+    const rows = await runQuery<{ project_path: string; git_branch: string }>(db, "digest", {
       after_date: null,
       before_date: null,
       project: null,
@@ -106,7 +103,7 @@ describe("digest", () => {
 
 describe("search", () => {
   it("finds sessions matching keyword", async () => {
-    const rows = await runQuery<SearchRow>(db, "search", {
+    const rows = await runQuery(db, "search", {
       query: "error",
       after_date: null,
       before_date: null,
@@ -117,7 +114,7 @@ describe("search", () => {
   });
 
   it("returns empty for non-matching query", async () => {
-    const rows = await runQuery<SearchRow>(db, "search", {
+    const rows = await runQuery(db, "search", {
       query: "zzzznonexistentzzzz",
       after_date: null,
       before_date: null,
@@ -128,7 +125,7 @@ describe("search", () => {
   });
 
   it("filters by project", async () => {
-    const rows = await runQuery<SearchRow>(db, "search", {
+    const rows = await runQuery<{ project_path: string }>(db, "search", {
       query: "authentication",
       after_date: null,
       before_date: null,
@@ -142,7 +139,7 @@ describe("search", () => {
   });
 
   it("respects limit", async () => {
-    const rows = await runQuery<SearchRow>(db, "search", {
+    const rows = await runQuery(db, "search", {
       query: "the",
       after_date: null,
       before_date: null,
@@ -153,7 +150,7 @@ describe("search", () => {
   });
 
   it("matches summary content", async () => {
-    const rows = await runQuery<SearchRow>(db, "search", {
+    const rows = await runQuery<{ session_id: string }>(db, "search", {
       query: "database connection pooling",
       after_date: null,
       before_date: null,
@@ -167,7 +164,7 @@ describe("search", () => {
 
 describe("stats", () => {
   it("aggregates tool usage", async () => {
-    const rows = await runQuery<StatsRow>(db, "stats", {
+    const rows = await runQuery<{ tool_name: string; uses: number }>(db, "stats", {
       after_date: null,
       before_date: null,
       project: null,
@@ -180,18 +177,18 @@ describe("stats", () => {
   });
 
   it("sorts by uses descending", async () => {
-    const rows = await runQuery<StatsRow>(db, "stats", {
+    const rows = await runQuery<{ uses: number }>(db, "stats", {
       after_date: null,
       before_date: null,
       project: null,
     });
     for (let i = 1; i < rows.length; i++) {
-      expect(rows[i - 1]!.uses).toBeGreaterThanOrEqual(rows[i]!.uses);
+      expect(rows[i - 1]?.uses).toBeGreaterThanOrEqual(rows[i]?.uses as number);
     }
   });
 
   it("includes aggregate totals", async () => {
-    const rows = await runQuery<StatsRow>(db, "stats", {
+    const rows = await runQuery<{ total_sessions: number; total_tool_uses: number }>(db, "stats", {
       after_date: null,
       before_date: null,
       project: null,
@@ -201,73 +198,13 @@ describe("stats", () => {
   });
 });
 
-describe("formatDigest", () => {
-  it("returns message for empty results", () => {
-    const output = formatDigest([]);
-    expect(output).toBe("No conversations found.");
-  });
-
-  it("includes timestamp and project", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
-      after_date: null,
-      before_date: null,
-      project: null,
-      session_id: null,
-      limit: "1",
-    });
-    const output = formatDigest(rows);
-    expect(output).toMatch(/\[\d{4}-\d{2}-\d{2}/);
-    expect(output).toMatch(/\/Users\/test\//);
-  });
-
-  it("shows branch when available", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
-      after_date: null,
-      before_date: null,
-      project: null,
-      session_id: null,
-      limit: "20",
-    });
-    const output = formatDigest(rows);
-    expect(output).toMatch(/Branch:/);
-  });
-});
-
-describe("formatSearchResults", () => {
-  it("returns message for empty results", () => {
-    const output = formatSearchResults([]);
-    expect(output).toBe("No matching conversations found.");
-  });
-});
-
-describe("formatStats", () => {
-  it("returns message for empty stats", () => {
-    const output = formatStats([]);
-    expect(output).toBe("No sessions found.");
-  });
-
-  it("includes tool table", async () => {
-    const rows = await runQuery<StatsRow>(db, "stats", {
-      after_date: null,
-      before_date: null,
-      project: null,
-    });
-    const output = formatStats(rows);
-    expect(output).toMatch(/Tool/);
-    expect(output).toMatch(/Uses/);
-    expect(output).toMatch(/sessions/);
-  });
-});
-
 describe("errors", () => {
   it("returns error rows", async () => {
-    const rows = await runQuery<ErrorRow>(db, "errors", {
-      after_date: null,
-      before_date: null,
-      project: null,
-      error_type: null,
-      limit: "20",
-    });
+    const rows = await runQuery<{ error_content: string; tool_name: string; session_id: string }>(
+      db,
+      "errors",
+      { after_date: null, before_date: null, project: null, error_type: null, limit: "20" },
+    );
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
       expect(row.error_content).toBeTruthy();
@@ -277,7 +214,7 @@ describe("errors", () => {
   });
 
   it("classifies rejection and failure error types", async () => {
-    const rows = await runQuery<ErrorRow>(db, "errors", {
+    const rows = await runQuery<{ error_type: string }>(db, "errors", {
       after_date: null,
       before_date: null,
       project: null,
@@ -290,7 +227,7 @@ describe("errors", () => {
   });
 
   it("filters by error_type", async () => {
-    const rows = await runQuery<ErrorRow>(db, "errors", {
+    const rows = await runQuery<{ error_type: string }>(db, "errors", {
       after_date: null,
       before_date: null,
       project: null,
@@ -306,7 +243,7 @@ describe("errors", () => {
 
 describe("incremental refresh", () => {
   it("produces no duplicates on repeated indexing", async () => {
-    const before = await runQuery<DigestRow>(db, "digest", {
+    const before = await runQuery(db, "digest", {
       after_date: null,
       before_date: null,
       project: null,
@@ -316,7 +253,7 @@ describe("incremental refresh", () => {
 
     await ensureIndex(db, fixturesDir);
 
-    const after = await runQuery<DigestRow>(db, "digest", {
+    const after = await runQuery(db, "digest", {
       after_date: null,
       before_date: null,
       project: null,
@@ -330,54 +267,19 @@ describe("incremental refresh", () => {
 
 describe("malformed JSONL", () => {
   it("imports valid messages from files with invalid lines", async () => {
-    const rows = await runQuery<DigestRow>(db, "digest", {
-      after_date: null,
-      before_date: null,
-      project: null,
-      session_id: "malformed-session",
-      limit: "20",
-    });
+    const rows = await runQuery<{ user_messages: number; assistant_messages: number }>(
+      db,
+      "digest",
+      {
+        after_date: null,
+        before_date: null,
+        project: null,
+        session_id: "malformed-session",
+        limit: "20",
+      },
+    );
     expect(rows).toHaveLength(1);
     expect(Number(rows[0]?.user_messages)).toBe(1);
     expect(Number(rows[0]?.assistant_messages)).toBe(1);
-  });
-});
-
-describe("formatErrors", () => {
-  it("returns message for empty errors", () => {
-    const output = formatErrors([]);
-    expect(output).toBe("No tool errors found.");
-  });
-});
-
-describe("parseDate", () => {
-  it('parses "today" as start of current day', () => {
-    const date = parseDate("today");
-    const now = new Date();
-    expect(date.getFullYear()).toBe(now.getFullYear());
-    expect(date.getMonth()).toBe(now.getMonth());
-    expect(date.getDate()).toBe(now.getDate());
-    expect(date.getHours()).toBe(0);
-    expect(date.getMinutes()).toBe(0);
-  });
-
-  it('parses "yesterday" as start of previous day', () => {
-    const date = parseDate("yesterday");
-    const expected = new Date();
-    expected.setDate(expected.getDate() - 1);
-    expect(date.getFullYear()).toBe(expected.getFullYear());
-    expect(date.getMonth()).toBe(expected.getMonth());
-    expect(date.getDate()).toBe(expected.getDate());
-  });
-
-  it("parses ISO date strings", () => {
-    const date = parseDate("2024-01-15T12:00:00Z");
-    expect(date.getUTCFullYear()).toBe(2024);
-    expect(date.getUTCMonth()).toBe(0);
-    expect(date.getUTCDate()).toBe(15);
-  });
-
-  it("throws on invalid date strings", () => {
-    expect(() => parseDate("not-a-date")).toThrow("Unable to parse date");
   });
 });

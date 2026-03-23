@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS messages (
   tool_use_id VARCHAR,
   result_content VARCHAR,
   is_error BOOLEAN,
+  is_rejection BOOLEAN,
   summary VARCHAR,
   model VARCHAR,
   input_tokens BIGINT,

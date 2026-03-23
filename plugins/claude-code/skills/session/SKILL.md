@@ -44,6 +44,7 @@ Each row is a content item extracted from a JSONL session line. Assistant messag
 | `tool_use_id` | VARCHAR | Matching tool use ID (for `tool_result` items) |
 | `result_content` | VARCHAR | Tool result text (for `tool_result` items) |
 | `is_error` | BOOLEAN | Whether the tool result is an error |
+| `is_rejection` | BOOLEAN | Whether the error was a user rejection (vs tool failure) |
 | `summary` | VARCHAR | Conversation summary (joined from `summary` type rows) |
 | `model` | VARCHAR | Model ID (e.g., `claude-opus-4-6`) — assistant rows only |
 | `input_tokens` | BIGINT | Input token count — assistant rows only |

@@ -12,6 +12,7 @@ INSERT INTO messages (
   tool_use_id,
   result_content,
   is_error,
+  is_rejection,
   model,
   input_tokens,
   output_tokens,
@@ -42,7 +43,8 @@ WITH raw AS (
       summary: 'VARCHAR',
       message: 'JSON',
       durationMs: 'BIGINT',
-      version: 'VARCHAR'
+      version: 'VARCHAR',
+      toolUseResult: 'JSON'
     },
     filename=true
   )
@@ -70,6 +72,7 @@ base AS (
     COALESCE(r.isSidechain, false) as is_sidechain,
     r.filename as source_file,
     r.source_line,
+    json_type(r.toolUseResult) = 'VARCHAR' as is_rejection,
     r.message,
     json_extract(r.message, '$.content') as content,
     json_type(json_extract(r.message, '$.content')) as content_type
@@ -87,6 +90,7 @@ string_content AS (
     NULL as tool_use_id,
     NULL as result_content,
     false as is_error,
+    false as is_rejection,
     model, input_tokens, output_tokens, stop_reason,
     duration_ms, version, is_sidechain, source_file, source_line
   FROM base
@@ -108,6 +112,7 @@ array_content AS (
       json_extract(b.message, '$.content[' || s.idx || '].is_error')::BOOLEAN,
       false
     ) as is_error,
+    b.is_rejection,
     b.model, b.input_tokens, b.output_tokens, b.stop_reason,
     b.duration_ms, b.version, b.is_sidechain, b.source_file, b.source_line
   FROM base b,

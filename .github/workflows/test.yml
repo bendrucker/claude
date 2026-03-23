@@ -193,11 +193,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           plugin="plugins/${{ matrix.plugin.name }}"
-          files=$(find "$plugin" -name package.json -not -path '*/node_modules/*' -not -path '*/.bun-cache/*')
-          echo "Found package.json files:"
-          echo "$files"
-          deps=$(echo "$files" | xargs jq -r '[.dependencies // {}, .devDependencies // {}] | map(keys) | flatten[]' 2>/dev/null | sort -u)
-          echo "Deps: $deps"
+          deps=$(find "$plugin" -name package.json -not -path '*/node_modules/*' -not -path '*/.bun-cache/*' \
+            -print0 | xargs -0 jq -r '[.dependencies // {}, .devDependencies // {}] | map(keys) | flatten[]' 2>/dev/null | sort -u)
           if echo "$deps" | grep -q '^sharp$'; then
             sudo apt-get update && sudo apt-get install -y libvips-dev
           fi

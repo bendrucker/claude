@@ -5,17 +5,6 @@ import { type Database, ensureIndex, getDb, runQuery } from "./db";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
 
-function digestParams(overrides: Record<string, string | null> = {}) {
-  return {
-    after_date: null,
-    before_date: null,
-    project: null,
-    session_id: null,
-    limit: "20",
-    ...overrides,
-  };
-}
-
 function filterParams(overrides: Record<string, string | null> = {}) {
   return { after_date: null, before_date: null, project: null, ...overrides };
 }
@@ -38,50 +27,20 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-describe("digest", () => {
+describe("sessions view", () => {
   it("returns sessions sorted by start time descending", async () => {
-    const rows = await runQuery<{ start_time: string }>(db, "digest", digestParams());
+    const rows = await db.query<{ start_time: Date }>(
+      "SELECT * FROM sessions ORDER BY start_time DESC",
+    );
     expect(rows.length).toBeGreaterThan(0);
     for (let i = 1; i < rows.length; i++) {
-      const prev = rows[i - 1]?.start_time ?? "";
-      const curr = rows[i]?.start_time ?? "";
-      expect(prev >= curr).toBe(true);
+      expect(rows[i - 1]?.start_time >= rows[i]?.start_time).toBe(true);
     }
-  });
-
-  it("respects limit", async () => {
-    const rows = await runQuery(db, "digest", digestParams({ limit: "2" }));
-    expect(rows.length).toBeLessThanOrEqual(2);
-  });
-
-  it("filters by date range", async () => {
-    const rows = await runQuery<{ start_time: string }>(
-      db,
-      "digest",
-      digestParams({ after_date: "2024-01-17T00:00:00.000Z" }),
-    );
-    for (const row of rows) {
-      expect(new Date(row.start_time).getTime()).toBeGreaterThanOrEqual(
-        new Date("2024-01-17T00:00:00.000Z").getTime(),
-      );
-    }
-  });
-
-  it("filters by session ID", async () => {
-    const rows = await runQuery<{ session_id: string }>(
-      db,
-      "digest",
-      digestParams({ session_id: "basic-session" }),
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.session_id).toBe("basic-session");
   });
 
   it("includes summary when present", async () => {
-    const rows = await runQuery<{ summary: string }>(
-      db,
-      "digest",
-      digestParams({ session_id: "summary-session" }),
+    const rows = await db.query<{ summary: string }>(
+      "SELECT summary FROM sessions WHERE session_id = 'summary-session'",
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.summary).toBe(
@@ -90,26 +49,11 @@ describe("digest", () => {
   });
 
   it("includes project metadata", async () => {
-    const rows = await runQuery<{ project_path: string; git_branch: string }>(
-      db,
-      "digest",
-      digestParams({ session_id: "basic-session" }),
+    const rows = await db.query<{ project_path: string; git_branch: string }>(
+      "SELECT project_path, git_branch FROM sessions WHERE session_id = 'basic-session'",
     );
     expect(rows[0]?.project_path).toBe("/Users/test/project");
     expect(rows[0]?.git_branch).toBe("main");
-  });
-
-  it("filters by before_date", async () => {
-    const rows = await runQuery<{ start_time: string }>(
-      db,
-      "digest",
-      digestParams({ before_date: "2024-01-16T00:00:00.000Z" }),
-    );
-    for (const row of rows) {
-      expect(new Date(row.start_time).getTime()).toBeLessThanOrEqual(
-        new Date("2024-01-16T00:00:00.000Z").getTime(),
-      );
-    }
   });
 });
 
@@ -121,16 +65,16 @@ describe("search", () => {
 
   it("returns empty for non-matching query", async () => {
     const rows = await runQuery(db, "search", {
-      query: "zzzznonexistentzzzz",
       ...queryParams({ limit: "10" }),
+      query: "zzzznonexistentzzzz",
     });
     expect(rows).toHaveLength(0);
   });
 
   it("filters by project", async () => {
     const rows = await runQuery<{ project_path: string }>(db, "search", {
-      query: "authentication",
       ...queryParams({ project: "webapp", limit: "10" }),
+      query: "authentication",
     });
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
@@ -145,8 +89,8 @@ describe("search", () => {
 
   it("matches summary content", async () => {
     const rows = await runQuery<{ session_id: string }>(db, "search", {
-      query: "database connection pooling",
       ...queryParams({ limit: "10" }),
+      query: "database connection pooling",
     });
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.some((r) => r.session_id === "summary-session")).toBe(true);
@@ -235,22 +179,21 @@ describe("errors", () => {
 
 describe("incremental refresh", () => {
   it("produces no duplicates on repeated indexing", async () => {
-    const before = await runQuery(db, "digest", digestParams({ limit: "100" }));
-
+    const before = await db.query<{ session_id: string }>(
+      "SELECT * FROM sessions ORDER BY session_id",
+    );
     await ensureIndex(db, fixturesDir);
-
-    const after = await runQuery(db, "digest", digestParams({ limit: "100" }));
-
+    const after = await db.query<{ session_id: string }>(
+      "SELECT * FROM sessions ORDER BY session_id",
+    );
     expect(after).toEqual(before);
   });
 });
 
 describe("malformed JSONL", () => {
   it("imports valid messages from files with invalid lines", async () => {
-    const rows = await runQuery<{ user_messages: number; assistant_messages: number }>(
-      db,
-      "digest",
-      digestParams({ session_id: "malformed-session" }),
+    const rows = await db.query<{ user_messages: number; assistant_messages: number }>(
+      "SELECT user_messages, assistant_messages FROM sessions WHERE session_id = 'malformed-session'",
     );
     expect(rows).toHaveLength(1);
     expect(Number(rows[0]?.user_messages)).toBe(1);

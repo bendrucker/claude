@@ -1,6 +1,6 @@
 ---
 name: claude-code:session
-description: View current session info or search conversation history. Use when debugging sessions, reviewing activity, finding past discussions, or summarizing recent work.
+description: Introspect on your own Claude Code usage and history — session ID, duration, tokens consumed, tool usage patterns, time per project, recent activity summaries, or searching past conversations. Use whenever the user asks about their Claude Code activity ("what's my session ID?", "how many tokens today?", "what did I work on this week?", "find that conversation where I set up X", "am I overusing Bash?"). Do NOT use for general codebase search, git log queries, or arbitrary databases.
 allowed-tools:
   - Bash
   - Read

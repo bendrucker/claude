@@ -19,7 +19,7 @@ let tmpDir: string;
 beforeEach(async () => {
   tmpDir = fs.mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-test-"));
   db = await getDb(tmpDir);
-  await ensureIndex(db, fixturesDir);
+  await ensureIndex(db, { projectsDir: fixturesDir });
 });
 
 afterEach(() => {
@@ -182,7 +182,7 @@ describe("incremental refresh", () => {
     const before = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
-    await ensureIndex(db, fixturesDir);
+    await ensureIndex(db, { projectsDir: fixturesDir });
     const after = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );

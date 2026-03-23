@@ -66,10 +66,21 @@ export async function getDb(dataDir: string): Promise<Database> {
   return createDatabase(dbPath);
 }
 
-export async function ensureIndex(db: Database, projectsDir?: string): Promise<void> {
-  const glob = getProjectsGlob(projectsDir);
-
+export async function ensureIndex(
+  db: Database,
+  options: { projectsDir?: string; force?: boolean; dataDir?: string } = {},
+): Promise<void> {
   await applySchema(db);
+
+  if (!options.force && options.dataDir) {
+    const sessionId = process.env.CLAUDE_SESSION_ID;
+    if (sessionId) {
+      const marker = path.join(options.dataDir, `.refreshed-${sessionId}`);
+      if (fs.existsSync(marker)) return;
+    }
+  }
+
+  const glob = getProjectsGlob(options.projectsDir);
 
   await db.run("SET VARIABLE projects_glob = $glob", { glob });
   await db.run(readSql(RESOURCES_DIR, "refresh"));
@@ -79,6 +90,13 @@ export async function ensureIndex(db: Database, projectsDir?: string): Promise<v
 
   await db.run("SET VARIABLE source = getvariable('changed_files')");
   await db.run(readSql(RESOURCES_DIR, "import"));
+
+  if (options.dataDir) {
+    const sessionId = process.env.CLAUDE_SESSION_ID;
+    if (sessionId) {
+      fs.writeFileSync(path.join(options.dataDir, `.refreshed-${sessionId}`), "");
+    }
+  }
 }
 
 export async function runQuery<T>(

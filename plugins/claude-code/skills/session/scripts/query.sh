@@ -7,9 +7,16 @@ DB_DIR="${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}/claude-session}"
 DB="$DB_DIR/session.duckdb"
 GLOB="${CLAUDE_PROJECTS_DIR:-$HOME/.claude/projects}/**/*.jsonl"
 EMPTY="$DB_DIR/empty.jsonl"
+REFRESHED_MARKER="$DB_DIR/.refreshed-${CLAUDE_SESSION_ID:-unknown}"
+
+REFRESH=0
+if [[ "${1:-}" == "--refresh" ]]; then
+  REFRESH=1
+  shift
+fi
 
 if [[ -z "${1:-}" ]]; then
-  echo "Usage: query.sh <sql-query | query-name> [key=value ...]" >&2
+  echo "Usage: query.sh [--refresh] <sql-query | query-name> [key=value ...]" >&2
   exit 1
 fi
 
@@ -18,6 +25,11 @@ mkdir -p "$DB_DIR"
 GLOB="${GLOB//\'/\'\'}"
 
 SCHEMA="$(cat "$RESOURCES"/schema/*.sql)"
+
+NEEDS_REFRESH=1
+if [[ "$REFRESH" -eq 0 ]] && [[ -f "$REFRESHED_MARKER" ]]; then
+  NEEDS_REFRESH=0
+fi
 
 QUERY_FILE="$RESOURCES/queries/$1.sql"
 if [[ -f "$QUERY_FILE" ]]; then
@@ -35,9 +47,9 @@ else
   PARAMS=""
 fi
 
-duckdb "$DB" -table <<SQL
-$SCHEMA
-
+REFRESH_SQL=""
+if [[ "$NEEDS_REFRESH" -eq 1 ]]; then
+  REFRESH_SQL="$(cat <<RSQL
 SET VARIABLE projects_glob = '$GLOB';
 $(cat "$RESOURCES/refresh.sql")
 
@@ -49,7 +61,19 @@ SET VARIABLE source = (
 );
 
 $(cat "$RESOURCES/import.sql")
+RSQL
+)"
+fi
+
+duckdb "$DB" -table <<SQL
+$SCHEMA
+
+$REFRESH_SQL
 
 $PARAMS
 $QUERY_SQL;
 SQL
+
+if [[ "$NEEDS_REFRESH" -eq 1 ]]; then
+  touch "$REFRESHED_MARKER"
+fi

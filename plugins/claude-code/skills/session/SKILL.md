@@ -22,9 +22,11 @@ Search and analyze Claude Code conversation history via a DuckDB index over JSON
 QUERY=${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/query.sh
 ```
 
+The index refreshes automatically on first use per session. Subsequent queries skip the refresh for faster results. Pass `--refresh` to force a re-scan when the user asks for the latest data.
+
 ```bash
 $QUERY "SELECT model, SUM(output_tokens) as tokens FROM messages WHERE type = 'assistant' GROUP BY model"
-$QUERY "SELECT * FROM sessions ORDER BY start_time DESC LIMIT 5"
+$QUERY --refresh "SELECT * FROM sessions ORDER BY start_time DESC LIMIT 5"
 ```
 
 #### Named Queries

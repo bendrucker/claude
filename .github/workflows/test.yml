@@ -189,23 +189,12 @@ jobs:
             bun run --cwd "plugins/${{ matrix.plugin.name }}" build
           fi
 
-      - name: Collect plugin dependencies
-        id: deps
+      - name: Install system dependencies
+        if: runner.os == 'Linux'
         run: |
           plugin="plugins/${{ matrix.plugin.name }}"
           deps=$(find "$plugin" -name package.json -not -path '*/node_modules/*' -not -path '*/.bun-cache/*' \
             -exec jq -r '[.dependencies // {}, .devDependencies // {}] | map(keys) | flatten[]' {} + 2>/dev/null | sort -u)
-          for dep in $deps; do
-            echo "${dep}" >> "$GITHUB_OUTPUT"
-          done
-          echo "all<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$deps" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Install system dependencies
-        if: runner.os == 'Linux'
-        run: |
-          deps="${{ steps.deps.outputs.all }}"
           if echo "$deps" | grep -q '^sharp$'; then
             sudo apt-get update && sudo apt-get install -y libvips-dev
           fi

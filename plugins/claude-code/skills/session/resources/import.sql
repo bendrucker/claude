@@ -43,7 +43,8 @@ WITH raw AS (
       summary: 'VARCHAR',
       message: 'JSON',
       durationMs: 'BIGINT',
-      version: 'VARCHAR'
+      version: 'VARCHAR',
+      toolUseResult: 'VARCHAR'
     },
     filename=true
   )
@@ -71,6 +72,7 @@ base AS (
     COALESCE(r.isSidechain, false) as is_sidechain,
     r.filename as source_file,
     r.source_line,
+    r.toolUseResult,
     r.message,
     json_extract(r.message, '$.content') as content,
     json_type(json_extract(r.message, '$.content')) as content_type
@@ -110,13 +112,7 @@ array_content AS (
       json_extract(b.message, '$.content[' || s.idx || '].is_error')::BOOLEAN,
       false
     ) as is_error,
-    COALESCE(
-      json_extract_string(b.message, '$.content[' || s.idx || '].content') LIKE 'Interrupted by user%'
-      OR json_extract_string(b.message, '$.content[' || s.idx || '].content') LIKE 'Permission to use%has been auto-denied%'
-      OR json_extract_string(b.message, '$.content[' || s.idx || '].content') LIKE 'User rejected%'
-      OR json_extract_string(b.message, '$.content[' || s.idx || '].content') LIKE '%tool use was rejected%',
-      false
-    ) as is_rejection,
+    COALESCE(b.toolUseResult = 'User rejected tool use', false) as is_rejection,
     b.model, b.input_tokens, b.output_tokens, b.stop_reason, b.duration_ms,
     b.version, b.is_sidechain, b.source_file, b.source_line
   FROM base b,

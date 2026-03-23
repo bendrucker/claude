@@ -190,15 +190,20 @@ jobs:
           fi
 
       - name: Install system dependencies
-        if: steps.inspect.outputs.has_tests == 'true' && runner.os == 'Linux'
+        if: runner.os == 'Linux'
         run: |
-          if [[ -f "plugins/${{ matrix.plugin.name }}/package.json" ]]; then
-            if jq -e '.dependencies.sharp // .devDependencies.sharp' "plugins/${{ matrix.plugin.name }}/package.json" > /dev/null 2>&1; then
-              sudo apt-get update && sudo apt-get install -y libvips-dev
-            fi
-            if jq -e '.dependencies.playwright // .devDependencies.playwright' "plugins/${{ matrix.plugin.name }}/package.json" > /dev/null 2>&1; then
-              bunx playwright install chromium --with-deps
-            fi
+          plugin="plugins/${{ matrix.plugin.name }}"
+          deps=$(find "$plugin" -name package.json -not -path '*/node_modules/*' -not -path '*/.bun-cache/*' \
+            -print0 | xargs -0 jq -r '[.dependencies // {}, .devDependencies // {}] | map(keys) | flatten[]' 2>/dev/null | sort -u)
+          if echo "$deps" | grep -q '^sharp$'; then
+            sudo apt-get update && sudo apt-get install -y libvips-dev
+          fi
+          if echo "$deps" | grep -q '^playwright$'; then
+            bunx playwright install chromium --with-deps
+          fi
+          if echo "$deps" | grep -q '^@duckdb/node-api$'; then
+            curl -fsSL https://install.duckdb.org | sh
+            echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
           fi
 
       - name: Run tests

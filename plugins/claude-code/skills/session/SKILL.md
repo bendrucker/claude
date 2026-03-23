@@ -12,6 +12,10 @@ Search and analyze Claude Code conversation history via a DuckDB index over JSON
 
 **Current Session ID**: `${CLAUDE_SESSION_ID}`
 
+## DuckDB CLI
+
+!`duckdb --version 2>/dev/null || echo "NOT INSTALLED — query.sh requires the DuckDB CLI. Install: curl -fsSL https://install.duckdb.org | sh"`
+
 ## Running Queries
 
 ```bash

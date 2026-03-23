@@ -29,7 +29,9 @@ async function createDatabase(dbPath: string): Promise<Database> {
     close() {
       try {
         connection.closeSync();
-      } catch {}
+      } catch (err) {
+        console.error("Failed to close DuckDB connection:", err);
+      }
     },
   };
 }

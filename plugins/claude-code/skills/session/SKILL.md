@@ -27,13 +27,13 @@ $QUERY "SELECT * FROM sessions ORDER BY start_time DESC LIMIT 5"
 
 ### `messages` table
 
-Each row is a content item extracted from a JSONL session line. Assistant messages with array content produce one row per item (text, tool_use, tool_result).
+Each row is a content item extracted from a JSONL session line. Assistant messages with array content produce one row per item (text, tool_use, tool_result, thinking).
 
 | Column | Type | Description |
 |---|---|---|
 | `session_id` | VARCHAR | Session UUID |
 | `type` | VARCHAR | `user` or `assistant` |
-| `timestamp` | VARCHAR | ISO 8601 timestamp |
+| `timestamp` | TIMESTAMP | Message timestamp |
 | `project_path` | VARCHAR | Absolute path to the project directory |
 | `git_branch` | VARCHAR | Branch at time of message |
 | `is_meta` | BOOLEAN | System-injected user message (not human input) |
@@ -63,9 +63,9 @@ Aggregated session-level data.
 |---|---|
 | `session_id` | VARCHAR |
 | `summary` | VARCHAR |
-| `start_time` | VARCHAR |
-| `end_time` | VARCHAR |
-| `duration_minutes` | DOUBLE |
+| `start_time` | TIMESTAMP |
+| `end_time` | TIMESTAMP |
+| `duration` | INTERVAL |
 | `project_path` | VARCHAR |
 | `git_branch` | VARCHAR |
 | `user_messages` | BIGINT |
@@ -81,7 +81,7 @@ One row per tool use.
 | `tool_id` | VARCHAR |
 | `session_id` | VARCHAR |
 | `project_path` | VARCHAR |
-| `timestamp` | VARCHAR |
+| `timestamp` | TIMESTAMP |
 
 ### `tool_errors` view
 
@@ -94,7 +94,7 @@ Tool results where `is_error` is true, joined with the originating tool call.
 | `tool_name` | VARCHAR |
 | `session_id` | VARCHAR |
 | `project_path` | VARCHAR |
-| `timestamp` | VARCHAR |
+| `timestamp` | TIMESTAMP |
 | `error_type` | VARCHAR (`rejection` or `failure`) |
 
 ## Source Lookup

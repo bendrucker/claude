@@ -8,8 +8,14 @@ DB="$DB_DIR/session.duckdb"
 GLOB="${CLAUDE_PROJECTS_DIR:-$HOME/.claude/projects}/**/*.jsonl"
 EMPTY="$DB_DIR/empty.jsonl"
 
+if [[ -z "${1:-}" ]]; then
+  echo "Usage: query.sh <sql-query>" >&2
+  exit 1
+fi
+
 mkdir -p "$DB_DIR"
 : > "$EMPTY"
+GLOB="${GLOB//\'/\'\'}"
 
 SCHEMA=""
 for f in "$RESOURCES"/schema/*.sql; do

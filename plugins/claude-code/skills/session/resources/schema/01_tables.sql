@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS messages (
   session_id VARCHAR,
   type VARCHAR,
-  timestamp VARCHAR,
+  timestamp TIMESTAMP,
   project_path VARCHAR,
   git_branch VARCHAR,
   is_meta BOOLEAN,

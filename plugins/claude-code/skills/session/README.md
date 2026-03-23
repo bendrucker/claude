@@ -4,17 +4,17 @@ Search and analyze Claude Code conversation history using a DuckDB index over JS
 
 ## Contents
 
-- `SKILL.md` - Skill definition with CLI usage examples
-- `search.md` - Advanced CLI reference documentation
-- `cli/` - TypeScript CLI: `search`, `digest`, `stats`, `errors`
+- `SKILL.md` - Skill definition with schema docs and usage examples
+- `scripts/query.sh` - Shell script entry point (runs arbitrary SQL via `duckdb` CLI)
+- `scripts/db.ts` - DuckDB index logic (used by tests)
 - `resources/schema/` - Table and view definitions (ordered, run on startup)
-- `resources/queries/` - Parameterized SQL for each subcommand
-- `resources/import.sql` - JSONL parsing and flattening template
+- `resources/queries/` - Parameterized SQL for built-in queries
+- `resources/import.sql` - JSONL parsing and flattening
 
 ## Testing
 
 ```bash
-bun test ./plugins/claude-code/skills/session/cli/search.test.ts
+bun test ./plugins/claude-code/skills/session/scripts/db.test.ts
 ```
 
 ## Inspiration

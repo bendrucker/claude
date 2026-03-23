@@ -90,7 +90,10 @@ array_content AS (
     r.cwd as project_path,
     r.gitBranch as git_branch,
     COALESCE(r.isMeta, false) as is_meta,
-    json_extract_string(r.message, '$.content') as content_text,
+    CASE
+      WHEN json_extract_string(r.message, '$.content[' || s.idx || '].type') = 'text'
+      THEN json_extract_string(r.message, '$.content[' || s.idx || '].text')
+    END as content_text,
     json_extract_string(r.message, '$.content[' || s.idx || '].type') as item_type,
     json_extract_string(r.message, '$.content[' || s.idx || '].name') as tool_name,
     json_extract_string(r.message, '$.content[' || s.idx || '].id') as tool_id,

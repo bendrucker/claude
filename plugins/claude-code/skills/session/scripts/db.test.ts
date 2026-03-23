@@ -99,6 +99,21 @@ describe("digest", () => {
     expect(rows[0]?.project_path).toBe("/Users/test/project");
     expect(rows[0]?.git_branch).toBe("main");
   });
+
+  it("filters by before_date", async () => {
+    const rows = await runQuery<{ start_time: string }>(db, "digest", {
+      after_date: null,
+      before_date: "2024-01-16T00:00:00.000Z",
+      project: null,
+      session_id: null,
+      limit: "20",
+    });
+    for (const row of rows) {
+      expect(new Date(row.start_time).getTime()).toBeLessThanOrEqual(
+        new Date("2024-01-16T00:00:00.000Z").getTime(),
+      );
+    }
+  });
 });
 
 describe("search", () => {
@@ -195,6 +210,23 @@ describe("stats", () => {
     });
     expect(rows[0]?.total_sessions).toBeGreaterThan(0);
     expect(rows[0]?.total_tool_uses).toBeGreaterThan(0);
+  });
+
+  it("includes non-zero error_rate_pct for tools with errors", async () => {
+    const rows = await runQuery<{
+      tool_name: string;
+      errors: number;
+      error_rate_pct: number;
+    }>(db, "stats", {
+      after_date: null,
+      before_date: null,
+      project: null,
+    });
+    const withErrors = rows.filter((r) => r.errors > 0);
+    expect(withErrors.length).toBeGreaterThan(0);
+    for (const row of withErrors) {
+      expect(row.error_rate_pct).toBeGreaterThan(0);
+    }
   });
 });
 

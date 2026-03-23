@@ -14,8 +14,10 @@ async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
     if (path.includes("node_modules") || path.includes(".bun-cache")) continue;
     try {
       const pkg = await Bun.file(join(pluginDir, path)).json();
-      for (const dep of Object.keys(pkg.dependencies ?? {})) {
-        deps.add(dep);
+      for (const field of ["dependencies", "devDependencies"] as const) {
+        for (const dep of Object.keys(pkg[field] ?? {})) {
+          deps.add(dep);
+        }
       }
     } catch {}
   }

@@ -34,7 +34,7 @@ describe("sessions view", () => {
     );
     expect(rows.length).toBeGreaterThan(0);
     for (let i = 1; i < rows.length; i++) {
-      expect(rows[i - 1]?.start_time >= rows[i]?.start_time).toBe(true);
+      expect(rows[i - 1]!.start_time >= rows[i]!.start_time).toBe(true);
     }
   });
 

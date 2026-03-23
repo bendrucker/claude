@@ -199,7 +199,7 @@ jobs:
             if jq -e '.dependencies.playwright // .devDependencies.playwright' "plugins/${{ matrix.plugin.name }}/package.json" > /dev/null 2>&1; then
               bunx playwright install chromium --with-deps
             fi
-            if jq -e '.dependencies."@duckdb/node-api" // .devDependencies."@duckdb/node-api"' "plugins/${{ matrix.plugin.name }}/package.json" > /dev/null 2>&1; then
+            if grep -rq '"@duckdb/node-api"' "plugins/${{ matrix.plugin.name }}/"; then
               curl -fsSL https://install.duckdb.org | sh
               echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
             fi

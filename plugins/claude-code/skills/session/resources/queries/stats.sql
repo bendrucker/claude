@@ -2,8 +2,8 @@ WITH filtered_calls AS (
   SELECT tc.*
   FROM tool_calls tc
   JOIN sessions s USING (session_id)
-  WHERE date_filter(s.start_time, $after_date, $before_date)
-    AND project_filter(s.project_path, $project)
+  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
+    AND project_filter(s.project_path, getvariable('project'))
 ),
 per_tool AS (
   SELECT

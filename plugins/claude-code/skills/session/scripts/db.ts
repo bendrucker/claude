@@ -86,6 +86,13 @@ export async function runQuery<T>(
   queryName: string,
   params: Record<string, string | null> = {},
 ): Promise<T[]> {
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null) {
+      await db.run(`SET VARIABLE "${key}" = NULL`);
+    } else {
+      await db.run(`SET VARIABLE "${key}" = $value`, { value });
+    }
+  }
   const sql = readSql(QUERIES_DIR, queryName);
-  return db.query<T>(sql, params);
+  return db.query<T>(sql);
 }

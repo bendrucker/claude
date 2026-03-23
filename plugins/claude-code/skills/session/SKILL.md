@@ -27,6 +27,20 @@ $QUERY "SELECT model, SUM(output_tokens) as tokens FROM messages WHERE type = 'a
 $QUERY "SELECT * FROM sessions ORDER BY start_time DESC LIMIT 5"
 ```
 
+#### Named Queries
+
+Built-in queries in `resources/queries/` can be run by name with `key=value` params. Prefer these over writing SQL from scratch for common tasks:
+
+```bash
+$QUERY search query=authentication limit=10
+$QUERY stats project=myapp after_date=2026-03-15
+$QUERY errors error_type=rejection limit=5
+```
+
+- `search`: find sessions by keyword (ILIKE on `content_text` and `summary`). Params: `query`, `limit`, `after_date`, `before_date`, `project`
+- `stats`: tool usage breakdown with error rates and aggregate totals. Params: `after_date`, `before_date`, `project`
+- `errors`: recent tool errors with type filtering. Params: `error_type` (`rejection` or `failure`), `limit`, `after_date`, `before_date`, `project`
+
 ## Schema
 
 ### `messages` table

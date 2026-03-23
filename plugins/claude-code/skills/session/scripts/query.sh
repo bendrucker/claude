@@ -26,21 +26,7 @@ duckdb "$DB" -table <<SQL
 $SCHEMA
 
 SET VARIABLE projects_glob = '$GLOB';
-SET VARIABLE last_import_time = COALESCE(
-  (SELECT last_import FROM meta LIMIT 1),
-  '1970-01-01'::TIMESTAMP
-);
-
-SET VARIABLE changed_files = (
-  SELECT COALESCE(LIST(filename), [])
-  FROM read_text(getvariable('projects_glob'))
-  WHERE last_modified > getvariable('last_import_time')
-);
-
-DELETE FROM messages WHERE session_id IN (
-  SELECT regexp_extract(f, '([^/]+)\.jsonl\$', 1)
-  FROM unnest(getvariable('changed_files')) t(f)
-);
+$(cat "$RESOURCES/refresh.sql")
 
 SET VARIABLE source = (
   SELECT CASE

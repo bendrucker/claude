@@ -2,9 +2,8 @@ WITH filtered_calls AS (
   SELECT tc.*
   FROM tool_calls tc
   JOIN sessions s USING (session_id)
-  WHERE ($after_date IS NULL OR s.start_time >= $after_date::TIMESTAMP)
-    AND ($before_date IS NULL OR s.start_time <= $before_date::TIMESTAMP)
-    AND ($project IS NULL OR s.project_path ILIKE '%' || $project || '%')
+  WHERE date_filter(s.start_time, $after_date, $before_date)
+    AND project_filter(s.project_path, $project)
 ),
 per_tool AS (
   SELECT

@@ -61,11 +61,6 @@ async function applySchema(db: Database): Promise<void> {
   }
 }
 
-async function hasData(db: Database): Promise<boolean> {
-  const rows = await db.query<{ last_import: Date }>("SELECT last_import FROM meta LIMIT 1");
-  return rows.length > 0;
-}
-
 export async function getDb(dataDir: string): Promise<Database> {
   const dbPath = path.join(dataDir, "session.duckdb");
   return createDatabase(dbPath);
@@ -76,22 +71,14 @@ export async function ensureIndex(db: Database, projectsDir?: string): Promise<v
 
   await applySchema(db);
 
-  const importSql = readSql(RESOURCES_DIR, "import");
-
   await db.run("SET VARIABLE projects_glob = $glob", { glob });
+  await db.run(readSql(RESOURCES_DIR, "refresh"));
 
-  if (await hasData(db)) {
-    await db.run(readSql(RESOURCES_DIR, "refresh"));
+  const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
+  if (!row || row.n === 0n) return;
 
-    const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
-    if (!row || row.n === 0n) return;
-
-    await db.run("SET VARIABLE source = getvariable('changed_files')");
-  } else {
-    await db.run("SET VARIABLE source = getvariable('projects_glob')");
-  }
-
-  await db.run(importSql);
+  await db.run("SET VARIABLE source = getvariable('changed_files')");
+  await db.run(readSql(RESOURCES_DIR, "import"));
 }
 
 export async function runQuery<T>(

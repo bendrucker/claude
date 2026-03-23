@@ -53,7 +53,7 @@ summaries AS (
   FROM raw
   WHERE type = 'summary'
 ),
-string_content AS (
+base AS (
   SELECT
     r.sessionId as session_id,
     r.type,
@@ -61,68 +61,64 @@ string_content AS (
     r.cwd as project_path,
     r.gitBranch as git_branch,
     COALESCE(r.isMeta, false) as is_meta,
-    json_extract_string(r.message, '$.content') as content_text,
+    json_extract_string(r.message, '$.model') as model,
+    json_extract(r.message, '$.usage.input_tokens')::BIGINT as input_tokens,
+    json_extract(r.message, '$.usage.output_tokens')::BIGINT as output_tokens,
+    json_extract_string(r.message, '$.stop_reason') as stop_reason,
+    r.durationMs as duration_ms,
+    r.version,
+    COALESCE(r.isSidechain, false) as is_sidechain,
+    r.filename as source_file,
+    r.source_line,
+    r.message,
+    json_extract(r.message, '$.content') as content,
+    json_type(json_extract(r.message, '$.content')) as content_type
+  FROM raw r
+  WHERE r.type IN ('user', 'assistant')
+    AND json_extract(r.message, '$.content') IS NOT NULL
+),
+string_content AS (
+  SELECT
+    session_id, type, timestamp, project_path, git_branch, is_meta,
+    json_extract_string(message, '$.content') as content_text,
     NULL as item_type,
     NULL as tool_name,
     NULL as tool_id,
     NULL as tool_use_id,
     NULL as result_content,
     false as is_error,
-    json_extract_string(r.message, '$.model') as model,
-    json_extract(r.message, '$.usage.input_tokens')::BIGINT as input_tokens,
-    json_extract(r.message, '$.usage.output_tokens')::BIGINT as output_tokens,
-    json_extract_string(r.message, '$.stop_reason') as stop_reason,
-    r.durationMs as duration_ms,
-    r.version,
-    COALESCE(r.isSidechain, false) as is_sidechain,
-    r.filename as source_file,
-    r.source_line
-  FROM raw r
-  WHERE r.type IN ('user', 'assistant')
-    AND json_extract(r.message, '$.content') IS NOT NULL
-    AND json_type(json_extract(r.message, '$.content')) = 'VARCHAR'
+    model, input_tokens, output_tokens, stop_reason,
+    duration_ms, version, is_sidechain, source_file, source_line
+  FROM base
+  WHERE content_type = 'VARCHAR'
 ),
 array_content AS (
   SELECT
-    r.sessionId as session_id,
-    r.type,
-    r.timestamp,
-    r.cwd as project_path,
-    r.gitBranch as git_branch,
-    COALESCE(r.isMeta, false) as is_meta,
+    b.session_id, b.type, b.timestamp, b.project_path, b.git_branch, b.is_meta,
     CASE
-      WHEN json_extract_string(r.message, '$.content[' || s.idx || '].type') = 'text'
-      THEN json_extract_string(r.message, '$.content[' || s.idx || '].text')
+      WHEN json_extract_string(b.message, '$.content[' || s.idx || '].type') = 'text'
+      THEN json_extract_string(b.message, '$.content[' || s.idx || '].text')
     END as content_text,
-    json_extract_string(r.message, '$.content[' || s.idx || '].type') as item_type,
-    json_extract_string(r.message, '$.content[' || s.idx || '].name') as tool_name,
-    json_extract_string(r.message, '$.content[' || s.idx || '].id') as tool_id,
-    json_extract_string(r.message, '$.content[' || s.idx || '].tool_use_id') as tool_use_id,
-    json_extract_string(r.message, '$.content[' || s.idx || '].content') as result_content,
+    json_extract_string(b.message, '$.content[' || s.idx || '].type') as item_type,
+    json_extract_string(b.message, '$.content[' || s.idx || '].name') as tool_name,
+    json_extract_string(b.message, '$.content[' || s.idx || '].id') as tool_id,
+    json_extract_string(b.message, '$.content[' || s.idx || '].tool_use_id') as tool_use_id,
+    json_extract_string(b.message, '$.content[' || s.idx || '].content') as result_content,
     COALESCE(
-      json_extract(r.message, '$.content[' || s.idx || '].is_error')::BOOLEAN,
+      json_extract(b.message, '$.content[' || s.idx || '].is_error')::BOOLEAN,
       false
     ) as is_error,
-    json_extract_string(r.message, '$.model') as model,
-    json_extract(r.message, '$.usage.input_tokens')::BIGINT as input_tokens,
-    json_extract(r.message, '$.usage.output_tokens')::BIGINT as output_tokens,
-    json_extract_string(r.message, '$.stop_reason') as stop_reason,
-    r.durationMs as duration_ms,
-    r.version,
-    COALESCE(r.isSidechain, false) as is_sidechain,
-    r.filename as source_file,
-    r.source_line
-  FROM raw r,
+    b.model, b.input_tokens, b.output_tokens, b.stop_reason,
+    b.duration_ms, b.version, b.is_sidechain, b.source_file, b.source_line
+  FROM base b,
   LATERAL (
     SELECT unnest(generate_series(
       0::BIGINT,
-      CAST(json_array_length(json_extract(r.message, '$.content')) AS BIGINT) - 1
+      CAST(json_array_length(b.content) AS BIGINT) - 1
     )) as idx
   ) s
-  WHERE r.type IN ('user', 'assistant')
-    AND json_extract(r.message, '$.content') IS NOT NULL
-    AND json_type(json_extract(r.message, '$.content')) = 'ARRAY'
-    AND json_array_length(json_extract(r.message, '$.content')) > 0
+  WHERE b.content_type = 'ARRAY'
+    AND json_array_length(b.content) > 0
 ),
 all_content AS (
   SELECT * FROM string_content

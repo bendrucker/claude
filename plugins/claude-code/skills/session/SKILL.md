@@ -97,6 +97,13 @@ Tool results where `is_error` is true, joined with the originating tool call.
 | `timestamp` | TIMESTAMP |
 | `error_type` | VARCHAR (`rejection` or `failure`) |
 
+### Macros
+
+Reusable filter helpers available in all queries:
+
+- `date_filter(ts, after_val, before_val)`: filters by timestamp range, NULL values bypass the check
+- `project_filter(path, project_val)`: ILIKE match on project path, NULL bypasses
+
 ## Source Lookup
 
 To retrieve the full JSONL line for a message (e.g., to inspect tool input):

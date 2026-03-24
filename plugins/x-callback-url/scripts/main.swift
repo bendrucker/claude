@@ -54,7 +54,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSWorkspace.shared.open(url, configuration: config) { _, error in
             if let error = error {
-                fputs("Failed to open URL: \(error.localizedDescription)\n", stderr)
+                let nsError = error as NSError
+                fputs("Failed to open URL: \(error.localizedDescription) (domain=\(nsError.domain) code=\(nsError.code)) url=\(urlString)\n", stderr)
                 exit(1)
             }
         }

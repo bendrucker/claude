@@ -1,0 +1,8 @@
+{
+  "name": "x-callback-url",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "sandbox-bypass": "workspace:*"
+  }
+}

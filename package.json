@@ -28,8 +28,7 @@
     "packages/claude-tool",
     "plugins/tmux",
     "plugins/mac",
-    "plugins/x-callback-url",
-    "packages/sandbox-bypass"
+    "plugins/x-callback-url"
   ],
   "scripts": {
     "build": "tsc --noEmit",

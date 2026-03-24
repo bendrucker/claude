@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "sandbox-bypass": "workspace:*"
+    "@constellos/claude-code-kit": "^0.4.0"
   }
 }

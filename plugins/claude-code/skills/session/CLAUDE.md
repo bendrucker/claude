@@ -4,16 +4,22 @@
 
 The session skill indexes JSONL session files from `~/.claude/projects/` into a persistent DuckDB database. The JSONL files are the canonical data store: the database is a derived cache.
 
-### Schema and Queries
+### Schema
 
-`resources/schema/` contains ordered DDL files run on every startup. `resources/queries/` contains parameterized SQL used by tests. The `query.sh` script runs arbitrary SQL directly against the index.
+`resources/schema/` contains ordered DDL files run on every startup:
 
-`import.sql` inserts into `messages` using `getvariable('source')` to resolve the file source. `query.sh` determines changed files via mtime comparison, then sets `source` to either the changed file list or an empty JSONL file (producing zero imported rows). `db.ts` uses a similar approach but returns early when no files changed.
+- `01_tables.sql`: The `raw` table stores one row per JSONL line with the `message` struct flattened (model, usage, stop_reason, content). `read_ndjson` auto-detects the JSONL schema — the `raw` columns are a curated subset.
+- `02_views.sql`: The `messages` view renames camelCase→snake_case and unnests `message.content` arrays into individual rows. Downstream views (`sessions`, `tool_calls`, `tool_errors`) query `messages`.
+- `03_macros.sql`: Reusable filter macros for date ranges and project paths.
+
+### Import
+
+`import.sql` reads JSONL files via `read_ndjson` with `union_by_name=true` for auto-detection, selects the `raw` table columns using struct access for `message` fields, and inserts directly. `query.sh` determines changed files via mtime comparison, skipping the import when no files changed. `db.ts` uses a similar approach but returns early when no files changed.
 
 ### Adding Columns
 
-To add a new column to `messages`:
+To expose a new JSONL field in queries:
 
-- Add the column to `01_tables.sql`
-- Update `import.sql` to populate the column during import
-- Update `query.sh` inline refresh logic if needed
+- Add the column to `01_tables.sql` and the corresponding select expression to `import.sql`
+- Add the column to the `messages` view in `02_views.sql` if it should be available downstream
+- Ensure at least one test fixture includes the field for auto-detection

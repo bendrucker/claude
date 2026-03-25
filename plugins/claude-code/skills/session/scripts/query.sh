@@ -6,7 +6,6 @@ RESOURCES="$SCRIPT_DIR/../resources"
 DB_DIR="${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}/claude-session}"
 DB="$DB_DIR/session.duckdb"
 GLOB="${CLAUDE_PROJECTS_DIR:-$HOME/.claude/projects}/**/*.jsonl"
-EMPTY="$DB_DIR/empty.jsonl"
 REFRESHED_MARKER="$DB_DIR/.refreshed-${CLAUDE_SESSION_ID:-unknown}"
 
 REFRESH=0
@@ -21,7 +20,6 @@ if [[ -z "${1:-}" ]]; then
 fi
 
 mkdir -p "$DB_DIR"
-: > "$EMPTY"
 GLOB="${GLOB//\'/\'\'}"
 
 SCHEMA="$(cat "$RESOURCES"/schema/*.sql)"
@@ -47,29 +45,28 @@ else
   PARAMS=""
 fi
 
-REFRESH_SQL=""
 if [[ "$NEEDS_REFRESH" -eq 1 ]]; then
-  REFRESH_SQL="$(cat <<RSQL
+  CHANGED_LIST="$DB_DIR/changed_files.list"
+
+  duckdb "$DB" -noheader -list <<SQL > "$CHANGED_LIST"
+$SCHEMA
 SET VARIABLE projects_glob = '$GLOB';
 $(cat "$RESOURCES/refresh.sql")
+SELECT unnest(getvariable('changed_files'));
+SQL
 
-SET VARIABLE source = (
-  SELECT CASE
-    WHEN LEN(getvariable('changed_files')) > 0 THEN getvariable('changed_files')
-    ELSE ['$EMPTY']
-  END
-);
-
+  if [[ -s "$CHANGED_LIST" ]]; then
+    SOURCE_ARRAY="[$(sed "s/'/''/" "$CHANGED_LIST" | sed "s/.*/'&'/" | paste -sd, -)]"
+    duckdb "$DB" <<SQL
+SET VARIABLE source = $SOURCE_ARRAY;
 $(cat "$RESOURCES/import.sql")
-RSQL
-)"
+$(cat "$RESOURCES/views.sql")
+SQL
+  fi
 fi
 
 duckdb "$DB" -table <<SQL
 $SCHEMA
-
-$REFRESH_SQL
-
 $PARAMS
 $QUERY_SQL;
 SQL

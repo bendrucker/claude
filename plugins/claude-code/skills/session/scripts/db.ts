@@ -90,6 +90,7 @@ export async function ensureIndex(
 
   await db.run("SET VARIABLE source = getvariable('changed_files')");
   await db.run(readSql(RESOURCES_DIR, "import"));
+  await db.run(readSql(RESOURCES_DIR, "views"));
 
   if (options.dataDir) {
     const sessionId = process.env.CLAUDE_SESSION_ID;

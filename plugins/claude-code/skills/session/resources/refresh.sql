@@ -8,8 +8,3 @@ SET VARIABLE changed_files = (
   FROM read_text(getvariable('projects_glob'))
   WHERE last_modified > getvariable('last_import_time')
 );
-
-DELETE FROM messages WHERE session_id IN (
-  SELECT regexp_extract(f, '([^/]+)\.jsonl$', 1)
-  FROM unnest(getvariable('changed_files')) t(f)
-);

@@ -56,7 +56,7 @@ SELECT unnest(getvariable('changed_files'));
 SQL
 
   if [[ -s "$CHANGED_LIST" ]]; then
-    SOURCE_ARRAY="[$(sed "s/'/''/" "$CHANGED_LIST" | sed "s/.*/'&'/" | paste -sd, -)]"
+    SOURCE_ARRAY="[$(sed "s/'/''/g; s/.*/'&'/" "$CHANGED_LIST" | paste -sd, -)]"
     duckdb "$DB" <<SQL
 SET VARIABLE source = $SOURCE_ARRAY;
 $(cat "$RESOURCES/import.sql")

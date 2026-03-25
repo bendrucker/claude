@@ -52,6 +52,11 @@ array_content AS (
   ) s
   WHERE json_type(b.content) = 'ARRAY'
     AND json_array_length(b.content) > 0
+),
+all_content AS (
+  SELECT * FROM string_content
+  UNION ALL
+  SELECT * FROM array_content
 )
 SELECT
   sessionId as session_id,
@@ -78,37 +83,7 @@ SELECT
   COALESCE(isSidechain, false) as is_sidechain,
   source_file,
   source_line
-FROM string_content
-UNION ALL
-SELECT
-  sessionId as session_id,
-  type,
-  timestamp::TIMESTAMP as timestamp,
-  cwd as project_path,
-  gitBranch as git_branch,
-  COALESCE(isMeta, false) as is_meta,
-  content_text,
-  item_type,
-  tool_name,
-  tool_id,
-  tool_use_id,
-  result_content,
-  is_error,
-  is_rejection,
-  summary,
-  model,
-  usage.input_tokens as input_tokens,
-  usage.output_tokens as output_tokens,
-  stop_reason,
-  durationMs as duration_ms,
-  version,
-  COALESCE(isSidechain, false) as is_sidechain,
-  source_file,
-  source_line
-FROM array_content;
-
-CREATE TABLE IF NOT EXISTS messages AS
-SELECT * FROM normalized WHERE false;
+FROM all_content;
 
 DELETE FROM messages
 WHERE session_id IN (
@@ -120,43 +95,3 @@ SELECT * FROM normalized
 WHERE session_id IN (
   SELECT unnest(getvariable('changed_sessions'))
 );
-
-CREATE OR REPLACE VIEW tool_calls AS
-SELECT
-  tool_name,
-  tool_id,
-  session_id,
-  project_path,
-  timestamp
-FROM messages
-WHERE item_type = 'tool_use'
-  AND tool_name IS NOT NULL;
-
-CREATE OR REPLACE VIEW tool_errors AS
-SELECT
-  er.tool_use_id as tool_id,
-  er.result_content as error_content,
-  COALESCE(tc.tool_name, 'unknown') as tool_name,
-  er.session_id,
-  tc.project_path,
-  er.timestamp,
-  CASE WHEN er.is_rejection THEN 'rejection' ELSE 'failure' END as error_type
-FROM messages er
-LEFT JOIN tool_calls tc ON er.tool_use_id = tc.tool_id
-WHERE er.item_type = 'tool_result'
-  AND er.is_error;
-
-CREATE OR REPLACE VIEW sessions AS
-SELECT
-  session_id,
-  ANY_VALUE(summary) as summary,
-  MIN(timestamp) as start_time,
-  MAX(timestamp) as end_time,
-  MAX(timestamp) - MIN(timestamp) as duration,
-  ANY_VALUE(project_path) as project_path,
-  ANY_VALUE(git_branch) as git_branch,
-  COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) as user_messages,
-  COUNT(*) FILTER (WHERE type = 'assistant') as assistant_messages
-FROM messages
-GROUP BY session_id
-HAVING COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) > 0;

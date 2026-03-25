@@ -27,7 +27,8 @@
     "packages/launch",
     "packages/claude-tool",
     "plugins/tmux",
-    "plugins/mac"
+    "plugins/mac",
+    "plugins/x-callback-url"
   ],
   "scripts": {
     "build": "tsc --noEmit",

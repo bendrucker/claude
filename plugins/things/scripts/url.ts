@@ -165,6 +165,8 @@ export async function xcall(url: string): Promise<string> {
 }
 
 if (import.meta.main) {
+  await $`open -g -a Things3`;
+
   const { cli } = await import("cleye");
 
   const argv = cli({

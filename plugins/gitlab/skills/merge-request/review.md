@@ -112,10 +112,8 @@ third line
 - **Reply field**: Use `in_reply_to_discussion_id`, not `discussion_id`.
 - **Don't update positioned notes**: PUT to update a draft note strips the position. Delete and recreate instead.
 - **No atomic review submit**: The REST API's `bulk_publish` only publishes drafts — no summary comment or review decision. The web UI uses an internal controller that combines all three, but it's session-authenticated only. The `submit` command above sequences the calls separately.
-- **Request changes is GraphQL-only**: `mergeRequestRequestChanges` mutation, requires Premium/Ultimate.
+- **Review state is GraphQL-only**: See [review-state.md](review-state.md) for mutations (`mergeRequestRequestChanges`, `mergeRequestDestroyRequestedChanges`) and querying review state. Key: `projectPath` is `ID!` not `String!`, caller must be assigned as reviewer, requires Premium/Ultimate.
 - **Range comments need `new_line`**: `line_range` alone is rejected ("position is incomplete"). Always set `new_line` to the range end line — the comment anchors at this line in the UI.
-- **Review state is GraphQL-only**: REST `reviewers[].state` only shows `"active"`. Use `mergeRequestInteraction.reviewState` via GraphQL to read the actual decision (`REQUESTED_CHANGES`, `APPROVED`, etc.).
-- **Request changes requires reviewer**: The `mergeRequestRequestChanges` mutation fails with "Reviewer not found" unless the caller is assigned as a reviewer on the MR first.
 
 ## Discussions
 

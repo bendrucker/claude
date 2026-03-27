@@ -1,8 +1,0 @@
-{
-  "name": "webfetch-auth",
-  "description": "Blocks WebFetch for authenticated URLs and suggests MCP alternatives",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  }
-}

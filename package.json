@@ -22,7 +22,6 @@
     "plugins/ui-design",
     "plugins/gitlab",
     "plugins/vscode",
-    "plugins/webfetch-auth",
     "packages/validate",
     "packages/launch",
     "packages/claude-tool",

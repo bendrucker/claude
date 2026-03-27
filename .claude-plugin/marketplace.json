@@ -152,11 +152,6 @@
       "source": "./plugins/plan"
     },
     {
-      "name": "webfetch-auth",
-      "description": "Blocks WebFetch for authenticated URLs and suggests MCP alternatives",
-      "source": "./plugins/webfetch-auth"
-    },
-    {
       "name": "mail",
       "description": "Apple Mail integration for reading and managing email via JXA",
       "source": "./plugins/mail"

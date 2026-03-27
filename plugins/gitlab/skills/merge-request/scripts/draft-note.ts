@@ -133,7 +133,7 @@ const submitCmd = command(
       console.error("Approved MR");
     } else if (parsed.flags.requestChanges) {
       const projectPath = (await $`glab repo view --output json | jq -r '.fullPath'`.text()).trim();
-      const query = `mutation($projectPath: String!, $iid: String!) {
+      const query = `mutation($projectPath: ID!, $iid: String!) {
         mergeRequestRequestChanges(input: { projectPath: $projectPath, iid: $iid }) {
           mergeRequest { iid }
           errors

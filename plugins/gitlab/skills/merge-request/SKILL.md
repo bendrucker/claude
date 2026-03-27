@@ -84,5 +84,6 @@ Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md
 ## Reference Files
 
 - [review.md](review.md) - Draft notes review workflow
+- [review-state.md](review-state.md) - GraphQL mutations for review decisions
 - [discussions.md](discussions.md) - Discussion threads and resolution
 - [stack.md](stack.md) - Stacked diff workflow

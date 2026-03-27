@@ -61,6 +61,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ~/.claude/hooks/webfetch-404"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {

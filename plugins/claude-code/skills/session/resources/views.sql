@@ -16,11 +16,11 @@ string_content AS (
   SELECT
     *,
     message_content::VARCHAR as content_text,
-    NULL as item_type,
-    NULL as tool_name,
-    NULL as tool_id,
-    NULL as tool_use_id,
-    NULL as result_content,
+    NULL::VARCHAR as item_type,
+    NULL::VARCHAR as tool_name,
+    NULL::VARCHAR as tool_id,
+    NULL::VARCHAR as tool_use_id,
+    NULL::VARCHAR as result_content,
     false as is_error,
     false as is_rejection
   FROM base
@@ -29,27 +29,26 @@ string_content AS (
 array_content AS (
   SELECT
     b.*,
-    CASE
-      WHEN json_extract_string(b.message_content, '$[' || s.idx || '].type') = 'text'
-      THEN json_extract_string(b.message_content, '$[' || s.idx || '].text')
-    END as content_text,
-    json_extract_string(b.message_content, '$[' || s.idx || '].type') as item_type,
-    json_extract_string(b.message_content, '$[' || s.idx || '].name') as tool_name,
-    json_extract_string(b.message_content, '$[' || s.idx || '].id') as tool_id,
-    json_extract_string(b.message_content, '$[' || s.idx || '].tool_use_id') as tool_use_id,
-    json_extract_string(b.message_content, '$[' || s.idx || '].content') as result_content,
-    COALESCE(
-      json_extract(b.message_content, '$[' || s.idx || '].is_error')::BOOLEAN,
-      false
-    ) as is_error,
+    CASE WHEN item.type = 'text' THEN item.text END as content_text,
+    item.type as item_type,
+    item.name as tool_name,
+    item.id as tool_id,
+    item.tool_use_id,
+    item.content as result_content,
+    COALESCE(item.is_error, false) as is_error,
     COALESCE(b.toolUseResult::VARCHAR = 'User rejected tool use', false) as is_rejection
   FROM base b,
   LATERAL (
-    SELECT unnest(generate_series(
-      0::BIGINT,
-      CAST(json_array_length(b.message_content) AS BIGINT) - 1
-    )) as idx
-  ) s
+    SELECT unnest(from_json(b.message_content, '[{
+      "type": "VARCHAR",
+      "text": "VARCHAR",
+      "name": "VARCHAR",
+      "id": "VARCHAR",
+      "tool_use_id": "VARCHAR",
+      "content": "VARCHAR",
+      "is_error": "BOOLEAN"
+    }]')) as item
+  ) t
   WHERE json_type(b.message_content) = 'ARRAY'
     AND json_array_length(b.message_content) > 0
 ),
@@ -59,30 +58,16 @@ all_content AS (
   SELECT * FROM array_content
 )
 SELECT
+  * EXCLUDE (sessionId, cwd, gitBranch, isMeta, isSidechain, durationMs, message_content, toolUseResult, usage, timestamp),
   sessionId::VARCHAR as session_id,
-  type,
   timestamp::TIMESTAMP as timestamp,
   cwd as project_path,
   gitBranch as git_branch,
   COALESCE(isMeta, false) as is_meta,
-  content_text,
-  item_type,
-  tool_name,
-  tool_id,
-  tool_use_id,
-  result_content,
-  is_error,
-  is_rejection,
-  summary,
-  model,
-  usage.input_tokens as input_tokens,
-  usage.output_tokens as output_tokens,
-  stop_reason,
-  durationMs as duration_ms,
-  version,
   COALESCE(isSidechain, false) as is_sidechain,
-  source_file,
-  source_line
+  durationMs as duration_ms,
+  usage.input_tokens as input_tokens,
+  usage.output_tokens as output_tokens
 FROM all_content;
 
 CREATE OR REPLACE TABLE messages AS

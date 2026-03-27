@@ -3,16 +3,6 @@ name: pull-request:update
 description: |
   Update a pull request or merge request body to reflect the current state of changes.
   Use when a PR/MR has evolved through additional commits and the body needs to reflect what will be merged.
-
-allowed-tools:
-  - mcp__github
-  - "Bash(gh pr:*)"
-  - "Bash(glab mr:*)"
-  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"
-  # workaround: inline skill execution includes syntax markers in the permission
-  # check pattern, breaking allowed-tools matching.
-  # https://github.com/bendrucker/claude/issues/486
-  - "Bash(!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/*`:*)"
 ---
 
 # Update Pull Request

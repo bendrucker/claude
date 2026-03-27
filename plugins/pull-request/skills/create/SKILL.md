@@ -3,19 +3,6 @@ name: pull-request:create
 description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR—including after committing changes.
-
-allowed-tools:
-  - mcp__github
-  - "Bash(git add:*)"
-  - "Bash(git commit:*)"
-  - "Bash(git push:*)"
-  - "Bash(gh pr:*)"
-  - "Bash(glab mr:*)"
-  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"
-  # workaround: inline skill execution includes syntax markers in the permission
-  # check pattern, breaking allowed-tools matching.
-  # https://github.com/bendrucker/claude/issues/486
-  - "Bash(!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/*`:*)"
 ---
 
 # Create Pull Request

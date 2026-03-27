@@ -1,7 +1,11 @@
 ---
 name: tmux
 description: Tmux session awareness and pane interaction. Use when the user asks about tmux panes, wants to capture terminal output, send keys to another pane, open a process in a pane, or organize panes in their window.
-allowed-tools: [Bash(tmux:*)]
+allowed-tools:
+  - Bash(tmux:*)
+  - "Bash(bun **/plugins/tmux/scripts/layout.ts:*)"
+  - "Bash(bun **/plugins/tmux/scripts/pane.ts:*)"
+  - "Bash(bun **/plugins/tmux/scripts/dispatch.ts:*)"
 hooks:
   PreToolUse:
     - matcher: "Bash(tmux:*)"
@@ -13,6 +17,11 @@ hooks:
               then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}
               else {hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}
               end'
+    - matcher: "Bash(bun **/plugins/tmux/scripts/:*)"
+      hooks:
+        - type: command
+          command: |
+            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
 ---
 
 # tmux
@@ -98,3 +107,52 @@ tmux capture-pane -t $TARGET -p -S -100
 ```
 
 `-S -100` includes 100 lines of scrollback above the visible area.
+
+## Layouts
+
+Use `layout.ts` to apply multi-pane presets in a single command:
+
+```bash
+bun plugins/tmux/scripts/layout.ts sidebar-right
+bun plugins/tmux/scripts/layout.ts stack-right --count 4
+bun plugins/tmux/scripts/layout.ts grid-2x2
+```
+
+Presets: `sidebar-right`, `sidebar-left`, `stack-right`, `grid-2x2`, `main-bottom`. All output JSON with pane IDs and positions. See [references/layouts.md](references/layouts.md) for ASCII diagrams and output format.
+
+## Pane Tracking
+
+Track named panes via tmux user options so they persist across tool calls:
+
+```bash
+bun plugins/tmux/scripts/pane.ts register logs --id %5
+bun plugins/tmux/scripts/pane.ts get logs
+bun plugins/tmux/scripts/pane.ts list
+bun plugins/tmux/scripts/pane.ts dismiss logs
+bun plugins/tmux/scripts/pane.ts dismiss-all
+```
+
+`register` stores the pane under a name. `get` returns JSON with live status. `list` shows a table (or `--json`). `dismiss` kills the pane and removes tracking.
+
+## Dispatch
+
+Combine split + track in one step with `dispatch.ts`:
+
+```bash
+bun plugins/tmux/scripts/dispatch.ts --name server -- npm run dev
+bun plugins/tmux/scripts/dispatch.ts --name tests --split v --size 30 -- bun test --watch
+```
+
+Capture output from a dispatched pane:
+
+```bash
+bun plugins/tmux/scripts/dispatch.ts capture --name server --lines 50
+```
+
+## Gotchas
+
+- Always use `-P -F '#{pane_id}'` to capture pane IDs at creation time
+- Always use `-d` on `split-window` to avoid switching Claude's pane
+- Use `$TMUX_PANE` (injected by context hook) to target the current pane
+- Prefer layout presets over manual multi-split sequences
+- Tracked pane names: alphanumeric and hyphens only

@@ -179,6 +179,7 @@
       "name": "@bendrucker/claude-tmux",
       "dependencies": {
         "cleye": "^1.3.2",
+        "table": "^6.9.0",
       },
     },
     "plugins/type-ignore": {

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { ensureThingsRunning } from "./ensure-running";
 import { mergeTags, parseTags } from "./tags";
 import { buildUrl, findXcallRunner, openUrl, xcall } from "./url";
 
@@ -55,6 +56,8 @@ params.set("tags", tags.join(","));
 const attribution = buildAttribution(argv.flags.sessionId);
 const existing = params.get("notes");
 params.set("notes", existing ? `${existing}\n\n${attribution}` : attribution);
+
+await ensureThingsRunning();
 
 if (findXcallRunner()) {
   const url = await buildUrl("add", params);

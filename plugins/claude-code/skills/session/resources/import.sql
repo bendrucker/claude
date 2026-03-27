@@ -1,7 +1,8 @@
 CREATE OR REPLACE TEMP TABLE new_raw AS
 SELECT
   * EXCLUDE (message, filename),
-  message.*,
+  message.* EXCLUDE (content),
+  message.content as message_content,
   filename as source_file,
   ROW_NUMBER() OVER () as source_line
 FROM read_ndjson(
@@ -18,7 +19,7 @@ SET VARIABLE changed_sessions = (
 
 CREATE OR REPLACE TABLE raw AS
 SELECT * FROM raw
-WHERE sessionId NOT IN (SELECT unnest(getvariable('changed_sessions')))
+WHERE sessionId NOT IN (SELECT unnest(getvariable('changed_sessions'))::VARCHAR)
 UNION ALL BY NAME
 SELECT * FROM new_raw;
 

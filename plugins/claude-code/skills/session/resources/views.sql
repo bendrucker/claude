@@ -10,12 +10,12 @@ WITH base AS (
     WHERE type = 'summary' AND summary IS NOT NULL
   ) s USING (sessionId)
   WHERE e.type IN ('user', 'assistant')
-    AND e.content IS NOT NULL
+    AND e.message_content IS NOT NULL
 ),
 string_content AS (
   SELECT
     *,
-    content::VARCHAR as content_text,
+    message_content::VARCHAR as content_text,
     NULL as item_type,
     NULL as tool_name,
     NULL as tool_id,
@@ -24,42 +24,42 @@ string_content AS (
     false as is_error,
     false as is_rejection
   FROM base
-  WHERE json_type(content) = 'VARCHAR'
+  WHERE json_type(message_content) = 'VARCHAR'
 ),
 array_content AS (
   SELECT
     b.*,
     CASE
-      WHEN json_extract_string(b.content, '$[' || s.idx || '].type') = 'text'
-      THEN json_extract_string(b.content, '$[' || s.idx || '].text')
+      WHEN json_extract_string(b.message_content, '$[' || s.idx || '].type') = 'text'
+      THEN json_extract_string(b.message_content, '$[' || s.idx || '].text')
     END as content_text,
-    json_extract_string(b.content, '$[' || s.idx || '].type') as item_type,
-    json_extract_string(b.content, '$[' || s.idx || '].name') as tool_name,
-    json_extract_string(b.content, '$[' || s.idx || '].id') as tool_id,
-    json_extract_string(b.content, '$[' || s.idx || '].tool_use_id') as tool_use_id,
-    json_extract_string(b.content, '$[' || s.idx || '].content') as result_content,
+    json_extract_string(b.message_content, '$[' || s.idx || '].type') as item_type,
+    json_extract_string(b.message_content, '$[' || s.idx || '].name') as tool_name,
+    json_extract_string(b.message_content, '$[' || s.idx || '].id') as tool_id,
+    json_extract_string(b.message_content, '$[' || s.idx || '].tool_use_id') as tool_use_id,
+    json_extract_string(b.message_content, '$[' || s.idx || '].content') as result_content,
     COALESCE(
-      json_extract(b.content, '$[' || s.idx || '].is_error')::BOOLEAN,
+      json_extract(b.message_content, '$[' || s.idx || '].is_error')::BOOLEAN,
       false
     ) as is_error,
-    COALESCE(b.toolUseResult = 'User rejected tool use', false) as is_rejection
+    COALESCE(b.toolUseResult::VARCHAR = 'User rejected tool use', false) as is_rejection
   FROM base b,
   LATERAL (
     SELECT unnest(generate_series(
       0::BIGINT,
-      CAST(json_array_length(b.content) AS BIGINT) - 1
+      CAST(json_array_length(b.message_content) AS BIGINT) - 1
     )) as idx
   ) s
-  WHERE json_type(b.content) = 'ARRAY'
-    AND json_array_length(b.content) > 0
+  WHERE json_type(b.message_content) = 'ARRAY'
+    AND json_array_length(b.message_content) > 0
 ),
 all_content AS (
   SELECT * FROM string_content
-  UNION ALL
+  UNION ALL BY NAME
   SELECT * FROM array_content
 )
 SELECT
-  sessionId as session_id,
+  sessionId::VARCHAR as session_id,
   type,
   timestamp::TIMESTAMP as timestamp,
   cwd as project_path,
@@ -85,13 +85,45 @@ SELECT
   source_line
 FROM all_content;
 
-DELETE FROM messages
-WHERE session_id IN (
-  SELECT unnest(getvariable('changed_sessions'))
-);
+CREATE OR REPLACE TABLE messages AS
+SELECT * FROM normalized;
 
-INSERT INTO messages
-SELECT * FROM normalized
-WHERE session_id IN (
-  SELECT unnest(getvariable('changed_sessions'))
-);
+CREATE OR REPLACE VIEW tool_calls AS
+SELECT
+  tool_name,
+  tool_id,
+  session_id,
+  project_path,
+  timestamp
+FROM messages
+WHERE item_type = 'tool_use'
+  AND tool_name IS NOT NULL;
+
+CREATE OR REPLACE VIEW tool_errors AS
+SELECT
+  er.tool_use_id as tool_id,
+  er.result_content as error_content,
+  COALESCE(tc.tool_name, 'unknown') as tool_name,
+  er.session_id,
+  tc.project_path,
+  er.timestamp,
+  CASE WHEN er.is_rejection THEN 'rejection' ELSE 'failure' END as error_type
+FROM messages er
+LEFT JOIN tool_calls tc ON er.tool_use_id = tc.tool_id
+WHERE er.item_type = 'tool_result'
+  AND er.is_error;
+
+CREATE OR REPLACE VIEW sessions AS
+SELECT
+  session_id,
+  ANY_VALUE(summary) as summary,
+  MIN(timestamp) as start_time,
+  MAX(timestamp) as end_time,
+  MAX(timestamp) - MIN(timestamp) as duration,
+  ANY_VALUE(project_path) as project_path,
+  ANY_VALUE(git_branch) as git_branch,
+  COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) as user_messages,
+  COUNT(*) FILTER (WHERE type = 'assistant') as assistant_messages
+FROM messages
+GROUP BY session_id
+HAVING COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) > 0;

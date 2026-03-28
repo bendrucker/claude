@@ -3,7 +3,7 @@ name: tmux
 description: Tmux session awareness and pane interaction. Use when the user asks about tmux panes, wants to capture terminal output, send keys to another pane, open a process in a pane, or organize panes in their window.
 allowed-tools:
   - Bash(tmux:*)
-  - "Bash(bun **/plugins/tmux/scripts/pane.ts:*)"
+  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts:*)"
 hooks:
   PreToolUse:
     - matcher: "Bash(tmux:*)"
@@ -15,7 +15,7 @@ hooks:
               then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}
               else {hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}
               end'
-    - matcher: "Bash(bun **/plugins/tmux/scripts/:*)"
+    - matcher: "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
       hooks:
         - type: command
           command: |
@@ -111,11 +111,11 @@ tmux capture-pane -t $TARGET -p -S -100
 Track named panes via tmux user options so they persist across tool calls:
 
 ```bash
-bun plugins/tmux/scripts/pane.ts register logs --id %5
-bun plugins/tmux/scripts/pane.ts get logs
-bun plugins/tmux/scripts/pane.ts list
-bun plugins/tmux/scripts/pane.ts dismiss logs
-bun plugins/tmux/scripts/pane.ts dismiss-all
+bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts register logs --id %5
+bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts get logs
+bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts list
+bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts dismiss logs
+bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts dismiss-all
 ```
 
 `register` stores the pane under a name. `get` returns JSON with live status. `list` shows a table (or `--json`). `dismiss` kills the pane and removes tracking.

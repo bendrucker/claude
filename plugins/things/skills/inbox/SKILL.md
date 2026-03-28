@@ -14,7 +14,7 @@ Add todos to the Things 3 inbox.
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
 ```
 
-The script handles URL encoding, session attribution, and the `Claude` tag automatically.
+The script handles URL encoding, session attribution, and the `Claude` tag automatically. Extra tags can be added via the `THINGS_EXTRA_TAGS` environment variable (comma-separated). For example, `THINGS_EXTRA_TAGS=claude-code` adds the `claude-code` tag to all captured todos.
 
 When the `x-callback-url` plugin is installed, the script uses xcall to get the todo ID back from Things and outputs a `https://things.bendrucker.me/show?id=...` URL. Present this URL to the user so they can click to open the todo. If xcall is unavailable, the script falls back to fire-and-forget.
 

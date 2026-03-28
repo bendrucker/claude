@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { mergeTags, parseTags } from "./tags";
 import { buildUrl, findXcallRunner, openUrl, xcall } from "./url";
 
 const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-items"]);
@@ -20,13 +21,6 @@ const argv = cli({
 function buildAttribution(sessionId: string): string {
   const dir = process.cwd();
   return `---\n\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\ncd ${dir} && claude --resume ${sessionId}\n\`\`\``;
-}
-
-function mergeTags(existing: string | undefined): string {
-  if (!existing) return "Claude";
-  const tags = existing.split(",").map((t) => t.trim());
-  if (tags.includes("Claude")) return existing;
-  return `Claude,${existing}`;
 }
 
 function parseThingsId(xcallOutput: string): string | null {
@@ -51,7 +45,12 @@ for (const arg of argv._.params) {
   }
 }
 
-params.set("tags", mergeTags(params.get("tags")));
+const tags = mergeTags(
+  ["Claude"],
+  parseTags(process.env.THINGS_EXTRA_TAGS),
+  parseTags(params.get("tags")),
+);
+params.set("tags", tags.join(","));
 
 const attribution = buildAttribution(argv.flags.sessionId);
 const existing = params.get("notes");

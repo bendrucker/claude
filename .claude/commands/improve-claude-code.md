@@ -15,13 +15,13 @@ Triage and batch-implement Claude-tagged Things todos as PRs for the claude conf
 
 - Do NOT write inline JXA or AppleScript — always load and use the `things:jxa` and `things:url` skills
 - Do NOT call `gh pr create` directly — always use the `pull-request:create` skill
-- The Things tag name is lowercase `claude` (not `Claude`)
+- The Things tag name is `claude-code`
 
 ## Workflow
 
 ### Fetch Todos
 
-Load the `things:jxa` skill. Find all open todos tagged `claude`. Track each item's ID, title, notes, and originating list.
+Load the `things:jxa` skill. Find all open todos tagged `claude-code`. Track each item's ID, title, notes, and originating list.
 
 ### Present for Triage
 
@@ -72,8 +72,8 @@ After all fix agents complete, re-monitor CI for the affected PRs.
 
 Load the `things:url` skill.
 
-- **Passing PRs**: Append the PR link to the todo's notes, add the `review` tag, remove the `claude` tag, and move the todo to Anytime.
-- **Still-failing PRs**: Append the PR link and failure summary to the todo's notes. Leave the `claude` tag so the item surfaces in the next run.
+- **Passing PRs**: Append the PR link to the todo's notes, add the `review` tag, remove the `claude-code` tag, and move the todo to Anytime.
+- **Still-failing PRs**: Append the PR link and failure summary to the todo's notes. Leave the `claude-code` tag so the item surfaces in the next run.
 
 ### Present Summary
 

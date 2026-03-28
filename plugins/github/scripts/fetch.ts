@@ -132,8 +132,19 @@ export function formatOutput(
   };
 }
 
+export function isRawGitHubUrl(url: string): boolean {
+  return url.startsWith("https://raw.githubusercontent.com/");
+}
+
 export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
   const { url } = input.tool_input as WebFetchInput;
+
+  if (isRawGitHubUrl(url)) {
+    return formatOutput(
+      "deny",
+      `Use: gh api repos/{owner}/{repo}/contents/{path}?ref={ref} to fetch raw file contents. ${SUFFIX}`,
+    );
+  }
 
   if (!isGitHubUrl(url)) {
     return null;
@@ -144,7 +155,7 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
     return formatOutput("deny", parsed.suggestion);
   }
 
-  return formatOutput("ask", "Unknown GitHub URL pattern. Run /github:gh for guidance.");
+  return null;
 }
 
 async function main(): Promise<void> {

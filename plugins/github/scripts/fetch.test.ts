@@ -210,9 +210,8 @@ describe("processInput", () => {
     );
   });
 
-  it("asks for unknown GitHub URL patterns", () => {
+  it("passes through unknown GitHub URL patterns", () => {
     const output = getOutput(mockInput("https://github.com/explore"));
-    expect(output?.permissionDecision).toBe("ask");
-    expect(output?.permissionDecisionReason).toContain("Run /github:gh for guidance");
+    expect(output).toBeNull();
   });
 });

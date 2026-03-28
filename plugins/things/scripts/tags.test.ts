@@ -1,58 +1,50 @@
 import { describe, expect, test } from "bun:test";
-import { mergeTags, parseExtraTags } from "./tags";
+import { mergeTags, parseTags } from "./tags";
 
-describe("parseExtraTags", () => {
+describe("parseTags", () => {
   test("returns empty array for undefined", () => {
-    expect(parseExtraTags(undefined)).toEqual([]);
+    expect(parseTags(undefined)).toEqual([]);
   });
 
   test("returns empty array for empty string", () => {
-    expect(parseExtraTags("")).toEqual([]);
+    expect(parseTags("")).toEqual([]);
   });
 
   test("parses single tag", () => {
-    expect(parseExtraTags("claude-code")).toEqual(["claude-code"]);
+    expect(parseTags("claude-code")).toEqual(["claude-code"]);
   });
 
   test("parses comma-separated tags", () => {
-    expect(parseExtraTags("claude-code,work")).toEqual(["claude-code", "work"]);
+    expect(parseTags("claude-code,work")).toEqual(["claude-code", "work"]);
   });
 
   test("trims whitespace", () => {
-    expect(parseExtraTags(" claude-code , work ")).toEqual(["claude-code", "work"]);
+    expect(parseTags(" claude-code , work ")).toEqual(["claude-code", "work"]);
   });
 
   test("filters empty segments", () => {
-    expect(parseExtraTags("claude-code,,work")).toEqual(["claude-code", "work"]);
+    expect(parseTags("claude-code,,work")).toEqual(["claude-code", "work"]);
   });
 });
 
 describe("mergeTags", () => {
-  test("returns Claude when no existing tags", () => {
-    expect(mergeTags(undefined)).toBe("Claude");
+  test("returns single source as-is", () => {
+    expect(mergeTags(["Claude"])).toBe("Claude");
   });
 
-  test("prepends Claude to existing tags", () => {
-    expect(mergeTags("Work")).toBe("Claude,Work");
+  test("combines multiple sources", () => {
+    expect(mergeTags(["Claude"], ["work"])).toBe("Claude,work");
   });
 
-  test("deduplicates Claude in existing tags", () => {
-    expect(mergeTags("Claude,Work")).toBe("Claude,Work");
+  test("deduplicates across sources", () => {
+    expect(mergeTags(["Claude"], ["Claude", "work"])).toBe("Claude,work");
   });
 
-  test("includes extra tags", () => {
-    expect(mergeTags(undefined, ["claude-code"])).toBe("Claude,claude-code");
+  test("preserves insertion order", () => {
+    expect(mergeTags(["Claude", "claude-code"], ["work"])).toBe("Claude,claude-code,work");
   });
 
-  test("merges extra tags with existing tags", () => {
-    expect(mergeTags("Work", ["claude-code"])).toBe("Claude,claude-code,Work");
-  });
-
-  test("deduplicates extra tags against existing", () => {
-    expect(mergeTags("claude-code,Work", ["claude-code"])).toBe("Claude,claude-code,Work");
-  });
-
-  test("deduplicates Claude in extra tags", () => {
-    expect(mergeTags(undefined, ["Claude", "work"])).toBe("Claude,work");
+  test("handles empty sources", () => {
+    expect(mergeTags([], ["Claude"])).toBe("Claude");
   });
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { mergeTags, parseExtraTags } from "./tags";
+import { mergeTags, parseTags } from "./tags";
 import { buildUrl, findXcallRunner, openUrl, xcall } from "./url";
 
 const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-items"]);
@@ -45,7 +45,10 @@ for (const arg of argv._.params) {
   }
 }
 
-params.set("tags", mergeTags(params.get("tags"), parseExtraTags(process.env.THINGS_EXTRA_TAGS)));
+params.set(
+  "tags",
+  mergeTags(["Claude"], parseTags(process.env.THINGS_EXTRA_TAGS), parseTags(params.get("tags"))),
+);
 
 const attribution = buildAttribution(argv.flags.sessionId);
 const existing = params.get("notes");

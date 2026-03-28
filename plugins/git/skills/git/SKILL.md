@@ -16,6 +16,12 @@ For multi-line commit messages:
   ```bash
   git commit -m "Subject line" -m "Body paragraph here."
   ```
-- **Complex:** Use the Write tool to write to `tmp/commit-msg.md`, then `git commit -F tmp/commit-msg.md`
+- **Complex:** Use a heredoc to pass the message:
+  ```bash
+  git commit -m "$(cat <<'EOF'
+  Subject line
 
-**Do not use heredocs** — they create temp files that fail in sandbox environments. This includes `git commit -m "$(cat <<'EOF' ... EOF)"` and `cat > file << 'EOF'`.
+  Body paragraph here.
+  EOF
+  )"
+  ```

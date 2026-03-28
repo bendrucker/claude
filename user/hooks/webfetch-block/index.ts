@@ -26,11 +26,6 @@ const blockedPatterns: BlockedPattern[] = [
     suggestion: "Notion requires authentication. Use Notion MCP.",
   },
   {
-    pattern: /^https:\/\/code\.claude\.com\//,
-    suggestion:
-      "code.claude.com is not a real site. Claude Code docs are at docs.anthropic.com/en/docs/claude-code/.",
-  },
-  {
     pattern: /^https:\/\/www\.npmjs\.com\/package\//,
     suggestion:
       "npmjs.com blocks automated requests. Use: npm view <package> [field]. For versions: npm view <package> versions --json.",

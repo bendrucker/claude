@@ -40,6 +40,10 @@ describe("mergeTags", () => {
     expect(mergeTags("Claude,Work")).toBe("Claude,Work");
   });
 
+  test("preserves position of Claude in existing tags", () => {
+    expect(mergeTags("Work,Claude")).toBe("Work,Claude");
+  });
+
   test("includes extra tags", () => {
     expect(mergeTags(undefined, ["claude-code"])).toBe("Claude,claude-code");
   });

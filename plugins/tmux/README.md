@@ -4,12 +4,10 @@ Tmux session awareness and pane interaction for Claude Code.
 
 ## Contents
 
-- **Skill: tmux** — Pane management, content capture, layout presets, and pane tracking
+- **Skill: tmux** — Pane management, content capture, and pane tracking
 - **Hook: context** — SessionStart hook that injects tmux env vars
 - **Hook: notification** — Bell and status bar notifications for permission prompts
-- **Script: layout.ts** — Multi-pane layout presets (sidebar, stack, grid)
-- **Script: pane.ts** — Named pane tracking via tmux user options
-- **Script: dispatch.ts** — Combined split + register + capture workflow
+- **Script: pane.ts** — Named pane tracking CLI
 - **Script: tmux.ts** — Shared tmux command execution utilities
 - **Script: tracking.ts** — Pane registry using tmux user options
 

@@ -4,38 +4,38 @@ MR discussions (threaded comments) via `glab api` and the discussions script.
 
 ## Discussions Script
 
-`${CLAUDE_SKILL_ROOT}/scripts/discussions.ts` handles creating, fetching, filtering, resolving, and summarizing discussions. It fetches diff refs automatically for positioned comments.
+`${CLAUDE_SKILL_DIR}/scripts/discussions.ts` handles creating, fetching, filtering, resolving, and summarizing discussions. It fetches diff refs automatically for positioned comments.
 
 ### List
 
 ```bash
 # All discussions as JSON
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts list <iid>
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid>
 
 # Filter by author
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts list <iid> --author username
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --author username
 
 # Only unresolved resolvable discussions
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts list <iid> --resolvable --unresolved
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --unresolved
 
 # Deduplicate threads across diff versions
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts list <iid> --dedupe
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --dedupe
 
 # Table output
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts list <iid> --format table
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 ```
 
 ### Resolve
 
 ```bash
 # Resolve specific discussions
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts resolve <iid> <discussion-id> [<discussion-id>...]
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id> [<discussion-id>...]
 
 # Resolve all by a specific author
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts resolve <iid> --all-by username
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> --all-by username
 
 # Unresolve
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts resolve <iid> <discussion-id> --unresolve
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id> --unresolve
 ```
 
 Or directly via the API:
@@ -50,7 +50,7 @@ glab api projects/:id/merge_requests/<iid>/discussions/<id> -X PUT -f resolved=f
 Shows resolution counts grouped by author:
 
 ```bash
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts summary <iid>
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts summary <iid>
 ```
 
 ### Create
@@ -59,13 +59,13 @@ Always use `--body-file` for comment bodies. Piping through echo breaks backtick
 
 ```bash
 # General discussion (no position)
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --body-file tmp/note.md
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --body-file tmp/note.md
 
 # Inline comment on a new line (validated against diff hunks)
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/note.md
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/note.md
 
 # Comment on a deleted line
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --old-line 10 --body-file tmp/note.md
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --old-line 10 --body-file tmp/note.md
 ```
 
 Diff refs are fetched automatically. Positioned comments are validated against diff hunks before posting — if a line is not in the diff, the command exits with valid line ranges.
@@ -93,7 +93,7 @@ third line
 Combine with the `create` command by writing the suggestion to a file first:
 
 ```bash
-bun ${CLAUDE_SKILL_ROOT}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/suggestion.md
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/suggestion.md
 ```
 
 ## Pitfalls

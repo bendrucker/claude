@@ -2,14 +2,14 @@
 name: wireframe
 description: Create wireframes for UI mockups. Supports SVG (precise layouts) and HTML/Tailwind (standard UI patterns). Use when creating wireframes, mockups, or skeletal UI layouts.
 allowed-tools:
-  - "Bash(bun ${CLAUDE_SKILL_ROOT}/scripts/render.ts:*)"
-  - "Bash(bun ${CLAUDE_SKILL_ROOT}/scripts/render-html.ts:*)"
+  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/render.ts:*)"
+  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/render-html.ts:*)"
 hooks:
   PreToolUse:
-    - matcher: "Bash(bun ${CLAUDE_SKILL_ROOT}/scripts/render.ts:*)|Bash(bun ${CLAUDE_SKILL_ROOT}/scripts/render-html.ts:*)"
+    - matcher: "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/render.ts:*)|Bash(bun ${CLAUDE_SKILL_DIR}/scripts/render-html.ts:*)"
       hooks:
         - type: command
-          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/setup.ts"
+          command: "bun ${CLAUDE_SKILL_DIR}/scripts/setup.ts"
           once: true
         - type: command
           command: |
@@ -18,7 +18,7 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/validate-hook.ts"
+          command: "bun ${CLAUDE_SKILL_DIR}/scripts/validate-hook.ts"
 ---
 
 # Wireframe

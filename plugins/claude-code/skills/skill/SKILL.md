@@ -14,11 +14,11 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-namespace.ts"
+          command: "bun ${CLAUDE_SKILL_DIR}/scripts/check-namespace.ts"
         - type: command
-          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-structure.ts"
+          command: "bun ${CLAUDE_SKILL_DIR}/scripts/check-structure.ts"
         - type: command
-          command: "bun ${CLAUDE_SKILL_ROOT}/scripts/check-lint.ts"
+          command: "bun ${CLAUDE_SKILL_DIR}/scripts/check-lint.ts"
 ---
 
 # Claude Code Skills Development
@@ -116,7 +116,7 @@ Skill-scoped hooks activate only when the skill is invoked and last for the sess
 | `$ARGUMENTS`           | All arguments passed when invoking the skill. Appended automatically if absent.  |
 | `$ARGUMENTS[N]` / `$N` | Access a specific argument by 0-based index.                                     |
 | `${CLAUDE_SESSION_ID}` | Current session ID.                                                              |
-| `${CLAUDE_SKILL_ROOT}` | Absolute path to the skill's directory. Works in hooks and allowed-tools, but NOT in `!` context. |
+| `${CLAUDE_SKILL_DIR}` | Absolute path to the skill's directory. Works in hooks and allowed-tools, but NOT in `!` context. |
 
 ### Dynamic Context Injection
 

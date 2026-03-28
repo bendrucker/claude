@@ -4,7 +4,7 @@ Submit review feedback as draft notes that accumulate before publishing. Comment
 
 ## Draft Notes Script
 
-`${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts` handles JSON construction and `glab api` calls. It fetches diff refs automatically when creating positioned comments, avoiding manual SHA management.
+`${CLAUDE_SKILL_DIR}/scripts/draft-note.ts` handles JSON construction and `glab api` calls. It fetches diff refs automatically when creating positioned comments, avoiding manual SHA management.
 
 ### Create
 
@@ -12,19 +12,19 @@ Always use `--body-file` for comment bodies. Piping through echo breaks backtick
 
 ```bash
 # General comment
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --body-file tmp/note.md
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --body-file tmp/note.md
 
 # Inline comment on a new line (validated against diff hunks)
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --file src/app.go --line 42 --body-file tmp/note.md
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --file src/app.go --line 42 --body-file tmp/note.md
 
 # Comment on a deleted line
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --file src/app.go --old-line 10 --body-file tmp/note.md
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --file src/app.go --old-line 10 --body-file tmp/note.md
 
 # Reply to existing discussion
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> --body-file tmp/note.md
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> --body-file tmp/note.md
 
 # Reply and resolve
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> --resolve --body-file tmp/note.md
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> --resolve --body-file tmp/note.md
 ```
 
 Positioned comments are validated against the MR diff before posting. If a line is not within a diff hunk, the command exits with an error showing valid line ranges.
@@ -34,10 +34,10 @@ Positioned comments are validated against the MR diff before posting. If a line 
 Create multiple draft notes from a JSON file:
 
 ```bash
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts review <iid> --input tmp/review.json
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts review <iid> --input tmp/review.json
 
 # Create, publish, and approve
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts review <iid> --input tmp/review.json --submit --approve
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts review <iid> --input tmp/review.json --submit --approve
 ```
 
 Input JSON format:
@@ -55,7 +55,7 @@ Each positioned entry is validated against diff hunks. Failures are reported per
 ### List
 
 ```bash
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts list <iid>
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts list <iid>
 ```
 
 ### Submit Review
@@ -64,25 +64,25 @@ Publish all draft notes and optionally set a review decision. GitLab's REST API 
 
 ```bash
 # Publish only (equivalent to "Comment" in web UI)
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid>
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid>
 
 # Publish with summary comment
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid> --summary "LGTM, minor nits"
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid> --summary "LGTM, minor nits"
 
 # Publish and approve
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid> --approve
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid> --approve
 
 # Publish and request changes (Premium+, uses GraphQL)
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid> --request-changes
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid> --request-changes
 
 # Full review: summary + approve
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts submit <iid> --approve --summary-file tmp/review-summary.md
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid> --approve --summary-file tmp/review-summary.md
 ```
 
 The older `publish` command is still available for quick draft publishing without a review decision:
 
 ```bash
-bun ${CLAUDE_SKILL_ROOT}/scripts/draft-note.ts publish <iid>
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts publish <iid>
 ```
 
 ## Code Suggestions

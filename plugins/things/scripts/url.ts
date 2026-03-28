@@ -3,6 +3,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { $ } from "bun";
+import { ensureThingsRunning } from "./ensure-running";
 
 const AUTH_REQUIRED_COMMANDS = ["update", "update-project", "json"] as const;
 
@@ -165,7 +166,7 @@ export async function xcall(url: string): Promise<string> {
 }
 
 if (import.meta.main) {
-  await $`open -g -a Things3`;
+  await ensureThingsRunning();
 
   const { cli } = await import("cleye");
 

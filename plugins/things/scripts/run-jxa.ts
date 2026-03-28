@@ -2,6 +2,7 @@
 
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { ensureThingsRunning } from "./ensure-running";
 
 function findJxaRunner(): string | null {
   const pluginRoot = join(import.meta.dirname, "..");
@@ -23,6 +24,8 @@ function findJxaRunner(): string | null {
 }
 
 if (import.meta.main) {
+  await ensureThingsRunning();
+
   const jxaPath = findJxaRunner();
   if (!jxaPath) {
     console.error("mac plugin jxa.ts not found — install the mac plugin");

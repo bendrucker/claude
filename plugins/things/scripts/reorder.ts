@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
+import { ensureThingsRunning } from "./ensure-running";
 import { buildUrl } from "./url";
 
 const INTERMEDIATE_LIST: Record<string, string> = {
@@ -64,5 +65,6 @@ if (import.meta.main) {
     },
   });
 
+  await ensureThingsRunning();
   await reorder(argv.flags.list, argv._.ids);
 }

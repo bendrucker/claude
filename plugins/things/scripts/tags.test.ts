@@ -40,8 +40,8 @@ describe("mergeTags", () => {
     expect(mergeTags("Claude,Work")).toBe("Claude,Work");
   });
 
-  test("preserves position of Claude in existing tags", () => {
-    expect(mergeTags("Work,Claude")).toBe("Work,Claude");
+  test("puts base tags first even if Claude appears later", () => {
+    expect(mergeTags("Work,Claude")).toBe("Claude,Work");
   });
 
   test("includes extra tags", () => {

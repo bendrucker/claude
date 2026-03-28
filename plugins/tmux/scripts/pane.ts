@@ -3,7 +3,14 @@
 import { cli } from "cleye";
 import { table } from "table";
 import { tmuxRun } from "./tmux";
-import { getTrackedPane, getTrackedPanes, registerPane, unregisterPane } from "./tracking";
+import {
+  getTrackedPane,
+  getTrackedPanes,
+  isPaneAlive,
+  registerPane,
+  sanitizeName,
+  unregisterPane,
+} from "./tracking";
 
 const argv = cli({
   name: "pane",
@@ -40,8 +47,18 @@ switch (command) {
     }
     const meta = argv.flags.meta ? JSON.parse(argv.flags.meta) : {};
     registerPane(name, argv.flags.id, meta);
-    const pane = getTrackedPane(name);
-    console.log(JSON.stringify(pane, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          name: sanitizeName(name),
+          id: argv.flags.id,
+          meta,
+          alive: isPaneAlive(argv.flags.id),
+        },
+        null,
+        2,
+      ),
+    );
     break;
   }
 
@@ -79,7 +96,7 @@ switch (command) {
       process.exit(1);
     }
     const pane = getTrackedPane(name);
-    if (pane?.alive) {
+    if (pane) {
       tmuxRun("kill-pane", "-t", pane.id);
     }
     unregisterPane(name);
@@ -90,9 +107,7 @@ switch (command) {
   case "dismiss-all": {
     const panes = getTrackedPanes();
     for (const pane of panes) {
-      if (pane.alive) {
-        tmuxRun("kill-pane", "-t", pane.id);
-      }
+      tmuxRun("kill-pane", "-t", pane.id);
       unregisterPane(pane.name);
     }
     console.log(`Dismissed ${panes.length} pane(s)`);

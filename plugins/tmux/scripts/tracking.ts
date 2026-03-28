@@ -45,13 +45,14 @@ export function unregisterPane(name: string): void {
   tmuxRun("set-option", "-gu", optionKey(sanitizeName(name)));
 }
 
-export function isPaneAlive(id: string): boolean {
-  const result = tmuxSync("has-session", "-t", id);
-  if (result !== null) return true;
+function getLivePaneIds(): Set<string> {
+  const output = tmuxSync("list-panes", "-a", "-F", "#{pane_id}");
+  if (!output) return new Set();
+  return new Set(output.split("\n"));
+}
 
-  const panes = tmuxSync("list-panes", "-a", "-F", "#{pane_id}");
-  if (!panes) return false;
-  return panes.split("\n").includes(id);
+export function isPaneAlive(id: string, livePaneIds?: Set<string>): boolean {
+  return (livePaneIds ?? getLivePaneIds()).has(id);
 }
 
 export function getTrackedPane(name: string): TrackedPane | null {
@@ -73,8 +74,10 @@ export function getTrackedPanes(): TrackedPane[] {
   const output = tmuxSync("show-options", "-g");
   if (!output) return [];
 
+  const livePaneIds = getLivePaneIds();
   const panes: TrackedPane[] = [];
   for (const line of output.split("\n")) {
+    if (!line.startsWith("@claude_pane_")) continue;
     const match = line.match(/^@claude_pane_\S+ "?(.+?)"?$/);
     if (!match) continue;
 
@@ -82,7 +85,7 @@ export function getTrackedPanes(): TrackedPane[] {
       const stored: StoredPane = JSON.parse(match[1] as string);
       panes.push({
         ...stored,
-        alive: isPaneAlive(stored.id),
+        alive: isPaneAlive(stored.id, livePaneIds),
       });
     } catch {}
   }

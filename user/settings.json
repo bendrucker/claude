@@ -98,7 +98,6 @@
     "agent-browser@agent-browser": true,
     "bun@bendrucker": true,
     "git-town@bendrucker": true,
-    "webfetch-auth@bendrucker": true,
     "mermaid@bendrucker": true,
     "tech-spec@bendrucker": true,
     "typescript-lsp@claude-plugins-official": true,

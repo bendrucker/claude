@@ -1,8 +1,0 @@
-{
-  "name": "webfetch-auth",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@constellos/claude-code-kit": "^0.4.0"
-  }
-}

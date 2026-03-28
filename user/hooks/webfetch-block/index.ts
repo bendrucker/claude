@@ -5,14 +5,14 @@ import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runn
 
 export type WebFetchInput = { url: string; prompt: string };
 
-type AuthenticatedDomain = {
+type BlockedPattern = {
   pattern: RegExp;
   suggestion: string;
 };
 
-// Catch-all for authenticated services without dedicated plugins.
+// Blocks URLs that require authentication, don't exist, or reject bot requests.
 // Services with plugins (GitHub, GitLab, Linear) handle blocking in their own hooks.
-const authenticatedDomains: AuthenticatedDomain[] = [
+const blockedPatterns: BlockedPattern[] = [
   {
     pattern: /^https:\/\/docs\.google\.com\//,
     suggestion: "Google Docs requires authentication. Use Google Drive MCP or export as PDF.",
@@ -24,6 +24,11 @@ const authenticatedDomains: AuthenticatedDomain[] = [
   {
     pattern: /^https:\/\/[^/]+\.notion\.so\//,
     suggestion: "Notion requires authentication. Use Notion MCP.",
+  },
+  {
+    pattern: /^https:\/\/www\.npmjs\.com\/package\//,
+    suggestion:
+      "npmjs.com blocks automated requests. Use: npm view <package> [field]. For versions: npm view <package> versions --json.",
   },
 ];
 
@@ -43,9 +48,9 @@ export function formatOutput(
 export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
   const { url } = input.tool_input as WebFetchInput;
 
-  for (const domain of authenticatedDomains) {
-    if (domain.pattern.test(url)) {
-      return formatOutput("deny", domain.suggestion);
+  for (const blocked of blockedPatterns) {
+    if (blocked.pattern.test(url)) {
+      return formatOutput("deny", blocked.suggestion);
     }
   }
 

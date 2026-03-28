@@ -45,10 +45,12 @@ for (const arg of argv._.params) {
   }
 }
 
-params.set(
-  "tags",
-  mergeTags(["Claude"], parseTags(process.env.THINGS_EXTRA_TAGS), parseTags(params.get("tags"))),
+const tags = mergeTags(
+  ["Claude"],
+  parseTags(process.env.THINGS_EXTRA_TAGS),
+  parseTags(params.get("tags")),
 );
+params.set("tags", tags.join(","));
 
 const attribution = buildAttribution(argv.flags.sessionId);
 const existing = params.get("notes");

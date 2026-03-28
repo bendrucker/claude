@@ -29,22 +29,26 @@ describe("parseTags", () => {
 
 describe("mergeTags", () => {
   test("returns single source as-is", () => {
-    expect(mergeTags(["Claude"])).toBe("Claude");
+    expect(mergeTags(["Claude"])).toEqual(["Claude"]);
   });
 
   test("combines multiple sources", () => {
-    expect(mergeTags(["Claude"], ["work"])).toBe("Claude,work");
+    expect(mergeTags(["Claude"], ["work"])).toEqual(["Claude", "work"]);
   });
 
   test("deduplicates across sources", () => {
-    expect(mergeTags(["Claude"], ["Claude", "work"])).toBe("Claude,work");
+    expect(mergeTags(["Claude"], ["Claude", "work"])).toEqual(["Claude", "work"]);
   });
 
   test("preserves insertion order", () => {
-    expect(mergeTags(["Claude", "claude-code"], ["work"])).toBe("Claude,claude-code,work");
+    expect(mergeTags(["Claude", "claude-code"], ["work"])).toEqual([
+      "Claude",
+      "claude-code",
+      "work",
+    ]);
   });
 
   test("handles empty sources", () => {
-    expect(mergeTags([], ["Claude"])).toBe("Claude");
+    expect(mergeTags([], ["Claude"])).toEqual(["Claude"]);
   });
 });

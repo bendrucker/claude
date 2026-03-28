@@ -6,6 +6,6 @@ export function parseTags(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export function mergeTags(...sources: string[][]): string {
-  return [...new Set(sources.flat())].join(",");
+export function mergeTags(...sources: string[][]): string[] {
+  return [...new Set(sources.flat())];
 }

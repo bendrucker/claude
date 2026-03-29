@@ -30,9 +30,34 @@ async function readSettingsFile(path: string): Promise<object | null> {
   }
 }
 
+interface SchemaObject {
+  [key: string]: unknown;
+  $defs?: Record<string, SchemaObject>;
+  anyOf?: SchemaObject[];
+  properties?: Record<string, SchemaObject>;
+}
+
+function patchSchema(schema: SchemaObject): void {
+  const hookCommand = schema.$defs?.hookCommand;
+  if (!hookCommand?.anyOf) return;
+
+  const ifProperty = {
+    type: "string",
+    description: "Permission rule pattern to filter when this hook fires (e.g. Bash(git *))",
+  };
+
+  for (const variant of hookCommand.anyOf) {
+    if (variant.properties) {
+      variant.properties.if = ifProperty;
+    }
+  }
+}
+
 export async function validate(cwd: string): Promise<Map<string, string[]>> {
   const schema = await fetchSchema();
   if (!schema) return new Map();
+
+  patchSchema(schema as SchemaObject);
 
   const ajv = new Ajv({ allErrors: true, strict: false });
   addFormats(ajv);

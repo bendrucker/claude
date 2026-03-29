@@ -216,6 +216,10 @@
               "type": "boolean",
               "default": false,
               "description": "Run the hook in the background without blocking"
+            },
+            "if": {
+              "type": "string",
+              "description": "Permission rule pattern to filter when this hook fires (e.g. Bash(git *), Edit(**/*.ts))"
             }
           }
         },
@@ -251,6 +255,10 @@
             "model": {
               "type": "string",
               "description": "Model to use for evaluation (defaults to a fast model)"
+            },
+            "if": {
+              "type": "string",
+              "description": "Permission rule pattern to filter when this hook fires (e.g. Bash(git *), Edit(**/*.ts))"
             }
           }
         },
@@ -281,6 +289,10 @@
             "model": {
               "type": "string",
               "description": "Model to use for evaluation (defaults to a fast model)"
+            },
+            "if": {
+              "type": "string",
+              "description": "Permission rule pattern to filter when this hook fires (e.g. Bash(git *), Edit(**/*.ts))"
             }
           }
         }

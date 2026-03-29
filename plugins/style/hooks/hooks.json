@@ -12,7 +12,7 @@
           {
             "type": "command",
             "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts",
-            "if": "Write(*.md)"
+            "if": "Write(**/*.md)"
           }
         ]
       },
@@ -26,7 +26,7 @@
           {
             "type": "command",
             "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts",
-            "if": "Edit(*.md)"
+            "if": "Edit(**/*.md)"
           }
         ]
       }

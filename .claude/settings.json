@@ -22,7 +22,7 @@
           {
             "type": "command",
             "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\"",
-            "if": "Edit(*.ts)|Edit(*.tsx)|Edit(*.js)|Edit(*.jsx)|Edit(*.json)|Edit(*.jsonc)|Write(*.ts)|Write(*.tsx)|Write(*.js)|Write(*.jsx)|Write(*.json)|Write(*.jsonc)"
+            "if": "Edit(**/*.ts)|Edit(**/*.tsx)|Edit(**/*.js)|Edit(**/*.jsx)|Edit(**/*.json)|Edit(**/*.jsonc)|Write(**/*.ts)|Write(**/*.tsx)|Write(**/*.js)|Write(**/*.jsx)|Write(**/*.json)|Write(**/*.jsonc)"
           }
         ]
       }

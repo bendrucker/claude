@@ -53,6 +53,9 @@
     "plugins/claude-code/skills/session": {
       "name": "session",
       "version": "1.0.0",
+      "dependencies": {
+        "table": "^6.9.0",
+      },
       "devDependencies": {
         "@duckdb/node-api": "1.5.0-r.1",
       },

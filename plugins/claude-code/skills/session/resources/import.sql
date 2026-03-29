@@ -1,8 +1,11 @@
 CREATE OR REPLACE TEMP TABLE new_raw AS
 SELECT
   * EXCLUDE (message, filename),
-  message.* EXCLUDE (content),
   message.content as message_content,
+  message.type as message_type,
+  message.id as message_id,
+  message.container as message_container,
+  message.* EXCLUDE (content, type, id, container),
   filename as source_file,
   ROW_NUMBER() OVER () as source_line
 FROM read_ndjson(
@@ -24,6 +27,25 @@ UNION ALL BY NAME
 SELECT * FROM new_raw;
 
 DROP TABLE new_raw;
+
+CREATE OR REPLACE TEMP TABLE content_items_export AS
+SELECT (
+  substr(item::VARCHAR, 1, length(item::VARCHAR) - 1) || ',' ||
+  ltrim(json_object(
+    'session_id', sessionId::VARCHAR,
+    'source_file', source_file,
+    'source_line', source_line,
+    'timestamp', timestamp,
+    'project_path', cwd,
+    'tool_use_result', toolUseResult
+  )::VARCHAR, '{')
+)::VARCHAR as line
+FROM raw,
+LATERAL (SELECT unnest(json_extract(message_content, '$[*]')) as item) t
+WHERE type IN ('user', 'assistant')
+  AND message_content IS NOT NULL
+  AND json_type(message_content) = 'ARRAY'
+  AND json_array_length(message_content) > 0;
 
 DELETE FROM meta;
 INSERT INTO meta VALUES (CURRENT_TIMESTAMP);

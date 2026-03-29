@@ -12,14 +12,10 @@ Search and analyze Claude Code conversation history via a DuckDB index over JSON
 
 **Current Session ID**: `${CLAUDE_SESSION_ID}`
 
-## DuckDB CLI
-
-!`duckdb --version 2>/dev/null || echo "NOT INSTALLED — query.sh requires the DuckDB CLI. Install: curl -fsSL https://install.duckdb.org | sh"`
-
 ## Running Queries
 
 ```bash
-QUERY=${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/query.sh
+QUERY="bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/query.ts"
 ```
 
 The index refreshes automatically on first use per session. Subsequent queries skip the refresh for faster results. Pass `--refresh` to force a re-scan when the user asks for the latest data.
@@ -47,7 +43,7 @@ $QUERY errors error_type=rejection limit=5
 
 ### `messages` table
 
-Each row is a content item extracted from a JSONL session line. Assistant messages with array content produce one row per item (text, tool_use, tool_result, thinking).
+One row per message. Schema is auto-detected from JSONL with snake_case renames for known fields.
 
 | Column | Type | Description |
 |---|---|---|
@@ -57,24 +53,35 @@ Each row is a content item extracted from a JSONL session line. Assistant messag
 | `project_path` | VARCHAR | Absolute path to the project directory |
 | `git_branch` | VARCHAR | Branch at time of message |
 | `is_meta` | BOOLEAN | System-injected user message (not human input) |
-| `content_text` | VARCHAR | Raw text content of the message |
-| `item_type` | VARCHAR | Content item type: `text`, `tool_use`, `tool_result`, `thinking` |
-| `tool_name` | VARCHAR | Tool name (for `tool_use` items) |
-| `tool_id` | VARCHAR | Tool use ID (for `tool_use` items) |
-| `tool_use_id` | VARCHAR | Matching tool use ID (for `tool_result` items) |
-| `result_content` | VARCHAR | Tool result text (for `tool_result` items) |
-| `is_error` | BOOLEAN | Whether the tool result is an error |
-| `is_rejection` | BOOLEAN | Whether the error was a user rejection (vs tool failure) |
-| `summary` | VARCHAR | Conversation summary (joined from `summary` type rows) |
-| `model` | VARCHAR | Model ID (e.g., `claude-opus-4-6`) — assistant rows only |
+| `content_text` | VARCHAR | Raw text content (string-content messages only) |
+| `summary` | VARCHAR | Conversation summary (joined from summary rows) |
 | `input_tokens` | BIGINT | Input token count — assistant rows only |
 | `output_tokens` | BIGINT | Output token count — assistant rows only |
-| `stop_reason` | VARCHAR | `end_turn`, `tool_use`, or `max_tokens` — assistant rows only |
-| `duration_ms` | BIGINT | Message duration in milliseconds (when available) |
-| `version` | VARCHAR | Claude Code version |
-| `is_sidechain` | BOOLEAN | Whether the message is on a sidechain (retry/branch) |
+| `duration_ms` | BIGINT | Message duration in milliseconds |
+| `is_sidechain` | BOOLEAN | Whether the message is on a sidechain |
 | `source_file` | VARCHAR | Absolute path to the source JSONL file |
 | `source_line` | BIGINT | Line number in the source file (1-based) |
+
+Unknown fields from JSONL pass through automatically via `* EXCLUDE`.
+
+### `content_items` table
+
+One row per content array element, with parent context merged in. Schema is fully auto-detected.
+
+| Column | Type | Description |
+|---|---|---|
+| `type` | VARCHAR | `text`, `tool_use`, `tool_result`, `thinking` |
+| `text` | VARCHAR | Text content |
+| `name` | VARCHAR | Tool name (for `tool_use`) |
+| `id` | VARCHAR | Tool use ID (for `tool_use`) |
+| `tool_use_id` | VARCHAR | Matching tool use ID (for `tool_result`) |
+| `content` | VARCHAR | Tool result text (for `tool_result`) |
+| `is_error` | BOOLEAN | Whether the tool result is an error |
+| `session_id` | VARCHAR | Session UUID (from parent message) |
+| `timestamp` | VARCHAR | Message timestamp (from parent message) |
+| `project_path` | VARCHAR | Project directory (from parent message) |
+
+Additional fields (`input`, `thinking`, `caller`, `signature`, etc.) are auto-detected from real data.
 
 ### `sessions` view
 

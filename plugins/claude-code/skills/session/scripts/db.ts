@@ -88,8 +88,18 @@ export async function ensureIndex(
   const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
   if (!row || row.n === 0n) return;
 
+  const dataDir = options.dataDir;
+  if (!dataDir) throw new Error("dataDir is required for import");
+  await db.run("SET VARIABLE data_dir = $dir", { dir: dataDir });
   await db.run("SET VARIABLE source = getvariable('changed_files')");
   await db.run(readSql(RESOURCES_DIR, "import"));
+
+  const contentItemsPath = path.join(dataDir, "content_items.jsonl");
+  await db.run(
+    `COPY content_items_export TO '${contentItemsPath}' (FORMAT CSV, HEADER false, QUOTE '', ESCAPE '')`,
+  );
+  await db.run("DROP TABLE content_items_export");
+
   await db.run(readSql(RESOURCES_DIR, "views"));
 
   if (options.dataDir) {

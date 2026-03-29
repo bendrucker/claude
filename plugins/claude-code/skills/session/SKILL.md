@@ -17,8 +17,8 @@ Search and analyze Claude Code conversation history via a DuckDB index over JSON
 The index refreshes automatically on first use per session. Subsequent queries skip the refresh for faster results. Pass `--refresh` to force a re-scan when the user asks for the latest data.
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/query.ts "SELECT model, SUM(output_tokens) as tokens FROM messages WHERE type = 'assistant' GROUP BY model"
-bun ${CLAUDE_SKILL_DIR}/scripts/query.ts --refresh "SELECT * FROM sessions ORDER BY start_time DESC LIMIT 5"
+${CLAUDE_SKILL_DIR}/scripts/query.ts "SELECT model, SUM(output_tokens) as tokens FROM messages WHERE type = 'assistant' GROUP BY model"
+${CLAUDE_SKILL_DIR}/scripts/query.ts --refresh "SELECT * FROM sessions ORDER BY start_time DESC LIMIT 5"
 ```
 
 #### Named Queries
@@ -26,9 +26,9 @@ bun ${CLAUDE_SKILL_DIR}/scripts/query.ts --refresh "SELECT * FROM sessions ORDER
 Built-in queries in `resources/queries/` can be run by name with `key=value` params. Prefer these over writing SQL from scratch for common tasks:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/query.ts search query=authentication limit=10
-bun ${CLAUDE_SKILL_DIR}/scripts/query.ts stats project=myapp after_date=2026-03-15
-bun ${CLAUDE_SKILL_DIR}/scripts/query.ts errors error_type=rejection limit=5
+${CLAUDE_SKILL_DIR}/scripts/query.ts search query=authentication limit=10
+${CLAUDE_SKILL_DIR}/scripts/query.ts stats project=myapp after_date=2026-03-15
+${CLAUDE_SKILL_DIR}/scripts/query.ts errors error_type=rejection limit=5
 ```
 
 - `search`: find sessions by keyword (ILIKE on `content_text` and `summary`). Params: `query`, `limit`, `after_date`, `before_date`, `project`

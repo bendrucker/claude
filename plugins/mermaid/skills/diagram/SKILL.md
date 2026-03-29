@@ -22,7 +22,7 @@ Create and validate Mermaid diagrams with syntax checking.
 Validate mermaid syntax in markdown files:
 
 ```bash
-bun ${CLAUDE_SKILL_ROOT}/scripts/validate.ts <file.md>
+bun ${CLAUDE_SKILL_DIR}/scripts/validate.ts <file.md>
 ```
 
 ## References

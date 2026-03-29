@@ -2,7 +2,7 @@
 name: gitlab:merge-request
 description: Working with GitLab merge requests via glab. Use when creating, updating, reviewing, or merging MRs.
 allowed-tools:
-  - Bash(bun ${CLAUDE_SKILL_ROOT}/scripts/*:*)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/*:*)
   - Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts:*)
   - Bash(glab mr:*)
   - Bash(glab api:*)

@@ -5,7 +5,7 @@ allowed-tools:
   - Read
   - Write
   - Edit
-  - "Bash(swift ${CLAUDE_SKILL_ROOT}/scripts/discover.swift:*)"
+  - "Bash(swift ${CLAUDE_SKILL_DIR}/scripts/discover.swift:*)"
   - Bash(plutil:*)
   - Bash(shortcuts:*)
   - Bash(open:*)
@@ -16,7 +16,7 @@ allowed-tools:
   - Grep
 hooks:
   PreToolUse:
-    - matcher: "Bash(swift ${CLAUDE_SKILL_ROOT}/scripts/discover.swift:*)|Bash(shortcuts:*)"
+    - matcher: "Bash(swift ${CLAUDE_SKILL_DIR}/scripts/discover.swift:*)|Bash(shortcuts:*)"
       hooks:
         - type: command
           command: |

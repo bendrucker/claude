@@ -1,7 +1,7 @@
 ---
 name: things:inbox
 description: Quick captures to the Things 3 inbox. Not for reads (things:jxa), scheduled tasks, updates, or projects (things:url).
-allowed-tools: ["Bash(bun ${CLAUDE_SKILL_DIR}/../../scripts/inbox.ts:*)"]
+allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"]
 ---
 
 # Things Inbox
@@ -11,7 +11,7 @@ Add todos to the Things 3 inbox.
 ## Add a Todo
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/../../scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
 ```
 
 The script handles URL encoding, session attribution, and the `Claude` tag automatically. Extra tags can be added via the `THINGS_EXTRA_TAGS` environment variable (comma-separated). For example, `THINGS_EXTRA_TAGS=claude-code` adds the `claude-code` tag to all captured todos.
@@ -30,18 +30,18 @@ When the `x-callback-url` plugin is installed, the script uses xcall to get the 
 
 ```bash
 # Simple inbox item
-bun ${CLAUDE_SKILL_DIR}/../../scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Call dentist"
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Call dentist"
 
 # With additional notes
-bun ${CLAUDE_SKILL_DIR}/../../scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Review PR #456" tags=Work notes="Check error handling"
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Review PR #456" tags=Work notes="Check error handling"
 
 # Multiple items at once
-bun ${CLAUDE_SKILL_DIR}/../../scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} titles="Buy milk
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} titles="Buy milk
 Pick up dry cleaning
 Walk dog"
 
 # With checklist
-bun ${CLAUDE_SKILL_DIR}/../../scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Prepare presentation" checklist-items="Create slides
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Prepare presentation" checklist-items="Create slides
 Prepare talking points
 Practice delivery"
 ```

@@ -15,7 +15,7 @@ Search and analyze Claude Code conversation history via a DuckDB index over JSON
 ## Running Queries
 
 ```bash
-QUERY="bun ${CLAUDE_PLUGIN_ROOT}/skills/session/scripts/query.ts"
+QUERY="bun ${CLAUDE_SKILL_DIR}/scripts/query.ts"
 ```
 
 The index refreshes automatically on first use per session. Subsequent queries skip the refresh for faster results. Pass `--refresh` to force a re-scan when the user asks for the latest data.

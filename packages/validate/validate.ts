@@ -45,12 +45,32 @@ function formatWarning(file: string, key: string): string {
 }
 
 export async function loadSchema(schemaPath: string): Promise<Record<string, unknown>> {
+  let schema: Record<string, unknown>;
   if (schemaPath.startsWith("http")) {
     const response = await fetch(schemaPath);
-    return response.json();
+    schema = await response.json();
+  } else {
+    const content = await readFile(schemaPath, "utf8");
+    schema = JSON.parse(content);
   }
-  const content = await readFile(schemaPath, "utf8");
-  return JSON.parse(content);
+  patchHookSchema(schema);
+  return schema;
+}
+
+function patchHookSchema(schema: Record<string, unknown>): void {
+  const defs = schema.$defs as Record<string, Record<string, unknown>> | undefined;
+  const hookCommand = defs?.hookCommand as { anyOf?: Array<Record<string, unknown>> } | undefined;
+  if (!hookCommand?.anyOf) return;
+
+  for (const variant of hookCommand.anyOf) {
+    const props = variant.properties as Record<string, unknown> | undefined;
+    if (props) {
+      props.if = {
+        type: "string",
+        description: "Permission rule pattern to filter when this hook fires",
+      };
+    }
+  }
 }
 
 export async function validateFile(

@@ -23,4 +23,4 @@ SELECT
   (SELECT SUM(uses) FROM per_tool) as total_tool_uses,
   (SELECT SUM(errors) FROM per_tool) as total_errors
 FROM per_tool
-ORDER BY uses DESC;
+ORDER BY uses DESC, tool_name;

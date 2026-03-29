@@ -48,7 +48,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ~/.claude/hooks/worktree"
+            "command": "bun ~/.claude/hooks/worktree",
+            "if": "Bash(git worktree *)"
           }
         ]
       },

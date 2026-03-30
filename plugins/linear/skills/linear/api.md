@@ -64,14 +64,14 @@ linear api 'query { viewer { id name email } }'
 **Get team issues:**
 
 ```bash
-linear api 'query($teamId: String!) { team(id: $teamId) { issues { nodes { id title state { name } assignee { name } } } } }' \
+linear api 'query($teamId: String!) { team(id: $teamId) { issues { nodes { id title url state { name } assignee { name } } } } }' \
   --variable teamId=TEAM_ID
 ```
 
 **Get user's assigned issues:**
 
 ```bash
-linear api 'query { viewer { assignedIssues { nodes { id title state { name } team { key } } } } }'
+linear api 'query { viewer { assignedIssues { nodes { id title url state { name } team { key } } } } }'
 ```
 
 ## Example Mutations

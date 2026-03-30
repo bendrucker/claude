@@ -123,7 +123,9 @@ function checkMatchers() {
         const mappedTool = claudeAi.tools[tool] ?? tool;
         const claudeAiVariant = `mcp__claude_ai_${claudeAi.displayName}__${mappedTool}`;
         if (!patterns.includes(claudeAiVariant)) {
-          errors.push(`${file}: matcher "${pattern}" is missing Claude AI variant "${claudeAiVariant}"`);
+          errors.push(
+            `${file}: matcher "${pattern}" is missing Claude AI variant "${claudeAiVariant}"`,
+          );
         }
       }
     }

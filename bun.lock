@@ -146,18 +146,6 @@
         "@constellos/claude-code-kit": "^0.4.0",
       },
     },
-    "plugins/style": {
-      "name": "@bendrucker/claude-style",
-      "dependencies": {
-        "@constellos/claude-code-kit": "^0.4.0",
-        "ap-style-title-case": "^2.0.0",
-        "mdast-util-from-markdown": "^2.0.2",
-        "unist-util-visit": "^5.1.0",
-      },
-      "devDependencies": {
-        "@types/mdast": "^4.0.4",
-      },
-    },
     "plugins/things": {
       "name": "things",
       "version": "1.0.0",
@@ -205,6 +193,18 @@
         "cleye": "^1.3.4",
       },
     },
+    "plugins/writing": {
+      "name": "@bendrucker/claude-writing",
+      "dependencies": {
+        "@constellos/claude-code-kit": "^0.4.0",
+        "ap-style-title-case": "^2.0.0",
+        "mdast-util-from-markdown": "^2.0.2",
+        "unist-util-visit": "^5.1.0",
+      },
+      "devDependencies": {
+        "@types/mdast": "^4.0.4",
+      },
+    },
     "plugins/x-callback-url": {
       "name": "x-callback-url",
       "dependencies": {
@@ -232,11 +232,11 @@
 
     "@babel/helper-validator-identifier": ["@babel/helper-validator-identifier@7.28.5", "", {}, "sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q=="],
 
-    "@bendrucker/claude-style": ["@bendrucker/claude-style@workspace:plugins/style"],
-
     "@bendrucker/claude-tmux": ["@bendrucker/claude-tmux@workspace:plugins/tmux"],
 
     "@bendrucker/claude-validate": ["@bendrucker/claude-validate@workspace:packages/validate"],
+
+    "@bendrucker/claude-writing": ["@bendrucker/claude-writing@workspace:plugins/writing"],
 
     "@bendrucker/type-ignore": ["@bendrucker/type-ignore@workspace:plugins/type-ignore"],
 

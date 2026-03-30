@@ -1,5 +1,5 @@
 {
-  "description": "Detects style violations in markdown and code",
+  "description": "Detects writing style violations and AI tropes",
   "hooks": {
     "PreToolUse": [
       {
@@ -13,6 +13,10 @@
             "type": "command",
             "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts",
             "if": "Write(**/*.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
           }
         ]
       },
@@ -27,6 +31,19 @@
             "type": "command",
             "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts",
             "if": "Edit(**/*.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
           }
         ]
       }

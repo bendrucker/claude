@@ -54,9 +54,9 @@
       "source": "./plugins/newline"
     },
     {
-      "name": "style",
-      "description": "Code style enforcement hooks",
-      "source": "./plugins/style"
+      "name": "writing",
+      "description": "Writing style enforcement hooks and AI trope detection",
+      "source": "./plugins/writing"
     },
     {
       "name": "github",

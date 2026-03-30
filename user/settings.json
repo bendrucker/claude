@@ -89,12 +89,12 @@
     "writing@bendrucker": true,
     "type-ignore@bendrucker": true,
     "agents-md@bendrucker": true,
-    "ast-grep@ast-grep": true,
+    "ast-grep@ast-grep-marketplace": true,
     "worktrunk@worktrunk": true,
     "vscode@bendrucker": true,
     "plan@bendrucker": true,
     "playground@claude-plugins-official": true,
-    "linear-cli@schpet": true,
+    "linear-cli@linear-cli": true,
     "tmux@bendrucker": true,
     "agent-browser@agent-browser": true,
     "bun@bendrucker": true,
@@ -125,7 +125,7 @@
         "ref": "f8034678a15ad751aae6a2b684daebac416267a1"
       }
     },
-    "ast-grep": {
+    "ast-grep-marketplace": {
       "source": {
         "source": "github",
         "repo": "ast-grep/claude-skill",
@@ -139,7 +139,7 @@
         "ref": "v0.33.0"
       }
     },
-    "schpet": {
+    "linear-cli": {
       "source": {
         "source": "github",
         "repo": "schpet/linear-cli",

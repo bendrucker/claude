@@ -11,25 +11,13 @@ Use for bug fixes, which should include a related issue.
 
 ## Changes
 
-High-level bulleted description of changes made, written for human reviewers.
+Organize by concept, not by file. Each bullet should describe a single conceptual shift, even when it spans multiple files. The reviewer reads this to understand *what's different and why*, not to get a tour of modified files.
 
-- Summarize user impact, don't narrate code
-- Emphasize API and interface changes first:
-  - Adds `POST /users` endpoint to create users
-  - Updates `User.create` to accept `email` parameter
-  - Handles `404` errors in `GET /users/{id}`
-- Include refactoring as separate bullets:
-  - Extracts repeated logic into `UserRepository`
-  - Refactors `UserService` to use dependency injection
-
-### Referencing code
-
-- Use the shortest unambiguous name: module name, filename, or component, not full paths
-  - `UserService`, not `src/services/UserService.ts`
-  - `discussions.ts`, not `plugins/gitlab/skills/merge-request/scripts/discussions.ts`
-  - The `diff` module, not `plugins/gitlab/scripts/diff.ts`
-- Never structure bullets as `**path**: description`. This reads like a file manifest, not a changelog
-- Reference identifiers only when they clarify the change. "Add `email` parameter to `User.create`" is useful. "Update `handleRequest` in `server.ts` to call `validateInput`" is noise
+- Lead with the conceptual change, not the file location
+- Omit cleanup that follows naturally from the main change (e.g. removing dead imports). The diff shows this
+- Never structure bullets as `**path**: description`
+- Reference code identifiers only when they add information beyond what the diff shows. Use the shortest unambiguous name (module, filename, or component, not full paths)
+- When referring to a set of things changed, write naturally: enumerate short lists inline (e.g. "hook command variants (command, model, prompt)"), use "all" or "each" for large sets. Never pair a count with the enumeration ("all three X (a, b, c)"). Either enumerate or summarize, not both
 
 ## Testing
 

@@ -42,6 +42,7 @@ allowed-tools:
 - Start with 1-3 sentences summarizing the change (no preceding header). Use active voice and direct language
   - Good: "Adds retry logic to the HTTP client and limits maximum attempts to 3."
   - Bad: "Retry logic is added to the HTTP client and maximum attempts are limited to 3."
+- If the PR is directly motivated by an issue, reference it at the end of the opening summary (`Closes #N`, `Fixes #N`, or just `#N` if not closing). Related issues mentioned for context belong in a `## References` section. Never drop issue refs at the bottom of the body without a section
 - **Wrap all code identifiers with backticks**: function names, class names, file paths, endpoints, status codes, etc.
 - Use `##` sections for larger changes. See [`sections.md`](sections.md) for detailed guidance on:
   - `## Issue` - Root cause analysis and issue linking

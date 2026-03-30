@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { extractBodyFilePath, processInput, validateBody } from "./validate";
+import { extractBodyFilePath, processInput, validateBody } from "./validate-body";
 
 function getPermissionDecision(result: Awaited<ReturnType<typeof validateBody>>) {
   const output = result?.hookSpecificOutput;

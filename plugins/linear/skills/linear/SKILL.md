@@ -21,6 +21,15 @@ Choose the right tool for the task:
 
 ## Conventions
 
+### Issue References
+
+When writing text that references other issues (descriptions, comments, updates), never use bare identifiers like `ENG-123`. Linear auto-renders issue URLs as inline preview components, so use the full URL:
+
+- **Bare URL**: `https://linear.app/workspace/issue/ENG-123` (renders as an inline preview)
+- **Hyperlinked text**: `[the auth bug](https://linear.app/workspace/issue/ENG-123)` (when linking specific words is more natural)
+
+Both MCP tools and GraphQL queries return a `url` field on issues. Always include `url` when querying issues you may reference in written content.
+
 ### Issue Status
 
 When creating issues, set the appropriate status based on assignment:
@@ -94,7 +103,7 @@ linear api 'query($id: String!) { issue(id: $id) { title } }' --variable id=ISSU
 Pipe output through `jq` for formatting:
 
 ```bash
-linear api 'query { viewer { assignedIssues { nodes { identifier title } } } }' | jq '.data.viewer.assignedIssues.nodes'
+linear api 'query { viewer { assignedIssues { nodes { identifier title url } } } }' | jq '.data.viewer.assignedIssues.nodes'
 ```
 
 ## Opening Issues in the Desktop App

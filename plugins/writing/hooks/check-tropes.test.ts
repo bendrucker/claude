@@ -1,0 +1,196 @@
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type {
+  PreToolUseHookInput,
+  PreToolUseHookSpecificOutput,
+} from "@anthropic-ai/claude-agent-sdk";
+import { collectText, processInput } from "./check-tropes";
+
+function mockWrite(content: string): PreToolUseHookInput {
+  return {
+    hook_event_name: "PreToolUse",
+    session_id: "test",
+    transcript_path: "/tmp/test",
+    cwd: "/tmp",
+    tool_name: "Write",
+    tool_input: { file_path: "test.md", content },
+    tool_use_id: "test",
+  };
+}
+
+function mockEdit(newString: string): PreToolUseHookInput {
+  return {
+    hook_event_name: "PreToolUse",
+    session_id: "test",
+    transcript_path: "/tmp/test",
+    cwd: "/tmp",
+    tool_name: "Edit",
+    tool_input: { file_path: "test.md", new_string: newString },
+    tool_use_id: "test",
+  };
+}
+
+function mockBash(command: string): PreToolUseHookInput {
+  return {
+    hook_event_name: "PreToolUse",
+    session_id: "test",
+    transcript_path: "/tmp/test",
+    cwd: "/tmp",
+    tool_name: "Bash",
+    tool_input: { command },
+    tool_use_id: "test",
+  };
+}
+
+function mockMcp(toolName: string, toolInput: Record<string, unknown>): PreToolUseHookInput {
+  return {
+    hook_event_name: "PreToolUse",
+    session_id: "test",
+    transcript_path: "/tmp/test",
+    cwd: "/tmp",
+    tool_name: toolName,
+    tool_input: toolInput,
+    tool_use_id: "test",
+  };
+}
+
+function getDecision(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
+  const result = processInput(input);
+  if (!result) return null;
+  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+}
+
+describe("Write/Edit", () => {
+  it("denies Write with spaced em dash", () => {
+    const output = getDecision(mockWrite("This \u2014 is bad"));
+    expect(output?.permissionDecision).toBe("deny");
+  });
+
+  it("asks on Edit with spaced em dash", () => {
+    const output = getDecision(mockEdit("This \u2014 is bad"));
+    expect(output?.permissionDecision).toBe("ask");
+  });
+
+  it("returns context for promotional language", () => {
+    const result = processInput(mockWrite("A groundbreaking approach"));
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("returns null for clean text", () => {
+    expect(processInput(mockWrite("Clean prose here."))).toBeNull();
+  });
+
+  it("returns null for empty content", () => {
+    expect(processInput(mockWrite(""))).toBeNull();
+  });
+});
+
+describe("collectText", () => {
+  describe("Bash commands", () => {
+    let dir: string;
+    let tmpFile: string;
+
+    beforeAll(() => {
+      dir = mkdtempSync(join(tmpdir(), "trope-test-"));
+      tmpFile = join(dir, "body.md");
+    });
+
+    afterAll(() => {
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("reads --body-file content", () => {
+      writeFileSync(tmpFile, "Body content here");
+      const texts = collectText(mockBash(`gh pr create --body-file ${tmpFile}`));
+      expect(texts).toContain("Body content here");
+    });
+
+    it("reads --body-file= content", () => {
+      writeFileSync(tmpFile, "Body content");
+      const texts = collectText(mockBash(`gh pr create --body-file=${tmpFile}`));
+      expect(texts).toContain("Body content");
+    });
+
+    it("extracts inline --body", () => {
+      const texts = collectText(mockBash('gh issue create --body "Issue description"'));
+      expect(texts).toContain("Issue description");
+    });
+
+    it("extracts inline --title", () => {
+      const texts = collectText(mockBash('gh issue create --title "My title"'));
+      expect(texts).toContain("My title");
+    });
+
+    it("returns empty for commands without text args", () => {
+      const texts = collectText(mockBash("git status"));
+      expect(texts).toHaveLength(0);
+    });
+  });
+
+  describe("MCP tools", () => {
+    it("extracts prose strings, skipping short values", () => {
+      const texts = collectText(
+        mockMcp("mcp__linear__save_issue", {
+          title: "Fix the bug in authentication flow",
+          description: "Users are unable to log in when using SSO",
+          team: "ENG",
+        }),
+      );
+      expect(texts).toContain("Fix the bug in authentication flow");
+      expect(texts).toContain("Users are unable to log in when using SSO");
+      expect(texts).not.toContain("ENG");
+    });
+
+    it("skips URLs and identifiers", () => {
+      const texts = collectText(
+        mockMcp("mcp__claude_ai_Slack__slack_send_message", {
+          channel_id: "C123ABC456",
+          text: "The deploy finished successfully and all tests pass",
+        }),
+      );
+      expect(texts).toContain("The deploy finished successfully and all tests pass");
+      expect(texts).not.toContain("C123ABC456");
+    });
+
+    it("handles empty input", () => {
+      const texts = collectText(mockMcp("mcp__test", {}));
+      expect(texts).toHaveLength(0);
+    });
+  });
+});
+
+describe("Bash/MCP processInput", () => {
+  it("denies MCP tool input with spaced em dash", () => {
+    const result = processInput(
+      mockMcp("mcp__linear__save_issue", {
+        title: "Fix the bug",
+        description: "This feature \u2014 which was added last week \u2014 is broken",
+      }),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+  });
+
+  it("denies Bash body-file with AI vocabulary", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
+    const file = join(dir, "body.md");
+    writeFileSync(file, "We must delve into the issue");
+    const result = processInput(mockBash(`gh pr create --body-file ${file}`));
+    rmSync(dir, { recursive: true, force: true });
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+  });
+
+  it("returns null for clean MCP input", () => {
+    const result = processInput(
+      mockMcp("mcp__claude_ai_Slack__slack_send_message", {
+        text: "The deploy finished successfully.",
+      }),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("returns null for non-text Bash commands", () => {
+    expect(processInput(mockBash("git push origin main"))).toBeNull();
+  });
+});

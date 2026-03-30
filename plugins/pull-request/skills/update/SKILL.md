@@ -24,6 +24,8 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 - Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts`
 - PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
 
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
+
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
 
 ## Workflow

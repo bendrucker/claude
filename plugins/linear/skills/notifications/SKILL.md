@@ -3,6 +3,7 @@ name: linear:notifications
 description: Managing Linear notifications inbox. Use when listing, filtering, or triaging Linear notifications.
 allowed-tools:
   - mcp__linear
+  - mcp__claude_ai_Linear
   - Bash
 ---
 

@@ -3,6 +3,7 @@ name: linear
 description: Interacting with Linear issues, projects, and teams. Use when creating issues, updating issues, querying issues, managing projects, working on tasks, discussing backlogs, or any interaction with Linear.
 allowed-tools:
   - mcp__linear
+  - mcp__claude_ai_Linear
   - WebFetch(domain:linear.app)
   - Bash
 ---

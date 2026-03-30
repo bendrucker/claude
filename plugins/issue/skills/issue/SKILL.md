@@ -9,6 +9,7 @@ allowed-tools:
   - mcp__github
   - mcp__plugin_github_github__issue_read
   - mcp__linear
+  - mcp__claude_ai_Linear
   - mcp__plugin_github_github__search_code
 ---
 

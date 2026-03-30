@@ -87,6 +87,20 @@ describe("processInput", () => {
     expect(output).toBeNull();
   });
 
+  it("works with Claude AI MCP tool name pattern", () => {
+    const output = processInput(
+      mockInput({ title: "Test issue", team: "ENG" }, "mcp__claude_ai_Linear__save_issue"),
+    );
+    expect(output).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        updatedInput: {
+          state: "Backlog",
+        },
+      },
+    });
+  });
+
   it("works with plugin MCP tool name pattern", () => {
     const output = processInput(
       mockInput({ title: "Test issue", team: "ENG" }, "mcp__plugin_linear_linear__create_issue"),

@@ -55,5 +55,5 @@ Links to related issues, prior attempts, upstream work.
 
 Fetch with `get_issue`, output refinement for review, update only after approval.
 
-- Linear: `mcp__linear__get_issue`, `mcp__linear__update_issue`
+- Linear: `mcp__linear__get_issue`, `mcp__linear__update_issue`, or `mcp__claude_ai_Linear__get_issue`, `mcp__claude_ai_Linear__save_issue`
 - GitHub: `mcp__github__get_issue`, `mcp__github__update_issue`

@@ -86,7 +86,7 @@
     "x-callback-url@bendrucker": true,
     "calendar@bendrucker": true,
     "research@bendrucker": true,
-    "style@bendrucker": true,
+    "writing@bendrucker": true,
     "type-ignore@bendrucker": true,
     "agents-md@bendrucker": true,
     "ast-grep@ast-grep": true,

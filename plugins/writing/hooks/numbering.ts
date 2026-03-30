@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { execSync } from "node:child_process";
-import { unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -67,7 +67,8 @@ export function checkCode(content: string, ext: string): string | null {
     return null;
   }
 
-  const tmpFile = join(tmpdir(), `hook-check.${ext}`);
+  const tmpDir = mkdtempSync(join(tmpdir(), "hook-check-"));
+  const tmpFile = join(tmpDir, `check.${ext}`);
   const ruleFile = join(__dirname, "numbering.yml");
 
   try {
@@ -96,11 +97,7 @@ export function checkCode(content: string, ext: string): string | null {
   } catch {
     // sg failed or parse error
   } finally {
-    try {
-      unlinkSync(tmpFile);
-    } catch {
-      // Ignore cleanup errors
-    }
+    rmSync(tmpDir, { recursive: true, force: true });
   }
 
   return null;

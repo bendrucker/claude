@@ -19,7 +19,16 @@ interface PluginMcp {
   serverNames: string[];
 }
 
-const MCP_PATTERN = /^mcp__(?!plugin_)(\w+)__(.+)$/;
+const MCP_PATTERN = /^mcp__(?!plugin_)(?!claude_ai_)(\w+)__(.+)$/;
+
+const CLAUDE_AI_MAPPINGS: Record<string, { displayName: string; tools: Record<string, string> }> = {
+  linear: {
+    displayName: "Linear",
+    tools: {
+      create_issue: "save_issue",
+    },
+  },
+};
 
 function discoverPluginMcpServers(): PluginMcp[] {
   const results: PluginMcp[] = [];
@@ -108,6 +117,15 @@ function checkMatchers() {
       if (!patterns.includes(pluginVariant)) {
         errors.push(`${file}: matcher "${pattern}" is missing plugin variant "${pluginVariant}"`);
       }
+
+      const claudeAi = CLAUDE_AI_MAPPINGS[server];
+      if (claudeAi) {
+        const mappedTool = claudeAi.tools[tool] ?? tool;
+        const claudeAiVariant = `mcp__claude_ai_${claudeAi.displayName}__${mappedTool}`;
+        if (!patterns.includes(claudeAiVariant)) {
+          errors.push(`${file}: matcher "${pattern}" is missing Claude AI variant "${claudeAiVariant}"`);
+        }
+      }
     }
   }
 
@@ -123,4 +141,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log("All MCP hook matchers include plugin variants");
+console.log("All MCP hook matchers include plugin and Claude AI variants");

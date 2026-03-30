@@ -33,6 +33,25 @@ Skills where the name differs from the plugin name must include the `plugin-name
 
 Anti-stuttering applies to the part after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right.
 
+### MCP Tool Naming
+
+MCP tools appear with three naming patterns depending on how the server is connected:
+
+| Pattern | Format | Example |
+|---------|--------|---------|
+| Local | `mcp__<server>__<tool>` | `mcp__linear__create_issue` |
+| Plugin | `mcp__plugin_<pluginName>_<server>__<tool>` | `mcp__plugin_linear_linear__create_issue` |
+| Claude AI | `mcp__claude_ai_<DisplayName>__<tool>` | `mcp__claude_ai_Linear__save_issue` |
+
+Claude AI display names differ from server names (e.g., `Linear` not `linear`) and cannot be derived programmatically. Tool names may also differ between variants — Linear uses `save_issue` instead of `create_issue`/`update_issue`. Known mappings:
+
+| Server | Display Name | Local Tool | Claude AI Tool |
+|--------|-------------|------------|----------------|
+| `linear` | `Linear` | `create_issue` | `save_issue` |
+| `linear` | `Linear` | `update_issue` | `save_issue` |
+
+Hook matchers must include all three patterns for matched tools. Skill `allowed-tools` needs the `mcp__claude_ai_<Name>` prefix. Run `bun scripts/check-mcp-matchers.ts` to validate hook matchers include all variants.
+
 ### Plugin READMEs
 
 Each plugin should have a `README.md` with consistent sections:

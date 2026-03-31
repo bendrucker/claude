@@ -21,34 +21,19 @@ allowed-tools:
 
 Monitor CI, fix trivial failures, repeat until green.
 
-## State
-
-!`bun ${CLAUDE_PLUGIN_ROOT}/skills/babysit/scripts/state.ts`
-
 ## Current Branch
 
 !`git branch --show-current`
 
 ## Workflow
 
-Read the state output above. Branch on `iteration` and `max_reached`.
+## State
+
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/babysit/scripts/state.ts ${CLAUDE_SESSION_ID}`
+
+Branch on `iteration` and `max_reached` from the state output above.
 
 ### First run (iteration: 0)
-
-#### Record start SHA
-
-Write the current HEAD SHA into the state file:
-
-```bash
-bun -e "
-const { join } = require('path');
-const fs = require('fs');
-const p = join(process.env.TMPDIR, process.env.CLAUDE_CODE_SESSION_ID, 'babysit-pr-state.json');
-const s = JSON.parse(fs.readFileSync(p, 'utf-8'));
-s.start_sha = '$(git rev-parse HEAD)';
-fs.writeFileSync(p, JSON.stringify(s));
-"
-```
 
 #### Determine polling interval
 
@@ -79,19 +64,12 @@ Use `CronCreate` with:
 Write the returned job ID into the state file:
 
 ```bash
-bun -e "
-const { join } = require('path');
-const fs = require('fs');
-const p = join(process.env.TMPDIR, process.env.CLAUDE_CODE_SESSION_ID, 'babysit-pr-state.json');
-const s = JSON.parse(fs.readFileSync(p, 'utf-8'));
-s.cron_job_id = '<JOB_ID>';
-fs.writeFileSync(p, JSON.stringify(s));
-"
+bun ${CLAUDE_SKILL_DIR}/scripts/state.ts ${CLAUDE_SESSION_ID} set cron_job_id <JOB_ID>
 ```
 
 ### Max iterations reached (max_reached: true)
 
-Cancel the cron job with `CronDelete` using the `cron_job_id` from state. Remove the state file. Report:
+Cancel the cron job with `CronDelete` using the `cron_job_id` from state. Clean up: `bun ${CLAUDE_SKILL_DIR}/scripts/state.ts ${CLAUDE_SESSION_ID} clean`. Report:
 - Total iterations used
 - Current CI status
 - Any commits made: `git log <start_sha>..HEAD --oneline`

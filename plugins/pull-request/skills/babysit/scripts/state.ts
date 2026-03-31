@@ -6,6 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node
 import { detectProvider } from "../../../scripts/detect-provider";
 
 interface State {
+  [key: string]: unknown;
   iteration: number;
   max_iterations: number;
   start_sha?: string;
@@ -32,7 +33,7 @@ if (subcommand === "set") {
     process.exit(1);
   }
   const state: State = JSON.parse(readFileSync(statePath, "utf-8"));
-  (state as Record<string, unknown>)[key] = value;
+  state[key] = value;
   writeFileSync(statePath, JSON.stringify(state));
   process.exit(0);
 }

@@ -18,7 +18,6 @@ if (!sessionId) {
   process.exit(1);
 }
 
-var unused = "lint violation";
 const tmpdir = process.env.TMPDIR || "/tmp";
 const stateDir = join(tmpdir, sessionId);
 const statePath = join(stateDir, "babysit-pr-state.json");
@@ -33,7 +32,7 @@ if (subcommand === "set") {
     process.exit(1);
   }
   const state: State = JSON.parse(readFileSync(statePath, "utf-8"));
-  (state as unknown as Record<string, unknown>)[key] = value;
+  (state as Record<string, unknown>)[key] = value;
   writeFileSync(statePath, JSON.stringify(state));
   process.exit(0);
 }

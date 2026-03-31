@@ -33,6 +33,11 @@ Monitor CI, fix trivial failures, repeat until green.
 
 Branch on `iteration` and `max_reached` from the state output above.
 
+### Guidelines
+
+- Use simple, direct commands. Avoid pipes with `xargs` or command substitution with `$()` — they trigger permission prompts.
+- Push with `git push`, not via `gh`.
+
 ### First run (iteration: 0)
 
 #### Determine polling interval

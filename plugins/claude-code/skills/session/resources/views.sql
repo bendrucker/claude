@@ -52,6 +52,18 @@ LEFT JOIN tool_calls tc ON er.tool_use_id = tc.tool_id
 WHERE er.type = 'tool_result'
   AND er.is_error;
 
+CREATE OR REPLACE VIEW skill_calls AS
+SELECT
+  TRIM(input.skill::VARCHAR, '"') as skill_name,
+  id as tool_id,
+  session_id,
+  project_path,
+  timestamp::TIMESTAMP as timestamp
+FROM content_items
+WHERE type = 'tool_use'
+  AND name = 'Skill'
+  AND input.skill IS NOT NULL;
+
 CREATE OR REPLACE VIEW sessions AS
 SELECT
   session_id,

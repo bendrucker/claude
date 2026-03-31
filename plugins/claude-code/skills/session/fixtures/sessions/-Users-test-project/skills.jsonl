@@ -1,0 +1,7 @@
+{"type":"user","message":{"role":"user","content":"Review the PR"},"sessionId":"skills-session","cwd":"/Users/test/project","gitBranch":"feature","timestamp":"2024-01-18T09:00:00.000Z","uuid":"uuid-s1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"skill-1","name":"Skill","input":{"skill":"review:peer","args":"123"}}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:01:00.000Z","uuid":"uuid-s2"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"skill-1","content":"Skill loaded"}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:02:00.000Z","uuid":"uuid-s3"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"skill-2","name":"Skill","input":{"skill":"pull-request:create"}}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:03:00.000Z","uuid":"uuid-s4"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"skill-2","content":"Skill loaded"}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:04:00.000Z","uuid":"uuid-s5"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"skill-3","name":"Skill","input":{"skill":"review:peer","args":"456"}}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:05:00.000Z","uuid":"uuid-s6"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"skill-3","content":"Skill loaded"}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:06:00.000Z","uuid":"uuid-s7"}

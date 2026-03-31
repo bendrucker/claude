@@ -55,6 +55,7 @@ WHERE er.type = 'tool_result'
 CREATE OR REPLACE VIEW skill_calls AS
 SELECT
   TRIM(input.skill::VARCHAR, '"') as skill_name,
+  NULLIF(TRIM(input.args::VARCHAR, '"'), '') as args,
   id as tool_id,
   session_id,
   project_path,

@@ -22,7 +22,7 @@ SET VARIABLE changed_sessions = (
 
 CREATE OR REPLACE TABLE raw AS
 SELECT * FROM raw
-WHERE sessionId NOT IN (SELECT unnest(getvariable('changed_sessions'))::VARCHAR)
+WHERE sessionId::VARCHAR NOT IN (SELECT unnest(getvariable('changed_sessions'))::VARCHAR)
 UNION ALL BY NAME
 SELECT * FROM new_raw;
 

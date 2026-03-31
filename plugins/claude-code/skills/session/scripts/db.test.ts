@@ -177,6 +177,81 @@ describe("errors", () => {
   });
 });
 
+describe("permission_requests", () => {
+  it("returns rejected tool calls with tool details", async () => {
+    const rows = await db.query<{
+      tool_name: string;
+      tool_id: string;
+      session_id: string;
+    }>("SELECT * FROM permission_requests");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.tool_name).toBe("Bash");
+    expect(rows[0]?.tool_id).toBe("tool-1");
+    expect(rows[0]?.session_id).toBe("tools-session");
+  });
+});
+
+describe("sandbox_bypasses", () => {
+  it("returns sandbox bypass calls", async () => {
+    const rows = await db.query<{
+      command: string;
+      description: string;
+      tool_id: string;
+      session_id: string;
+    }>("SELECT * FROM sandbox_bypasses");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.command).toContain("osascript");
+    expect(rows[0]?.description).toBe("Query Things via JXA");
+    expect(rows[0]?.session_id).toBe("tools-session");
+  });
+
+  it("links to the prior failed sandboxed call", async () => {
+    const rows = await db.query<{
+      retried_tool_id: string | null;
+      retried_error: string | null;
+    }>("SELECT retried_tool_id, retried_error FROM sandbox_bypasses");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.retried_tool_id).toBe("tool-4a");
+    expect(rows[0]?.retried_error).toContain("Connection Invalid");
+  });
+});
+
+describe("permissions query", () => {
+  it("returns permission requests with filters", async () => {
+    const rows = await runQuery<{ tool_name: string; target: string }>(
+      db,
+      "permissions",
+      queryParams(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.tool_name).toBe("Bash");
+    expect(rows[0]?.target).toContain("npm test");
+  });
+
+  it("filters by project", async () => {
+    const rows = await runQuery<{ tool_name: string }>(
+      db,
+      "permissions",
+      queryParams({ project: "nonexistent" }),
+    );
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe("sandbox query", () => {
+  it("returns sandbox bypasses with retry detection", async () => {
+    const rows = await runQuery<{ command: string; is_retry: boolean; prior_error: string | null }>(
+      db,
+      "sandbox",
+      queryParams(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.command).toContain("osascript");
+    expect(rows[0]?.is_retry).toBe(true);
+    expect(rows[0]?.prior_error).toContain("Connection Invalid");
+  });
+});
+
 describe("incremental refresh", () => {
   it("produces no duplicates on repeated indexing", async () => {
     const before = await db.query<{ session_id: string }>(

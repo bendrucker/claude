@@ -5,5 +5,8 @@
   "type": "module",
   "devDependencies": {
     "@duckdb/node-api": "1.5.0-r.1"
+  },
+  "dependencies": {
+    "table": "^6.9.0"
   }
 }

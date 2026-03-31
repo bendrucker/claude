@@ -1,10 +1,17 @@
 SELECT s.*
 FROM sessions s
-WHERE EXISTS (
-  SELECT 1 FROM messages m
-  WHERE m.session_id = s.session_id
-    AND (m.content_text ILIKE '%' || getvariable('query') || '%'
-      OR m.summary ILIKE '%' || getvariable('query') || '%')
+WHERE (
+  EXISTS (
+    SELECT 1 FROM messages m
+    WHERE m.session_id = s.session_id
+      AND (m.content_text ILIKE '%' || getvariable('query') || '%'
+        OR m.summary ILIKE '%' || getvariable('query') || '%')
+  )
+  OR EXISTS (
+    SELECT 1 FROM content_items ci
+    WHERE ci.session_id = s.session_id
+      AND ci.text ILIKE '%' || getvariable('query') || '%'
+  )
 )
   AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
   AND project_filter(s.project_path, getvariable('project'))

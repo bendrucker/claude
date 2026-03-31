@@ -2,18 +2,32 @@
 
 ## DuckDB Architecture
 
-The session skill indexes JSONL session files from `~/.claude/projects/` into a persistent DuckDB database. The JSONL files are the canonical data store: the database is a derived cache.
+JSONL files in `~/.claude/projects/` are the canonical data. The DuckDB database is a derived cache.
 
-### Schema and Queries
+### Schema
 
-`resources/schema/` contains ordered DDL files run on every startup. `resources/queries/` contains parameterized SQL used by tests. The `query.sh` script runs arbitrary SQL directly against the index.
+`resources/schema/` contains ordered DDL files run on every startup:
 
-`import.sql` inserts into `messages` using `getvariable('source')` to resolve the file source. `query.sh` determines changed files via mtime comparison, then sets `source` to either the changed file list or an empty JSONL file (producing zero imported rows). `db.ts` uses a similar approach but returns early when no files changed.
+- `01_tables.sql`: Bootstrap `raw` (minimal schema, replaced on import) and `meta` (import timestamps)
+- `03_macros.sql`: Filter macros for date ranges and project paths
 
-### Adding Columns
+### Tables
 
-To add a new column to `messages`:
+- **`raw`**: Incremental `UNION ALL BY NAME` — only changed JSONL files are re-read. `01_tables.sql` seeds sparse columns (`summary`).
+- **`messages`**: Built from `raw` via `* EXCLUDE` pass-through + snake_case renames. One row per message.
+- **`content_items`**: Built from a temp JSONL file via `read_ndjson` auto-detect. Each content array element is written with parent context merged in. Schema is fully auto-detected.
 
-- Add the column to `01_tables.sql`
-- Update `import.sql` to populate the column during import
-- Update `query.sh` inline refresh logic if needed
+Views (`tool_calls`, `tool_errors`, `sessions`) query these tables.
+
+### Import pipeline
+
+`import.sql` flattens `message.*` into `raw`. Known collisions with top-level fields (`type`, `content`, `id`, `container`) use explicit aliases. New collisions produce a DuckDB error.
+
+After rebuilding `raw`, `import.sql` creates a `content_items_export` temp table. Callers must COPY this to `${data_dir}/content_items.jsonl` and DROP it before running `views.sql`. DuckDB's `COPY TO` requires a literal path, so this step cannot live in SQL alone.
+
+`views.sql` reads the temp file back via `read_ndjson(getvariable('data_dir') || '/content_items.jsonl')` and creates `content_items`, `messages`, and downstream views.
+
+### Callers
+
+- `db.ts`: Sets `data_dir` variable, orchestrates import → COPY → views via separate `db.run()` calls
+- `query.ts`: CLI entry point, uses `db.ts` functions directly

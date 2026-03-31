@@ -9,6 +9,8 @@ allowed-tools:
 
 # Claude Code Changelog Review
 
+**Current version**: `!`claude --version``
+
 Surface Claude Code changelog entries relevant to the user's installed plugins, skills, and tool usage patterns.
 
 ## Workflow

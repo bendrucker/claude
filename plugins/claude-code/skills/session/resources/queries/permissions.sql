@@ -5,7 +5,7 @@ SELECT
     pr.file_path
   ) as target,
   pr.description,
-  LIST_EXTRACT(STRING_SPLIT(pr.project_path, '/'), -1) as project,
+  SPLIT_PART(pr.project_path, '/', -1) as project,
   strftime(pr.timestamp, '%Y-%m-%d %H:%M') as time
 FROM permission_requests pr
 JOIN sessions s USING (session_id)

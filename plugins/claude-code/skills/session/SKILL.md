@@ -33,7 +33,7 @@ ${CLAUDE_SKILL_DIR}/scripts/query.ts permissions project=bendrucker.me limit=10
 ${CLAUDE_SKILL_DIR}/scripts/query.ts sandbox limit=10
 ```
 
-The `project` param uses ILIKE matching on the project path, so `project=myapp` matches `myapp`, `myapp.feature-branch`, `myapp.bugfix`, etc. This is useful for spanning a repo and its worktrees.
+The `project` param matches against the directory name (last path component) using glob syntax. `project=myapp` matches exactly, `project=myapp*` matches the repo and its worktrees (`myapp.feature-branch`, `myapp.bugfix`, etc.).
 
 - `search`: find sessions by keyword (ILIKE on `content_text` and `summary`). Params: `query`, `limit`, `after_date`, `before_date`, `project`
 - `stats`: tool usage breakdown with error rates and aggregate totals. Params: `after_date`, `before_date`, `project`

@@ -3,7 +3,7 @@ SELECT
   sb.description,
   sb.retried_tool_id IS NOT NULL as is_retry,
   LEFT(sb.retried_error, 80) as prior_error,
-  LIST_EXTRACT(STRING_SPLIT(sb.project_path, '/'), -1) as project,
+  SPLIT_PART(sb.project_path, '/', -1) as project,
   strftime(sb.timestamp, '%Y-%m-%d %H:%M') as time
 FROM sandbox_bypasses sb
 JOIN sessions s USING (session_id)

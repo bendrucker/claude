@@ -29,7 +29,11 @@ Built-in queries in `resources/queries/` can be run by name with `key=value` par
 ${CLAUDE_SKILL_DIR}/scripts/query.ts search query=authentication limit=10
 ${CLAUDE_SKILL_DIR}/scripts/query.ts stats project=myapp after_date=2026-03-15
 ${CLAUDE_SKILL_DIR}/scripts/query.ts errors error_type=rejection limit=5
+${CLAUDE_SKILL_DIR}/scripts/query.ts permissions project=bendrucker.me limit=10
+${CLAUDE_SKILL_DIR}/scripts/query.ts sandbox limit=10
 ```
+
+The `project` param uses ILIKE matching on the project path, so `project=myapp` matches `myapp`, `myapp.feature-branch`, `myapp.bugfix`, etc. This is useful for spanning a repo and its worktrees.
 
 - `search`: find sessions by keyword (ILIKE on `content_text` and `summary`). Params: `query`, `limit`, `after_date`, `before_date`, `project`
 - `stats`: tool usage breakdown with error rates and aggregate totals. Params: `after_date`, `before_date`, `project`

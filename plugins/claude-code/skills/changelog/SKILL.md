@@ -23,13 +23,13 @@ allowed-tools:
 Use the GraphQL query at `${CLAUDE_SKILL_DIR}/references/releases.graphql` to fetch releases in a single API call:
 
 ```
-gh api graphql -f query=@${CLAUDE_SKILL_DIR}/references/releases.graphql -F owner=anthropics -F name=claude-code -F limit=10
+gh api graphql -f "query=$(cat ${CLAUDE_SKILL_DIR}/references/releases.graphql)" -F owner=anthropics -F name=claude-code -F limit=10
 ```
 
 Variables:
 - `$owner` (`String!`): Repository owner
 - `$name` (`String!`): Repository name
-- `$limit` (`Int!`): Number of releases to fetch (default 10)
+- `$limit` (`Int!`): Number of releases to fetch. Default 10. Increase if the user asks for a broader range (e.g., "what changed in the last month?").
 
 Response shape: `data.repository.releases.nodes[]` with `tagName`, `publishedAt` (ISO 8601), and `description` (release notes markdown).
 

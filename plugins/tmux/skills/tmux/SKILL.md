@@ -124,5 +124,5 @@ bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts dismiss-all
 
 - Always use `-P -F '#{pane_id}'` to capture pane IDs at creation time
 - Always use `-d` on `split-window` to avoid switching Claude's pane
-- Use `$TMUX_PANE` (injected by context hook) to target the current pane
+- Use `$TMUX_PANE` (set by tmux natively and injected by context hook) to target the current pane
 - Tracked pane names: alphanumeric and hyphens only

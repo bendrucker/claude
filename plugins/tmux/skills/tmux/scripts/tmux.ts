@@ -14,9 +14,9 @@ export function tmuxRun(...args: string[]): void {
 }
 
 export function currentPane(): string {
-  const pane = process.env.TMUX_PANE;
+  const pane = process.env.TMUX_PANE ?? tmuxSync("display-message", "-p", "#{pane_id}");
   if (!pane) {
-    throw new Error("TMUX_PANE is not set — not running inside tmux");
+    throw new Error("Could not determine pane ID from TMUX_PANE or tmux query");
   }
   return pane;
 }

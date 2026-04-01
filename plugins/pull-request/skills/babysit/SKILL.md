@@ -7,7 +7,9 @@ allowed-tools:
   - Bash(glab:*)
   - Bash(git:*)
   - Bash(bun:*)
+  - Bash(bunx:*)
   - CronCreate
+  - CronDelete
 ---
 
 # Babysit PR
@@ -28,12 +30,48 @@ Query recent CI run durations, add 30s buffer, clamp to 1-10m (default 3m). Chec
 
 Use `CronCreate` with a self-contained prompt that handles each iteration:
 
+<<<<<<< HEAD
 1. Run state script to track iteration (`bun <state-script> <session-id> <pr-number>`)
 2. Check CI for the branch
 3. **Green**: `CronDelete`, clean state (`bun <state-script> <session-id> <pr-number> clean`), summarize commits since start SHA
 4. **Running**: Do nothing
 5. **Failing**: Diagnose with `/github:actions-monitor` or `/gitlab:ci-monitor`, fix if trivial, commit and push
 6. **Max iterations** (20): `CronDelete`, report, clean state
+=======
+#### Track State
+
+Run state script to track iteration (`bun <state-script> <session-id>`).
+
+#### Check CI
+
+Query the latest CI run for the branch, including the commit SHA it ran against. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote. Compare the run's commit SHA against `git rev-parse HEAD`.
+
+#### SHA Mismatch
+
+If the latest run's SHA does not match the current HEAD, a fix was recently pushed and CI has not started or completed for the new commit yet. Treat this as "waiting" and do nothing.
+
+#### Green
+
+`CronDelete`, clean state (`bun <state-script> <session-id> clean`), summarize commits since start SHA.
+
+#### Running
+
+Do nothing.
+
+#### Failing
+
+Before diagnosing, check whether a fix was already pushed by comparing the failing run's SHA to the current HEAD. If HEAD is newer, skip diagnosis and wait for the new run.
+
+Otherwise, diagnose with `/github:actions-monitor` or `/gitlab:ci-monitor`. Check whether the start SHA's CI run had the same failure. If so, this is a pre-existing issue, not a regression introduced by this branch's changes. Report it and cancel rather than attempting a fix.
+
+If the failure is new, attempt a fix if trivial. Before pushing, reproduce the failing CI step locally to verify the fix works. Then commit and push.
+
+After pushing, note the new HEAD SHA. On the next iteration, skip diagnosis until a run matching the new SHA completes.
+
+#### Max Iterations
+
+After 20 iterations: `CronDelete`, report, clean state.
+>>>>>>> origin/main
 
 Resolve all `${}` placeholders to absolute values in the prompt. Avoid `xargs`, `$()`, and pipes.
 

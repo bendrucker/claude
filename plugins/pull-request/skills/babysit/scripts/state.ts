@@ -1,0 +1,34 @@
+#!/usr/bin/env bun
+
+import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+
+const sessionId = process.argv[2];
+const subcommand = process.argv[3];
+
+if (!sessionId) {
+  console.error("Usage: state.ts <session-id> [clean]");
+  process.exit(1);
+}
+
+const stateDir = join(process.env.TMPDIR || "/tmp", sessionId);
+const statePath = join(stateDir, "babysit-pr-state.json");
+
+if (subcommand === "clean") {
+  rmSync(statePath, { force: true });
+  process.exit(0);
+}
+
+let iteration: number;
+if (!existsSync(statePath)) {
+  mkdirSync(stateDir, { recursive: true });
+  iteration = 0;
+} else {
+  iteration = JSON.parse(readFileSync(statePath, "utf-8")).iteration + 1;
+}
+
+writeFileSync(statePath, JSON.stringify({ iteration }));
+
+const max = 20;
+console.log(`iteration: ${iteration}`);
+console.log(`max_reached: ${iteration >= max}`);

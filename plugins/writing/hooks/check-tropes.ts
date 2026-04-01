@@ -73,7 +73,9 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
 
 function isPlanFile(input: PreToolUseHookInput): boolean {
   const filePath = (input.tool_input as Record<string, unknown>).file_path;
-  return typeof filePath === "string" && filePath.includes("/.claude/plans/");
+  if (typeof filePath !== "string") return false;
+  const home = process.env.HOME ?? "";
+  return home !== "" && filePath.startsWith(`${home}/.claude/plans/`);
 }
 
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {

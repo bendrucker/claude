@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
-import * as fs from "node:fs";
+import { mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { table } from "table";
 import { ensureIndex, getDb, runQuery } from "./db";
 
 const dataDir =
   process.env.CLAUDE_PLUGIN_DATA || path.join(process.env.TMPDIR || "/tmp", "claude-session");
-fs.mkdirSync(dataDir, { recursive: true });
+mkdirSync(dataDir, { recursive: true });
 
 let refresh = false;
 const args = process.argv.slice(2);
@@ -35,7 +35,7 @@ try {
   );
 
   let rows: Record<string, unknown>[];
-  if (fs.existsSync(queryFile)) {
+  if (await Bun.file(queryFile).exists()) {
     const params: Record<string, string | null> = {};
     for (const arg of args.slice(1)) {
       const eq = arg.indexOf("=");

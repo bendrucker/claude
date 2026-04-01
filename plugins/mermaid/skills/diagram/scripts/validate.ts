@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { readFile } from "node:fs/promises";
 import { cli } from "cleye";
 import { JSDOM } from "jsdom";
 
@@ -103,7 +102,7 @@ export async function validateContent(content: string): Promise<ValidationError[
 }
 
 export async function validateFile(file: string): Promise<ValidationResult> {
-  const content = await readFile(file, "utf-8");
+  const content = await Bun.file(file).text();
   const blocks = extractMermaidBlocks(content);
   const errors = await validateBlocks(blocks);
   return { file, blocks: blocks.length, errors };

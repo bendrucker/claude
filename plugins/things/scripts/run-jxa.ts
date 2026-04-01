@@ -1,22 +1,22 @@
 #!/usr/bin/env bun
 
-import { existsSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { ensureThingsRunning } from "./ensure-running";
 
-function findJxaRunner(): string | null {
+async function findJxaRunner(): Promise<string | null> {
   const pluginRoot = join(import.meta.dirname, "..");
 
   // Dev layout: sibling plugin directory
   const devPath = join(pluginRoot, "..", "mac", "scripts", "jxa.ts");
-  if (existsSync(devPath)) return devPath;
+  if (await Bun.file(devPath).exists()) return devPath;
 
   // Prod layout: up 2 levels to marketplace root, then into mac/<version>/
   const marketplaceDir = join(pluginRoot, "..", "..", "mac");
-  if (existsSync(marketplaceDir)) {
+  if (await Bun.file(marketplaceDir).exists()) {
     for (const entry of readdirSync(marketplaceDir)) {
       const candidate = join(marketplaceDir, entry, "scripts", "jxa.ts");
-      if (existsSync(candidate)) return candidate;
+      if (await Bun.file(candidate).exists()) return candidate;
     }
   }
 
@@ -26,7 +26,7 @@ function findJxaRunner(): string | null {
 if (import.meta.main) {
   await ensureThingsRunning();
 
-  const jxaPath = findJxaRunner();
+  const jxaPath = await findJxaRunner();
   if (!jxaPath) {
     console.error("mac plugin jxa.ts not found — install the mac plugin");
     process.exit(1);

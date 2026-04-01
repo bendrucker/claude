@@ -1,4 +1,4 @@
-import { type ValidationResult, reportAndExit, validateFile } from "./validate";
+import { reportAndExit, type ValidationResult, validateFile } from "./validate";
 
 const schema = "https://www.schemastore.org/claude-code-settings.json";
 

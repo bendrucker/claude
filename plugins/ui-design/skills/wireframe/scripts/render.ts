@@ -1,5 +1,3 @@
-import { readFile, writeFile } from "node:fs/promises";
-
 import sharp from "sharp";
 
 export interface RenderOptions {
@@ -32,7 +30,7 @@ export async function render(
   }
 
   const pngBuffer = await pipeline.png().toBuffer();
-  await writeFile(outputPath, pngBuffer);
+  await Bun.write(outputPath, pngBuffer);
 }
 
 export async function renderFile(
@@ -43,7 +41,7 @@ export async function renderFile(
   const scale = options.scale ?? 1;
   const suffix = scale !== 1 ? `@${scale}x` : "";
   const output = outputPath || inputPath.replace(/\.svg$/, `${suffix}.png`);
-  const content = await readFile(inputPath);
+  const content = Buffer.from(await Bun.file(inputPath).arrayBuffer());
   await render(content, output, options);
   return { input: inputPath, output, scale };
 }

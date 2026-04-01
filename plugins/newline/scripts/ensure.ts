@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
@@ -8,30 +7,32 @@ type ToolInput = {
   file_path?: string;
 };
 
-export function ensureTrailingNewline(filePath: string): string | null {
-  if (!existsSync(filePath)) {
+export async function ensureTrailingNewline(filePath: string): Promise<string | null> {
+  const file = Bun.file(filePath);
+  if (!(await file.exists())) {
     return null;
   }
 
-  const stat = statSync(filePath);
-  if (stat.size === 0) {
+  if (file.size === 0) {
     return "File is empty, skipping";
   }
 
-  const content = readFileSync(filePath, "utf-8");
+  const content = await file.text();
   if (content.endsWith("\n")) {
     return "File already has trailing newline";
   }
 
-  writeFileSync(filePath, `${content}\n`);
+  await Bun.write(filePath, `${content}\n`);
   return "Added trailing newline";
 }
 
-export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | null {
+export async function processInput(
+  input: PostToolUseHookInput,
+): Promise<SyncHookJSONOutput | null> {
   const { file_path: filePath } = input.tool_input as ToolInput;
   if (!filePath) return null;
 
-  const message = ensureTrailingNewline(filePath);
+  const message = await ensureTrailingNewline(filePath);
 
   if (message) {
     return {
@@ -57,7 +58,7 @@ async function main(): Promise<void> {
   }
 
   try {
-    const output = processInput(input);
+    const output = await processInput(input);
     if (output) {
       writeStdoutJson(output);
     }

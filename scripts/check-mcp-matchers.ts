@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync, globSync, readFileSync } from "node:fs";
+import { globSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dirname, "..");
@@ -30,17 +30,19 @@ const CLAUDE_AI_MAPPINGS: Record<string, { displayName: string; tools: Record<st
   },
 };
 
-function discoverPluginMcpServers(): PluginMcp[] {
+async function discoverPluginMcpServers(): Promise<PluginMcp[]> {
   const results: PluginMcp[] = [];
   const mcpFiles = globSync("plugins/*/.mcp.json", { cwd: root });
   for (const mcpFile of mcpFiles) {
     const pluginDir = mcpFile.split("/")[1];
     if (!pluginDir) continue;
     const pluginJsonPath = join(root, "plugins", pluginDir, ".claude-plugin", "plugin.json");
-    if (!existsSync(pluginJsonPath)) continue;
+    if (!(await Bun.file(pluginJsonPath).exists())) continue;
 
-    const pluginJson = JSON.parse(readFileSync(pluginJsonPath, "utf8"));
-    const mcpJson = JSON.parse(readFileSync(join(root, mcpFile), "utf8"));
+    const [pluginJson, mcpJson] = await Promise.all([
+      Bun.file(pluginJsonPath).json(),
+      Bun.file(join(root, mcpFile)).json(),
+    ]);
 
     results.push({
       pluginName: pluginJson.name,
@@ -50,12 +52,12 @@ function discoverPluginMcpServers(): PluginMcp[] {
   return results;
 }
 
-function discoverEnabledPluginNames(): Set<string> {
+async function discoverEnabledPluginNames(): Promise<Set<string>> {
   const names = new Set<string>();
-  const settingsPath = join(root, "user", "settings.json");
-  if (!existsSync(settingsPath)) return names;
+  const settingsFile = Bun.file(join(root, "user", "settings.json"));
+  if (!(await settingsFile.exists())) return names;
 
-  const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+  const settings = await settingsFile.json();
   const enabled = settings.enabledPlugins ?? {};
   for (const key of Object.keys(enabled)) {
     if (!enabled[key]) continue;
@@ -66,11 +68,11 @@ function discoverEnabledPluginNames(): Set<string> {
   return names;
 }
 
-function collectMatchers(): Array<{ file: string; matcher: string }> {
+async function collectMatchers(): Promise<Array<{ file: string; matcher: string }>> {
   const results: Array<{ file: string; matcher: string }> = [];
   const hooksFiles = globSync("plugins/*/hooks/hooks.json", { cwd: root });
   for (const file of hooksFiles) {
-    const content: HooksFile = JSON.parse(readFileSync(join(root, file), "utf8"));
+    const content: HooksFile = await Bun.file(join(root, file)).json();
     for (const entries of Object.values(content.hooks)) {
       for (const entry of entries) {
         if ("matcher" in entry && typeof entry.matcher === "string") {
@@ -82,9 +84,11 @@ function collectMatchers(): Array<{ file: string; matcher: string }> {
   return results;
 }
 
-function checkMatchers() {
-  const localMcp = discoverPluginMcpServers();
-  const enabledNames = discoverEnabledPluginNames();
+async function checkMatchers() {
+  const [localMcp, enabledNames] = await Promise.all([
+    discoverPluginMcpServers(),
+    discoverEnabledPluginNames(),
+  ]);
 
   // Build a set of server names that come from known plugins
   const knownServers = new Map<string, string>();
@@ -94,7 +98,7 @@ function checkMatchers() {
     }
   }
 
-  const matchers = collectMatchers();
+  const matchers = await collectMatchers();
   const errors: string[] = [];
 
   for (const { file, matcher } of matchers) {
@@ -134,7 +138,7 @@ function checkMatchers() {
   return errors;
 }
 
-const errors = checkMatchers();
+const errors = await checkMatchers();
 if (errors.length > 0) {
   console.log("MCP hook matchers missing plugin variants:");
   for (const err of errors) {

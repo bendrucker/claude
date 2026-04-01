@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { rmSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { parseIssueUrl, readTarget, writeTarget } from "./target";
 
 describe("parseIssueUrl", () => {
@@ -86,29 +86,29 @@ describe("readTarget / writeTarget", () => {
   const sessionId = `test-target-${Date.now()}`;
   const dir = `/tmp/claude/${sessionId}`;
 
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
   });
 
-  it("round-trips a GitHub target", () => {
+  it("round-trips a GitHub target", async () => {
     const target = { service: "github" as const, owner: "o", repo: "r", number: 1 };
-    writeTarget(sessionId, target);
-    expect(readTarget(sessionId)).toEqual(target);
+    await writeTarget(sessionId, target);
+    expect(await readTarget(sessionId)).toEqual(target);
   });
 
-  it("round-trips a Linear target", () => {
+  it("round-trips a Linear target", async () => {
     const target = { service: "linear" as const, identifier: "ENG-123" };
-    writeTarget(sessionId, target);
-    expect(readTarget(sessionId)).toEqual(target);
+    await writeTarget(sessionId, target);
+    expect(await readTarget(sessionId)).toEqual(target);
   });
 
-  it("round-trips a GitLab target", () => {
+  it("round-trips a GitLab target", async () => {
     const target = { service: "gitlab" as const, project: "group/project", number: 5 };
-    writeTarget(sessionId, target);
-    expect(readTarget(sessionId)).toEqual(target);
+    await writeTarget(sessionId, target);
+    expect(await readTarget(sessionId)).toEqual(target);
   });
 
-  it("returns null when no target file exists", () => {
-    expect(readTarget(`nonexistent-${Date.now()}`)).toBeNull();
+  it("returns null when no target file exists", async () => {
+    expect(await readTarget(`nonexistent-${Date.now()}`)).toBeNull();
   });
 });

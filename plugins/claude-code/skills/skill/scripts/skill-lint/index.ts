@@ -1,12 +1,11 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { estimateTokens, parseSkill } from "./parse";
 import { allRules, findReferences, lintReference } from "./rules";
 import type { RuleResult, SkillLintResult } from "./types";
 
-export function lintSkill(skillDir: string): SkillLintResult {
+export async function lintSkill(skillDir: string): Promise<SkillLintResult> {
   const skillPath = path.join(skillDir, "SKILL.md");
-  const raw = fs.readFileSync(skillPath, "utf-8");
+  const raw = await Bun.file(skillPath).text();
   const content = parseSkill(raw);
 
   const results: RuleResult[] = [];
@@ -21,16 +20,15 @@ export function lintSkill(skillDir: string): SkillLintResult {
   }
 
   const refs = findReferences(content.body);
-  const referenceResults = refs.map((ref) => lintReference(skillDir, ref));
+  const referenceResults = await Promise.all(refs.map((ref) => lintReference(skillDir, ref)));
 
   let totalTokens = estimateTokens(raw);
   for (const ref of referenceResults) {
     const refPath = path.join(skillDir, ref.path);
-    try {
-      const refContent = fs.readFileSync(refPath, "utf-8");
+    const refFile = Bun.file(refPath);
+    if (await refFile.exists()) {
+      const refContent = await refFile.text();
       totalTokens += estimateTokens(refContent);
-    } catch {
-      // Reference doesn't exist, already reported
     }
   }
 

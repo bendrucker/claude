@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import { exec } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import type {
   PostToolUseHookInput,
@@ -39,12 +38,7 @@ function isBiomeFile(filePath: string): boolean {
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
+  return Bun.file(filePath).exists();
 }
 
 async function hasBiome(): Promise<boolean> {
@@ -61,7 +55,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
     return [];
   }
 
-  const content = await readFile(transcriptPath, "utf-8");
+  const content = await Bun.file(transcriptPath).text();
   const files = new Set<string>();
   const existChecks: Array<Promise<{ path: string; exists: boolean }>> = [];
 

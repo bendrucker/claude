@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { existsSync, readFileSync, statSync } from "node:fs";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson } from "@constellos/claude-code-kit/runners";
 import { setState } from "./state";
@@ -9,30 +8,30 @@ type ToolInput = {
   file_path?: string;
 };
 
-export function hasTrailingNewline(filePath: string): boolean | null {
-  if (!existsSync(filePath)) {
+export async function hasTrailingNewline(filePath: string): Promise<boolean | null> {
+  const file = Bun.file(filePath);
+  if (!(await file.exists())) {
     return null;
   }
 
-  const stat = statSync(filePath);
-  if (stat.size === 0) {
+  if (file.size === 0) {
     return null;
   }
 
-  const content = readFileSync(filePath, "utf-8");
+  const content = await file.text();
   return content.endsWith("\n");
 }
 
-export function processInput(input: PreToolUseHookInput): void {
+export async function processInput(input: PreToolUseHookInput): Promise<void> {
   const { file_path: filePath } = input.tool_input as ToolInput;
   if (!filePath) return;
 
-  const hasNewline = hasTrailingNewline(filePath);
+  const hasNewline = await hasTrailingNewline(filePath);
 
   if (hasNewline === null) {
-    setState("newline", filePath, "");
+    await setState("newline", filePath, "");
   } else {
-    setState("newline", filePath, hasNewline ? "1" : "");
+    await setState("newline", filePath, hasNewline ? "1" : "");
   }
 }
 
@@ -48,7 +47,7 @@ async function main(): Promise<void> {
   }
 
   try {
-    processInput(input);
+    await processInput(input);
   } catch (error) {
     console.error(`[newline/check] ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);

@@ -19,8 +19,8 @@ function matchesTarget(input: IssueReadInput, target: IssueTarget): boolean {
   );
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const target = readTarget(input.session_id);
+export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  const target = await readTarget(input.session_id);
   if (!target) return null;
 
   const toolInput = input.tool_input as IssueReadInput;
@@ -47,7 +47,7 @@ if (import.meta.main) {
       return;
     }
 
-    const output = processInput(input);
+    const output = await processInput(input);
     if (output) {
       writeStdoutJson(output);
     }

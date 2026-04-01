@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { renderFile } from "./render-html";
@@ -26,7 +26,7 @@ describe("render-html", () => {
     expect(result.output).toContain(".png");
     expect(result.scale).toBe(1);
 
-    const pngBuffer = await readFile(outputPath);
+    const pngBuffer = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     expect(pngBuffer.length).toBeGreaterThan(0);
   });
 
@@ -39,7 +39,7 @@ describe("render-html", () => {
     expect(result.scale).toBe(2);
     expect(result.output).toContain("@2x.png");
 
-    const pngBuffer = await readFile(outputPath);
+    const pngBuffer = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     expect(pngBuffer.length).toBeGreaterThan(0);
   });
 

@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 interface PluginEntry {
@@ -19,22 +18,21 @@ interface PluginMatrix {
   runner: string;
 }
 
-function getLocalPlugins(): string[] {
-  const content = readFileSync(".claude-plugin/marketplace.json", "utf8");
-  const marketplace: Marketplace = JSON.parse(content);
+async function getLocalPlugins(): Promise<string[]> {
+  const marketplace: Marketplace = await Bun.file(".claude-plugin/marketplace.json").json();
   return marketplace.plugins
     .filter((p): p is PluginEntry & { source: string } => typeof p.source === "string")
     .map((p) => p.name);
 }
 
-function readCiConfig(plugin: string): CiConfig {
-  const path = `plugins/${plugin}/.ci.json`;
-  if (!existsSync(path)) return {};
-  return JSON.parse(readFileSync(path, "utf8"));
+async function readCiConfig(plugin: string): Promise<CiConfig> {
+  const file = Bun.file(`plugins/${plugin}/.ci.json`);
+  if (!(await file.exists())) return {};
+  return file.json();
 }
 
-function toMatrixEntry(name: string): PluginMatrix {
-  const ci = readCiConfig(name);
+async function toMatrixEntry(name: string): Promise<PluginMatrix> {
+  const ci = await readCiConfig(name);
   return { name, runner: ci.runner ?? "ubuntu-latest" };
 }
 
@@ -51,7 +49,7 @@ function matchesAlwaysPaths(files: string[], alwaysPaths: string[]): boolean {
   return files.some((file) => alwaysPaths.some((path) => file.startsWith(path)));
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     options: {
       always: { type: "string", multiple: true, default: [] },
@@ -61,7 +59,7 @@ function main(): void {
 
   const alwaysPaths = values.always ?? [];
   const changedFiles = positionals;
-  const allPlugins = getLocalPlugins();
+  const allPlugins = await getLocalPlugins();
 
   let plugins: string[];
   if (changedFiles.length > 0) {
@@ -75,7 +73,7 @@ function main(): void {
     plugins = allPlugins;
   }
 
-  console.log(JSON.stringify(plugins.map(toMatrixEntry)));
+  console.log(JSON.stringify(await Promise.all(plugins.map(toMatrixEntry))));
 }
 
 main();

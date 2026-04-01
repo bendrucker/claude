@@ -8,7 +8,32 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "node:fs": {
+                "allowImportNames": [
+                  "globSync",
+                  "mkdirSync",
+                  "mkdtempSync",
+                  "readdirSync",
+                  "realpathSync"
+                ],
+                "message": "Use Bun file APIs (Bun.file, Bun.write) instead of node:fs. Sync directory operations (glob, mkdir, mkdtemp, readdir, realpath) are allowed."
+              },
+              "node:fs/promises": {
+                "allowImportNames": ["mkdir", "mkdtemp", "readdir", "rm"],
+                "message": "Use Bun file APIs (Bun.file, Bun.write) instead of node:fs/promises. Directory operations (mkdir, mkdtemp, readdir, rm) are allowed."
+              },
+              "fs": "Use \"node:fs\" with allowed directory operations, or Bun file APIs for file operations.",
+              "fs/promises": "Use \"node:fs/promises\" with allowed directory operations, or Bun file APIs for file operations."
+            }
+          }
+        }
+      }
     }
   },
   "formatter": {

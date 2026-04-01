@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { type Violation, validate, validateFile, validateFiles } from "./validate";
@@ -8,11 +7,11 @@ const assetsDir = path.join(import.meta.dirname, "..", "assets");
 const fixturesDir = path.join(import.meta.dirname, "fixtures");
 
 async function loadAsset(name: string): Promise<string> {
-  return readFile(path.join(assetsDir, `${name}.svg`), "utf-8");
+  return Bun.file(path.join(assetsDir, `${name}.svg`)).text();
 }
 
 async function loadFixture(name: string): Promise<string> {
-  return readFile(path.join(fixturesDir, `${name}.svg`), "utf-8");
+  return Bun.file(path.join(fixturesDir, `${name}.svg`)).text();
 }
 
 function findViolation(violations: Violation[], issue: string): Violation | undefined {

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type ErrorObject, formatError, validateFile } from "./validate";
@@ -20,7 +20,7 @@ beforeAll(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "validate-test-"));
   await mkdir(join(tempDir, "schemas"), { recursive: true });
   schemaPath = join(tempDir, "schemas/test.json");
-  await writeFile(schemaPath, JSON.stringify(schema));
+  await Bun.write(schemaPath, JSON.stringify(schema));
 });
 
 afterAll(async () => {
@@ -85,7 +85,7 @@ describe("validateFile", () => {
   for (const fixture of fixtures) {
     it(fixture.name, async () => {
       const file = join(tempDir, `${fixture.name.replace(/\s+/g, "-")}.json`);
-      await writeFile(file, JSON.stringify(fixture.data));
+      await Bun.write(file, JSON.stringify(fixture.data));
 
       const result = await validateFile(
         file,

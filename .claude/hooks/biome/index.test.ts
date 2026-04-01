@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
@@ -81,8 +81,8 @@ function createTranscriptContent(files: Array<{ path: string; tool: string }>): 
 async function copyFixture(name: string, destDir: string): Promise<string> {
   const source = join(FIXTURES_DIR, name);
   const dest = join(destDir, `${Date.now()}-${Math.random()}-${name}`);
-  const content = await readFile(source, "utf-8");
-  await writeFile(dest, content);
+  const content = await Bun.file(source).text();
+  await Bun.write(dest, content);
   return dest;
 }
 
@@ -140,7 +140,7 @@ describe("biome hook", () => {
     it("extracts file paths from Edit tool uses", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-edit-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
 
       const files = await parseTranscript(transcriptPath);
       expect(files).toContain(filePath);
@@ -149,7 +149,7 @@ describe("biome hook", () => {
     it("extracts file paths from Write tool uses", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-write-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
 
       const files = await parseTranscript(transcriptPath);
       expect(files).toContain(filePath);
@@ -157,9 +157,9 @@ describe("biome hook", () => {
 
     it("ignores non-Biome files", async () => {
       const mdPath = join(tempDir, "readme.md");
-      await writeFile(mdPath, "# Test");
+      await Bun.write(mdPath, "# Test");
       const transcriptPath = join(tempDir, `transcript-md-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: mdPath, tool: "Write" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: mdPath, tool: "Write" }]));
 
       const files = await parseTranscript(transcriptPath);
       expect(files).toEqual([]);
@@ -168,7 +168,7 @@ describe("biome hook", () => {
     it("ignores non-Edit/Write tools", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-read-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Read" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Read" }]));
 
       const files = await parseTranscript(transcriptPath);
       expect(files).toEqual([]);
@@ -177,7 +177,7 @@ describe("biome hook", () => {
     it("deduplicates file paths", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-dup-${Date.now()}.jsonl`);
-      await writeFile(
+      await Bun.write(
         transcriptPath,
         createTranscriptContent([
           { path: filePath, tool: "Edit" },
@@ -191,7 +191,7 @@ describe("biome hook", () => {
 
     it("filters out deleted files", async () => {
       const transcriptPath = join(tempDir, `transcript-deleted-${Date.now()}.jsonl`);
-      await writeFile(
+      await Bun.write(
         transcriptPath,
         createTranscriptContent([{ path: "/nonexistent/deleted.ts", tool: "Write" }]),
       );
@@ -250,7 +250,7 @@ describe("biome hook", () => {
     it("returns null when stop_hook_active is true", async () => {
       const filePath = await copyFixture("unfixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-active-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
 
       const input = mockStopHookInput(transcriptPath, true);
       expect(await processStop(input)).toBeNull();
@@ -258,7 +258,7 @@ describe("biome hook", () => {
 
     it("returns null when no files were modified", async () => {
       const transcriptPath = join(tempDir, `transcript-empty-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, "");
+      await Bun.write(transcriptPath, "");
 
       const input = mockStopHookInput(transcriptPath);
       expect(await processStop(input)).toBeNull();
@@ -267,7 +267,7 @@ describe("biome hook", () => {
     it("returns null when all files pass biome check", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-valid-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
 
       const input = mockStopHookInput(transcriptPath);
       expect(await processStop(input)).toBeNull();
@@ -276,7 +276,7 @@ describe("biome hook", () => {
     it("auto-fixes fixable issues and allows stop", async () => {
       const filePath = await copyFixture("fixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-fixable-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
 
       const input = mockStopHookInput(transcriptPath);
       const result = await processStop(input);
@@ -288,7 +288,7 @@ describe("biome hook", () => {
     it("returns block decision when issues cannot be auto-fixed", async () => {
       const filePath = await copyFixture("unfixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-unfixable-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
 
       const input = mockStopHookInput(transcriptPath);
       const result = await processStop(input);
@@ -307,7 +307,7 @@ describe("biome hook", () => {
       ]);
 
       const transcriptPath = join(tempDir, `transcript-multi-${Date.now()}.jsonl`);
-      await writeFile(
+      await Bun.write(
         transcriptPath,
         createTranscriptContent([
           { path: validPath, tool: "Edit" },
@@ -350,7 +350,7 @@ describe("biome hook", () => {
     it("routes Stop events correctly", async () => {
       const filePath = await copyFixture("unfixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-route-${Date.now()}.jsonl`);
-      await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
 
       const input = mockStopHookInput(transcriptPath);
       const result = await processInput(input);

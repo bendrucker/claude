@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
@@ -60,29 +61,29 @@ describe("getResourceName", () => {
     testDir = mkdtempSync(join(tmpdir(), "namespace-test-"));
   });
 
-  afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(testDir, { recursive: true, force: true });
   });
 
-  it("extracts name from agent filename", () => {
-    expect(getResourceName("/plugins/gitlab/agents/reviewer.md", "agent")).toBe("reviewer");
-    expect(getResourceName("/plugins/gitlab/agents/gitlab-reviewer.md", "agent")).toBe(
+  it("extracts name from agent filename", async () => {
+    expect(await getResourceName("/plugins/gitlab/agents/reviewer.md", "agent")).toBe("reviewer");
+    expect(await getResourceName("/plugins/gitlab/agents/gitlab-reviewer.md", "agent")).toBe(
       "gitlab-reviewer",
     );
   });
 
-  it("extracts name from command filename", () => {
-    expect(getResourceName("/plugins/gitlab/commands/merge.md", "command")).toBe("merge");
+  it("extracts name from command filename", async () => {
+    expect(await getResourceName("/plugins/gitlab/commands/merge.md", "command")).toBe("merge");
   });
 
-  it("extracts name from skill frontmatter", () => {
+  it("extracts name from skill frontmatter", async () => {
     const skillPath = join(testDir, "SKILL.md");
-    writeFileSync(skillPath, "---\nname: ci-monitor\ndescription: foo\n---\n");
-    expect(getResourceName(skillPath, "skill")).toBe("ci-monitor");
+    await Bun.write(skillPath, "---\nname: ci-monitor\ndescription: foo\n---\n");
+    expect(await getResourceName(skillPath, "skill")).toBe("ci-monitor");
   });
 
-  it("returns null for missing file", () => {
-    expect(getResourceName("/nonexistent/SKILL.md", "skill")).toBeNull();
+  it("returns null for missing file", async () => {
+    expect(await getResourceName("/nonexistent/SKILL.md", "skill")).toBeNull();
   });
 });
 
@@ -154,69 +155,69 @@ describe("processHookInput", () => {
     mkdirSync(join(testDir, "plugins/gitlab/commands"), { recursive: true });
   });
 
-  afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(testDir, { recursive: true, force: true });
   });
 
-  it("warns on missing skill prefix", () => {
+  it("warns on missing skill prefix", async () => {
     const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
-    writeFileSync(skillPath, "name: ci\n");
+    await Bun.write(skillPath, "name: ci\n");
 
-    const warnings = processHookInput(mockWriteInput(skillPath));
+    const warnings = await processHookInput(mockWriteInput(skillPath));
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("Warning");
     expect(warnings[0]).toContain("should be prefixed");
   });
 
-  it("warns on stuttering skill name after prefix", () => {
+  it("warns on stuttering skill name after prefix", async () => {
     const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
-    writeFileSync(skillPath, "name: gitlab:gitlab-ci\n");
+    await Bun.write(skillPath, "name: gitlab:gitlab-ci\n");
 
-    const warnings = processHookInput(mockWriteInput(skillPath));
+    const warnings = await processHookInput(mockWriteInput(skillPath));
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("stutters");
   });
 
-  it("warns on stuttering agent name", () => {
+  it("warns on stuttering agent name", async () => {
     const agentPath = join(testDir, "plugins/gitlab/agents/gitlab-reviewer.md");
-    writeFileSync(agentPath, "---\n");
+    await Bun.write(agentPath, "---\n");
 
-    const warnings = processHookInput(mockWriteInput(agentPath));
+    const warnings = await processHookInput(mockWriteInput(agentPath));
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("agent name");
   });
 
-  it("warns on stuttering command name", () => {
+  it("warns on stuttering command name", async () => {
     const cmdPath = join(testDir, "plugins/gitlab/commands/gitlab-merge.md");
-    writeFileSync(cmdPath, "---\n");
+    await Bun.write(cmdPath, "---\n");
 
-    const warnings = processHookInput(mockWriteInput(cmdPath));
+    const warnings = await processHookInput(mockWriteInput(cmdPath));
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("command name");
   });
 
-  it("returns empty for properly namespaced skill", () => {
+  it("returns empty for properly namespaced skill", async () => {
     const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
-    writeFileSync(skillPath, "name: gitlab:ci\n");
+    await Bun.write(skillPath, "name: gitlab:ci\n");
 
-    const warnings = processHookInput(mockWriteInput(skillPath));
+    const warnings = await processHookInput(mockWriteInput(skillPath));
     expect(warnings).toEqual([]);
   });
 
-  it("returns empty for primary skill (name matches plugin)", () => {
+  it("returns empty for primary skill (name matches plugin)", async () => {
     const skillPath = join(testDir, "plugins/gitlab/skills/ci/SKILL.md");
-    writeFileSync(skillPath, "name: gitlab\n");
+    await Bun.write(skillPath, "name: gitlab\n");
 
-    const warnings = processHookInput(mockWriteInput(skillPath));
+    const warnings = await processHookInput(mockWriteInput(skillPath));
     expect(warnings).toEqual([]);
   });
 
-  it("returns empty for non-plugin paths", () => {
-    const warnings = processHookInput(mockWriteInput("/Users/ben/src/project/SKILL.md"));
+  it("returns empty for non-plugin paths", async () => {
+    const warnings = await processHookInput(mockWriteInput("/Users/ben/src/project/SKILL.md"));
     expect(warnings).toEqual([]);
   });
 
-  it("returns empty for non-file tools", () => {
+  it("returns empty for non-file tools", async () => {
     const input: PostToolUseInput = {
       session_id: "test",
       transcript_path: "/tmp/transcript.jsonl",
@@ -228,7 +229,7 @@ describe("processHookInput", () => {
       tool_input: { command: "ls" },
       tool_response: { output: "", exit_code: 0 },
     };
-    const warnings = processHookInput(input);
+    const warnings = await processHookInput(input);
     expect(warnings).toEqual([]);
   });
 });

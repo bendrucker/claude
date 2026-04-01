@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 function hasBashCommand(input: unknown): input is { command: string } {
@@ -44,10 +43,11 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
     return null;
   }
 
-  if (!existsSync(bodyFilePath)) {
+  const file = Bun.file(bodyFilePath);
+  if (!(await file.exists())) {
     return null;
   }
 
-  const body = readFileSync(bodyFilePath, "utf-8");
+  const body = await file.text();
   return validateBody(body);
 }

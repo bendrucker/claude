@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,7 +60,7 @@ export function checkMarkdown(content: string): string | null {
   return null;
 }
 
-export function checkCode(content: string, ext: string): string | null {
+export async function checkCode(content: string, ext: string): Promise<string | null> {
   // Check if sg is available
   try {
     execSync("command -v sg", { stdio: ["pipe", "pipe", "pipe"] });
@@ -72,7 +73,7 @@ export function checkCode(content: string, ext: string): string | null {
   const ruleFile = join(__dirname, "numbering.yml");
 
   try {
-    writeFileSync(tmpFile, content);
+    await Bun.write(tmpFile, content);
 
     // sg scan returns exit code 1 when matches are found (as errors)
     // We need to capture stdout regardless of exit code
@@ -97,13 +98,16 @@ export function checkCode(content: string, ext: string): string | null {
   } catch {
     // sg failed or parse error
   } finally {
-    rmSync(tmpDir, { recursive: true, force: true });
+    await rm(tmpDir, { recursive: true, force: true });
   }
 
   return null;
 }
 
-export function processInput(input: PreToolUseHookInput, mode: Mode): SyncHookJSONOutput | null {
+export async function processInput(
+  input: PreToolUseHookInput,
+  mode: Mode,
+): Promise<SyncHookJSONOutput | null> {
   const toolName = input.tool_name;
 
   let content: string;
@@ -127,7 +131,7 @@ export function processInput(input: PreToolUseHookInput, mode: Mode): SyncHookJS
   if (isMarkdownFile(ext)) {
     match = checkMarkdown(content);
   } else {
-    match = checkCode(content, ext);
+    match = await checkCode(content, ext);
   }
 
   if (!match) {
@@ -159,7 +163,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processInput(input, mode);
+  const output = await processInput(input, mode);
   if (output) {
     writeStdoutJson(output);
   }

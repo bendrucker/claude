@@ -50,11 +50,7 @@ for (const arg of argv._.params) {
   }
 }
 
-const tags = mergeTags(
-  ["Claude"],
-  argv.flags.tag ?? [],
-  parseTags(params.get("tags")),
-);
+const tags = mergeTags(["Claude"], argv.flags.tag ?? [], parseTags(params.get("tags")));
 params.set("tags", tags.join(","));
 
 const attribution = buildAttribution(argv.flags.sessionId);

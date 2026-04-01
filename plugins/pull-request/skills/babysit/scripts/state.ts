@@ -32,5 +32,7 @@ if (!(await file.exists())) {
 await Bun.write(statePath, JSON.stringify({ iteration }));
 
 const max = 20;
-console.log(`iteration: ${iteration}`);
-console.log(`max_reached: ${iteration >= max}`);
+console.log(`run ${iteration + 1}/${max}`);
+if (iteration >= max) {
+  console.log("max_reached: true");
+}

@@ -12,16 +12,20 @@ const limit = Number(values.limit);
 const repo = values.repo;
 const [owner, name] = repo.split("/");
 
-const query = `{
-  repository(owner: "${owner}", name: "${name}") {
-    releases(first: ${limit}, orderBy: {field: CREATED_AT, direction: DESC}) {
+const query = `query($owner: String!, $name: String!, $limit: Int!) {
+  repository(owner: $owner, name: $name) {
+    releases(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes { tagName publishedAt description }
     }
   }
 }`;
 
 const result = Bun.spawnSync([
-  "gh", "api", "graphql", "-f", `query=${query}`,
+  "gh", "api", "graphql",
+  "-f", `query=${query}`,
+  "-F", `owner=${owner}`,
+  "-F", `name=${name}`,
+  "-F", `limit=${limit}`,
   "--jq", ".data.repository.releases.nodes",
 ]);
 

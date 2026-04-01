@@ -10,7 +10,7 @@ JXA scripts run via `osascript`, which requires Apple Events mach-lookup service
 - Formatter (`scripts/format-output.ts`) — reads JSON from stdin, outputs tables or passes through `--json`
 - `run-jxa.ts` — discovers mac plugin's `jxa.ts`, validates `Application("Things3")` scope via AST
 
-Sandbox bypass is handled by the plugin-level PreToolUse hook in `hooks/hooks.json`, which sets `dangerouslyDisableSandbox: true` for any Bash command running a plugin script.
+Sandbox bypass is handled by a PreToolUse hook in `hooks/hooks.json`. The matcher uses broad `"Bash"` matching because piped commands (the standard pipeline pattern) conflict with the `|` OR operator in matcher patterns. The hook script (`hooks/sandbox.ts`) filters internally, checking whether the command references the plugin's scripts directory before setting `dangerouslyDisableSandbox: true`.
 
 ## JXA Script Conventions
 

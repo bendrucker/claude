@@ -16,6 +16,10 @@ const argv = cli({
       description: "Claude session ID for attribution",
       alias: "s",
     },
+    tag: {
+      type: [String],
+      description: "Extra tags to add (repeatable)",
+    },
   },
 });
 
@@ -48,7 +52,7 @@ for (const arg of argv._.params) {
 
 const tags = mergeTags(
   ["Claude"],
-  parseTags(process.env.THINGS_EXTRA_TAGS),
+  argv.flags.tag ?? [],
   parseTags(params.get("tags")),
 );
 params.set("tags", tags.join(","));

@@ -71,7 +71,14 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   return extractProse(toolInput);
 }
 
+function isPlanFile(input: PreToolUseHookInput): boolean {
+  const filePath = (input.tool_input as Record<string, unknown>).file_path;
+  return typeof filePath === "string" && filePath.includes("/.claude/plans/");
+}
+
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  if (isPlanFile(input)) return null;
+
   const texts = await collectText(input);
   if (texts.length === 0) return null;
 

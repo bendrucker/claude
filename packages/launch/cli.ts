@@ -28,7 +28,7 @@ const argv = cli({
 
 const task = argv._.task;
 const { settingsPath, marketplacePath } = defaultPaths();
-const plugins = loadPluginCatalog(settingsPath, marketplacePath);
+const plugins = await loadPluginCatalog(settingsPath, marketplacePath);
 
 async function analyze(task: string, followUp?: string): Promise<LaunchConfig> {
   const prompt = followUp

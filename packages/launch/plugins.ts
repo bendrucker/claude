@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export type PluginEntry = {
@@ -19,9 +18,14 @@ const thirdPartyDescriptions: Record<string, string> = {
   "linear-cli@schpet": "Linear CLI integration",
 };
 
-export function loadPluginCatalog(settingsPath: string, marketplacePath: string): PluginEntry[] {
-  const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-  const marketplace = JSON.parse(readFileSync(marketplacePath, "utf-8"));
+export async function loadPluginCatalog(
+  settingsPath: string,
+  marketplacePath: string,
+): Promise<PluginEntry[]> {
+  const [settings, marketplace] = await Promise.all([
+    Bun.file(settingsPath).json(),
+    Bun.file(marketplacePath).json(),
+  ]);
   const enabledPlugins: Record<string, boolean> = settings.enabledPlugins ?? {};
   const marketplacePlugins: Array<{ name: string; description: string }> =
     marketplace.plugins ?? [];

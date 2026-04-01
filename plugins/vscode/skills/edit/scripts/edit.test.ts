@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { existsSync } from "node:fs";
-import { readFile, rm } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { dirname, extname } from "node:path";
 import { createTempFile, readAndCleanup } from "./edit";
 
@@ -9,7 +8,7 @@ const tempPaths: string[] = [];
 afterEach(async () => {
   for (const p of tempPaths) {
     const dir = dirname(p);
-    if (existsSync(dir)) {
+    if (await Bun.file(dir).exists()) {
       await rm(dir, { recursive: true });
     }
   }
@@ -21,7 +20,7 @@ describe("createTempFile", () => {
     const filePath = await createTempFile("hello world", "json");
     tempPaths.push(filePath);
 
-    expect(await readFile(filePath, "utf-8")).toBe("hello world");
+    expect(await Bun.file(filePath).text()).toBe("hello world");
     expect(extname(filePath)).toBe(".json");
     expect(dirname(filePath)).toMatch(/^\/tmp\/claude\/vscode-edit-/);
   });
@@ -46,6 +45,6 @@ describe("readAndCleanup", () => {
     const filePath = await createTempFile("temporary", "txt");
     const dir = dirname(filePath);
     await readAndCleanup(filePath);
-    expect(existsSync(dir)).toBe(false);
+    expect(await Bun.file(dir).exists()).toBe(false);
   });
 });

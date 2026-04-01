@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
@@ -39,124 +39,124 @@ function mockPostToolInput(filePath: string): PostToolUseHookInput {
   };
 }
 
-function hasNewline(filePath: string): boolean {
-  const content = readFileSync(filePath, "utf-8");
+async function hasNewline(filePath: string): Promise<boolean> {
+  const content = await Bun.file(filePath).text();
   return content.endsWith("\n");
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   mkdirSync(testDir, { recursive: true });
-  clearAllState();
+  await clearAllState();
 });
 
-afterEach(() => {
-  if (existsSync(testDir)) {
-    rmSync(testDir, { recursive: true });
-  }
-  clearAllState();
+afterEach(async () => {
+  try {
+    rmSync(testDir, { recursive: true, force: true });
+  } catch {}
+  await clearAllState();
 });
 
 describe("state module", () => {
-  it("stores and retrieves state", () => {
-    setState("newline", "/test/file.txt", "1");
-    expect(getState("newline", "/test/file.txt")).toBe("1");
+  it("stores and retrieves state", async () => {
+    await setState("newline", "/test/file.txt", "1");
+    expect(await getState("newline", "/test/file.txt")).toBe("1");
   });
 
-  it("returns empty string for missing state", () => {
-    expect(getState("newline", "/nonexistent/file.txt")).toBe("");
+  it("returns empty string for missing state", async () => {
+    expect(await getState("newline", "/nonexistent/file.txt")).toBe("");
   });
 
-  it("clears state", () => {
-    setState("newline", "/test/file.txt", "1");
-    clearState("newline", "/test/file.txt");
-    expect(getState("newline", "/test/file.txt")).toBe("");
+  it("clears state", async () => {
+    await setState("newline", "/test/file.txt", "1");
+    await clearState("newline", "/test/file.txt");
+    expect(await getState("newline", "/test/file.txt")).toBe("");
   });
 });
 
 describe("check.ts", () => {
   describe("hasTrailingNewline", () => {
-    it("returns null for empty file", () => {
+    it("returns null for empty file", async () => {
       const filePath = join(testDir, "empty.txt");
-      writeFileSync(filePath, "");
-      expect(hasTrailingNewline(filePath)).toBeNull();
+      await Bun.write(filePath, "");
+      expect(await hasTrailingNewline(filePath)).toBeNull();
     });
 
-    it("returns true for file with trailing newline", () => {
+    it("returns true for file with trailing newline", async () => {
       const filePath = join(testDir, "with_newline.txt");
-      writeFileSync(filePath, "content\n");
-      expect(hasTrailingNewline(filePath)).toBe(true);
+      await Bun.write(filePath, "content\n");
+      expect(await hasTrailingNewline(filePath)).toBe(true);
     });
 
-    it("returns false for file without trailing newline", () => {
+    it("returns false for file without trailing newline", async () => {
       const filePath = join(testDir, "no_newline.txt");
-      writeFileSync(filePath, "content");
-      expect(hasTrailingNewline(filePath)).toBe(false);
+      await Bun.write(filePath, "content");
+      expect(await hasTrailingNewline(filePath)).toBe(false);
     });
 
-    it("returns null for nonexistent file", () => {
-      expect(hasTrailingNewline("/nonexistent/file.txt")).toBeNull();
+    it("returns null for nonexistent file", async () => {
+      expect(await hasTrailingNewline("/nonexistent/file.txt")).toBeNull();
     });
   });
 
   describe("processInput", () => {
-    it("stores empty state for empty file", () => {
+    it("stores empty state for empty file", async () => {
       const filePath = join(testDir, "empty.txt");
-      writeFileSync(filePath, "");
-      checkInput(mockPreToolInput(filePath));
-      expect(getState("newline", filePath)).toBe("");
+      await Bun.write(filePath, "");
+      await checkInput(mockPreToolInput(filePath));
+      expect(await getState("newline", filePath)).toBe("");
     });
 
-    it("stores '1' for file with trailing newline", () => {
+    it("stores '1' for file with trailing newline", async () => {
       const filePath = join(testDir, "with_newline.txt");
-      writeFileSync(filePath, "content\n");
-      checkInput(mockPreToolInput(filePath));
-      expect(getState("newline", filePath)).toBe("1");
+      await Bun.write(filePath, "content\n");
+      await checkInput(mockPreToolInput(filePath));
+      expect(await getState("newline", filePath)).toBe("1");
     });
 
-    it("stores empty string for file without trailing newline", () => {
+    it("stores empty string for file without trailing newline", async () => {
       const filePath = join(testDir, "no_newline.txt");
-      writeFileSync(filePath, "content");
-      checkInput(mockPreToolInput(filePath));
-      expect(getState("newline", filePath)).toBe("");
+      await Bun.write(filePath, "content");
+      await checkInput(mockPreToolInput(filePath));
+      expect(await getState("newline", filePath)).toBe("");
     });
   });
 });
 
 describe("ensure.ts", () => {
   describe("ensureTrailingNewline", () => {
-    it("adds newline to file without one", () => {
+    it("adds newline to file without one", async () => {
       const filePath = join(testDir, "no_newline.txt");
-      writeFileSync(filePath, "content");
-      const message = ensureTrailingNewline(filePath);
+      await Bun.write(filePath, "content");
+      const message = await ensureTrailingNewline(filePath);
       expect(message).toBe("Added trailing newline");
-      expect(hasNewline(filePath)).toBe(true);
+      expect(await hasNewline(filePath)).toBe(true);
     });
 
-    it("preserves existing newline", () => {
+    it("preserves existing newline", async () => {
       const filePath = join(testDir, "with_newline.txt");
-      writeFileSync(filePath, "content\n");
-      const message = ensureTrailingNewline(filePath);
+      await Bun.write(filePath, "content\n");
+      const message = await ensureTrailingNewline(filePath);
       expect(message).toBe("File already has trailing newline");
-      expect(hasNewline(filePath)).toBe(true);
+      expect(await hasNewline(filePath)).toBe(true);
     });
 
-    it("skips empty files", () => {
+    it("skips empty files", async () => {
       const filePath = join(testDir, "empty.txt");
-      writeFileSync(filePath, "");
-      const message = ensureTrailingNewline(filePath);
+      await Bun.write(filePath, "");
+      const message = await ensureTrailingNewline(filePath);
       expect(message).toBe("File is empty, skipping");
     });
 
-    it("returns null for nonexistent file", () => {
-      expect(ensureTrailingNewline("/nonexistent/file.txt")).toBeNull();
+    it("returns null for nonexistent file", async () => {
+      expect(await ensureTrailingNewline("/nonexistent/file.txt")).toBeNull();
     });
   });
 
   describe("processInput", () => {
-    it("returns additionalContext when adding newline", () => {
+    it("returns additionalContext when adding newline", async () => {
       const filePath = join(testDir, "no_newline.txt");
-      writeFileSync(filePath, "content");
-      const output = ensureInput(mockPostToolInput(filePath));
+      await Bun.write(filePath, "content");
+      const output = await ensureInput(mockPostToolInput(filePath));
       const hookOutput = output?.hookSpecificOutput as PostToolUseHookSpecificOutput | undefined;
       expect(hookOutput?.additionalContext).toContain("Added trailing newline");
     });
@@ -165,75 +165,75 @@ describe("ensure.ts", () => {
 
 describe("preserve.ts", () => {
   describe("preserveNewlineState", () => {
-    it("adds newline when original had one", () => {
+    it("adds newline when original had one", async () => {
       const filePath = join(testDir, "preserve_with.txt");
-      writeFileSync(filePath, "new content");
-      const message = preserveNewlineState(filePath, "1");
+      await Bun.write(filePath, "new content");
+      const message = await preserveNewlineState(filePath, "1");
       expect(message).toContain("Added trailing newline");
-      expect(hasNewline(filePath)).toBe(true);
+      expect(await hasNewline(filePath)).toBe(true);
     });
 
-    it("removes newline when original had none", () => {
+    it("removes newline when original had none", async () => {
       const filePath = join(testDir, "preserve_without.txt");
-      writeFileSync(filePath, "new content\n");
-      const message = preserveNewlineState(filePath, "");
+      await Bun.write(filePath, "new content\n");
+      const message = await preserveNewlineState(filePath, "");
       expect(message).toContain("Removed trailing newline");
-      expect(hasNewline(filePath)).toBe(false);
+      expect(await hasNewline(filePath)).toBe(false);
     });
 
-    it("preserves existing newline when original had one", () => {
+    it("preserves existing newline when original had one", async () => {
       const filePath = join(testDir, "preserve_keep.txt");
-      writeFileSync(filePath, "content\n");
-      const message = preserveNewlineState(filePath, "1");
+      await Bun.write(filePath, "content\n");
+      const message = await preserveNewlineState(filePath, "1");
       expect(message).toBeNull();
-      expect(hasNewline(filePath)).toBe(true);
+      expect(await hasNewline(filePath)).toBe(true);
     });
 
-    it("skips empty files", () => {
+    it("skips empty files", async () => {
       const filePath = join(testDir, "empty_preserve.txt");
-      writeFileSync(filePath, "");
-      const message = preserveNewlineState(filePath, "1");
+      await Bun.write(filePath, "");
+      const message = await preserveNewlineState(filePath, "1");
       expect(message).toBe("File is empty, skipping");
     });
   });
 
   describe("processInput", () => {
-    it("cleans up state after processing", () => {
+    it("cleans up state after processing", async () => {
       const filePath = join(testDir, "cleanup.txt");
-      writeFileSync(filePath, "content\n");
-      setState("newline", filePath, "1");
-      preserveInput(mockPostToolInput(filePath));
-      expect(getState("newline", filePath)).toBe("");
+      await Bun.write(filePath, "content\n");
+      await setState("newline", filePath, "1");
+      await preserveInput(mockPostToolInput(filePath));
+      expect(await getState("newline", filePath)).toBe("");
     });
   });
 });
 
 describe("integration", () => {
-  it("preserves trailing newline through check and preserve cycle", () => {
+  it("preserves trailing newline through check and preserve cycle", async () => {
     const filePath = join(testDir, "integration.txt");
-    writeFileSync(filePath, "original content\n");
+    await Bun.write(filePath, "original content\n");
 
-    checkInput(mockPreToolInput(filePath));
-    expect(getState("newline", filePath)).toBe("1");
+    await checkInput(mockPreToolInput(filePath));
+    expect(await getState("newline", filePath)).toBe("1");
 
-    writeFileSync(filePath, "modified content");
+    await Bun.write(filePath, "modified content");
 
-    preserveInput(mockPostToolInput(filePath));
-    expect(hasNewline(filePath)).toBe(true);
-    expect(getState("newline", filePath)).toBe("");
+    await preserveInput(mockPostToolInput(filePath));
+    expect(await hasNewline(filePath)).toBe(true);
+    expect(await getState("newline", filePath)).toBe("");
   });
 
-  it("preserves no trailing newline through check and preserve cycle", () => {
+  it("preserves no trailing newline through check and preserve cycle", async () => {
     const filePath = join(testDir, "integration_no_newline.txt");
-    writeFileSync(filePath, "original content");
+    await Bun.write(filePath, "original content");
 
-    checkInput(mockPreToolInput(filePath));
-    expect(getState("newline", filePath)).toBe("");
+    await checkInput(mockPreToolInput(filePath));
+    expect(await getState("newline", filePath)).toBe("");
 
-    writeFileSync(filePath, "modified content\n");
+    await Bun.write(filePath, "modified content\n");
 
-    preserveInput(mockPostToolInput(filePath));
-    expect(hasNewline(filePath)).toBe(false);
-    expect(getState("newline", filePath)).toBe("");
+    await preserveInput(mockPostToolInput(filePath));
+    expect(await hasNewline(filePath)).toBe(false);
+    expect(await getState("newline", filePath)).toBe("");
   });
 });

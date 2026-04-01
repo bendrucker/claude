@@ -215,34 +215,34 @@ describe("frontmatter rules", () => {
 });
 
 describe("lintSkill", () => {
-  it("passes valid skill", () => {
-    const result = lintSkill(path.join(fixturesDir, "valid"));
+  it("passes valid skill", async () => {
+    const result = await lintSkill(path.join(fixturesDir, "valid"));
     expect(result.errors).toBe(0);
     expect(result.warnings).toBe(0);
   });
 
-  it("reports invalid name format", () => {
-    const result = lintSkill(path.join(fixturesDir, "invalid-name"));
+  it("reports invalid name format", async () => {
+    const result = await lintSkill(path.join(fixturesDir, "invalid-name"));
     expect(result.errors).toBeGreaterThan(0);
     const nameError = result.results.find((r) => r.rule === "name-format");
     expect(nameError?.passed).toBe(false);
   });
 
-  it("reports missing description", () => {
-    const result = lintSkill(path.join(fixturesDir, "missing-description"));
+  it("reports missing description", async () => {
+    const result = await lintSkill(path.join(fixturesDir, "missing-description"));
     expect(result.errors).toBeGreaterThan(0);
     const descError = result.results.find((r) => r.rule === "description-required");
     expect(descError?.passed).toBe(false);
   });
 
-  it("detects references", () => {
-    const result = lintSkill(path.join(fixturesDir, "with-references"));
+  it("detects references", async () => {
+    const result = await lintSkill(path.join(fixturesDir, "with-references"));
     expect(result.references).toHaveLength(1);
     expect(result.references[0]?.path).toBe("references/language.md");
   });
 
-  it("calculates token counts", () => {
-    const result = lintSkill(path.join(fixturesDir, "valid"));
+  it("calculates token counts", async () => {
+    const result = await lintSkill(path.join(fixturesDir, "valid"));
     expect(result.tokens.skill).toBeGreaterThan(0);
     expect(result.tokens.total).toBeGreaterThanOrEqual(result.tokens.skill);
   });

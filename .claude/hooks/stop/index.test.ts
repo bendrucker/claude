@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseTranscript } from ".";
@@ -41,11 +41,11 @@ describe("parseTranscript", () => {
   it("extracts file paths from Edit and Write tool uses", async () => {
     const filePath = join(tempDir, "test.ts");
     const mdPath = join(tempDir, "readme.md");
-    await writeFile(filePath, "export {}");
-    await writeFile(mdPath, "# Test");
+    await Bun.write(filePath, "export {}");
+    await Bun.write(mdPath, "# Test");
 
     const transcriptPath = join(tempDir, "transcript-tools.jsonl");
-    await writeFile(
+    await Bun.write(
       transcriptPath,
       createTranscriptContent([
         { path: filePath, tool: "Edit" },
@@ -60,20 +60,20 @@ describe("parseTranscript", () => {
 
   it("ignores non-Edit/Write tools", async () => {
     const filePath = join(tempDir, "read-only.ts");
-    await writeFile(filePath, "export {}");
+    await Bun.write(filePath, "export {}");
 
     const transcriptPath = join(tempDir, "transcript-read.jsonl");
-    await writeFile(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Read" }]));
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Read" }]));
 
     expect(await parseTranscript(transcriptPath)).toEqual([]);
   });
 
   it("deduplicates file paths", async () => {
     const filePath = join(tempDir, "dup.ts");
-    await writeFile(filePath, "export {}");
+    await Bun.write(filePath, "export {}");
 
     const transcriptPath = join(tempDir, "transcript-dup.jsonl");
-    await writeFile(
+    await Bun.write(
       transcriptPath,
       createTranscriptContent([
         { path: filePath, tool: "Edit" },
@@ -86,7 +86,7 @@ describe("parseTranscript", () => {
 
   it("filters out deleted files", async () => {
     const transcriptPath = join(tempDir, "transcript-deleted.jsonl");
-    await writeFile(
+    await Bun.write(
       transcriptPath,
       createTranscriptContent([{ path: "/nonexistent/deleted.ts", tool: "Write" }]),
     );

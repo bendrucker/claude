@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { readFileSync } from "node:fs";
 import * as acorn from "acorn";
 
 type Node = acorn.Node & Record<string, unknown>;
@@ -109,7 +108,7 @@ if (import.meta.main) {
       console.error("Usage: bun jxa.ts <app> <script> [args...] or bun jxa.ts <app> -e '<expr>'");
       process.exit(1);
     }
-    source = readFileSync(scriptPath, "utf-8");
+    source = await Bun.file(scriptPath).text();
     osascriptArgs = ["-l", "JavaScript", scriptPath, ...args.slice(1)];
   }
 

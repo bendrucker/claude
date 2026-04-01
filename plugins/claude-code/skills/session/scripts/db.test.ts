@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import * as fs from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import * as path from "node:path";
 import { type Database, ensureIndex, getDb, runQuery } from "./db";
 
@@ -17,14 +17,14 @@ let db: Database;
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = fs.mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-test-"));
+  tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-test-"));
   db = await getDb(tmpDir);
   await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir });
 });
 
 afterEach(() => {
   db.close();
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  rmSync(tmpDir, { recursive: true, force: true });
 });
 
 describe("sessions view", () => {

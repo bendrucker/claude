@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execSync } from "node:child_process";
-import * as fs from "node:fs";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { detectProvider } from "./detect-provider";
@@ -9,12 +9,12 @@ describe("detect-provider", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "detect-provider-")));
+    tempDir = realpathSync(mkdtempSync(path.join(os.tmpdir(), "detect-provider-")));
     execSync("git init -q", { cwd: tempDir, stdio: "pipe" });
   });
 
   afterEach(() => {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("detects github.com", () => {

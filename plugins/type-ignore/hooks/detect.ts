@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 
-import * as fs from "node:fs";
+import { mkdirSync } from "node:fs";
 import * as path from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
@@ -78,24 +78,22 @@ function getMarkerPath(): string {
   return path.join(MARKER_DIR, getSessionId());
 }
 
-export function isCleanupAgentActive(): boolean {
+export async function isCleanupAgentActive(): Promise<boolean> {
   const markerPath = getMarkerPath();
-  try {
-    const stats = fs.statSync(markerPath);
-    const age = Date.now() - stats.mtimeMs;
-    if (age > MARKER_TTL_MS) {
-      fs.unlinkSync(markerPath);
-      return false;
-    }
-    return true;
-  } catch {
+  const file = Bun.file(markerPath);
+  if (!(await file.exists())) return false;
+  const age = Date.now() - file.lastModified;
+  if (age > MARKER_TTL_MS) {
+    const { unlink } = await import("node:fs/promises");
+    await unlink(markerPath);
     return false;
   }
+  return true;
 }
 
-function setMarker(): void {
-  fs.mkdirSync(MARKER_DIR, { recursive: true });
-  fs.writeFileSync(getMarkerPath(), String(Date.now()));
+async function setMarker(): Promise<void> {
+  mkdirSync(MARKER_DIR, { recursive: true });
+  await Bun.write(getMarkerPath(), String(Date.now()));
 }
 
 export function formatOutput(
@@ -111,7 +109,7 @@ export function formatOutput(
   };
 }
 
-export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | null {
+export async function processInput(input: PostToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   const toolName = input.tool_name;
 
   let filePath: string;
@@ -140,7 +138,7 @@ export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | 
     return null;
   }
 
-  if (isCleanupAgentActive()) {
+  if (await isCleanupAgentActive()) {
     return null;
   }
 
@@ -151,7 +149,7 @@ export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | 
 
   const lineNumber = findLineNumber(newContent, pattern.match);
 
-  setMarker();
+  await setMarker();
 
   return formatOutput(filePath, lineNumber, pattern.label);
 }
@@ -167,7 +165,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processInput(input);
+  const output = await processInput(input);
   if (output) {
     writeStdoutJson(output);
   }

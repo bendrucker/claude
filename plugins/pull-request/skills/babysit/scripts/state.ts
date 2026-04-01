@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 
 const sessionId = process.argv[2];
 const subcommand = process.argv[3];
@@ -20,14 +20,15 @@ if (subcommand === "clean") {
 }
 
 let iteration: number;
-if (!existsSync(statePath)) {
+const file = Bun.file(statePath);
+if (!(await file.exists())) {
   mkdirSync(stateDir, { recursive: true });
   iteration = 0;
 } else {
-  iteration = JSON.parse(readFileSync(statePath, "utf-8")).iteration + 1;
+  iteration = (await file.json()).iteration + 1;
 }
 
-writeFileSync(statePath, JSON.stringify({ iteration }));
+await Bun.write(statePath, JSON.stringify({ iteration }));
 
 const max = 20;
 console.log(`iteration: ${iteration}`);

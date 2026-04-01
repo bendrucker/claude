@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 const jxa = join(import.meta.dirname, "jxa.ts");
@@ -35,7 +35,7 @@ describe("jxa cli", () => {
     const dir = join(import.meta.dirname, "fixtures");
     mkdirSync(dir, { recursive: true });
     const script = join(dir, "finder-name.js");
-    writeFileSync(script, 'Application("Finder").name()');
+    await Bun.write(script, 'Application("Finder").name()');
     const result = await output(run("Finder", script));
     expect(result.code).toBe(0);
     expect(result.stdout.trim()).toBe("Finder");

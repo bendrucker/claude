@@ -25,8 +25,8 @@ function mockInput(
 }
 
 describe("approve-read hook", () => {
-  beforeEach(() => {
-    writeTarget(sessionId, {
+  beforeEach(async () => {
+    await writeTarget(sessionId, {
       service: "github",
       owner: "acme",
       repo: "widgets",
@@ -38,8 +38,8 @@ describe("approve-read hook", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("approves matching issue", () => {
-    const result = processInput(mockInput("acme", "widgets", 123));
+  it("approves matching issue", async () => {
+    const result = await processInput(mockInput("acme", "widgets", 123));
     expect(result).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -48,27 +48,27 @@ describe("approve-read hook", () => {
     });
   });
 
-  it("approves all read methods for matching issue", () => {
+  it("approves all read methods for matching issue", async () => {
     for (const method of ["get", "get_comments", "get_sub_issues", "get_labels"]) {
-      const result = processInput(mockInput("acme", "widgets", 123, method));
+      const result = await processInput(mockInput("acme", "widgets", 123, method));
       expect(result).not.toBeNull();
     }
   });
 
-  it("returns null for different issue number", () => {
-    expect(processInput(mockInput("acme", "widgets", 456))).toBeNull();
+  it("returns null for different issue number", async () => {
+    expect(await processInput(mockInput("acme", "widgets", 456))).toBeNull();
   });
 
-  it("returns null for different repo", () => {
-    expect(processInput(mockInput("acme", "other", 123))).toBeNull();
+  it("returns null for different repo", async () => {
+    expect(await processInput(mockInput("acme", "other", 123))).toBeNull();
   });
 
-  it("returns null for different owner", () => {
-    expect(processInput(mockInput("other", "widgets", 123))).toBeNull();
+  it("returns null for different owner", async () => {
+    expect(await processInput(mockInput("other", "widgets", 123))).toBeNull();
   });
 
-  it("returns null when no target file exists", () => {
+  it("returns null when no target file exists", async () => {
     rmSync(dir, { recursive: true, force: true });
-    expect(processInput(mockInput("acme", "widgets", 123))).toBeNull();
+    expect(await processInput(mockInput("acme", "widgets", 123))).toBeNull();
   });
 });

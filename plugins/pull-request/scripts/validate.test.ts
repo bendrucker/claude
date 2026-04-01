@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import * as fs from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
@@ -79,11 +79,11 @@ describe("processInput", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "validate-test-"));
+    tempDir = mkdtempSync(path.join(os.tmpdir(), "validate-test-"));
   });
 
   afterEach(() => {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   function createInput(command: string): PreToolUseHookInput {
@@ -113,14 +113,14 @@ describe("processInput", () => {
 
   it("returns null for valid body", async () => {
     const bodyFile = path.join(tempDir, "body.md");
-    fs.writeFileSync(bodyFile, "## Summary\nFixes a bug");
+    await Bun.write(bodyFile, "## Summary\nFixes a bug");
     const result = await processInput(createInput(`gh pr create --body-file ${bodyFile}`));
     expect(result).toBeNull();
   });
 
   it("denies body with test count", async () => {
     const bodyFile = path.join(tempDir, "body.md");
-    fs.writeFileSync(bodyFile, "## Test plan\nAdded 5 tests");
+    await Bun.write(bodyFile, "## Test plan\nAdded 5 tests");
     const result = await processInput(createInput(`gh pr create --body-file ${bodyFile}`));
     expect(result).not.toBeNull();
     expect(getPermissionDecision(result)).toBe("deny");

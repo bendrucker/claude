@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import * as fs from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import * as path from "node:path";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
@@ -8,11 +8,11 @@ const queryScript = path.join(import.meta.dirname, "query.ts");
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "query-integration-"));
+  tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "query-integration-"));
 });
 
 afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  rmSync(tmpDir, { recursive: true, force: true });
 });
 
 function env() {

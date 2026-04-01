@@ -26,4 +26,4 @@ if (!target) {
   process.exit(0);
 }
 
-writeTarget(argv.flags.sessionId, target);
+await writeTarget(argv.flags.sessionId, target);

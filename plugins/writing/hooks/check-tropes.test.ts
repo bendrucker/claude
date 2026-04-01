@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
@@ -56,34 +56,34 @@ function mockMcp(toolName: string, toolInput: Record<string, unknown>): PreToolU
   };
 }
 
-function getDecision(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = processInput(input);
+async function getDecision(input: PreToolUseHookInput): Promise<PreToolUseHookSpecificOutput | null> {
+  const result = await processInput(input);
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
 
 describe("Write/Edit", () => {
-  it("denies Write with spaced em dash", () => {
-    const output = getDecision(mockWrite("This \u2014 is bad"));
+  it("denies Write with spaced em dash", async () => {
+    const output = await getDecision(mockWrite("This \u2014 is bad"));
     expect(output?.permissionDecision).toBe("deny");
   });
 
-  it("asks on Edit with spaced em dash", () => {
-    const output = getDecision(mockEdit("This \u2014 is bad"));
+  it("asks on Edit with spaced em dash", async () => {
+    const output = await getDecision(mockEdit("This \u2014 is bad"));
     expect(output?.permissionDecision).toBe("ask");
   });
 
-  it("returns context for promotional language", () => {
-    const result = processInput(mockWrite("A groundbreaking approach"));
+  it("returns context for promotional language", async () => {
+    const result = await processInput(mockWrite("A groundbreaking approach"));
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
-  it("returns null for clean text", () => {
-    expect(processInput(mockWrite("Clean prose here."))).toBeNull();
+  it("returns null for clean text", async () => {
+    expect(await processInput(mockWrite("Clean prose here."))).toBeNull();
   });
 
-  it("returns null for empty content", () => {
-    expect(processInput(mockWrite(""))).toBeNull();
+  it("returns null for empty content", async () => {
+    expect(await processInput(mockWrite(""))).toBeNull();
   });
 });
 
@@ -101,37 +101,37 @@ describe("collectText", () => {
       rmSync(dir, { recursive: true, force: true });
     });
 
-    it("reads --body-file content", () => {
-      writeFileSync(tmpFile, "Body content here");
-      const texts = collectText(mockBash(`gh pr create --body-file ${tmpFile}`));
+    it("reads --body-file content", async () => {
+      await Bun.write(tmpFile, "Body content here");
+      const texts = await collectText(mockBash(`gh pr create --body-file ${tmpFile}`));
       expect(texts).toContain("Body content here");
     });
 
-    it("reads --body-file= content", () => {
-      writeFileSync(tmpFile, "Body content");
-      const texts = collectText(mockBash(`gh pr create --body-file=${tmpFile}`));
+    it("reads --body-file= content", async () => {
+      await Bun.write(tmpFile, "Body content");
+      const texts = await collectText(mockBash(`gh pr create --body-file=${tmpFile}`));
       expect(texts).toContain("Body content");
     });
 
-    it("extracts inline --body", () => {
-      const texts = collectText(mockBash('gh issue create --body "Issue description"'));
+    it("extracts inline --body", async () => {
+      const texts = await collectText(mockBash('gh issue create --body "Issue description"'));
       expect(texts).toContain("Issue description");
     });
 
-    it("extracts inline --title", () => {
-      const texts = collectText(mockBash('gh issue create --title "My title"'));
+    it("extracts inline --title", async () => {
+      const texts = await collectText(mockBash('gh issue create --title "My title"'));
       expect(texts).toContain("My title");
     });
 
-    it("returns empty for commands without text args", () => {
-      const texts = collectText(mockBash("git status"));
+    it("returns empty for commands without text args", async () => {
+      const texts = await collectText(mockBash("git status"));
       expect(texts).toHaveLength(0);
     });
   });
 
   describe("MCP tools", () => {
-    it("extracts prose strings, skipping short values", () => {
-      const texts = collectText(
+    it("extracts prose strings, skipping short values", async () => {
+      const texts = await collectText(
         mockMcp("mcp__linear__save_issue", {
           title: "Fix the bug in authentication flow",
           description: "Users are unable to log in when using SSO",
@@ -143,8 +143,8 @@ describe("collectText", () => {
       expect(texts).not.toContain("ENG");
     });
 
-    it("skips URLs and identifiers", () => {
-      const texts = collectText(
+    it("skips URLs and identifiers", async () => {
+      const texts = await collectText(
         mockMcp("mcp__claude_ai_Slack__slack_send_message", {
           channel_id: "C123ABC456",
           text: "The deploy finished successfully and all tests pass",
@@ -154,16 +154,16 @@ describe("collectText", () => {
       expect(texts).not.toContain("C123ABC456");
     });
 
-    it("handles empty input", () => {
-      const texts = collectText(mockMcp("mcp__test", {}));
+    it("handles empty input", async () => {
+      const texts = await collectText(mockMcp("mcp__test", {}));
       expect(texts).toHaveLength(0);
     });
   });
 });
 
 describe("Bash/MCP processInput", () => {
-  it("denies MCP tool input with spaced em dash", () => {
-    const result = processInput(
+  it("denies MCP tool input with spaced em dash", async () => {
+    const result = await processInput(
       mockMcp("mcp__linear__save_issue", {
         title: "Fix the bug",
         description: "This feature \u2014 which was added last week \u2014 is broken",
@@ -172,17 +172,17 @@ describe("Bash/MCP processInput", () => {
     expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
   });
 
-  it("denies Bash body-file with AI vocabulary", () => {
+  it("denies Bash body-file with AI vocabulary", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
     const file = join(dir, "body.md");
-    writeFileSync(file, "We must delve into the issue");
-    const result = processInput(mockBash(`gh pr create --body-file ${file}`));
+    await Bun.write(file, "We must delve into the issue");
+    const result = await processInput(mockBash(`gh pr create --body-file ${file}`));
     rmSync(dir, { recursive: true, force: true });
     expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
   });
 
-  it("returns null for clean MCP input", () => {
-    const result = processInput(
+  it("returns null for clean MCP input", async () => {
+    const result = await processInput(
       mockMcp("mcp__claude_ai_Slack__slack_send_message", {
         text: "The deploy finished successfully.",
       }),
@@ -190,7 +190,7 @@ describe("Bash/MCP processInput", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null for non-text Bash commands", () => {
-    expect(processInput(mockBash("git push origin main"))).toBeNull();
+  it("returns null for non-text Bash commands", async () => {
+    expect(await processInput(mockBash("git push origin main"))).toBeNull();
   });
 });

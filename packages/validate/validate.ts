@@ -3,7 +3,6 @@ import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
 export type { ErrorObject } from "ajv";
 
 import addFormats from "ajv-formats";
-import { readFile } from "fs/promises";
 
 function isCI(): boolean {
   return process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
@@ -52,8 +51,7 @@ export async function loadSchema(schemaPath: string): Promise<Record<string, unk
     const response = await fetch(schemaPath);
     schema = await response.json();
   } else {
-    const content = await readFile(schemaPath, "utf8");
-    schema = JSON.parse(content);
+    schema = await Bun.file(schemaPath).json();
   }
   patchHookSchema(schema);
   return schema;
@@ -90,8 +88,7 @@ export async function validateFile(
     validatorCache.set(schemaPath, entry);
   }
 
-  const content = await readFile(file, "utf8");
-  const data = JSON.parse(content);
+  const data = await Bun.file(file).json();
   const valid = entry.validate(data);
 
   const errors = valid

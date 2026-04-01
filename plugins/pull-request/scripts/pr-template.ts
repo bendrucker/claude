@@ -3,7 +3,6 @@
 // Outputs: template content if found, nothing otherwise
 
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { detectProvider, type Provider } from "./detect-provider";
 
@@ -20,12 +19,13 @@ const GITLAB_PATHS = [
   ".gitlab/merge_request_templates/default.md",
 ];
 
-export function findTemplate(provider: Provider, repoRoot: string): string | null {
+export async function findTemplate(provider: Provider, repoRoot: string): Promise<string | null> {
   const paths = provider === "github" ? GITHUB_PATHS : provider === "gitlab" ? GITLAB_PATHS : [];
   for (const p of paths) {
     const full = join(repoRoot, p);
-    if (existsSync(full)) {
-      return readFileSync(full, "utf-8");
+    const file = Bun.file(full);
+    if (await file.exists()) {
+      return await file.text();
     }
   }
   return null;
@@ -41,7 +41,7 @@ function getRepoRoot(): string {
 if (import.meta.main) {
   const repoRoot = getRepoRoot();
   const provider = detectProvider();
-  const template = findTemplate(provider, repoRoot);
+  const template = await findTemplate(provider, repoRoot);
   if (template) {
     process.stdout.write(template);
   }

@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
 import { readStdinJson } from "@constellos/claude-code-kit/runners";
@@ -16,13 +15,13 @@ export function getResourceType(filePath: string): "agent" | "command" | "skill"
   return "skill";
 }
 
-export function getResourceName(filePath: string, type: string): string | null {
+export async function getResourceName(filePath: string, type: string): Promise<string | null> {
   if (type === "agent" || type === "command") {
     return basename(filePath, ".md");
   }
 
   try {
-    const content = readFileSync(filePath, "utf-8");
+    const content = await Bun.file(filePath).text();
     const match = content.match(/^name:\s*(.+)$/m);
     return match?.[1]?.trim() ?? null;
   } catch {
@@ -68,7 +67,7 @@ export function checkSkillNamespace(name: string, pluginName: string): string[] 
   return warnings;
 }
 
-export function processHookInput(input: PostToolUseInput): string[] {
+export async function processHookInput(input: PostToolUseInput): Promise<string[]> {
   const warnings: string[] = [];
 
   if (input.tool_name !== "Write" && input.tool_name !== "Edit") return warnings;
@@ -79,7 +78,7 @@ export function processHookInput(input: PostToolUseInput): string[] {
   if (!pluginName) return warnings;
 
   const type = getResourceType(filePath);
-  const name = getResourceName(filePath, type);
+  const name = await getResourceName(filePath, type);
   if (!name) return warnings;
 
   if (type === "skill") {

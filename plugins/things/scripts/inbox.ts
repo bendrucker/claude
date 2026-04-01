@@ -59,7 +59,7 @@ params.set("notes", existing ? `${existing}\n\n${attribution}` : attribution);
 
 await ensureThingsRunning();
 
-if (findXcallRunner()) {
+if (await findXcallRunner()) {
   const url = await buildUrl("add", params);
   try {
     const result = await xcall(url);

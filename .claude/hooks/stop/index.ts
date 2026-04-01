@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import { execFile } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
 import { relative } from "node:path";
 import { promisify } from "node:util";
 import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
@@ -22,12 +21,7 @@ interface TranscriptEntry {
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
+  return Bun.file(filePath).exists();
 }
 
 export async function parseTranscript(transcriptPath: string): Promise<string[]> {
@@ -35,7 +29,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
     return [];
   }
 
-  const content = await readFile(transcriptPath, "utf-8");
+  const content = await Bun.file(transcriptPath).text();
   const existChecks: Array<Promise<{ path: string; exists: boolean }>> = [];
 
   for (const line of content.split("\n")) {

@@ -4,23 +4,24 @@
 
 import { execSync } from "node:child_process";
 import { join } from "node:path";
-import { detectProvider, type Provider } from "./detect-provider";
+export type Provider = "github" | "gitlab";
 
-const GITHUB_PATHS = [
-  ".github/PULL_REQUEST_TEMPLATE.md",
-  ".github/pull_request_template.md",
-  "PULL_REQUEST_TEMPLATE.md",
-  "pull_request_template.md",
-  "docs/pull_request_template.md",
-];
-
-const GITLAB_PATHS = [
-  ".gitlab/merge_request_templates/Default.md",
-  ".gitlab/merge_request_templates/default.md",
-];
+const TEMPLATE_PATHS: Record<Provider, string[]> = {
+  github: [
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    ".github/pull_request_template.md",
+    "PULL_REQUEST_TEMPLATE.md",
+    "pull_request_template.md",
+    "docs/pull_request_template.md",
+  ],
+  gitlab: [
+    ".gitlab/merge_request_templates/Default.md",
+    ".gitlab/merge_request_templates/default.md",
+  ],
+};
 
 export async function findTemplate(provider: Provider, repoRoot: string): Promise<string | null> {
-  const paths = provider === "github" ? GITHUB_PATHS : provider === "gitlab" ? GITLAB_PATHS : [];
+  const paths = TEMPLATE_PATHS[provider] ?? [];
   for (const p of paths) {
     const full = join(repoRoot, p);
     const file = Bun.file(full);
@@ -40,7 +41,7 @@ function getRepoRoot(): string {
 
 if (import.meta.main) {
   const repoRoot = getRepoRoot();
-  const provider = detectProvider();
+  const provider = (process.argv[2] as Provider) || "github";
   const template = await findTemplate(provider, repoRoot);
   if (template) {
     process.stdout.write(template);

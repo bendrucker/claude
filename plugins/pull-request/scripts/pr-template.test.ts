@@ -73,11 +73,4 @@ describe("findTemplate", () => {
     await Bun.write(path.join(dir, "Default.md"), "gitlab template\n");
     expect(await findTemplate("github", tempDir)).toBeNull();
   });
-
-  it("returns null for unknown provider", async () => {
-    const dir = path.join(tempDir, ".github");
-    mkdirSync(dir);
-    await Bun.write(path.join(dir, "PULL_REQUEST_TEMPLATE.md"), "template\n");
-    expect(await findTemplate("unknown", tempDir)).toBeNull();
-  });
 });

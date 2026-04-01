@@ -38,6 +38,15 @@ Run state script to track iteration (`bun <state-script> <session-id>`).
 
 Query the latest CI run for the branch, including the commit SHA it ran against. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote. Compare the run's commit SHA against `git rev-parse HEAD`.
 
+#### Check Merge Conflicts
+
+Also check for merge conflicts: `gh pr view <number> --json mergeable,mergeStateStatus`. If `mergeable` is `CONFLICTING`, identify conflicting files by running `git merge origin/main --no-commit --no-ff`, then `git diff --name-only --diff-filter=U`. Abort the merge afterward with `git merge --abort`.
+
+- **Trivial**: Lockfiles (`bun.lock`) or generated files. For lockfiles, delete and regenerate per project convention (e.g., `rm bun.lock && bun install`). Also trivial: conflicts in files the PR modified where the resolution is obvious (both sides added adjacent lines).
+- **Non-trivial**: Report the conflicting file list to the user and cancel.
+
+After resolving, commit the merge and push. The next iteration will pick up the new SHA.
+
 #### SHA Mismatch
 
 If the latest run's SHA does not match the current HEAD, a fix was recently pushed and CI has not started or completed for the new commit yet. Treat this as "waiting" and do nothing.
@@ -68,7 +77,7 @@ Resolve all `${}` placeholders to absolute values in the prompt. Avoid `xargs`, 
 
 ## Trivial Failures
 
-Lint errors, type errors, formatting, missing imports, simple test updates.
+Lint errors, type errors, formatting, missing imports, simple test updates, merge conflicts in lockfiles or generated files.
 
 Reproduce locally, fix, verify, commit with a descriptive message, and push.
 

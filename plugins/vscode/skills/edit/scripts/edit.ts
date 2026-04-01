@@ -2,7 +2,7 @@
 
 import { execFile, execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { cli } from "cleye";
 
@@ -10,7 +10,7 @@ export async function createTempFile(content: string, ext: string): Promise<stri
   const dir = `/tmp/claude/vscode-edit-${randomUUID()}`;
   await mkdir(dir, { recursive: true });
   const filePath = join(dir, `edit.${ext}`);
-  await writeFile(filePath, content);
+  await Bun.write(filePath, content);
   return filePath;
 }
 
@@ -25,7 +25,7 @@ export function openInEditor(filePath: string, wait: boolean): void {
 }
 
 export async function readAndCleanup(filePath: string): Promise<string> {
-  const content = await readFile(filePath, "utf-8");
+  const content = await Bun.file(filePath).text();
   await rm(dirname(filePath), { recursive: true });
   return content;
 }

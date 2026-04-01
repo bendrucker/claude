@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import * as fs from "node:fs";
+import { readdirSync } from "node:fs";
 import * as path from "node:path";
 import { parseArgs } from "node:util";
 import { lintSkill } from "../../plugins/claude-code/skills/skill/scripts/skill-lint/index";
@@ -38,33 +38,45 @@ Exit codes:
   process.exit(0);
 }
 
-const skillDirs = positionals.flatMap((pattern) => {
-  if (pattern.includes("*")) {
-    const base = pattern.split("*")[0] ?? "";
-    const suffix = pattern.split("*").slice(1).join("*");
-
-    if (!fs.existsSync(base)) return [];
-
-    return fs
-      .readdirSync(base, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => path.join(base, d.name, suffix.replace(/^\*?\/?/, "")))
-      .filter((p) => fs.existsSync(path.join(p, "SKILL.md")));
+function tryReaddir(dir: string) {
+  try {
+    return readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return null;
   }
+}
 
-  if (fs.existsSync(path.join(pattern, "SKILL.md"))) {
-    return [pattern];
+async function resolveSkillDirs(patterns: string[]): Promise<string[]> {
+  const dirs: string[] = [];
+  for (const pattern of patterns) {
+    if (pattern.includes("*")) {
+      const base = pattern.split("*")[0] ?? "";
+      const suffix = pattern.split("*").slice(1).join("*");
+
+      const entries = tryReaddir(base);
+      if (!entries) continue;
+      for (const d of entries) {
+        if (!d.isDirectory()) continue;
+        const p = path.join(base, d.name, suffix.replace(/^\*?\/?/, ""));
+        if (await Bun.file(path.join(p, "SKILL.md")).exists()) {
+          dirs.push(p);
+        }
+      }
+    } else if (await Bun.file(path.join(pattern, "SKILL.md")).exists()) {
+      dirs.push(pattern);
+    }
   }
+  return dirs;
+}
 
-  return [];
-});
+const skillDirs = await resolveSkillDirs(positionals);
 
 if (skillDirs.length === 0) {
   console.error("No skill directories found");
   process.exit(1);
 }
 
-const results = skillDirs.map((dir) => lintSkill(dir));
+const results = await Promise.all(skillDirs.map((dir) => lintSkill(dir)));
 
 if (values.json) {
   console.log(formatJson(results));

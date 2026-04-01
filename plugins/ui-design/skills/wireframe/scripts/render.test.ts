@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { render, renderFile } from "./render";
@@ -44,18 +44,18 @@ describe("render", () => {
     expect(result.scale).toBe(2);
     expect(result.output).toContain("@2x.png");
 
-    const pngBuffer = await readFile(outputPath);
+    const pngBuffer = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     expect(pngBuffer.length).toBeGreaterThan(0);
   });
 
   it("generates default output path with scale suffix", async () => {
     const inputPath = path.join(assetsDir, "login-screen.svg");
-    const content = await readFile(inputPath);
+    const content = Buffer.from(await Bun.file(inputPath).arrayBuffer());
     const outputPath = path.join(tmpDir, "scaled-output@2x.png");
 
     await render(content, outputPath, { scale: 2 });
 
-    const pngBuffer = await readFile(outputPath);
+    const pngBuffer = Buffer.from(await Bun.file(outputPath).arrayBuffer());
     expect(pngBuffer.length).toBeGreaterThan(0);
   });
 

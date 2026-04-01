@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
@@ -53,7 +53,7 @@ describe("processInput", () => {
     await $`git init -q -b main`.cwd(testRepo).quiet();
     await $`git config user.email test@example.com`.cwd(testRepo).quiet();
     await $`git config user.name "Test User"`.cwd(testRepo).quiet();
-    await writeFile(join(testRepo, "README.md"), "");
+    await Bun.write(join(testRepo, "README.md"), "");
     await $`git add README.md`.cwd(testRepo).quiet();
     await $`git commit -q -m initial`.cwd(testRepo).quiet();
     await $`git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main`

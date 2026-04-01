@@ -1,4 +1,4 @@
-import * as fs from "node:fs";
+import { readdirSync } from "node:fs";
 import * as path from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 
@@ -36,8 +36,8 @@ async function createDatabase(dbPath: string): Promise<Database> {
   };
 }
 
-function readSql(dir: string, name: string): string {
-  return fs.readFileSync(path.join(dir, `${name}.sql`), "utf-8");
+async function readSql(dir: string, name: string): Promise<string> {
+  return Bun.file(path.join(dir, `${name}.sql`)).text();
 }
 
 function getProjectsGlob(projectsDir?: string): string {
@@ -51,12 +51,11 @@ function getProjectsGlob(projectsDir?: string): string {
 }
 
 async function applySchema(db: Database): Promise<void> {
-  const files = fs
-    .readdirSync(SCHEMA_DIR)
+  const files = readdirSync(SCHEMA_DIR)
     .filter((f) => f.endsWith(".sql"))
     .sort();
   for (const file of files) {
-    const sql = fs.readFileSync(path.join(SCHEMA_DIR, file), "utf-8");
+    const sql = await Bun.file(path.join(SCHEMA_DIR, file)).text();
     await db.run(sql);
   }
 }
@@ -76,14 +75,14 @@ export async function ensureIndex(
     const sessionId = process.env.CLAUDE_SESSION_ID;
     if (sessionId) {
       const marker = path.join(options.dataDir, `.refreshed-${sessionId}`);
-      if (fs.existsSync(marker)) return;
+      if (await Bun.file(marker).exists()) return;
     }
   }
 
   const glob = getProjectsGlob(options.projectsDir);
 
   await db.run("SET VARIABLE projects_glob = $glob", { glob });
-  await db.run(readSql(RESOURCES_DIR, "refresh"));
+  await db.run(await readSql(RESOURCES_DIR, "refresh"));
 
   const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
   if (!row || row.n === 0n) return;
@@ -92,7 +91,7 @@ export async function ensureIndex(
   if (!dataDir) throw new Error("dataDir is required for import");
   await db.run("SET VARIABLE data_dir = $dir", { dir: dataDir });
   await db.run("SET VARIABLE source = getvariable('changed_files')");
-  await db.run(readSql(RESOURCES_DIR, "import"));
+  await db.run(await readSql(RESOURCES_DIR, "import"));
 
   const contentItemsPath = path.join(dataDir, "content_items.jsonl");
   await db.run(
@@ -100,12 +99,12 @@ export async function ensureIndex(
   );
   await db.run("DROP TABLE content_items_export");
 
-  await db.run(readSql(RESOURCES_DIR, "views"));
+  await db.run(await readSql(RESOURCES_DIR, "views"));
 
   if (options.dataDir) {
     const sessionId = process.env.CLAUDE_SESSION_ID;
     if (sessionId) {
-      fs.writeFileSync(path.join(options.dataDir, `.refreshed-${sessionId}`), "");
+      await Bun.write(path.join(options.dataDir, `.refreshed-${sessionId}`), "");
     }
   }
 }
@@ -122,6 +121,6 @@ export async function runQuery<T>(
       await db.run(`SET VARIABLE "${key}" = $value`, { value });
     }
   }
-  const sql = readSql(QUERIES_DIR, queryName);
+  const sql = await readSql(QUERIES_DIR, queryName);
   return db.query<T>(sql);
 }

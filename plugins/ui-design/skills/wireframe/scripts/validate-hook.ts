@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
@@ -32,7 +31,7 @@ export async function processInput(
     return null;
   }
 
-  const content = await readFile(filePath, "utf-8");
+  const content = await Bun.file(filePath).text();
   const violations = validate(content);
 
   if (violations.length === 0) {

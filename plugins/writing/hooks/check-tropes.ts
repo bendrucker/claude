@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { existsSync, readFileSync } from "node:fs";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { formatContext, formatDecision, type SyncHookJSONOutput } from "./markdown";
@@ -42,7 +41,7 @@ function extractInlineArg(command: string, flag: string): string | null {
   return match?.[1] ?? match?.[2] ?? null;
 }
 
-export function collectText(input: PreToolUseHookInput): string[] {
+export async function collectText(input: PreToolUseHookInput): Promise<string[]> {
   const toolInput = input.tool_input as Record<string, unknown>;
   const toolName = input.tool_name;
 
@@ -59,8 +58,8 @@ export function collectText(input: PreToolUseHookInput): string[] {
   if (toolName === "Bash" && typeof toolInput.command === "string") {
     const texts: string[] = [];
     const bodyFile = extractBodyFilePath(toolInput.command);
-    if (bodyFile && existsSync(bodyFile)) {
-      texts.push(readFileSync(bodyFile, "utf-8"));
+    if (bodyFile && (await Bun.file(bodyFile).exists())) {
+      texts.push(await Bun.file(bodyFile).text());
     }
     for (const flag of ["--body", "--message", "--description", "--title"]) {
       const value = extractInlineArg(toolInput.command, flag);
@@ -72,8 +71,8 @@ export function collectText(input: PreToolUseHookInput): string[] {
   return extractProse(toolInput);
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const texts = collectText(input);
+export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  const texts = await collectText(input);
   if (texts.length === 0) return null;
 
   const combined = texts.join("\n");
@@ -106,7 +105,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processInput(input);
+  const output = await processInput(input);
   if (output) {
     writeStdoutJson(output);
   }

@@ -1,4 +1,3 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { countLines } from "../parse";
 import type { ReferenceResult, RuleResult } from "../types";
@@ -24,14 +23,15 @@ export function getDepth(refPath: string): number {
   return parts.length - 1;
 }
 
-export function lintReference(skillDir: string, refPath: string): ReferenceResult {
+export async function lintReference(skillDir: string, refPath: string): Promise<ReferenceResult> {
   const fullPath = path.join(skillDir, refPath);
   const results: RuleResult[] = [];
   let lines = 0;
   const depth = getDepth(refPath);
 
-  try {
-    const content = fs.readFileSync(fullPath, "utf-8");
+  const file = Bun.file(fullPath);
+  if (await file.exists()) {
+    const content = await file.text();
     lines = countLines(content);
 
     if (depth > 1) {
@@ -49,7 +49,7 @@ export function lintReference(skillDir: string, refPath: string): ReferenceResul
         message: `depth ${depth}`,
       });
     }
-  } catch {
+  } else {
     results.push({
       rule: "reference-exists",
       severity: "error",

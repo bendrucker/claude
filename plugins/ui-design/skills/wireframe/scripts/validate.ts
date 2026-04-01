@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { DOMParser, type Element as XmlElement } from "@xmldom/xmldom";
 
 export interface Bounds {
@@ -254,7 +252,7 @@ export function validate(svgContent: string): Violation[] {
 }
 
 export async function validateFile(file: string): Promise<ValidationResult> {
-  const content = await readFile(file, "utf-8");
+  const content = await Bun.file(file).text();
   return { file, violations: validate(content) };
 }
 

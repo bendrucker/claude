@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
@@ -23,8 +22,7 @@ async function fetchSchema(): Promise<object | null> {
 
 async function readSettingsFile(path: string): Promise<object | null> {
   try {
-    const content = await readFile(path, "utf-8");
-    return JSON.parse(content) as object;
+    return await Bun.file(path).json();
   } catch {
     return null;
   }

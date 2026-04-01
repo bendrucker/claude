@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { writeFileSync } from "node:fs";
 import { cli } from "cleye";
 
 const argv = cli({
@@ -149,7 +148,7 @@ async function main(): Promise<void> {
   }
 
   try {
-    writeFileSync(tty, "\x07");
+    await Bun.write(tty, "\x07");
   } catch (error) {
     console.error(
       `[tmux/notification] Failed to write bell to ${tty}: ${error instanceof Error ? error.message : String(error)}`,

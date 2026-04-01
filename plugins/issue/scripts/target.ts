@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export type GitHubTarget = { service: "github"; owner: string; repo: string; number: number };
@@ -45,17 +45,14 @@ function targetPath(sessionId: string): string {
   return join("/tmp/claude", sessionId, "issue-target.json");
 }
 
-export function readTarget(sessionId: string): IssueTarget | null {
-  try {
-    const content = readFileSync(targetPath(sessionId), "utf-8");
-    return JSON.parse(content) as IssueTarget;
-  } catch {
-    return null;
-  }
+export async function readTarget(sessionId: string): Promise<IssueTarget | null> {
+  const file = Bun.file(targetPath(sessionId));
+  if (!(await file.exists())) return null;
+  return file.json();
 }
 
-export function writeTarget(sessionId: string, target: IssueTarget): void {
+export async function writeTarget(sessionId: string, target: IssueTarget): Promise<void> {
   const path = targetPath(sessionId);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(target));
+  await Bun.write(path, JSON.stringify(target));
 }

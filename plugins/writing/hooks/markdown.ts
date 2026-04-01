@@ -1,4 +1,5 @@
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+
 export type { SyncHookJSONOutput };
 
 export type WriteInput = { file_path: string; content: string };

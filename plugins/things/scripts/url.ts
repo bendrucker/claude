@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { $ } from "bun";
 import { ensureThingsRunning } from "./ensure-running";
@@ -83,19 +83,19 @@ export async function openUrl(
   }
 }
 
-export function findXcallRunner(): string | null {
+export async function findXcallRunner(): Promise<string | null> {
   const pluginRoot = join(import.meta.dirname, "..");
 
   // Dev layout: sibling plugin directory
   const devPath = join(pluginRoot, "..", "x-callback-url", "scripts", "run.sh");
-  if (existsSync(devPath)) return devPath;
+  if (await Bun.file(devPath).exists()) return devPath;
 
   // Prod layout: up 2 levels to marketplace root, then into x-callback-url/<version>/
   const marketplaceDir = join(pluginRoot, "..", "..", "x-callback-url");
-  if (existsSync(marketplaceDir)) {
+  if (await Bun.file(marketplaceDir).exists()) {
     for (const entry of readdirSync(marketplaceDir)) {
       const candidate = join(marketplaceDir, entry, "scripts", "run.sh");
-      if (existsSync(candidate)) return candidate;
+      if (await Bun.file(candidate).exists()) return candidate;
     }
   }
 
@@ -154,7 +154,7 @@ export function buildJsonPayload(ids: string[], attributes: Record<string, strin
 }
 
 export async function xcall(url: string): Promise<string> {
-  const runner = findXcallRunner();
+  const runner = await findXcallRunner();
   if (!runner) {
     throw new Error("xcall not found — x-callback-url plugin not installed");
   }
@@ -207,7 +207,7 @@ if (import.meta.main) {
     const payload = buildJsonPayload(ids, attributes);
     const jsonParams = new Map<string, string>();
     jsonParams.set("data", payload);
-    if (argv.flags.callback && findXcallRunner()) {
+    if (argv.flags.callback && (await findXcallRunner())) {
       const url = await buildUrl("json", jsonParams);
       try {
         const result = await xcall(url);
@@ -224,7 +224,7 @@ if (import.meta.main) {
     if (singleId) {
       params.set("id", singleId);
     }
-    if (argv.flags.callback && findXcallRunner()) {
+    if (argv.flags.callback && (await findXcallRunner())) {
       const url = await buildUrl(command, params);
       try {
         const result = await xcall(url);

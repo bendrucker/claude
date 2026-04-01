@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { clearState, getState } from "./state";
@@ -9,40 +8,45 @@ type ToolInput = {
   file_path?: string;
 };
 
-export function preserveNewlineState(filePath: string, hadNewline: string): string | null {
-  if (!existsSync(filePath)) {
+export async function preserveNewlineState(
+  filePath: string,
+  hadNewline: string,
+): Promise<string | null> {
+  const file = Bun.file(filePath);
+  if (!(await file.exists())) {
     return null;
   }
 
-  const stat = statSync(filePath);
-  if (stat.size === 0) {
+  if (file.size === 0) {
     return "File is empty, skipping";
   }
 
-  const content = readFileSync(filePath, "utf-8");
+  const content = await file.text();
   const hasNewline = content.endsWith("\n");
 
   if (hadNewline === "1" && !hasNewline) {
-    writeFileSync(filePath, `${content}\n`);
+    await Bun.write(filePath, `${content}\n`);
     return "Added trailing newline (preserving original state)";
   }
 
   if (hadNewline === "" && hasNewline) {
-    writeFileSync(filePath, content.slice(0, -1));
+    await Bun.write(filePath, content.slice(0, -1));
     return "Removed trailing newline (preserving original state)";
   }
 
   return null;
 }
 
-export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | null {
+export async function processInput(
+  input: PostToolUseHookInput,
+): Promise<SyncHookJSONOutput | null> {
   const { file_path: filePath } = input.tool_input as ToolInput;
   if (!filePath) return null;
 
-  const hadNewline = getState("newline", filePath);
-  const message = preserveNewlineState(filePath, hadNewline);
+  const hadNewline = await getState("newline", filePath);
+  const message = await preserveNewlineState(filePath, hadNewline);
 
-  clearState("newline", filePath);
+  await clearState("newline", filePath);
 
   if (message) {
     return {
@@ -68,7 +72,7 @@ async function main(): Promise<void> {
   }
 
   try {
-    const output = processInput(input);
+    const output = await processInput(input);
     if (output) {
       writeStdoutJson(output);
     }

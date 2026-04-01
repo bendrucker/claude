@@ -6,10 +6,10 @@ import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runn
 import { lintSkill as defaultLintSkill } from "./skill-lint";
 import type { SkillLintResult } from "./skill-lint/types";
 
-type LintSkillFn = (dir: string) => SkillLintResult;
+type LintSkillFn = (dir: string) => SkillLintResult | Promise<SkillLintResult>;
 
-function lintMessages(skillDir: string, lintSkill: LintSkillFn): string[] {
-  const result = lintSkill(skillDir);
+async function lintMessages(skillDir: string, lintSkill: LintSkillFn): Promise<string[]> {
+  const result = await lintSkill(skillDir);
   if (result.errors === 0 && result.warnings === 0) return [];
 
   const messages: string[] = [];
@@ -20,14 +20,14 @@ function lintMessages(skillDir: string, lintSkill: LintSkillFn): string[] {
   return messages;
 }
 
-export function processPostToolUse(
+export async function processPostToolUse(
   input: PostToolUseInput,
   lintSkill: LintSkillFn = defaultLintSkill,
-): PostToolUseHookOutput | null {
+): Promise<PostToolUseHookOutput | null> {
   const filePath = (input.tool_input as { file_path?: string }).file_path;
   if (!filePath || basename(filePath) !== "SKILL.md") return null;
 
-  const messages = lintMessages(dirname(filePath), lintSkill);
+  const messages = await lintMessages(dirname(filePath), lintSkill);
   if (messages.length === 0) return null;
 
   return {

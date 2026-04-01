@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const [name, ...args] = process.argv.slice(2);
@@ -13,7 +12,7 @@ if (!name) {
 const packagesDir = join(import.meta.dirname, "..");
 const packageDir = join(packagesDir, name);
 
-if (!existsSync(packageDir)) {
+if (!(await Bun.file(join(packageDir, "package.json")).exists())) {
   console.error(`Unknown package: ${name}`);
   process.exit(1);
 }

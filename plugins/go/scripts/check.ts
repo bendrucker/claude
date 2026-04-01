@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { existsSync, readFileSync } from "node:fs";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
@@ -40,7 +39,7 @@ export function isGeneratedFile(content: string): boolean {
   return foundMarker && foundCode;
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
+export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   const { file_path: filePath } = input.tool_input as FileInput;
 
   // Only check .go files
@@ -48,12 +47,12 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
     return null;
   }
 
-  // File doesn't exist yet, allow operation
-  if (!existsSync(filePath)) {
+  const file = Bun.file(filePath);
+  if (!(await file.exists())) {
     return null;
   }
 
-  const content = readFileSync(filePath, "utf-8");
+  const content = await file.text();
 
   if (isGeneratedFile(content)) {
     return {
@@ -79,7 +78,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processInput(input);
+  const output = await processInput(input);
   if (output) {
     writeStdoutJson(output);
   }

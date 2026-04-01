@@ -1,4 +1,3 @@
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,20 +8,20 @@ function getStateFilePath(): string {
   return join(tmpdir(), "claude-newline-state.json");
 }
 
-function readStore(): StateStore {
-  const path = getStateFilePath();
-  if (!existsSync(path)) {
+async function readStore(): Promise<StateStore> {
+  const file = Bun.file(getStateFilePath());
+  if (!(await file.exists())) {
     return {};
   }
   try {
-    return JSON.parse(readFileSync(path, "utf-8")) as StateStore;
+    return (await file.json()) as StateStore;
   } catch {
     return {};
   }
 }
 
-function writeStore(store: StateStore): void {
-  writeFileSync(getStateFilePath(), JSON.stringify(store));
+async function writeStore(store: StateStore): Promise<void> {
+  await Bun.write(getStateFilePath(), JSON.stringify(store));
 }
 
 function makeKey(type: string, filePath: string): string {
@@ -30,26 +29,26 @@ function makeKey(type: string, filePath: string): string {
   return `${type}:${hash}`;
 }
 
-export function getState(type: string, filePath: string): string {
-  const store = readStore();
+export async function getState(type: string, filePath: string): Promise<string> {
+  const store = await readStore();
   return store[makeKey(type, filePath)] ?? "";
 }
 
-export function setState(type: string, filePath: string, value: string): void {
-  const store = readStore();
+export async function setState(type: string, filePath: string, value: string): Promise<void> {
+  const store = await readStore();
   store[makeKey(type, filePath)] = value;
-  writeStore(store);
+  await writeStore(store);
 }
 
-export function clearState(type: string, filePath: string): void {
-  const store = readStore();
+export async function clearState(type: string, filePath: string): Promise<void> {
+  const store = await readStore();
   delete store[makeKey(type, filePath)];
-  writeStore(store);
+  await writeStore(store);
 }
 
-export function clearAllState(): void {
-  const path = getStateFilePath();
-  if (existsSync(path)) {
-    unlinkSync(path);
+export async function clearAllState(): Promise<void> {
+  const file = Bun.file(getStateFilePath());
+  if (await file.exists()) {
+    await file.delete();
   }
 }

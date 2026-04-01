@@ -22,7 +22,7 @@ allowed-tools:
 
 ## Context
 
-- Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-provider.ts`
+- Remote URL: !`git remote get-url origin`
 - PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`

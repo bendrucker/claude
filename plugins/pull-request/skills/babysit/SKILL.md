@@ -17,7 +17,7 @@ Set up recurring CI monitoring that fixes trivial failures and cancels when gree
 ## Context
 
 - Branch: !`git branch --show-current`
-- Provider: !`bun ${CLAUDE_PLUGIN_ROOT}/../../scripts/detect-provider.ts`
+- Remote URL: !`git remote get-url origin`
 - Start SHA: !`git rev-parse HEAD`
 - State script: `${CLAUDE_SKILL_DIR}/scripts/state.ts`
 - Session: `${CLAUDE_SESSION_ID}`

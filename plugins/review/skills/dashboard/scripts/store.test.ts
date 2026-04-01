@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
+import { readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -37,8 +38,8 @@ describe("store", () => {
     process.env.CLAUDE_PLUGIN_DATA = tmpDir;
   });
 
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true });
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true });
     if (originalEnv === undefined) {
       delete process.env.CLAUDE_PLUGIN_DATA;
     } else {
@@ -55,7 +56,7 @@ describe("store", () => {
       const state: DashboardState = { reviews: [makeReview()] };
       const dir = join(tmpDir, "review-dashboard");
       mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, "state.json"), JSON.stringify(state));
+      await Bun.write(join(dir, "state.json"), JSON.stringify(state));
 
       expect(await readState()).toEqual(state);
     });
@@ -63,7 +64,7 @@ describe("store", () => {
     test("throws on malformed JSON missing reviews array", async () => {
       const dir = join(tmpDir, "review-dashboard");
       mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, "state.json"), JSON.stringify({ something: "else" }));
+      await Bun.write(join(dir, "state.json"), JSON.stringify({ something: "else" }));
 
       expect(readState()).rejects.toThrow("Invalid state file");
     });
@@ -90,11 +91,11 @@ describe("store", () => {
   describe("writeState", () => {
     test("creates directory if it does not exist", async () => {
       const dir = join(tmpDir, "review-dashboard");
-      expect(existsSync(dir)).toBe(false);
+      await expect(readdir(dir)).rejects.toThrow();
 
       await writeState({ reviews: [] });
 
-      expect(existsSync(dir)).toBe(true);
+      await expect(readdir(dir)).resolves.toBeDefined();
     });
   });
 

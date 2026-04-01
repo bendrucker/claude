@@ -1,4 +1,4 @@
-import { mkdir, rename } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { derivePaneName, deriveRepo } from "./parse";
 
@@ -86,7 +86,5 @@ export function completeReview(state: DashboardState, paneId: string): boolean {
 export async function writeState(state: DashboardState): Promise<void> {
   await mkdir(stateDir(), { recursive: true });
   const path = statePath();
-  const tmp = `${path}.tmp`;
-  await Bun.write(tmp, JSON.stringify(state, null, 2));
-  await rename(tmp, path);
+  await Bun.write(path, JSON.stringify(state, null, 2));
 }

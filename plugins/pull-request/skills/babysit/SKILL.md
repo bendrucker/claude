@@ -7,7 +7,9 @@ allowed-tools:
   - Bash(glab:*)
   - Bash(git:*)
   - Bash(bun:*)
+  - Bash(bunx:*)
   - CronCreate
+  - CronDelete
 ---
 
 # Babysit PR

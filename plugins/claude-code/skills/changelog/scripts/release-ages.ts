@@ -10,17 +10,19 @@ const { values } = parseArgs({
 
 const limit = Number(values.limit);
 const repo = values.repo;
+const [owner, name] = repo.split("/");
+
+const query = `{
+  repository(owner: "${owner}", name: "${name}") {
+    releases(first: ${limit}, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { tagName publishedAt description }
+    }
+  }
+}`;
 
 const result = Bun.spawnSync([
-  "gh",
-  "release",
-  "list",
-  "--repo",
-  repo,
-  "--limit",
-  String(limit),
-  "--json",
-  "tagName,publishedAt",
+  "gh", "api", "graphql", "-f", `query=${query}`,
+  "--jq", ".data.repository.releases.nodes",
 ]);
 
 if (result.exitCode !== 0) {
@@ -31,6 +33,7 @@ if (result.exitCode !== 0) {
 interface Release {
   tagName: string;
   publishedAt: string;
+  description: string;
 }
 
 const releases: Release[] = JSON.parse(result.stdout.toString());
@@ -50,5 +53,8 @@ function relativeAge(publishedAt: string): string {
 }
 
 for (const release of releases) {
-  console.log(`${release.tagName}\t${relativeAge(release.publishedAt)}`);
+  const age = relativeAge(release.publishedAt);
+  console.log(`## ${release.tagName} (${age})\n`);
+  console.log(release.description);
+  console.log();
 }

@@ -2,16 +2,13 @@
 name: claude-code:changelog
 description: Review Claude Code release notes for changes relevant to the user's skills, plugins, and tool usage. Use when the user asks "what's new in Claude Code?", "check for updates", "release notes", "new features", "what changed recently?", or wants to stay current with Claude Code.
 allowed-tools:
-  - Bash(gh release list --repo anthropics/claude-code:*)
-  - Bash(gh release view --repo anthropics/claude-code:*)
-  - Bash(claude plugin list:*)
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/release-ages.ts:*)
+  - Bash(claude plugin list:*)
 ---
 
 # Claude Code Changelog Review
 
 **Current version**: `!`claude --version``
-**Latest release**: `!`gh release list --repo anthropics/claude-code --limit 1 --json tagName --jq '.[0].tagName'``
 **Platform**: `!`uname -s``
 
 **Installed plugins**:
@@ -23,13 +20,9 @@ allowed-tools:
 
 #### Fetch Releases
 
-Run in parallel:
+Run `bun ${CLAUDE_SKILL_DIR}/scripts/release-ages.ts` to fetch the last 10 releases in a single GraphQL query. The output includes version, relative age, and full release notes for each release.
 
-- **Release ages**: `bun ${CLAUDE_SKILL_DIR}/scripts/release-ages.ts` to get versions with relative dates
-- **Release notes**: `gh release view --repo anthropics/claude-code <tag> --json body --jq '.body'` for each release
-- **Project config**: Scan the project's `.claude/` directory for settings, hooks, skills, and rules
-
-Fetch the **last 10 releases** unless the user asks for a different range.
+Also scan the project's `.claude/` directory for settings, hooks, skills, and rules to understand what's in use.
 
 #### Filter
 

@@ -30,11 +30,11 @@ hooks:
 - Window: #{window_index} (#{window_name})
 - Pane: #{pane_index} (#{pane_id})' 2>/dev/null || echo 'not running in tmux'`
 
-Use `$TMUX_PANE_ID` to identify the current pane and target adjacent ones.
+Use `$TMUX_PANE` to identify the current pane and target adjacent ones.
 
 ## Opening Panes
 
-Use `split-window` with `-t $TMUX_PANE_ID` so new panes open relative to Claude's pane. Always pass `-d` to avoid switching Claude's own pane to the new one.
+Use `split-window` with `-t $TMUX_PANE` so new panes open relative to Claude's pane. Always pass `-d` to avoid switching Claude's own pane to the new one.
 
 ### Layout Mapping
 
@@ -50,7 +50,7 @@ Use `split-window` with `-t $TMUX_PANE_ID` so new panes open relative to Claude'
 ### Running a Command
 
 ```bash
-tmux split-window -h -d -t $TMUX_PANE_ID 'tail -f logs/dev.log'
+tmux split-window -h -d -t $TMUX_PANE 'tail -f logs/dev.log'
 ```
 
 The command string runs in the new pane's shell. When it exits, the pane closes. Use `$SHELL` or omit the command to open an interactive shell.
@@ -60,7 +60,7 @@ The command string runs in the new pane's shell. When it exits, the pane closes.
 When collaborating on a file, open it in a sidebar pane so the user can see changes in real-time as you edit.
 
 ```bash
-tmux split-window -h -d -l 40% -t $TMUX_PANE_ID '<command> <file>'
+tmux split-window -h -d -l 40% -t $TMUX_PANE '<command> <file>'
 ```
 
 #### Available Tools

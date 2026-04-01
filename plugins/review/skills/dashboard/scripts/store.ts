@@ -51,7 +51,12 @@ export async function readState(): Promise<DashboardState> {
   if (!(await file.exists())) {
     return { reviews: [] };
   }
-  const data: unknown = await file.json();
+  let data: unknown;
+  try {
+    data = await file.json();
+  } catch (cause) {
+    throw new Error(`Failed to parse state file: ${file.name}`, { cause });
+  }
   if (!data || typeof data !== "object" || !Array.isArray((data as DashboardState).reviews)) {
     throw new Error(`Invalid state file: ${file.name}`);
   }
@@ -63,6 +68,19 @@ export function addReview(state: DashboardState, review: Review): void {
     throw new Error(`Review already tracked: ${review.url}`);
   }
   state.reviews.push(review);
+}
+
+export function removeReview(state: DashboardState, url: string): number {
+  const before = state.reviews.length;
+  state.reviews = state.reviews.filter((r) => r.url !== url);
+  return before - state.reviews.length;
+}
+
+export function completeReview(state: DashboardState, paneId: string): boolean {
+  const review = state.reviews.find((r) => r.status === "active" && r.paneId === paneId);
+  if (!review) return false;
+  review.status = "completed";
+  return true;
 }
 
 export async function writeState(state: DashboardState): Promise<void> {

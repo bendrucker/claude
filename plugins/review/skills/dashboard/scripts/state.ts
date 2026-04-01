@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { table } from "table";
-import { readState, writeState } from "./store";
+import { completeReview, readState, removeReview, writeState } from "./store";
 
 function getLivePaneIds(): Set<string> {
   const proc = Bun.spawnSync(["tmux", "list-panes", "-a", "-F", "#{pane_id}"], {
@@ -60,10 +60,9 @@ switch (command) {
       process.exit(1);
     }
     const state = await readState();
-    const before = state.reviews.length;
-    state.reviews = state.reviews.filter((r) => r.url !== url);
+    const removed = removeReview(state, url);
     await writeState(state);
-    console.log(`Removed ${before - state.reviews.length} review(s)`);
+    console.log(`Removed ${removed} review(s)`);
     break;
   }
 
@@ -73,7 +72,7 @@ switch (command) {
     let updated = 0;
     for (const review of state.reviews) {
       if (review.status === "active" && !livePanes.has(review.paneId)) {
-        review.status = "completed";
+        completeReview(state, review.paneId);
         updated++;
       }
     }

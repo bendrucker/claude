@@ -57,7 +57,12 @@ if (result.exitCode !== 0) {
 const paneId = result.stdout.toString().trim();
 
 const review = createReview({ url, title: null, sessionId, paneId, repoPath });
-addReview(state, review);
-await writeState(state);
+try {
+  addReview(state, review);
+  await writeState(state);
+} catch (error) {
+  Bun.spawnSync(["tmux", "kill-pane", "-t", paneId]);
+  throw error;
+}
 
 console.log(JSON.stringify({ sessionId, paneId, paneName, url, repoPath }, null, 2));

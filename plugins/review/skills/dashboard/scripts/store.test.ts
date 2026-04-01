@@ -4,10 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   addReview,
+  completeReview,
   createReview,
   type DashboardState,
   type Review,
   readState,
+  removeReview,
   writeState,
 } from "./store";
 
@@ -141,6 +143,46 @@ describe("store", () => {
       const duplicate = makeReview();
 
       expect(() => addReview(state, duplicate)).toThrow("Review already tracked");
+    });
+  });
+
+  describe("removeReview", () => {
+    test("removes matching review and returns count", () => {
+      const state: DashboardState = { reviews: [makeReview()] };
+      const removed = removeReview(state, "https://github.com/owner/repo/pull/42");
+
+      expect(removed).toBe(1);
+      expect(state.reviews).toEqual([]);
+    });
+
+    test("returns 0 when URL not found", () => {
+      const state: DashboardState = { reviews: [makeReview()] };
+      const removed = removeReview(state, "https://github.com/other/repo/pull/1");
+
+      expect(removed).toBe(0);
+      expect(state.reviews).toHaveLength(1);
+    });
+  });
+
+  describe("completeReview", () => {
+    test("marks active review as completed", () => {
+      const state: DashboardState = { reviews: [makeReview({ paneId: "%3" })] };
+      const result = completeReview(state, "%3");
+
+      expect(result).toBe(true);
+      expect(state.reviews[0]?.status).toBe("completed");
+    });
+
+    test("returns false when pane not found", () => {
+      const state: DashboardState = { reviews: [makeReview()] };
+      expect(completeReview(state, "%99")).toBe(false);
+    });
+
+    test("skips already completed reviews", () => {
+      const state: DashboardState = {
+        reviews: [makeReview({ paneId: "%3", status: "completed" })],
+      };
+      expect(completeReview(state, "%3")).toBe(false);
     });
   });
 

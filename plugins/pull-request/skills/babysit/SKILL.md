@@ -30,6 +30,14 @@ Query recent CI run durations, add 30s buffer, clamp to 1-10m (default 3m). Chec
 
 Use `CronCreate` with a self-contained prompt that handles each iteration:
 
+<<<<<<< HEAD
+1. Run state script to track iteration (`bun <state-script> <session-id> <pr-number>`)
+2. Check CI for the branch
+3. **Green**: `CronDelete`, clean state (`bun <state-script> <session-id> <pr-number> clean`), summarize commits since start SHA
+4. **Running**: Do nothing
+5. **Failing**: Diagnose with `/github:actions-monitor` or `/gitlab:ci-monitor`, fix if trivial, commit and push
+6. **Max iterations** (20): `CronDelete`, report, clean state
+=======
 #### Track State
 
 Run state script to track iteration (`bun <state-script> <session-id>`).
@@ -63,6 +71,7 @@ After pushing, note the new HEAD SHA. On the next iteration, skip diagnosis unti
 #### Max Iterations
 
 After 20 iterations: `CronDelete`, report, clean state.
+>>>>>>> origin/main
 
 Resolve all `${}` placeholders to absolute values in the prompt. Avoid `xargs`, `$()`, and pipes.
 

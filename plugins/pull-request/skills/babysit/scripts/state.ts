@@ -4,15 +4,16 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 const sessionId = process.argv[2];
-const subcommand = process.argv[3];
+const prNumber = process.argv[3];
+const subcommand = process.argv[4];
 
-if (!sessionId) {
-  console.error("Usage: state.ts <session-id> [clean]");
+if (!sessionId || !prNumber) {
+  console.error("Usage: state.ts <session-id> <pr-number> [clean]");
   process.exit(1);
 }
 
-const stateDir = join(process.env.TMPDIR || "/tmp", sessionId);
-const statePath = join(stateDir, "babysit-pr-state.json");
+const stateDir = join(process.env.TMPDIR || "/tmp", sessionId, prNumber);
+const statePath = join(stateDir, "babysit.json");
 
 if (subcommand === "clean") {
   await Bun.file(statePath).delete();

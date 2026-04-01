@@ -29,11 +29,17 @@ Built-in queries in `resources/queries/` can be run by name with `key=value` par
 ${CLAUDE_SKILL_DIR}/scripts/query.ts search query=authentication limit=10
 ${CLAUDE_SKILL_DIR}/scripts/query.ts stats project=myapp after_date=2026-03-15
 ${CLAUDE_SKILL_DIR}/scripts/query.ts errors error_type=rejection limit=5
+${CLAUDE_SKILL_DIR}/scripts/query.ts permissions project=bendrucker.me limit=10
+${CLAUDE_SKILL_DIR}/scripts/query.ts sandbox limit=10
 ```
+
+The `project` param matches against the directory name (last path component) using glob syntax. `project=myapp` matches exactly, `project=myapp*` matches the repo and its worktrees (`myapp.feature-branch`, `myapp.bugfix`, etc.).
 
 - `search`: find sessions by keyword (ILIKE on `content_text` and `summary`). Params: `query`, `limit`, `after_date`, `before_date`, `project`
 - `stats`: tool usage breakdown with error rates and aggregate totals. Params: `after_date`, `before_date`, `project`
 - `errors`: recent tool errors with type filtering. Params: `error_type` (`rejection` or `failure`), `limit`, `after_date`, `before_date`, `project`
+- `permissions`: tool calls the user rejected. Params: `limit`, `after_date`, `before_date`, `project`
+- `sandbox`: Bash calls that bypassed the sandbox (`dangerouslyDisableSandbox`), with back-links to prior failed sandboxed calls of the same command. Params: `limit`, `after_date`, `before_date`, `project`
 
 ## Schema
 
@@ -120,6 +126,36 @@ Tool results where `is_error` is true, joined with the originating tool call.
 | `project_path` | VARCHAR |
 | `timestamp` | TIMESTAMP |
 | `error_type` | VARCHAR (`rejection` or `failure`) |
+
+### `permission_requests` view
+
+Tool calls the user rejected (denied the permission prompt).
+
+| Column | Type |
+|---|---|
+| `tool_name` | VARCHAR |
+| `tool_id` | VARCHAR |
+| `command` | VARCHAR (Bash only) |
+| `file_path` | VARCHAR (Edit/Write only) |
+| `description` | VARCHAR |
+| `session_id` | VARCHAR |
+| `project_path` | VARCHAR |
+| `timestamp` | TIMESTAMP |
+
+### `sandbox_bypasses` view
+
+Bash calls that used `dangerouslyDisableSandbox=true`. Includes a back-link to the most recent prior failed sandboxed call with the same command, identifying retry patterns where the sandbox caused the initial failure.
+
+| Column | Type | Description |
+|---|---|---|
+| `command` | VARCHAR | The Bash command |
+| `description` | VARCHAR | Command description |
+| `tool_id` | VARCHAR | Tool use ID |
+| `session_id` | VARCHAR | Session UUID |
+| `project_path` | VARCHAR | Project directory |
+| `timestamp` | TIMESTAMP | When the bypass was used |
+| `retried_tool_id` | VARCHAR | Tool ID of the prior failed sandboxed call (NULL if no match) |
+| `retried_error` | VARCHAR | Error from the prior failed call (NULL if no match) |
 
 ### Macros
 

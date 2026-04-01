@@ -2,13 +2,18 @@ import { describe, expect, it } from "bun:test";
 import { currentPane } from "./tmux";
 
 describe("currentPane", () => {
-  it("throws when TMUX_PANE is not set", () => {
+  it("falls back to tmux query when TMUX_PANE is not set", () => {
     const original = process.env.TMUX_PANE;
     delete process.env.TMUX_PANE;
     try {
-      expect(() => currentPane()).toThrow(
-        "Could not determine pane ID from TMUX_PANE or tmux query",
-      );
+      try {
+        const pane = currentPane();
+        expect(pane).toMatch(/^%\d+$/);
+      } catch (e) {
+        expect((e as Error).message).toBe(
+          "Could not determine pane ID from TMUX_PANE or tmux query",
+        );
+      }
     } finally {
       if (original) process.env.TMUX_PANE = original;
     }

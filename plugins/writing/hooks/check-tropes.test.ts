@@ -68,13 +68,13 @@ async function getDecision(
 describe("plan files", () => {
   it("skips Write to plan file with spaced em dash", async () => {
     const input = mockWrite("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = "/Users/ben/.claude/plans/my-plan.md";
+    (input.tool_input as Record<string, unknown>).file_path = `${process.env.HOME}/.claude/plans/my-plan.md`;
     expect(await processInput(input)).toBeNull();
   });
 
   it("skips Edit to plan file with spaced em dash", async () => {
     const input = mockEdit("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = "/Users/ben/.claude/plans/my-plan.md";
+    (input.tool_input as Record<string, unknown>).file_path = `${process.env.HOME}/.claude/plans/my-plan.md`;
     expect(await processInput(input)).toBeNull();
   });
 
@@ -112,13 +112,13 @@ describe("Write/Edit", () => {
 describe("plan files", () => {
   it("skips Write to plan file with spaced em dash", async () => {
     const input = mockWrite("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = "/Users/ben/.claude/plans/my-plan.md";
+    (input.tool_input as Record<string, unknown>).file_path = `${process.env.HOME}/.claude/plans/my-plan.md`;
     expect(await processInput(input)).toBeNull();
   });
 
   it("skips Edit to plan file with spaced em dash", async () => {
     const input = mockEdit("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = "/Users/ben/.claude/plans/my-plan.md";
+    (input.tool_input as Record<string, unknown>).file_path = `${process.env.HOME}/.claude/plans/my-plan.md`;
     expect(await processInput(input)).toBeNull();
   });
 

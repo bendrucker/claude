@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.25",
     "@constellos/claude-code-kit": "^0.4.0",
     "@xmldom/xmldom": "^0.9.8",
     "cleye": "^2.2.1",

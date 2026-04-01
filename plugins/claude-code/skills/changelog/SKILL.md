@@ -23,7 +23,7 @@ allowed-tools:
 Use the GraphQL query at `${CLAUDE_SKILL_DIR}/references/releases.graphql` to fetch releases in a single API call:
 
 ```
-gh api graphql -f "query=$(cat ${CLAUDE_SKILL_DIR}/references/releases.graphql)" -F owner=anthropics -F name=claude-code -F limit=10
+gh api graphql -F query=@${CLAUDE_SKILL_DIR}/references/releases.graphql -F owner=anthropics -F name=claude-code -F limit=10
 ```
 
 Variables:

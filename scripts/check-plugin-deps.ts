@@ -46,7 +46,7 @@ async function getImportedPackages(pluginDir: string): Promise<Set<string>> {
     if (path.endsWith(".test.ts") || path.endsWith(".integration.ts")) continue;
 
     const content = await Bun.file(join(pluginDir, path)).text();
-    for (const match of content.matchAll(/^import\s+(?!type\s).*?from\s+["']([^"']+)["']/gm)) {
+    for (const match of content.matchAll(/^import\s+.*?from\s+["']([^"']+)["']/gm)) {
       const specifier = match[1] as string;
       if (specifier.startsWith(".") || isBuiltin(specifier)) continue;
       packages.add(packageName(specifier));
@@ -66,7 +66,7 @@ for (const entry of await readdir(pluginsDir, { withFileTypes: true })) {
   const imported = await getImportedPackages(pluginDir);
 
   for (const pkg of imported) {
-    if (!declared.has(pkg)) {
+    if (!declared.has(pkg) && !declared.has(`@types/${pkg}`)) {
       console.error(`${entry.name}: missing dependency "${pkg}"`);
       failed = true;
     }

@@ -1,15 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { derivePaneName, derivePlatform, deriveRepo } from "./parse";
-
-describe("derivePlatform", () => {
-  test("GitHub URL returns github", () => {
-    expect(derivePlatform("https://github.com/owner/repo/pull/1")).toBe("github");
-  });
-
-  test("GitLab URL returns gitlab", () => {
-    expect(derivePlatform("https://gitlab.com/group/repo/-/merge_requests/1")).toBe("gitlab");
-  });
-});
+import { derivePaneName, deriveRepo } from "./parse";
 
 describe("deriveRepo", () => {
   test("extracts owner/repo from GitHub PR URL", () => {

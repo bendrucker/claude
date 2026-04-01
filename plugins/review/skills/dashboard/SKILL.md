@@ -59,7 +59,7 @@ Ask the user where the repo is cloned locally. If it's not cloned, clone it firs
 bun ${CLAUDE_SKILL_DIR}/scripts/spawn.ts <pr-url> --repo-path <local-path>
 ```
 
-`spawn.ts` handles: UUID session ID generation, `--worktree` for branch isolation, tmux layout computation, and state tracking. The first pane splits right (70% width). Panes 2-3 stack vertically. Pane 4+ starts a new column.
+`spawn.ts` handles `--worktree` for branch isolation, tmux layout computation, and state tracking. Panes cycle in groups of 3: one horizontal split (new column at 70% width for the first, equal width after), then two vertical splits stacking within the column.
 
 Before spawning the first pane, resize the orchestrator to a sidebar:
 

@@ -29,13 +29,13 @@ const command = argv._.command;
 
 switch (command) {
   case "init": {
-    writeState({ reviews: [] });
+    await writeState({ reviews: [] });
     console.log("State initialized");
     break;
   }
 
   case "list": {
-    const state = readState();
+    const state = await readState();
     if (argv.flags.json) {
       console.log(JSON.stringify(state.reviews, null, 2));
     } else if (state.reviews.length === 0) {
@@ -59,16 +59,16 @@ switch (command) {
       console.error("--url is required for remove");
       process.exit(1);
     }
-    const state = readState();
+    const state = await readState();
     const before = state.reviews.length;
     state.reviews = state.reviews.filter((r) => r.url !== url);
-    writeState(state);
+    await writeState(state);
     console.log(`Removed ${before - state.reviews.length} review(s)`);
     break;
   }
 
   case "sync": {
-    const state = readState();
+    const state = await readState();
     const livePanes = getLivePaneIds();
     let updated = 0;
     for (const review of state.reviews) {
@@ -77,7 +77,7 @@ switch (command) {
         updated++;
       }
     }
-    writeState(state);
+    await writeState(state);
     console.log(`Synced: ${updated} review(s) marked completed`);
     break;
   }

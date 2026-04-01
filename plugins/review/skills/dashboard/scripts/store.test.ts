@@ -1,14 +1,14 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
-  readState,
-  writeState,
-  createReview,
   addReview,
+  createReview,
   type DashboardState,
   type Review,
+  readState,
+  writeState,
 } from "./store";
 
 function makeReview(overrides: Partial<Review> = {}): Review {
@@ -16,7 +16,6 @@ function makeReview(overrides: Partial<Review> = {}): Review {
     url: "https://github.com/owner/repo/pull/42",
     title: "Fix bug",
     repo: "owner/repo",
-    platform: "github",
     sessionId: "sess-1",
     paneId: "%1",
     paneName: "review-owner-repo-42",
@@ -46,60 +45,59 @@ describe("store", () => {
   });
 
   describe("readState", () => {
-    test("returns empty reviews when no file exists", () => {
-      expect(readState()).toEqual({ reviews: [] });
+    test("returns empty reviews when no file exists", async () => {
+      expect(await readState()).toEqual({ reviews: [] });
     });
 
-    test("reads and parses valid state file", () => {
+    test("reads and parses valid state file", async () => {
       const state: DashboardState = { reviews: [makeReview()] };
       const dir = join(tmpDir, "review-dashboard");
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, "state.json"), JSON.stringify(state));
 
-      expect(readState()).toEqual(state);
+      expect(await readState()).toEqual(state);
     });
 
-    test("throws on malformed JSON missing reviews array", () => {
+    test("throws on malformed JSON missing reviews array", async () => {
       const dir = join(tmpDir, "review-dashboard");
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, "state.json"), JSON.stringify({ something: "else" }));
 
-      expect(() => readState()).toThrow("Invalid state file");
+      expect(readState()).rejects.toThrow("Invalid state file");
     });
   });
 
   describe("writeState + readState round-trip", () => {
-    test("write then read returns equal state", () => {
+    test("write then read returns equal state", async () => {
       const state: DashboardState = {
         reviews: [
           makeReview(),
           makeReview({
             url: "https://gitlab.com/org/proj/-/merge_requests/7",
             repo: "org/proj",
-            platform: "gitlab",
             paneName: "review-org-proj-7",
           }),
         ],
       };
 
-      writeState(state);
-      expect(readState()).toEqual(state);
+      await writeState(state);
+      expect(await readState()).toEqual(state);
     });
   });
 
   describe("writeState", () => {
-    test("creates directory if it does not exist", () => {
+    test("creates directory if it does not exist", async () => {
       const dir = join(tmpDir, "review-dashboard");
       expect(existsSync(dir)).toBe(false);
 
-      writeState({ reviews: [] });
+      await writeState({ reviews: [] });
 
       expect(existsSync(dir)).toBe(true);
     });
   });
 
   describe("createReview", () => {
-    test("derives platform, repo, paneName from URL", () => {
+    test("derives repo and paneName from URL", () => {
       const review = createReview({
         url: "https://github.com/acme/widgets/pull/99",
         title: "Add feature",
@@ -108,7 +106,6 @@ describe("store", () => {
         repoPath: "/code/widgets",
       });
 
-      expect(review.platform).toBe("github");
       expect(review.repo).toBe("acme/widgets");
       expect(review.paneName).toBe("review-acme-widgets-99");
     });
@@ -150,12 +147,12 @@ describe("store", () => {
   describe("CLAUDE_PLUGIN_DATA unset", () => {
     test("readState throws", () => {
       delete process.env.CLAUDE_PLUGIN_DATA;
-      expect(() => readState()).toThrow("CLAUDE_PLUGIN_DATA is not set");
+      expect(readState()).rejects.toThrow("CLAUDE_PLUGIN_DATA is not set");
     });
 
     test("writeState throws", () => {
       delete process.env.CLAUDE_PLUGIN_DATA;
-      expect(() => writeState({ reviews: [] })).toThrow("CLAUDE_PLUGIN_DATA is not set");
+      expect(writeState({ reviews: [] })).rejects.toThrow("CLAUDE_PLUGIN_DATA is not set");
     });
   });
 });

@@ -1,14 +1,11 @@
-#!/usr/bin/env bun
-
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { derivePaneName, derivePlatform, deriveRepo, type Platform } from "./parse";
+import { derivePaneName, deriveRepo } from "./parse";
 
 export interface Review {
   url: string;
   title: string | null;
   repo: string;
-  platform: Platform;
   sessionId: string;
   paneId: string;
   paneName: string;
@@ -31,7 +28,6 @@ export function createReview(params: {
   return {
     ...params,
     repo: deriveRepo(params.url),
-    platform: derivePlatform(params.url),
     paneName: derivePaneName(params.url),
     status: "active",
     startedAt: new Date().toISOString(),
@@ -50,25 +46,14 @@ function statePath(): string {
   return join(stateDir(), "state.json");
 }
 
-export function readState(): DashboardState {
-  const path = statePath();
-  if (!existsSync(path)) {
+export async function readState(): Promise<DashboardState> {
+  const file = Bun.file(statePath());
+  if (!(await file.exists())) {
     return { reviews: [] };
   }
-  let data: unknown;
-  try {
-    data = JSON.parse(readFileSync(path, "utf-8"));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to parse state file ${path}: ${message}`);
-  }
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    !("reviews" in data) ||
-    !Array.isArray((data as DashboardState).reviews)
-  ) {
-    throw new Error(`Invalid state file: ${path}`);
+  const data: unknown = await file.json();
+  if (!data || typeof data !== "object" || !Array.isArray((data as DashboardState).reviews)) {
+    throw new Error(`Invalid state file: ${file.name}`);
   }
   return data as DashboardState;
 }
@@ -80,10 +65,10 @@ export function addReview(state: DashboardState, review: Review): void {
   state.reviews.push(review);
 }
 
-export function writeState(state: DashboardState): void {
-  const dir = stateDir();
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  writeFileSync(statePath(), JSON.stringify(state, null, 2));
+export async function writeState(state: DashboardState): Promise<void> {
+  await mkdir(stateDir(), { recursive: true });
+  const path = statePath();
+  const tmp = `${path}.tmp`;
+  await Bun.write(tmp, JSON.stringify(state, null, 2));
+  await rename(tmp, path);
 }

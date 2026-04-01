@@ -27,7 +27,7 @@ if (!repoPath) {
 
 const sessionId = crypto.randomUUID();
 const paneName = derivePaneName(url);
-const state = readState();
+const state = await readState();
 const activeReviews = state.reviews.filter((r) => r.status === "active");
 const splitArgs = layoutArgs(activeReviews.length, activeReviews.at(-1)?.paneId);
 
@@ -58,8 +58,6 @@ const paneId = result.stdout.toString().trim();
 
 const review = createReview({ url, title: null, sessionId, paneId, repoPath });
 addReview(state, review);
-writeState(state);
+await writeState(state);
 
 console.log(JSON.stringify({ sessionId, paneId, paneName, url, repoPath }, null, 2));
-
-export { layoutArgs } from "./layout";

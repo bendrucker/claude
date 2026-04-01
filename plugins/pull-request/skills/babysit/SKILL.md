@@ -37,8 +37,14 @@ Use `CronCreate` with a self-contained prompt that handles each iteration:
 
 Resolve all `${}` placeholders to absolute values in the prompt. Avoid `xargs`, `$()`, and pipes.
 
-## Fix Classification
+## Trivial Failures
 
-**Trivial** (fix and push): lint, type errors, formatting, missing imports, simple test updates
+Lint errors, type errors, formatting, missing imports, simple test updates.
 
-**Non-trivial** (cancel cron, report): logic bugs, design issues, flaky tests, environment-dependent failures
+Reproduce locally, fix, verify, commit with a descriptive message, and push.
+
+## Non-Trivial Failures
+
+Logic bugs, design issues, flaky tests, environment-dependent failures.
+
+Cancel the cron job and report the failure details to the user.

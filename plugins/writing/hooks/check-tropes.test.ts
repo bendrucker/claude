@@ -56,7 +56,9 @@ function mockMcp(toolName: string, toolInput: Record<string, unknown>): PreToolU
   };
 }
 
-async function getDecision(input: PreToolUseHookInput): Promise<PreToolUseHookSpecificOutput | null> {
+async function getDecision(
+  input: PreToolUseHookInput,
+): Promise<PreToolUseHookSpecificOutput | null> {
   const result = await processInput(input);
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;

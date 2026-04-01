@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { join } from "node:path";
 import { mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 
 const sessionId = process.argv[2];
 const subcommand = process.argv[3];

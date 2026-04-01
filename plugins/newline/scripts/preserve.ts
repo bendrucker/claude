@@ -8,7 +8,10 @@ type ToolInput = {
   file_path?: string;
 };
 
-export async function preserveNewlineState(filePath: string, hadNewline: string): Promise<string | null> {
+export async function preserveNewlineState(
+  filePath: string,
+  hadNewline: string,
+): Promise<string | null> {
   const file = Bun.file(filePath);
   if (!(await file.exists())) {
     return null;
@@ -34,7 +37,9 @@ export async function preserveNewlineState(filePath: string, hadNewline: string)
   return null;
 }
 
-export async function processInput(input: PostToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+export async function processInput(
+  input: PostToolUseHookInput,
+): Promise<SyncHookJSONOutput | null> {
   const { file_path: filePath } = input.tool_input as ToolInput;
   if (!filePath) return null;
 

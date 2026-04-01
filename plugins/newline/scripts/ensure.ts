@@ -26,7 +26,9 @@ export async function ensureTrailingNewline(filePath: string): Promise<string | 
   return "Added trailing newline";
 }
 
-export async function processInput(input: PostToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+export async function processInput(
+  input: PostToolUseHookInput,
+): Promise<SyncHookJSONOutput | null> {
   const { file_path: filePath } = input.tool_input as ToolInput;
   if (!filePath) return null;
 

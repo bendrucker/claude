@@ -46,8 +46,8 @@ function postToolUseInput(filePath: string) {
 }
 
 describe("processPostToolUse", () => {
-  it("returns lint issues for SKILL.md writes", () => {
-    const output = processPostToolUse(
+  it("returns lint issues for SKILL.md writes", async () => {
+    const output = await processPostToolUse(
       postToolUseInput("/plugins/gitlab/skills/ci/SKILL.md"),
       fakeLintSkill,
     );
@@ -59,24 +59,24 @@ describe("processPostToolUse", () => {
     });
   });
 
-  it("returns null for passing lint", () => {
-    const output = processPostToolUse(
+  it("returns null for passing lint", async () => {
+    const output = await processPostToolUse(
       postToolUseInput("/passing/skills/ci/SKILL.md"),
       fakeLintSkill,
     );
     expect(output).toBeNull();
   });
 
-  it("ignores non-SKILL.md files", () => {
-    const output = processPostToolUse(
+  it("ignores non-SKILL.md files", async () => {
+    const output = await processPostToolUse(
       postToolUseInput("/plugins/gitlab/skills/ci/scripts/run.ts"),
       fakeLintSkill,
     );
     expect(output).toBeNull();
   });
 
-  it("ignores non-file tools", () => {
-    const output = processPostToolUse(
+  it("ignores non-file tools", async () => {
+    const output = await processPostToolUse(
       {
         session_id: "test",
         transcript_path: "/tmp/transcript.jsonl",

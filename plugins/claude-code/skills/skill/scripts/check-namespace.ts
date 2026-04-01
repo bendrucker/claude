@@ -105,7 +105,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const warnings = processHookInput(input);
+  const warnings = await processHookInput(input);
   for (const warning of warnings) {
     console.error(warning);
   }

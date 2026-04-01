@@ -113,7 +113,10 @@ describe.skipIf(!hasSg())("checkCode (requires sg)", () => {
   });
 
   it("allows descriptive Go function names", async () => {
-    const match = await checkCode('package main\nfunc processItems() { fmt.Println("test") }', "go");
+    const match = await checkCode(
+      'package main\nfunc processItems() { fmt.Println("test") }',
+      "go",
+    );
     expect(match).toBeNull();
   });
 
@@ -207,12 +210,18 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
   describe("Python numbered identifiers", () => {
     it("detects def step1()", async () => {
-      const output = await getOutput(mockWriteInput("script.py", "def step1():\n    pass"), "write");
+      const output = await getOutput(
+        mockWriteInput("script.py", "def step1():\n    pass"),
+        "write",
+      );
       expect(output?.permissionDecision).toBe("deny");
     });
 
     it("detects class Phase2", async () => {
-      const output = await getOutput(mockWriteInput("script.py", "class Phase2:\n    pass"), "write");
+      const output = await getOutput(
+        mockWriteInput("script.py", "class Phase2:\n    pass"),
+        "write",
+      );
       expect(output?.permissionDecision).toBe("deny");
     });
 
@@ -227,7 +236,10 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
   describe("Write vs Edit mode", () => {
     it("blocks Write tool with deny", async () => {
-      const output = await getOutput(mockWriteInput("main.go", "package main\nfunc step1() {}"), "write");
+      const output = await getOutput(
+        mockWriteInput("main.go", "package main\nfunc step1() {}"),
+        "write",
+      );
       expect(output?.permissionDecision).toBe("deny");
     });
 
@@ -266,7 +278,10 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
     });
 
     it("checks test_*.py files", async () => {
-      const output = await getOutput(mockWriteInput("test_utils.py", "def step1():\n    pass"), "write");
+      const output = await getOutput(
+        mockWriteInput("test_utils.py", "def step1():\n    pass"),
+        "write",
+      );
       expect(output?.permissionDecision).toBe("deny");
     });
   });

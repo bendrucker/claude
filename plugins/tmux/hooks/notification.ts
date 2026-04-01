@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-
 import { cli } from "cleye";
 
 const argv = cli({

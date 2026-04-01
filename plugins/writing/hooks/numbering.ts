@@ -103,7 +103,10 @@ export async function checkCode(content: string, ext: string): Promise<string | 
   return null;
 }
 
-export async function processInput(input: PreToolUseHookInput, mode: Mode): Promise<SyncHookJSONOutput | null> {
+export async function processInput(
+  input: PreToolUseHookInput,
+  mode: Mode,
+): Promise<SyncHookJSONOutput | null> {
   const toolName = input.tool_name;
 
   let content: string;

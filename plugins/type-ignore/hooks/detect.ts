@@ -109,7 +109,9 @@ export function formatOutput(
   };
 }
 
-export async function processInput(input: PostToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+export async function processInput(
+  input: PostToolUseHookInput,
+): Promise<SyncHookJSONOutput | null> {
   const toolName = input.tool_name;
 
   let filePath: string;

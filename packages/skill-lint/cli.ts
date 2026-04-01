@@ -38,6 +38,14 @@ Exit codes:
   process.exit(0);
 }
 
+function tryReaddir(dir: string) {
+  try {
+    return readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+}
+
 async function resolveSkillDirs(patterns: string[]): Promise<string[]> {
   const dirs: string[] = [];
   for (const pattern of patterns) {
@@ -45,12 +53,8 @@ async function resolveSkillDirs(patterns: string[]): Promise<string[]> {
       const base = pattern.split("*")[0] ?? "";
       const suffix = pattern.split("*").slice(1).join("*");
 
-      let entries: ReturnType<typeof readdirSync>;
-      try {
-        entries = readdirSync(base, { withFileTypes: true });
-      } catch {
-        continue;
-      }
+      const entries = tryReaddir(base);
+      if (!entries) continue;
       for (const d of entries) {
         if (!d.isDirectory()) continue;
         const p = path.join(base, d.name, suffix.replace(/^\*?\/?/, ""));

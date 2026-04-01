@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { formatContext, formatDecision, type SyncHookJSONOutput } from "./markdown";

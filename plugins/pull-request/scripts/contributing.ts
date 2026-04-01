@@ -5,7 +5,9 @@ import { join } from "node:path";
 
 const CANDIDATES = ["CONTRIBUTING.md", "contributing.md", ".github/CONTRIBUTING.md"];
 
-export async function findContributing(repoRoot: string): Promise<{ path: string; content: string } | null> {
+export async function findContributing(
+  repoRoot: string,
+): Promise<{ path: string; content: string } | null> {
   for (const candidate of CANDIDATES) {
     const full = join(repoRoot, candidate);
     const file = Bun.file(full);

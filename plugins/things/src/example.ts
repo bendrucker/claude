@@ -2,8 +2,9 @@
  * Example: Get non-repeating todos from Today with notes
  */
 /// <reference path="./jxa-globals.d.ts" />
-import type { Things3 } from "./Things3";
+
 import { toArray } from "./array";
+import type { Things3 } from "./Things3";
 
 const app = Application("Things3");
 const list = app.lists.byId("TMTodayListSource");

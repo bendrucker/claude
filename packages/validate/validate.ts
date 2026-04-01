@@ -93,7 +93,7 @@ export async function validateFile(
 
   const errors = valid
     ? []
-    : entry.validate.errors!.map((err: ErrorObject) => formatError(file, err));
+    : (entry.validate.errors?.map((err: ErrorObject) => formatError(file, err)) ?? []);
 
   const warnings: string[] = [];
   if (options?.warnAdditional && entry.schema.properties) {

@@ -23,16 +23,12 @@ function mockPostToolUseInput(
 }
 
 describe("type-ignore detection hook", () => {
-  beforeEach(async () => {
-    if (await Bun.file(MARKER_DIR).exists()) {
-      rmSync(MARKER_DIR, { recursive: true });
-    }
+  beforeEach(() => {
+    rmSync(MARKER_DIR, { recursive: true, force: true });
   });
 
-  afterEach(async () => {
-    if (await Bun.file(MARKER_DIR).exists()) {
-      rmSync(MARKER_DIR, { recursive: true });
-    }
+  afterEach(() => {
+    rmSync(MARKER_DIR, { recursive: true, force: true });
   });
 
   describe("isCleanupAgentActive", () => {

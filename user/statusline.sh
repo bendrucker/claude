@@ -18,10 +18,9 @@ else
   color="\033[31m"
 fi
 
-# nf-md-circle_slice 1-8 as a filling dial
-slices=(󰪞 󰪟 󰪠 󰪡 󰪢 󰪣 󰪤 󰪥)
+# nf-md-circle_slice 1-8 (U+F0ABE..U+F0AC5) as a filling dial
 idx=$(( int_pct * 7 / 100 ))
 if [ "$idx" -gt 7 ]; then idx=7; fi
-icon=${slices[$idx]}
+icon=$(python3 -c "print(chr(0xF0A9E + $idx), end='')")
 
 printf "${color}%s\033[0m" "$icon"

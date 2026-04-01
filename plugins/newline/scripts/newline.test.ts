@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
@@ -51,7 +52,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   try {
-    rmSync(testDir, { recursive: true, force: true });
+    await rm(testDir, { recursive: true, force: true });
   } catch {}
   await clearAllState();
 });

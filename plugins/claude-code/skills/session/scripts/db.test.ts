@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { type Database, ensureIndex, getDb, runQuery } from "./db";
 
@@ -22,9 +23,9 @@ beforeEach(async () => {
   await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir });
 });
 
-afterEach(() => {
+afterEach(async () => {
   db.close();
-  rmSync(tmpDir, { recursive: true, force: true });
+  await rm(tmpDir, { recursive: true, force: true });
 });
 
 describe("sessions view", () => {

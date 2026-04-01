@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
@@ -82,8 +83,8 @@ describe("processInput", () => {
     tempDir = mkdtempSync(path.join(os.tmpdir(), "validate-test-"));
   });
 
-  afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   function createInput(command: string): PreToolUseHookInput {

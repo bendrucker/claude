@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -97,7 +98,7 @@ export async function checkCode(content: string, ext: string): Promise<string | 
   } catch {
     // sg failed or parse error
   } finally {
-    rmSync(tmpDir, { recursive: true, force: true });
+    await rm(tmpDir, { recursive: true, force: true });
   }
 
   return null;

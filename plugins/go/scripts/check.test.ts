@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
@@ -72,8 +73,8 @@ describe("processInput", () => {
     tempDir = mkdtempSync(join(tmpdir(), "go-hook-test-"));
   });
 
-  afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it("allows non-Go files", async () => {

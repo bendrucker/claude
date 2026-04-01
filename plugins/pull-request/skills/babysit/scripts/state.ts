@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 const sessionId = process.argv[2];
@@ -15,7 +15,7 @@ const stateDir = join(process.env.TMPDIR || "/tmp", sessionId);
 const statePath = join(stateDir, "babysit-pr-state.json");
 
 if (subcommand === "clean") {
-  rmSync(statePath, { force: true });
+  await Bun.file(statePath).delete();
   process.exit(0);
 }
 

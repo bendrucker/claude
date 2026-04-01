@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { rmSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { parseIssueUrl, readTarget, writeTarget } from "./target";
 
 describe("parseIssueUrl", () => {
@@ -86,8 +86,8 @@ describe("readTarget / writeTarget", () => {
   const sessionId = `test-target-${Date.now()}`;
   const dir = `/tmp/claude/${sessionId}`;
 
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
   });
 
   it("round-trips a GitHub target", async () => {

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
@@ -99,8 +100,8 @@ describe("collectText", () => {
       tmpFile = join(dir, "body.md");
     });
 
-    afterAll(() => {
-      rmSync(dir, { recursive: true, force: true });
+    afterAll(async () => {
+      await rm(dir, { recursive: true, force: true });
     });
 
     it("reads --body-file content", async () => {
@@ -179,7 +180,7 @@ describe("Bash/MCP processInput", () => {
     const file = join(dir, "body.md");
     await Bun.write(file, "We must delve into the issue");
     const result = await processInput(mockBash(`gh pr create --body-file ${file}`));
-    rmSync(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true });
     expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
   });
 

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { detectProvider } from "./detect-provider";
@@ -13,8 +14,8 @@ describe("detect-provider", () => {
     execSync("git init -q", { cwd: tempDir, stdio: "pipe" });
   });
 
-  afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it("detects github.com", () => {

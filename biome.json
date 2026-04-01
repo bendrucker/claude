@@ -20,10 +20,9 @@
                   "mkdirSync",
                   "mkdtempSync",
                   "readdirSync",
-                  "realpathSync",
-                  "rmSync"
+                  "realpathSync"
                 ],
-                "message": "Use Bun file APIs (Bun.file, Bun.write) instead of node:fs. Directory operations (mkdir, mkdtemp, readdir, rm) are allowed."
+                "message": "Use Bun file APIs (Bun.file, Bun.write) instead of node:fs. Sync directory operations (glob, mkdir, mkdtemp, readdir, realpath) are allowed."
               },
               "node:fs/promises": {
                 "allowImportNames": ["mkdir", "mkdtemp", "readdir", "rm"],

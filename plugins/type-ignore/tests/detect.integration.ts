@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { formatOutput, isCleanupAgentActive, processInput } from "../hooks/detect";
@@ -23,12 +24,12 @@ function mockPostToolUseInput(
 }
 
 describe("type-ignore detection hook", () => {
-  beforeEach(() => {
-    rmSync(MARKER_DIR, { recursive: true, force: true });
+  beforeEach(async () => {
+    await rm(MARKER_DIR, { recursive: true, force: true });
   });
 
-  afterEach(() => {
-    rmSync(MARKER_DIR, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(MARKER_DIR, { recursive: true, force: true });
   });
 
   describe("isCleanupAgentActive", () => {

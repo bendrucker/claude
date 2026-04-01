@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { rmSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { writeTarget } from "../scripts/target";
 import { processInput } from "./approve-read";
@@ -34,8 +34,8 @@ describe("approve-read hook", () => {
     });
   });
 
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
   });
 
   it("approves matching issue", async () => {
@@ -68,7 +68,7 @@ describe("approve-read hook", () => {
   });
 
   it("returns null when no target file exists", async () => {
-    rmSync(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true });
     expect(await processInput(mockInput("acme", "widgets", 123))).toBeNull();
   });
 });

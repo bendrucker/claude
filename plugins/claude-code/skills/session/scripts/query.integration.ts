@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import * as path from "node:path";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
@@ -11,8 +12,8 @@ beforeEach(() => {
   tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "query-integration-"));
 });
 
-afterEach(() => {
-  rmSync(tmpDir, { recursive: true, force: true });
+afterEach(async () => {
+  await rm(tmpDir, { recursive: true, force: true });
 });
 
 function env() {

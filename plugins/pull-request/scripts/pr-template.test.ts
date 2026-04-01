@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { findTemplate } from "./pr-template";
@@ -17,8 +18,8 @@ describe("findTemplate", () => {
     });
   });
 
-  afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it("finds .github/PULL_REQUEST_TEMPLATE.md", async () => {

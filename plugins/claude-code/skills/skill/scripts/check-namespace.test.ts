@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
@@ -60,8 +61,8 @@ describe("getResourceName", () => {
     testDir = mkdtempSync(join(tmpdir(), "namespace-test-"));
   });
 
-  afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(testDir, { recursive: true, force: true });
   });
 
   it("extracts name from agent filename", async () => {
@@ -154,8 +155,8 @@ describe("processHookInput", () => {
     mkdirSync(join(testDir, "plugins/gitlab/commands"), { recursive: true });
   });
 
-  afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(testDir, { recursive: true, force: true });
   });
 
   it("warns on missing skill prefix", async () => {

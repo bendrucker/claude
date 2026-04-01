@@ -209,6 +209,7 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "TMPDIR": "/tmp",
     "TMPPREFIX": "/tmp/claude/zsh",
-    "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}"
+    "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}",
+    "CLAUDE_CODE_NO_FLICKER": "1"
   }
 }

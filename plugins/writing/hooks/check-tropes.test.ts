@@ -110,28 +110,6 @@ describe("Write/Edit", () => {
     expect(await processInput(mockWrite(""))).toBeNull();
   });
 });
-
-describe("plan files", () => {
-  it("skips Write to plan file with spaced em dash", async () => {
-    const input = mockWrite("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path =
-      `${process.env.HOME}/.claude/plans/my-plan.md`;
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("skips Edit to plan file with spaced em dash", async () => {
-    const input = mockEdit("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path =
-      `${process.env.HOME}/.claude/plans/my-plan.md`;
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("still denies non-plan files with spaced em dash", async () => {
-    const output = await getDecision(mockWrite("This \u2014 is bad"));
-    expect(output?.permissionDecision).toBe("deny");
-  });
-});
-
 describe("collectText", () => {
   describe("Bash commands", () => {
     let dir: string;

@@ -28,9 +28,9 @@ Query recent CI run durations, add 30s buffer, clamp to 1-10m (default 3m). Chec
 
 Use `CronCreate` with a self-contained prompt that handles each iteration:
 
-1. Run state script to track iteration (`bun <state-script> <session-id>`)
+1. Run state script to track iteration (`bun <state-script> <session-id> <pr-number>`)
 2. Check CI for the branch
-3. **Green**: `CronDelete`, clean state (`bun <state-script> <session-id> clean`), summarize commits since start SHA
+3. **Green**: `CronDelete`, clean state (`bun <state-script> <session-id> <pr-number> clean`), summarize commits since start SHA
 4. **Running**: Do nothing
 5. **Failing**: Diagnose with `/github:actions-monitor` or `/gitlab:ci-monitor`, fix if trivial, commit and push
 6. **Max iterations** (20): `CronDelete`, report, clean state

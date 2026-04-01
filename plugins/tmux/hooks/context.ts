@@ -5,7 +5,7 @@ const FORMAT = [
   "export TMUX_WINDOW_INDEX='#{window_index}'",
   "export TMUX_WINDOW_NAME='#{window_name}'",
   "export TMUX_PANE_INDEX='#{pane_index}'",
-  "export TMUX_PANE_ID='#{pane_id}'",
+  "export TMUX_PANE='#{pane_id}'",
 ].join("\n");
 
 async function main(): Promise<void> {

@@ -6,7 +6,9 @@ describe("currentPane", () => {
     const original = process.env.TMUX_PANE;
     delete process.env.TMUX_PANE;
     try {
-      expect(() => currentPane()).toThrow("TMUX_PANE is not set");
+      expect(() => currentPane()).toThrow(
+        "Could not determine pane ID from TMUX_PANE or tmux query",
+      );
     } finally {
       if (original) process.env.TMUX_PANE = original;
     }

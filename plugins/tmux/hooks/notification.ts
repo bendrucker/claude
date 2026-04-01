@@ -112,8 +112,9 @@ async function readHookInput(): Promise<HookInput | null> {
 }
 
 async function main(): Promise<void> {
-  const pane = process.env.TMUX_PANE;
-  if (!process.env.TMUX || !pane) return;
+  if (!process.env.TMUX) return;
+  const pane = process.env.TMUX_PANE ?? tmuxQuery("display-message", "-p", "#{pane_id}");
+  if (!pane) return;
 
   if (argv.flags.clear) {
     tmux("set-option", "-gu", paneOptionKey(pane));

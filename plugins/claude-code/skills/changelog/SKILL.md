@@ -2,7 +2,7 @@
 name: claude-code:changelog
 description: Review Claude Code release notes for changes relevant to the user's skills, plugins, and tool usage. Use when the user asks "what's new in Claude Code?", "check for updates", "release notes", "new features", "what changed recently?", or wants to stay current with Claude Code.
 allowed-tools:
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/release-ages.ts:*)
+  - Bash(gh api graphql:*)
   - Bash(claude plugin list:*)
 ---
 
@@ -20,7 +20,18 @@ allowed-tools:
 
 #### Fetch Releases
 
-Run `bun ${CLAUDE_SKILL_DIR}/scripts/release-ages.ts` to fetch the last 10 releases in a single GraphQL query. The output includes version, relative age, and full release notes for each release.
+Use the GraphQL query at `${CLAUDE_SKILL_DIR}/references/releases.graphql` to fetch releases in a single API call:
+
+```
+gh api graphql -f query=@<path> -F owner=anthropics -F name=claude-code -F limit=10
+```
+
+Variables:
+- `$owner` (`String!`): Repository owner
+- `$name` (`String!`): Repository name
+- `$limit` (`Int!`): Number of releases to fetch (default 10)
+
+Response shape: `data.repository.releases.nodes[]` with `tagName`, `publishedAt` (ISO 8601), and `description` (release notes markdown).
 
 Also scan the project's `.claude/` directory for settings, hooks, skills, and rules to understand what's in use.
 
@@ -37,7 +48,7 @@ Categorize each relevant entry and order by impact within each category.
 
 **Suggested Uses** must reference the user's actual workflow plugins (e.g., `things`, `linear`, `review:peer`, `pull-request`) with concrete, thoughtful explanations of how the plugin would benefit. Never suggest uses for meta skills (`claude-code:skill`, `claude-code:hook`). If a feature has no concrete application to an installed plugin, omit Suggested Uses entirely.
 
-Only mark a feature 🆕 if it's from a release **less than 7 days old** (use the relative dates from the release-ages script).
+Only mark a feature 🆕 if it's from a release published **less than 7 days** before today.
 
 #### Present
 

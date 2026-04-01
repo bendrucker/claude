@@ -18,9 +18,7 @@ describe("layoutArgs", () => {
   });
 
   test("first pane: horizontal split at 70% against orchestrator", () => {
-    expect(layoutArgs(0, undefined)).toEqual([
-      "-h", "-d", "-l", "70%", "-t", "%0",
-    ]);
+    expect(layoutArgs(0, undefined)).toEqual(["-h", "-d", "-l", "70%", "-t", "%0"]);
   });
 
   test("second pane: vertical split against last pane", () => {

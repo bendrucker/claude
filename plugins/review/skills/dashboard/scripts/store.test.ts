@@ -71,7 +71,15 @@ describe("store", () => {
   describe("writeState + readState round-trip", () => {
     test("write then read returns equal state", () => {
       const state: DashboardState = {
-        reviews: [makeReview(), makeReview({ url: "https://gitlab.com/org/proj/-/merge_requests/7", repo: "org/proj", platform: "gitlab", paneName: "review-org-proj-7" })],
+        reviews: [
+          makeReview(),
+          makeReview({
+            url: "https://gitlab.com/org/proj/-/merge_requests/7",
+            repo: "org/proj",
+            platform: "gitlab",
+            paneName: "review-org-proj-7",
+          }),
+        ],
       };
 
       writeState(state);

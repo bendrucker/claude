@@ -73,5 +73,4 @@ describe("findTemplate", () => {
     await Bun.write(path.join(dir, "Default.md"), "gitlab template\n");
     expect(await findTemplate("github", tempDir)).toBeNull();
   });
-
 });

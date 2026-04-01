@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 
-import { mkdirSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import * as path from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
@@ -84,8 +84,7 @@ export async function isCleanupAgentActive(): Promise<boolean> {
   if (!(await file.exists())) return false;
   const age = Date.now() - file.lastModified;
   if (age > MARKER_TTL_MS) {
-    const { unlink } = await import("node:fs/promises");
-    await unlink(markerPath);
+    rmSync(markerPath);
     return false;
   }
   return true;

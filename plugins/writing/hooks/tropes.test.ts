@@ -176,10 +176,26 @@ describe("scan", () => {
   });
 
   describe("semicolon overuse", () => {
+    const text = "First point; second point; third point; fourth";
+
     it("detects three semicolons in proximity", () => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("semicolon overuse");
+    });
+
+    it("detects in prose files", () => {
+      expect(firstByTier(scan(text, "doc.md"), "context")?.category).toBe("semicolon overuse");
+    });
+
+    it("skips in code files", () => {
       expect(
-        firstByTier(scan("First point; second point; third point; fourth"), "context")?.category,
-      ).toBe("semicolon overuse");
+        scan(text, "script.sh").find((m) => m.category === "semicolon overuse"),
+      ).toBeUndefined();
+    });
+
+    it("skips in CSS files", () => {
+      expect(
+        scan(text, "style.css").find((m) => m.category === "semicolon overuse"),
+      ).toBeUndefined();
     });
 
     for (const allowed of ["First clause; second clause.", "First; second; third."]) {

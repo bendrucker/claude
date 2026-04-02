@@ -85,7 +85,8 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   if (texts.length === 0) return null;
 
   const combined = texts.join("\n");
-  const matches = scan(combined);
+  const filePath = (input.tool_input as Record<string, unknown>).file_path as string | undefined;
+  const matches = scan(combined, filePath);
   const deny = firstByTier(matches, "deny");
 
   if (deny) {

@@ -1,36 +1,48 @@
 ---
 name: tmux
-description: Tmux session awareness and pane interaction. Use when the user asks about tmux panes, wants to capture terminal output, send keys to another pane, open a process in a pane, or organize panes in their window.
+description: Tmux session, window, and pane awareness. Use when the user asks about tmux panes, wants to capture terminal output, send keys to another pane, open a process in a pane, organize panes, navigate windows/sessions, or check for bell/activity notifications.
 allowed-tools:
-  - Bash(tmux:*)
-  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts:*)"
+  - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/layout.sh)"
 hooks:
   PreToolUse:
     - matcher: "Bash(tmux:*)"
       hooks:
         - type: command
-          command: |
-            cat | jq '
-              if (.tool_input.command | test("^tmux\\s+(display-message|display|list-sessions|ls|list-windows|lsw|list-panes|lsp|capture-pane|capturep|show-options|show|has-session|has)\\b"))
-              then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}
-              else {hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}
-              end'
-    - matcher: "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
+          command: "bash ${CLAUDE_SKILL_DIR}/scripts/safe-command.sh"
+    - matcher: "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/:*)"
       hooks:
         - type: command
           command: |
-            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
+            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
 ---
 
 # tmux
 
 ## Current Pane
 
-!`tmux display-message -p '- Session: #{session_name}
+!`tmux display-message -t "$TMUX_PANE" -p '- Session: #{session_name}
 - Window: #{window_index} (#{window_name})
 - Pane: #{pane_index} (#{pane_id})' 2>/dev/null || echo 'not running in tmux'`
 
 Use `$TMUX_PANE` to identify the current pane and target adjacent ones.
+
+## Layout
+
+!`bash ${CLAUDE_SKILL_DIR}/scripts/layout.sh`
+
+Use `left`/`top` coordinates to resolve spatial references (LHS = lowest `left`, RHS = highest `left`, top = lowest `top`, bottom = highest `top`). When describing layouts, draw ASCII box diagrams showing pane positions and sizes.
+
+Target panes across windows and sessions with `<session>:<window>.<pane>` (e.g., `dotfiles:1.%42`). Use `tmux list-panes -t <session>:<window>` to discover pane IDs in other windows.
+
+### Notifications
+
+Windows marked `[bell]` or `[activity]` need attention (a process finished, errored, or produced output). Use `capture-pane` on the flagged window's panes to investigate.
+
+To check for new notifications after skill load:
+
+```bash
+tmux list-windows -F '#{window_index} #{window_name} #{window_bell_flag} #{window_activity_flag}'
+```
 
 ## Opening Panes
 
@@ -55,6 +67,16 @@ tmux split-window -h -d -t $TMUX_PANE 'tail -f logs/dev.log'
 
 The command string runs in the new pane's shell. When it exits, the pane closes. Use `$SHELL` or omit the command to open an interactive shell.
 
+### Starting Claude Sessions
+
+Pass the initial prompt as a CLI argument rather than using `send-keys`:
+
+```bash
+tmux split-window -h -d -t $TMUX_PANE 'claude "analyze the test failures"'
+```
+
+Use `send-keys` only for follow-up messages to an already-running session.
+
 ## Collaborative File Viewing
 
 When collaborating on a file, open it in a sidebar pane so the user can see changes in real-time as you edit.
@@ -65,10 +87,7 @@ tmux split-window -h -d -l 40% -t $TMUX_PANE '<command> <file>'
 
 #### Available Tools
 
-- markless: !`which markless 2>/dev/null || echo 'not found'`
-- batwatch: !`which batwatch 2>/dev/null || echo 'not found'`
-- bat: !`which bat 2>/dev/null || echo 'not found'`
-- EDITOR: !`echo "${EDITOR:-unset}"`
+!`bash ${CLAUDE_SKILL_DIR}/scripts/tools.sh`
 
 #### Markdown Files
 
@@ -106,23 +125,8 @@ tmux capture-pane -t $TARGET -p -S -100
 
 `-S -100` includes 100 lines of scrollback above the visible area.
 
-## Pane Tracking
-
-Track named panes via tmux user options so they persist across tool calls:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts register logs --id %5
-bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts get logs
-bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts list
-bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts dismiss logs
-bun ${CLAUDE_SKILL_DIR}/scripts/pane.ts dismiss-all
-```
-
-`register` stores the pane under a name. `get` returns JSON with live status. `list` shows a table (or `--json`). `dismiss` kills the pane and removes tracking.
-
 ## Gotchas
 
 - Always use `-P -F '#{pane_id}'` to capture pane IDs at creation time
 - Always use `-d` on `split-window` to avoid switching Claude's pane
 - Use `$TMUX_PANE` (set by tmux natively and injected by context hook) to target the current pane
-- Tracked pane names: alphanumeric and hyphens only

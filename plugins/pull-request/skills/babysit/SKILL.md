@@ -45,7 +45,7 @@ After resolving, commit the merge and push. The next iteration will pick up the 
 
 #### Check CI
 
-Query the MR/PR's source branch SHA and CI status. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote. Compare the MR/PR's source branch SHA (not the pipeline/run SHA) against `git rev-parse HEAD`. Pipelines may run on synthetic merge commits whose SHAs never match the branch HEAD.
+Query the PR's source branch SHA and CI status. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote. Compare the PR's source branch SHA (not the pipeline/run SHA) against `git rev-parse HEAD`. Pipelines may run on synthetic merge commits whose SHAs never match the branch HEAD.
 
 #### SHA Mismatch
 
@@ -61,7 +61,7 @@ Do nothing.
 
 #### Failing
 
-Before diagnosing, check whether a fix was already pushed by comparing the MR/PR's source branch SHA to `git rev-parse HEAD`. If HEAD is newer, skip diagnosis and wait for the new run.
+Before diagnosing, check whether a fix was already pushed by comparing the PR's source branch SHA to `git rev-parse HEAD`. If HEAD is newer, skip diagnosis and wait for the new run.
 
 Otherwise, diagnose with `/github:actions-monitor` or `/gitlab:ci-monitor`. Check whether the start SHA's CI run had the same failure. If so, this is a pre-existing issue, not a regression introduced by this branch's changes. Report it and cancel rather than attempting a fix.
 

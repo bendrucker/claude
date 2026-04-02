@@ -202,7 +202,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline.sh"
+    "command": "~/.claude/scripts/statusline.sh"
   },
   "alwaysThinkingEnabled": true,
   "env": {

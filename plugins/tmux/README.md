@@ -1,24 +1,15 @@
 # Tmux Plugin
 
-Tmux session awareness and pane interaction for Claude Code.
+Tmux session, window, and pane awareness for Claude Code.
 
 ## Contents
 
-- **Skill: tmux** — Pane management, content capture, and pane tracking
+- **Skill: tmux** — Layout awareness, pane interaction, and notification monitoring
 - **Hook: context** — SessionStart hook that injects tmux env vars
 - **Hook: notification** — Bell and status bar notifications for permission prompts
-- **Script: pane.ts** — Named pane tracking CLI
-- **Script: tmux.ts** — Shared tmux command execution utilities
-- **Script: tracking.ts** — Pane registry using tmux user options
 
 ## How It Works
 
 A SessionStart hook detects whether Claude is running inside tmux and writes session/window/pane identifiers to `CLAUDE_ENV_FILE`. These env vars are available in all subsequent Bash calls.
 
-The skill provides a PreToolUse hook that auto-allows read-only tmux commands and disables the sandbox for all tmux calls (the tmux socket is not in the sandbox allowlist). A second hook matcher handles script execution with sandbox bypass.
-
-## Testing
-
-```bash
-bun test plugins/tmux
-```
+The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only, navigation, layout) and disables the sandbox for all tmux calls. The safe command list is maintained in `scripts/safe-commands.txt`.

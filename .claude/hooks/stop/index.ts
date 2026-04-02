@@ -75,6 +75,7 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
   const relativePaths = files.map((f) => relative(input.cwd, f));
 
   try {
+    await execFileAsync("bun", ["install", "--cwd", input.cwd]);
     await execFileAsync("prek", ["run", "--files", ...relativePaths], {
       cwd: input.cwd,
       timeout: PREK_TIMEOUT,

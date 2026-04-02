@@ -20,7 +20,7 @@ const argv = cli({
     },
     context: {
       type: String,
-      description: "Additional context to append as a system prompt to the spawned session",
+      description: "Additional context to pass as the initial prompt to the spawned session",
     },
   },
 });
@@ -42,11 +42,11 @@ const splitArgs = layoutArgs(activeReviews.length, activeReviews.at(-1)?.paneId)
 
 const claudeArgs = ["claude", "--worktree", "--session-id", sessionId, "--name", paneName];
 
-if (argv.flags.context) {
-  claudeArgs.push("--append-system-prompt", argv.flags.context);
-}
+const prompt = argv.flags.context
+  ? `${argv.flags.context}\n\n/review:peer ${url}`
+  : `/review:peer ${url}`;
 
-claudeArgs.push(`/review:peer ${url}`);
+claudeArgs.push(prompt);
 
 const claudeCmd = claudeArgs.map((arg) => Bun.$.escape(arg)).join(" ");
 

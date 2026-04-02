@@ -7,10 +7,6 @@
           {
             "type": "command",
             "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/context.ts"
-          },
-          {
-            "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/team-workaround.ts --setup"
           }
         ]
       }
@@ -21,6 +17,15 @@
           {
             "type": "command",
             "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts --clear"
+          }
+        ]
+      },
+      {
+        "matcher": "TeamCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/team-workaround.ts --setup"
           }
         ]
       }

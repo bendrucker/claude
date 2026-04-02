@@ -9,11 +9,13 @@ Group, prioritize, defer, and reorder the Things Today list.
 
 ## Query
 
-Load the `things:jxa` skill. Run the pipeline to get all Today items as JSON:
+Load the `things:jxa` skill. Run the query to get all Today items as JSON:
 
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts --json
 ```
+/mac:jxa-run Things3 ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource
+```
+
+Pipe the output through the formatter: `bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts --json`
 
 Filter to open items.
 

@@ -1,20 +1,15 @@
 # Things 3 JXA Development
 
-Guide for writing JXA (JavaScript for Automation) scripts for Things 3.
+Guide for writing JXA scripts for Things 3.
 
 ## Running JXA
 
-Use the `run-jxa.ts` wrapper with inline `-e` for one-off queries:
+Use `/mac:jxa-run` with inline `-e` for one-off queries:
 
-```bash
-# Get today's todo count
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 -e 'const app = Application("Things3"); const list = app.lists.byId("TMTodayListSource"); list.toDos().length;'
+```
+/mac:jxa-run Things3 -e 'var app = Application("Things3"); var list = app.lists.byId("TMTodayListSource"); list.toDos().length;'
 
-# List all tags
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 -e 'const app = Application("Things3"); const tags = app.tags(); const names = []; for (let i = 0; i < tags.length; i++) { names.push(tags[i].name()); } JSON.stringify(names);'
-
-# Get inbox todos as JSON
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 -e 'const app = Application("Things3"); const inbox = app.lists.byId("TMInboxListSource"); const todos = []; const items = inbox.toDos(); for (let i = 0; i < items.length; i++) { todos.push({id: items[i].id(), name: items[i].name()}); } JSON.stringify(todos, null, 2);'
+/mac:jxa-run Things3 -e 'var app = Application("Things3"); var tags = app.tags(); var names = []; for (var i = 0; i < tags.length; i++) { names.push(tags[i].name()); } JSON.stringify(names);'
 ```
 
 For script files, define a `run(argv)` function. `osascript` calls it automatically and prints the return value:
@@ -22,12 +17,12 @@ For script files, define a `run(argv)` function. `osascript` calls it automatica
 ```javascript
 #!/usr/bin/env osascript -l JavaScript
 function run(argv) {
-  const app = Application("Things3");
+  var app = Application("Things3");
   return JSON.stringify({ count: app.toDos().length });
 }
 ```
 
-Run script files via the wrapper: `bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 <script> [args...]`
+Run script files: `/mac:jxa-run Things3 <script> [args...]`
 
 **Important**: The function must be named `run`, not `_run`. `osascript` does not call `_run`.
 
@@ -40,16 +35,16 @@ JXA arrays have:
 - Can be indexed with `[i]`
 - **DO NOT** have `.filter()`, `.map()`, `.forEach()`, etc.
 
-Always use a for loop or convert manually:
+Always use a for loop:
 
 ```javascript
 // WRONG: JXA array doesn't have .map()
-// const names = list.toDos().map(t => t.name());
+// var names = list.toDos().map(function(t) { return t.name(); });
 
 // CORRECT: Use a for loop
-const items = list.toDos();
-const names = [];
-for (let i = 0; i < items.length; i++) {
+var items = list.toDos();
+var names = [];
+for (var i = 0; i < items.length; i++) {
   names.push(items[i].name());
 }
 ```

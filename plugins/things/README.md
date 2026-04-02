@@ -19,7 +19,6 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 - `scripts/format-output.ts` — Generic stdin JSON → table formatter with `--json`, `--columns`, `--count-prefix`
 - `scripts/url.ts` — URL scheme wrapper with auth token, encoding, and bulk update via JSON command
 - `scripts/reorder.ts` — List reordering via URL scheme (bun TypeScript, reuses `url.ts` exports)
-- `scripts/run-jxa.ts` — Shim that discovers and delegates to the mac plugin's `jxa.ts` wrapper
 
 Write verification uses the `x-callback-url` plugin's `xcall` skill.
 

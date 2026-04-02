@@ -4,8 +4,14 @@ macOS-specific automation, sandbox workarounds, and system integration.
 
 ## Contents
 
-- **Hook: sandbox** — Detects Go binaries and disables sandbox for TLS cert verification
-- **Settings** — Sandbox exclusions for macOS system commands (`osascript`, `security`, `open`, etc.)
+### Skills
+
+- **jxa** — JXA language guide for writing JavaScript for Automation code
+- **jxa-run** — App-scoped JXA runner with AST-based Application() validation
+
+### Hooks
+
+- **sandbox** — Detects Go binaries and disables sandbox for TLS cert verification
 
 ### Scripts
 

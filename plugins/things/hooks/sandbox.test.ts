@@ -11,12 +11,12 @@ function makeInput(command: string): PreToolUseHookInput {
 
 describe("processInput", () => {
   test("sets dangerouslyDisableSandbox on tool input", () => {
-    const result = processInput(makeInput("bun scripts/run-jxa.ts Things3"));
+    const result = processInput(makeInput("bun scripts/url.ts add --title test"));
     expect(result).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         updatedInput: {
-          command: "bun scripts/run-jxa.ts Things3",
+          command: "bun scripts/url.ts add --title test",
           dangerouslyDisableSandbox: true,
         },
       },

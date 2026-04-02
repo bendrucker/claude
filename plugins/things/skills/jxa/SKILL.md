@@ -1,17 +1,36 @@
 ---
 name: things:jxa
-description: Read and query Things 3 data (lists, todos, projects, tags, logbook). Not for writes — use things:url to create/update, things:inbox for quick captures.
+description: Read and query Things 3 data (lists, todos, projects, tags, logbook). Not for writes. Use things:url to create/update, things:inbox for quick captures.
 allowed-tools:
-  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts:*)"
+  - "Skill(mac:jxa-run)"
+  - "Skill(mac:jxa-run Things3:*)"
   - Read
 ---
 
 # Things JXA
 
-Read and query Things 3 data via JXA. Queries use a pipeline: `bun <root>/scripts/run-jxa.ts Things3 <root>/scripts/jxa/<script> <args> | bun <root>/scripts/format-output.ts [--json] [--columns name,status] [--count-prefix "completed items"]`
+Read and query Things 3 data via JXA.
 
-`<root>` is `${CLAUDE_PLUGIN_ROOT}`.
+## Running JXA
+
+To run JXA, use the Skill tool to invoke `mac:jxa-run`. Do NOT run `bun` or `osascript` directly.
+
+#### Script file
+
+Invoke via: `Skill(mac:jxa-run, args: "Things3 ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource")`
+
+#### Inline expression
+
+Invoke via: `Skill(mac:jxa-run, args: "Things3 -e 'var app = Application(\"Things3\"); JSON.stringify(app.lists.byId(\"TMTodayListSource\").toDos().length)'")`
+
+#### Formatting output
+
+Pipe the returned JSON through the formatter for table display:
+
+```bash
+echo '<json>' | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts [--json] [--columns name,status]
+```
 
 ## Scripts
 
@@ -21,15 +40,7 @@ Read and query Things 3 data via JXA. Queries use a pipeline: `bun <root>/script
 | `query-list.js` | `<list-id>` | Query todos from any built-in list |
 | `query-logbook.js` | `<start-iso> <end-iso>` | Query logbook with early termination. Full scans of 10k+ items are slow. |
 | `query-metadata.js` | `<projects\|areas\|tags>` | List projects, areas, or tags (tags omit todoCount for performance) |
-| `export-markdown.js` | `bun <root>/scripts/run-jxa.ts Things3 <root>/skills/jxa/scripts/export-markdown.js [list-id]` | Export a list to markdown checklist |
-
-### query-logbook.js
-
-Compute ISO dates in the shell:
-
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-logbook.js "$(date -v-7d -u +%Y-%m-%dT%H:%M:%SZ)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts --count-prefix "completed items"
-```
+| `export-markdown.js` | `[list-id]` | Export a list to markdown checklist |
 
 ## Built-in List IDs
 
@@ -39,19 +50,15 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 ${CLAUDE_PLUGIN_ROOT}/scrip
 
 Detect via midnight heuristic: `creationDate` at `T00:00:00` local time = repeating instance. Templates have `activationDate: null`. See [troubleshooting.md](troubleshooting.md) for examples.
 
-## Inline JXA
-
-For one-off queries: `bun ${CLAUDE_PLUGIN_ROOT}/scripts/run-jxa.ts Things3 -e '...'`. JXA arrays lack `.map()/.filter()` — use for-loops.
-
 ## Status Values
 
 `open`, `completed`, `canceled`
 
 ## Reference
 
-- [jxa.md](jxa.md) — Object model and API
-- [setup.md](setup.md) — Development setup
-- [troubleshooting.md](troubleshooting.md) — Common issues
+- [jxa.md](jxa.md): Object model and API
+- [setup.md](setup.md): Development setup
+- [troubleshooting.md](troubleshooting.md): Common issues
 
 ## Tips
 

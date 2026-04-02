@@ -2,13 +2,13 @@
 
 ## JXA/Bun Pipeline Architecture
 
-JXA scripts run via `osascript`, which requires Apple Events mach-lookup services. The mac plugin's `jxa.ts` wrapper validates that scripts only target the allowed application via AST parsing, then spawns `osascript` directly. The Things plugin's `run-jxa.ts` shim discovers and delegates to the mac plugin wrapper.
+JXA scripts run via `osascript`, which requires Apple Events mach-lookup services. The `mac:jxa-run` skill provides the JXA runner, which validates that scripts only target the allowed application via AST parsing, then spawns `osascript` directly.
 
-**Pipeline pattern**: `bun <root>/scripts/run-jxa.ts Things3 <root>/scripts/jxa/<script> <args> | bun <root>/scripts/format-output.ts <flags>`
+**Pipeline pattern**: `/mac:jxa-run Things3 <root>/scripts/jxa/<script> <args>`, then pipe output through `bun <root>/scripts/format-output.ts <flags>`
 
-- JXA scripts (`scripts/jxa/*.js`) — pure data queries, return JSON via `JSON.stringify`
-- Formatter (`scripts/format-output.ts`) — reads JSON from stdin, outputs tables or passes through `--json`
-- `run-jxa.ts` — discovers mac plugin's `jxa.ts`, validates `Application("Things3")` scope via AST
+- JXA scripts (`scripts/jxa/*.js`): pure data queries, return JSON via `JSON.stringify`
+- Formatter (`scripts/format-output.ts`): reads JSON from stdin, outputs tables or passes through `--json`
+- JXA execution: invoke the `mac:jxa-run` skill, which validates `Application("Things3")` scope via AST
 
 Sandbox bypass is handled by a PreToolUse hook in `hooks/hooks.json`. The matcher is `"Bash"` with an `if` condition that narrows to plugin scripts (`Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)`). The `if` field uses permission rule syntax where `|` is literal, avoiding the conflict with piped commands that the matcher's OR operator causes.
 

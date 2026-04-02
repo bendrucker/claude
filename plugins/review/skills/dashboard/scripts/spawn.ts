@@ -14,11 +14,20 @@ const argv = cli({
       alias: "C",
       description: "Local path to the repository",
     },
+    dataDir: {
+      type: String,
+      description: "Data directory for persistent state (defaults to CLAUDE_PLUGIN_DATA)",
+    },
+    context: {
+      type: String,
+      description: "Additional context to append as a system prompt to the spawned session",
+    },
   },
 });
 
 const url = argv._.url;
 const repoPath = argv.flags.repoPath;
+const dataDir = argv.flags.dataDir;
 
 if (!repoPath) {
   console.error("--repo-path (-C) is required: local path to the repository");
@@ -27,21 +36,26 @@ if (!repoPath) {
 
 const sessionId = crypto.randomUUID();
 const paneName = derivePaneName(url);
-const state = await readState();
+const state = await readState(dataDir);
 const activeReviews = state.reviews.filter((r) => r.status === "active");
 const splitArgs = layoutArgs(activeReviews.length, activeReviews.at(-1)?.paneId);
 
-const claudeCmd = [
+const claudeArgs = [
   "claude",
   "--worktree",
   "--session-id",
   sessionId,
   "--name",
   paneName,
-  `/review:peer ${url}`,
-]
-  .map((arg) => Bun.$.escape(arg))
-  .join(" ");
+];
+
+if (argv.flags.context) {
+  claudeArgs.push("--append-system-prompt", argv.flags.context);
+}
+
+claudeArgs.push(`/review:peer ${url}`);
+
+const claudeCmd = claudeArgs.map((arg) => Bun.$.escape(arg)).join(" ");
 
 const result = Bun.spawnSync(
   ["tmux", "split-window", ...splitArgs, "-c", repoPath, "-P", "-F", "#{pane_id}", claudeCmd],
@@ -59,7 +73,7 @@ const paneId = result.stdout.toString().trim();
 const review = createReview({ url, title: null, sessionId, paneId, repoPath });
 try {
   addReview(state, review);
-  await writeState(state);
+  await writeState(state, dataDir);
 } catch (error) {
   Bun.spawnSync(["tmux", "kill-pane", "-t", paneId]);
   throw error;

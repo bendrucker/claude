@@ -34,20 +34,24 @@ export function createReview(params: {
   };
 }
 
-function stateDir(): string {
-  const base = process.env.CLAUDE_PLUGIN_DATA;
+function resolveDataDir(dataDir?: string): string {
+  const base = dataDir ?? process.env.CLAUDE_PLUGIN_DATA;
   if (!base) {
-    throw new Error("CLAUDE_PLUGIN_DATA is not set");
+    throw new Error("dataDir is required (or set CLAUDE_PLUGIN_DATA)");
   }
-  return join(base, "review-dashboard");
+  return base;
 }
 
-function statePath(): string {
-  return join(stateDir(), "state.json");
+function stateDir(dataDir?: string): string {
+  return join(resolveDataDir(dataDir), "review-dashboard");
 }
 
-export async function readState(): Promise<DashboardState> {
-  const file = Bun.file(statePath());
+function statePath(dataDir?: string): string {
+  return join(stateDir(dataDir), "state.json");
+}
+
+export async function readState(dataDir?: string): Promise<DashboardState> {
+  const file = Bun.file(statePath(dataDir));
   if (!(await file.exists())) {
     return { reviews: [] };
   }
@@ -83,8 +87,8 @@ export function completeReview(state: DashboardState, paneId: string): boolean {
   return true;
 }
 
-export async function writeState(state: DashboardState): Promise<void> {
-  await mkdir(stateDir(), { recursive: true });
-  const path = statePath();
+export async function writeState(state: DashboardState, dataDir?: string): Promise<void> {
+  await mkdir(stateDir(dataDir), { recursive: true });
+  const path = statePath(dataDir);
   await Bun.write(path, JSON.stringify(state, null, 2));
 }

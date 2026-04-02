@@ -40,14 +40,7 @@ const state = await readState(dataDir);
 const activeReviews = state.reviews.filter((r) => r.status === "active");
 const splitArgs = layoutArgs(activeReviews.length, activeReviews.at(-1)?.paneId);
 
-const claudeArgs = [
-  "claude",
-  "--worktree",
-  "--session-id",
-  sessionId,
-  "--name",
-  paneName,
-];
+const claudeArgs = ["claude", "--worktree", "--session-id", sessionId, "--name", paneName];
 
 if (argv.flags.context) {
   claudeArgs.push("--append-system-prompt", argv.flags.context);

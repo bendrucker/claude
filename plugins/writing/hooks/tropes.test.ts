@@ -187,11 +187,15 @@ describe("scan", () => {
     });
 
     it("skips in code files", () => {
-      expect(scan(text, "script.sh").find((m) => m.category === "semicolon overuse")).toBeUndefined();
+      expect(
+        scan(text, "script.sh").find((m) => m.category === "semicolon overuse"),
+      ).toBeUndefined();
     });
 
     it("skips in CSS files", () => {
-      expect(scan(text, "style.css").find((m) => m.category === "semicolon overuse")).toBeUndefined();
+      expect(
+        scan(text, "style.css").find((m) => m.category === "semicolon overuse"),
+      ).toBeUndefined();
     });
 
     for (const allowed of ["First clause; second clause.", "First; second; third."]) {

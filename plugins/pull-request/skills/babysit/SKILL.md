@@ -30,30 +30,22 @@ Query recent CI run durations, add 30s buffer, clamp to 1-10m (default 3m). Chec
 
 Use `CronCreate` with a self-contained prompt that handles each iteration:
 
-<<<<<<< HEAD
-1. Run state script to track iteration (`bun <state-script> <session-id> <pr-number>`)
-2. Check CI for the branch
-3. **Green**: `CronDelete`, clean state (`bun <state-script> <session-id> <pr-number> clean`), summarize commits since start SHA
-4. **Running**: Do nothing
-5. **Failing**: Diagnose with `/github:actions-monitor` or `/gitlab:ci-monitor`, fix if trivial, commit and push
-6. **Max iterations** (20): `CronDelete`, report, clean state
-=======
 #### Track State
 
 Run state script to track iteration (`bun <state-script> <session-id>`).
 
-#### Check CI
-
-Query the latest CI run for the branch, including the commit SHA it ran against. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote. Compare the run's commit SHA against `git rev-parse HEAD`.
-
 #### Check Merge Conflicts
 
-Also check for merge conflicts: `gh pr view <number> --json mergeable,mergeStateStatus`. If `mergeable` is `CONFLICTING`, identify conflicting files by running `git merge origin/main --no-commit --no-ff`, then `git diff --name-only --diff-filter=U`. Abort the merge afterward with `git merge --abort`.
+Check for merge conflicts: `gh pr view <number> --json mergeable,mergeStateStatus`. If `mergeable` is `CONFLICTING`, identify conflicting files by running `git merge origin/main --no-commit --no-ff`, then `git diff --name-only --diff-filter=U`. Abort the merge afterward with `git merge --abort`.
 
 - **Trivial**: Lockfiles (`bun.lock`) or generated files. For lockfiles, delete and regenerate per project convention (e.g., `rm bun.lock && bun install`). Also trivial: conflicts in files the PR modified where the resolution is obvious (both sides added adjacent lines).
 - **Non-trivial**: Report the conflicting file list to the user and cancel.
 
 After resolving, commit the merge and push. The next iteration will pick up the new SHA.
+
+#### Check CI
+
+Query the latest CI run for the branch, including the commit SHA it ran against. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote. Compare the run's commit SHA against `git rev-parse HEAD`.
 
 #### SHA Mismatch
 
@@ -80,7 +72,6 @@ After pushing, note the new HEAD SHA. On the next iteration, skip diagnosis unti
 #### Max Iterations
 
 After 20 iterations: `CronDelete`, report, clean state.
->>>>>>> origin/main
 
 Resolve all `${}` placeholders to absolute values in the prompt. Avoid `xargs`, `$()`, and pipes.
 

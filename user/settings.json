@@ -38,6 +38,10 @@
       "Edit(~/.bun/**)",
       "Read(~/.claude/plugins/**)",
       "Edit(~/.claude/plugins/cache/**/node_modules/**)",
+      "Bash(tmux display-message:*)",
+      "Bash(tmux list-panes:*)",
+      "Bash(tmux list-windows:*)",
+      "Bash(tmux capture-pane:*)",
       "Bash(gh run view:*)",
       "Bash(gh run list:*)",
       "Bash(gh pr checks:*)",
@@ -165,8 +169,7 @@
     "network": {
       "allowLocalBinding": true,
       "allowUnixSockets": [
-        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
-        "~/.tmux/tmux-501/default"
+        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
       ]
     },
     "excludedCommands": [
@@ -201,6 +204,7 @@
       "xattr:*",
       "dscl:*",
       "plutil:*",
+      "tmux:*",
       "gh:*",
       "code:*"
     ]

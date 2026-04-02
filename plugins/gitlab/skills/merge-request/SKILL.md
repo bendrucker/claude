@@ -18,10 +18,19 @@ glab mr create --fill      # Create from commits (push branch first!)
 glab mr list               # List MRs
 glab mr view               # View current branch's MR
 glab mr checkout <id>      # Check out MR branch
-glab mr merge              # Merge current branch's MR
 ```
 
 Use `glab mr --help` and `glab mr <command> --help` for full options.
+
+## Merging
+
+Always use `merge.ts` to merge. It handles merge trains, auto-merge, and squash automatically, falling back to `glab mr merge` internally when appropriate.
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge --squash
+```
 
 ## Patterns
 
@@ -56,18 +65,6 @@ glab api projects/:id/merge_requests/10/blocks
 # Remove a block
 glab api projects/:id/merge_requests/10/blocks/<block-id> -X DELETE
 ```
-
-## Merge Trains
-
-When a project has merge trains enabled, `glab mr merge --auto-merge` fails with 422. Use the merge script instead:
-
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge --squash
-```
-
-The script detects merge trains automatically and calls the correct API (`POST /merge_trains/merge_requests/:iid`). For projects without merge trains, it falls through to `glab mr merge`.
 
 ## Reviews
 

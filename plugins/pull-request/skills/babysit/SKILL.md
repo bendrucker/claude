@@ -45,17 +45,11 @@ After resolving, commit the merge and push. The next iteration will pick up the 
 
 #### Check CI
 
-Query CI status using platform-aware methods, then compare the source branch SHA against `git rev-parse HEAD`.
-
-**GitHub**: Run `gh pr view <number> --json headRefOid,statusCheckRollup`. Compare `headRefOid` against HEAD. If the check rollup includes a run ID, pass it to `/github:actions-monitor <run-id>`.
-
-**GitLab**: Run `glab api projects/:id/merge_requests/:iid` and read `head_pipeline.status` and the MR's `sha` field. Compare the MR `sha` (not `head_pipeline.sha`) against HEAD. The pipeline may run on `refs/merge-requests/N/merge`, a synthetic merge commit whose SHA will never match the branch HEAD. The MR `sha` field always reflects the source branch tip. If `head_pipeline.id` is present, pass it to `/gitlab:ci-monitor <pipeline-id>`.
+Query the MR/PR's source branch SHA and CI status. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote. Compare the MR/PR's source branch SHA (not the pipeline/run SHA) against `git rev-parse HEAD`. Pipelines may run on synthetic merge commits whose SHAs never match the branch HEAD.
 
 #### SHA Mismatch
 
-If the source SHA (GitHub `headRefOid`, GitLab MR `sha`) does not match `git rev-parse HEAD`, a fix was recently pushed and CI has not started or completed for the new commit yet. Treat this as "waiting" and do nothing.
-
-Do not compare the pipeline/run SHA directly. GitLab merge-result pipelines and GitHub merge queue runs use synthetic merge commits whose SHAs will never match the branch HEAD.
+If the source branch SHA does not match `git rev-parse HEAD`, a fix was recently pushed and CI has not started or completed for the new commit yet. Treat this as "waiting" and do nothing.
 
 #### Green
 
@@ -67,9 +61,9 @@ Do nothing.
 
 #### Failing
 
-Before diagnosing, check whether a fix was already pushed by comparing the source branch SHA (GitHub `headRefOid`, GitLab MR `sha`) to `git rev-parse HEAD`. If HEAD is newer, skip diagnosis and wait for the new run.
+Before diagnosing, check whether a fix was already pushed by comparing the MR/PR's source branch SHA to `git rev-parse HEAD`. If HEAD is newer, skip diagnosis and wait for the new run.
 
-Otherwise, diagnose with `/github:actions-monitor <run-id>` or `/gitlab:ci-monitor <pipeline-id>` using the ID from the MR/PR query. Check whether the start SHA's CI run had the same failure. If so, this is a pre-existing issue, not a regression introduced by this branch's changes. Report it and cancel rather than attempting a fix.
+Otherwise, diagnose with `/github:actions-monitor` or `/gitlab:ci-monitor`. Check whether the start SHA's CI run had the same failure. If so, this is a pre-existing issue, not a regression introduced by this branch's changes. Report it and cancel rather than attempting a fix.
 
 If the failure is new, attempt a fix if trivial. Before pushing, reproduce the failing CI step locally to verify the fix works. Then commit and push.
 

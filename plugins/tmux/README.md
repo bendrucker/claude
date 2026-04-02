@@ -12,4 +12,4 @@ Tmux session, window, and pane awareness for Claude Code.
 
 A SessionStart hook detects whether Claude is running inside tmux and writes session/window/pane identifiers to `CLAUDE_ENV_FILE`. These env vars are available in all subsequent Bash calls.
 
-The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only, navigation, layout) and disables the sandbox for all tmux calls. The safe command list is maintained in `scripts/safe-commands.txt`.
+The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only, navigation, layout) and disables the sandbox for all tmux calls. The safe command list is maintained in [`safe-commands.json`](skills/tmux/resources/safe-commands.json).

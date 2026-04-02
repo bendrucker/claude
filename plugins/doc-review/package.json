@@ -1,0 +1,5 @@
+{
+  "name": "@bendrucker/claude-plugin-doc-review",
+  "private": true,
+  "type": "module"
+}

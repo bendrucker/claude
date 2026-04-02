@@ -32,6 +32,10 @@ Fetch recent runs for the current branch:
 gh run list --branch <current-branch> --limit 5 --json databaseId,status,conclusion,displayTitle,workflowName
 ```
 
+### Report source SHA
+
+Query the PR to get the source branch SHA: `gh pr view --json headRefOid`. Report this as "Source SHA" in the output. Compare against the run's `headSha` to detect merge queue or other synthetic commit scenarios.
+
 ### Identify the run
 
 From the recent runs, identify the most relevant run (latest, or matching the target). If the run is still in progress, use `gh run watch <id>` to wait for completion.

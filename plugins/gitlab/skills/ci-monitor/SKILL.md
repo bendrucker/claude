@@ -30,6 +30,10 @@ If no pipeline ID or MR is specified, use the current branch.
 
 From the pipeline status above, identify the relevant pipeline. If still running, use `glab ci status --wait` to wait for completion.
 
+### Report source SHA
+
+Query the MR to get the source branch SHA: `glab api projects/:id/merge_requests/:iid` and read the `sha` field. Report this as "Source SHA" in the output. The `sha` field reflects the branch tip, not the pipeline SHA (which may be a synthetic merge commit from `refs/merge-requests/N/merge`).
+
 ### Enumerate failing jobs
 
 ```bash

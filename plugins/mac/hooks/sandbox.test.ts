@@ -1,14 +1,17 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { join } from "node:path";
+import { mkdtemp } from "node:fs/promises";
+import { join, sep } from "node:path";
+import { tmpdir } from "node:os";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { extractCommands, hasGoBuildInfo, processInput } from "./sandbox";
 
-const fixtureDir = join(import.meta.dirname, "..", "tmp", "test-fixtures");
-
+let fixtureDir: string;
 let goBinaryPath: string;
 let plainBinaryPath: string;
 
 beforeAll(async () => {
+  fixtureDir = await mkdtemp(`${tmpdir()}${sep}sandbox-test-`);
+
   goBinaryPath = join(fixtureDir, "fake-go");
   await Bun.write(goBinaryPath, `\x00__go_buildinfo\x00padding`);
 

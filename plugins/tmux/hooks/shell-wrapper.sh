@@ -6,6 +6,13 @@ if [ "$(tmux show-option -wqv @claude_fast_shell)" = "1" ]; then
   if [ -n "$claude_path" ]; then
     export PATH="${claude_path#CLAUDE_PATH=}"
   fi
-  exec bash --norc --noprofile
+
+  shell="${SHELL:-/bin/zsh}"
+  case "$(basename "$shell")" in
+    zsh)  exec "$shell" --no-rcs --no-globalrcs ;;
+    bash) exec "$shell" --norc --noprofile ;;
+    fish) exec "$shell" --no-config ;;
+    *)    exec "$shell" ;;
+  esac
 fi
 exec "${SHELL:-/bin/zsh}" -l

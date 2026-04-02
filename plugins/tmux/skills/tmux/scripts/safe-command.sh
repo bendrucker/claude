@@ -2,7 +2,7 @@
 set -euo pipefail
 
 dir="$(cd "$(dirname "$0")" && pwd)"
-pattern=$(paste -sd '|' "$dir/safe-commands.txt")
+pattern=$(jq -r 'join("|")' "$dir/../resources/safe-commands.json")
 
 cat | jq --arg pattern "$pattern" '
   if (.tool_input.command | test("^tmux\\s+(" + $pattern + ")\\b"))

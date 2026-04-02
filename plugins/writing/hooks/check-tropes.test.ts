@@ -86,6 +86,28 @@ describe("plan files", () => {
   });
 });
 
+describe("semicolon file scoping", () => {
+  const semicolonText = "First point; second point; third point; fourth";
+
+  it("flags semicolons in markdown files", async () => {
+    const input = mockWrite(semicolonText);
+    const result = await processInput(input);
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("skips semicolons in shell scripts", async () => {
+    const input = mockWrite(semicolonText);
+    (input.tool_input as Record<string, unknown>).file_path = "deploy.sh";
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("skips semicolons in TypeScript files", async () => {
+    const input = mockWrite(semicolonText);
+    (input.tool_input as Record<string, unknown>).file_path = "index.ts";
+    expect(await processInput(input)).toBeNull();
+  });
+});
+
 describe("Write/Edit", () => {
   it("denies Write with spaced em dash", async () => {
     const output = await getDecision(mockWrite("This \u2014 is bad"));

@@ -1,3 +1,5 @@
+import { isProseFile } from "./markdown";
+
 export type PatternTier = "deny" | "context";
 
 export type PatternMatch = {
@@ -12,6 +14,7 @@ type PatternDef = {
   category: string;
   test: RegExp | ((text: string) => boolean);
   message: (matched: string) => string;
+  fileOnly?: boolean;
 };
 
 const FENCED_CODE_BLOCK = /```[\s\S]*?```/g;
@@ -89,6 +92,7 @@ const PATTERNS: PatternDef[] = [
     tier: "context",
     category: "semicolon overuse",
     test: /;[^;]*;[^;]*;/g,
+    fileOnly: true,
     message: () =>
       "Multiple semicolons in close proximity. AI tends to overuse semicolons. Prefer shorter sentences or commas.",
   },
@@ -98,13 +102,14 @@ export function stripCode(text: string): string {
   return text.replace(FENCED_CODE_BLOCK, "").replace(INLINE_CODE, "");
 }
 
-export function scan(text: string): PatternMatch[] {
+export function scan(text: string, filePath?: string): PatternMatch[] {
   const stripped = stripCode(text);
   const matches: PatternMatch[] = [];
   const seenTiers = new Set<PatternTier>();
 
   for (const def of PATTERNS) {
     if (seenTiers.has(def.tier)) continue;
+    if (def.fileOnly && filePath && !isProseFile(filePath)) continue;
 
     let matched: string | null = null;
     if (typeof def.test === "function") {

@@ -14,6 +14,12 @@ export function isMarkdownFile(ext: string): boolean {
   return ext === "md" || ext === "markdown";
 }
 
+const PROSE_EXTENSIONS = new Set(["md", "markdown", "txt", "mdx", "rst", "adoc"]);
+
+export function isProseFile(filePath: string): boolean {
+  return PROSE_EXTENSIONS.has(getExtension(filePath));
+}
+
 export function formatDecision(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {

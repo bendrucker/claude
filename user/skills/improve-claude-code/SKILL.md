@@ -7,80 +7,56 @@ allowed-tools:
   - Skill(things:jxa)
   - Skill(things:url)
   - Skill(pull-request:create)
+  - Skill(simplify)
   - Skill(github:actions-monitor)
 ---
 
 # Improve Claude Code
 
-Triage and batch-implement Claude-tagged Things todos as PRs for the claude config repo.
+Work through the `claude-code` Things backlog: fetch todos, triage with the user, then plan and implement each in parallel as separate PRs.
 
-## Rules
+All Things interaction goes through the `things:jxa` and `things:url` skills (never inline JXA). PRs go through `pull-request:create` (never `gh pr create`).
 
-- Do NOT write inline JXA or AppleScript. Always load and use the `things:jxa` and `things:url` skills.
-- Do NOT call `gh pr create` directly. Always use the `pull-request:create` skill.
-- The Things tag name is `claude-code`.
-- Do NOT number steps or phases in headings or code.
+## Fetch and Triage
 
-## Fetch Todos
+Use `things:jxa` to find all open todos tagged `claude-code`. Display a numbered table:
 
-Load the `things:jxa` skill. Find all open todos tagged `claude-code`. Track each item's ID, title, notes, and originating list.
+| # | Title | Notes (first line) | List |
+|---|-------|--------------------|------|
 
-## Present for Triage
+Ask the user which items to work on (numbers, ranges like `1-3`, or `all`). Cap each batch at 3 to keep parallel agents manageable. Split larger selections automatically.
 
-Display a numbered table with columns: #, Title, Notes (first line), List (inbox/anytime/someday).
+## Plan
 
-Ask the user which items to work on. Accept numbers, ranges (e.g. `1-3`), or `all`. Enforce a max batch size of 3. Split larger selections automatically.
+Launch parallel `Plan` agents (one per todo). Give each the todo title, full notes, and instruction to explore the repo and produce a concrete implementation plan.
 
-## Plan Each Todo
+Point agents to relevant domain skills: `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts.
 
-Launch parallel `Plan` agents via the Agent tool (one per selected todo). Each agent receives:
+Present all plans. The user approves or rejects each before implementation begins.
 
-- Todo title and full notes
-- Instruction to explore the repo, identify files to modify, and produce a concrete implementation plan
-- Which skills to load for domain context (e.g., `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts)
+## Implement
 
-Collect all plans and present them to the user in a numbered list. User approves or rejects each. Only approved plans proceed.
+For each approved plan, launch a background `general-purpose` agent with `isolation: "worktree"`. Each agent implements the plan, runs `bun test`, runs `/simplify`, commits, and creates the PR via `pull-request:create`. Pass the same domain skills from the planning step.
 
-## Implement and Create PRs
+#### PR body
 
-For each approved plan, launch a `general-purpose` agent via the Agent tool with `isolation: "worktree"`. Each agent receives:
-
-- The full approved implementation plan
-- The todo ID and title for the `Original Task` link
-- Instruction to implement changes, run `bun test` to verify, commit with a descriptive message, and create the PR using the `pull-request:create` skill
-- Which skills to load for the domain (same as the planning step)
-
-PR body includes an `Original Task` section:
+Include an `Original Task` link so the PR traces back to the Things todo:
 
 ```
 Original Task: [<todo-title>](https://things.bendrucker.me/show?id=<todo-id>)
 ```
 
-## Monitor CI
+## Monitor CI and Fix Failures
 
-Launch parallel Agent instances (one per PR) using the `github:actions-monitor` skill. Collect pass/fail status and failure logs from each.
+Use `github:actions-monitor` agents (one per PR) to collect pass/fail status. For failures, launch a worktree agent with the logs and branch to fix, test, and push. Re-monitor after fixes.
 
-## Fix Failures
+## Annotate Things
 
-For each failing PR, launch a `general-purpose` agent via the Agent tool with `isolation: "worktree"`. The agent receives:
+Use `things:url` to update each todo based on its PR outcome:
 
-- The failure logs from CI
-- The branch name to check out
-- Instruction to fix the issue, run `bun test`, commit, and push
+- **Passing**: Append PR link to notes, add `review` tag, remove `claude-code` tag, move to Anytime
+- **Failing**: Append PR link and failure summary to notes. Leave `claude-code` tag so it resurfaces next run.
 
-After all fix agents complete, re-monitor CI for the affected PRs.
+## Summary
 
-## Annotate and Complete
-
-Load the `things:url` skill.
-
-- **Passing PRs**: Append the PR link to the todo's notes, add the `review` tag, remove the `claude-code` tag, and move the todo to Anytime.
-- **Still-failing PRs**: Append the PR link and failure summary to the todo's notes. Leave the `claude-code` tag so the item surfaces in the next run.
-
-## Present Summary
-
-Output a final bulleted list (one entry per todo):
-
-- PR link (with pass/fail status)
-- Things URL: `https://things.bendrucker.me/show?id=<todo-id>`
-- Todo title
+Output a bulleted list (one entry per todo): PR link (pass/fail), Things URL (`https://things.bendrucker.me/show?id=<todo-id>`), title.

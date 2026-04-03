@@ -20,9 +20,7 @@ hooks:
 
 ## Current Pane
 
-!`tmux display-message -t "$TMUX_PANE" -p '- Session: #{session_name}
-- Window: #{window_index} (#{window_name})
-- Pane: #{pane_index} (#{pane_id})' 2>/dev/null || echo 'not running in tmux'`
+!`bash ${CLAUDE_SKILL_DIR}/scripts/pane.sh`
 
 Use `$TMUX_PANE` to identify the current pane and target adjacent ones.
 

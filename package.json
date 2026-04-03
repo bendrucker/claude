@@ -28,8 +28,7 @@
     "plugins/tmux",
     "plugins/mac",
     "plugins/x-callback-url",
-    "plugins/review",
-    "plugins/doc-review"
+    "plugins/review"
   ],
   "scripts": {
     "build": "tsc --noEmit",

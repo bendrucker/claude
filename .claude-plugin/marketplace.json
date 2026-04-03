@@ -183,11 +183,6 @@
       "name": "tmux",
       "description": "Tmux session awareness and pane interaction",
       "source": "./plugins/tmux"
-    },
-    {
-      "name": "doc-review",
-      "description": "Multi-agent document review through specialized lenses",
-      "source": "./plugins/doc-review"
     }
   ]
 }

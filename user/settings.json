@@ -110,7 +110,6 @@
     "git-town@bendrucker": true,
     "mermaid@bendrucker": true,
     "tech-spec@bendrucker": true,
-    "doc-review@bendrucker": true,
     "typescript-lsp@claude-plugins-official": true,
     "gopls-lsp@claude-plugins-official": true
   },

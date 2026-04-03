@@ -5,7 +5,8 @@ Writing style enforcement hooks and AI trope detection.
 ## Contents
 
 - **Hooks**: Numbered heading detection, heading style enforcement, AI writing trope detection (em dashes, vocabulary, copula avoidance, promotional language, parallelism, semicolons)
-- **Skills**: `writing` system reminder for prose writing guidelines
+- **Skills**: `writing` system reminder for prose writing guidelines, `writing:review` multi-agent document review
+- **Agents**: `content`, `style`, `artifacts` (conditional review lenses)
 
 ## Hook Commands
 

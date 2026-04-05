@@ -26,7 +26,7 @@ export async function renderFile(
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    await page.goto(`file://${absInput}`, { waitUntil: "networkidle" });
+    await page.goto(`file://${absInput}`, { waitUntil: "domcontentloaded" });
 
     const element = await page.$("body > div");
     if (!element) {

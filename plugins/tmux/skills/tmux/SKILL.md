@@ -93,7 +93,7 @@ Prefer a terminal markdown renderer with file watching. Tools in preference orde
 
 | Tool | Command | Notes |
 |---|---|---|
-| markless | `markless --watch file.md` | Rendered markdown with live reload |
+| bun | `bun --watch file.md` | Rendered markdown with live reload |
 | glow | `glow -w 0 file.md` | Rendered, no watch (reopen on change) |
 | batwatch | `batwatch --watcher poll file.md` | Syntax-highlighted with file watching |
 | bat | `bat --paging always file.md` | Syntax-highlighted source, no watch |

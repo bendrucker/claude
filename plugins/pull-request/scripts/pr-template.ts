@@ -4,6 +4,7 @@
 
 import { execSync } from "node:child_process";
 import { join } from "node:path";
+import { markdown } from "bun";
 export type Provider = "github" | "gitlab";
 
 const TEMPLATE_PATHS: Record<Provider, string[]> = {
@@ -44,6 +45,6 @@ if (import.meta.main) {
   const provider = (process.argv[2] as Provider) || "github";
   const template = await findTemplate(provider, repoRoot);
   if (template) {
-    process.stdout.write(template);
+    process.stdout.write(markdown.ansi(template));
   }
 }

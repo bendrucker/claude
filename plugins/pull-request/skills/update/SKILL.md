@@ -6,6 +6,7 @@ description: |
 
 allowed-tools:
   - mcp__github
+  - "Bash(git remote get-url:*)"
   - "Bash(gh pr:*)"
   - "Bash(glab mr:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"

@@ -9,6 +9,7 @@ allowed-tools:
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
   - "Bash(git push:*)"
+  - "Bash(git remote get-url:*)"
   - "Bash(gh pr:*)"
   - "Bash(glab mr:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"

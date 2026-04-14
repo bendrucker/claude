@@ -144,7 +144,7 @@
       "source": {
         "source": "github",
         "repo": "max-sixty/worktrunk",
-        "ref": "v0.33.0"
+        "ref": "v0.37.0"
       }
     },
     "linear-cli": {

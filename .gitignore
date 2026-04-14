@@ -4,6 +4,7 @@
 node_modules/
 .DS_Store
 **/fixtures/
+**/evals-workspace/
 
 # Generated coverage output (bun test --coverage)
 /coverage/

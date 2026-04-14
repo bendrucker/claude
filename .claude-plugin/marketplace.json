@@ -163,6 +163,11 @@
       "name": "tmux",
       "description": "Tmux session awareness and pane interaction",
       "source": "./plugins/tmux"
+    },
+    {
+      "name": "portless",
+      "description": "Portless-managed dev servers and stable .localhost URLs",
+      "source": "./plugins/portless"
     }
   ]
 }

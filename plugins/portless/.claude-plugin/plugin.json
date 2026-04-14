@@ -1,0 +1,8 @@
+{
+  "name": "portless",
+  "description": "Portless-managed dev servers and stable .localhost URLs",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

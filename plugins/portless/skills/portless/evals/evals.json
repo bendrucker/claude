@@ -1,0 +1,33 @@
+{
+  "skill_name": "portless",
+  "evals": [
+    {
+      "id": 1,
+      "name": "main-worktree-start-and-browse",
+      "prompt": "I just tweaked the Header component in my Next.js app. Start the dev server and open it in Chrome so I can eyeball the change. Investigate the repo and explain exactly what you would do: the commands you would run, and the URL you would navigate to in Chrome. Do not actually spawn servers or open a browser. Save your complete response to outputs/response.md.",
+      "mock_repo": "eval-1-main",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "worktree-branch-prefix",
+      "prompt": "This checkout is a linked git worktree on branch fix-auth-redirect (the main checkout lives elsewhere). Bring up the app and verify the login page still works. Investigate the repo and explain exactly what you would do: the commands you would run, and the URL you would navigate to in Chrome. Do not actually spawn servers or open a browser. Save your complete response to outputs/response.md.",
+      "mock_repo": "eval-2-worktree",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "debug-port-url-not-loading",
+      "prompt": "The dev server started fine (I ran npm run dev and it didn't error out) but http://localhost:3000 is not loading in my browser. What am I doing wrong? Investigate the repo and diagnose. Save your complete response to outputs/response.md.",
+      "mock_repo": "eval-3-debug",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "negative-non-portless-repo",
+      "prompt": "Start the dev server and open localhost in Chrome to check the homepage. Investigate the repo and explain exactly what you would do: the commands you would run, and the URL you would navigate to in Chrome. Do not actually spawn servers or open a browser. Save your complete response to outputs/response.md.",
+      "mock_repo": "eval-4-plain",
+      "files": []
+    }
+  ]
+}

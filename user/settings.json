@@ -213,6 +213,7 @@
     "command": "~/.claude/scripts/statusline.sh"
   },
   "alwaysThinkingEnabled": true,
+  "showClearContextOnPlanAccept": true,
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "TMPDIR": "/tmp",

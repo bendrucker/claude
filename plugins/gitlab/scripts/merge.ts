@@ -22,7 +22,7 @@ interface MergeRequest {
 
 export async function getMrIid(branch: string): Promise<number> {
   const mrs: MergeRequest[] =
-    await $`glab api projects/:id/merge_requests --field source_branch=${branch} --field state=opened`.json();
+    await $`glab api projects/:id/merge_requests -X GET --field source_branch=${branch} --field state=opened`.json();
 
   if (mrs.length === 0) {
     throw new Error(`No open MR found for branch: ${branch}`);

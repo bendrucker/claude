@@ -156,7 +156,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Install Claude Code CLI
-        run: bun install -g @anthropic-ai/claude-code@latest
+        run: curl -fsSL https://claude.ai/install.sh | bash
 
       - name: Validate plugin
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
@@ -255,7 +255,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install Claude Code CLI
-        run: bun install -g @anthropic-ai/claude-code@latest
+        run: curl -fsSL https://claude.ai/install.sh | bash
 
       - name: Setup Claude configuration
         run: |

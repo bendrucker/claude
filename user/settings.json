@@ -144,21 +144,21 @@
       "source": {
         "source": "github",
         "repo": "max-sixty/worktrunk",
-        "ref": "v0.33.0"
+        "ref": "v0.37.0"
       }
     },
     "linear-cli": {
       "source": {
         "source": "github",
         "repo": "schpet/linear-cli",
-        "ref": "v1.11.1"
+        "ref": "v2.0.0"
       }
     },
     "agent-browser": {
       "source": {
         "source": "github",
         "repo": "vercel-labs/agent-browser",
-        "ref": "v0.23.0"
+        "ref": "v0.25.4"
       }
     }
   },
@@ -213,6 +213,7 @@
     "command": "~/.claude/scripts/statusline.sh"
   },
   "alwaysThinkingEnabled": true,
+  "showClearContextOnPlanAccept": true,
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "TMPDIR": "/tmp",

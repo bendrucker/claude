@@ -23,6 +23,7 @@ portless list
 ## URL contract
 
 - Inside a process spawned by `portless run`, `PORTLESS_URL` is authoritative.
+- From outside the process, `portless get <name>` prints the URL (use `--no-worktree` to skip the branch prefix).
 - Otherwise the URL is `https://<name>.localhost`. `<name>` comes from (in order): `--name <name>`, the first positional arg to `portless`, or the `package.json` name.
 - `PORT` / `HOST` in the child env are the ephemeral upstream. Browsers hit the `.localhost` URL, not those.
 - When driving `mcp__claude-in-chrome__navigate` or any browser tool, use the portless URL, not `localhost:<port>`.
@@ -47,3 +48,7 @@ Don't assume the bare name. If unsure, check `PORTLESS_URL` or `portless list`.
 ## Reserved names
 
 `run`, `get`, `alias`, `hosts`, `list`, `trust`, `clean`, and `proxy` are subcommands and can't be used as app names. Use `portless run <cmd>` to infer the name, or `portless --name <name> <cmd>` to force it.
+
+## Full docs
+
+Installation, LAN mode, framework notes, HTTPS/CA trust, and the complete CLI reference live in the upstream skill: [vercel-labs/portless SKILL.md](https://github.com/vercel-labs/portless/blob/main/skills/portless/SKILL.md).

@@ -156,7 +156,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Validate plugin
-        run: bunx @anthropic-ai/claude-code plugin validate "plugins/${{ matrix.plugin.name }}"
+        run: npx -y @anthropic-ai/claude-code@latest plugin validate "plugins/${{ matrix.plugin.name }}"
 
       - name: Check for hardcoded version
         if: steps.inspect.outputs.has_plugin_json == 'true'
@@ -264,5 +264,5 @@ jobs:
           echo '## Claude Code Context Usage' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          bunx @anthropic-ai/claude-code --print '/context' --output-format json --verbose | jq -r '.[-1].result' >> $GITHUB_STEP_SUMMARY
+          npx -y @anthropic-ai/claude-code@latest --print '/context' --output-format json --verbose | jq -r '.[-1].result' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

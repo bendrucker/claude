@@ -29,7 +29,7 @@ Every customization costs tokens on every session. Before adding one, define how
 - For questions about Claude Code features or usage, use the Task tool with `subagent_type='claude-code-guide'` to consult official documentation.
 - Always use the `pull-request:create` skill to create pull requests. If the skill is unavailable, create the PR with an empty body.
 - When executing build commands, output to `/dev/null` to avoid creating binaries.
-- Dev servers: load the `portless` skill when a repo's scripts invoke `portless run`.
+- Dev servers: load the `portless` skill when a repo's scripts invoke `portless run`. Skip it if `PORTLESS=0` is set, since portless is bypassed and `.localhost` URLs don't apply.
 - Store temporary files in `tmp/` directory.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
 

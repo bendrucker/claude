@@ -16,6 +16,7 @@ description: >-
 - From outside, `portless get <name>` prints the URL (use `--no-worktree` to skip the branch prefix), or run `portless list` for all active routes.
 - Otherwise the URL is `https://<name>.localhost`, where `<name>` is the `package.json` name (or `--name` / first positional arg to `portless`).
 - `PORT` / `HOST` in the child env are the ephemeral upstream. Browsers hit the `.localhost` URL, not those.
+- With `PORTLESS=0`, portless is bypassed: the dev server binds directly to `PORT`/`HOST`, no `.localhost` URL is routed, and `PORTLESS_URL` / `portless list` shouldn't be treated as authoritative. Use the port-based URL from the dev server's own output.
 
 ## Worktrees
 

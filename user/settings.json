@@ -212,6 +212,7 @@
     "type": "command",
     "command": "~/.claude/scripts/statusline.sh"
   },
+  "skipAutoPermissionPrompt": true,
   "alwaysThinkingEnabled": true,
   "showClearContextOnPlanAccept": true,
   "env": {

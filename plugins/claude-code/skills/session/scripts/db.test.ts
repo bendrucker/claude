@@ -266,6 +266,16 @@ describe("incremental refresh", () => {
   });
 });
 
+describe("sessions without message container/type/id", () => {
+  it("indexes alongside sessions that have them", async () => {
+    const rows = await db.query<{ session_id: string; project_path: string }>(
+      "SELECT session_id, project_path FROM sessions WHERE session_id = 'no-container-session'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.project_path).toBe("/Users/test/project");
+  });
+});
+
 describe("malformed JSONL", () => {
   it("imports valid messages from files with invalid lines", async () => {
     const rows = await db.query<{ user_messages: number; assistant_messages: number }>(

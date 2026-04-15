@@ -21,7 +21,7 @@ Views (`tool_calls`, `tool_errors`, `sessions`) query these tables.
 
 ### Import pipeline
 
-`import.sql` flattens `message.*` into `raw`. Known collisions with top-level fields (`type`, `content`, `id`, `container`) use explicit aliases. New collisions produce a DuckDB error.
+`import.sql` flattens `message.*` into `raw`. Only `message.content` is explicitly aliased to `message_content`; the rest of `message.*` expands via `EXCLUDE (content)`. When message fields collide with top-level fields (e.g., `type`, `id`, `container`), DuckDB auto-suffixes them (`type_1`, `id_1`, etc.). This avoids `EXCLUDE` on optional message fields, which fails when they're absent from the struct.
 
 After rebuilding `raw`, `import.sql` creates a `content_items_export` temp table. Callers must COPY this to `${data_dir}/content_items.jsonl` and DROP it before running `views.sql`. DuckDB's `COPY TO` requires a literal path, so this step cannot live in SQL alone.
 

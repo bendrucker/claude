@@ -2,10 +2,7 @@ CREATE OR REPLACE TEMP TABLE new_raw AS
 SELECT
   * EXCLUDE (message, filename),
   message.content as message_content,
-  message.type as message_type,
-  message.id as message_id,
-  message.container as message_container,
-  message.* EXCLUDE (content, type, id, container),
+  message.* EXCLUDE (content),
   filename as source_file,
   ROW_NUMBER() OVER () as source_line
 FROM read_ndjson(

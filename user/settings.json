@@ -24,20 +24,11 @@
       "WebFetch(domain:proxy.golang.org)",
       "WebFetch(domain:sum.golang.org)",
       "WebFetch(domain:pkg.go.dev)",
-      "Edit(//tmp/**)",
       "Edit(tmp/**)",
       "Edit(.git/config)",
       "Edit(.git/config.lock)",
       "Edit(.worktrees/**)",
-      "Edit(~/.npm/**)",
-      "Edit(~/.terraform.d/plugin-cache/**)",
-      "Edit(~/.cache/uv/**)",
-      "Edit(~/Library/Caches/go-build/**)",
-      "Edit(~/src/go/pkg/mod/**)",
-      "Edit(~/src/go/pkg/sumdb/**)",
-      "Edit(~/.bun/**)",
       "Read(~/.claude/plugins/**)",
-      "Edit(~/.claude/plugins/cache/**/node_modules/**)",
       "Bash(tmux display-message:*)",
       "Bash(tmux list-panes:*)",
       "Bash(tmux list-windows:*)",
@@ -171,6 +162,17 @@
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
       ]
     },
+    "filesystem": {
+      "allowWrite": [
+        "/tmp",
+        "~/.terraform.d/plugin-cache",
+        "~/.cache",
+        "~/Library/Caches/go-build",
+        "~/src/go/pkg/mod",
+        "~/src/go/pkg/sumdb",
+        "~/.bun/install"
+      ]
+    },
     "excludedCommands": [
       "docker:*",
       "ssh:*",
@@ -204,6 +206,7 @@
       "dscl:*",
       "plutil:*",
       "tmux:*",
+      "git:*",
       "gh:*",
       "code:*"
     ]

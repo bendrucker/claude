@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-for tool in markless batwatch bat; do
+for tool in batwatch bat; do
   path=$(which "$tool" 2>/dev/null || true)
   if [ -n "$path" ]; then
     echo "- $tool: $path"

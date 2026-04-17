@@ -2,6 +2,7 @@
 
 import { type ExecSyncOptions, execSync } from "node:child_process";
 import { join } from "node:path";
+import { markdown } from "bun";
 
 const CANDIDATES = ["CONTRIBUTING.md", "contributing.md", ".github/CONTRIBUTING.md"];
 
@@ -27,6 +28,6 @@ if (import.meta.main) {
   const result = await findContributing(getRepoRoot());
   if (result) {
     console.log(`Contributing Guidelines (${result.path}):\n`);
-    console.log(result.content.trim());
+    console.log(markdown.ansi(result.content.trim()));
   }
 }

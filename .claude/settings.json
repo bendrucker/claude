@@ -3,6 +3,21 @@
   "env": {
     "THINGS_EXTRA_TAGS": "claude-code"
   },
+  "permissions": {
+    "allow": [
+      "Skill(claude-code:*)",
+      "Skill(pr-review-toolkit:*)",
+      "Skill(pull-request:*)",
+      "Skill(review:*)",
+      "Skill(github:*)",
+      "Skill(git:*)",
+      "Skill(bun:bun)",
+      "Skill(writing:*)",
+      "Skill(plan:guidelines)",
+      "Skill(update-config)",
+      "Skill(simplify)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

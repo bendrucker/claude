@@ -1,6 +1,6 @@
 # MR Reviews
 
-Submit review feedback as draft notes that accumulate before publishing. Comments stay private until bulk-published — mirrors GitHub's pending review workflow.
+Submit review feedback as draft notes that accumulate before publishing. Comments stay private until bulk-published, mirroring GitHub's pending review workflow.
 
 ## Draft Notes Script
 
@@ -111,9 +111,9 @@ third line
 - **No nested `-f` fields**: `glab api -f "position[base_sha]=..."` silently fails. Nested objects must be sent as JSON via `--input`.
 - **Reply field**: Use `in_reply_to_discussion_id`, not `discussion_id`.
 - **Don't update positioned notes**: PUT to update a draft note strips the position. Delete and recreate instead.
-- **No atomic review submit**: The REST API's `bulk_publish` only publishes drafts — no summary comment or review decision. The web UI uses an internal controller that combines all three, but it's session-authenticated only. The `submit` command above sequences the calls separately.
+- **No atomic review submit**: The REST API's `bulk_publish` only publishes drafts (no summary comment or review decision). The web UI uses an internal controller that combines all three, but it's session-authenticated only. The `submit` command above sequences the calls separately.
 - **Review state is GraphQL-only**: See [review-state.md](review-state.md) for mutations (`mergeRequestRequestChanges`, `mergeRequestDestroyRequestedChanges`) and querying review state. Key: `projectPath` is `ID!` not `String!`, caller must be assigned as reviewer, requires Premium/Ultimate.
-- **Range comments need `new_line`**: `line_range` alone is rejected ("position is incomplete"). Always set `new_line` to the range end line — the comment anchors at this line in the UI.
+- **Range comments need `new_line`**: `line_range` alone is rejected ("position is incomplete"). Always set `new_line` to the range end line. The comment anchors at this line in the UI.
 
 ## Discussions
 
@@ -122,9 +122,13 @@ See [discussions.md](discussions.md) for fetching, filtering, resolving, and sum
 ## Approvals
 
 ```bash
-# Approve (with SHA safety check — returns 409 if MR updated)
+# Approve with SHA safety check (returns 409 if MR updated)
 glab api projects/:id/merge_requests/<iid>/approve -X POST -f sha="<head_sha>"
 
 # Unapprove
 glab api projects/:id/merge_requests/<iid>/unapprove -X POST
 ```
+
+## Re-Request Review
+
+GraphQL only (no REST or `glab mr` equivalent). See [review-state.md](review-state.md#re-request-review).

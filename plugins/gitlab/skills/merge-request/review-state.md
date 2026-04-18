@@ -37,6 +37,39 @@ mutation($projectPath: ID!, $iid: String!) {
 }
 ```
 
+## Re-Request Review
+
+Fires the same mutation as the web UI's "re-request review" button.
+
+```graphql
+mutation($projectPath: ID!, $iid: String!, $userId: UserID!) {
+  mergeRequestReviewerRereview(input: {
+    projectPath: $projectPath,
+    iid: $iid,
+    userId: $userId
+  }) {
+    errors
+  }
+}
+```
+
+Look up the numeric user ID first, then pass it as the full `gid://gitlab/User/<id>`:
+
+```bash
+user_id=$(glab api "users?username=<username>" | jq -r '.[0].id')
+
+glab api graphql \
+  -f query='mutation($projectPath: ID!, $iid: String!, $userId: UserID!) { mergeRequestReviewerRereview(input: { projectPath: $projectPath, iid: $iid, userId: $userId }) { errors } }' \
+  -F projectPath=$(glab repo view --output json | jq -r '.fullPath') \
+  -F iid=<iid> \
+  -F userId="gid://gitlab/User/$user_id"
+```
+
+**Gotchas:**
+- Target user must already be a reviewer on the MR
+- `userId` is typed `UserID!`, so bare numeric IDs or usernames fail with a type error
+- Probing the schema fires the mutation. Use the documented form, don't explore.
+
 ## Read Review State
 
 REST `reviewers[].state` only returns `"active"`. Use GraphQL:

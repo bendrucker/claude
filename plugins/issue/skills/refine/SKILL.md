@@ -24,14 +24,14 @@ Expand brief issue descriptions into structured issues for developers and AI age
 
 ## Output Structure
 
-All issues share this skeleton. Type guides add sections in between.
+Every issue opens with Summary and closes with Context. Type guides offer a menu of middle sections. Include only those that earn their place.
 
 ```markdown
 ## Summary
 
 One to two sentences.
 
-[Type-specific sections from guide]
+[Type-specific sections from guide (select, don't fill)]
 
 ## Context
 
@@ -44,11 +44,18 @@ Files that need changes or inform the work.
 Links to related issues, prior attempts, upstream work.
 ```
 
+## Section Selection
+
+Every section must tell the reader something they couldn't have guessed. Cut sections whose content is tautological ("tests must pass"), template residue ("no behavior change"), or obvious given the issue's size.
+
+Minimum: Summary plus one type section plus Context. Grow only when content demands.
+
 ## Style
 
 - **Direct** - Facts, not hedging
 - **Specific** - Name the function, file, behavior
 - **Concise** - Every sentence adds information
+- **Earn the heading** - A section present only to match the template is filler
 - **Link to code** - Permalinks for GitHub (`https://github.com/{owner}/{repo}/blob/{sha}/path#L10-L20`), file paths elsewhere (`path/to/file:10-20`)
 
 ## Issue Trackers

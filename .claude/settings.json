@@ -9,7 +9,18 @@
       "Bash(gh search prs:*)",
       "Bash(npm view:*)",
       "Bash(shellcheck:*)",
-      "Bash(brew info:*)"
+      "Bash(brew info:*)",
+      "Skill(claude-code:*)",
+      "Skill(pr-review-toolkit:*)",
+      "Skill(pull-request:*)",
+      "Skill(review:*)",
+      "Skill(github:*)",
+      "Skill(git:*)",
+      "Skill(bun:bun)",
+      "Skill(writing:*)",
+      "Skill(plan:guidelines)",
+      "Skill(update-config)",
+      "Skill(simplify)"
     ]
   },
   "hooks": {

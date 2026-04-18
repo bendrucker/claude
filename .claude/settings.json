@@ -3,6 +3,15 @@
   "env": {
     "THINGS_EXTRA_TAGS": "claude-code"
   },
+  "permissions": {
+    "allow": [
+      "Bash(gh extension list)",
+      "Bash(gh search prs:*)",
+      "Bash(npm view:*)",
+      "Bash(shellcheck:*)",
+      "Bash(brew info:*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

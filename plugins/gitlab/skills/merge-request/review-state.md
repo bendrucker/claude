@@ -37,9 +37,9 @@ mutation($projectPath: ID!, $iid: String!) {
 }
 ```
 
-## Re-request Review
+## Re-Request Review
 
-Fires the same mutation as the web UI's "re-request review" button. Re-requests review from a specific reviewer after you've pushed changes addressing their feedback.
+Fires the same mutation as the web UI's "re-request review" button.
 
 ```graphql
 mutation($projectPath: ID!, $iid: String!, $userId: UserID!) {
@@ -53,7 +53,7 @@ mutation($projectPath: ID!, $iid: String!, $userId: UserID!) {
 }
 ```
 
-The `userId` must be a global ID (`gid://gitlab/User/<id>`), not a username. Look up the numeric ID first:
+Look up the numeric user ID first, then pass it as the full `gid://gitlab/User/<id>`:
 
 ```bash
 user_id=$(glab api "users?username=<username>" | jq -r '.[0].id')
@@ -65,13 +65,10 @@ glab api graphql \
   -F userId="gid://gitlab/User/$user_id"
 ```
 
-**Requirements:**
-- Target user must already be a reviewer on the MR
-- Caller needs permission to update the MR
-
 **Gotchas:**
-- `userId` is typed `UserID!` and expects the full `gid://gitlab/User/<id>` form. Bare numeric IDs or usernames fail with a type error.
-- This is a mutation; probing the schema by running it will actually fire the re-request. Use the documented form, don't explore.
+- Target user must already be a reviewer on the MR
+- `userId` is typed `UserID!` — bare numeric IDs or usernames fail with a type error
+- Probing the schema fires the mutation. Use the documented form, don't explore.
 
 ## Read Review State
 

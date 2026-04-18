@@ -129,6 +129,6 @@ glab api projects/:id/merge_requests/<iid>/approve -X POST -f sha="<head_sha>"
 glab api projects/:id/merge_requests/<iid>/unapprove -X POST
 ```
 
-## Re-request Review
+## Re-Request Review
 
-After addressing reviewer feedback, re-request review via GraphQL (no REST or `glab mr` equivalent). See [review-state.md](review-state.md#re-request-review).
+No REST or `glab mr` equivalent — GraphQL only. See [review-state.md](review-state.md#re-request-review).

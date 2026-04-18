@@ -238,3 +238,30 @@ describe("integration", () => {
     expect(await getState("newline", filePath)).toBe("");
   });
 });
+
+describe("memory files", () => {
+  const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
+
+  it("check skips memory files without touching state", async () => {
+    await checkInput(mockPreToolInput(memoryPath));
+    expect(await getState("newline", memoryPath)).toBe("");
+  });
+
+  it("ensure skips memory files", async () => {
+    const output = await ensureInput(mockPostToolInput(memoryPath));
+    expect(output).toBeNull();
+  });
+
+  it("preserve skips memory files", async () => {
+    const output = await preserveInput(mockPostToolInput(memoryPath));
+    expect(output).toBeNull();
+  });
+
+  it("ensure still processes non-memory files", async () => {
+    const filePath = join(testDir, "non_memory.txt");
+    await Bun.write(filePath, "no newline");
+    const output = await ensureInput(mockPostToolInput(filePath));
+    expect(output).not.toBeNull();
+    expect(await hasNewline(filePath)).toBe(true);
+  });
+});

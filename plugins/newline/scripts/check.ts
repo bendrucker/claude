@@ -2,6 +2,7 @@
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson } from "@constellos/claude-code-kit/runners";
+import { isMemoryPath } from "./memory-path";
 import { setState } from "./state";
 
 type ToolInput = {
@@ -25,6 +26,7 @@ export async function hasTrailingNewline(filePath: string): Promise<boolean | nu
 export async function processInput(input: PreToolUseHookInput): Promise<void> {
   const { file_path: filePath } = input.tool_input as ToolInput;
   if (!filePath) return;
+  if (isMemoryPath(filePath)) return;
 
   const hasNewline = await hasTrailingNewline(filePath);
 

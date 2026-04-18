@@ -86,6 +86,22 @@ describe("plan files", () => {
   });
 });
 
+describe("memory files", () => {
+  const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
+
+  it("skips Write to memory file with spaced em dash", async () => {
+    const input = mockWrite("This \u2014 is bad");
+    (input.tool_input as Record<string, unknown>).file_path = memoryPath;
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("skips Edit to memory file with spaced em dash", async () => {
+    const input = mockEdit("This \u2014 is bad");
+    (input.tool_input as Record<string, unknown>).file_path = memoryPath;
+    expect(await processInput(input)).toBeNull();
+  });
+});
+
 describe("semicolon file scoping", () => {
   const semicolonText = "First point; second point; third point; fourth";
 

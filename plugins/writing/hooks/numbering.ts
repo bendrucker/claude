@@ -16,6 +16,7 @@ import {
   formatDecision,
   getExtension,
   isMarkdownFile,
+  isMemoryPath,
   type SyncHookJSONOutput,
   type WriteInput,
 } from "./markdown";
@@ -124,6 +125,8 @@ export async function processInput(
   } else {
     return null;
   }
+
+  if (isMemoryPath(filePath)) return null;
 
   const ext = getExtension(filePath);
   let match: string | null = null;

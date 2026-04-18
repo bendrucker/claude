@@ -5,6 +5,11 @@
   },
   "permissions": {
     "allow": [
+      "Bash(gh extension list)",
+      "Bash(gh search prs:*)",
+      "Bash(npm view:*)",
+      "Bash(shellcheck:*)",
+      "Bash(brew info:*)",
       "Skill(claude-code:*)",
       "Skill(pr-review-toolkit:*)",
       "Skill(pull-request:*)",

@@ -217,6 +217,7 @@
   },
   "skipAutoPermissionPrompt": true,
   "alwaysThinkingEnabled": true,
+  "spinnerTipsEnabled": false,
   "showClearContextOnPlanAccept": true,
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",

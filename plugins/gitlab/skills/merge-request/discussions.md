@@ -68,7 +68,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --old-line 10 --body-file tmp/note.md
 ```
 
-Diff refs are fetched automatically. Positioned comments are validated against diff hunks before posting — if a line is not in the diff, the command exits with valid line ranges.
+Diff refs are fetched automatically. Positioned comments are validated against diff hunks before posting. If a line is not in the diff, the command exits with valid line ranges.
 
 ### Suggestions
 

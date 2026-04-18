@@ -43,7 +43,7 @@ The script reads stack refs from `.git/stacked/<title>/*.json`, checks project a
 
 1. MR1 merges when its pipeline passes
 2. GitLab auto-retargets MR2 to the base branch
-3. MR2's pipeline runs — since the logical diff is unchanged, the smart patch-id reset (GitLab 16.7+) preserves approvals
+3. MR2's pipeline runs; since the logical diff is unchanged, the smart patch-id reset (GitLab 16.7+) preserves approvals
 4. MR2 auto-merges, triggering the same cascade for MR3, etc.
 
 ### Requirements

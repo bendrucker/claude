@@ -5,6 +5,7 @@ description: |
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)
+  - Bash(jq:*)
   - Bash(git:*)
   - Bash(bun:*)
   - Bash(bunx:*)
@@ -36,7 +37,14 @@ Run state script to track iteration (`bun <state-script> <session-id>`).
 
 #### Check Merge Conflicts
 
-Check for merge conflicts: `gh pr view <number> --json mergeable,mergeStateStatus`. If `mergeable` is `CONFLICTING`, identify conflicting files by running `git merge origin/main --no-commit --no-ff`, then `git diff --name-only --diff-filter=U`. Abort the merge afterward with `git merge --abort`.
+Check for merge conflicts:
+
+- **GitHub**: `gh pr view <number> --json mergeable --jq '.mergeable'`. If the output is `CONFLICTING`, proceed.
+- **GitLab**: `glab mr view <iid> --output json | jq -r '.has_conflicts'`. If `true`, proceed.
+
+Identify conflicting files locally: `git merge origin/<base> --no-commit --no-ff`, then `git diff --name-only --diff-filter=U`. Abort with `git merge --abort` after.
+
+Do not pipe CLI JSON output to `python3`, `bun`, or other interpreters for parsing. Use `gh --jq` / `gh --template` or `glab ... --output json | jq` only.
 
 - **Trivial**: Lockfiles (`bun.lock`) or generated files. For lockfiles, delete and regenerate per project convention (e.g., `rm bun.lock && bun install`). Also trivial: conflicts in files the PR modified where the resolution is obvious (both sides added adjacent lines).
 - **Non-trivial**: Report the conflicting file list to the user and cancel.
@@ -45,7 +53,14 @@ After resolving, commit the merge and push. The next iteration will pick up the 
 
 #### Check CI
 
-Query the PR's source branch SHA and CI status. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote. Compare the PR's source branch SHA (not the pipeline/run SHA) against `git rev-parse HEAD`. Pipelines may run on synthetic merge commits whose SHAs never match the branch HEAD.
+Query the PR's source branch SHA and CI status. Use `/github:actions-monitor` or `/gitlab:ci-monitor` as appropriate for the remote.
+
+Extract the source branch SHA directly from the CLI:
+
+- **GitHub**: `gh pr view <number> --json headRefOid --jq '.headRefOid'`
+- **GitLab**: `glab mr view <iid> --output json | jq -r '.sha'`
+
+Compare that SHA against `git rev-parse HEAD`. Pipelines may run on synthetic merge commits whose SHAs never match the branch HEAD — always compare against `headRefOid` / `.sha`, not the run or pipeline SHA.
 
 #### SHA Mismatch
 
@@ -73,7 +88,13 @@ After pushing, note the new HEAD SHA. On the next iteration, skip diagnosis unti
 
 After 20 iterations: `CronDelete`, report, clean state.
 
-Resolve all `${}` placeholders to absolute values in the prompt. Avoid `xargs`, `$()`, and pipes.
+Resolve all `${}` placeholders to absolute values in the prompt. Avoid `xargs` and `$()`. The only pipes permitted are `glab ... --output json | jq ...` — never pipe CLI output to `python3`, `bun`, `node`, or any interpreter for JSON parsing.
+
+## Gotchas
+
+- **No inline JSON parsing.** Do not pipe `gh`/`glab` output to `python3 -c`, `bun -e`, `node -e`, or similar. Use `gh --jq` / `gh --template` (gh has first-class jq support), or `glab ... --output json | jq ...` (glab lacks `--jq` / `--template`). Inline interpreters trigger permission prompts that kill the cron loop.
+- **Compare branch SHA, not pipeline SHA.** Pipelines may run on synthetic merge commits whose SHA never matches the branch tip. Extract `headRefOid` (gh) or `.sha` from the MR payload (glab).
+- **Trailing `!=` in jq.** The Bash tool escapes `!` to `\!`. Use `| not` (e.g. `select(.x == null | not)`) or pass the filter via heredoc.
 
 ## Trivial Failures
 

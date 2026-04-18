@@ -67,7 +67,7 @@ glab api graphql \
 
 **Gotchas:**
 - Target user must already be a reviewer on the MR
-- `userId` is typed `UserID!` — bare numeric IDs or usernames fail with a type error
+- `userId` is typed `UserID!`, so bare numeric IDs or usernames fail with a type error
 - Probing the schema fires the mutation. Use the documented form, don't explore.
 
 ## Read Review State

@@ -37,7 +37,14 @@
       "Bash(gh run list:*)",
       "Bash(gh pr checks:*)",
       "Bash(gh pr view:*)",
-      "Bash(gh pr diff:*)"
+      "Bash(gh pr diff:*)",
+      "Bash(glab api:*)",
+      "Bash(glab ci get:*)",
+      "Bash(glab ci list:*)",
+      "Bash(glab ci trace:*)",
+      "Bash(glab mr view:*)",
+      "Bash(bun:*)",
+      "Bash(jq:*)"
     ],
     "deny": []
   },

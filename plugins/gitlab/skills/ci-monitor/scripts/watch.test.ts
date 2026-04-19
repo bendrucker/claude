@@ -33,18 +33,14 @@ describe("parseMrUrl", () => {
   });
 
   it("parses a nested subgroup MR URL", () => {
-    const parsed = parseMrUrl(
-      "https://gitlab.com/group/subgroup/project/-/merge_requests/7",
-    );
+    const parsed = parseMrUrl("https://gitlab.com/group/subgroup/project/-/merge_requests/7");
     expect(parsed.project).toBe("group/subgroup/project");
     expect(parsed.projectEncoded).toBe("group%2Fsubgroup%2Fproject");
     expect(parsed.iid).toBe(7);
   });
 
   it("tolerates trailing path segments", () => {
-    const parsed = parseMrUrl(
-      "https://gitlab.com/group/project/-/merge_requests/12/diffs",
-    );
+    const parsed = parseMrUrl("https://gitlab.com/group/project/-/merge_requests/12/diffs");
     expect(parsed.iid).toBe(12);
     expect(parsed.project).toBe("group/project");
   });
@@ -184,9 +180,7 @@ describe("deriveEvents", () => {
   it("emits status:success on first probe when already green", () => {
     const probe = makeProbe({ state: "success" });
     const { events, state } = deriveEvents(probe, initialState(), 0, 15);
-    expect(events).toEqual([
-      { type: "status", state: "success", sha: "sha1", run_id: "100" },
-    ]);
+    expect(events).toEqual([{ type: "status", state: "success", sha: "sha1", run_id: "100" }]);
     expect(state.lastSha).toBe("sha1");
     expect(state.lastState).toBe("success");
   });
@@ -196,27 +190,19 @@ describe("deriveEvents", () => {
 
     const r1 = deriveEvents(makeProbe({ state: "running" }), state, 0, 15);
     state = r1.state;
-    expect(r1.events).toEqual([
-      { type: "status", state: "running", sha: "sha1", run_id: "100" },
-    ]);
+    expect(r1.events).toEqual([{ type: "status", state: "running", sha: "sha1", run_id: "100" }]);
 
     const r2 = deriveEvents(makeProbe({ state: "failing" }), state, 1, 15);
     state = r2.state;
-    expect(r2.events).toEqual([
-      { type: "status", state: "failing", sha: "sha1", run_id: "100" },
-    ]);
+    expect(r2.events).toEqual([{ type: "status", state: "failing", sha: "sha1", run_id: "100" }]);
 
     const r3 = deriveEvents(makeProbe({ state: "running" }), state, 2, 15);
     state = r3.state;
-    expect(r3.events).toEqual([
-      { type: "status", state: "running", sha: "sha1", run_id: "100" },
-    ]);
+    expect(r3.events).toEqual([{ type: "status", state: "running", sha: "sha1", run_id: "100" }]);
 
     const r4 = deriveEvents(makeProbe({ state: "success" }), state, 3, 15);
     state = r4.state;
-    expect(r4.events).toEqual([
-      { type: "status", state: "success", sha: "sha1", run_id: "100" },
-    ]);
+    expect(r4.events).toEqual([{ type: "status", state: "success", sha: "sha1", run_id: "100" }]);
   });
 
   it("dedups identical (sha, state) probes", () => {
@@ -258,12 +244,7 @@ describe("deriveEvents", () => {
     state = crossed.state;
     expect(crossed.events).toContainEqual({ type: "queued-timeout", minutes: 15 });
 
-    const stillQueued = deriveEvents(
-      makeProbe({ state: "queued" }),
-      state,
-      20 * minute,
-      15,
-    );
+    const stillQueued = deriveEvents(makeProbe({ state: "queued" }), state, 20 * minute, 15);
     expect(stillQueued.events.some((e) => e.type === "queued-timeout")).toBe(false);
   });
 
@@ -279,32 +260,17 @@ describe("deriveEvents", () => {
 
   it("emits conflicts once per SHA and not again for the same SHA", () => {
     let state = initialState();
-    const first = deriveEvents(
-      makeProbe({ state: "running", hasConflicts: true }),
-      state,
-      0,
-      15,
-    );
+    const first = deriveEvents(makeProbe({ state: "running", hasConflicts: true }), state, 0, 15);
     state = first.state;
     expect(first.events).toContainEqual({ type: "conflicts", sha: "sha1" });
 
-    const second = deriveEvents(
-      makeProbe({ state: "running", hasConflicts: true }),
-      state,
-      1,
-      15,
-    );
+    const second = deriveEvents(makeProbe({ state: "running", hasConflicts: true }), state, 1, 15);
     expect(second.events.some((e) => e.type === "conflicts")).toBe(false);
   });
 
   it("emits conflicts again when the SHA changes", () => {
     let state = initialState();
-    state = deriveEvents(
-      makeProbe({ sha: "sha1", hasConflicts: true }),
-      state,
-      0,
-      15,
-    ).state;
+    state = deriveEvents(makeProbe({ sha: "sha1", hasConflicts: true }), state, 0, 15).state;
     const next = deriveEvents(
       makeProbe({ sha: "sha2", hasConflicts: true, runId: "101" }),
       state,
@@ -315,12 +281,7 @@ describe("deriveEvents", () => {
   });
 
   it("emits pr-closed when the MR is closed", () => {
-    const { events } = deriveEvents(
-      makeProbe({ mrState: "closed" }),
-      initialState(),
-      0,
-      15,
-    );
+    const { events } = deriveEvents(makeProbe({ mrState: "closed" }), initialState(), 0, 15);
     expect(events).toEqual([{ type: "pr-closed" }]);
   });
 
@@ -366,9 +327,7 @@ describe("api-error tracking", () => {
       state = registerApiError(state, 5).state;
     }
     const again = registerApiError(state, 5);
-    expect(again.events.some((e) => e.type === "api-error" && e.consecutive === 5)).toBe(
-      false,
-    );
+    expect(again.events.some((e) => e.type === "api-error" && e.consecutive === 5)).toBe(false);
   });
 });
 
@@ -415,12 +374,7 @@ describe("deriveEvents in branch mode", () => {
   it("never emits conflicts when hasConflicts stays false", () => {
     let state = initialState();
     for (let i = 0; i < 5; i += 1) {
-      const outcome = deriveEvents(
-        makeProbe({ state: "running", sha: `sha${i}` }),
-        state,
-        i,
-        15,
-      );
+      const outcome = deriveEvents(makeProbe({ state: "running", sha: `sha${i}` }), state, i, 15);
       state = outcome.state;
       expect(outcome.events.some((e) => e.type === "conflicts")).toBe(false);
     }
@@ -487,8 +441,6 @@ describe("deriveEvents in pipeline-id mode", () => {
       0,
       15,
     );
-    expect(events).toEqual([
-      { type: "status", state: "failing", sha: "sha1", run_id: "9001" },
-    ]);
+    expect(events).toEqual([{ type: "status", state: "failing", sha: "sha1", run_id: "9001" }]);
   });
 });

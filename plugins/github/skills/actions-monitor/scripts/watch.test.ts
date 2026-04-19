@@ -157,12 +157,7 @@ describe("deriveEvents transitions", () => {
 
 describe("queued-timeout", () => {
   it("emits queued-timeout once threshold is exceeded", () => {
-    const first = deriveEvents(
-      baseProbe({ state: "queued", sha: "s1" }),
-      initialState(),
-      0,
-      15,
-    );
+    const first = deriveEvents(baseProbe({ state: "queued", sha: "s1" }), initialState(), 0, 15);
     expect(first.events.find((e) => e.type === "queued-timeout")).toBeUndefined();
 
     const second = deriveEvents(
@@ -184,12 +179,7 @@ describe("queued-timeout", () => {
   });
 
   it("resets queued timer when state transitions back to running", () => {
-    const queued = deriveEvents(
-      baseProbe({ state: "queued", sha: "s1" }),
-      initialState(),
-      0,
-      15,
-    );
+    const queued = deriveEvents(baseProbe({ state: "queued", sha: "s1" }), initialState(), 0, 15);
     const running = deriveEvents(
       baseProbe({ state: "running", sha: "s1" }),
       queued.state,
@@ -331,39 +321,27 @@ describe("parseRepo", () => {
 
 describe("deriveRunListState", () => {
   it("maps conclusion=failure to failing", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "failure" })).toBe(
-      "failing",
-    );
+    expect(deriveRunListState({ status: "completed", conclusion: "failure" })).toBe("failing");
   });
 
   it("maps conclusion=cancelled to failing", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "cancelled" })).toBe(
-      "failing",
-    );
+    expect(deriveRunListState({ status: "completed", conclusion: "cancelled" })).toBe("failing");
   });
 
   it("maps conclusion=timed_out to failing", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "timed_out" })).toBe(
-      "failing",
-    );
+    expect(deriveRunListState({ status: "completed", conclusion: "timed_out" })).toBe("failing");
   });
 
   it("maps conclusion=success to success", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "success" })).toBe(
-      "success",
-    );
+    expect(deriveRunListState({ status: "completed", conclusion: "success" })).toBe("success");
   });
 
   it("maps conclusion=neutral to success", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "neutral" })).toBe(
-      "success",
-    );
+    expect(deriveRunListState({ status: "completed", conclusion: "neutral" })).toBe("success");
   });
 
   it("maps conclusion=skipped to success", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "skipped" })).toBe(
-      "success",
-    );
+    expect(deriveRunListState({ status: "completed", conclusion: "skipped" })).toBe("success");
   });
 
   it("maps status=in_progress (no conclusion) to running", () => {

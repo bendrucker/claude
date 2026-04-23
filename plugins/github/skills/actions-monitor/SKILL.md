@@ -1,74 +1,107 @@
 ---
 name: github:actions-monitor
 description: |
-  Monitor GitHub Actions workflow runs and extract failure diagnostics. Use when watching CI after a push, checking workflow status, or investigating failed runs. Identifies failing jobs, extracts relevant error output, and returns a concise summary.
-context: fork
-agent: general-purpose
-model: haiku
-allowed-tools: [Bash(gh run:*)]
+  Monitor GitHub Actions workflow runs for a PR, a branch, or a specific run (including `workflow_dispatch` triggers) and extract failure diagnostics. Use when watching PR CI, main-branch build-and-deploy, or a specific workflow run (including `workflow_dispatch` triggers). Identifies failing jobs, extracts relevant error output, and returns a concise summary.
+allowed-tools:
+  - Monitor
+  - TaskStop
+  - Agent
+  - Bash(bun:*)
+  - Bash(gh run:*)
+  - Bash(gh pr view:*)
+  - Bash(gh pr checks:*)
+  - Bash(git remote:*)
+  - Bash(jq:*)
 ---
 
 # Actions Monitor
 
-Monitor GitHub Actions and extract failure diagnostics. Extract only: find the failures and present them concisely. Do not analyze root causes or suggest fixes.
+Watch a PR, a branch, or a specific run's GitHub Actions progress and react to failures by pulling logs through the `github:logs` agent. The monitor handles state tracking, deduplication, and the initial-green fast path; this skill is the thin coordinator that starts it, reacts to events, and stops it.
 
 ## Target
 
-$ARGUMENTS
+`$ARGUMENTS`
 
-If no run ID or PR is specified, use the current branch.
+Accepted forms:
 
-## Current Branch
-
-!`git branch --show-current`
+- A GitHub PR URL (e.g. `https://github.com/owner/repo/pull/42`) runs in **PR mode**.
+- A branch name (e.g. `main`) runs in **branch mode**. The script infers the repo from `git remote get-url origin` in the current directory; pass `--repo <owner/repo>` to override.
+- A run ID (e.g. `12345678`) runs in **run-id mode**, watching a specific workflow run directly. Covers `workflow_dispatch`, manually-triggered, and re-run cases where the exact run ID is known. The script infers the repo from the git remote; pass `--repo <owner/repo>` to override.
+- No argument: derive the current PR from the current branch with `gh pr view --json url --jq '.url'`. If the current branch has no PR, fall back to branch mode with the current branch name.
 
 ## Workflow
 
-### List recent runs
+#### Start the monitor
 
-Fetch recent runs for the current branch:
+Invoke `Monitor` with `persistent: true` on the watch script. Pick a mode by flag:
 
-```bash
-gh run list --branch <current-branch> --limit 5 --json databaseId,status,conclusion,displayTitle,workflowName
+PR mode:
+
+```
+bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --pr <pr-url>
 ```
 
-### Report source SHA
+Branch mode:
 
-Query the PR to get the source branch SHA: `gh pr view --json headRefOid`. Report this as "Source SHA" in the output. Compare against the run's `headSha` to detect merge queue or other synthetic commit scenarios.
-
-### Identify the run
-
-From the recent runs, identify the most relevant run (latest, or matching the target). If the run is still in progress, use `gh run watch <id>` to wait for completion.
-
-### Enumerate failing jobs
-
-```bash
-gh run view <run-id> --json jobs --jq '[.jobs[] | select(.conclusion == "failure") | {name, databaseId, conclusion}]'
+```
+bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --branch <name> [--repo <owner/repo>]
 ```
 
-### Extract per-job logs
+Run-id mode:
 
-For each failing job, fetch its log:
-
-```bash
-gh run view --log --job <job-id>
+```
+bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --run-id <id> [--repo <owner/repo>]
 ```
 
-Parse the log output for failure-relevant sections. See [references/log-parsing.md](references/log-parsing.md) for CI-specific log structure.
+Exactly one of `--pr`, `--branch`, or `--run-id` must be set. `--repo` applies to branch mode and run-id mode and is inferred from the git remote when omitted.
 
-If the full job log is still too large, try `--log-failed` on the specific job:
+Optional flags: `--interval <seconds>`, `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`. Omit `--interval` to let the script derive one from recent run durations in PR/branch mode; run-id mode uses a 180s default.
 
-```bash
-gh run view --log-failed --job <job-id>
+#### Event schema
+
+The script emits one JSON object per line on stdout:
+
+- `{"type":"status","state":"running|failing|success","sha":"...","run_id":"..."}`
+- `{"type":"conflicts","sha":"..."}` (PR mode only)
+- `{"type":"queued-timeout","minutes":N}`
+- `{"type":"api-error","consecutive":N}`
+- `{"type":"rate-limited","retry_after":"..."}`
+- `{"type":"pr-closed"}` (PR mode only)
+- `{"type":"max-time-reached","minutes":60}`
+
+`conflicts` and `pr-closed` fire only in PR mode; run-id and branch mode never emit them. The script exits on `status:success`, `pr-closed`, and `max-time-reached`. In run-id mode it also exits on `status:failing`, since a specific run reaches a terminal conclusion and there is no "next run" to wait for. In PR and branch mode, `failing` is not terminal (the user may push a fix or start another run).
+
+#### React to status:failing
+
+On a `status` event with `state == "failing"`, invoke the `github:logs` agent via the `Agent` tool. Pass the `run_id` and the PR URL (or branch name in branch mode) from the event:
+
+```
+Agent({
+  subagent_type: "github:logs",
+  model: "haiku",
+  prompt: "Fetch failing-job logs for run <run_id>. Return the structured JSON summary."
+})
 ```
 
-When multiple jobs fail, fetch logs for each job in separate parallel Bash calls.
+Use the agent's JSON response to report failures to the user. The agent persists the raw logs to a known temp path; read that file if you need more context.
 
-### Report
+#### React to other events
 
-For each failed job, report:
-- Job name and step that failed
-- The relevant error snippet (10-50 lines)
-- Any test names, file:line references, or error codes
+- `conflicts` (PR mode): note the conflicting SHA; the caller (e.g. `pull-request:babysit`) decides whether to resolve.
+- `queued-timeout`: surface to the user that a run has been queued past the threshold.
+- `api-error`: surface repeated CLI failures so the user can intervene.
+- `rate-limited`: back off or stop; retry once the window passes.
+- `pr-closed` (PR mode): the PR was merged, closed, or the branch was deleted. The script exits on its own.
+- `max-time-reached`: the wall-clock cap fired. The script exits on its own.
 
-Keep the total output concise. The parent conversation will use this to investigate.
+#### Initial-green case
+
+No separate path. If the target is already green at startup, the script emits a single `status:success` event and exits. Report that the target is green and stop.
+
+#### Stopping
+
+The monitor exits naturally on `status:success`, `pr-closed` (PR mode), `status:failing` (run-id mode only), or `max-time-reached`. To stop early, call `TaskStop` on the monitor task.
+
+## References
+
+Log parsing strategy (shared with `github:logs`): [references/log-parsing.md](references/log-parsing.md).

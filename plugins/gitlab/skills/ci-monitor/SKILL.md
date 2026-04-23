@@ -1,64 +1,89 @@
 ---
 name: gitlab:ci-monitor
 description: |
-  Investigate GitLab CI pipeline failures and extract diagnostic information. Use when checking pipeline status, debugging failed jobs, or monitoring CI after a push. Identifies failing jobs, extracts relevant error output, and returns a concise summary.
-context: fork
-agent: general-purpose
-model: haiku
+  Investigate GitLab CI pipeline failures and extract diagnostic information. Use when watching MR CI, main-branch build-and-deploy, or a specific pipeline (including manually-triggered pipelines). Identifies failing jobs, extracts relevant error output, and returns a concise summary.
 allowed-tools:
+  - Monitor
+  - TaskStop
+  - Agent
+  - Bash(bun:*)
   - Bash(glab ci:*)
   - Bash(glab api:*)
+  - Bash(glab mr view:*)
+  - Bash(git remote:*)
+  - Bash(jq:*)
 ---
 
 # CI Monitor
 
-Investigate GitLab CI pipeline failures and extract diagnostic information. Extract only: find the failures and present them concisely. Do not analyze root causes or suggest fixes.
+Watch a GitLab pipeline (for an MR, a branch, or a specific pipeline ID), reacting to failures by dispatching the `gitlab:logs` agent for diagnostics. Exits cleanly when the pipeline is green, the MR is closed, a pipeline-id target reaches a terminal status, or the wall-clock cap is hit.
 
 ## Target
 
 $ARGUMENTS
 
-If no pipeline ID or MR is specified, use the current branch.
+Accepts an MR URL, a branch name, a pipeline ID, or derives one from the current branch:
 
-## Current Pipeline
-
-!`glab ci status 2>/dev/null || echo "no pipeline"`
+- MR mode: pass a URL like `https://gitlab.com/group/project/-/merge_requests/123`.
+- Branch mode: pass a branch name (e.g. `main`, a release branch). Project path `group/project` is inferred from `git remote get-url origin` in the current directory; pass `--project <group/project>` to override.
+- Pipeline-id mode: pass a pipeline ID (e.g. from a manually-triggered pipeline or a re-run). Project is inferred from the git remote; override with `--project <group/project>`.
+- If no argument is given, derive an MR URL from the current branch: `glab mr view --output json | jq -r '.web_url'`.
 
 ## Workflow
 
-### Identify the pipeline
+#### Start the monitor
 
-From the pipeline status above, identify the relevant pipeline. If still running, use `glab ci status --wait` to wait for completion.
+Launch the watch script via the `Monitor` tool with `persistent: true`:
 
-### Report source SHA
+- MR mode: `bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --mr <mr-url>`
+- Branch mode: `bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --branch <name> [--project <group/project>]`
+- Pipeline-id mode: `bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --pipeline-id <id> [--project <group/project>]`
+- Optional flags: `--interval <seconds>`, `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`.
 
-Query the MR to get the source branch SHA: `glab api projects/:id/merge_requests/:iid` and read the `sha` field. Report this as "Source SHA" in the output. The `sha` field reflects the branch tip, not the pipeline SHA (which may be a synthetic merge commit from `refs/merge-requests/N/merge`).
+Exactly one of `--mr`, `--branch`, or `--pipeline-id` is required. In branch and pipeline-id modes, `--project` is inferred from the current git remote when omitted. Pipeline-id mode queries `glab api projects/:id/pipelines/:pid` directly; if the pipeline does not exist the watcher exits non-zero on the first call.
 
-### Enumerate failing jobs
+The script emits one JSON object per line on stdout. When the first probe is already green, it emits a single `status: success` event and exits, so there is no separate initial-green path to handle. In pipeline-id mode the script also exits after emitting `status: failing`, because a specific pipeline has a finite lifetime and will not restart on its own.
 
-```bash
-glab ci get --output json | jq '[.jobs[] | select(.status == "failed") | {name, id, stage, status}]'
+#### Event schema
+
+Each line is one of:
+
+- `{"type":"status","state":"running|failing|success","sha":"...","run_id":"..."}`: `run_id` is the GitLab pipeline ID.
+- `{"type":"conflicts","sha":"..."}`: MR reports merge conflicts against the target branch. MR mode only.
+- `{"type":"queued-timeout","minutes":N}`: pipeline has been queued longer than the threshold.
+- `{"type":"api-error","consecutive":N}`: consecutive `glab` failures crossed the threshold.
+- `{"type":"rate-limited","retry_after":"..."}`: emitted only when `glab` surfaces structured rate-limit data.
+- `{"type":"pr-closed"}`: MR was merged, closed, or the source branch was deleted. MR mode only. The script exits after emitting.
+- `{"type":"max-time-reached","minutes":60}`: wall-clock cap hit. The script exits after emitting.
+
+In branch and pipeline-id modes, `conflicts` and `pr-closed` are never emitted (there is no MR metadata to derive them from).
+
+The script exits on `status: success` in every mode. In pipeline-id mode it also exits on `status: failing` (the pipeline is terminal).
+
+#### React to events
+
+On `status: failing`, invoke the `gitlab:logs` agent via the `Agent` tool with the pipeline ID from `run_id`. This applies to all three modes; the logs agent accepts a pipeline ID, so pipeline-id mode fits naturally:
+
+```
+Agent(
+  subagent_type="gitlab:logs",
+  model="haiku",
+  prompt="Fetch failing-job logs for pipeline <run_id>. Return the JSON summary described in the logs agent definition."
+)
 ```
 
-If `glab ci get` is unavailable, use `glab ci list` to find the pipeline ID and `glab api projects/:id/pipelines/<pipeline-id>/jobs` for job details.
+Surface the summary to the parent conversation. Do not attempt fixes; `pull-request:babysit` owns that decision.
 
-### Extract per-job logs
+On `conflicts`, report the SHA with conflicts and stop watching; conflict resolution belongs to the caller.
 
-For each failing job, fetch its log:
+On `queued-timeout`, `api-error`, or `rate-limited`, surface the event once and keep the monitor running. Consecutive rate-limit or api-error events indicate the monitor should be stopped manually.
 
-```bash
-glab ci trace <job-id>
-```
+On `pr-closed` or `max-time-reached`, the monitor has already exited. Report and finish.
 
-Parse the log output for failure-relevant sections. See [references/log-parsing.md](references/log-parsing.md) for CI-specific log structure.
+#### Stopping
 
-When multiple jobs fail, fetch logs for each job in separate parallel Bash calls.
+The monitor exits on its own for `status: success`, `pr-closed`, and `max-time-reached`. In pipeline-id mode it also exits on `status: failing`. To stop earlier (for example after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
 
-### Report
+## Reference
 
-For each failed job, report:
-- Job name, stage, and the step that failed
-- The relevant error snippet (10-50 lines)
-- Any test names, file:line references, or error codes
-
-Keep the total output concise. The parent conversation will use this to investigate.
+See [references/log-parsing.md](references/log-parsing.md) for how the `gitlab:logs` agent narrows long job traces via ANSI `section_start`/`section_end` markers.

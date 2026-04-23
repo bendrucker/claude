@@ -117,4 +117,9 @@ describe("processInput", () => {
     };
     expect(getOutput(input)).toBeNull();
   });
+
+  it("skips memory markdown files", () => {
+    const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
+    expect(getOutput(mockWriteInput(memoryPath, "# introduction"))).toBeNull();
+  });
 });

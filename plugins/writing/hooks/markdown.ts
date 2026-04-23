@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 export type { SyncHookJSONOutput };
@@ -8,6 +9,12 @@ export type EditInput = { file_path: string; new_string: string };
 export function getExtension(filePath: string): string {
   const parts = filePath.split(".");
   return parts.length > 1 ? (parts.at(-1) ?? "") : "";
+}
+
+const MEMORY_PATH_PATTERN = /\/\.claude\/projects\/[^/]+\/memory\//;
+
+export function isMemoryPath(filePath: string): boolean {
+  return MEMORY_PATH_PATTERN.test(resolve(filePath));
 }
 
 export function isMarkdownFile(ext: string): boolean {

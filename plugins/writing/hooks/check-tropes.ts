@@ -2,7 +2,7 @@
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import { formatContext, formatDecision, type SyncHookJSONOutput } from "./markdown";
+import { formatContext, formatDecision, isMemoryPath, type SyncHookJSONOutput } from "./markdown";
 import { firstByTier, scan } from "./tropes";
 
 const MIN_PROSE_LENGTH = 20;
@@ -78,8 +78,15 @@ function isPlanFile(input: PreToolUseHookInput): boolean {
   return home !== "" && filePath.startsWith(`${home}/.claude/plans/`);
 }
 
+function isMemoryFile(input: PreToolUseHookInput): boolean {
+  const filePath = (input.tool_input as Record<string, unknown>).file_path;
+  if (typeof filePath !== "string") return false;
+  return isMemoryPath(filePath);
+}
+
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   if (isPlanFile(input)) return null;
+  if (isMemoryFile(input)) return null;
 
   const texts = await collectText(input);
   if (texts.length === 0) return null;

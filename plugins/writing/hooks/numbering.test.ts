@@ -347,3 +347,22 @@ describe("processInput edge cases", () => {
     expect(await getOutput(input, "write")).toBeNull();
   });
 });
+
+describe("memory files", () => {
+  const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
+
+  it("skips Write to memory markdown with numbered heading", async () => {
+    const output = await getOutput(mockWriteInput(memoryPath, "# 1. Introduction"), "write");
+    expect(output).toBeNull();
+  });
+
+  it("skips Edit to memory markdown with numbered heading", async () => {
+    const output = await getOutput(mockEditInput(memoryPath, "# 1. Introduction"), "edit");
+    expect(output).toBeNull();
+  });
+
+  it("still denies non-memory markdown with numbered heading", async () => {
+    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
+    expect(output?.permissionDecision).toBe("deny");
+  });
+});

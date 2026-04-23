@@ -11,6 +11,7 @@ import {
   formatContext,
   getExtension,
   isMarkdownFile,
+  isMemoryPath,
   type SyncHookJSONOutput,
   type WriteInput,
 } from "./markdown";
@@ -98,6 +99,8 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   } else {
     return null;
   }
+
+  if (isMemoryPath(filePath)) return null;
 
   const ext = getExtension(filePath);
   if (!isMarkdownFile(ext)) return null;

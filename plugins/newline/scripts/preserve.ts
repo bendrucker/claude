@@ -2,6 +2,7 @@
 
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { isMemoryPath } from "./memory-path";
 import { clearState, getState } from "./state";
 
 type ToolInput = {
@@ -42,6 +43,7 @@ export async function processInput(
 ): Promise<SyncHookJSONOutput | null> {
   const { file_path: filePath } = input.tool_input as ToolInput;
   if (!filePath) return null;
+  if (isMemoryPath(filePath)) return null;
 
   const hadNewline = await getState("newline", filePath);
   const message = await preserveNewlineState(filePath, hadNewline);

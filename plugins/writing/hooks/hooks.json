@@ -21,7 +21,7 @@
         ]
       },
       {
-        "matcher": "Edit",
+        "matcher": "Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
@@ -30,7 +30,7 @@
           {
             "type": "command",
             "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts",
-            "if": "Edit(**/*.md)"
+            "if": "Edit(**/*.md)|MultiEdit(**/*.md)"
           },
           {
             "type": "command",

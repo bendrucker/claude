@@ -21,14 +21,33 @@ function mockWrite(content: string): PreToolUseHookInput {
   };
 }
 
-function mockEdit(newString: string): PreToolUseHookInput {
+function mockEdit(newString: string, oldString?: string): PreToolUseHookInput {
+  const toolInput: Record<string, unknown> = {
+    file_path: "test.md",
+    new_string: newString,
+  };
+  if (oldString !== undefined) toolInput.old_string = oldString;
   return {
     hook_event_name: "PreToolUse",
     session_id: "test",
     transcript_path: "/tmp/test",
     cwd: "/tmp",
     tool_name: "Edit",
-    tool_input: { file_path: "test.md", new_string: newString },
+    tool_input: toolInput,
+    tool_use_id: "test",
+  };
+}
+
+function mockMultiEdit(
+  edits: Array<{ old_string?: string; new_string: string }>,
+): PreToolUseHookInput {
+  return {
+    hook_event_name: "PreToolUse",
+    session_id: "test",
+    transcript_path: "/tmp/test",
+    cwd: "/tmp",
+    tool_name: "MultiEdit",
+    tool_input: { file_path: "test.md", edits },
     tool_use_id: "test",
   };
 }
@@ -119,6 +138,20 @@ describe("Write/Edit", () => {
     expect(output?.permissionDecision).toBe("ask");
   });
 
+  it("ignores flagged content in Edit old_string", async () => {
+    const input = mockEdit(
+      "clean replacement text here",
+      "old content with \u2014 spaced em dash inside",
+    );
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("asks on Edit when old_string is clean but new_string has em dash", async () => {
+    const input = mockEdit("This \u2014 is bad", "clean original text here");
+    const output = await getDecision(input);
+    expect(output?.permissionDecision).toBe("ask");
+  });
+
   it("returns context for promotional language", async () => {
     const result = await processInput(mockWrite("A groundbreaking approach"));
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
@@ -130,6 +163,32 @@ describe("Write/Edit", () => {
 
   it("returns null for empty content", async () => {
     expect(await processInput(mockWrite(""))).toBeNull();
+  });
+});
+
+describe("MultiEdit", () => {
+  it("returns null when all old_string values are flagged but new_string values are clean", async () => {
+    const input = mockMultiEdit([
+      { old_string: "text with \u2014 em dash", new_string: "clean replacement text here" },
+      { old_string: "delve into the codebase", new_string: "look at the code carefully" },
+    ]);
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("asks when any new_string contains a spaced em dash", async () => {
+    const input = mockMultiEdit([
+      { old_string: "clean original text here", new_string: "clean replacement text here" },
+      { old_string: "more clean original content", new_string: "bad \u2014 replacement here" },
+    ]);
+    const output = await getDecision(input);
+    expect(output?.permissionDecision).toBe("ask");
+  });
+
+  it("returns null for fully clean MultiEdit", async () => {
+    const input = mockMultiEdit([
+      { old_string: "original content here", new_string: "replacement content here" },
+    ]);
+    expect(await processInput(input)).toBeNull();
   });
 });
 describe("collectText", () => {
@@ -237,5 +296,35 @@ describe("Bash/MCP processInput", () => {
 
   it("returns null for non-text Bash commands", async () => {
     expect(await processInput(mockBash("git push origin main"))).toBeNull();
+  });
+
+  it("ignores flagged content in nested old_str fields", async () => {
+    const flagged = "text with; semicolons; everywhere; really; lots of them";
+    const result = await processInput(
+      mockMcp("mcp__example_tool", {
+        command: "update_content",
+        content_updates: [{ old_str: flagged, new_str: "Clean replacement text here." }],
+      }),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("ignores blocklisted query fields but scans remaining prose", async () => {
+    const result = await processInput(
+      mockMcp("mcp__search_tool", {
+        query: "delve into the codebase and find issues",
+        result_description: "A straightforward summary of the findings.",
+      }),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("still flags nested prose in non-blocklisted keys", async () => {
+    const result = await processInput(
+      mockMcp("mcp__some_tool", {
+        payload: { body: "We delve into the system for a while longer" },
+      }),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
   });
 });

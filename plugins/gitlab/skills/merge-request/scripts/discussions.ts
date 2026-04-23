@@ -8,9 +8,12 @@ import {
   fetchMrDiffs,
   getDiffRefs,
   glabApiPost,
+  parseGlabPaginated,
   readBody,
   validateLineInDiff,
 } from "./diff";
+
+export { parseGlabPaginated } from "./diff";
 
 type LineRange = {
   start: { type: "new" | "old"; new_line?: number; old_line?: number };
@@ -49,11 +52,6 @@ type DiscussionSummary = {
   line?: number;
   lineRange?: { start: number; end: number } | null;
 };
-
-export function parseGlabPaginated(raw: string): unknown[] {
-  const fixed = raw.replace(/\]\s*\[/g, ",");
-  return JSON.parse(fixed);
-}
 
 function summarize(d: Discussion): DiscussionSummary | null {
   const note = d.notes[0];

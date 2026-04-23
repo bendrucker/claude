@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { Discussion } from "./discussions";
-import { deduplicateDiscussions, filterDiscussions, parseGlabPaginated } from "./discussions";
+import { deduplicateDiscussions, filterDiscussions } from "./discussions";
 
 function makeNote(overrides: Record<string, unknown> = {}) {
   return {
@@ -15,33 +15,6 @@ function makeNote(overrides: Record<string, unknown> = {}) {
 function makeDiscussion(id: string, noteOverrides: Record<string, unknown> = {}): Discussion {
   return { id, notes: [makeNote(noteOverrides)] };
 }
-
-describe("parseGlabPaginated", () => {
-  it("parses a single page", () => {
-    const result = parseGlabPaginated('[{"id": 1}]');
-    expect(result).toEqual([{ id: 1 }]);
-  });
-
-  it("fixes concatenated pages", () => {
-    const result = parseGlabPaginated('[{"id": 1}][{"id": 2}]');
-    expect(result).toEqual([{ id: 1 }, { id: 2 }]);
-  });
-
-  it("handles whitespace between pages", () => {
-    const result = parseGlabPaginated('[{"id": 1}]\n[{"id": 2}]');
-    expect(result).toEqual([{ id: 1 }, { id: 2 }]);
-  });
-
-  it("handles three concatenated pages", () => {
-    const result = parseGlabPaginated('[{"a":1}][{"b":2}][{"c":3}]');
-    expect(result).toEqual([{ a: 1 }, { b: 2 }, { c: 3 }]);
-  });
-
-  it("preserves arrays inside objects", () => {
-    const result = parseGlabPaginated('[{"notes": [1, 2]}]');
-    expect(result).toEqual([{ notes: [1, 2] }]);
-  });
-});
 
 describe("filterDiscussions", () => {
   it("filters by author", () => {

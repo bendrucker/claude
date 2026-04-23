@@ -46,9 +46,14 @@ type MrDiff = {
   diff: string;
 };
 
+export function parseGlabPaginated(raw: string): unknown[] {
+  const fixed = raw.replace(/\]\s*\[/g, ",");
+  return JSON.parse(fixed);
+}
+
 export async function fetchMrDiffs(iid: number | string): Promise<MrDiff[]> {
-  const result = await $`glab api projects/:id/merge_requests/${iid}/diffs`.json();
-  return result as MrDiff[];
+  const raw = await $`glab api projects/:id/merge_requests/${iid}/diffs --paginate`.text();
+  return parseGlabPaginated(raw) as MrDiff[];
 }
 
 export function validateLineInDiff(

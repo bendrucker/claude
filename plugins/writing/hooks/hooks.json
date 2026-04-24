@@ -21,7 +21,7 @@
         ]
       },
       {
-        "matcher": "Edit|MultiEdit",
+        "matcher": "Edit",
         "hooks": [
           {
             "type": "command",
@@ -30,8 +30,17 @@
           {
             "type": "command",
             "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts",
-            "if": "Edit(**/*.md)|MultiEdit(**/*.md)"
+            "if": "Edit(**/*.md)"
           },
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
+          }
+        ]
+      },
+      {
+        "matcher": "MultiEdit",
+        "hooks": [
           {
             "type": "command",
             "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"

@@ -7,6 +7,24 @@ import { firstByTier, scan } from "./tropes";
 
 const MIN_PROSE_LENGTH = 20;
 
+const SKIPPED_KEYS = new Set([
+  "old_string",
+  "oldstring",
+  "old_str",
+  "pattern",
+  "match",
+  "search",
+  "search_query",
+  "query",
+]);
+
+function shouldSkipKey(key: string | undefined): boolean {
+  if (!key) return false;
+  const lower = key.toLowerCase();
+  if (SKIPPED_KEYS.has(lower)) return true;
+  return lower.startsWith("old_");
+}
+
 function isProse(value: string): boolean {
   if (value.length < MIN_PROSE_LENGTH) return false;
   if (/^https?:\/\//.test(value)) return false;
@@ -14,11 +32,14 @@ function isProse(value: string): boolean {
   return /\s/.test(value);
 }
 
-function extractProse(value: unknown): string[] {
+function extractProse(value: unknown, key?: string): string[] {
+  if (shouldSkipKey(key)) return [];
   if (typeof value === "string") return isProse(value) ? [value] : [];
-  if (Array.isArray(value)) return value.flatMap(extractProse);
+  if (Array.isArray(value)) return value.flatMap((item) => extractProse(item, key));
   if (typeof value === "object" && value !== null) {
-    return Object.values(value).flatMap(extractProse);
+    return Object.entries(value).flatMap(([childKey, childValue]) =>
+      extractProse(childValue, childKey),
+    );
   }
   return [];
 }
@@ -41,6 +62,19 @@ function extractInlineArg(command: string, flag: string): string | null {
   return match?.[1] ?? match?.[2] ?? null;
 }
 
+function collectMultiEditText(toolInput: Record<string, unknown>): string[] {
+  const edits = toolInput.edits;
+  if (!Array.isArray(edits)) return [];
+  const texts: string[] = [];
+  for (const edit of edits) {
+    if (edit && typeof edit === "object") {
+      const newString = (edit as Record<string, unknown>).new_string;
+      if (typeof newString === "string") texts.push(newString);
+    }
+  }
+  return texts;
+}
+
 export async function collectText(input: PreToolUseHookInput): Promise<string[]> {
   const toolInput = input.tool_input as Record<string, unknown>;
   const toolName = input.tool_name;
@@ -53,6 +87,10 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   if (toolName === "Edit") {
     const content = toolInput.new_string as string | undefined;
     return content ? [content] : [];
+  }
+
+  if (toolName === "MultiEdit") {
+    return collectMultiEditText(toolInput);
   }
 
   if (toolName === "Bash" && typeof toolInput.command === "string") {
@@ -97,7 +135,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   const deny = firstByTier(matches, "deny");
 
   if (deny) {
-    if (input.tool_name === "Edit") {
+    if (input.tool_name === "Edit" || input.tool_name === "MultiEdit") {
       return formatDecision("ask", deny.message);
     }
     return formatDecision("deny", deny.message);

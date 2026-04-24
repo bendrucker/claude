@@ -39,6 +39,15 @@
         ]
       },
       {
+        "matcher": "MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
+          }
+        ]
+      },
+      {
         "matcher": "Bash|mcp__.*",
         "hooks": [
           {

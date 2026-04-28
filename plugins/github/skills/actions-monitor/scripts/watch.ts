@@ -180,9 +180,11 @@ const execOptions: ExecSyncOptions = {
   stdio: ["pipe", "pipe", "pipe"],
 };
 
-type ExecResult =
+export type ExecResult =
   | { ok: true; stdout: string }
   | { ok: false; stderr: string; rateLimited: boolean; retryAfter: string };
+
+export type ExecFn = (command: string) => ExecResult;
 
 export function detectRateLimit(stderr: string): { rateLimited: boolean; retryAfter: string } {
   const lower = stderr.toLowerCase();
@@ -223,31 +225,30 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// `gh pr checks --json` exposes a unified `state` (status when in-flight,
+// conclusion when complete) and a normalized `bucket` ("pass" | "fail" |
+// "cancel" | "pending" | "skipping"). It does NOT expose `conclusion`. Use
+// `bucket` for terminal classification and `state` to distinguish running
+// from queued.
 export function deriveChecksState(
-  checks: Array<{ state?: string; conclusion?: string; name?: string }>,
+  checks: Array<{ state?: string; bucket?: string; name?: string }>,
 ): InternalState {
   if (checks.length === 0) {
     return "running";
   }
-  const anyFailure = checks.some(
-    (c) =>
-      (c.conclusion ?? "").toLowerCase() === "failure" ||
-      (c.conclusion ?? "").toLowerCase() === "cancelled" ||
-      (c.conclusion ?? "").toLowerCase() === "timed_out",
-  );
-  if (anyFailure) return "failing";
+  const buckets = checks.map((c) => (c.bucket ?? "").toLowerCase());
+  if (buckets.some((b) => b === "fail" || b === "cancel")) {
+    return "failing";
+  }
   const states = checks.map((c) => (c.state ?? "").toUpperCase());
-  const conclusions = checks.map((c) => (c.conclusion ?? "").toLowerCase());
-  const allQueued = states.every((s) => s === "QUEUED" || s === "PENDING");
-  const anyInProgress = states.some((s) => s === "IN_PROGRESS");
-  const anyQueued = states.some((s) => s === "QUEUED" || s === "PENDING");
-  if (anyInProgress) return "running";
+  if (states.some((s) => s === "IN_PROGRESS")) return "running";
+  const isQueuedState = (s: string): boolean =>
+    s === "QUEUED" || s === "PENDING" || s === "WAITING" || s === "REQUESTED" || s === "EXPECTED";
+  const anyQueued = states.some(isQueuedState);
+  const allQueued = states.every(isQueuedState);
   if (allQueued && anyQueued) return "queued";
   if (anyQueued) return "running";
-  const allSuccess = conclusions.every(
-    (c) => c === "success" || c === "neutral" || c === "skipped",
-  );
-  if (allSuccess) return "success";
+  if (buckets.every((b) => b === "pass" || b === "skipping")) return "success";
   return "running";
 }
 
@@ -268,16 +269,21 @@ export function deriveRunListState(run: { status?: string; conclusion?: string }
 // Probed uses a `kind` discriminator so callers narrow via switch rather than
 // brittle `"empty" in result` / `"notFound" in result` property checks. Only
 // probePr populates `branch`; the other probes leave it null.
-type Probed =
+export type Probed =
   | { kind: "ok"; probe: Probe; branch: string | null }
-  | { kind: "error"; rateLimited: boolean; retryAfter: string }
+  | { kind: "error"; rateLimited: boolean; retryAfter: string; stderr: string }
   | { kind: "empty" }
   | { kind: "not-found"; stderr: string };
 
-function probePr(prNumber: number): Probed {
-  const prResult = exec(`gh pr view ${prNumber} --json headRefOid,headRefName,state,mergeable`);
+export function probePr(prNumber: number, run: ExecFn = exec): Probed {
+  const prResult = run(`gh pr view ${prNumber} --json headRefOid,headRefName,state,mergeable`);
   if (!prResult.ok) {
-    return { kind: "error", rateLimited: prResult.rateLimited, retryAfter: prResult.retryAfter };
+    return {
+      kind: "error",
+      rateLimited: prResult.rateLimited,
+      retryAfter: prResult.retryAfter,
+      stderr: prResult.stderr,
+    };
   }
   let sha = "";
   let branch = "";
@@ -292,46 +298,41 @@ function probePr(prNumber: number): Probed {
       mergeable = parsed.mergeable as Probe["mergeable"];
     }
   } catch (err) {
-    console.error(
-      `gh pr view returned unparseable JSON for PR #${prNumber}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return { kind: "error", rateLimited: false, retryAfter: "" };
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`gh pr view returned unparseable JSON for PR #${prNumber}: ${message}`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
   if (!branch) {
-    console.error(
-      `gh pr view did not include headRefName for PR #${prNumber}; treating as probe failure`,
-    );
-    return { kind: "error", rateLimited: false, retryAfter: "" };
+    const message = `gh pr view did not include headRefName for PR #${prNumber}`;
+    console.error(`${message}; treating as probe failure`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
-  const checksResult = exec(
-    `gh pr checks ${prNumber} --required=false --json state,conclusion,name`,
-  );
+  const checksResult = run(`gh pr checks ${prNumber} --required=false --json state,bucket,name`);
   if (!checksResult.ok) {
     return {
       kind: "error",
       rateLimited: checksResult.rateLimited,
       retryAfter: checksResult.retryAfter,
+      stderr: checksResult.stderr,
     };
   }
   let state: InternalState;
   try {
     const parsed = JSON.parse(checksResult.stdout || "[]");
     if (!Array.isArray(parsed)) {
-      console.error(
-        `gh pr checks returned non-array JSON for PR #${prNumber}; treating as probe failure`,
-      );
-      return { kind: "error", rateLimited: false, retryAfter: "" };
+      const message = `gh pr checks returned non-array JSON for PR #${prNumber}`;
+      console.error(`${message}; treating as probe failure`);
+      return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
     }
     state = deriveChecksState(parsed as Record<string, unknown>[]);
   } catch (err) {
-    console.error(
-      `gh pr checks returned unparseable JSON for PR #${prNumber}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return { kind: "error", rateLimited: false, retryAfter: "" };
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`gh pr checks returned unparseable JSON for PR #${prNumber}: ${message}`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
-  const runIdResult = exec(
+  const runIdResult = run(
     `gh run list --branch ${branch} --limit 1 --json databaseId --jq '.[0].databaseId // ""'`,
   );
   if (!runIdResult.ok) {
@@ -339,6 +340,7 @@ function probePr(prNumber: number): Probed {
       kind: "error",
       rateLimited: runIdResult.rateLimited,
       retryAfter: runIdResult.retryAfter,
+      stderr: runIdResult.stderr,
     };
   }
   const runId = runIdResult.stdout ? runIdResult.stdout : null;
@@ -373,21 +375,25 @@ function buildRunProbe(run: Record<string, unknown>, fallbackRunId: string | nul
 // Branch-mode probe: query the latest run for the branch. If no runs exist yet
 // (empty array), signal "empty" so the main loop can skip event emission and
 // keep polling without tripping the api-error threshold.
-function probeBranch(repo: string, branch: string): Probed {
-  const result = exec(
+export function probeBranch(repo: string, branch: string, run: ExecFn = exec): Probed {
+  const result = run(
     `gh run list --repo ${repo} --branch ${branch} --limit 1 --json databaseId,headSha,status,conclusion`,
   );
   if (!result.ok) {
-    return { kind: "error", rateLimited: result.rateLimited, retryAfter: result.retryAfter };
+    return {
+      kind: "error",
+      rateLimited: result.rateLimited,
+      retryAfter: result.retryAfter,
+      stderr: result.stderr,
+    };
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.stdout || "[]");
   } catch (err) {
-    console.error(
-      `gh run list returned unparseable JSON for ${repo}@${branch}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return { kind: "error", rateLimited: false, retryAfter: "" };
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`gh run list returned unparseable JSON for ${repo}@${branch}: ${message}`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
   if (!Array.isArray(parsed) || parsed.length === 0) {
     return { kind: "empty" };
@@ -438,8 +444,8 @@ function fetchInterval(branch: string, repo: string | null): number {
   return DEFAULT_INTERVAL_SECONDS;
 }
 
-function probeRunId(runId: string, repo: string): Probed {
-  const result = exec(
+export function probeRunId(runId: string, repo: string, run: ExecFn = exec): Probed {
+  const result = run(
     `gh run view ${runId} --repo ${repo} --json databaseId,headSha,status,conclusion`,
   );
   if (!result.ok) {
@@ -449,22 +455,25 @@ function probeRunId(runId: string, repo: string): Probed {
     if (notFound) {
       return { kind: "not-found", stderr: result.stderr };
     }
-    return { kind: "error", rateLimited: result.rateLimited, retryAfter: result.retryAfter };
+    return {
+      kind: "error",
+      rateLimited: result.rateLimited,
+      retryAfter: result.retryAfter,
+      stderr: result.stderr,
+    };
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.stdout || "{}");
   } catch (err) {
-    console.error(
-      `gh run view returned unparseable JSON for run ${runId}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return { kind: "error", rateLimited: false, retryAfter: "" };
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`gh run view returned unparseable JSON for run ${runId}: ${message}`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
   if (!parsed || typeof parsed !== "object") {
-    console.error(
-      `gh run view returned non-object JSON for run ${runId}; treating as probe failure`,
-    );
-    return { kind: "error", rateLimited: false, retryAfter: "" };
+    const message = `gh run view returned non-object JSON for run ${runId}`;
+    console.error(`${message}; treating as probe failure`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
   return {
     kind: "ok",
@@ -536,6 +545,12 @@ async function run(options: RunOptions): Promise<void> {
     } else if (result.kind === "error") {
       if (result.rateLimited) {
         emit({ type: "rate-limited", retry_after: result.retryAfter });
+      } else if (result.stderr) {
+        // Surface the probe failure so callers see *something* before the
+        // api-error threshold is reached. Without this, a misshapen gh
+        // command (e.g., schema drift in --json fields) silently retries
+        // for ~threshold * interval seconds before emitting any event.
+        console.error(`probe failed: ${result.stderr.trim()}`);
       }
       const outcome = registerApiError(state, options.apiErrorThreshold);
       state = outcome.state;

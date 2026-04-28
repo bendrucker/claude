@@ -5,14 +5,52 @@ import {
   deriveChecksState,
   deriveEvents,
   deriveRunListState,
+  type Event,
+  type ExecFn,
+  type ExecResult,
   initialState,
+  type Probe,
   parsePrUrl,
   parseRepo,
+  probeBranch,
+  probePr,
+  probeRunId,
   registerApiError,
-  type Event,
-  type Probe,
   type WatcherState,
 } from "./watch";
+
+// Stub `exec` for probe* tests. Each entry maps a substring matcher (anything
+// the gh command line should contain) to a canned result. Tests assert that
+// commands are issued in the expected order by exhausting the array.
+function makeExec(scripted: Array<{ match: string; result: ExecResult }>): {
+  exec: ExecFn;
+  remaining: () => Array<{ match: string; result: ExecResult }>;
+} {
+  const queue = [...scripted];
+  return {
+    exec: (command: string): ExecResult => {
+      const next = queue.shift();
+      if (!next) {
+        throw new Error(`unexpected exec call: ${command}`);
+      }
+      if (!command.includes(next.match)) {
+        throw new Error(
+          `exec call did not match expected substring "${next.match}". got: ${command}`,
+        );
+      }
+      return next.result;
+    },
+    remaining: () => queue,
+  };
+}
+
+const ok = (stdout: string): ExecResult => ({ ok: true, stdout });
+const err = (stderr: string): ExecResult => ({
+  ok: false,
+  stderr,
+  rateLimited: false,
+  retryAfter: "",
+});
 
 function baseProbe(overrides: Partial<Probe> = {}): Probe {
   return {
@@ -59,16 +97,33 @@ describe("parsePrUrl", () => {
   });
 });
 
+// `gh pr checks --json state,bucket,name` shapes (verified against gh CLI):
+//   - completed pass:    { state: "SUCCESS",     bucket: "pass" }
+//   - completed skip:    { state: "SKIPPED",     bucket: "skipping" }
+//   - completed fail:    { state: "FAILURE",     bucket: "fail" }
+//   - cancelled:         { state: "CANCELLED",   bucket: "cancel" }
+//   - in flight:         { state: "IN_PROGRESS", bucket: "pending" }
+//   - queued (action):   { state: "QUEUED",      bucket: "pending" }
+//   - pending (status):  { state: "PENDING",     bucket: "pending" }
 describe("deriveChecksState", () => {
   it("returns running on empty checks", () => {
     expect(deriveChecksState([])).toBe("running");
   });
 
-  it("returns failing on any failure conclusion", () => {
+  it("returns failing when any check is in fail bucket", () => {
     expect(
       deriveChecksState([
-        { state: "COMPLETED", conclusion: "success", name: "a" },
-        { state: "COMPLETED", conclusion: "failure", name: "b" },
+        { state: "SUCCESS", bucket: "pass", name: "a" },
+        { state: "FAILURE", bucket: "fail", name: "b" },
+      ]),
+    ).toBe("failing");
+  });
+
+  it("returns failing when any check is in cancel bucket", () => {
+    expect(
+      deriveChecksState([
+        { state: "SUCCESS", bucket: "pass", name: "a" },
+        { state: "CANCELLED", bucket: "cancel", name: "b" },
       ]),
     ).toBe("failing");
   });
@@ -76,8 +131,8 @@ describe("deriveChecksState", () => {
   it("returns running when any check is IN_PROGRESS", () => {
     expect(
       deriveChecksState([
-        { state: "IN_PROGRESS", conclusion: "", name: "a" },
-        { state: "QUEUED", conclusion: "", name: "b" },
+        { state: "IN_PROGRESS", bucket: "pending", name: "a" },
+        { state: "QUEUED", bucket: "pending", name: "b" },
       ]),
     ).toBe("running");
   });
@@ -85,19 +140,43 @@ describe("deriveChecksState", () => {
   it("returns queued when all checks are queued", () => {
     expect(
       deriveChecksState([
-        { state: "QUEUED", conclusion: "", name: "a" },
-        { state: "QUEUED", conclusion: "", name: "b" },
+        { state: "QUEUED", bucket: "pending", name: "a" },
+        { state: "QUEUED", bucket: "pending", name: "b" },
       ]),
     ).toBe("queued");
   });
 
-  it("returns success when all checks pass", () => {
+  it("returns running when some checks are queued and others have completed", () => {
     expect(
       deriveChecksState([
-        { state: "COMPLETED", conclusion: "success", name: "a" },
-        { state: "COMPLETED", conclusion: "skipped", name: "b" },
+        { state: "QUEUED", bucket: "pending", name: "a" },
+        { state: "SUCCESS", bucket: "pass", name: "b" },
+      ]),
+    ).toBe("running");
+  });
+
+  it("returns success when all checks pass or skip", () => {
+    expect(
+      deriveChecksState([
+        { state: "SUCCESS", bucket: "pass", name: "a" },
+        { state: "SKIPPED", bucket: "skipping", name: "b" },
       ]),
     ).toBe("success");
+  });
+
+  it("returns success on the canonical all-green payload (regression: bucket+state schema)", () => {
+    // Exact shape captured from `gh pr checks <num> --json state,bucket,name`
+    // against a fully-green PR. If this assertion ever flips back to "running"
+    // it means deriveChecksState has drifted from gh's actual JSON schema —
+    // the same drift that caused the silent-hang on initial-green PRs.
+    const allGreen = [
+      { bucket: "pass", name: "plugins", state: "SUCCESS" },
+      { bucket: "pass", name: "lint", state: "SUCCESS" },
+      { bucket: "pass", name: "build", state: "SUCCESS" },
+      { bucket: "pass", name: "hooks", state: "SUCCESS" },
+      { bucket: "pass", name: "validate", state: "SUCCESS" },
+    ];
+    expect(deriveChecksState(allGreen)).toBe("success");
   });
 });
 
@@ -435,5 +514,202 @@ describe("deriveEvents run-id mode", () => {
     for (const s of statuses) {
       expect(s).toMatchObject({ run_id: "42" });
     }
+  });
+});
+
+// End-to-end probe* tests that exercise the full gh-output → probe pipeline.
+// These exist because the previous unit tests only fed hand-rolled fictional
+// payloads (`{ state: "COMPLETED", conclusion: "success" }`) to
+// deriveChecksState in isolation — they never validated that probe* actually
+// requested fields gh exposes, or that gh's real JSON shape parses cleanly
+// into the success/failing/queued/running classification. That blind spot
+// caused watch.ts to silently retry for ~15 minutes against any green PR
+// because it asked gh for a non-existent `conclusion` field.
+describe("probePr (gh schema integration)", () => {
+  const prJson = JSON.stringify({
+    headRefOid: "abc123",
+    headRefName: "feature/x",
+    state: "OPEN",
+    mergeable: "MERGEABLE",
+  });
+
+  it("emits state=success when gh pr checks reports all-pass buckets", () => {
+    const checksJson = JSON.stringify([
+      { state: "SUCCESS", bucket: "pass", name: "lint" },
+      { state: "SUCCESS", bucket: "pass", name: "build" },
+      { state: "SKIPPED", bucket: "skipping", name: "docs" },
+    ]);
+    const { exec, remaining } = makeExec([
+      { match: "gh pr view 42", result: ok(prJson) },
+      { match: "gh pr checks 42", result: ok(checksJson) },
+      { match: "gh run list --branch feature/x", result: ok("999") },
+    ]);
+    const result = probePr(42, exec);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.probe.state).toBe("success");
+    expect(result.probe.sha).toBe("abc123");
+    expect(result.probe.runId).toBe("999");
+    expect(result.branch).toBe("feature/x");
+    expect(remaining()).toEqual([]);
+  });
+
+  it("requests gh pr checks with --json state,bucket,name (regression)", () => {
+    // Pin the JSON field set the script asks for. If someone reintroduces
+    // `conclusion` (which gh rejects) or drops `bucket` (which gh's
+    // pass/fail/cancel categorization needs), this test will throw on the
+    // matcher mismatch.
+    const seen: string[] = [];
+    const recordingExec: ExecFn = (command) => {
+      seen.push(command);
+      if (command.startsWith("gh pr view")) return ok(prJson);
+      if (command.startsWith("gh pr checks")) {
+        return ok(JSON.stringify([{ state: "SUCCESS", bucket: "pass", name: "x" }]));
+      }
+      if (command.startsWith("gh run list")) return ok("");
+      throw new Error(`unexpected: ${command}`);
+    };
+    probePr(42, recordingExec);
+    const checksCall = seen.find((c) => c.startsWith("gh pr checks"));
+    expect(checksCall).toBeDefined();
+    expect(checksCall).toContain("--json state,bucket,name");
+    expect(checksCall).not.toContain("conclusion");
+  });
+
+  it("emits state=failing when any check is in fail bucket", () => {
+    const checksJson = JSON.stringify([
+      { state: "SUCCESS", bucket: "pass", name: "lint" },
+      { state: "FAILURE", bucket: "fail", name: "build" },
+    ]);
+    const { exec } = makeExec([
+      { match: "gh pr view", result: ok(prJson) },
+      { match: "gh pr checks", result: ok(checksJson) },
+      { match: "gh run list", result: ok("123") },
+    ]);
+    const result = probePr(42, exec);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.probe.state).toBe("failing");
+  });
+
+  it("emits state=queued when all checks pending in QUEUED state", () => {
+    const checksJson = JSON.stringify([
+      { state: "QUEUED", bucket: "pending", name: "lint" },
+      { state: "QUEUED", bucket: "pending", name: "build" },
+    ]);
+    const { exec } = makeExec([
+      { match: "gh pr view", result: ok(prJson) },
+      { match: "gh pr checks", result: ok(checksJson) },
+      { match: "gh run list", result: ok("123") },
+    ]);
+    const result = probePr(42, exec);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.probe.state).toBe("queued");
+  });
+
+  it("propagates stderr on gh exec failure so callers can surface it", () => {
+    // Covers the silent-hang root cause: when gh exits non-zero (e.g., schema
+    // drift, network blip, auth issue), the probe must carry stderr through
+    // to the caller so the loop can log it instead of swallowing the error
+    // and waiting for the api-error threshold to trip.
+    const ghError = err('Unknown JSON field: "conclusion"');
+    const { exec } = makeExec([
+      { match: "gh pr view", result: ok(prJson) },
+      { match: "gh pr checks", result: ghError },
+    ]);
+    const result = probePr(42, exec);
+    expect(result.kind).toBe("error");
+    if (result.kind !== "error") return;
+    expect(result.stderr).toContain("Unknown JSON field");
+    expect(result.rateLimited).toBe(false);
+  });
+
+  it("returns kind=error when gh pr view emits unparseable JSON", () => {
+    const { exec } = makeExec([{ match: "gh pr view", result: ok("not json") }]);
+    const result = probePr(42, exec);
+    expect(result.kind).toBe("error");
+  });
+
+  it("returns kind=error with stderr when headRefName is missing", () => {
+    const partialJson = JSON.stringify({
+      headRefOid: "abc",
+      state: "OPEN",
+      mergeable: "MERGEABLE",
+    });
+    const { exec } = makeExec([{ match: "gh pr view", result: ok(partialJson) }]);
+    const result = probePr(42, exec);
+    expect(result.kind).toBe("error");
+    if (result.kind !== "error") return;
+    expect(result.stderr).toContain("headRefName");
+  });
+});
+
+describe("probeBranch (gh schema integration)", () => {
+  it("returns kind=empty when gh run list returns []", () => {
+    const { exec } = makeExec([{ match: "gh run list", result: ok("[]") }]);
+    const result = probeBranch("owner/repo", "main", exec);
+    expect(result.kind).toBe("empty");
+  });
+
+  it("maps a successful run-list payload to state=success", () => {
+    const runJson = JSON.stringify([
+      {
+        databaseId: 12345,
+        headSha: "deadbeef",
+        status: "completed",
+        conclusion: "success",
+      },
+    ]);
+    const { exec } = makeExec([{ match: "gh run list", result: ok(runJson) }]);
+    const result = probeBranch("owner/repo", "main", exec);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.probe.state).toBe("success");
+    expect(result.probe.runId).toBe("12345");
+    expect(result.probe.sha).toBe("deadbeef");
+  });
+
+  it("propagates stderr on gh exec failure", () => {
+    const { exec } = makeExec([{ match: "gh run list", result: err("auth required") }]);
+    const result = probeBranch("owner/repo", "main", exec);
+    expect(result.kind).toBe("error");
+    if (result.kind !== "error") return;
+    expect(result.stderr).toContain("auth required");
+  });
+});
+
+describe("probeRunId (gh schema integration)", () => {
+  it("classifies kind=not-found from gh's 'could not resolve' stderr", () => {
+    const { exec } = makeExec([
+      { match: "gh run view", result: err("could not resolve to a Node") },
+    ]);
+    const result = probeRunId("999", "owner/repo", exec);
+    expect(result.kind).toBe("not-found");
+  });
+
+  it("maps a failed run-view payload to state=failing", () => {
+    const runJson = JSON.stringify({
+      databaseId: 555,
+      headSha: "cafebabe",
+      status: "completed",
+      conclusion: "failure",
+    });
+    const { exec } = makeExec([{ match: "gh run view", result: ok(runJson) }]);
+    const result = probeRunId("555", "owner/repo", exec);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.probe.state).toBe("failing");
+    expect(result.probe.runId).toBe("555");
+  });
+
+  it("propagates stderr on transient gh failure (non-not-found)", () => {
+    const { exec } = makeExec([
+      { match: "gh run view", result: err("network timeout reaching api.github.com") },
+    ]);
+    const result = probeRunId("555", "owner/repo", exec);
+    expect(result.kind).toBe("error");
+    if (result.kind !== "error") return;
+    expect(result.stderr).toContain("network timeout");
   });
 });

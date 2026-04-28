@@ -173,3 +173,16 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 - `Edit(tmp/**)` → `<cwd>/tmp/**` (relative to current directory)
 - `Edit(//tmp/**)` → `/tmp/**` (absolute)
 - `Edit(~/.config/**)` → home directory (tilde expansion works)
+
+### Sandbox and Nested Commands
+
+`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. The convention is a per-plugin PreToolUse hook scoped to the wrapping `bun ${CLAUDE_PLUGIN_ROOT}/scripts/...:*` matcher that emits `dangerouslyDisableSandbox: true`. See [`plugins/things/hooks/`](plugins/things/hooks/) and [`plugins/x-callback-url/hooks/`](plugins/x-callback-url/hooks/) for canonical examples:
+
+```json
+{
+  "matcher": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)",
+  "hooks": [
+    { "type": "command", "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts" }
+  ]
+}
+```

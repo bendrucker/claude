@@ -3,12 +3,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)",
         "hooks": [
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts",
-            "if": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)"
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts"
           }
         ]
       }

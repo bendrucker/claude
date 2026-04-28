@@ -1,29 +1,21 @@
-CREATE OR REPLACE TEMP TABLE new_raw AS
+CREATE OR REPLACE TABLE raw AS
 SELECT
   * EXCLUDE (message, filename),
   message.content as message_content,
   message.* EXCLUDE (content),
   filename as source_file,
-  ROW_NUMBER() OVER () as source_line
+  ROW_NUMBER() OVER (PARTITION BY filename) as source_line
 FROM read_ndjson(
-  getvariable('source'),
+  getvariable('projects_glob'),
   ignore_errors=true,
   union_by_name=true,
   filename=true
 )
 WHERE type IN ('user', 'assistant', 'summary');
 
-SET VARIABLE changed_sessions = (
-  SELECT COALESCE(LIST(DISTINCT sessionId), []) FROM new_raw
-);
-
-CREATE OR REPLACE TABLE raw AS
-SELECT * FROM raw
-WHERE sessionId::VARCHAR NOT IN (SELECT unnest(getvariable('changed_sessions'))::VARCHAR)
-UNION ALL BY NAME
-SELECT * FROM new_raw;
-
-DROP TABLE new_raw;
+-- views.sql references `summary` directly; corpora without any summary-type
+-- rows won't have the column auto-detected, so add it defensively.
+ALTER TABLE raw ADD COLUMN IF NOT EXISTS summary VARCHAR;
 
 CREATE OR REPLACE TEMP TABLE content_items_export AS
 SELECT (

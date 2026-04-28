@@ -90,7 +90,6 @@ export async function ensureIndex(
   const dataDir = options.dataDir;
   if (!dataDir) throw new Error("dataDir is required for import");
   await db.run("SET VARIABLE data_dir = $dir", { dir: dataDir });
-  await db.run("SET VARIABLE source = getvariable('changed_files')");
   await db.run(await readSql(RESOURCES_DIR, "import"));
 
   const contentItemsPath = path.join(dataDir, "content_items.jsonl");

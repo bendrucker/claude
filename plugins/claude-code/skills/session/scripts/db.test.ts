@@ -286,3 +286,22 @@ describe("malformed JSONL", () => {
     expect(Number(rows[0]?.assistant_messages)).toBe(1);
   });
 });
+
+describe("type drift across imports", () => {
+  it("recovers when a cached column type drifts from the freshly-detected one", async () => {
+    await db.run(
+      "ALTER TABLE raw ALTER COLUMN container_1 TYPE VARCHAR USING container_1::VARCHAR",
+    );
+    await db.run(
+      "INSERT INTO raw (sessionId, container_1) VALUES (gen_random_uuid()::VARCHAR, '')",
+    );
+    await db.run("DELETE FROM meta");
+
+    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, force: true });
+
+    const [typeRow] = await db.query<{ data_type: string }>(
+      "SELECT data_type FROM information_schema.columns WHERE table_name = 'raw' AND column_name = 'container_1'",
+    );
+    expect(typeRow?.data_type).toBe("JSON");
+  });
+});

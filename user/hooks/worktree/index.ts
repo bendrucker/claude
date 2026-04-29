@@ -7,7 +7,8 @@ export type BashInput = {
   command?: string;
 };
 
-const REPLACED_SUBCOMMANDS = new Set(["add", "list", "remove"]);
+const READ_ONLY_SUBCOMMANDS = new Set(["list"]);
+const REPLACED_SUBCOMMANDS = new Set(["add", "remove"]);
 
 export function formatDenyOutput(subcommand: string): SyncHookJSONOutput {
   return {
@@ -39,6 +40,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   const match = command.match(/\bgit\s+worktree\s+(\w+)/);
   const subcommand = match?.[1];
   if (!subcommand) {
+    return null;
+  }
+  if (READ_ONLY_SUBCOMMANDS.has(subcommand)) {
     return null;
   }
   if (REPLACED_SUBCOMMANDS.has(subcommand)) {

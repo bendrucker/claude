@@ -16,8 +16,8 @@ describe("processInput", () => {
     );
   });
 
-  it("denies git worktree list", () => {
-    expect(processInput(bashInput("git worktree list"))).toEqual(formatDenyOutput("list"));
+  it("allows git worktree list", () => {
+    expect(processInput(bashInput("git worktree list"))).toBeNull();
   });
 
   it("denies git worktree remove", () => {

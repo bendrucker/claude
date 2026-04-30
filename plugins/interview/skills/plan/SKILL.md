@@ -8,27 +8,30 @@ agent: Plan
 
 # Planning Interview
 
-Interview the user comprehensively about their requested change using `AskUserQuestion`.
+Interview the user about their requested change via the `AskUserQuestion` tool.
 
-## Interview Topics
+## Rules
 
-Cover these areas, adapting to context:
+- Every question goes through `AskUserQuestion`. Never list questions in chat prose.
+- Up to 4 questions per call, batched by topic. The cap is per call, not per interview: chain calls until the plan is solid.
+- Refine the next batch based on prior answers. Do not pre-plan all questions.
 
-- **Requirements** - What exactly should this do? What shouldn't it do?
-- **Technical implementation** - Architecture, data flow, dependencies, APIs
-- **UI/UX** - User interactions, feedback, error states, edge cases
-- **Constraints** - Performance, compatibility, security, accessibility
-- **Tradeoffs** - What are you willing to sacrifice? What's non-negotiable?
-- **Scope boundaries** - What's explicitly out of scope for this change?
-- **Validation** - How will we know it works? What does success look like?
+## Open-Ended Questions
 
-## Interview Style
+Even when the answer space feels open, sketch 2-4 plausible options. The user gets "Other" automatically (do not add it). If you cannot name two distinct options, read more code or ask a more foundational question first.
 
-- **Non-obvious questions** - Skip questions with obvious answers
-- **In-depth** - Dig into specifics, follow interesting threads
-- **Batch questions** - Use up to 4 questions per `AskUserQuestion` call
-- **Continue until complete** - Keep interviewing until the plan feels solid
-- **Challenge assumptions** - Surface implicit decisions that deserve explicit consideration
+When you have a recommendation, put it first and append "(Recommended)". For visual or code comparisons, use the `preview` field on options.
+
+## Topics
+
+Adapt to context. Skip questions with obvious answers. Challenge implicit decisions.
+
+- Requirements: what it should and shouldn't do
+- Technical implementation: architecture, data flow, dependencies
+- UI/UX: interactions, feedback, error states
+- Constraints: performance, compatibility, security, accessibility
+- Tradeoffs and scope boundaries
+- Validation: how we know it works
 
 ## Output
 

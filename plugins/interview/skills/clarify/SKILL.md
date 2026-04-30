@@ -7,21 +7,19 @@ context: fork
 
 # Clarification Interview
 
-Ask targeted questions using `AskUserQuestion` to resolve a specific blocker.
+Resolve a specific blocker via the `AskUserQuestion` tool.
 
-## When to Use
+## Rules
 
-- Implementation detail is ambiguous
-- Multiple valid approaches exist
-- Edge case behavior is undefined
-- User preference affects the solution
+- Every question goes through `AskUserQuestion`. Never list questions in chat prose.
+- One blocker at a time. 1-2 questions per call; 4 is the cap.
+- If the answer would not change your next action, do not ask.
 
-## Interview Style
+## Open-Ended Questions
 
-- **Focused** - Address the immediate blocker, not comprehensive coverage
-- **Targeted** - Usually 1-2 questions at a time
-- **Actionable** - Each question should unblock progress
-- **Context-rich** - Explain why you're asking and what the options mean
+Even when the answer space feels open, sketch 2-4 plausible options. The user gets "Other" automatically (do not add it). If you cannot name two distinct options, read more code first.
+
+When you have a recommendation, put it first and append "(Recommended)" to the label.
 
 ## Output
 

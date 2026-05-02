@@ -233,6 +233,9 @@
   "alwaysThinkingEnabled": true,
   "spinnerTipsEnabled": false,
   "showClearContextOnPlanAccept": true,
+  "autoCompactEnabled": false,
+  "preferredNotifChannel": "terminal_bell",
+  "teammateMode": "auto",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "TMPDIR": "/tmp",

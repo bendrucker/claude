@@ -2,18 +2,23 @@
 
 Detailed guidance for optional PR body sections.
 
+Stick to active voice. Don't use passive ("X was added"). Rewrite so something is doing the verb.
+
+- Self-evident description of what the PR does: PR-as-subject is fine ("Adds retry logic") or subject-elided in bullets ("Added retry logic", "Extracted the helper")
+- Design decisions and judgment calls: use "I" so it's clear you made the call ("I chose X over Y because…")
+
 ## Issue
 
 Use for bug fixes, which should include a related issue.
 
-- Provide root cause analysis
+- Describe the root cause as the author ("I traced this to…", "I found that…"). Avoid passive writeups ("the bug was caused by…")
 - Link existing issues with `Closes #123` or `Fixes #456`
 
 ## Changes
 
 Organize by concept, not by file. Each bullet should describe a single conceptual shift, even when it spans multiple files. The reviewer reads this to understand *what's different and why*, not to get a tour of modified files.
 
-- Lead with the conceptual change, not the file location
+- Lead with the conceptual change, not the file location. Subject-elided phrasing works for plain description ("Extracted the helper", "Replaced X with Y"); use "I" when a bullet explains a judgment call. Don't use passive ("X was added")
 - Omit cleanup that follows naturally from the main change (e.g. removing dead imports). The diff shows this
 - Never structure bullets as `**path**: description`
 - Reference code identifiers only when they add information beyond what the diff shows. Use the shortest unambiguous name (module, filename, or component, not full paths)
@@ -28,14 +33,14 @@ Only include if tests were added/modified or manual testing was performed. Omit 
 Focus on **what** is covered and **why** it matters:
 
 **Good examples:**
-- "Tests cover error handling for malformed JSON responses"
+- "Added tests covering error handling for malformed JSON responses"
 - "Added integration tests for the full request/response cycle"
-- "Extended auth tests to cover the new OAuth flow"
+- "Extended the auth tests to cover the new OAuth flow"
 - "Verified edge cases: empty input, null values, and Unicode handling"
 
 **Coverage gaps**: Note anything that merited testing but was difficult to automate:
-- "Rate limiting behavior requires manual verification against live API"
-- "Visual layout changes verified in browser but not covered by snapshot tests"
+- "Left rate-limiting behavior for manual verification against the live API"
+- "Verified visual layout changes in the browser but didn't add snapshot coverage"
 
 **Manual verification**: Include any testing done outside of automated tests—running commands, checking output, verifying behavior in a browser or tool. This counts whether performed by the user or by Claude during the session.
 

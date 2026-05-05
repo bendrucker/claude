@@ -40,7 +40,7 @@ allowed-tools:
 
 ## Body
 
-- Start with 1-3 sentences summarizing the change (no preceding header). Stick to active voice. Don't use passive ("Retry logic was added") — rewrite so something is actually doing the verb
+- Start with 1-3 sentences summarizing the change (no preceding header). Stick to active voice. Don't use passive ("Retry logic was added"); rewrite so something is actually doing the verb
   - Self-evident description of what the PR does: PR-as-subject is fine ("Adds retry logic to the HTTP client") or subject-elided in bullets ("Added retry logic")
   - Design decisions and judgment calls: use "I" so it's clear you made the call ("I chose X over Y because…", "I kept the old endpoint to avoid a breaking change")
 - If the PR is directly motivated by an issue, reference it at the end of the opening summary (`Closes #N`, `Fixes #N`, or just `#N` if not closing). Related issues mentioned for context belong in a `## References` section. Never drop issue refs at the bottom of the body without a section

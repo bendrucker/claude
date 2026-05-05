@@ -2,7 +2,7 @@
 
 Detailed guidance for optional PR body sections.
 
-Stick to active voice. Don't use passive ("X was added") — rewrite so something is doing the verb.
+Stick to active voice. Don't use passive ("X was added"). Rewrite so something is doing the verb.
 
 - Self-evident description of what the PR does: PR-as-subject is fine ("Adds retry logic") or subject-elided in bullets ("Added retry logic", "Extracted the helper")
 - Design decisions and judgment calls: use "I" so it's clear you made the call ("I chose X over Y because…")

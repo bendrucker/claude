@@ -40,10 +40,9 @@ allowed-tools:
 
 ## Body
 
-- Start with 1-3 sentences summarizing the change (no preceding header). Write as the author, in past tense. Don't use passive voice ("Retry logic was added") — rewrite so the actor (you) is doing the verb
-  - Bullets: drop the "I" ("Added retry logic", "Capped attempts at 3")
-  - Prose: use "I" where a subject helps, especially for judgment calls ("I chose X over Y because…")
-  - Avoid present-tense "Adds X" — it reads as third-person, with the PR as the actor
+- Start with 1-3 sentences summarizing the change (no preceding header). Stick to active voice. Don't use passive ("Retry logic was added") — rewrite so something is actually doing the verb
+  - Self-evident description of what the PR does: PR-as-subject is fine ("Adds retry logic to the HTTP client") or subject-elided in bullets ("Added retry logic")
+  - Design decisions and judgment calls: use "I" so it's clear you made the call ("I chose X over Y because…", "I kept the old endpoint to avoid a breaking change")
 - If the PR is directly motivated by an issue, reference it at the end of the opening summary (`Closes #N`, `Fixes #N`, or just `#N` if not closing). Related issues mentioned for context belong in a `## References` section. Never drop issue refs at the bottom of the body without a section
 - **Wrap all code identifiers with backticks**: function names, class names, file paths, endpoints, status codes, etc.
 - Use `##` sections for larger changes. See [`sections.md`](sections.md) for detailed guidance on:

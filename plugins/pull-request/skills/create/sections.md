@@ -2,11 +2,10 @@
 
 Detailed guidance for optional PR body sections.
 
-Write as the PR author, in past tense. Don't use passive voice ("X was added") — rewrite so you're the actor.
+Stick to active voice. Don't use passive ("X was added") — rewrite so something is doing the verb.
 
-- Bullets: drop the "I" ("Added retry logic", "Extracted the helper")
-- Prose: use "I" where a subject helps, especially for judgment calls ("I chose X over Y because…")
-- Avoid present-tense "Adds X" — it reads as third-person, with the PR as the actor
+- Self-evident description of what the PR does: PR-as-subject is fine ("Adds retry logic") or subject-elided in bullets ("Added retry logic", "Extracted the helper")
+- Design decisions and judgment calls: use "I" so it's clear you made the call ("I chose X over Y because…")
 
 ## Issue
 
@@ -19,7 +18,7 @@ Use for bug fixes, which should include a related issue.
 
 Organize by concept, not by file. Each bullet should describe a single conceptual shift, even when it spans multiple files. The reviewer reads this to understand *what's different and why*, not to get a tour of modified files.
 
-- Lead with the conceptual change, not the file location. Use past-tense subject-elided phrasing ("Extracted the helper", "Replaced X with Y"); avoid present-tense "Adds X" and passive "X was added"
+- Lead with the conceptual change, not the file location. Subject-elided phrasing works for plain description ("Extracted the helper", "Replaced X with Y"); use "I" when a bullet explains a judgment call. Don't use passive ("X was added")
 - Omit cleanup that follows naturally from the main change (e.g. removing dead imports). The diff shows this
 - Never structure bullets as `**path**: description`
 - Reference code identifiers only when they add information beyond what the diff shows. Use the shortest unambiguous name (module, filename, or component, not full paths)

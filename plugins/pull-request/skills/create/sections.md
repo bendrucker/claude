@@ -2,27 +2,24 @@
 
 Detailed guidance for optional PR body sections.
 
-All sections are written by the PR author (you, on behalf of the user). The cardinal sin is **passive voice** ("X was added", "is handled by…") — the body should read as the author reflecting on the decisions they made, not a neutral changelog.
+Write as the PR author, in past tense. Don't use passive voice ("X was added") — rewrite so you're the actor.
 
-Voice ranking, best to worst:
-
-1. **First-person active**: "I added retry logic", "I chose to extract this into a helper"
-2. **Subject-elided past tense** (acceptable shorthand for first-person): "Added retry logic", "Chose to extract…"
-3. **Third-person/PR-as-actor**: "Adds retry logic", "Refactors the client" — avoid; the present-tense verb makes the PR the subject instead of you
-4. **Passive**: "Retry logic was added", "The client is refactored" — never use this
+- Bullets: drop the "I" ("Added retry logic", "Extracted the helper")
+- Prose: use "I" where a subject helps, especially for judgment calls ("I chose X over Y because…")
+- Avoid present-tense "Adds X" — it reads as third-person, with the PR as the actor
 
 ## Issue
 
 Use for bug fixes, which should include a related issue.
 
-- Describe the root cause in first person ("I traced this to…", "I found that…")
+- Describe the root cause as the author ("I traced this to…", "I found that…"). Avoid passive writeups ("the bug was caused by…")
 - Link existing issues with `Closes #123` or `Fixes #456`
 
 ## Changes
 
 Organize by concept, not by file. Each bullet should describe a single conceptual shift, even when it spans multiple files. The reviewer reads this to understand *what's different and why*, not to get a tour of modified files.
 
-- Lead with the conceptual change, not the file location. Phrase bullets in active voice — first-person ("I extracted…") or past-tense subject-elided ("Extracted…") both work. Avoid present-tense "Adds X" (third-person) and never use passive "X was added"
+- Lead with the conceptual change, not the file location. Use past-tense subject-elided phrasing ("Extracted the helper", "Replaced X with Y"); avoid present-tense "Adds X" and passive "X was added"
 - Omit cleanup that follows naturally from the main change (e.g. removing dead imports). The diff shows this
 - Never structure bullets as `**path**: description`
 - Reference code identifiers only when they add information beyond what the diff shows. Use the shortest unambiguous name (module, filename, or component, not full paths)
@@ -37,14 +34,14 @@ Only include if tests were added/modified or manual testing was performed. Omit 
 Focus on **what** is covered and **why** it matters:
 
 **Good examples:**
-- "I added tests covering error handling for malformed JSON responses"
-- "I added integration tests for the full request/response cycle"
-- "I extended the auth tests to cover the new OAuth flow"
-- "I verified edge cases: empty input, null values, and Unicode handling"
+- "Added tests covering error handling for malformed JSON responses"
+- "Added integration tests for the full request/response cycle"
+- "Extended the auth tests to cover the new OAuth flow"
+- "Verified edge cases: empty input, null values, and Unicode handling"
 
 **Coverage gaps**: Note anything that merited testing but was difficult to automate:
-- "I left rate-limiting behavior for manual verification against the live API"
-- "I verified visual layout changes in the browser but didn't add snapshot coverage"
+- "Left rate-limiting behavior for manual verification against the live API"
+- "Verified visual layout changes in the browser but didn't add snapshot coverage"
 
 **Manual verification**: Include any testing done outside of automated tests—running commands, checking output, verifying behavior in a browser or tool. This counts whether performed by the user or by Claude during the session.
 

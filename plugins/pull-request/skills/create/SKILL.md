@@ -40,11 +40,12 @@ allowed-tools:
 
 ## Body
 
-- Start with 1-3 sentences summarizing the change (no preceding header). Write in **first-person active voice** as the author reflecting on the decisions you made
-  - Good: "I added retry logic to the HTTP client and capped maximum attempts at 3 to avoid hammering downstream services."
-  - Bad (passive): "Retry logic is added to the HTTP client and maximum attempts are limited to 3."
-  - Bad (third-person/subject-elided): "Adds retry logic to the HTTP client and limits maximum attempts to 3."
-- Throughout the body, prefer "I" over "we", "this PR", or subject-elided imperatives. The PR is your work; describe the choices you made and why
+- Start with 1-3 sentences summarizing the change (no preceding header). Write as the author reflecting on the decisions you made — **first-person active voice**, with passive voice as the cardinal sin
+  - Best: "I added retry logic to the HTTP client and capped maximum attempts at 3 to avoid hammering downstream services."
+  - Acceptable shorthand: "Added retry logic to the HTTP client and capped maximum attempts at 3." (past-tense "Added" reads as first-person with the "I" elided)
+  - Avoid (third-person): "Adds retry logic to the HTTP client and limits maximum attempts to 3." (present-tense "Adds" implies the PR is the actor, not you)
+  - Worst (passive): "Retry logic is added to the HTTP client and maximum attempts are limited to 3."
+- Prefer "I" over "we" or "this PR". You can drop the "I" for brevity, but keep the verb in past tense so it still reads as your action ("Refactored…", "Chose…") rather than the PR's ("Refactors…", "Chooses…")
 - If the PR is directly motivated by an issue, reference it at the end of the opening summary (`Closes #N`, `Fixes #N`, or just `#N` if not closing). Related issues mentioned for context belong in a `## References` section. Never drop issue refs at the bottom of the body without a section
 - **Wrap all code identifiers with backticks**: function names, class names, file paths, endpoints, status codes, etc.
 - Use `##` sections for larger changes. See [`sections.md`](sections.md) for detailed guidance on:

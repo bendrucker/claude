@@ -2,7 +2,14 @@
 
 Detailed guidance for optional PR body sections.
 
-All sections are written by the PR author (you, on behalf of the user). Use **first-person active voice** ("I added…", "I chose…", "I split…") rather than passive ("X was added") or subject-elided imperative ("Adds X"). The body should read as the author reflecting on the decisions they made, not a neutral changelog.
+All sections are written by the PR author (you, on behalf of the user). The cardinal sin is **passive voice** ("X was added", "is handled by…") — the body should read as the author reflecting on the decisions they made, not a neutral changelog.
+
+Voice ranking, best to worst:
+
+1. **First-person active**: "I added retry logic", "I chose to extract this into a helper"
+2. **Subject-elided past tense** (acceptable shorthand for first-person): "Added retry logic", "Chose to extract…"
+3. **Third-person/PR-as-actor**: "Adds retry logic", "Refactors the client" — avoid; the present-tense verb makes the PR the subject instead of you
+4. **Passive**: "Retry logic was added", "The client is refactored" — never use this
 
 ## Issue
 
@@ -15,7 +22,7 @@ Use for bug fixes, which should include a related issue.
 
 Organize by concept, not by file. Each bullet should describe a single conceptual shift, even when it spans multiple files. The reviewer reads this to understand *what's different and why*, not to get a tour of modified files.
 
-- Lead with the conceptual change, not the file location. Phrase bullets in first-person active voice ("I extracted…", "I replaced X with Y because…") rather than "Adds X" or "X was added"
+- Lead with the conceptual change, not the file location. Phrase bullets in active voice — first-person ("I extracted…") or past-tense subject-elided ("Extracted…") both work. Avoid present-tense "Adds X" (third-person) and never use passive "X was added"
 - Omit cleanup that follows naturally from the main change (e.g. removing dead imports). The diff shows this
 - Never structure bullets as `**path**: description`
 - Reference code identifiers only when they add information beyond what the diff shows. Use the shortest unambiguous name (module, filename, or component, not full paths)

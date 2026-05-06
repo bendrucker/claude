@@ -60,6 +60,20 @@ async function applySchema(db: Database): Promise<void> {
   }
 }
 
+async function migrateIfNeeded(db: Database): Promise<void> {
+  const [row] = await db.query<{ ok: boolean }>(`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'main' AND table_name = 'raw' AND column_name = 'data'
+    ) AS ok
+  `);
+  if (row?.ok) return;
+  await db.run("DROP TABLE IF EXISTS messages");
+  await db.run("DROP TABLE IF EXISTS content_items");
+  await db.run("DROP TABLE IF EXISTS raw");
+  await db.run("DROP TABLE IF EXISTS meta");
+}
+
 export async function getDb(dataDir: string): Promise<Database> {
   const dbPath = path.join(dataDir, "session.duckdb");
   return createDatabase(dbPath);
@@ -69,8 +83,6 @@ export async function ensureIndex(
   db: Database,
   options: { projectsDir?: string; force?: boolean; dataDir?: string } = {},
 ): Promise<void> {
-  await applySchema(db);
-
   if (!options.force && options.dataDir) {
     const sessionId = process.env.CLAUDE_SESSION_ID;
     if (sessionId) {
@@ -78,6 +90,9 @@ export async function ensureIndex(
       if (await Bun.file(marker).exists()) return;
     }
   }
+
+  await migrateIfNeeded(db);
+  await applySchema(db);
 
   const glob = getProjectsGlob(options.projectsDir);
 
@@ -87,18 +102,8 @@ export async function ensureIndex(
   const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
   if (!row || row.n === 0n) return;
 
-  const dataDir = options.dataDir;
-  if (!dataDir) throw new Error("dataDir is required for import");
-  await db.run("SET VARIABLE data_dir = $dir", { dir: dataDir });
   await db.run("SET VARIABLE source = getvariable('changed_files')");
   await db.run(await readSql(RESOURCES_DIR, "import"));
-
-  const contentItemsPath = path.join(dataDir, "content_items.jsonl");
-  await db.run(
-    `COPY content_items_export TO '${contentItemsPath}' (FORMAT CSV, HEADER false, QUOTE '', ESCAPE '')`,
-  );
-  await db.run("DROP TABLE content_items_export");
-
   await db.run(await readSql(RESOURCES_DIR, "views"));
 
   if (options.dataDir) {

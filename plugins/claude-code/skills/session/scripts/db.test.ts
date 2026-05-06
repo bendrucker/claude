@@ -286,3 +286,85 @@ describe("malformed JSONL", () => {
     expect(Number(rows[0]?.assistant_messages)).toBe(1);
   });
 });
+
+describe("type drift across imports", () => {
+  it("absorbs heterogeneous nested shapes via the `data` JSON column", async () => {
+    const drifted = JSON.stringify({
+      type: "assistant",
+      sessionId: "drift-session",
+      cwd: "/Users/test/project",
+      timestamp: "2024-01-15T10:00:00.000Z",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "drifted" }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stop_sequence: { nested: "object" },
+      },
+    });
+    await db.run(
+      `INSERT INTO raw (session_id, type, project_path, timestamp, data)
+                  VALUES ('drift-session', 'assistant', '/Users/test/project',
+                          '2024-01-15T10:00:00'::TIMESTAMP, $line::JSON)`,
+      {
+        line: drifted,
+      },
+    );
+    await db.run("DELETE FROM meta");
+
+    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, force: true });
+
+    const [typeRow] = await db.query<{ data_type: string }>(
+      "SELECT data_type FROM information_schema.columns WHERE table_name = 'raw' AND column_name = 'data'",
+    );
+    expect(typeRow?.data_type).toBe("JSON");
+
+    const rows = await db.query<{ session_id: string }>(
+      "SELECT session_id FROM sessions ORDER BY session_id",
+    );
+    expect(rows.length).toBeGreaterThan(0);
+  });
+});
+
+describe("discovery", () => {
+  it("returns column metadata via the schema query", async () => {
+    const rows = await runQuery<{ table_name: string; column_name: string }>(db, "schema");
+    const tables = new Set(rows.map((r) => r.table_name));
+    expect(tables.has("raw")).toBe(true);
+    expect(tables.has("messages")).toBe(true);
+    expect(tables.has("content_items")).toBe(true);
+    expect(rows.some((r) => r.table_name === "raw" && r.column_name === "data")).toBe(true);
+  });
+
+  it("samples JSON keys from raw.data via the keys query", async () => {
+    const rows = await runQuery<{ key: string; occurrences: number }>(db, "keys");
+    expect(rows.length).toBeGreaterThan(0);
+    const keys = new Set(rows.map((r) => r.key));
+    expect(keys.has("sessionId")).toBe(true);
+    expect(keys.has("type")).toBe(true);
+    expect(keys.has("message")).toBe(true);
+  });
+
+  it("describes messages with the expected pinned columns", async () => {
+    const rows = await db.query<{ column_name: string }>("DESCRIBE messages");
+    const cols = rows.map((r) => r.column_name);
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        "session_id",
+        "type",
+        "project_path",
+        "git_branch",
+        "is_meta",
+        "is_sidechain",
+        "duration_ms",
+        "timestamp",
+        "input_tokens",
+        "output_tokens",
+        "source_file",
+        "source_line",
+        "data",
+        "content_text",
+        "summary",
+      ]),
+    );
+  });
+});

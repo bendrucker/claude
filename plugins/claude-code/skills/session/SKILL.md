@@ -1,6 +1,6 @@
 ---
 name: claude-code:session
-description: Introspect on your own Claude Code usage and history — session ID, duration, tokens consumed, tool usage patterns, time per project, recent activity summaries, or searching past conversations. Use whenever the user asks about their Claude Code activity ("what's my session ID?", "how many tokens today?", "what did I work on this week?", "find that conversation where I set up X", "am I overusing Bash?"). Do NOT use for general codebase search, git log queries, or arbitrary databases.
+description: Introspect on your own Claude Code usage and history (session ID, duration, tokens consumed, tool usage patterns, time per project, recent activity summaries, or searching past conversations). Use whenever the user asks about their Claude Code activity ("what's my session ID?", "how many tokens today?", "what did I work on this week?", "find that conversation where I set up X", "am I overusing Bash?"). Do NOT use for general codebase search, git log queries, or arbitrary databases.
 allowed-tools:
   - Bash
   - Read
@@ -14,16 +14,16 @@ Search and analyze Claude Code conversation history via a DuckDB index over JSON
 
 ## Running Queries
 
-The index refreshes automatically on first use per session. Subsequent queries skip the refresh for faster results. Pass `--refresh` to force a re-scan when the user asks for the latest data.
+The index refreshes automatically on first use per session. Subsequent queries skip the refresh for faster results. Pass `--refresh` to re-scan when the user asks for the latest data.
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/query.ts "SELECT model, SUM(output_tokens) as tokens FROM messages WHERE type = 'assistant' GROUP BY model"
+${CLAUDE_SKILL_DIR}/scripts/query.ts "SELECT model, SUM(output_tokens) FROM messages WHERE type = 'assistant' GROUP BY model"
 ${CLAUDE_SKILL_DIR}/scripts/query.ts --refresh "SELECT * FROM sessions ORDER BY start_time DESC LIMIT 5"
 ```
 
-#### Named Queries
+## Named Queries
 
-Built-in queries in `resources/queries/` can be run by name with `key=value` params. Prefer these over writing SQL from scratch for common tasks:
+Built-in queries in `resources/queries/` run by name with `key=value` params. Prefer these over writing SQL from scratch.
 
 ```bash
 ${CLAUDE_SKILL_DIR}/scripts/query.ts search query=authentication limit=10
@@ -33,145 +33,61 @@ ${CLAUDE_SKILL_DIR}/scripts/query.ts permissions project=bendrucker.me limit=10
 ${CLAUDE_SKILL_DIR}/scripts/query.ts sandbox limit=10
 ```
 
-The `project` param matches against the directory name (last path component) using glob syntax. `project=myapp` matches exactly, `project=myapp*` matches the repo and its worktrees (`myapp.feature-branch`, `myapp.bugfix`, etc.).
+The `project` param matches against the directory name (last path component) using glob syntax: `project=myapp` matches exactly, `project=myapp*` matches the repo and its worktrees.
 
 - `search`: find sessions by keyword (ILIKE on `content_text` and `summary`). Params: `query`, `limit`, `after_date`, `before_date`, `project`
 - `stats`: tool usage breakdown with error rates and aggregate totals. Params: `after_date`, `before_date`, `project`
 - `errors`: recent tool errors with type filtering. Params: `error_type` (`rejection` or `failure`), `limit`, `after_date`, `before_date`, `project`
 - `permissions`: tool calls the user rejected. Params: `limit`, `after_date`, `before_date`, `project`
 - `sandbox`: Bash calls that bypassed the sandbox (`dangerouslyDisableSandbox`), with back-links to prior failed sandboxed calls of the same command. Params: `limit`, `after_date`, `before_date`, `project`
+- `skills`: skill invocation counts by name. Params: `skill`, `after_date`, `before_date`, `project`
+- `schema`: list every column in every table/view. Use this first when you don't know what's available.
+- `keys`: sample which top-level JSON keys appear in `raw.data` (the unstructured part), with occurrence counts.
 
-## Schema
+## Tables and Views
 
-### `messages` table
+- `raw`: one row per JSONL line. Pinned scalar columns (`session_id`, `type`, `project_path`, `git_branch`, `is_meta`, `is_sidechain`, `duration_ms`, `timestamp`, `summary`, `input_tokens`, `output_tokens`, `source_file`, `source_line`) plus a `data JSON` column that holds the full original line.
+- `messages`: view over `raw` filtered to `type IN ('user', 'assistant')`, with a derived `content_text` (string-form messages only) and a `summary` joined from summary rows.
+- `content_items`: one row per element of `data->'$.message.content'`, with pinned columns (`type`, `name`, `id`, `tool_use_id`, `text`, `content`, `is_error`) plus `data JSON` (the content item) and `tool_use_result JSON` (merged from the parent message).
+- `sessions`: aggregated session-level stats (start/end time, duration, message counts).
+- `tool_calls`: one row per tool use.
+- `tool_errors`: tool results where `is_error` is true, joined with the originating tool call. `error_type` is `rejection` or `failure`.
+- `permission_requests`: tool calls the user rejected.
+- `sandbox_bypasses`: Bash calls that used `dangerouslyDisableSandbox=true`, with back-links to retried failures.
+- `skill_calls`: one row per `Skill` tool invocation.
 
-One row per message. Schema is auto-detected from JSONL with snake_case renames for known fields.
+## Discovery
 
-| Column | Type | Description |
-|---|---|---|
-| `session_id` | VARCHAR | Session UUID |
-| `type` | VARCHAR | `user` or `assistant` |
-| `timestamp` | TIMESTAMP | Message timestamp |
-| `project_path` | VARCHAR | Absolute path to the project directory |
-| `git_branch` | VARCHAR | Branch at time of message |
-| `is_meta` | BOOLEAN | System-injected user message (not human input) |
-| `content_text` | VARCHAR | Raw text content (string-content messages only) |
-| `summary` | VARCHAR | Conversation summary (joined from summary rows) |
-| `input_tokens` | BIGINT | Input token count — assistant rows only |
-| `output_tokens` | BIGINT | Output token count — assistant rows only |
-| `duration_ms` | BIGINT | Message duration in milliseconds |
-| `is_sidechain` | BOOLEAN | Whether the message is on a sidechain |
-| `source_file` | VARCHAR | Absolute path to the source JSONL file |
-| `source_line` | BIGINT | Line number in the source file (1-based) |
+Don't memorize column lists. Ask DuckDB.
 
-Unknown fields from JSONL pass through automatically via `* EXCLUDE`.
+```bash
+${CLAUDE_SKILL_DIR}/scripts/query.ts schema
+${CLAUDE_SKILL_DIR}/scripts/query.ts keys
+${CLAUDE_SKILL_DIR}/scripts/query.ts "DESCRIBE messages"
+${CLAUDE_SKILL_DIR}/scripts/query.ts "DESCRIBE content_items"
+```
 
-### `content_items` table
+For fields not in the pinned columns, reach into `data` directly with JSON path operators.
 
-One row per content array element, with parent context merged in. Schema is fully auto-detected.
+```sql
+SELECT (data->>'$.message.model') AS model
+FROM messages
+WHERE type = 'assistant' AND (data->>'$.message.model') IS NOT NULL
+GROUP BY model;
+```
 
-| Column | Type | Description |
-|---|---|---|
-| `type` | VARCHAR | `text`, `tool_use`, `tool_result`, `thinking` |
-| `text` | VARCHAR | Text content |
-| `name` | VARCHAR | Tool name (for `tool_use`) |
-| `id` | VARCHAR | Tool use ID (for `tool_use`) |
-| `tool_use_id` | VARCHAR | Matching tool use ID (for `tool_result`) |
-| `content` | VARCHAR | Tool result text (for `tool_result`) |
-| `is_error` | BOOLEAN | Whether the tool result is an error |
-| `session_id` | VARCHAR | Session UUID (from parent message) |
-| `timestamp` | VARCHAR | Message timestamp (from parent message) |
-| `project_path` | VARCHAR | Project directory (from parent message) |
-
-Additional fields (`input`, `thinking`, `caller`, `signature`, etc.) are auto-detected from real data.
-
-### `sessions` view
-
-Aggregated session-level data.
-
-| Column | Type |
-|---|---|
-| `session_id` | VARCHAR |
-| `summary` | VARCHAR |
-| `start_time` | TIMESTAMP |
-| `end_time` | TIMESTAMP |
-| `duration` | INTERVAL |
-| `project_path` | VARCHAR |
-| `git_branch` | VARCHAR |
-| `user_messages` | BIGINT |
-| `assistant_messages` | BIGINT |
-
-### `tool_calls` view
-
-One row per tool use.
-
-| Column | Type |
-|---|---|
-| `tool_name` | VARCHAR |
-| `tool_id` | VARCHAR |
-| `session_id` | VARCHAR |
-| `project_path` | VARCHAR |
-| `timestamp` | TIMESTAMP |
-
-### `tool_errors` view
-
-Tool results where `is_error` is true, joined with the originating tool call.
-
-| Column | Type |
-|---|---|
-| `tool_id` | VARCHAR |
-| `error_content` | VARCHAR |
-| `tool_name` | VARCHAR |
-| `session_id` | VARCHAR |
-| `project_path` | VARCHAR |
-| `timestamp` | TIMESTAMP |
-| `error_type` | VARCHAR (`rejection` or `failure`) |
-
-### `permission_requests` view
-
-Tool calls the user rejected (denied the permission prompt).
-
-| Column | Type |
-|---|---|
-| `tool_name` | VARCHAR |
-| `tool_id` | VARCHAR |
-| `command` | VARCHAR (Bash only) |
-| `file_path` | VARCHAR (Edit/Write only) |
-| `description` | VARCHAR |
-| `session_id` | VARCHAR |
-| `project_path` | VARCHAR |
-| `timestamp` | TIMESTAMP |
-
-### `sandbox_bypasses` view
-
-Bash calls that used `dangerouslyDisableSandbox=true`. Includes a back-link to the most recent prior failed sandboxed call with the same command, identifying retry patterns where the sandbox caused the initial failure.
-
-| Column | Type | Description |
-|---|---|---|
-| `command` | VARCHAR | The Bash command |
-| `description` | VARCHAR | Command description |
-| `tool_id` | VARCHAR | Tool use ID |
-| `session_id` | VARCHAR | Session UUID |
-| `project_path` | VARCHAR | Project directory |
-| `timestamp` | TIMESTAMP | When the bypass was used |
-| `retried_tool_id` | VARCHAR | Tool ID of the prior failed sandboxed call (NULL if no match) |
-| `retried_error` | VARCHAR | Error from the prior failed call (NULL if no match) |
-
-### Macros
-
-Reusable filter helpers available in all queries:
-
-- `date_filter(ts, after_val, before_val)`: filters by timestamp range, NULL values bypass the check
-- `project_filter(path, project_val)`: ILIKE match on project path, NULL bypasses
+Wrap `data->>'$.path'` in parens before any comparison. DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` (boolean array index) and fails.
 
 ## Source Lookup
 
-To retrieve the full JSONL line for a message (e.g., to inspect tool input):
+To retrieve the full JSONL line for a message:
 
 ```bash
 sed -n '<source_line>p' <source_file>
 ```
 
+`source_line` is 1-based and per-file (partitioned by `source_file`).
+
 ## Session File Structure
 
-Session logs are stored in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`. The CLI maintains a DuckDB index at `$CLAUDE_PLUGIN_DATA/session.duckdb`, rebuilt incrementally on each invocation.
+Session logs live in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`. The index lives at `$CLAUDE_PLUGIN_DATA/session.duckdb`, refreshed incrementally based on file mtime.

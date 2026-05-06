@@ -6,30 +6,34 @@ JSONL files in `~/.claude/projects/` are the canonical data. The DuckDB database
 
 ### Schema
 
-`resources/schema/` contains ordered DDL files run on every startup:
+`resources/schema/` runs on every startup:
 
-- `01_tables.sql`: Bootstrap `raw` (minimal schema, replaced on import) and `meta` (import timestamps)
-- `03_macros.sql`: Filter macros for date ranges and project paths
+- `01_tables.sql`: `raw` with pinned columns plus a `data JSON` blob, and `meta` with `last_import`. The full pinned column set is declared upfront so the table type is stable across imports.
+- `03_macros.sql`: filter macros for date ranges and project paths.
 
 ### Tables
 
-- **`raw`**: Rebuilt from disk on every import via a single `read_ndjson` over the full `projects_glob`. `refresh.sql` short-circuits the import when nothing has changed since `last_import`, but when it does run, `raw` is fully replaced — never `UNION`-ed with cached rows. This avoids cross-run column type drift (e.g., a column inferred as `VARCHAR` in one run and `JSON` in the next), which would fail the union cast.
-- **`messages`**: Built from `raw` via `* EXCLUDE` pass-through + snake_case renames. One row per message.
-- **`content_items`**: Built from a temp JSONL file via `read_ndjson` auto-detect. Each content array element is written with parent context merged in. Schema is fully auto-detected.
+- **`raw`**: pinned scalar columns (`session_id`, `type`, `project_path`, `git_branch`, `is_meta`, `is_sidechain`, `duration_ms`, `timestamp`, `summary`, `input_tokens`, `output_tokens`, `source_file`, `source_line`) plus `data JSON` holding the full original JSONL line. Imports use `read_json_objects(...)` (no auto-detected types beyond `json` itself), so column types never drift between imports.
+- **`messages`**: view over `raw` filtered to `type IN ('user', 'assistant')`, adding `content_text` (when message content is a string) and a joined `summary`.
+- **`content_items`**: built from `raw` via `unnest(json_extract(data, '$.message.content[*]'))`. Pinned columns plus the content item's full `data JSON` plus the parent's `tool_use_result JSON`. No temp file roundtrip.
 
-Views (`tool_calls`, `tool_errors`, `sessions`) query these tables.
+Other views (`tool_calls`, `tool_errors`, `permission_requests`, `sandbox_bypasses`, `skill_calls`, `sessions`) read from `messages` / `content_items`.
 
 ### Import pipeline
 
-`import.sql` flattens `message.*` into `raw`. Only `message.content` is explicitly aliased to `message_content`; the rest of `message.*` expands via `EXCLUDE (content)`. When message fields collide with top-level fields (e.g., `type`, `id`, `container`), DuckDB auto-suffixes them (`type_1`, `id_1`, etc.). This avoids `EXCLUDE` on optional message fields, which fails when they're absent from the struct.
+`refresh.sql` returns `changed_files` (those modified after `last_import`). `import.sql` runs `read_json_objects` on just those files, projects pinned columns with explicit casts, and updates `raw` via `UNION ALL BY NAME` against the cached rows from sessions not in `changed_sessions`. The pinned schema means the cached `raw` and the freshly-built `new_raw` always have identical column types, so the union cannot fail with conversion errors.
 
-`source_line` uses `ROW_NUMBER() OVER (PARTITION BY filename)` so it preserves per-file 1-based line numbers — needed by the `sed -n '<source_line>p' <source_file>` lookup pattern documented in `SKILL.md`.
+After `import.sql`, `views.sql` rebuilds `content_items` and the views. No temp JSONL files, no `COPY TO` step.
 
-After rebuilding `raw`, `import.sql` creates a `content_items_export` temp table. Callers must COPY this to `${data_dir}/content_items.jsonl` and DROP it before running `views.sql`. DuckDB's `COPY TO` requires a literal path, so this step cannot live in SQL alone.
+### Migration
 
-`views.sql` reads the temp file back via `read_ndjson(getvariable('data_dir') || '/content_items.jsonl')` and creates `content_items`, `messages`, and downstream views.
+`db.ts` runs `migrateIfNeeded` after the warm-session marker check, before `applySchema`. If `raw.data` is missing (the old auto-detected schema), it drops `raw`, `meta`, `messages`, and `content_items`. The next `applySchema` recreates the pinned tables, and the empty `meta` forces a one-shot full reimport from JSONL. Warm sessions with a `.refreshed-<id>` marker skip migration entirely.
+
+### JSON path gotcha
+
+DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` because `=` binds tighter than `->>`. Wrap `data->>'$.path'` in parens before any comparison or function call where this matters. The views in `views.sql` apply this convention; downstream queries in `resources/queries/` should too.
 
 ### Callers
 
-- `db.ts`: Sets `data_dir` variable, orchestrates import → COPY → views via separate `db.run()` calls
-- `query.ts`: CLI entry point, uses `db.ts` functions directly
+- `db.ts`: orchestrates migration, schema, refresh, import, views.
+- `query.ts`: CLI entry point.

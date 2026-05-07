@@ -1,81 +1,34 @@
 ---
 name: review:self
 description: |
-  Self-review your own code changes using a visual diff viewer. Opens a GitHub-style web UI where you can add comments on changed lines. Comments are returned to Claude for action.
+  Self-review your own code changes using Hunk. You annotate lines in the Hunk TUI; Claude reads your comments via `hunk session comment list` and applies the requested edits.
 allowed-tools:
-  - "Bash(bunx difit:*)"
-  - "Bash(git diff:*)"
-hooks:
-  PreToolUse:
-    - matcher: "Bash(bunx difit:*)|Bash(git diff:*)"
-      hooks:
-        - type: command
-          command: |
-            cat | jq '
-              if (.tool_input.command | test("bunx difit"))
-              then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {dangerouslyDisableSandbox: true}}}
-              else {}
-              end'
+  - "Bash(hunk session:*)"
 ---
 
 # Self Review
 
-Review your own code changes before committing or requesting peer review.
+Apply your own review notes to a working tree. You drive the review in Hunk; Claude reads your annotations and edits the code.
 
-## Usage
-
-### Direct mode
-
-```bash
-bunx difit $ARGUMENTS
-```
-
-Common arguments:
-- `staged` — Staged changes only
-- `working` — Unstaged changes only
-- `@ main` — Compare HEAD with main branch
-
-### Stdin mode
-
-Pipe a git diff for full control over the diff content:
-
-```bash
-git diff $ARGUMENTS | bunx difit
-```
-
-Common arguments:
-- `HEAD` — All uncommitted changes (staged + unstaged)
-- `--merge-base main` — Changes since diverging from main
-
-Use stdin mode for all uncommitted changes (`git diff HEAD`) or when using git diff flags (e.g., `--merge-base`, revision ranges).
+This skill assumes the `hunk-review` skill is loaded — it owns the CLI mechanics (session selection, navigation, comment commands). This skill only covers the self-review-specific flow.
 
 ## Workflow
 
-1. Run `difit` with the target diff
-2. User reviews in the browser and adds comments on specific lines
-3. When the user closes the browser tab, comments are output to stdout
-4. Parse the comments and apply the requested changes
+1. **Make sure Hunk is running.** Run `hunk session list --json` to find a live session for the current repo. If none, ask the user to open one in their terminal:
+   - `hunk diff` — uncommitted changes (staged + unstaged + untracked)
+   - `hunk diff --exclude-untracked` — tracked changes only
+   - `hunk diff main...HEAD` — branch changes vs. main
+   - `hunk show HEAD` — the latest commit
+2. **Wait for the user to finish annotating.** Do not poll. Let the user say they're done before reading comments.
+3. **Read their notes.** `hunk session comment list --repo . --json`. The author is the user, not the agent — these are change requests, not narration.
+4. **Apply each comment.** For every entry:
+   - Read the referenced file at the indicated line(s)
+   - Make the requested change with Edit
+   - Optionally remove the comment after applying: `hunk session comment rm --repo . <comment-id>`
+5. **Summarize what you changed** and what (if anything) you skipped or want to push back on.
 
-## Comment Format
+## Notes
 
-Comments are output in this format:
-
-```
-📝 Comments from review session:
-==================================================
-path/to/file.ts:L42
-Comment text here
-=====
-path/to/other.ts:L10-L20
-Comment on a range of lines
-==================================================
-Total comments: 2
-```
-
-## Applying Feedback
-
-For each comment:
-1. Read the referenced file and lines
-2. Understand the requested change
-3. Apply the edit using the Edit tool
-4. Confirm the change was made correctly
+- Don't run `hunk diff` or `hunk show` yourself — those are interactive TUI commands for the user. Only `hunk session *` subcommands are for Claude.
+- If a comment is ambiguous, ask before editing rather than guessing.
+- If you disagree with a requested change, say so instead of silently applying or skipping it.

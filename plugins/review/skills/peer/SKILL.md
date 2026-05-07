@@ -4,6 +4,7 @@ description: |
   Review a pull request when requested by a peer. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes. Supports GitHub and GitLab.
 allowed-tools:
   - Bash(gh:*)
+  - Bash(hunk session:*)
   - mcp__github
 ---
 
@@ -32,11 +33,23 @@ If not on the branch, first run `gh pr checkout` to switch.
    - Skip delegation for trivial PRs (docs-only, config changes, dependency bumps).
 5. **Think** - Evaluate against priorities (see [priorities.md](priorities.md)), incorporating toolkit agent findings
 6. **Suggest** - Propose comments with revisions or issues
-7. **Comment** - Add approved comments to PR review
-8. **Submit** - Approve / Comment / Request Changes based on severity
+7. **Stage in Hunk** - Push proposed comments into a live Hunk session for me to revise locally (see [Hunk staging](#hunk-staging))
+8. **Submit** - Read back the revised comments and submit as a batch review (Approve / Comment / Request Changes)
 
 See [tone.md](tone.md) for comment style guidelines.
 
+## Hunk staging
+
+By default this skill uses Hunk to stage comments before they're posted. This skill assumes the `hunk-review` skill is loaded — it owns the CLI mechanics.
+
+1. **Find or request a session.** `hunk session list --json`. If none matches the PR's checkout, ask me to open one — usually `hunk diff <base>...HEAD` (e.g. `main...HEAD`) so the view matches the PR's diff. If I decline to use Hunk, fall back to posting directly via `mcp__github` / `glab`.
+2. **Push proposed comments as a batch.** Build a JSON payload of the comments you'd otherwise post, then pipe to `hunk session comment apply --repo . --stdin`. One batch per review pass — not one shell call per comment.
+3. **Hand control back.** Tell me the staged comments are ready and wait for me to revise them in the TUI (edit wording, drop notes I disagree with, add my own).
+4. **Read back the final set.** When I say I'm done, run `hunk session comment list --repo . --json`. That's the authoritative set to submit — do not re-use your original draft.
+5. **Submit as a batch review** to GitHub or GitLab using the platform's review API (see [Service Support](#service-support)). After successful submission, clear the staging area: `hunk session comment clear --repo . --yes`.
+
+Don't run `hunk diff` or `hunk show` yourself — those are interactive TUI commands for me.
+
 ## Service Support
 
-This skill assumes GitHub. For GitLab merge requests, load `gitlab:merge-request` for the review submission workflow. Use `draft-note.ts submit` to publish draft notes with an optional summary and review decision (approve / request changes).
+For GitHub, submit the batched review via `mcp__github` PR review tools. For GitLab merge requests, load `gitlab:merge-request` for the review submission workflow and use `draft-note.ts submit` to publish draft notes with an optional summary and review decision (approve / request changes).

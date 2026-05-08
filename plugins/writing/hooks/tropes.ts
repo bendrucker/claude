@@ -102,8 +102,28 @@ export function stripCode(text: string): string {
   return text.replace(FENCED_CODE_BLOCK, "").replace(INLINE_CODE, "");
 }
 
+type Hits = { count: number; sample: string };
+
+function patternHits(stripped: string, def: PatternDef): Hits {
+  if (typeof def.test === "function") {
+    return { count: def.test(stripped) ? 1 : 0, sample: "" };
+  }
+  def.test.lastIndex = 0;
+  const all = stripped.match(def.test);
+  return { count: all?.length ?? 0, sample: all?.[0] ?? "" };
+}
+
 export function scan(text: string, filePath?: string): PatternMatch[] {
-  const stripped = stripCode(text);
+  return scanIntroduced(text, "", filePath);
+}
+
+export function scanIntroduced(
+  newText: string,
+  oldText: string,
+  filePath?: string,
+): PatternMatch[] {
+  const newStripped = stripCode(newText);
+  const oldStripped = stripCode(oldText);
   const matches: PatternMatch[] = [];
   const seenTiers = new Set<PatternTier>();
 
@@ -111,24 +131,18 @@ export function scan(text: string, filePath?: string): PatternMatch[] {
     if (seenTiers.has(def.tier)) continue;
     if (def.fileOnly && filePath && !isProseFile(filePath)) continue;
 
-    let matched: string | null = null;
-    if (typeof def.test === "function") {
-      if (def.test(stripped)) matched = "";
-    } else {
-      def.test.lastIndex = 0;
-      const result = def.test.exec(stripped);
-      if (result) matched = result[0];
-    }
+    const newHits = patternHits(newStripped, def);
+    if (newHits.count === 0) continue;
+    const oldHits = patternHits(oldStripped, def);
+    if (newHits.count <= oldHits.count) continue;
 
-    if (matched !== null) {
-      matches.push({
-        tier: def.tier,
-        category: def.category,
-        matched,
-        message: def.message(matched),
-      });
-      seenTiers.add(def.tier);
-    }
+    matches.push({
+      tier: def.tier,
+      category: def.category,
+      matched: newHits.sample,
+      message: def.message(newHits.sample),
+    });
+    seenTiers.add(def.tier);
   }
 
   return matches;

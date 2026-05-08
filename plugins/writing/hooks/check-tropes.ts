@@ -3,7 +3,9 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { formatContext, formatDecision, isMemoryPath, type SyncHookJSONOutput } from "./markdown";
-import { firstByTier, scan } from "./tropes";
+import { firstByTier, type PatternMatch, scan, scanIntroduced } from "./tropes";
+
+const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
 const MIN_PROSE_LENGTH = 20;
 
@@ -62,35 +64,64 @@ function extractInlineArg(command: string, flag: string): string | null {
   return match?.[1] ?? match?.[2] ?? null;
 }
 
-function collectMultiEditText(toolInput: Record<string, unknown>): string[] {
+function collectMultiEditPairs(toolInput: Record<string, unknown>): {
+  newText: string;
+  oldText: string;
+} {
   const edits = toolInput.edits;
-  if (!Array.isArray(edits)) return [];
-  const texts: string[] = [];
+  if (!Array.isArray(edits)) return { newText: "", oldText: "" };
+  const newParts: string[] = [];
+  const oldParts: string[] = [];
   for (const edit of edits) {
-    if (edit && typeof edit === "object") {
-      const newString = (edit as Record<string, unknown>).new_string;
-      if (typeof newString === "string") texts.push(newString);
-    }
+    if (!edit || typeof edit !== "object") continue;
+    const fields = edit as Record<string, unknown>;
+    if (typeof fields.new_string === "string") newParts.push(fields.new_string);
+    if (typeof fields.old_string === "string") oldParts.push(fields.old_string);
   }
-  return texts;
+  return { newText: newParts.join("\n"), oldText: oldParts.join("\n") };
+}
+
+async function collectFileOpPair(
+  input: PreToolUseHookInput,
+): Promise<{ newText: string; oldText: string } | null> {
+  const toolInput = input.tool_input as Record<string, unknown>;
+  const toolName = input.tool_name;
+
+  if (toolName === "Write") {
+    const content = toolInput.content;
+    if (typeof content !== "string" || content.length === 0) return null;
+    const filePath = toolInput.file_path;
+    let oldText = "";
+    if (typeof filePath === "string") {
+      const file = Bun.file(filePath);
+      if (await file.exists()) oldText = await file.text();
+    }
+    return { newText: content, oldText };
+  }
+
+  if (toolName === "Edit") {
+    const newString = toolInput.new_string;
+    if (typeof newString !== "string" || newString.length === 0) return null;
+    const oldString = toolInput.old_string;
+    return { newText: newString, oldText: typeof oldString === "string" ? oldString : "" };
+  }
+
+  if (toolName === "MultiEdit") {
+    const pair = collectMultiEditPairs(toolInput);
+    if (pair.newText.length === 0) return null;
+    return pair;
+  }
+
+  return null;
 }
 
 export async function collectText(input: PreToolUseHookInput): Promise<string[]> {
   const toolInput = input.tool_input as Record<string, unknown>;
   const toolName = input.tool_name;
 
-  if (toolName === "Write") {
-    const content = toolInput.content as string | undefined;
-    return content ? [content] : [];
-  }
-
-  if (toolName === "Edit") {
-    const content = toolInput.new_string as string | undefined;
-    return content ? [content] : [];
-  }
-
-  if (toolName === "MultiEdit") {
-    return collectMultiEditText(toolInput);
+  if (FILE_OP_TOOLS.has(toolName)) {
+    const pair = await collectFileOpPair(input);
+    return pair ? [pair.newText] : [];
   }
 
   if (toolName === "Bash" && typeof toolInput.command === "string") {
@@ -122,31 +153,56 @@ function isMemoryFile(input: PreToolUseHookInput): boolean {
   return isMemoryPath(filePath);
 }
 
+function buildFileOpReminder(
+  toolName: string,
+  filePath: string | undefined,
+  deny: PatternMatch,
+): string {
+  const target = filePath ? `\`${filePath}\`` : "the file";
+  if (toolName === "Write") {
+    return `${deny.message} You wrote ${target} introducing this. Issue a follow-up Edit that fixes only the trope you just introduced. Do not modify unrelated parts of the file.`;
+  }
+  return `${deny.message} You introduced this in your edit to ${target}. Issue a follow-up Edit that targets only the text you just changed. Do not modify unrelated parts of the file, including other pre-existing tropes.`;
+}
+
+async function processFileOp(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  const pair = await collectFileOpPair(input);
+  if (!pair) return null;
+  const filePath = (input.tool_input as Record<string, unknown>).file_path as string | undefined;
+  const matches = scanIntroduced(pair.newText, pair.oldText, filePath);
+
+  const deny = firstByTier(matches, "deny");
+  if (deny) {
+    return formatContext(buildFileOpReminder(input.tool_name, filePath, deny));
+  }
+
+  const context = firstByTier(matches, "context");
+  if (context) return formatContext(context.message);
+
+  return null;
+}
+
+async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  const texts = await collectText(input);
+  if (texts.length === 0) return null;
+  const combined = texts.join("\n");
+  const matches = scan(combined);
+
+  const deny = firstByTier(matches, "deny");
+  if (deny) return formatDecision("deny", deny.message);
+
+  const context = firstByTier(matches, "context");
+  if (context) return formatContext(context.message);
+
+  return null;
+}
+
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   if (isPlanFile(input)) return null;
   if (isMemoryFile(input)) return null;
 
-  const texts = await collectText(input);
-  if (texts.length === 0) return null;
-
-  const combined = texts.join("\n");
-  const filePath = (input.tool_input as Record<string, unknown>).file_path as string | undefined;
-  const matches = scan(combined, filePath);
-  const deny = firstByTier(matches, "deny");
-
-  if (deny) {
-    if (input.tool_name === "Edit" || input.tool_name === "MultiEdit") {
-      return formatDecision("ask", deny.message);
-    }
-    return formatDecision("deny", deny.message);
-  }
-
-  const context = firstByTier(matches, "context");
-  if (context) {
-    return formatContext(context.message);
-  }
-
-  return null;
+  if (FILE_OP_TOOLS.has(input.tool_name)) return processFileOp(input);
+  return processSideEffect(input);
 }
 
 async function main(): Promise<void> {

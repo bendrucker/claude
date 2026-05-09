@@ -28,9 +28,9 @@ Use `$TMUX_PANE` to identify the current pane and target adjacent ones.
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/layout.sh`
 
-Use `left`/`top` coordinates to resolve spatial references (LHS = lowest `left`, RHS = highest `left`, top = lowest `top`, bottom = highest `top`). When describing layouts, draw ASCII box diagrams showing pane positions and sizes.
+Use `left`/`top` coordinates to resolve spatial references within the current window (LHS = lowest `left`, RHS = highest `left`, top = lowest `top`, bottom = highest `top`). When describing layouts, draw ASCII box diagrams showing pane positions and sizes.
 
-Target panes across windows and sessions with `<session>:<window>.<pane>` (e.g., `dotfiles:1.%42`). Use `tmux list-panes -t <session>:<window>` to discover pane IDs in other windows.
+The `Other Panes` section lists panes in other windows and sessions. Its `TARGET` column is ready to use with `-t` (e.g., `tmux capture-pane -t website:1.%7 -p`). The `TITLE` column shows app-set context — Claude sessions advertise their current task there, which is usually enough to identify a pane without capturing its content.
 
 ### Notifications
 

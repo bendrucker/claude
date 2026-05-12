@@ -184,7 +184,8 @@
         "~/Library/Caches/go-build",
         "~/src/go/pkg/mod",
         "~/src/go/pkg/sumdb",
-        "~/.bun/install"
+        "~/.bun/install",
+        "~/.local/share/uv"
       ]
     },
     "excludedCommands": [

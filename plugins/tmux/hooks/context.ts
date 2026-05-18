@@ -9,9 +9,10 @@ const FORMAT = [
 ].join("\n");
 
 async function main(): Promise<void> {
-  if (!process.env.TMUX || !process.env.CLAUDE_ENV_FILE) return;
+  const pane = process.env.TMUX_PANE;
+  if (!process.env.TMUX || !pane || !process.env.CLAUDE_ENV_FILE) return;
 
-  const proc = Bun.spawn(["tmux", "display-message", "-p", FORMAT], {
+  const proc = Bun.spawn(["tmux", "display-message", "-t", pane, "-p", FORMAT], {
     stdout: "pipe",
     stderr: "ignore",
   });

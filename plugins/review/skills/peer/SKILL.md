@@ -42,8 +42,10 @@ See [tone.md](tone.md) for comment style guidelines.
 
 By default this skill uses Hunk to stage comments before they're posted. This skill assumes the `hunk-review` skill is loaded — it owns the CLI mechanics.
 
+If the review is approve-with-no-comments, skip Hunk staging entirely and go straight to Submit.
+
 1. **Find or request a session.** `hunk session list --json`. If none matches the PR's checkout, ask me to open one — usually `hunk diff <base>...HEAD` (e.g. `main...HEAD`) so the view matches the PR's diff. If I decline to use Hunk, fall back to posting directly via `mcp__github` / `glab`.
-2. **Push proposed comments as a batch.** Build a JSON payload of the comments you'd otherwise post, then pipe to `hunk session comment apply --repo . --stdin`. One batch per review pass — not one shell call per comment.
+2. **Push proposed comments as a batch.** Build the `{"comments":[...]}` JSON payload, `Write` it to a temp file, then `hunk session comment apply --repo . --stdin < /tmp/hunk-batch.json`. Use a file rather than a pipe so the bash command starts with `hunk session` and matches the permission rule. One batch per review pass — not one shell call per comment.
 3. **Hand control back.** Tell me the staged comments are ready and wait for me to revise them in the TUI (edit wording, drop notes I disagree with, add my own).
 4. **Read back the final set.** When I say I'm done, run `hunk session comment list --repo . --json`. That's the authoritative set to submit — do not re-use your original draft.
 5. **Submit as a batch review** to GitHub or GitLab using the platform's review API (see [Service Support](#service-support)). After successful submission, clear the staging area: `hunk session comment clear --repo . --yes`.

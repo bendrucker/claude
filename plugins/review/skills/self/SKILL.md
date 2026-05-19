@@ -24,7 +24,7 @@ This skill assumes the `hunk-review` skill is loaded — it owns the CLI mechani
 4. **Apply each comment.** For every entry:
    - Read the referenced file at the indicated line(s)
    - Make the requested change with Edit
-   - Optionally remove the comment after applying: `hunk session comment rm --repo . <comment-id>`
+   - Remove the comment after applying: `hunk session comment rm --repo . <comment-id>`. Leave it in place only if the user asked you to skip or push back — so the remaining comments at the end represent unresolved feedback.
 5. **Summarize what you changed** and what (if anything) you skipped or want to push back on.
 
 ## Notes

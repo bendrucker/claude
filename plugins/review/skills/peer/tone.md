@@ -4,7 +4,7 @@ Comments should be concise and instructive. Help the author understand why a sug
 
 Write in a natural, conversational tone. Avoid stiff or over-punctuated prose. Read the reviewer's actual comment history to match their voice.
 
-Don't address the author by name or with greetings ("Hey Arya,", "Hi @alice"). Comments are already targeted at the author — open with the substance.
+Don't address the author by name or with greetings ("Hey Alice,", "Hi @bob"). Comments are already targeted at the author, so open with the substance.
 
 ## Severity
 

@@ -67,6 +67,10 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
     return null;
   }
 
+  if (process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE) {
+    return null;
+  }
+
   const files = await parseTranscript(input.transcript_path);
   if (files.length === 0) {
     return null;

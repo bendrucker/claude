@@ -7,7 +7,7 @@ allowed-tools:
   - Skill(things:jxa)
   - Skill(things:url)
   - Skill(pull-request:create)
-  - Skill(code-review *)
+  - Skill(code-review)
   - Skill(github:actions-monitor)
 ---
 
@@ -32,13 +32,7 @@ Launch parallel `Plan` agents (one per todo). Give each the todo title, full not
 
 Point agents to relevant domain skills: `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts.
 
-Present all plans. For each, propose a `/code-review` effort level based on the planned changes with one-line reasoning and confirm via `AskUserQuestion`. The user approves the plan and effort together before implementation begins. Effort heuristics:
-
-- **low**: docs-only, dep bumps, config tweaks, trivial fixes (<50 lines)
-- **medium**: typical features or fixes, single module, ~50–500 lines
-- **high**: large refactors, multi-module, public API or schema changes, ~500–2000 lines
-- **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations
-- **max**: rare — incident hotfix or change with extreme blast radius
+Present all plans. For each, propose a `/code-review` effort (typically `low`; `medium` for changes touching multiple plugins) and confirm via `AskUserQuestion` alongside plan approval.
 
 ## Implement
 

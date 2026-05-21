@@ -17,7 +17,7 @@
       "Skill(claude-code:session)",
       "Skill(claude-code:skill)",
       "Skill(claude-code:skill-creator)",
-      "Skill(code-review *)",
+      "Skill(code-review)",
       "Skill(git:conflicts)",
       "Skill(git:fix-conflicts)",
       "Skill(git:git)",

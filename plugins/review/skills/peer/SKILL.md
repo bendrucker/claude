@@ -5,7 +5,7 @@ description: |
 allowed-tools:
   - Bash(gh:*)
   - mcp__github
-  - Skill(code-review *)
+  - Skill(code-review)
 ---
 
 # Peer Review

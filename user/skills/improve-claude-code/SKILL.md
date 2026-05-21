@@ -7,7 +7,7 @@ allowed-tools:
   - Skill(things:jxa)
   - Skill(things:url)
   - Skill(pull-request:create)
-  - Skill(simplify)
+  - Skill(code-review *)
   - Skill(github:actions-monitor)
 ---
 
@@ -32,11 +32,17 @@ Launch parallel `Plan` agents (one per todo). Give each the todo title, full not
 
 Point agents to relevant domain skills: `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts.
 
-Present all plans. The user approves or rejects each before implementation begins.
+Present all plans. For each, propose a `/code-review` effort level based on the planned changes with one-line reasoning and confirm via `AskUserQuestion`. The user approves the plan and effort together before implementation begins. Effort heuristics:
+
+- **low**: docs-only, dep bumps, config tweaks, trivial fixes (<50 lines)
+- **medium**: typical features or fixes, single module, ~50–500 lines
+- **high**: large refactors, multi-module, public API or schema changes, ~500–2000 lines
+- **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations
+- **max**: rare — incident hotfix or change with extreme blast radius
 
 ## Implement
 
-For each approved plan, launch a background `general-purpose` agent with `isolation: "worktree"`. Each agent implements the plan, runs `bun test`, runs `/simplify`, commits, and creates the PR via `pull-request:create`. Pass the same domain skills from the planning step.
+For each approved plan, launch a background `general-purpose` agent with `isolation: "worktree"`. Each agent implements the plan, runs `bun test`, runs `/code-review <effort>` with the level chosen during planning, commits, and creates the PR via `pull-request:create`. Pass the same domain skills from the planning step.
 
 #### PR body
 

@@ -17,6 +17,7 @@
       "Skill(claude-code:session)",
       "Skill(claude-code:skill)",
       "Skill(claude-code:skill-creator)",
+      "Skill(code-review)",
       "Skill(git:conflicts)",
       "Skill(git:fix-conflicts)",
       "Skill(git:git)",
@@ -26,7 +27,6 @@
       "Skill(github:notifications)",
       "Skill(github:pr-comments)",
       "Skill(plan:guidelines)",
-      "Skill(pr-review-toolkit:review-pr)",
       "Skill(pull-request:babysit)",
       "Skill(pull-request:create)",
       "Skill(pull-request:follow-up)",
@@ -35,7 +35,6 @@
       "Skill(review:follow-up)",
       "Skill(review:peer)",
       "Skill(review:self)",
-      "Skill(simplify)",
       "Skill(update-config)",
       "Skill(writing:review)",
       "Skill(writing:writing)"

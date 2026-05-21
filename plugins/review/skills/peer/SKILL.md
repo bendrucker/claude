@@ -5,6 +5,7 @@ description: |
 allowed-tools:
   - Bash(gh:*)
   - mcp__github
+  - Skill(code-review)
 ---
 
 # Peer Review
@@ -25,12 +26,13 @@ If not on the branch, first run `gh pr checkout` to switch.
 1. **Research** - Gather context (see [research.md](research.md))
 2. **Context** - Determine review context using repository visibility. Private repositories use [corporate](references/corporate.md) defaults. Public repositories use [open-source](references/open-source.md) defaults. Check visibility via the platform API (`gh api repos/OWNER/REPO --jq .visibility` or `glab api projects/ENCODED_PATH | jq .visibility`). If ambiguous, ask me.
 3. **Review** - Examine changed files and existing comments
-4. **Delegate** - Selectively dispatch PR review toolkit agents in parallel based on what the diff touches:
-   - Error handling, catch blocks, fallback logic: `silent-failure-hunter`
-   - New type definitions: `type-design-analyzer`
-   - New or modified tests: `pr-test-analyzer`
-   - Skip delegation for trivial PRs (docs-only, config changes, dependency bumps).
-5. **Think** - Evaluate against priorities (see [priorities.md](priorities.md)), incorporating toolkit agent findings
+4. **Delegate** - Run `/code-review` for code-quality analysis. Summarize the diff (rough line count, files touched, sensitive areas) and signals from the PR body, propose an effort level with one-line reasoning, and confirm via `AskUserQuestion` before invoking. Skip the call entirely for trivial PRs (docs-only, dep bumps). Effort heuristics:
+   - **low**: docs-only, dep bumps, config tweaks, trivial fixes (<50 lines)
+   - **medium**: typical features or fixes, single module, ~50–500 lines
+   - **high**: large refactors, multi-module, public API or schema changes, ~500–2000 lines
+   - **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations
+   - **max**: rare — incident hotfix or change with extreme blast radius
+5. **Think** - Evaluate against priorities (see [priorities.md](priorities.md)), incorporating `/code-review` findings
 6. **Suggest** - Propose comments with revisions or issues
 7. **Comment** - Add approved comments to PR review
 8. **Submit** - Approve / Comment / Request Changes based on severity

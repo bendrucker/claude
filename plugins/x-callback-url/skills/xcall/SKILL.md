@@ -12,7 +12,7 @@ Send [x-callback-url](https://x-callback-url.com/) requests from the command lin
 
 ## How It Works
 
-`xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source into `${CLAUDE_PLUGIN_DATA}/xcall.app` and registers the callback scheme (`xcall-claude://`) with Launch Services. The bundle lives in the persistent plugin data directory so it survives plugin cache invalidation.
+`xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source into `${CLAUDE_PLUGIN_DATA}/xcall.app` and registers the callback scheme (`xcall-claude://`) with Launch Services. Installing into the plugin's data directory (instead of the plugin source/cache tree) keeps the registered path stable across plugin updates: the marketplace cache is content-addressed, so building xcall.app inside it would orphan the Launch Services registration on the next update.
 
 ## Usage
 
@@ -74,7 +74,7 @@ Apps with their own CLI (e.g., Shortcuts via `shortcuts run`) don't need xcall â
 ## Build Details
 
 - Source: `scripts/main.swift` (~100 lines)
-- Build: `scripts/build.sh` compiles to `${CLAUDE_PLUGIN_DATA}/xcall.app/` (falls back to `~/.claude/plugins/data/x-callback-url-bendrucker/xcall.app/`)
+- Build: `scripts/build.sh` compiles to `${CLAUDE_PLUGIN_DATA}/xcall.app/`. The script exits non-zero if `CLAUDE_PLUGIN_DATA` is unset.
 - Bundle ID: `com.bendrucker.xcall-claude`
 - Callback scheme: `xcall-claude://`
 - `Info.plist`: `CFBundleTypeRole=Editor`, `LSUIElement=true`. `LSBackgroundOnly` is intentionally not set: combining it with `LSUIElement` causes macOS to refuse to route URL scheme callbacks to the app, surfacing as a "no application set" dialog.

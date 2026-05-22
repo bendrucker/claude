@@ -6,19 +6,23 @@ set -euo pipefail
 # The .app bundle is required because macOS only delivers URL scheme
 # callbacks to registered applications with CFBundleURLTypes in Info.plist.
 #
-# Installs into ${CLAUDE_PLUGIN_DATA} so the bundle survives plugin cache
-# invalidation. Builds inside the plugin's cache directory would otherwise
-# go stale whenever the plugin's content hash rotates, leaving Launch
-# Services pointing at a deleted path.
+# Installs into ${CLAUDE_PLUGIN_DATA}. Marketplace installs put plugin
+# sources in a content-addressed cache directory whose hash rotates per
+# plugin version; building xcall.app there would leave Launch Services
+# pointing at a deleted path after any plugin update.
 #
 # Output (stdout): path to the compiled binary inside the .app bundle.
 # Cached: only recompiles if main.swift is newer than the existing binary.
 
+if [[ -z "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+  echo "CLAUDE_PLUGIN_DATA is not set; this script must be invoked from a Claude Code plugin context" >&2
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE="$SCRIPT_DIR/main.swift"
 
-INSTALL_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/x-callback-url-bendrucker}"
-APP_DIR="$INSTALL_DIR/xcall.app"
+APP_DIR="$CLAUDE_PLUGIN_DATA/xcall.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 BINARY="$MACOS_DIR/xcall"

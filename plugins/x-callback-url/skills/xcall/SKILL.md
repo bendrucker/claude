@@ -12,7 +12,7 @@ Send [x-callback-url](https://x-callback-url.com/) requests from the command lin
 
 ## How It Works
 
-`xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source and registers the callback scheme (`xcall-claude://`) with Launch Services.
+`xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source into `${CLAUDE_PLUGIN_DATA}/xcall.app` and registers the callback scheme (`xcall-claude://`) with Launch Services. The bundle lives in the persistent plugin data directory so it survives plugin cache invalidation.
 
 ## Usage
 
@@ -74,9 +74,10 @@ Apps with their own CLI (e.g., Shortcuts via `shortcuts run`) don't need xcall â
 ## Build Details
 
 - Source: `scripts/main.swift` (~100 lines)
-- Build: `scripts/build.sh` compiles to `scripts/xcall.app/`
+- Build: `scripts/build.sh` compiles to `${CLAUDE_PLUGIN_DATA}/xcall.app/` (falls back to `~/.claude/plugins/data/x-callback-url-bendrucker/xcall.app/`)
 - Bundle ID: `com.bendrucker.xcall-claude`
 - Callback scheme: `xcall-claude://`
-- `Info.plist`: `CFBundleTypeRole=Editor`, `LSUIElement=true`, `LSBackgroundOnly=true`
+- `Info.plist`: `CFBundleTypeRole=Editor`, `LSUIElement=true`. `LSBackgroundOnly` is intentionally not set: combining it with `LSUIElement` causes macOS to refuse to route URL scheme callbacks to the app, surfacing as a "no application set" dialog.
+- After building, `build.sh` calls `lsregister -f` and verifies the scheme handler is the freshly built bundle. If verification fails it exits non-zero.
 - Build is cached â€” only recompiles if `main.swift` is newer than the binary
 - Timeout: 10 seconds

@@ -68,6 +68,10 @@ export async function buildUrl(command: string, params: Map<string, string>): Pr
   return url;
 }
 
+export function isSandboxBlockedHandoff(stderr: string): boolean {
+  return /procNotFound|LSOpenURLsWithRole|(?<![\d-])-10810(?!\d)/i.test(stderr);
+}
+
 export async function openUrl(
   command: string,
   params: Map<string, string>,
@@ -76,10 +80,22 @@ export async function openUrl(
   const url = await buildUrl(command, params);
   const background = options?.background ?? (command !== "show" && command !== "search");
 
-  if (background) {
-    await $`open -g ${url}`;
-  } else {
-    await $`open ${url}`;
+  try {
+    if (background) {
+      await $`open -g ${url}`;
+    } else {
+      await $`open ${url}`;
+    }
+  } catch (error) {
+    if (error instanceof $.ShellError) {
+      const stderr = error.stderr.toString();
+      if (isSandboxBlockedHandoff(stderr)) {
+        throw new Error(
+          `Things URL handoff was blocked by the Claude Code sandbox (LaunchServices procNotFound / -10810). The things plugin's PreToolUse hook should disable the sandbox for this script; verify the hook is registered, or rerun the calling tool with sandbox disabled. Original stderr: ${stderr.trim()}`,
+        );
+      }
+    }
+    throw error;
   }
 }
 

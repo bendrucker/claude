@@ -61,8 +61,7 @@ async function writeEnvFile(envFile: string, pane: string): Promise<void> {
   }
 }
 
-const PREAMBLE =
-  "You are running inside a tmux session. The user is attached to this session and can see your pane and the surrounding panes in real time.";
+const PREAMBLE = "You are running inside a tmux session.";
 
 function buildContext(
   pane: string | null,

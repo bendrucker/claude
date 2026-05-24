@@ -9,17 +9,11 @@ Rules for rewriting text in direct, concise style. Rewritten text must pass all 
 - Specific verbs over vague ones. "Generates a report" not "handles report generation."
 - Every sentence teaches the reader something new. Cut sentences that restate what came before.
 
-## Banned Vocabulary
+## Vocabulary
 
-These words are AI tells. Replace them with natural alternatives:
+Read `plugins/writing/wordlists/vocabulary.txt` for the full banned word list. These are AI tells. Replace every occurrence with a natural alternative.
 
-- delve, tapestry, landscape (figurative), meticulous/meticulously
-- pivotal, testament, underscore (figurative), interplay, intricacies
-- bolstered, garner/garnered, foster/fostering
-
-## Banned Promotional Language
-
-- boasts, vibrant, showcasing, nestled, groundbreaking, renowned, diverse array
+Read `plugins/writing/wordlists/marketing-verbs.txt` for promotional verbs to avoid. These are weighted by severity. Replace with concrete, specific verbs.
 
 ## Copula Avoidance
 
@@ -30,7 +24,7 @@ Do not replace "is" or "are" with fancier constructions:
 
 ## Em Dashes
 
-Never use spaced em dashes (` — `). Rewrite with commas, colons, parentheses, or periods. Unspaced em dashes are acceptable but less common in natural writing.
+Never use spaced em dashes (` — `). Rewrite with commas, colons, parentheses, or periods.
 
 ## Parallelism
 
@@ -57,14 +51,7 @@ Cut filler phrases that add no information:
 
 ## Openers
 
-Do not start with sycophantic or formulaic openers:
-
-- "Great question"
-- "Absolutely"
-- "That's a great point"
-- "Sure thing"
-
-Start with the substance.
+Do not start with sycophantic or formulaic openers. Read `plugins/writing/wordlists/openers.txt` for the full list. Start with the substance.
 
 ## Tone
 

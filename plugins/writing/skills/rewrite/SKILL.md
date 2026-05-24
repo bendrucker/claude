@@ -32,7 +32,7 @@ If `$ARGUMENTS` is empty, read from the clipboard with `pbpaste`.
 
 ## Rewriting
 
-Apply every rule in [references/style-rules.md](references/style-rules.md). Focus on:
+Read the wordlist files referenced in [references/style-rules.md](references/style-rules.md), then apply every rule. Focus on:
 
 - Replacing banned vocabulary and promotional language with natural alternatives
 - Removing filler phrases and hedging

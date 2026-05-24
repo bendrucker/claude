@@ -1,6 +1,9 @@
 import { isProseFile } from "./markdown";
+import { type Hits, type StemmedWeight, WORDLISTS, weightedStemHits } from "./wordlists";
 
 export type PatternTier = "deny" | "context";
+
+export type ScanContext = "file" | "sideEffect";
 
 export type PatternMatch = {
   tier: PatternTier;
@@ -12,8 +15,18 @@ export type PatternMatch = {
 type PatternDef = {
   tier: PatternTier;
   category: string;
-  test: RegExp | ((text: string) => boolean);
+  test: RegExp | ((text: string) => Hits);
   message: (matched: string) => string;
+  fileOnly?: boolean;
+  sideEffectOnly?: boolean;
+};
+
+type WeightedPatternGroup = {
+  tier: PatternTier;
+  category: string;
+  entries: StemmedWeight[];
+  threshold: number;
+  message: (matchedExamples: string[], totalWeight: number) => string;
   fileOnly?: boolean;
 };
 
@@ -31,7 +44,7 @@ const RESULT_SENTENCES = [
   /^(?:\w+\s+){0,3}pass(?:es|ed|ing)?(?:\s|$)/im,
 ];
 
-function hasTestResultReport(text: string): boolean {
+function testResultHits(text: string): Hits {
   for (const sentence of text.split(/[.!?\n]+/)) {
     const s = sentence.trim();
     for (const pattern of RESULT_SENTENCES) {
@@ -40,24 +53,27 @@ function hasTestResultReport(text: string): boolean {
       if (!match) continue;
       const after = s.slice(match.index + match[0].length).trim();
       if (DETERMINERS.test(after)) continue;
-      return true;
+      return { count: 1, sample: "" };
     }
   }
-  return false;
+  return { count: 0, sample: "" };
 }
+
+const CROSS_SENTENCE_NOT =
+  /\b(it|this|that|he|she|they|we|you)\s+(?:is|are|was|were)(?:n't|\s+not)\s+[^.!?]{1,80}[.!?]\s+\1\s+(?:is|are|was|were)\b/gi;
 
 const PATTERNS: PatternDef[] = [
   {
     tier: "deny",
     category: "spaced em dash",
-    test: / \u2014 /g,
+    test: / — /g,
     message: () =>
-      "Spaced em dashes ( \u2014 ) are an AI writing tell. Use unspaced em dashes (\u2014), commas, colons, or parentheses instead.",
+      "Spaced em dashes ( — ) are an AI writing tell. Use unspaced em dashes (—), commas, colons, or parentheses instead.",
   },
   {
     tier: "deny",
     category: "AI vocabulary",
-    test: /\b(delve|tapestry|landscape|meticulous(?:ly)?|pivotal|testament|underscore[sd]?|interplay|intricacies|bolstered|garner(?:ed|s)?|foster(?:ing|ed|s)?)\b/gi,
+    test: WORDLISTS.vocabulary,
     message: (matched) =>
       `"${matched}" is flagged as AI-typical vocabulary. Use a more natural word.`,
   },
@@ -68,9 +84,46 @@ const PATTERNS: PatternDef[] = [
     message: (matched) => `"${matched}" avoids a simple copula. Use "is" or "are" instead.`,
   },
   {
+    tier: "deny",
+    category: "sycophantic opener",
+    test: WORDLISTS.openers,
+    sideEffectOnly: true,
+    message: (matched) =>
+      `"${matched.trim()}" reads as a sycophantic opener. Open with the substance.`,
+  },
+  {
+    tier: "deny",
+    category: "sycophantic acknowledgment",
+    test: /\byou(?:'re|\s+are)\s+(?:absolutely\s+|completely\s+)?right\b/gi,
+    sideEffectOnly: true,
+    message: () =>
+      '"You\'re right" is a sycophantic acknowledgment. Move directly to the correction.',
+  },
+  {
+    tier: "deny",
+    category: "permission-seeking",
+    test: /\bwant\s+me\s+to\s+\w+/gi,
+    sideEffectOnly: true,
+    message: () => '"Want me to ..." reads as permission-seeking. Just do it, or describe options.',
+  },
+  {
+    tier: "deny",
+    category: "hedging close",
+    test: /\bwould\s+you\s+like\b/gi,
+    sideEffectOnly: true,
+    message: () => '"Would you like ..." is a hedging close. State the next step directly.',
+  },
+  {
+    tier: "deny",
+    category: "reaching for",
+    test: /\breach(?:ing|es|ed)?\s+for\b/gi,
+    message: (matched) =>
+      `"${matched}" is an AI-flavored figurative construction. Prefer "use" or "prefer X over Y".`,
+  },
+  {
     tier: "context",
     category: "test result reporting",
-    test: hasTestResultReport,
+    test: testResultHits,
     message: () =>
       "Do not report test results, counts, or CI status. Describe what is covered instead.",
   },
@@ -90,11 +143,90 @@ const PATTERNS: PatternDef[] = [
   },
   {
     tier: "context",
+    category: "cross-sentence not-X",
+    test: CROSS_SENTENCE_NOT,
+    message: () =>
+      'Cross-sentence "It isn\'t X. It is Y." patterns are an AI tell. Combine into one sentence or drop the negation.',
+  },
+  {
+    tier: "context",
     category: "semicolon overuse",
     test: /;[^;]*;[^;]*;/g,
     fileOnly: true,
     message: () =>
       "Multiple semicolons in close proximity. AI tends to overuse semicolons. Prefer shorter sentences or commas.",
+  },
+  {
+    tier: "context",
+    category: "passive PR summary",
+    test: /\b(?:is|was|are|were)\s+(?:added|updated|removed|refactored|introduced|created|deleted|modified|improved)\b/gi,
+    fileOnly: true,
+    message: (matched) =>
+      `"${matched}" is passive voice in PR-style writing. Rewrite so something is doing the verb.`,
+  },
+  {
+    tier: "context",
+    category: "tests cover preamble",
+    test: /^Tests\s+(?:cover|verify|ensure|validate)\b/m,
+    message: () =>
+      '"Tests cover ..." elides the subject. Use "Added tests covering ..." or describe the change.',
+  },
+  {
+    tier: "context",
+    category: "path bullet",
+    test: /^\s*-\s*\*\*[^*\n]+\*\*\s*:\s*/m,
+    fileOnly: true,
+    message: () =>
+      "`- **path**: description` bullets read as file manifests. Describe the conceptual change in prose.",
+  },
+  {
+    tier: "context",
+    category: "trailing hedge",
+    test: /\b(?:regardless|nonetheless|anyway)\.\s*(?:$|\n)/gim,
+    fileOnly: true,
+    message: (matched) =>
+      `"${matched.trim()}" dangles at sentence end as AI hedging. Drop it or rewrite the clause.`,
+  },
+  {
+    tier: "context",
+    category: "label bold",
+    test: /^\s*\*\*[A-Z][A-Za-z ]+(?::\*\*|\*\*:)\s/m,
+    fileOnly: true,
+    message: () => "`**Label:**` reads as templated. Use a `####` header instead.",
+  },
+  {
+    tier: "context",
+    category: "dig into",
+    test: /\b(?:dig|dive|wade)\s+into\b/gi,
+    message: (matched) =>
+      `"${matched}" is exploration filler. Describe what you're actually looking at.`,
+  },
+  {
+    tier: "context",
+    category: "hedging observation",
+    test: /\b(?:looks|appears|seems)\s+(?:like|to)\b/gi,
+    message: (matched) =>
+      `"${matched}" is hedging observation. State the observation directly or name the uncertainty.`,
+  },
+  {
+    tier: "context",
+    category: "I understand",
+    test: /\bi\s+understand\b/gi,
+    sideEffectOnly: true,
+    message: () => '"I understand" is a sycophantic preamble. Move to the substance.',
+  },
+];
+
+const MARKETING_VERB_THRESHOLD = 3.0;
+
+const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
+  {
+    tier: "context",
+    category: "marketing verbs",
+    entries: WORDLISTS.marketingVerbs,
+    threshold: MARKETING_VERB_THRESHOLD,
+    message: (examples) =>
+      `Marketing verbs stack up (${examples.join(", ")}). Describe concretely what changed instead of promotional framing.`,
   },
 ];
 
@@ -102,25 +234,24 @@ export function stripCode(text: string): string {
   return text.replace(FENCED_CODE_BLOCK, "").replace(INLINE_CODE, "");
 }
 
-type Hits = { count: number; sample: string };
-
 function patternHits(stripped: string, def: PatternDef): Hits {
   if (typeof def.test === "function") {
-    return { count: def.test(stripped) ? 1 : 0, sample: "" };
+    return def.test(stripped);
   }
   def.test.lastIndex = 0;
   const all = stripped.match(def.test);
   return { count: all?.length ?? 0, sample: all?.[0] ?? "" };
 }
 
-export function scan(text: string, filePath?: string): PatternMatch[] {
-  return scanIntroduced(text, "", filePath);
+export function scan(text: string, filePath?: string, context?: ScanContext): PatternMatch[] {
+  return scanIntroduced(text, "", filePath, context);
 }
 
 export function scanIntroduced(
   newText: string,
   oldText: string,
   filePath?: string,
+  context?: ScanContext,
 ): PatternMatch[] {
   const newStripped = stripCode(newText);
   const oldStripped = stripCode(oldText);
@@ -130,6 +261,7 @@ export function scanIntroduced(
   for (const def of PATTERNS) {
     if (seenTiers.has(def.tier)) continue;
     if (def.fileOnly && filePath && !isProseFile(filePath)) continue;
+    if (def.sideEffectOnly && context === "file") continue;
 
     const newHits = patternHits(newStripped, def);
     if (newHits.count === 0) continue;
@@ -143,6 +275,24 @@ export function scanIntroduced(
       message: def.message(newHits.sample),
     });
     seenTiers.add(def.tier);
+  }
+
+  for (const group of WEIGHTED_PATTERNS) {
+    if (seenTiers.has(group.tier)) continue;
+    if (group.fileOnly && filePath && !isProseFile(filePath)) continue;
+
+    const newWeighted = weightedStemHits(newStripped, group.entries);
+    if (newWeighted.totalWeight < group.threshold) continue;
+    const oldWeighted = weightedStemHits(oldStripped, group.entries);
+    if (newWeighted.totalWeight <= oldWeighted.totalWeight) continue;
+
+    matches.push({
+      tier: group.tier,
+      category: group.category,
+      matched: newWeighted.samples[0] ?? "",
+      message: group.message(newWeighted.samples, newWeighted.totalWeight),
+    });
+    seenTiers.add(group.tier);
   }
 
   return matches;

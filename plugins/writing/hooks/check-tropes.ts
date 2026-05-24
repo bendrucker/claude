@@ -3,7 +3,7 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { formatContext, formatDecision, isMemoryPath, type SyncHookJSONOutput } from "./markdown";
-import { firstByTier, type PatternMatch, scan, scanIntroduced } from "./tropes";
+import { firstByTier, type PatternMatch, type ScanContext, scan, scanIntroduced } from "./tropes";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
@@ -153,6 +153,14 @@ function isMemoryFile(input: PreToolUseHookInput): boolean {
   return isMemoryPath(filePath);
 }
 
+const WORDLIST_PATH_PATTERN = /\/wordlists\/[^/]+\.txt$/;
+
+function isWordlistFile(input: PreToolUseHookInput): boolean {
+  const filePath = (input.tool_input as Record<string, unknown>).file_path;
+  if (typeof filePath !== "string") return false;
+  return WORDLIST_PATH_PATTERN.test(filePath);
+}
+
 function buildFileOpReminder(
   toolName: string,
   filePath: string | undefined,
@@ -169,7 +177,7 @@ async function processFileOp(input: PreToolUseHookInput): Promise<SyncHookJSONOu
   const pair = await collectFileOpPair(input);
   if (!pair) return null;
   const filePath = (input.tool_input as Record<string, unknown>).file_path as string | undefined;
-  const matches = scanIntroduced(pair.newText, pair.oldText, filePath);
+  const matches = scanIntroduced(pair.newText, pair.oldText, filePath, "file");
 
   const deny = firstByTier(matches, "deny");
   if (deny) {
@@ -186,7 +194,7 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJS
   const texts = await collectText(input);
   if (texts.length === 0) return null;
   const combined = texts.join("\n");
-  const matches = scan(combined);
+  const matches = scan(combined, undefined, "sideEffect");
 
   const deny = firstByTier(matches, "deny");
   if (deny) return formatDecision("deny", deny.message);
@@ -200,6 +208,7 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJS
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   if (isPlanFile(input)) return null;
   if (isMemoryFile(input)) return null;
+  if (isWordlistFile(input)) return null;
 
   if (FILE_OP_TOOLS.has(input.tool_name)) return processFileOp(input);
   return processSideEffect(input);

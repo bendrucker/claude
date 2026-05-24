@@ -223,6 +223,7 @@
         "@constellos/claude-code-kit": "^0.4.0",
         "ap-style-title-case": "^2.0.0",
         "mdast-util-from-markdown": "^2.0.2",
+        "stemmer": "^2.0.1",
         "unist-util-visit": "^5.1.0",
       },
       "devDependencies": {
@@ -1196,6 +1197,8 @@
     "statuses": ["statuses@2.0.2", "", {}, "sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw=="],
 
     "stdin": ["stdin@0.0.1", "", {}, "sha512-2bacd1TXzqOEsqRa+eEWkRdOSznwptrs4gqFcpMq5tOtmJUGPZd10W5Lam6wQ4YQ/+qjQt4e9u35yXCF6mrlfQ=="],
+
+    "stemmer": ["stemmer@2.0.1", "", { "bin": { "stemmer": "cli.js" } }, "sha512-bkWvSX2JR4nSZFfs113kd4C6X13bBBrg4fBKv2pVdzpdQI2LA5pZcWzTFNdkYsiUNl13E4EzymSRjZ0D55jBYg=="],
 
     "string-width": ["string-width@4.2.3", "", { "dependencies": { "emoji-regex": "^8.0.0", "is-fullwidth-code-point": "^3.0.0", "strip-ansi": "^6.0.1" } }, "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g=="],
 

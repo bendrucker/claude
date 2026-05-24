@@ -1,0 +1,43 @@
+# Single-word AI vocabulary deny list.
+# One entry per line. Matching uses a Porter stemmer, so inflected forms
+# (e.g., "meticulously", "garnered") are caught automatically.
+#
+# Original deny list.
+delve
+tapestry
+landscape
+meticulous
+pivotal
+testament
+underscore
+interplay
+intricacies
+bolstered
+garner
+foster
+#
+# High-confidence additions sourced from sam-paech/slop-forensics
+# (https://github.com/sam-paech/slop-forensics). Filtered to entries that
+# match the user's correction history and avoid ambiguous technical terms.
+myriad
+plethora
+seamless
+revolutionary
+paradigm
+holistic
+synergy
+leverage
+robust
+comprehensive
+nuance
+realm
+resonate
+embrace
+unveil
+intricate
+embark
+elucidate
+multifaceted
+quintessential
+mosaic
+beacon

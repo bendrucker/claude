@@ -23,7 +23,7 @@ beforeAll(async () => {
   markedScriptPath = join(fixtureDir, "marked.ts");
   await Bun.write(
     markedScriptPath,
-    `#!/usr/bin/env bun\n// claude:sandbox-bypass: calls a Go binary\nconsole.log("hi");\n`,
+    `#!/usr/bin/env bun\n// claude:dangerouslyDisableSandbox: calls a Go binary\nconsole.log("hi");\n`,
   );
 
   unmarkedScriptPath = join(fixtureDir, "unmarked.ts");

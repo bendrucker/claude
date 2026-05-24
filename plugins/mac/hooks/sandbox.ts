@@ -8,7 +8,7 @@ type ToolInput = { command: string };
 
 const SHELL_OPERATORS = /\s*(?:&&|\|\||[|;])\s*/;
 const SCRIPT_INTERPRETERS = new Set(["bun", "node"]);
-const SCRIPT_MARKER = "claude:sandbox-bypass";
+const SCRIPT_MARKER = "claude:dangerouslyDisableSandbox";
 
 export type Invocation = { cmd: string; scriptArg?: string };
 

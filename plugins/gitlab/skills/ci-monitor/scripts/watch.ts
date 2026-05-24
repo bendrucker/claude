@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// claude:sandbox-bypass: shells out to glab (Go binary) for TLS-bearing API calls
+// claude:dangerouslyDisableSandbox: shells out to glab (Go binary) for TLS-bearing API calls
 
 import { type ExecSyncOptions, execSync } from "node:child_process";
 import { cli } from "cleye";

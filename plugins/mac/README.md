@@ -23,13 +23,13 @@ macOS-specific automation, sandbox workarounds, and system integration.
 The sandbox hook auto-disables Seatbelt for two cases:
 
 1. The invoked executable is a Go binary (detected by the `__go_buildinfo` byte marker in the first 64KB of the binary).
-2. A `bun <script>` or `node <script>` invocation, where the script's first 64KB contains the literal string `claude:sandbox-bypass`.
+2. A `bun <script>` or `node <script>` invocation, where the script's first 64KB contains the literal string `claude:dangerouslyDisableSandbox`.
 
 The second mechanism is opt-in. Plugins that ship a wrapper script which shells out to Go binaries (`gh`, `glab`, `terraform`, etc.) can add a comment near the top of the script:
 
 ```ts
 #!/usr/bin/env bun
-// claude:sandbox-bypass: shells out to gh for TLS-bearing API calls
+// claude:dangerouslyDisableSandbox: shells out to gh for TLS-bearing API calls
 ```
 
 The marker is inert on Linux and inert when the `mac` plugin is not installed. It only activates when this hook is running on macOS.

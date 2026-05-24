@@ -139,6 +139,55 @@ LEFT JOIN LATERAL (
   LIMIT 1
 ) prior ON true;
 
+CREATE OR REPLACE VIEW text_content AS
+WITH unified AS (
+  SELECT
+    ci.session_id,
+    ci.timestamp,
+    ci.project_path,
+    m.type AS role,
+    CASE WHEN m.type = 'assistant' THEN (m.data->>'$.message.model') END AS model,
+    ci.text AS raw_text,
+    ci.source_file,
+    ci.source_line
+  FROM content_items ci
+  JOIN messages m USING (source_file, source_line)
+  WHERE ci.type = 'text'
+    AND ci.text IS NOT NULL
+    AND length(trim(ci.text)) > 0
+
+  UNION ALL
+
+  SELECT
+    m.session_id,
+    m.timestamp,
+    m.project_path,
+    m.type AS role,
+    NULL AS model,
+    m.content_text AS raw_text,
+    m.source_file,
+    m.source_line
+  FROM messages m
+  WHERE m.type = 'user'
+    AND m.content_text IS NOT NULL
+    AND length(trim(m.content_text)) > 0
+    AND NOT m.is_meta
+)
+SELECT
+  session_id,
+  timestamp,
+  project_path,
+  role,
+  model,
+  regexp_replace(
+    regexp_replace(raw_text, '```.*?```', '', 'gs'),
+    '`[^`\n]*`', '', 'g'
+  ) AS text,
+  raw_text,
+  source_file,
+  source_line
+FROM unified;
+
 CREATE OR REPLACE VIEW sessions AS
 SELECT
   session_id,

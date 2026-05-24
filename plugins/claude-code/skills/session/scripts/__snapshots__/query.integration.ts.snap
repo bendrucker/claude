@@ -20,6 +20,8 @@ exports[`query.ts lists sessions 1`] = `
 ╟──────────────────────╢
 ║ tools-session        ║
 ╟──────────────────────╢
+║ trope-session        ║
+╟──────────────────────╢
 ║ webapp-session       ║
 ╚══════════════════════╝
 "

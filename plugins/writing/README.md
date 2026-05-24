@@ -1,6 +1,6 @@
 # Writing
 
-Writing style enforcement hooks and AI trope detection.
+Write like Ben Drucker. This plugin enforces voice and style in prose output so that text the assistant produces on your behalf (PR descriptions, review comments, Slack messages, documentation) sounds like you wrote it yourself. The rules come from your corrections, your preferences, and patterns you've flagged in conversation.
 
 ## Contents
 

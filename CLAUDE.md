@@ -24,7 +24,7 @@ Before adding a customization, define how it gets removed:
 - What evidence will show it isn't?
 - Where does that evidence surface?
 
-Detectors of model behavior need particular care. Models drift, and a ruleset that doesn't evolve with them stops earning its cost. Pair detection with a path to evolve or retire.
+Detectors of model behavior need particular care. Models drift and rules lose value. Pair detection with a path to evolve or retire.
 
 ## Plugin Architecture
 

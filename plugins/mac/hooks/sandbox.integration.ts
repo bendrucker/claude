@@ -1,7 +1,31 @@
-import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, sep } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { hasBypassMarker, isGoBinary, processInput } from "./sandbox";
+
+let fixtureDir: string;
+let markedScriptPath: string;
+let unmarkedScriptPath: string;
+
+beforeAll(async () => {
+  fixtureDir = await mkdtemp(`${tmpdir()}${sep}sandbox-integration-`);
+
+  markedScriptPath = join(fixtureDir, "marked.ts");
+  await Bun.write(
+    markedScriptPath,
+    `#!/usr/bin/env bun\n// claude:dangerouslyDisableSandbox: calls a Go binary\nconsole.log("hi");\n`,
+  );
+
+  unmarkedScriptPath = join(fixtureDir, "unmarked.ts");
+  await Bun.write(unmarkedScriptPath, `#!/usr/bin/env bun\nconsole.log("hi");\n`);
+});
+
+afterAll(async () => {
+  const { rm } = await import("node:fs/promises");
+  await rm(fixtureDir, { recursive: true, force: true });
+});
 
 function makeInput(command: string, toolName = "Bash"): PreToolUseHookInput {
   return {
@@ -9,26 +33,6 @@ function makeInput(command: string, toolName = "Bash"): PreToolUseHookInput {
     tool_input: { command },
   } as PreToolUseHookInput;
 }
-
-const repoRoot = join(import.meta.dirname, "..", "..", "..");
-const githubWatchScript = join(
-  repoRoot,
-  "plugins",
-  "github",
-  "skills",
-  "actions-monitor",
-  "scripts",
-  "watch.ts",
-);
-const gitlabWatchScript = join(
-  repoRoot,
-  "plugins",
-  "gitlab",
-  "skills",
-  "ci-monitor",
-  "scripts",
-  "watch.ts",
-);
 
 describe("isGoBinary", () => {
   test("gh is a Go binary", async () => {
@@ -45,12 +49,12 @@ describe("isGoBinary", () => {
 });
 
 describe("hasBypassMarker", () => {
-  test("github actions-monitor watch.ts carries the marker", async () => {
-    expect(await hasBypassMarker(githubWatchScript)).toBe(true);
+  test("detects marker in script", async () => {
+    expect(await hasBypassMarker(markedScriptPath)).toBe(true);
   });
 
-  test("gitlab ci-monitor watch.ts carries the marker", async () => {
-    expect(await hasBypassMarker(gitlabWatchScript)).toBe(true);
+  test("returns false for script without marker", async () => {
+    expect(await hasBypassMarker(unmarkedScriptPath)).toBe(false);
   });
 });
 
@@ -79,9 +83,9 @@ describe("processInput", () => {
     expect(result).not.toBeNull();
   });
 
-  test("disables sandbox for github watch.ts under Monitor", async () => {
+  test("disables sandbox for marked script under Monitor", async () => {
     const result = await processInput(
-      makeInput(`bun ${githubWatchScript} --pr https://github.com/o/r/pull/1`, "Monitor"),
+      makeInput(`bun ${markedScriptPath} --flag value`, "Monitor"),
       "darwin",
     );
     expect(result).not.toBeNull();
@@ -91,14 +95,11 @@ describe("processInput", () => {
     });
   });
 
-  test("disables sandbox for gitlab watch.ts under Monitor", async () => {
+  test("does not disable sandbox for unmarked script under Monitor", async () => {
     const result = await processInput(
-      makeInput(
-        `bun ${gitlabWatchScript} --mr https://gitlab.com/o/r/-/merge_requests/1`,
-        "Monitor",
-      ),
+      makeInput(`bun ${unmarkedScriptPath}`, "Monitor"),
       "darwin",
     );
-    expect(result).not.toBeNull();
+    expect(result).toBeNull();
   });
 });

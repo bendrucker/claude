@@ -14,11 +14,12 @@ Search and analyze Claude Code conversation history via a DuckDB index over JSON
 
 ## Running Queries
 
-The index refreshes automatically on first use per session. Subsequent queries skip the refresh for faster results. Pass `--refresh` to re-scan when the user asks for the latest data.
+The index refreshes automatically on first use per session. Subsequent queries skip the refresh for faster results. Pass `--refresh` to re-scan when the user asks for the latest data. Pass `--json` for machine-readable output (use this when a script consumes the rows).
 
 ```bash
 ${CLAUDE_SKILL_DIR}/scripts/query.ts "SELECT model, SUM(output_tokens) FROM messages WHERE type = 'assistant' GROUP BY model"
 ${CLAUDE_SKILL_DIR}/scripts/query.ts --refresh "SELECT * FROM sessions ORDER BY start_time DESC LIMIT 5"
+${CLAUDE_SKILL_DIR}/scripts/query.ts --json model-summary
 ```
 
 ## Named Queries

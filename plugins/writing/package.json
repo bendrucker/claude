@@ -6,6 +6,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.25",
     "@constellos/claude-code-kit": "^0.4.0",
     "ap-style-title-case": "^2.0.0",
+    "cleye": "^2.2.1",
     "mdast-util-from-markdown": "^2.0.2",
     "stemmer": "^2.0.1",
     "unist-util-visit": "^5.1.0"

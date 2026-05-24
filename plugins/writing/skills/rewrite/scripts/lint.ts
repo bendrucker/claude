@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { stemmer } from "stemmer";
-import { WORDLISTS, weightedStemHits } from "../../../hooks/wordlists";
 
 const WORD_TOKEN = /[a-zA-Z]+/g;
 
@@ -67,13 +66,12 @@ const INLINE_PATTERNS: InlinePattern[] = [
   },
 ];
 
-function lintLine(line: string, lineNum: number, stripped: string): Violation[] {
+function lintLine(lineNum: number, stripped: string): Violation[] {
   const violations: Violation[] = [];
 
   for (const { category, pattern, message } of INLINE_PATTERNS) {
     pattern.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(stripped)) !== null) {
+    for (let match = pattern.exec(stripped); match !== null; match = pattern.exec(stripped)) {
       violations.push({
         line: lineNum,
         col: match.index + 1,
@@ -87,12 +85,10 @@ function lintLine(line: string, lineNum: number, stripped: string): Violation[] 
   return violations;
 }
 
-async function lintVocabulary(lines: string[], strippedLines: string[]): Promise<Violation[]> {
+async function lintVocabulary(strippedLines: string[]): Promise<Violation[]> {
   const violations: Violation[] = [];
   const vocabStems = new Set<string>();
-  const vocabFile = Bun.file(
-    `${import.meta.dirname}/../../../wordlists/vocabulary.txt`,
-  );
+  const vocabFile = Bun.file(`${import.meta.dirname}/../../../wordlists/vocabulary.txt`);
 
   const content = await vocabFile.text();
   for (const raw of content.split(/\r?\n/)) {
@@ -124,7 +120,30 @@ async function lintVocabulary(lines: string[], strippedLines: string[]): Promise
   return violations;
 }
 
-function lintMarketingVerbs(strippedLines: string[]): Violation[] {
+type WeightedEntry = { stem: string; weight: number };
+
+const WEIGHTED_LINE = /^(\S+)\s+([0-9]+(?:\.[0-9]+)?)$/;
+
+async function loadMarketingVerbs(): Promise<WeightedEntry[]> {
+  const content = await Bun.file(
+    `${import.meta.dirname}/../../../wordlists/marketing-verbs.txt`,
+  ).text();
+  const entries: WeightedEntry[] = [];
+  for (const raw of content.split(/\r?\n/)) {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const match = WEIGHTED_LINE.exec(trimmed);
+    if (!match) continue;
+    entries.push({
+      stem: stemmer((match[1] ?? "").toLowerCase()),
+      weight: Number.parseFloat(match[2] ?? "0"),
+    });
+  }
+  return entries;
+}
+
+async function lintMarketingVerbs(strippedLines: string[]): Promise<Violation[]> {
+  const entries = await loadMarketingVerbs();
   const violations: Violation[] = [];
 
   for (let i = 0; i < strippedLines.length; i++) {
@@ -133,7 +152,7 @@ function lintMarketingVerbs(strippedLines: string[]): Violation[] {
     for (const word of words) {
       const idx = strippedLines[i].indexOf(word, col);
       const stem = stemmer(word.toLowerCase());
-      const entry = WORDLISTS.marketingVerbs.find((e) => e.stem === stem);
+      const entry = entries.find((e) => e.stem === stem);
       if (entry) {
         violations.push({
           line: i + 1,
@@ -171,18 +190,19 @@ async function main(): Promise<void> {
     input = await new Response(Bun.stdin.stream()).text();
   }
 
-  const stripped = stripCode(input);
-  const lines = input.split("\n");
-  const strippedLines = stripped.split("\n");
+  const strippedLines = stripCode(input).split("\n");
 
   const violations: Violation[] = [];
 
   for (let i = 0; i < strippedLines.length; i++) {
-    violations.push(...lintLine(lines[i], i + 1, strippedLines[i]));
+    violations.push(...lintLine(i + 1, strippedLines[i]));
   }
 
-  violations.push(...(await lintVocabulary(lines, strippedLines)));
-  violations.push(...lintMarketingVerbs(strippedLines));
+  const [vocabViolations, marketingViolations] = await Promise.all([
+    lintVocabulary(strippedLines),
+    lintMarketingVerbs(strippedLines),
+  ]);
+  violations.push(...vocabViolations, ...marketingViolations);
 
   violations.sort((a, b) => a.line - b.line || a.col - b.col);
 

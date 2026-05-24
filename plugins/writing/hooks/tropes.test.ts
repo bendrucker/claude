@@ -475,7 +475,9 @@ describe("scan", () => {
       });
 
       it(`fires in sideEffect context: "${text.slice(0, 40)}"`, () => {
-        expect(scan(text, undefined, "sideEffect").find((m) => m.category === category)).toBeDefined();
+        expect(
+          scan(text, undefined, "sideEffect").find((m) => m.category === category),
+        ).toBeDefined();
       });
 
       it(`skips in file context: "${text.slice(0, 40)}"`, () => {
@@ -484,7 +486,9 @@ describe("scan", () => {
     }
 
     it("non-conversational patterns still fire in file context", () => {
-      expect(firstByTier(scan("The tapestry of the project", undefined, "file"), "deny")?.category).toBe("AI vocabulary");
+      expect(
+        firstByTier(scan("The tapestry of the project", undefined, "file"), "deny")?.category,
+      ).toBe("AI vocabulary");
     });
   });
 

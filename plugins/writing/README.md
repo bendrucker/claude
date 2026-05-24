@@ -12,13 +12,17 @@ Writing style enforcement hooks and AI trope detection.
 
 Trope patterns that take the form of a list of words live as line-delimited files under [`wordlists/`](wordlists/).
 
-#### Plain wordlists
+#### Stemmed wordlists
 
-One entry per line. Each entry compiles to a `\b...\b` regex fragment. Entries support a suffix-group syntax: `meticulous(ly)` becomes `meticulous(?:ly)?`, `underscore(s|d)` becomes `underscore(?:s|d)?`. `#` comments and blank lines are ignored.
+One word per line. Matching uses a Porter stemmer (`stemmer` npm package), so inflected forms are caught automatically from base entries. `#` comments and blank lines are ignored. Multi-word and hyphenated phrases are not supported in stemmed wordlists (the stemmer tokenizes on word boundaries). Use inline regex patterns in `tropes.ts` for phrase matching.
+
+#### Plain wordlists (regex)
+
+Used for openers and let-me-verbs where the match depends on position context (line start, "let me" prefix). One entry per line, compiled to a regex alternation with configurable prefix/suffix.
 
 #### Weighted wordlists
 
-`<entry> <weight>` per line. The hook accumulates the weighted total of hits and reminds when the total clears a threshold.
+`<word> <weight>` per line. Uses the same Porter stemmer as vocabulary. The hook accumulates the weighted total of hits and reminds when the total clears a threshold.
 
 The loader lives in [`hooks/wordlists.ts`](hooks/wordlists.ts). Compiled patterns are exposed via the `WORDLISTS` constant and consumed by `tropes.ts`.
 

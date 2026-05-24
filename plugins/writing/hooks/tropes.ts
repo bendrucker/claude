@@ -1,5 +1,5 @@
 import { isProseFile } from "./markdown";
-import { type Hits, WORDLISTS, weightedStemHits } from "./wordlists";
+import { type Hits, type StemmedWeight, WORDLISTS, weightedStemHits } from "./wordlists";
 
 export type PatternTier = "deny" | "context";
 
@@ -24,6 +24,7 @@ type PatternDef = {
 type WeightedPatternGroup = {
   tier: PatternTier;
   category: string;
+  entries: StemmedWeight[];
   threshold: number;
   message: (matchedExamples: string[], totalWeight: number) => string;
   fileOnly?: boolean;
@@ -230,6 +231,7 @@ const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
   {
     tier: "context",
     category: "marketing verbs",
+    entries: WORDLISTS.marketingVerbs,
     threshold: MARKETING_VERB_THRESHOLD,
     message: (examples) =>
       `Marketing verbs stack up (${examples.join(", ")}). Describe concretely what changed instead of promotional framing.`,
@@ -287,9 +289,9 @@ export function scanIntroduced(
     if (seenTiers.has(group.tier)) continue;
     if (group.fileOnly && filePath && !isProseFile(filePath)) continue;
 
-    const newWeighted = weightedStemHits(newStripped, WORDLISTS.marketingVerbs);
+    const newWeighted = weightedStemHits(newStripped, group.entries);
     if (newWeighted.totalWeight < group.threshold) continue;
-    const oldWeighted = weightedStemHits(oldStripped, WORDLISTS.marketingVerbs);
+    const oldWeighted = weightedStemHits(oldStripped, group.entries);
     if (newWeighted.totalWeight <= oldWeighted.totalWeight) continue;
 
     matches.push({

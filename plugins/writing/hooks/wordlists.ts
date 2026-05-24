@@ -63,7 +63,7 @@ export function compileStemmedWordlist(content: string): (text: string) => Hits 
 
 const WEIGHTED_LINE = /^(\S+)\s+([0-9]+(?:\.[0-9]+)?)$/;
 
-type StemmedWeight = { stem: string; weight: number; original: string };
+export type StemmedWeight = { stem: string; weight: number; original: string };
 
 export function compileWeightedStems(content: string): StemmedWeight[] {
   const entries: StemmedWeight[] = [];
@@ -90,7 +90,8 @@ export function weightedStemHits(text: string, entries: StemmedWeight[]): Weight
   const words = text.match(WORD_TOKEN) ?? [];
   const stemCounts = new Map<string, number>();
   for (const word of words) {
-    stemCounts.set(stemmer(word.toLowerCase()), (stemCounts.get(stemmer(word.toLowerCase())) ?? 0) + 1);
+    const stem = stemmer(word.toLowerCase());
+    stemCounts.set(stem, (stemCounts.get(stem) ?? 0) + 1);
   }
 
   let totalWeight = 0;

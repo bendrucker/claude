@@ -3,8 +3,8 @@ import {
   compilePlainWordlist,
   compileStemmedWordlist,
   compileWeightedStems,
-  weightedStemHits,
   WORDLISTS,
+  weightedStemHits,
 } from "./wordlists";
 
 describe("compilePlainWordlist", () => {

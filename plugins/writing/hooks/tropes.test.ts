@@ -459,6 +459,35 @@ describe("scan", () => {
     });
   });
 
+  describe("sideEffectOnly scoping", () => {
+    const conversational = [
+      { text: "Let me check the test file.", category: "let-me preamble" },
+      { text: "Perfect. That works.", category: "sycophantic opener" },
+      { text: "You're right about that.", category: "sycophantic acknowledgment" },
+      { text: "Want me to fix the bug?", category: "permission-seeking" },
+      { text: "Would you like me to retry?", category: "hedging close" },
+      { text: "I understand the issue.", category: "I understand" },
+    ];
+
+    for (const { text, category } of conversational) {
+      it(`fires without context: "${text.slice(0, 40)}"`, () => {
+        expect(scan(text).find((m) => m.category === category)).toBeDefined();
+      });
+
+      it(`fires in sideEffect context: "${text.slice(0, 40)}"`, () => {
+        expect(scan(text, undefined, "sideEffect").find((m) => m.category === category)).toBeDefined();
+      });
+
+      it(`skips in file context: "${text.slice(0, 40)}"`, () => {
+        expect(scan(text, undefined, "file").find((m) => m.category === category)).toBeUndefined();
+      });
+    }
+
+    it("non-conversational patterns still fire in file context", () => {
+      expect(firstByTier(scan("The tapestry of the project", undefined, "file"), "deny")?.category).toBe("AI vocabulary");
+    });
+  });
+
   describe("marketing verbs (weighted)", () => {
     it("does not flag single low-weight hit", () => {
       expect(

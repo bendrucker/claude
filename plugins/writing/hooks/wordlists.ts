@@ -1,9 +1,8 @@
 import { join } from "node:path";
+import { stemmer } from "stemmer";
 
-export type WeightedPattern = {
-  pattern: RegExp;
-  weight: number;
-};
+export type Hits = { count: number; sample: string };
+export type WeightedHits = { totalWeight: number; samples: string[] };
 
 export type PlainWordlistOptions = {
   flags?: string;
@@ -12,6 +11,7 @@ export type PlainWordlistOptions = {
 };
 
 const COMMENT_OR_BLANK = /^\s*(?:#|$)/;
+const WORD_TOKEN = /[a-zA-Z]+/g;
 
 function parseLines(content: string): string[] {
   const lines: string[] = [];
@@ -27,39 +27,46 @@ function escapeRegex(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Convert a wordlist entry like `meticulous(ly)` or `underscore(s|d)` into a
-// regex fragment. A bare `(...)` group is treated as optional, so
-// `meticulous(ly)` becomes `meticulous(?:ly)?` and `underscore(s|d)` becomes
-// `underscore(?:s|d)?`. Escape everything else literally.
-export function entryToFragment(entry: string): string {
-  const match = entry.match(/^([^()]+)(?:\(([^()]+)\))?$/);
-  if (!match) {
-    return escapeRegex(entry);
-  }
-  const stem = escapeRegex(match[1] ?? "");
-  const suffixes = match[2];
-  if (!suffixes) return stem;
-  const alternates = suffixes.split("|").map((s) => escapeRegex(s));
-  return `${stem}(?:${alternates.join("|")})?`;
-}
-
 export function compilePlainWordlist(
   content: string,
   options: PlainWordlistOptions = {},
 ): RegExp | null {
   const entries = parseLines(content);
   if (entries.length === 0) return null;
-  const fragments = Array.from(new Set(entries.map(entryToFragment)));
+  const fragments = Array.from(new Set(entries.map(escapeRegex)));
   const prefix = options.prefix ?? "\\b";
   const suffix = options.suffix ?? "\\b";
   const flags = options.flags ?? "gi";
   return new RegExp(`${prefix}(?:${fragments.join("|")})${suffix}`, flags);
 }
 
+export function compileStemmedWordlist(content: string): (text: string) => Hits {
+  const stems = new Set<string>();
+  for (const entry of parseLines(content)) {
+    for (const word of entry.toLowerCase().match(WORD_TOKEN) ?? []) {
+      stems.add(stemmer(word));
+    }
+  }
+  return (text: string): Hits => {
+    const words = text.match(WORD_TOKEN) ?? [];
+    let count = 0;
+    let sample = "";
+    for (const word of words) {
+      if (stems.has(stemmer(word.toLowerCase()))) {
+        count++;
+        if (!sample) sample = word;
+      }
+    }
+    return { count, sample };
+  };
+}
+
 const WEIGHTED_LINE = /^(\S+)\s+([0-9]+(?:\.[0-9]+)?)$/;
 
-export function compileWeightedWordlist(content: string): WeightedPattern[] {
-  const patterns: WeightedPattern[] = [];
+type StemmedWeight = { stem: string; weight: number; original: string };
+
+export function compileWeightedStems(content: string): StemmedWeight[] {
+  const entries: StemmedWeight[] = [];
   for (const line of parseLines(content)) {
     const match = WEIGHTED_LINE.exec(line);
     if (!match) {
@@ -70,12 +77,31 @@ export function compileWeightedWordlist(content: string): WeightedPattern[] {
     if (!Number.isFinite(weight) || weight <= 0) {
       throw new Error(`Invalid weight in entry: ${line}`);
     }
-    patterns.push({
-      pattern: new RegExp(`\\b${entryToFragment(entry)}\\b`, "gi"),
+    entries.push({
+      stem: stemmer(entry.toLowerCase()),
       weight,
+      original: entry,
     });
   }
-  return patterns;
+  return entries;
+}
+
+export function weightedStemHits(text: string, entries: StemmedWeight[]): WeightedHits {
+  const words = text.match(WORD_TOKEN) ?? [];
+  const stemCounts = new Map<string, number>();
+  for (const word of words) {
+    stemCounts.set(stemmer(word.toLowerCase()), (stemCounts.get(stemmer(word.toLowerCase())) ?? 0) + 1);
+  }
+
+  let totalWeight = 0;
+  const samples: string[] = [];
+  for (const entry of entries) {
+    const count = stemCounts.get(entry.stem) ?? 0;
+    if (count === 0) continue;
+    totalWeight += count * entry.weight;
+    if (samples.length < 3) samples.push(entry.original);
+  }
+  return { totalWeight, samples };
 }
 
 const WORDLISTS_DIR = join(import.meta.dirname, "..", "wordlists");
@@ -85,10 +111,10 @@ async function readWordlist(name: string): Promise<string> {
 }
 
 export type LoadedWordlists = {
-  vocabulary: RegExp;
+  vocabulary: (text: string) => Hits;
   openers: RegExp;
   letMeVerbs: RegExp;
-  marketingVerbs: WeightedPattern[];
+  marketingVerbs: StemmedWeight[];
 };
 
 async function load(): Promise<LoadedWordlists> {
@@ -99,11 +125,8 @@ async function load(): Promise<LoadedWordlists> {
     readWordlist("marketing-verbs.txt"),
   ]);
 
-  const vocabulary = compilePlainWordlist(vocabularySrc);
-  if (!vocabulary) throw new Error("vocabulary.txt produced no entries");
+  const vocabulary = compileStemmedWordlist(vocabularySrc);
 
-  // Openers match at the start of a line (after optional whitespace) followed
-  // by terminal punctuation or a comma. `m` flag makes `^` match line starts.
   const openers = compilePlainWordlist(openersSrc, {
     prefix: "^\\s*",
     suffix: "(?=[.!,])",
@@ -111,7 +134,6 @@ async function load(): Promise<LoadedWordlists> {
   });
   if (!openers) throw new Error("openers.txt produced no entries");
 
-  // let-me-verbs compiles into a single regex: \b(?:now\s+)?let\s+me\s+(?:...)
   const letMeVerbs = compilePlainWordlist(letMeVerbsSrc, {
     prefix: "\\b(?:now\\s+)?let\\s+me\\s+(?:",
     suffix: ")\\b",
@@ -119,11 +141,9 @@ async function load(): Promise<LoadedWordlists> {
   });
   if (!letMeVerbs) throw new Error("let-me-verbs.txt produced no entries");
 
-  const marketingVerbs = compileWeightedWordlist(marketingSrc);
+  const marketingVerbs = compileWeightedStems(marketingSrc);
 
   return { vocabulary, openers, letMeVerbs, marketingVerbs };
 }
 
-// Top-level await: the hook process is short-lived and loads each wordlist
-// once. Keeping `scan` synchronous avoids cascading async through callers.
 export const WORDLISTS: LoadedWordlists = await load();

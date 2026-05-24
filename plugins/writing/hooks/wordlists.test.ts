@@ -1,28 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import {
   compilePlainWordlist,
-  compileWeightedWordlist,
-  entryToFragment,
+  compileStemmedWordlist,
+  compileWeightedStems,
+  weightedStemHits,
   WORDLISTS,
 } from "./wordlists";
-
-describe("entryToFragment", () => {
-  it("returns plain stem for bare words", () => {
-    expect(entryToFragment("delve")).toBe("delve");
-  });
-
-  it("converts (suffix) to optional non-capturing group", () => {
-    expect(entryToFragment("meticulous(ly)")).toBe("meticulous(?:ly)?");
-  });
-
-  it("converts (a|b) to alternation in optional group", () => {
-    expect(entryToFragment("underscore(s|d)")).toBe("underscore(?:s|d)?");
-  });
-
-  it("escapes regex metacharacters in bare stems", () => {
-    expect(entryToFragment("foo.bar")).toBe("foo\\.bar");
-  });
-});
 
 describe("compilePlainWordlist", () => {
   it("returns null for empty content", () => {
@@ -58,39 +41,107 @@ describe("compilePlainWordlist", () => {
   });
 });
 
-describe("compileWeightedWordlist", () => {
-  it("parses weight per entry", () => {
-    const patterns = compileWeightedWordlist("empower(s|ed|ing) 2.5\nenable(s) 0.8\n");
-    expect(patterns).toHaveLength(2);
-    const empower = patterns[0];
-    const enable = patterns[1];
-    if (!empower || !enable) throw new Error("expected two patterns");
-    expect(empower.weight).toBe(2.5);
-    expect(enable.weight).toBe(0.8);
-    expect("empowers users".match(empower.pattern)?.[0]).toBe("empowers");
+describe("compileStemmedWordlist", () => {
+  it("matches base word", () => {
+    const matcher = compileStemmedWordlist("delve\n");
+    expect(matcher("we delve into the data").count).toBeGreaterThan(0);
   });
 
-  it("throws on missing weight", () => {
-    expect(() => compileWeightedWordlist("empower\n")).toThrow();
+  it("matches inflected forms via stemming", () => {
+    const matcher = compileStemmedWordlist("meticulous\n");
+    expect(matcher("done meticulously").count).toBeGreaterThan(0);
+    expect(matcher("a meticulous review").count).toBeGreaterThan(0);
   });
 
-  it("throws on non-positive weight", () => {
-    expect(() => compileWeightedWordlist("empower 0\n")).toThrow();
+  it("matches garnered from garner", () => {
+    const matcher = compileStemmedWordlist("garner\n");
+    expect(matcher("the project garnered attention").count).toBeGreaterThan(0);
   });
 
-  it("ignores comments", () => {
-    const patterns = compileWeightedWordlist("# header\nempower 1\n");
-    expect(patterns).toHaveLength(1);
+  it("returns sample of original word from text", () => {
+    const matcher = compileStemmedWordlist("foster\n");
+    const result = matcher("by fostering collaboration");
+    expect(result.count).toBe(1);
+    expect(result.sample).toBe("fostering");
+  });
+
+  it("does not match unrelated words", () => {
+    const matcher = compileStemmedWordlist("delve\n");
+    expect(matcher("the function processes input").count).toBe(0);
+  });
+
+  it("ignores comments and blank lines", () => {
+    const matcher = compileStemmedWordlist("# header\n\ndelve\n");
+    expect(matcher("we delve into it").count).toBeGreaterThan(0);
+  });
+
+  it("counts multiple occurrences", () => {
+    const matcher = compileStemmedWordlist("foster\n");
+    expect(matcher("fostering growth by fostering collaboration").count).toBe(2);
   });
 });
 
-// The compiled wordlist regexes use the `g` flag, so callers must use
-// `.match()` (which doesn't carry state) or reset `lastIndex` before
-// `.test()`. These tests use `match()`.
+describe("compileWeightedStems", () => {
+  it("parses weight per entry", () => {
+    const entries = compileWeightedStems("empower 2.5\nenable 0.8\n");
+    expect(entries).toHaveLength(2);
+    expect(entries[0]?.weight).toBe(2.5);
+    expect(entries[1]?.weight).toBe(0.8);
+  });
+
+  it("throws on missing weight", () => {
+    expect(() => compileWeightedStems("empower\n")).toThrow();
+  });
+
+  it("throws on non-positive weight", () => {
+    expect(() => compileWeightedStems("empower 0\n")).toThrow();
+  });
+
+  it("ignores comments", () => {
+    const entries = compileWeightedStems("# header\nempower 1\n");
+    expect(entries).toHaveLength(1);
+  });
+});
+
+describe("weightedStemHits", () => {
+  it("accumulates weights from matched stems", () => {
+    const entries = compileWeightedStems("empower 2.5\nenable 0.8\n");
+    const result = weightedStemHits("this empowers and enables users", entries);
+    expect(result.totalWeight).toBeCloseTo(3.3, 1);
+    expect(result.samples).toContain("empower");
+    expect(result.samples).toContain("enable");
+  });
+
+  it("matches inflected forms", () => {
+    const entries = compileWeightedStems("streamline 2.5\n");
+    const result = weightedStemHits("we streamlined the process", entries);
+    expect(result.totalWeight).toBeCloseTo(2.5, 1);
+  });
+
+  it("returns zero for no matches", () => {
+    const entries = compileWeightedStems("empower 2.5\n");
+    const result = weightedStemHits("the function returns a value", entries);
+    expect(result.totalWeight).toBe(0);
+    expect(result.samples).toHaveLength(0);
+  });
+
+  it("counts multiple occurrences of same word", () => {
+    const entries = compileWeightedStems("empower 2.5\n");
+    const result = weightedStemHits("empower users to empower others", entries);
+    expect(result.totalWeight).toBeCloseTo(5.0, 1);
+  });
+});
+
 describe("loaded WORDLISTS", () => {
-  it("loads vocabulary", () => {
-    expect("we delve into the data".match(WORDLISTS.vocabulary)).not.toBeNull();
-    expect("the myriad options".match(WORDLISTS.vocabulary)).not.toBeNull();
+  it("loads vocabulary as stemmed matcher", () => {
+    expect(WORDLISTS.vocabulary("we delve into the data").count).toBeGreaterThan(0);
+    expect(WORDLISTS.vocabulary("the myriad options").count).toBeGreaterThan(0);
+  });
+
+  it("matches inflected vocabulary via stemming", () => {
+    expect(WORDLISTS.vocabulary("done meticulously").count).toBeGreaterThan(0);
+    expect(WORDLISTS.vocabulary("she garnered support").count).toBeGreaterThan(0);
+    expect(WORDLISTS.vocabulary("by fostering growth").count).toBeGreaterThan(0);
   });
 
   it("loads openers", () => {
@@ -105,12 +156,9 @@ describe("loaded WORDLISTS", () => {
     expect("she wouldn't let me near it".match(WORDLISTS.letMeVerbs)).toBeNull();
   });
 
-  it("loads marketing verbs as weighted patterns", () => {
+  it("loads marketing verbs as weighted stems", () => {
     expect(WORDLISTS.marketingVerbs.length).toBeGreaterThan(0);
-    const empower = WORDLISTS.marketingVerbs.find(
-      (p) => "this empowers users".match(p.pattern) !== null,
-    );
-    if (!empower) throw new Error("expected empower pattern");
-    expect(empower.weight).toBeGreaterThan(2);
+    const result = weightedStemHits("this empowers users", WORDLISTS.marketingVerbs);
+    expect(result.totalWeight).toBeGreaterThan(2);
   });
 });

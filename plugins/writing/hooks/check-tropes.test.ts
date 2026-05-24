@@ -265,10 +265,9 @@ describe("diff-aware filtering", () => {
     expect(await processInput(input)).toBeNull();
   });
 
-  it("flags Edit that adds a new sycophantic opener beyond what old had", async () => {
+  it("skips sycophantic opener in file Edit (sideEffectOnly)", async () => {
     const input = mockEdit("Perfect. Let me proceed.\nNext line.", "Next line.");
-    const result = await processInput(input);
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(await processInput(input)).toBeNull();
   });
 });
 

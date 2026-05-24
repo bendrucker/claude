@@ -20,7 +20,7 @@ Never use spaced em dashes (` — `). This is the most recognizable AI writing t
 
 #### Vocabulary
 
-These words are strongly associated with AI-generated text. The full list lives in [`wordlists/vocabulary.txt`](../../wordlists/vocabulary.txt). Highlights:
+These words are strongly associated with AI-generated text. The full list lives in [`wordlists/vocabulary.txt`](../../wordlists/vocabulary.txt). Matching uses a Porter stemmer, so inflected forms (`meticulously`, `garnered`, `fostering`) are caught automatically from base entries. Highlights:
 
 - delve, tapestry, landscape (figurative), meticulous
 - pivotal, testament, underscore (figurative), interplay, intricacies
@@ -38,17 +38,16 @@ Do not replace "is" or "are" with fancier constructions:
 
 Don't start a message or sentence with `Perfect.`, `Excellent.`, `Great.`, `Wonderful.`, `Absolutely.`, `Fantastic.`, `Amazing.`, `Awesome.`, `Brilliant.`. Open with the substance. Full list in [`wordlists/openers.txt`](../../wordlists/openers.txt).
 
-#### Sycophantic Acknowledgments
+#### Conversational Patterns (Bash/MCP Only)
 
-Don't say "you're right" or "you're absolutely right." Move directly to the correction.
+The following patterns are scoped to side-effect tools (Slack messages, PR bodies, issue comments) where pasted assistant prose is the concern. They don't fire on file writes.
 
-#### Permission-Seeking and Hedging Closes
+- **Sycophantic acknowledgments**: "you're right", "you're absolutely right." Move directly to the correction.
+- **Permission-seeking**: "want me to ...?" Take the next step, or state options crisply.
+- **Hedging closes**: "would you like ...?" State the next step directly.
+- **Self-narrating preambles**: "let me check," "let me verify," "now let me run." Skip the preamble and describe the action or result. Full verb list in [`wordlists/let-me-verbs.txt`](../../wordlists/let-me-verbs.txt).
+- **"I understand"**: sycophantic preamble. Move to the substance.
 
-Don't ask "want me to ...?" or "would you like ...?" Take the next step, or state options crisply.
-
-#### Self-Narrating Preambles
-
-Don't say "let me check," "let me verify," "now let me run," or any variant. Skip the preamble and describe the action or result. Full verb list in [`wordlists/let-me-verbs.txt`](../../wordlists/let-me-verbs.txt).
 
 #### "Reaching for"
 
@@ -65,10 +64,6 @@ Verbs like `empower`, `streamline`, `generalize`, `unlock`, `elevate`, `transfor
 #### "Dig into" / "dive into"
 
 Filler for exploration. Describe what you're actually looking at.
-
-#### "I understand"
-
-Sycophantic preamble. Move to the substance.
 
 #### Cross-Sentence Negation
 

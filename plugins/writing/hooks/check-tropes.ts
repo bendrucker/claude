@@ -3,7 +3,7 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { formatContext, formatDecision, isMemoryPath, type SyncHookJSONOutput } from "./markdown";
-import { firstByTier, type PatternMatch, scan, scanIntroduced } from "./tropes";
+import { firstByTier, type PatternMatch, type ScanContext, scan, scanIntroduced } from "./tropes";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
@@ -177,7 +177,7 @@ async function processFileOp(input: PreToolUseHookInput): Promise<SyncHookJSONOu
   const pair = await collectFileOpPair(input);
   if (!pair) return null;
   const filePath = (input.tool_input as Record<string, unknown>).file_path as string | undefined;
-  const matches = scanIntroduced(pair.newText, pair.oldText, filePath);
+  const matches = scanIntroduced(pair.newText, pair.oldText, filePath, "file");
 
   const deny = firstByTier(matches, "deny");
   if (deny) {
@@ -194,7 +194,7 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJS
   const texts = await collectText(input);
   if (texts.length === 0) return null;
   const combined = texts.join("\n");
-  const matches = scan(combined);
+  const matches = scan(combined, undefined, "sideEffect");
 
   const deny = firstByTier(matches, "deny");
   if (deny) return formatDecision("deny", deny.message);

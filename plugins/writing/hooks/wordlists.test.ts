@@ -150,13 +150,7 @@ describe("loaded WORDLISTS", () => {
     expect("this was a perfect example".match(WORDLISTS.openers)).toBeNull();
   });
 
-  it("loads let-me verbs", () => {
-    expect("now let me check the file".match(WORDLISTS.letMeVerbs)).not.toBeNull();
-    expect("let me verify the output".match(WORDLISTS.letMeVerbs)).not.toBeNull();
-    expect("she wouldn't let me near it".match(WORDLISTS.letMeVerbs)).toBeNull();
-  });
-
-  it("loads marketing verbs as weighted stems", () => {
+it("loads marketing verbs as weighted stems", () => {
     expect(WORDLISTS.marketingVerbs.length).toBeGreaterThan(0);
     const result = weightedStemHits("this empowers users", WORDLISTS.marketingVerbs);
     expect(result.totalWeight).toBeGreaterThan(2);

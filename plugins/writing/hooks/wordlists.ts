@@ -114,15 +114,13 @@ async function readWordlist(name: string): Promise<string> {
 export type LoadedWordlists = {
   vocabulary: (text: string) => Hits;
   openers: RegExp;
-  letMeVerbs: RegExp;
   marketingVerbs: StemmedWeight[];
 };
 
 async function load(): Promise<LoadedWordlists> {
-  const [vocabularySrc, openersSrc, letMeVerbsSrc, marketingSrc] = await Promise.all([
+  const [vocabularySrc, openersSrc, marketingSrc] = await Promise.all([
     readWordlist("vocabulary.txt"),
     readWordlist("openers.txt"),
-    readWordlist("let-me-verbs.txt"),
     readWordlist("marketing-verbs.txt"),
   ]);
 
@@ -135,16 +133,9 @@ async function load(): Promise<LoadedWordlists> {
   });
   if (!openers) throw new Error("openers.txt produced no entries");
 
-  const letMeVerbs = compilePlainWordlist(letMeVerbsSrc, {
-    prefix: "\\b(?:now\\s+)?let\\s+me\\s+(?:",
-    suffix: ")\\b",
-    flags: "gi",
-  });
-  if (!letMeVerbs) throw new Error("let-me-verbs.txt produced no entries");
-
   const marketingVerbs = compileWeightedStems(marketingSrc);
 
-  return { vocabulary, openers, letMeVerbs, marketingVerbs };
+  return { vocabulary, openers, marketingVerbs };
 }
 
 export const WORDLISTS: LoadedWordlists = await load();

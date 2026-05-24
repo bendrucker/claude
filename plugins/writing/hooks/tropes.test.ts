@@ -218,32 +218,7 @@ describe("scan", () => {
     expect(scan("The function processes input and returns a result.")).toHaveLength(0);
   });
 
-  describe("let-me preamble", () => {
-    const flag = [
-      "Let me check the test file.",
-      "Now let me verify the output.",
-      "Let me dig into the source.",
-      "let me also look at the config.",
-    ];
-    const allow = [
-      "She wouldn't let me near the controls.",
-      "If you let me know by Friday I can help.",
-    ];
-
-    for (const text of flag) {
-      it(`flags: "${text}"`, () => {
-        expect(firstByTier(scan(text), "deny")?.category).toBe("let-me preamble");
-      });
-    }
-
-    for (const text of allow) {
-      it(`allows: "${text}"`, () => {
-        expect(scan(text).find((m) => m.category === "let-me preamble")).toBeUndefined();
-      });
-    }
-  });
-
-  describe("sycophantic opener", () => {
+describe("sycophantic opener", () => {
     const flag = [
       "Perfect. That works.",
       "Excellent! Moving on.",
@@ -461,7 +436,6 @@ describe("scan", () => {
 
   describe("sideEffectOnly scoping", () => {
     const conversational = [
-      { text: "Let me check the test file.", category: "let-me preamble" },
       { text: "Perfect. That works.", category: "sycophantic opener" },
       { text: "You're right about that.", category: "sycophantic acknowledgment" },
       { text: "Want me to fix the bug?", category: "permission-seeking" },

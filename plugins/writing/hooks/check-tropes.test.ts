@@ -257,14 +257,6 @@ describe("diff-aware filtering", () => {
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
-  it("ignores Edit that preserves a pre-existing let-me preamble", async () => {
-    const input = mockEdit(
-      "Let me check the file and verify the output.",
-      "Let me check the file.",
-    );
-    expect(await processInput(input)).toBeNull();
-  });
-
   it("skips sycophantic opener in file Edit (sideEffectOnly)", async () => {
     const input = mockEdit("Perfect. Let me proceed.\nNext line.", "Next line.");
     expect(await processInput(input)).toBeNull();

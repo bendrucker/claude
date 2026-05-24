@@ -85,14 +85,6 @@ const PATTERNS: PatternDef[] = [
   },
   {
     tier: "deny",
-    category: "let-me preamble",
-    test: WORDLISTS.letMeVerbs,
-    sideEffectOnly: true,
-    message: (matched) =>
-      `"${matched}" is a self-narrating preamble. Skip it and describe the action or result directly.`,
-  },
-  {
-    tier: "deny",
     category: "sycophantic opener",
     test: WORDLISTS.openers,
     sideEffectOnly: true,

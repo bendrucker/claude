@@ -45,7 +45,6 @@ The following patterns are scoped to side-effect tools (Slack messages, PR bodie
 - **Sycophantic acknowledgments**: "you're right", "you're absolutely right." Move directly to the correction.
 - **Permission-seeking**: "want me to ...?" Take the next step, or state options crisply.
 - **Hedging closes**: "would you like ...?" State the next step directly.
-- **Self-narrating preambles**: "let me check," "let me verify," "now let me run." Skip the preamble and describe the action or result. Full verb list in [`wordlists/let-me-verbs.txt`](../../wordlists/let-me-verbs.txt).
 - **"I understand"**: sycophantic preamble. Move to the substance.
 
 

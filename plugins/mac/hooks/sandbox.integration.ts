@@ -96,10 +96,7 @@ describe("processInput", () => {
   });
 
   test("does not disable sandbox for unmarked script under Monitor", async () => {
-    const result = await processInput(
-      makeInput(`bun ${unmarkedScriptPath}`, "Monitor"),
-      "darwin",
-    );
+    const result = await processInput(makeInput(`bun ${unmarkedScriptPath}`, "Monitor"), "darwin");
     expect(result).toBeNull();
   });
 });

@@ -2,7 +2,10 @@
 name: tmux
 description: Tmux session, window, and pane awareness. Use when the user asks about tmux panes, wants to capture terminal output, send keys to another pane, open a process in a pane, organize panes, navigate windows/sessions, or check for bell/activity notifications.
 allowed-tools:
-  - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/window.sh)"
+  - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/pane.sh:*)"
+  - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/window.sh:*)"
+  - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/session.sh:*)"
+  - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/sessions.sh)"
 hooks:
   PreToolUse:
     - matcher: "Bash(tmux:*)"
@@ -18,7 +21,7 @@ hooks:
 
 # tmux
 
-## Current Pane
+## Pane
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/pane.sh`
 
@@ -30,17 +33,27 @@ Use `$TMUX_PANE` to identify the current pane and target adjacent ones.
 
 Use `left`/`top` coordinates to resolve spatial references within the current window (LHS = lowest `left`, RHS = highest `left`, top = lowest `top`, bottom = highest `top`). When describing layouts, draw ASCII box diagrams showing pane positions and sizes.
 
-The `Other Panes` section lists panes in other windows and sessions. Its `TARGET` column is ready to use with `-t` (e.g., `tmux capture-pane -t website:1.%7 -p`). The `TITLE` column shows app-set context — Claude sessions advertise their current task there, which is usually enough to identify a pane without capturing its content.
+## Session
 
-### Notifications
+!`bash ${CLAUDE_SKILL_DIR}/scripts/session.sh`
 
-Windows marked `[bell]` or `[activity]` need attention (a process finished, errored, or produced output). Use `capture-pane` on the flagged window's panes to investigate.
+The `TITLE` column shows the active pane's title in each window. Claude sessions advertise their current task there, which is usually enough to identify a window without capturing its content. Windows marked `here` are the current window; `bell` or `activity` flags mean the window needs attention (a process finished, errored, or produced output).
 
-To check for new notifications after skill load:
+## Sessions
+
+!`bash ${CLAUDE_SKILL_DIR}/scripts/sessions.sh`
+
+### Drilling Into Other Targets
+
+Each script accepts an optional target argument so you can inspect any pane, window, or session — not just the current one:
 
 ```bash
-tmux list-windows -F '#{window_index} #{window_name} #{window_bell_flag} #{window_activity_flag}'
+bash ${CLAUDE_SKILL_DIR}/scripts/session.sh other-session
+bash ${CLAUDE_SKILL_DIR}/scripts/window.sh other-session:2
+bash ${CLAUDE_SKILL_DIR}/scripts/pane.sh %12
 ```
+
+Compose them to drill down: pick a session from `sessions.sh`, list its windows with `session.sh <name>`, then inspect a specific window with `window.sh <name>:<idx>`.
 
 ## Opening Panes
 

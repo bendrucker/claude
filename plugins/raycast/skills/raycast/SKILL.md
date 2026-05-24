@@ -1,7 +1,8 @@
 ---
 name: raycast
 description: Raycast extension development. Use when working with @raycast/api imports, Raycast commands/tools, or building extensions.
-user-invocable: false
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Raycast

@@ -13,6 +13,7 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "Bash|Edit|Write|MultiEdit|mcp__.*",
         "hooks": [
           {
             "type": "command",

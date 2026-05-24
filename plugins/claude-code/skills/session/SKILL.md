@@ -41,6 +41,10 @@ The `project` param matches against the directory name (last path component) usi
 - `permissions`: tool calls the user rejected. Params: `limit`, `after_date`, `before_date`, `project`
 - `sandbox`: Bash calls that bypassed the sandbox (`dangerouslyDisableSandbox`), with back-links to prior failed sandboxed calls of the same command. Params: `limit`, `after_date`, `before_date`, `project`
 - `skills`: skill invocation counts by name. Params: `skill`, `after_date`, `before_date`, `project`
+- `text-export`: dump cleaned prose from `text_content` (TSV-friendly). Params: `role`, `model` (glob), `after_date`, `before_date`, `project`, `min_chars`.
+- `phrase-lift`: count a phrase per role/model with per-1M-char rate and assistant-vs-user lift. Params: `phrase`, `after_date`, `before_date`.
+- `correction-candidates`: adjacent (long assistant, short user) message pairs in the same session, as a heuristic for "user corrected the assistant." Params: `min_assistant_chars` (default 300), `max_user_chars` (default 250), `after_date`, `before_date`, `project`, `limit` (default 50).
+- `model-summary`: assistant text item/message/char counts per model. Params: `after_date`, `before_date`, `project`.
 - `schema`: list every column in every table/view. Use this first when you don't know what's available.
 - `keys`: sample which top-level JSON keys appear in `raw.data` (the unstructured part), with occurrence counts.
 
@@ -49,6 +53,7 @@ The `project` param matches against the directory name (last path component) usi
 - `raw`: one row per JSONL line. Pinned scalar columns (`session_id`, `type`, `project_path`, `git_branch`, `is_meta`, `is_sidechain`, `duration_ms`, `timestamp`, `summary`, `input_tokens`, `output_tokens`, `source_file`, `source_line`) plus a `data JSON` column that holds the full original line.
 - `messages`: view over `raw` filtered to `type IN ('user', 'assistant')`, with a derived `content_text` (string-form messages only) and a `summary` joined from summary rows.
 - `content_items`: one row per element of `data->'$.message.content'`, with pinned columns (`type`, `name`, `id`, `tool_use_id`, `text`, `content`, `is_error`) plus `data JSON` (the content item) and `tool_use_result JSON` (merged from the parent message).
+- `text_content`: one row per prose text item across user and assistant messages. Columns: `session_id`, `timestamp`, `role`, `model` (NULL for user), `project_path`, `text` (fenced and inline-backtick code stripped), `raw_text`, `source_file`, `source_line`.
 - `sessions`: aggregated session-level stats (start/end time, duration, message counts).
 - `tool_calls`: one row per tool use.
 - `tool_errors`: tool results where `is_error` is true, joined with the originating tool call. `error_type` is `rejection` or `failure`.

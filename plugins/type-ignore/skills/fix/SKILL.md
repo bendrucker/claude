@@ -1,7 +1,6 @@
 ---
 name: type-ignore:fix
-description: |
-  Fixes type ignores in a file, directory, or codebase by discovering ignores and dispatching parallel fixer agents. Use when cleaning up type ignores across multiple files, eliminating ignores before a release, or batch-fixing type errors.
+description: Fix type errors instead of ignoring them. Use when cleaning up type ignores across files or batch-fixing type errors.
 context: fork
 agent: general-purpose
 allowed-tools:

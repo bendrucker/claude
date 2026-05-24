@@ -1,6 +1,7 @@
 ---
 name: shortcuts:shortcut
 description: Creating Apple Shortcuts programmatically as plist XML files. Use when the user wants to build, generate, or author Apple Shortcuts without the GUI app.
+disable-model-invocation: true
 allowed-tools:
   - Read
   - Write

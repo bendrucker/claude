@@ -1,6 +1,7 @@
 ---
 name: vscode:edit
 description: Open content in VS Code for interactive editing before using it in the next step.
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/edit.ts:*)"

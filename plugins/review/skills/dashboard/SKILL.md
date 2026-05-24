@@ -3,6 +3,7 @@ name: review:dashboard
 description: >
   Live tmux dashboard for reviewing inbound pull requests across GitHub and GitLab.
   Use when reviewing multiple PRs, checking review queue, batch reviews, or managing a review dashboard.
+disable-model-invocation: true
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)

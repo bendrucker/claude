@@ -1,12 +1,6 @@
 ---
 name: bun
-description: >-
-  Bun runtime patterns and best practices. Use when running bun commands (bun run, bun test, bunx),
-  working with package.json or bun.lock, writing TypeScript scripts that run under Bun,
-  developing Claude Code skills/hooks/scripts (which use Bun as their runtime),
-  or working in projects that use Bun as their package manager.
-  Covers bunx execution, lockfile handling, module resolution, shell scripting with Bun.$,
-  subprocess spawning, file I/O, and testing with bun test.
+description: Bun runtime patterns. Use when running bun commands, working with package.json/bun.lock, writing TypeScript scripts under Bun, or developing Claude Code plugins.
 user-invocable: false
 ---
 

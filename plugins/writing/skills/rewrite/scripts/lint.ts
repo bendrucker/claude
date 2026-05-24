@@ -1,5 +1,8 @@
 #!/usr/bin/env bun
+import { join } from "node:path";
 import { stemmer } from "stemmer";
+
+const WORDLISTS_DIR = join(import.meta.dirname, "..", "..", "..", "wordlists");
 
 const WORD_TOKEN = /[a-zA-Z]+/g;
 
@@ -50,7 +53,7 @@ const INLINE_PATTERNS: InlinePattern[] = [
   },
   {
     category: "promotional",
-    pattern: /\b(boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b/gi,
+    pattern: /\b(?:boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b/gi,
     message: (m) => `"${m}" is promotional. Use a neutral alternative.`,
   },
   {
@@ -88,7 +91,7 @@ function lintLine(lineNum: number, stripped: string): Violation[] {
 async function lintVocabulary(strippedLines: string[]): Promise<Violation[]> {
   const violations: Violation[] = [];
   const vocabStems = new Set<string>();
-  const vocabFile = Bun.file(`${import.meta.dirname}/../../../wordlists/vocabulary.txt`);
+  const vocabFile = Bun.file(join(WORDLISTS_DIR, "vocabulary.txt"));
 
   const content = await vocabFile.text();
   for (const raw of content.split(/\r?\n/)) {
@@ -125,9 +128,7 @@ type WeightedEntry = { stem: string; weight: number };
 const WEIGHTED_LINE = /^(\S+)\s+([0-9]+(?:\.[0-9]+)?)$/;
 
 async function loadMarketingVerbs(): Promise<WeightedEntry[]> {
-  const content = await Bun.file(
-    `${import.meta.dirname}/../../../wordlists/marketing-verbs.txt`,
-  ).text();
+  const content = await Bun.file(join(WORDLISTS_DIR, "marketing-verbs.txt")).text();
   const entries: WeightedEntry[] = [];
   for (const raw of content.split(/\r?\n/)) {
     const trimmed = raw.trim();

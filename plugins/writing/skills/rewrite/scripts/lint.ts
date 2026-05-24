@@ -103,10 +103,11 @@ async function lintVocabulary(strippedLines: string[]): Promise<Violation[]> {
   }
 
   for (let i = 0; i < strippedLines.length; i++) {
-    const words = strippedLines[i].match(WORD_TOKEN) ?? [];
+    const line = strippedLines[i] ?? "";
+    const words = line.match(WORD_TOKEN) ?? [];
     let col = 0;
     for (const word of words) {
-      const idx = strippedLines[i].indexOf(word, col);
+      const idx = line.indexOf(word, col);
       if (vocabStems.has(stemmer(word.toLowerCase()))) {
         violations.push({
           line: i + 1,
@@ -148,10 +149,11 @@ async function lintMarketingVerbs(strippedLines: string[]): Promise<Violation[]>
   const violations: Violation[] = [];
 
   for (let i = 0; i < strippedLines.length; i++) {
-    const words = strippedLines[i].match(WORD_TOKEN) ?? [];
+    const line = strippedLines[i] ?? "";
+    const words = line.match(WORD_TOKEN) ?? [];
     let col = 0;
     for (const word of words) {
-      const idx = strippedLines[i].indexOf(word, col);
+      const idx = line.indexOf(word, col);
       const stem = stemmer(word.toLowerCase());
       const entry = entries.find((e) => e.stem === stem);
       if (entry) {
@@ -196,7 +198,7 @@ async function main(): Promise<void> {
   const violations: Violation[] = [];
 
   for (let i = 0; i < strippedLines.length; i++) {
-    violations.push(...lintLine(i + 1, strippedLines[i]));
+    violations.push(...lintLine(i + 1, strippedLines[i] ?? ""));
   }
 
   const [vocabViolations, marketingViolations] = await Promise.all([

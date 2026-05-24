@@ -44,6 +44,20 @@ async function runScript(name: string): Promise<string | null> {
   }
 }
 
+async function isSessionAttached(pane: string): Promise<boolean> {
+  try {
+    const proc = Bun.spawn(
+      ["tmux", "display-message", "-t", pane, "-p", "#{session_attached}"],
+      { stdout: "pipe", stderr: "ignore" },
+    );
+    const output = await new Response(proc.stdout).text();
+    if ((await proc.exited) !== 0) return true;
+    return output.trimEnd() === "1";
+  } catch {
+    return true;
+  }
+}
+
 async function writeEnvFile(envFile: string, pane: string): Promise<void> {
   try {
     const proc = Bun.spawn(["tmux", "display-message", "-t", pane, "-p", FORMAT], {
@@ -64,6 +78,7 @@ async function writeEnvFile(envFile: string, pane: string): Promise<void> {
 const PREAMBLE = "You are running inside a tmux session.";
 
 function buildContext(
+  attached: boolean,
   pane: string | null,
   window: string | null,
   directive: string | null,
@@ -73,7 +88,9 @@ function buildContext(
   const tmuxChildren: string[] = [];
   if (pane) tmuxChildren.push(`<pane>\n${pane}\n</pane>`);
   if (window) tmuxChildren.push(`<window>\n${window}\n</window>`);
-  if (tmuxChildren.length > 0) sections.push(`<tmux>\n${tmuxChildren.join("\n\n")}\n</tmux>`);
+  if (tmuxChildren.length > 0) {
+    sections.push(`<tmux attached="${attached}">\n${tmuxChildren.join("\n\n")}\n</tmux>`);
+  }
 
   if (directive) sections.push(directive);
   return sections.join("\n\n");
@@ -83,7 +100,8 @@ async function main(): Promise<void> {
   const pane = process.env.TMUX_PANE;
   if (!process.env.TMUX || !pane || !process.env.CLAUDE_ENV_FILE) return;
 
-  const [paneOutput, windowOutput, directive] = await Promise.all([
+  const [attached, paneOutput, windowOutput, directive] = await Promise.all([
+    isSessionAttached(pane),
     runScript("pane.sh"),
     runScript("window.sh"),
     loadDirective(),
@@ -93,7 +111,7 @@ async function main(): Promise<void> {
   const response = {
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: buildContext(paneOutput, windowOutput, directive),
+      additionalContext: buildContext(attached, paneOutput, windowOutput, directive),
     },
   };
 

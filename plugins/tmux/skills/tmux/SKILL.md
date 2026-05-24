@@ -2,7 +2,7 @@
 name: tmux
 description: Tmux session, window, and pane awareness. Use when the user asks about tmux panes, wants to capture terminal output, send keys to another pane, open a process in a pane, organize panes, navigate windows/sessions, or check for bell/activity notifications.
 allowed-tools:
-  - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/layout.sh)"
+  - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/window.sh)"
 hooks:
   PreToolUse:
     - matcher: "Bash(tmux:*)"
@@ -24,9 +24,9 @@ hooks:
 
 Use `$TMUX_PANE` to identify the current pane and target adjacent ones.
 
-## Layout
+## Window
 
-!`bash ${CLAUDE_SKILL_DIR}/scripts/layout.sh`
+!`bash ${CLAUDE_SKILL_DIR}/scripts/window.sh`
 
 Use `left`/`top` coordinates to resolve spatial references within the current window (LHS = lowest `left`, RHS = highest `left`, top = lowest `top`, bottom = highest `top`). When describing layouts, draw ASCII box diagrams showing pane positions and sizes.
 

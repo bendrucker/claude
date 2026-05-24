@@ -66,12 +66,16 @@ const PREAMBLE =
 
 function buildContext(
   pane: string | null,
-  layout: string | null,
+  window: string | null,
   directive: string | null,
 ): string {
   const sections = [PREAMBLE];
-  if (pane) sections.push(`<tmux-pane>\n${pane}\n</tmux-pane>`);
-  if (layout) sections.push(`<tmux-layout>\n${layout}\n</tmux-layout>`);
+
+  const tmuxChildren: string[] = [];
+  if (pane) tmuxChildren.push(`<pane>\n${pane}\n</pane>`);
+  if (window) tmuxChildren.push(`<window>\n${window}\n</window>`);
+  if (tmuxChildren.length > 0) sections.push(`<tmux>\n${tmuxChildren.join("\n\n")}\n</tmux>`);
+
   if (directive) sections.push(directive);
   return sections.join("\n\n");
 }
@@ -80,9 +84,9 @@ async function main(): Promise<void> {
   const pane = process.env.TMUX_PANE;
   if (!process.env.TMUX || !pane || !process.env.CLAUDE_ENV_FILE) return;
 
-  const [paneOutput, layoutOutput, directive] = await Promise.all([
+  const [paneOutput, windowOutput, directive] = await Promise.all([
     runScript("pane.sh"),
-    runScript("layout.sh"),
+    runScript("window.sh"),
     loadDirective(),
     writeEnvFile(process.env.CLAUDE_ENV_FILE, pane),
   ]);
@@ -90,7 +94,7 @@ async function main(): Promise<void> {
   const response = {
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: buildContext(paneOutput, layoutOutput, directive),
+      additionalContext: buildContext(paneOutput, windowOutput, directive),
     },
   };
 

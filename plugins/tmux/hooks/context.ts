@@ -1,8 +1,10 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
+import { tmuxQuery } from "./tmux";
+import { xml } from "./xml";
 
-const FORMAT = [
+const ENV_FORMAT = [
   "export TMUX_SESSION_NAME='#{session_name}'",
   "export TMUX_WINDOW_INDEX='#{window_index}'",
   "export TMUX_WINDOW_NAME='#{window_name}'",
@@ -44,34 +46,20 @@ async function runScript(name: string): Promise<string | null> {
   }
 }
 
-async function isSessionAttached(pane: string): Promise<boolean> {
-  try {
-    const proc = Bun.spawn(
-      ["tmux", "display-message", "-t", pane, "-p", "#{session_attached}"],
-      { stdout: "pipe", stderr: "ignore" },
-    );
-    const output = await new Response(proc.stdout).text();
-    if ((await proc.exited) !== 0) return true;
-    return output.trimEnd() === "1";
-  } catch {
-    return true;
-  }
+function isSessionAttached(pane: string): boolean {
+  return tmuxQuery("display-message", "-t", pane, "-p", "#{session_attached}") === "1";
 }
 
 async function writeEnvFile(envFile: string, pane: string): Promise<void> {
   try {
-    const proc = Bun.spawn(["tmux", "display-message", "-t", pane, "-p", FORMAT], {
-      stdout: "pipe",
-      stderr: "ignore",
-    });
-    const output = await new Response(proc.stdout).text();
-    if ((await proc.exited) !== 0) return;
+    const output = tmuxQuery("display-message", "-t", pane, "-p", ENV_FORMAT);
+    if (!output) return;
 
     const file = Bun.file(envFile);
     const existing = (await file.exists()) ? await file.text() : "";
     await Bun.write(file, existing + output);
   } catch {
-    // Env file write is best-effort: don't let it abort context injection.
+    // best-effort
   }
 }
 
@@ -85,11 +73,11 @@ function buildContext(
 ): string {
   const sections = [PREAMBLE];
 
-  const tmuxChildren: string[] = [];
-  if (pane) tmuxChildren.push(`<pane>\n${pane}\n</pane>`);
-  if (window) tmuxChildren.push(`<window>\n${window}\n</window>`);
-  if (tmuxChildren.length > 0) {
-    sections.push(`<tmux attached="${attached}">\n${tmuxChildren.join("\n\n")}\n</tmux>`);
+  const children: string[] = [];
+  if (pane) children.push(xml("pane", pane));
+  if (window) children.push(xml("window", window));
+  if (children.length > 0) {
+    sections.push(xml("tmux", { attached }, children.join("\n\n")));
   }
 
   if (directive) sections.push(directive);
@@ -100,8 +88,9 @@ async function main(): Promise<void> {
   const pane = process.env.TMUX_PANE;
   if (!process.env.TMUX || !pane || !process.env.CLAUDE_ENV_FILE) return;
 
-  const [attached, paneOutput, windowOutput, directive] = await Promise.all([
-    isSessionAttached(pane),
+  const attached = isSessionAttached(pane);
+
+  const [paneOutput, windowOutput, directive] = await Promise.all([
     runScript("pane.sh"),
     runScript("window.sh"),
     loadDirective(),

@@ -4,6 +4,7 @@ description: >-
   Terraform Cloud workspace management, run monitoring, and log retrieval. Use when
   listing workspaces, checking run status, fetching plan/apply logs, or looking up
   providers and modules in the Terraform Registry.
+disable-model-invocation: true
 allowed-tools:
   - mcp__terraform
   - Bash(curl:*)

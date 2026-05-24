@@ -1,6 +1,6 @@
 ---
 name: tmux
-description: Tmux session, window, and pane awareness. Use when the user asks about tmux panes, wants to capture terminal output, send keys to another pane, open a process in a pane, organize panes, navigate windows/sessions, or check for bell/activity notifications.
+description: Tmux session, window, and pane management. Use when capturing output, sending keys, opening processes in panes, or checking notifications.
 allowed-tools:
   - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/layout.sh)"
 hooks:

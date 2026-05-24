@@ -182,34 +182,13 @@ function surfaceCandidates(assistant: CorpusStats, user: CorpusStats, existing: 
 
 async function resolveQueryScript(override: string | undefined): Promise<string> {
   if (override) return path.resolve(override);
-  const candidates: string[] = [];
-  if (process.env.CLAUDE_PLUGIN_ROOT) {
-    candidates.push(
-      path.join(
-        process.env.CLAUDE_PLUGIN_ROOT,
-        "..",
-        "claude-code",
-        "skills",
-        "session",
-        "scripts",
-        "query.ts",
-      ),
-    );
-  }
-  candidates.push(
-    path.resolve(
-      import.meta.dirname,
-      "..",
-      "..",
-      "..",
-      "..",
-      "claude-code",
-      "skills",
-      "session",
-      "scripts",
-      "query.ts",
-    ),
-  );
+  const sessionQueryRelPath = path.join("claude-code", "skills", "session", "scripts", "query.ts");
+  const candidates = [
+    process.env.CLAUDE_PLUGIN_ROOT
+      ? path.join(process.env.CLAUDE_PLUGIN_ROOT, "..", sessionQueryRelPath)
+      : null,
+    path.resolve(path.join(import.meta.dirname, "..", "..", "..", ".."), sessionQueryRelPath),
+  ].filter(Boolean) as string[];
   for (const candidate of candidates) {
     if (await Bun.file(candidate).exists()) return candidate;
   }
@@ -219,9 +198,7 @@ async function resolveQueryScript(override: string | undefined): Promise<string>
 }
 
 function defaultWordlistsDir(): string {
-  const skillRoot = path.resolve(import.meta.dirname, "..");
-  const writingPlugin = path.resolve(skillRoot, "..", "..");
-  return path.join(writingPlugin, "wordlists");
+  return path.join(import.meta.dirname, "..", "..", "..", "wordlists");
 }
 
 function daysAgo(n: number): string {

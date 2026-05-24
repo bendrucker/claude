@@ -30,50 +30,49 @@ export interface ReportInput {
 }
 
 export function renderReport(input: ReportInput): string {
-  const sections: string[] = [];
-  sections.push(renderHeader(input));
-  sections.push(renderSummary(input));
-  sections.push(renderProposedRemovals(input));
-  sections.push(renderProposedAdditions(input));
-  sections.push(renderRuleHealthTable(input));
-  sections.push(renderCorrections(input));
+  const sections = [
+    renderHeader(input),
+    renderSummary(input),
+    renderProposedRemovals(input),
+    renderProposedAdditions(input),
+    renderRuleHealthTable(input),
+    renderCorrections(input),
+  ];
   return `${sections.join("\n\n")}\n`;
 }
 
 function renderHeader(input: ReportInput): string {
+  const project = input.projectFilter ? `\`${input.projectFilter}\`` : "(none)";
   return [
     `# Writing trope analysis (${input.generatedAt})`,
     "",
     `Window: ${input.since} to ${input.until}`,
     `Model filter: \`${input.modelFilter}\``,
-    input.projectFilter ? `Project filter: \`${input.projectFilter}\`` : "Project filter: (none)",
-    `Min lift threshold: ${input.minLift.toFixed(1)}x`,
+    `Project filter: ${project}`,
+    `Min lift threshold: ${fmtLift(input.minLift)}`,
     `Top N candidates: ${input.topN}`,
   ].join("\n");
 }
 
 function renderSummary(input: ReportInput): string {
   const removals = input.ruleHealth.filter((r) => !r.noData && !r.stillDistinctive).length;
-  const additions = input.candidatePhrases.length;
   const lines = [
     "## Summary",
     "",
-    `- Assistant corpus: ${formatNumber(input.assistantTotalChars)} chars`,
-    `- User corpus: ${formatNumber(input.userTotalChars)} chars`,
+    `- Assistant corpus: ${fmtNum(input.assistantTotalChars)} chars`,
+    `- User corpus: ${fmtNum(input.userTotalChars)} chars`,
     `- Current wordlist entries audited: ${input.ruleHealth.length}`,
     `- Proposed removals (collapsed lift): ${removals}`,
-    `- Proposed additions (new candidates above threshold): ${additions}`,
+    `- Proposed additions (new candidates above threshold): ${input.candidatePhrases.length}`,
     `- Correction candidates surfaced: ${input.corrections.length}`,
   ];
   if (input.modelSummary.length > 0) {
-    lines.push("");
-    lines.push("### Models seen in window");
-    lines.push("");
+    lines.push("", "### Models Seen in Window", "");
     lines.push("| model | text items | messages | sessions | total chars |");
     lines.push("| --- | --- | --- | --- | --- |");
     for (const row of input.modelSummary) {
       lines.push(
-        `| ${row.model} | ${formatNumber(row.text_items)} | ${formatNumber(row.messages)} | ${formatNumber(row.sessions)} | ${formatNumber(row.total_chars)} |`,
+        `| ${row.model} | ${fmtNum(row.text_items)} | ${fmtNum(row.messages)} | ${fmtNum(row.sessions)} | ${fmtNum(row.total_chars)} |`,
       );
     }
   }
@@ -81,12 +80,12 @@ function renderSummary(input: ReportInput): string {
 }
 
 function renderProposedRemovals(input: ReportInput): string {
-  const lines = ["## Proposed wordlist removals"];
-  lines.push("");
-  lines.push(
-    "Rules whose assistant-vs-user lift dropped below the threshold. Review and remove from the wordlist file shown.",
-  );
-  lines.push("");
+  const lines = [
+    "## Proposed Wordlist Removals",
+    "",
+    "Rules whose assistant-vs-user lift dropped below the threshold.",
+    "",
+  ];
   const removable = input.ruleHealth
     .filter((r) => !r.noData && !r.stillDistinctive)
     .sort((a, b) => (a.lift ?? 0) - (b.lift ?? 0));
@@ -98,27 +97,24 @@ function renderProposedRemovals(input: ReportInput): string {
   lines.push("| --- | --- | --- | --- | --- |");
   for (const r of removable) {
     lines.push(
-      `| \`${escapePipe(r.entry.phrase)}\` | ${r.entry.source} | ${formatPerM(r.assistantPerM)} | ${formatPerM(r.userPerM)} | ${formatLift(r.lift)} |`,
+      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${fmtLift(r.lift)} |`,
     );
   }
-  lines.push("");
-  lines.push("Diff (paste into the relevant wordlist file):");
-  lines.push("");
-  lines.push("```diff");
+  lines.push("", "```diff");
   for (const r of removable) {
-    lines.push(`- ${r.entry.phrase}  # was lift=${formatLift(r.lift)}, source=${r.entry.source}`);
+    lines.push(`- ${r.entry.phrase}  # was lift=${fmtLift(r.lift)}, source=${r.entry.source}`);
   }
   lines.push("```");
   return lines.join("\n");
 }
 
 function renderProposedAdditions(input: ReportInput): string {
-  const lines = ["## Proposed wordlist additions"];
-  lines.push("");
-  lines.push(
-    `Phrases distinctive to the assistant (lift >= ${input.minLift.toFixed(1)}x) and not yet covered by the current wordlists.`,
-  );
-  lines.push("");
+  const lines = [
+    "## Proposed Wordlist Additions",
+    "",
+    `Phrases distinctive to the assistant (lift >= ${input.minLift.toFixed(1)}x) not yet in the wordlists.`,
+    "",
+  ];
   if (input.candidatePhrases.length === 0) {
     lines.push("_No additions proposed._");
     return lines.join("\n");
@@ -127,13 +123,10 @@ function renderProposedAdditions(input: ReportInput): string {
   lines.push("| --- | --- | --- | --- | --- |");
   for (const r of input.candidatePhrases) {
     lines.push(
-      `| \`${escapePipe(r.phrase)}\` | ${r.n} | ${r.assistantCount} | ${r.userCount} | ${r.lift.toFixed(1)} |`,
+      `| \`${esc(r.phrase)}\` | ${r.n} | ${r.assistantCount} | ${r.userCount} | ${r.lift.toFixed(1)} |`,
     );
   }
-  lines.push("");
-  lines.push("Diff (paste into the relevant wordlist file):");
-  lines.push("");
-  lines.push("```diff");
+  lines.push("", "```diff");
   for (const r of input.candidatePhrases) {
     lines.push(`+ ${r.phrase}  # lift=${r.lift.toFixed(1)}, n=${r.n}`);
   }
@@ -142,12 +135,12 @@ function renderProposedAdditions(input: ReportInput): string {
 }
 
 function renderRuleHealthTable(input: ReportInput): string {
-  const lines = ["## Current rule health"];
-  lines.push("");
-  lines.push(
-    "Full audit of every existing wordlist entry. Use this when a phrase has marginal but non-zero lift.",
-  );
-  lines.push("");
+  const lines = [
+    "## Current Rule Health",
+    "",
+    "Full audit of every wordlist entry. Check phrases with marginal lift.",
+    "",
+  ];
   if (input.ruleHealth.length === 0) {
     lines.push("_No wordlists found at `plugins/writing/wordlists/`._");
     return lines.join("\n");
@@ -157,19 +150,19 @@ function renderRuleHealthTable(input: ReportInput): string {
   for (const r of input.ruleHealth) {
     const status = r.noData ? "no data" : r.stillDistinctive ? "keep" : "remove";
     lines.push(
-      `| \`${escapePipe(r.entry.phrase)}\` | ${r.entry.source} | ${formatPerM(r.assistantPerM)} | ${formatPerM(r.userPerM)} | ${formatLift(r.lift)} | ${status} |`,
+      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${fmtLift(r.lift)} | ${status} |`,
     );
   }
   return lines.join("\n");
 }
 
 function renderCorrections(input: ReportInput): string {
-  const lines = ["## Correction candidates"];
-  lines.push("");
-  lines.push(
-    "Adjacent (long assistant, short user) pairs. Scan for prose corrections the assistant might have missed.",
-  );
-  lines.push("");
+  const lines = [
+    "## Correction Candidates",
+    "",
+    "Adjacent (long assistant, short user) pairs. Scan for prose corrections.",
+    "",
+  ];
   if (input.corrections.length === 0) {
     lines.push("_No correction candidates in window._");
     return lines.join("\n");
@@ -178,17 +171,9 @@ function renderCorrections(input: ReportInput): string {
     lines.push(`### ${c.assistant_timestamp} (${c.project ?? "unknown"})`);
     lines.push("");
     lines.push(`Assistant (${c.assistant_chars} chars):`);
-    lines.push("");
-    lines.push("```");
-    lines.push(c.assistant_snippet);
-    lines.push("```");
-    lines.push("");
+    lines.push("", "```", c.assistant_snippet, "```", "");
     lines.push(`User reply (${c.user_chars} chars):`);
-    lines.push("");
-    lines.push("```");
-    lines.push(c.user_snippet);
-    lines.push("```");
-    lines.push("");
+    lines.push("", "```", c.user_snippet, "```", "");
   }
   return lines.join("\n").trimEnd();
 }
@@ -222,7 +207,6 @@ export function buildRuleHealth(
     const userPerM = userChars > 0 ? (userCount / userChars) * 1_000_000 : null;
     const lift =
       assistantPerM !== null && userPerM !== null ? assistantPerM / Math.max(userPerM, 1) : null;
-    const stillDistinctive = lift !== null && lift >= minLift;
     return {
       entry,
       assistantCount,
@@ -230,27 +214,27 @@ export function buildRuleHealth(
       assistantPerM,
       userPerM,
       lift,
-      stillDistinctive,
+      stillDistinctive: lift !== null && lift >= minLift,
       noData: false,
     };
   });
 }
 
-function formatNumber(value: number | bigint | null): string {
-  if (value === null) return "—";
+function fmtNum(value: number | bigint | null): string {
+  if (value === null) return "-";
   return Number(value).toLocaleString();
 }
 
-function formatPerM(value: number | null): string {
-  if (value === null) return "—";
+function fmtPerM(value: number | null): string {
+  if (value === null) return "-";
   return value.toFixed(1);
 }
 
-function formatLift(value: number | null): string {
-  if (value === null) return "—";
+function fmtLift(value: number | null): string {
+  if (value === null) return "-";
   return `${value.toFixed(1)}x`;
 }
 
-function escapePipe(s: string): string {
+function esc(s: string): string {
   return s.replace(/\|/g, "\\|");
 }

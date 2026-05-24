@@ -91,10 +91,10 @@ describe("renderReport", () => {
     const output = renderReport(baseInput);
     expect(output).toContain("# Writing trope analysis");
     expect(output).toContain("## Summary");
-    expect(output).toContain("## Proposed wordlist removals");
-    expect(output).toContain("## Proposed wordlist additions");
-    expect(output).toContain("## Current rule health");
-    expect(output).toContain("## Correction candidates");
+    expect(output).toContain("## Proposed Wordlist Removals");
+    expect(output).toContain("## Proposed Wordlist Additions");
+    expect(output).toContain("## Current Rule Health");
+    expect(output).toContain("## Correction Candidates");
   });
 
   test("renders proposed-removals diff block when entries collapse", () => {
@@ -160,9 +160,9 @@ describe("renderReport", () => {
 
   test("treats removals and additions as co-equal top-level sections", () => {
     const output = renderReport(baseInput);
-    const removalIdx = output.indexOf("## Proposed wordlist removals");
-    const additionIdx = output.indexOf("## Proposed wordlist additions");
-    const healthIdx = output.indexOf("## Current rule health");
+    const removalIdx = output.indexOf("## Proposed Wordlist Removals");
+    const additionIdx = output.indexOf("## Proposed Wordlist Additions");
+    const healthIdx = output.indexOf("## Current Rule Health");
     expect(removalIdx).toBeGreaterThan(0);
     expect(additionIdx).toBeGreaterThan(removalIdx);
     expect(healthIdx).toBeGreaterThan(additionIdx);

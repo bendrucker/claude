@@ -1,33 +1,27 @@
-const FENCED_CODE = /```[\s\S]*?```/g;
-const INLINE_CODE = /`[^`]+`/g;
-const URL = /https?:\/\/\S+/g;
-const PATH_LIKE = /(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+/g;
-const HTML_TAG = /<[^>]+>/g;
-const QUOTED = /^\s*>.*$/gm;
-const TABLE_LINE = /^.*\|.*\|.*\|.*$/gm;
-const HEADER = /^#{1,6}\s.*$/gm;
-const CAMEL = /\b[A-Z][a-z]+[A-Z][A-Za-z]+\b/g;
-const SNAKE = /\b[a-z]+_[a-z_]+\b/g;
-const FUNC_CALL = /\b[a-zA-Z_][a-zA-Z0-9_]*\(/g;
-const FLAG = /(?<=\s|^)-{1,2}[a-zA-Z][a-zA-Z0-9-]*/g;
+const STRIP_PATTERNS: RegExp[] = [
+  /```[\s\S]*?```/g, // fenced code
+  /`[^`]+`/g, // inline code
+  /https?:\/\/\S+/g, // URLs
+  /^\s*>.*$/gm, // blockquotes
+  /<[^>]+>/g, // HTML tags
+  /^.*\|.*\|.*\|.*$/gm, // table lines
+  /^#{1,6}\s.*$/gm, // headers
+  /(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+/g, // paths
+  /(?<=\s|^)-{1,2}[a-zA-Z][a-zA-Z0-9-]*/g, // CLI flags
+  /\b[a-zA-Z_][a-zA-Z0-9_]*\(/g, // function calls
+  /\b[a-z]+_[a-z_]+\b/g, // snake_case
+  /\b[A-Z][a-z]+[A-Z][A-Za-z]+\b/g, // camelCase/PascalCase
+];
 
 const WORD_RE = /[a-z][a-z'-]*/g;
 const SENTENCE_BREAK = /[.!?\n]+/;
 
 export function cleanText(text: string): string {
-  return text
-    .replace(FENCED_CODE, " ")
-    .replace(INLINE_CODE, " ")
-    .replace(URL, " ")
-    .replace(QUOTED, " ")
-    .replace(HTML_TAG, " ")
-    .replace(TABLE_LINE, " ")
-    .replace(HEADER, " ")
-    .replace(PATH_LIKE, " ")
-    .replace(FLAG, " ")
-    .replace(FUNC_CALL, " ")
-    .replace(SNAKE, " ")
-    .replace(CAMEL, " ");
+  let result = text;
+  for (const pattern of STRIP_PATTERNS) {
+    result = result.replace(pattern, " ");
+  }
+  return result;
 }
 
 export function* splitSentences(text: string): Generator<string> {
@@ -44,7 +38,6 @@ export function tokenizeSentence(sentence: string): string[] {
 export type NGramCounts = Map<string, number>;
 
 export function addNgrams(counts: NGramCounts, tokens: string[], n: number): void {
-  if (tokens.length < n) return;
   for (let i = 0; i <= tokens.length - n; i++) {
     const key = tokens.slice(i, i + n).join(" ");
     counts.set(key, (counts.get(key) ?? 0) + 1);

@@ -3,10 +3,10 @@ set -euo pipefail
 
 [ -z "${TMUX_PANE:-}" ] && exit 0
 
-info=$(tmux display-message -t "$TMUX_PANE" -p '#{session_name} #{window_index}' 2>/dev/null) || exit 0
-read -r session current_window <<< "$info"
-
 TAB=$'\t'
+
+info=$(tmux display-message -t "$TMUX_PANE" -p "#{session_name}${TAB}#{window_index}" 2>/dev/null) || exit 0
+IFS=$'\t' read -r session current_window <<< "$info"
 
 echo "## Panes (current window)"
 echo ""

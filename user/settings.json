@@ -79,7 +79,6 @@
     ]
   },
   "enabledPlugins": {
-    "pr-review-toolkit@claude-plugins-official": true,
     "go@bendrucker": true,
     "mac@bendrucker": true,
     "git@bendrucker": true,
@@ -109,7 +108,6 @@
     "playground@claude-plugins-official": true,
     "linear-cli@linear-cli": true,
     "tmux@bendrucker": true,
-    "agent-browser@agent-browser": true,
     "bun@bendrucker": true,
     "git-town@bendrucker": true,
     "mermaid@bendrucker": true,

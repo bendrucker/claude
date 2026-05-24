@@ -18,6 +18,10 @@
 - Break code into multiple files where appropriate first before splitting across directories.
 - Do not number steps or phases in code (e.g., "Phase 1:", "Step 2:"). Use descriptive function names and call them in sequence. Numbering creates tight coupling, obscures whether order matters, and impedes inserting new steps.
 
+## Curation
+
+Customizations (skills, hooks, wordlists, agents, rules, permissions) cost tokens on every session that touches them. Before adding one, define how it gets removed: what tells you it's working, what tells you it isn't, and where that signal surfaces. If you can't answer all three, design the prune mechanism before adding.
+
 ## Workflow
 
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.

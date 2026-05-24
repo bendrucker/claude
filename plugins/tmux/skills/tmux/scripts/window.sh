@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MAX_PATH=44
 MAX_TITLE=48
 
 trunc() {
@@ -20,11 +19,22 @@ if [ -z "$target" ]; then
 fi
 
 TAB=$'\t'
-fmt="#{pane_id}${TAB}#{pane_left}${TAB}#{pane_top}${TAB}#{pane_width}x#{pane_height}${TAB}#{pane_current_command}${TAB}#{pane_pid}${TAB}#{pane_current_path}${TAB}#{pane_title}"
+fmt="#{pane_id}${TAB}#{pane_current_command}${TAB}#{pane_title}${TAB}#{pane_current_path}"
 
-printf '%-14s %-5s %-5s %-10s %-9s %-7s %-44s %s\n' "ID" "LEFT" "TOP" "SIZE" "CMD" "PID" "PATH" "TITLE"
-tmux list-panes -t "$target" -F "$fmt" 2>/dev/null | while IFS=$'\t' read -r id left top size cmd pid path title; do
+tmux list-panes -t "$target" -F "$fmt" 2>/dev/null | while IFS=$'\t' read -r id cmd title path; do
   tag=""
   [ "$id" = "${TMUX_PANE:-}" ] && tag=" (you)"
-  printf '%-14s %-5s %-5s %-10s %-9s %-7s %-44s %s\n' "${id}${tag}" "$left" "$top" "$size" "$cmd" "$pid" "$(trunc $MAX_PATH "$path")" "$(trunc $MAX_TITLE "$title")"
+
+  line="${id}${tag} ${cmd}"
+
+  if [ -n "$title" ]; then
+    line="${line} $(trunc $MAX_TITLE "$title")"
+  fi
+
+  if [ "$path" != "$PWD" ]; then
+    short="${path/#"$HOME"/~}"
+    line="${line} [${short}]"
+  fi
+
+  echo "$line"
 done

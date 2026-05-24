@@ -15,6 +15,10 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
   - `logs`: Extracts relevant lines from failing-job logs (invoked by `actions-monitor`)
 - **Hook**: Intercepts WebFetch for efficient GitHub data access
 
+## macOS
+
+The `actions-monitor` watch script shells out to `gh`, which fails with `OSStatus -26276` TLS errors under macOS Seatbelt. On macOS, install the `mac` plugin alongside this one. Its sandbox hook recognizes the `claude:sandbox-bypass` marker at the top of the watch script and disables Seatbelt for that invocation. Linux users do not need the `mac` plugin.
+
 ## Testing
 
 ```bash

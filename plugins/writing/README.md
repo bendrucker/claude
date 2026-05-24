@@ -1,6 +1,6 @@
 # Writing
 
-Write like Ben Drucker. This plugin enforces voice and style in prose output so that text the assistant produces on your behalf (PR descriptions, review comments, Slack messages, documentation) sounds like you wrote it yourself. The rules come from your corrections, your preferences, and patterns you've flagged in conversation.
+Writing style enforcement and slop detection for prose output (PR descriptions, review comments, Slack messages, documentation). Catches AI-generated and human writing patterns that read as vague, promotional, or templated.
 
 ## Contents
 

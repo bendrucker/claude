@@ -218,7 +218,7 @@ describe("scan", () => {
     expect(scan("The function processes input and returns a result.")).toHaveLength(0);
   });
 
-describe("sycophantic opener", () => {
+  describe("sycophantic opener", () => {
     const flag = [
       "Perfect. That works.",
       "Excellent! Moving on.",

@@ -1,7 +1,7 @@
 ---
 name: writing
 description: >-
-  Write like Ben Drucker. Use when writing or editing PR descriptions,
+  Enforce direct, concise prose style and catch writing slop. Use when writing or editing PR descriptions,
   issue bodies, commit messages, documentation, Slack messages, or any human-facing text.
   Also use when asked to clean up, rewrite, or "de-AI" existing text.
 user-invocable: false

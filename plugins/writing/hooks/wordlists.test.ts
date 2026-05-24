@@ -150,7 +150,7 @@ describe("loaded WORDLISTS", () => {
     expect("this was a perfect example".match(WORDLISTS.openers)).toBeNull();
   });
 
-it("loads marketing verbs as weighted stems", () => {
+  it("loads marketing verbs as weighted stems", () => {
     expect(WORDLISTS.marketingVerbs.length).toBeGreaterThan(0);
     const result = weightedStemHits("this empowers users", WORDLISTS.marketingVerbs);
     expect(result.totalWeight).toBeGreaterThan(2);

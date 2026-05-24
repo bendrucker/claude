@@ -1,10 +1,11 @@
 import { extname, resolve } from "node:path";
 
 import { cli } from "cleye";
-import { chromium } from "playwright";
+import { type Browser, chromium } from "playwright";
 
 export interface RenderOptions {
   scale?: number;
+  browser?: Browser;
 }
 
 export interface RenderResult {
@@ -23,7 +24,8 @@ export async function renderFile(
   const absInput = resolve(inputPath);
   const output = outputPath ?? absInput.replace(/\.html$/, `${suffix}.png`);
 
-  const browser = await chromium.launch();
+  const owned = !options.browser;
+  const browser = options.browser ?? (await chromium.launch());
   try {
     const page = await browser.newPage();
     await page.goto(`file://${absInput}`, { waitUntil: "domcontentloaded" });
@@ -50,7 +52,9 @@ export async function renderFile(
 
     return { input: inputPath, output, scale };
   } finally {
-    await browser.close();
+    if (owned) {
+      await browser.close();
+    }
   }
 }
 

@@ -17,7 +17,7 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
 
 ## macOS
 
-The `actions-monitor` watch script shells out to `gh`, which fails with `OSStatus -26276` TLS errors under macOS Seatbelt. On macOS, install the `mac` plugin alongside this one. Its sandbox hook recognizes the `claude:dangerouslyDisableSandbox` marker at the top of the watch script and disables Seatbelt for that invocation. Linux users do not need the `mac` plugin.
+The `actions-monitor` watch script shells out to `gh`, which fails with `OSStatus -26276` TLS errors under macOS Seatbelt. On macOS, install the `mac` plugin alongside this one. Its sandbox hook recognizes the `claude:dangerouslyDisableSandbox` marker at the top of the watch script and disables Seatbelt for that invocation.
 
 ## Testing
 

@@ -25,7 +25,7 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 
 ## macOS
 
-The `ci-monitor` watch script shells out to `glab`, which fails with `OSStatus -26276` TLS errors under macOS Seatbelt. On macOS, install the `mac` plugin alongside this one. Its sandbox hook recognizes the `claude:dangerouslyDisableSandbox` marker at the top of the watch script and disables Seatbelt for that invocation. Linux users do not need the `mac` plugin.
+The `ci-monitor` watch script shells out to `glab`, which fails with `OSStatus -26276` TLS errors under macOS Seatbelt. On macOS, install the `mac` plugin alongside this one. Its sandbox hook recognizes the `claude:dangerouslyDisableSandbox` marker at the top of the watch script and disables Seatbelt for that invocation.
 
 ## Testing
 

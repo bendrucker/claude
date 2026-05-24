@@ -1,0 +1,54 @@
+# Single-word AI vocabulary deny list.
+# One entry per line. Lines starting with # are comments. Blank lines ignored.
+# Entries support a simple suffix-group syntax via the (...) marker; see wordlists.ts.
+#
+# Original deny list.
+delve
+tapestry
+landscape
+meticulous(ly)
+pivotal
+testament
+underscore(s|d)
+interplay
+intricacies
+bolstered
+garner(ed|s)
+foster(ing|ed|s)
+#
+# High-confidence additions sourced from sam-paech/slop-forensics
+# (https://github.com/sam-paech/slop-forensics). Filtered to entries that
+# match the user's correction history and avoid ambiguous technical terms.
+myriad
+plethora
+seamless(ly)
+seamlessness
+cutting-edge
+revolutionary
+paradigm
+holistic(ally)
+synergy
+synergies
+leverage
+leverages
+leveraging
+robust(ly)
+robustness
+comprehensive(ly)
+nuanced
+nuance
+nuances
+realm
+intricate(ly)
+ever-evolving
+ever-changing
+ever-growing
+embark(ed|ing)
+embarks
+elucidate(s|d)
+elucidating
+multifaceted
+quintessential(ly)
+mosaic
+beacon
+treasure trove

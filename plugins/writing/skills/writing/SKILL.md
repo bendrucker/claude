@@ -11,41 +11,102 @@ user-invocable: false
 
 ## Patterns to Avoid
 
-### Em Dashes
+#### Em Dashes
 
 Never use spaced em dashes (` — `). This is the most recognizable AI writing tell.
 
 - Use unspaced em dashes: `word—word`
 - Or rewrite with commas, colons, or parentheses
 
-### Vocabulary
+#### Vocabulary
 
-These words are strongly associated with AI-generated text. Do not use them:
+These words are strongly associated with AI-generated text. The full list lives in [`wordlists/vocabulary.txt`](../../wordlists/vocabulary.txt). Highlights:
 
-- delve, tapestry, landscape (figurative), meticulous/meticulously
+- delve, tapestry, landscape (figurative), meticulous
 - pivotal, testament, underscore (figurative), interplay, intricacies
-- bolstered, garner/garnered, foster/fostering
+- myriad, plethora, seamless, holistic, synergy, robust, comprehensive
+- leverage (verb, figurative), realm, mosaic, beacon
 
-### Copula Avoidance
+#### Copula Avoidance
 
 Do not replace "is" or "are" with fancier constructions:
 
 - "serves as" -> "is"
 - "stands as" -> "is"
 
-### Promotional Language
+#### Sycophantic Openers
+
+Don't start a message or sentence with `Perfect.`, `Excellent.`, `Great.`, `Wonderful.`, `Absolutely.`, `Fantastic.`, `Amazing.`, `Awesome.`, `Brilliant.`. Open with the substance. Full list in [`wordlists/openers.txt`](../../wordlists/openers.txt).
+
+#### Sycophantic Acknowledgments
+
+Don't say "you're right" or "you're absolutely right." Move directly to the correction.
+
+#### Permission-Seeking and Hedging Closes
+
+Don't ask "want me to ...?" or "would you like ...?" Take the next step, or state options crisply.
+
+#### Self-Narrating Preambles
+
+Don't say "let me check," "let me verify," "now let me run," or any variant. Skip the preamble and describe the action or result. Full verb list in [`wordlists/let-me-verbs.txt`](../../wordlists/let-me-verbs.txt).
+
+#### "Reaching for"
+
+Don't write "reaching for X" as figurative use. Prefer "use X" or "prefer X over Y."
+
+#### Marketing Verbs
+
+Verbs like `empower`, `streamline`, `generalize`, `unlock`, `elevate`, `transform`, `enhance`, `optimize` (used figuratively) read as promotional. The hook grades them by promotional intensity in [`wordlists/marketing-verbs.txt`](../../wordlists/marketing-verbs.txt) and flags a context-tier reminder when they stack. Describe concretely what changed.
+
+#### Hedging Observation
+
+"looks like", "appears to", "seems to" are AI-typical hedges. State the observation directly, or name the actual uncertainty.
+
+#### "Dig into" / "dive into"
+
+Filler for exploration. Describe what you're actually looking at.
+
+#### "I understand"
+
+Sycophantic preamble. Move to the substance.
+
+#### Cross-Sentence Negation
+
+"It isn't X. It is Y." reads as AI rhetorical pacing. Combine into one sentence or drop the negation.
+
+#### Promotional Language
 
 Avoid marketing-style adjectives and verbs:
 
 - boasts, vibrant, showcasing, nestled, groundbreaking, renowned, diverse array
 
-### Parallelism
+#### Parallelism
 
 Avoid the "not just X, but also Y" construction. Simplify.
 
-### Semicolons
+#### Semicolons
 
 Semicolons are not wrong but AI overuses them. Prefer shorter sentences or commas. If you find yourself using more than one semicolon in a paragraph, rewrite.
+
+#### Passive Voice in PR Summaries
+
+Don't write "X is added," "Y was refactored." Rewrite so something is doing the verb.
+
+#### "Tests cover ..." Preamble
+
+`Tests cover ...` elides the subject. Use `Added tests covering ...` or describe the change.
+
+#### `**path**: description` Bullets
+
+Don't structure markdown bullets as `- **path/to/file**: description`. Describe the conceptual change in prose.
+
+#### Trailing Hedge Adverbs
+
+`regardless.`, `nonetheless.`, `anyway.` at sentence end is AI hedging. Drop or rewrite the clause.
+
+#### `**Label:**` Outside Code
+
+Use `####` headers instead of `**Label:**` for labeled subsections.
 
 ## Voice
 

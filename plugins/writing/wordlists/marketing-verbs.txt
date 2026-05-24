@@ -1,0 +1,25 @@
+# Marketing/promotional verbs, weighted by promotional intensity.
+# Format: <pattern> <weight>
+#   pattern uses the same suffix-group syntax as plain wordlists.
+#   weight is a positive number.
+# A context-tier reminder fires when the sum of weighted hits in the
+# introduced text reaches the threshold defined in tropes.ts.
+#
+# Promotional and vague verbs (high weight).
+empower(s|ed|ing) 2.5
+streamline(s|d|ing) 2.5
+generalize(s|d|ing) 2.5
+#
+# Figurative motion verbs (medium-high weight).
+unlock(s|ed|ing) 2.0
+elevate(s|d|ing) 2.0
+#
+# Borderline figurative; commonly legitimate but worth counting.
+transform(s|ed|ing) 1.5
+enhance(s|d|ing) 1.5
+optimize(s|d|ing) 1.2
+#
+# Often legitimate technical usage; low weight so they accumulate only
+# when stacked with stronger entries.
+enable(s|d|ing) 0.8
+simplif(y|ies|ied|ying) 0.8

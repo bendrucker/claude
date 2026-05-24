@@ -121,6 +121,29 @@ describe("memory files", () => {
   });
 });
 
+describe("wordlist files", () => {
+  it("skips Write to wordlist file containing flagged vocabulary", async () => {
+    const input = mockWrite("delve\ntapestry\nbolstered\n");
+    (input.tool_input as Record<string, unknown>).file_path =
+      "/Users/test/plugins/writing/wordlists/vocabulary.txt";
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("skips Edit to wordlist file", async () => {
+    const input = mockEdit("delve\nadded entry\n");
+    (input.tool_input as Record<string, unknown>).file_path =
+      "/Users/test/plugins/writing/wordlists/vocabulary.txt";
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("does not skip non-wordlist .txt files", async () => {
+    const input = mockWrite("delve into the data is the way forward.");
+    (input.tool_input as Record<string, unknown>).file_path = "/tmp/notes.txt";
+    const result = await processInput(input);
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+});
+
 describe("semicolon file scoping", () => {
   const semicolonText = "First point; second point; third point; fourth";
 
@@ -231,6 +254,20 @@ describe("diff-aware filtering", () => {
     (input.tool_input as Record<string, unknown>).file_path = file;
     const result = await processInput(input);
     await rm(dir, { recursive: true, force: true });
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("ignores Edit that preserves a pre-existing let-me preamble", async () => {
+    const input = mockEdit(
+      "Let me check the file and verify the output.",
+      "Let me check the file.",
+    );
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("flags Edit that adds a new sycophantic opener beyond what old had", async () => {
+    const input = mockEdit("Perfect. Let me proceed.\nNext line.", "Next line.");
+    const result = await processInput(input);
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 });

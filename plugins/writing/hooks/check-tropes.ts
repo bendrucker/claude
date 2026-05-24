@@ -153,6 +153,14 @@ function isMemoryFile(input: PreToolUseHookInput): boolean {
   return isMemoryPath(filePath);
 }
 
+const WORDLIST_PATH_PATTERN = /\/wordlists\/[^/]+\.txt$/;
+
+function isWordlistFile(input: PreToolUseHookInput): boolean {
+  const filePath = (input.tool_input as Record<string, unknown>).file_path;
+  if (typeof filePath !== "string") return false;
+  return WORDLIST_PATH_PATTERN.test(filePath);
+}
+
 function buildFileOpReminder(
   toolName: string,
   filePath: string | undefined,
@@ -200,6 +208,7 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJS
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   if (isPlanFile(input)) return null;
   if (isMemoryFile(input)) return null;
+  if (isWordlistFile(input)) return null;
 
   if (FILE_OP_TOOLS.has(input.tool_name)) return processFileOp(input);
   return processSideEffect(input);

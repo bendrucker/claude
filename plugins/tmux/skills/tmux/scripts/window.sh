@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+MAX_PATH=44
+MAX_TITLE=48
+
+trunc() {
+  local max=$1 str=$2
+  if [ ${#str} -gt "$max" ]; then
+    printf '%s…' "${str:0:$((max-1))}"
+  else
+    printf '%s' "$str"
+  fi
+}
+
 target="${1:-}"
 if [ -z "$target" ]; then
   [ -z "${TMUX_PANE:-}" ] && { echo 'no window target' >&2; exit 1; }
@@ -14,5 +26,5 @@ printf '%-14s %-5s %-5s %-10s %-9s %-7s %-44s %s\n' "ID" "LEFT" "TOP" "SIZE" "CM
 tmux list-panes -t "$target" -F "$fmt" 2>/dev/null | while IFS=$'\t' read -r id left top size cmd pid path title; do
   tag=""
   [ "$id" = "${TMUX_PANE:-}" ] && tag=" (you)"
-  printf '%-14s %-5s %-5s %-10s %-9s %-7s %-44s %s\n' "${id}${tag}" "$left" "$top" "$size" "$cmd" "$pid" "$path" "$title"
+  printf '%-14s %-5s %-5s %-10s %-9s %-7s %-44s %s\n' "${id}${tag}" "$left" "$top" "$size" "$cmd" "$pid" "$(trunc $MAX_PATH "$path")" "$(trunc $MAX_TITLE "$title")"
 done

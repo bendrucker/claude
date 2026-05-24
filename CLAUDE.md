@@ -14,6 +14,18 @@ This repository contains my personal Claude Code configuration and a plugin mark
 
 The [`user/`](user/) directory contains user-level Claude Code configuration that gets symlinked to `~/.claude`. This includes global instructions (`CLAUDE.md`), settings (plugins, permissions, sandbox), and hooks that apply across all projects. Symlinks and other system setup are managed by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles.
 
+## Curation
+
+Every customization (skill, hook, wordlist entry, agent, rule, permission) costs tokens on every session that touches it. Adding is cheap, accumulation is silent, and removal has no natural trigger. Without one, the configuration only grows, and sessions pay tokens for things that may no longer matter.
+
+Before adding a customization, define how it gets removed:
+
+- What evidence will show it's earning its cost?
+- What evidence will show it isn't?
+- Where does that evidence surface?
+
+Detectors of model behavior need particular care. Models drift and rules lose value. Pair detection with a path to evolve or retire.
+
 ## Plugin Architecture
 
 Each plugin in `plugins/` contains:

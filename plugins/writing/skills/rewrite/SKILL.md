@@ -6,6 +6,9 @@ description: >-
   before sending. Strips AI voice, slop, and filler while preserving meaning.
 user-invocable: true
 context: fork
+allowed-tools:
+  - Bash
+  - Read
 ---
 
 # Rewrite
@@ -18,11 +21,11 @@ $ARGUMENTS
 
 Read input from one of these sources, checked in order:
 
-#### File path
+#### File Path
 
 If `$ARGUMENTS` is a path to an existing file, read the file contents.
 
-#### Inline text
+#### Inline Text
 
 If `$ARGUMENTS` contains text, use it directly.
 
@@ -30,16 +33,30 @@ If `$ARGUMENTS` contains text, use it directly.
 
 If `$ARGUMENTS` is empty, read from the clipboard with `pbpaste`.
 
+## Lint
+
+Before and after rewriting, run the lint script to find violations:
+
+```bash
+echo "<text>" | bun ${CLAUDE_SKILL_DIR}/scripts/lint.ts
+```
+
+Or pass a file path directly:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/lint.ts path/to/file.md
+```
+
+The script outputs one violation per line (`line:col: category: message`). Fix every reported violation. Re-run until the output is clean.
+
 ## Rewriting
 
-Read the wordlist files referenced in [references/style-rules.md](references/style-rules.md), then apply every rule. Focus on:
+Fix all lint violations, then apply the structural rules from [references/style-rules.md](references/style-rules.md):
 
-- Replacing banned vocabulary and promotional language with natural alternatives
-- Removing filler phrases and hedging
 - Breaking long compound sentences into shorter ones
 - Converting passive voice to active
 - Cutting sentences that restate previous ones
-- Removing sycophantic openers
+- Removing filler phrases and hedging
 
 Do not add, remove, or restructure the content's meaning. The output should convey the same information in fewer, clearer words.
 

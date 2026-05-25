@@ -1,3 +1,15 @@
+import * as path from "node:path";
+import { DuckDBInstance } from "@duckdb/node-api";
+
+const QUERIES_DIR = path.join(import.meta.dirname, "..", "resources", "queries");
+
+export interface Database {
+  run(sql: string): Promise<void>;
+  query<T>(sql: string): Promise<T[]>;
+  setParams(params: QueryParams): Promise<void>;
+  close(): void;
+}
+
 export interface TextRow {
   session_id: string;
   timestamp: string;
@@ -32,57 +44,58 @@ export interface QueryParams {
   [key: string]: string | number | undefined;
 }
 
-export interface RunQueryOptions {
-  refresh?: boolean;
-  exec?: boolean;
-  queryDir?: string;
+export async function openDb(dbPath: string): Promise<Database> {
+  const instance = await DuckDBInstance.create(dbPath);
+  const connection = await instance.connect();
+
+  return {
+    async run(sql: string) {
+      await connection.run(sql);
+    },
+    async query<T>(sql: string): Promise<T[]> {
+      const reader = await connection.runAndReadAll(sql);
+      return reader.getRowObjectsJS() as T[];
+    },
+    async setParams(params: QueryParams) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value === undefined) {
+          await connection.run(`SET VARIABLE "${key}" = NULL`);
+        } else {
+          await connection.run(`SET VARIABLE "${key}" = $1`, [String(value)]);
+        }
+      }
+    },
+    close() {
+      try {
+        connection.closeSync();
+      } catch {}
+    },
+  };
 }
 
-export async function runSessionQuery<T = Record<string, unknown>>(
-  queryScript: string,
+export async function runQuery<T>(
+  db: Database,
   queryName: string,
   params: QueryParams = {},
-  options: RunQueryOptions = {},
 ): Promise<T[]> {
-  const args: string[] = [];
-  if (options.refresh) args.push("--refresh");
-  if (options.exec) args.push("--exec");
-  if (options.queryDir) args.push("--query-dir", options.queryDir);
-  if (!options.exec) args.push("--json");
-  args.push(queryName);
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === "") continue;
-    args.push(`${key}=${value}`);
-  }
-  const proc = Bun.spawn([queryScript, ...args], { stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (exitCode !== 0) {
-    throw new Error(`${queryScript} exited ${exitCode}: ${stderr.trim() || "no stderr"}`);
-  }
-  if (options.exec) return [];
-  if (!stdout.trim()) return [];
-  return JSON.parse(stdout, reviveBigints) as T[];
+  await db.setParams(params);
+  const sql = await Bun.file(path.join(QUERIES_DIR, `${queryName}.sql`)).text();
+  return db.query<T>(sql);
 }
 
-function reviveBigints(_key: string, value: unknown): unknown {
-  if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    const n = Number(value);
-    if (Number.isSafeInteger(n)) return n;
-  }
-  return value;
-}
-
-export async function execSessionQuery(
-  queryScript: string,
+export async function execQuery(
+  db: Database,
   queryName: string,
   params: QueryParams = {},
-  options: Omit<RunQueryOptions, "exec"> = {},
 ): Promise<void> {
-  await runSessionQuery(queryScript, queryName, params, { ...options, exec: true });
+  await db.setParams(params);
+  const sql = await Bun.file(path.join(QUERIES_DIR, `${queryName}.sql`)).text();
+  for (const stmt of sql
+    .split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)) {
+    await db.run(stmt);
+  }
 }
 
 export function serializeCorpus(rows: Array<{ text?: string }>): string {

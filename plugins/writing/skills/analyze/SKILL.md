@@ -8,6 +8,7 @@ description: >-
 allowed-tools:
   - Bash
   - Read
+  - Skill(claude-code:session)
 ---
 
 # Writing Analyze
@@ -16,18 +17,25 @@ Mine the session DuckDB index for assistant writing patterns, compare against th
 
 ## Prerequisites
 
-Requires the `claude-code:session` skill's query script. Locate it before running:
+Before running, refresh the session index via the `claude-code:session` skill:
 
 ```bash
-SESSION_QUERY=$(find ~/.claude/plugins -path "*/claude-code/skills/session/scripts/query.ts" | head -1)
+# Run any session query with --refresh to ensure the index is current
+${CLAUDE_SKILL_DIR}/../../../claude-code/skills/session/scripts/query.ts --refresh schema
+```
+
+The session database lives at `$CLAUDE_PLUGIN_DATA/session.duckdb` (typically `/tmp/claude-$UID/claude-session/session.duckdb`). Find it with:
+
+```bash
+SESSION_DB=$(find /tmp -name "session.duckdb" -path "*/claude-session/*" 2>/dev/null | head -1)
 ```
 
 ## Run
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-query "$SESSION_QUERY"
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-query "$SESSION_QUERY" --since 2026-04-01 --model '*opus*' --top 50
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-query "$SESSION_QUERY" --project bendrucker.me --min-lift 7
+${CLAUDE_SKILL_DIR}/scripts/analyze.ts --db "$SESSION_DB"
+${CLAUDE_SKILL_DIR}/scripts/analyze.ts --db "$SESSION_DB" --since 2026-04-01 --model '*opus*' --top 50
+${CLAUDE_SKILL_DIR}/scripts/analyze.ts --db "$SESSION_DB" --project bendrucker.me --min-lift 7
 ```
 
 Run with `--help` for all flags. Writes a markdown report to `tmp/trope-analysis-<date>.md` (override with `--out`).

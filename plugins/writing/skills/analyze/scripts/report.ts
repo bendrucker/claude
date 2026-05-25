@@ -1,6 +1,24 @@
-import type { CorrectionRow, ModelSummaryRow, PhraseLiftRow } from "./dump";
+import type { CorrectionRow, ModelSummaryRow } from "./dump";
 import type { LiftRow } from "./ngram";
 import type { WordlistEntry } from "./wordlists";
+
+export interface TermLiftRow {
+  term: string;
+  assistant_count: number;
+  user_count: number;
+  assistant_per_m: number;
+  user_per_m: number;
+  lift: number;
+}
+
+export interface FtsAuditRow {
+  term: string;
+  assistant_count: number;
+  user_count: number;
+  assistant_per_m: number | null;
+  user_per_m: number | null;
+  lift: number | null;
+}
 
 export interface CurrentRuleHealth {
   entry: WordlistEntry;
@@ -26,6 +44,7 @@ export interface ReportInput {
   userTotalChars: number;
   ruleHealth: CurrentRuleHealth[];
   candidatePhrases: LiftRow[];
+  vocabTerms: TermLiftRow[];
   corrections: CorrectionRow[];
 }
 
@@ -33,6 +52,7 @@ export function renderReport(input: ReportInput): string {
   const sections = [
     renderHeader(input),
     renderSummary(input),
+    renderVocabulary(input),
     renderProposedRemovals(input),
     renderProposedAdditions(input),
     renderRuleHealthTable(input),
@@ -75,6 +95,27 @@ function renderSummary(input: ReportInput): string {
         `| ${row.model} | ${fmtNum(row.text_items)} | ${fmtNum(row.messages)} | ${fmtNum(row.sessions)} | ${fmtNum(row.total_chars)} |`,
       );
     }
+  }
+  return lines.join("\n");
+}
+
+function renderVocabulary(input: ReportInput): string {
+  const lines = [
+    "## Vocabulary Lift",
+    "",
+    "Single stemmed terms distinctive to the assistant (via FTS Porter stemming).",
+    "",
+  ];
+  if (input.vocabTerms.length === 0) {
+    lines.push("_No distinctive vocabulary terms found._");
+    return lines.join("\n");
+  }
+  lines.push("| term | assistant count | user count | assistant/M | user/M | lift |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
+  for (const r of input.vocabTerms) {
+    lines.push(
+      `| \`${esc(r.term)}\` | ${fmtNum(r.assistant_count)} | ${fmtNum(r.user_count)} | ${fmtPerM(r.assistant_per_m)} | ${fmtPerM(r.user_per_m)} | ${fmtLift(r.lift)} |`,
+    );
   }
   return lines.join("\n");
 }
@@ -180,12 +221,12 @@ function renderCorrections(input: ReportInput): string {
 
 export function buildRuleHealth(
   entries: WordlistEntry[],
-  liftByPhrase: Map<string, PhraseLiftRow[]>,
+  auditByTerm: Map<string, FtsAuditRow>,
   minLift: number,
 ): CurrentRuleHealth[] {
   return entries.map((entry) => {
-    const rows = liftByPhrase.get(entry.phrase.toLowerCase()) ?? [];
-    if (rows.length === 0) {
+    const row = auditByTerm.get(entry.phrase.toLowerCase());
+    if (!row || (row.assistant_count === 0 && row.user_count === 0)) {
       return {
         entry,
         assistantCount: 0,
@@ -197,24 +238,14 @@ export function buildRuleHealth(
         noData: true,
       };
     }
-    const assistantRows = rows.filter((r) => r.role === "assistant");
-    const userRows = rows.filter((r) => r.role === "user");
-    const assistantCount = assistantRows.reduce((s, r) => s + Number(r.phrase_count), 0);
-    const userCount = userRows.reduce((s, r) => s + Number(r.phrase_count), 0);
-    const assistantChars = assistantRows.reduce((s, r) => s + Number(r.total_chars), 0);
-    const userChars = userRows.reduce((s, r) => s + Number(r.total_chars), 0);
-    const assistantPerM = assistantChars > 0 ? (assistantCount / assistantChars) * 1_000_000 : null;
-    const userPerM = userChars > 0 ? (userCount / userChars) * 1_000_000 : null;
-    const lift =
-      assistantPerM !== null && userPerM !== null ? assistantPerM / Math.max(userPerM, 1) : null;
     return {
       entry,
-      assistantCount,
-      userCount,
-      assistantPerM,
-      userPerM,
-      lift,
-      stillDistinctive: lift !== null && lift >= minLift,
+      assistantCount: Number(row.assistant_count),
+      userCount: Number(row.user_count),
+      assistantPerM: row.assistant_per_m !== null ? Number(row.assistant_per_m) : null,
+      userPerM: row.user_per_m !== null ? Number(row.user_per_m) : null,
+      lift: row.lift !== null ? Number(row.lift) : null,
+      stillDistinctive: row.lift !== null && Number(row.lift) >= minLift,
       noData: false,
     };
   });

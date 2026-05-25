@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { CorrectionRow, ModelSummaryRow, PhraseLiftRow } from "./dump";
+import type { CorrectionRow, ModelSummaryRow } from "./dump";
+import type { FtsAuditRow, TermLiftRow } from "./report";
 import { buildRuleHealth, renderReport } from "./report";
 import type { WordlistEntry } from "./wordlists";
 
@@ -16,6 +17,7 @@ const baseInput = {
   userTotalChars: 0,
   ruleHealth: [],
   candidatePhrases: [],
+  vocabTerms: [] as TermLiftRow[],
   corrections: [] as CorrectionRow[],
 };
 
@@ -31,57 +33,33 @@ describe("buildRuleHealth", () => {
     expect(result[1]?.stillDistinctive).toBe(false);
   });
 
-  test("computes lift across roles and decides distinctiveness", () => {
-    const lift = new Map<string, PhraseLiftRow[]>();
-    lift.set("let me", [
-      {
-        role: "assistant",
-        model: "claude-opus-4-7",
-        messages: 10,
-        total_chars: 10_000,
-        phrase_count: 50,
-        per_1m_chars: 5000,
-        lift_vs_user: 10,
-      },
-      {
-        role: "user",
-        model: null,
-        messages: 10,
-        total_chars: 10_000,
-        phrase_count: 5,
-        per_1m_chars: 500,
-        lift_vs_user: null,
-      },
-    ]);
-    const result = buildRuleHealth(entries, lift, 5);
+  test("computes lift from FTS audit and decides distinctiveness", () => {
+    const audit = new Map<string, FtsAuditRow>();
+    audit.set("let me", {
+      term: "let me",
+      assistant_count: 50,
+      user_count: 5,
+      assistant_per_m: 5000,
+      user_per_m: 500,
+      lift: 10,
+    });
+    const result = buildRuleHealth(entries, audit, 5);
     expect(result[0]?.noData).toBe(false);
     expect(result[0]?.stillDistinctive).toBe(true);
     expect(result[0]?.lift).toBeCloseTo(10, 0);
   });
 
   test("proposes removal when lift drops below threshold", () => {
-    const lift = new Map<string, PhraseLiftRow[]>();
-    lift.set("let me", [
-      {
-        role: "assistant",
-        model: "claude-opus-4-7",
-        messages: 10,
-        total_chars: 10_000,
-        phrase_count: 10,
-        per_1m_chars: 1000,
-        lift_vs_user: 2,
-      },
-      {
-        role: "user",
-        model: null,
-        messages: 10,
-        total_chars: 10_000,
-        phrase_count: 5,
-        per_1m_chars: 500,
-        lift_vs_user: null,
-      },
-    ]);
-    const result = buildRuleHealth(entries, lift, 5);
+    const audit = new Map<string, FtsAuditRow>();
+    audit.set("let me", {
+      term: "let me",
+      assistant_count: 10,
+      user_count: 5,
+      assistant_per_m: 1000,
+      user_per_m: 500,
+      lift: 2,
+    });
+    const result = buildRuleHealth(entries, audit, 5);
     expect(result[0]?.stillDistinctive).toBe(false);
   });
 });
@@ -91,6 +69,7 @@ describe("renderReport", () => {
     const output = renderReport(baseInput);
     expect(output).toContain("# Writing trope analysis");
     expect(output).toContain("## Summary");
+    expect(output).toContain("## Vocabulary Lift");
     expect(output).toContain("## Proposed Wordlist Removals");
     expect(output).toContain("## Proposed Wordlist Additions");
     expect(output).toContain("## Current Rule Health");
@@ -158,12 +137,34 @@ describe("renderReport", () => {
     expect(output).toContain("no, do it differently");
   });
 
-  test("treats removals and additions as co-equal top-level sections", () => {
+  test("renders vocabulary table with high-lift terms", () => {
+    const output = renderReport({
+      ...baseInput,
+      vocabTerms: [
+        {
+          term: "robust",
+          assistant_count: 42,
+          user_count: 3,
+          assistant_per_m: 120.5,
+          user_per_m: 8.1,
+          lift: 14.9,
+        },
+      ],
+    });
+    expect(output).toContain("| `robust` |");
+    expect(output).toContain("14.9x");
+  });
+
+  test("orders sections: summary, vocabulary, removals, additions, health", () => {
     const output = renderReport(baseInput);
+    const summaryIdx = output.indexOf("## Summary");
+    const vocabIdx = output.indexOf("## Vocabulary Lift");
     const removalIdx = output.indexOf("## Proposed Wordlist Removals");
     const additionIdx = output.indexOf("## Proposed Wordlist Additions");
     const healthIdx = output.indexOf("## Current Rule Health");
-    expect(removalIdx).toBeGreaterThan(0);
+    expect(summaryIdx).toBeGreaterThan(0);
+    expect(vocabIdx).toBeGreaterThan(summaryIdx);
+    expect(removalIdx).toBeGreaterThan(vocabIdx);
     expect(additionIdx).toBeGreaterThan(removalIdx);
     expect(healthIdx).toBeGreaterThan(additionIdx);
   });

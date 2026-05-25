@@ -2,17 +2,18 @@
 import { mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { cli } from "cleye";
+import { stemmer } from "stemmer";
 import {
   type CorrectionRow,
+  execSessionQuery,
   type ModelSummaryRow,
-  type PhraseLiftRow,
   runSessionQuery,
   serializeCorpus,
   type TextRow,
   totalChars,
 } from "./dump";
-import { computeLift, type CorpusStats, excludePhrases, processCorpus } from "./ngram";
-import { buildRuleHealth, renderReport } from "./report";
+import { type CorpusStats, computeLift, excludePhrases, processCorpus } from "./ngram";
+import { buildRuleHealth, type FtsAuditRow, renderReport, type TermLiftRow } from "./report";
 import { loadWordlists, type WordlistEntry } from "./wordlists";
 
 const argv = cli({
@@ -77,6 +78,7 @@ const correctionsLimit = argv.flags.correctionsLimit;
 const queryScript = await resolveQueryScript(argv.flags.sessionQuery);
 const wordlistsDir = argv.flags.wordlistsDir ?? defaultWordlistsDir();
 const outPath = argv.flags.out ?? path.join("tmp", `trope-analysis-${today}.md`);
+const ftsQueryDir = path.join(import.meta.dirname, "..", "resources", "queries");
 
 await main();
 
@@ -88,83 +90,122 @@ async function main(): Promise<void> {
   const wordlistEntries = await loadWordlists(wordlistsDir);
   process.stderr.write(`Loaded ${wordlistEntries.length} wordlist entries from ${wordlistsDir}\n`);
 
-  process.stderr.write("Auditing current wordlists via phrase-lift\n");
-  const liftByPhrase = await auditWordlists(wordlistEntries);
-
-  process.stderr.write("Fetching model summary\n");
-  const modelSummary = await runSessionQuery<ModelSummaryRow>(queryScript, "model-summary", {
-    after_date: since,
-    before_date: until,
-    project: projectFilter ?? undefined,
-  });
-
-  process.stderr.write("Dumping assistant corpus\n");
-  const assistantRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
-    role: "assistant",
-    model: modelFilter,
-    after_date: since,
-    before_date: until,
-    project: projectFilter ?? undefined,
-    min_chars: 50,
-  });
-
-  process.stderr.write("Dumping user corpus\n");
-  const userRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
-    role: "user",
-    after_date: since,
-    before_date: until,
-    project: projectFilter ?? undefined,
-    min_chars: 50,
-  });
-
-  process.stderr.write(`Assistant rows: ${assistantRows.length}, user rows: ${userRows.length}\n`);
-
-  const assistantCorpus = processCorpus(serializeCorpus(assistantRows));
-  const userCorpus = processCorpus(serializeCorpus(userRows));
-
-  const candidatePhrases = surfaceCandidates(assistantCorpus, userCorpus, wordlistEntries);
-
-  process.stderr.write("Fetching correction candidates\n");
-  const corrections = await runSessionQuery<CorrectionRow>(queryScript, "correction-candidates", {
-    after_date: since,
-    before_date: until,
-    project: projectFilter ?? undefined,
-    limit: correctionsLimit,
-  });
-
-  const ruleHealth = buildRuleHealth(wordlistEntries, liftByPhrase, minLift);
-
-  const report = renderReport({
-    generatedAt: today,
-    since,
-    until,
-    modelFilter,
-    projectFilter,
-    minLift,
-    topN,
-    modelSummary,
-    assistantTotalChars: totalChars(assistantRows),
-    userTotalChars: totalChars(userRows),
-    ruleHealth,
-    candidatePhrases,
-    corrections,
-  });
-
-  mkdirSync(path.dirname(outPath), { recursive: true });
-  await Bun.write(outPath, report);
-  process.stderr.write(`Wrote report to ${outPath}\n`);
-  process.stdout.write(`${outPath}\n`);
-}
-
-async function auditWordlists(entries: WordlistEntry[]): Promise<Map<string, PhraseLiftRow[]>> {
-  const result = new Map<string, PhraseLiftRow[]>();
-  for (const entry of entries) {
-    const rows = await runSessionQuery<PhraseLiftRow>(queryScript, "phrase-lift", {
-      phrase: entry.phrase,
+  process.stderr.write("Building FTS indexes\n");
+  await execSessionQuery(
+    queryScript,
+    "fts-setup",
+    {
       after_date: since,
       before_date: until,
+      model: modelFilter,
+      project: projectFilter ?? undefined,
+    },
+    { queryDir: ftsQueryDir },
+  );
+
+  try {
+    process.stderr.write("Computing vocabulary lift via FTS\n");
+    const vocabTerms = await runSessionQuery<TermLiftRow>(
+      queryScript,
+      "fts-term-lift",
+      {
+        min_count: 5,
+        limit: 100,
+      },
+      { queryDir: ftsQueryDir },
+    );
+
+    process.stderr.write("Auditing wordlists via FTS\n");
+    const auditByTerm = await auditWordlistsFts(wordlistEntries);
+
+    process.stderr.write("Fetching model summary\n");
+    const modelSummary = await runSessionQuery<ModelSummaryRow>(queryScript, "model-summary", {
+      after_date: since,
+      before_date: until,
+      project: projectFilter ?? undefined,
     });
-    result.set(entry.phrase.toLowerCase(), rows);
+
+    process.stderr.write("Dumping assistant corpus\n");
+    const assistantRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
+      role: "assistant",
+      model: modelFilter,
+      after_date: since,
+      before_date: until,
+      project: projectFilter ?? undefined,
+      min_chars: 50,
+    });
+
+    process.stderr.write("Dumping user corpus\n");
+    const userRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
+      role: "user",
+      after_date: since,
+      before_date: until,
+      project: projectFilter ?? undefined,
+      min_chars: 50,
+    });
+
+    process.stderr.write(
+      `Assistant rows: ${assistantRows.length}, user rows: ${userRows.length}\n`,
+    );
+
+    const assistantCorpus = processCorpus(serializeCorpus(assistantRows));
+    const userCorpus = processCorpus(serializeCorpus(userRows));
+
+    const candidatePhrases = surfaceCandidates(assistantCorpus, userCorpus, wordlistEntries);
+
+    process.stderr.write("Fetching correction candidates\n");
+    const corrections = await runSessionQuery<CorrectionRow>(queryScript, "correction-candidates", {
+      after_date: since,
+      before_date: until,
+      project: projectFilter ?? undefined,
+      limit: correctionsLimit,
+    });
+
+    const wordlistStems = new Set(wordlistEntries.map((e) => stemmer(e.phrase.toLowerCase())));
+    const filteredVocab = vocabTerms.filter((t) => !wordlistStems.has(t.term));
+
+    const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minLift);
+
+    const report = renderReport({
+      generatedAt: today,
+      since,
+      until,
+      modelFilter,
+      projectFilter,
+      minLift,
+      topN,
+      modelSummary,
+      assistantTotalChars: totalChars(assistantRows),
+      userTotalChars: totalChars(userRows),
+      ruleHealth,
+      candidatePhrases,
+      vocabTerms: filteredVocab,
+      corrections,
+    });
+
+    mkdirSync(path.dirname(outPath), { recursive: true });
+    await Bun.write(outPath, report);
+    process.stderr.write(`Wrote report to ${outPath}\n`);
+    process.stdout.write(`${outPath}\n`);
+  } finally {
+    process.stderr.write("Cleaning up FTS indexes\n");
+    await execSessionQuery(queryScript, "fts-cleanup", {}, { queryDir: ftsQueryDir });
+  }
+}
+
+async function auditWordlistsFts(entries: WordlistEntry[]): Promise<Map<string, FtsAuditRow>> {
+  const terms = entries.map((e) => e.phrase.toLowerCase()).join(",");
+  const rows = await runSessionQuery<FtsAuditRow>(
+    queryScript,
+    "fts-phrase-audit",
+    {
+      terms,
+    },
+    { queryDir: ftsQueryDir },
+  );
+  const result = new Map<string, FtsAuditRow>();
+  for (const row of rows) {
+    result.set(row.term, row);
   }
   return result;
 }

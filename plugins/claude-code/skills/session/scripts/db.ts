@@ -114,11 +114,7 @@ export async function ensureIndex(
   }
 }
 
-export async function runQuery<T>(
-  db: Database,
-  queryName: string,
-  params: Record<string, string | null> = {},
-): Promise<T[]> {
+async function setParams(db: Database, params: Record<string, string | null>): Promise<void> {
   for (const [key, value] of Object.entries(params)) {
     if (value === null) {
       await db.run(`SET VARIABLE "${key}" = NULL`);
@@ -126,6 +122,26 @@ export async function runQuery<T>(
       await db.run(`SET VARIABLE "${key}" = $value`, { value });
     }
   }
-  const sql = await readSql(QUERIES_DIR, queryName);
+}
+
+export async function runQuery<T>(
+  db: Database,
+  queryName: string,
+  params: Record<string, string | null> = {},
+  queriesDir: string = QUERIES_DIR,
+): Promise<T[]> {
+  await setParams(db, params);
+  const sql = await readSql(queriesDir, queryName);
   return db.query<T>(sql);
+}
+
+export async function execQuery(
+  db: Database,
+  queryName: string,
+  params: Record<string, string | null> = {},
+  queriesDir: string = QUERIES_DIR,
+): Promise<void> {
+  await setParams(db, params);
+  const sql = await readSql(queriesDir, queryName);
+  await db.run(sql);
 }

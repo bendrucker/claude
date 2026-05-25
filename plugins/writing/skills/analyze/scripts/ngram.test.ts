@@ -158,6 +158,19 @@ describe("computeLift", () => {
     });
     expect(rows.length).toBe(0);
   });
+
+  test("returns Infinity lift when phrase is absent from user corpus", () => {
+    const assistant = processCorpus("foo bar foo bar foo bar foo bar foo bar");
+    const user = processCorpus("completely different words in the user text here now");
+    const rows = computeLift({
+      assistant,
+      user,
+      minAssistantCount: { 2: 2, 3: 2, 4: 2 },
+    });
+    const fooBar = rows.find((r) => r.phrase === "foo bar");
+    expect(fooBar).toBeDefined();
+    expect(fooBar?.lift).toBe(Infinity);
+  });
 });
 
 describe("filterByMinLift", () => {

@@ -20,7 +20,8 @@ export async function loadWordlists(dir: string): Promise<WordlistEntry[]> {
     for (const rawLine of text.split("\n")) {
       const line = rawLine.replace(/#.*$/, "").trim();
       if (line.length === 0) continue;
-      entries.push({ phrase: line, source: file });
+      const phrase = line.replace(/\s+[\d.]+$/, "");
+      entries.push({ phrase, source: file });
     }
   }
   return entries;

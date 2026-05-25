@@ -33,4 +33,15 @@ describe("loadWordlists", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  test("strips trailing weight suffixes from entries", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "wordlists-"));
+    try {
+      await Bun.write(path.join(dir, "verbs.txt"), "empower 2.5\nstreamline 2.5\nensure\n");
+      const entries = await loadWordlists(dir);
+      expect(entries.map((e) => e.phrase)).toEqual(["empower", "streamline", "ensure"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

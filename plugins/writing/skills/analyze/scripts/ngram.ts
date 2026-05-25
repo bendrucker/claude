@@ -112,7 +112,7 @@ export function computeLift({ assistant, user, minAssistantCount }: LiftInput): 
         userCount,
         assistantPerM,
         userPerM,
-        lift: assistantPerM / Math.max(userPerM, 1),
+        lift: userPerM > 0 ? assistantPerM / userPerM : Infinity,
       });
     }
   }

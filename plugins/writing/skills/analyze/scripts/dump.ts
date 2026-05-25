@@ -44,6 +44,8 @@ export interface QueryParams {
 
 export interface RunQueryOptions {
   refresh?: boolean;
+  exec?: boolean;
+  queryDir?: string;
 }
 
 export async function runSessionQuery<T = Record<string, unknown>>(
@@ -54,7 +56,9 @@ export async function runSessionQuery<T = Record<string, unknown>>(
 ): Promise<T[]> {
   const args: string[] = [];
   if (options.refresh) args.push("--refresh");
-  args.push("--json");
+  if (options.exec) args.push("--exec");
+  if (options.queryDir) args.push("--query-dir", options.queryDir);
+  if (!options.exec) args.push("--json");
   args.push(queryName);
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === "") continue;
@@ -69,8 +73,26 @@ export async function runSessionQuery<T = Record<string, unknown>>(
   if (exitCode !== 0) {
     throw new Error(`${queryScript} exited ${exitCode}: ${stderr.trim() || "no stderr"}`);
   }
+  if (options.exec) return [];
   if (!stdout.trim()) return [];
-  return JSON.parse(stdout) as T[];
+  return JSON.parse(stdout, reviveBigints) as T[];
+}
+
+function reviveBigints(_key: string, value: unknown): unknown {
+  if (typeof value === "string" && /^-?\d+$/.test(value)) {
+    const n = Number(value);
+    if (Number.isSafeInteger(n)) return n;
+  }
+  return value;
+}
+
+export async function execSessionQuery(
+  queryScript: string,
+  queryName: string,
+  params: QueryParams = {},
+  options: Omit<RunQueryOptions, "exec"> = {},
+): Promise<void> {
+  await runSessionQuery(queryScript, queryName, params, { ...options, exec: true });
 }
 
 export function serializeCorpus(rows: Array<{ text?: string }>): string {

@@ -88,6 +88,9 @@ jobs:
       - name: Check plugin dependencies
         run: bun scripts/check-plugin-deps.ts
 
+      - name: Check plugin imports
+        run: bun scripts/check-plugin-imports.ts
+
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'
         env:

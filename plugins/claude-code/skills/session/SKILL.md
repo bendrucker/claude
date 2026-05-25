@@ -22,6 +22,17 @@ ${CLAUDE_SKILL_DIR}/scripts/query.ts --refresh "SELECT * FROM sessions ORDER BY 
 ${CLAUDE_SKILL_DIR}/scripts/query.ts --json model-summary
 ```
 
+## External Queries
+
+Other skills can run their own SQL against the session database. Pass `--query-dir <path>` to load SQL files from a different directory, and `--exec` for DDL operations that don't return rows (e.g., creating tables or FTS indexes).
+
+```bash
+${CLAUDE_SKILL_DIR}/scripts/query.ts --exec --query-dir /path/to/skill/queries fts-setup after_date=2026-04-01
+${CLAUDE_SKILL_DIR}/scripts/query.ts --json --query-dir /path/to/skill/queries custom-query param=value
+```
+
+The session schema (tables, views, macros) is available to external queries. Use `--refresh` on the first call to ensure the index is current.
+
 ## Named Queries
 
 Built-in queries in `resources/queries/` run by name with `key=value` params. Prefer these over writing SQL from scratch.

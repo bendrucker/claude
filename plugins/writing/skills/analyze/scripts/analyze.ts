@@ -4,10 +4,9 @@ import * as path from "node:path";
 import { cli } from "cleye";
 import {
   type CorrectionRow,
-  execQuery,
+  execSessionQuery,
   type ModelSummaryRow,
-  openDb,
-  runQuery,
+  runSessionQuery,
   serializeCorpus,
   type TextRow,
   totalChars,
@@ -50,9 +49,9 @@ const argv = cli({
       type: String,
       description: "Output report path (default: tmp/trope-analysis-<date>.md)",
     },
-    db: {
+    sessionQuery: {
       type: String,
-      description: "Path to session DuckDB database",
+      description: "Path to session plugin query.ts",
       required: true as const,
     },
     wordlistsDir: {
@@ -76,96 +75,117 @@ const minLift = argv.flags.minLift;
 const topN = argv.flags.top;
 const correctionsLimit = argv.flags.correctionsLimit;
 
+const queryScript = path.resolve(argv.flags.sessionQuery);
 const wordlistsDir =
   argv.flags.wordlistsDir ?? path.join(import.meta.dirname, "..", "..", "..", "wordlists");
 const outPath = argv.flags.out ?? path.join("tmp", `trope-analysis-${today}.md`);
+const ftsQueryDir = path.join(import.meta.dirname, "..", "resources", "queries");
 const baseParams = { after_date: since, before_date: until, project: projectFilter ?? undefined };
 
-const db = await openDb(path.resolve(argv.flags.db));
+await main();
 
-try {
+async function main(): Promise<void> {
+  console.error(`Refreshing session index via ${queryScript}`);
+  await runSessionQuery(queryScript, "schema", {}, { refresh: true });
+
   console.error("Loading current wordlists");
   const wordlistEntries = await loadWordlists(wordlistsDir);
   console.error(`Loaded ${wordlistEntries.length} wordlist entries from ${wordlistsDir}`);
 
-  console.error("Building FTS indexes");
-  await execQuery(db, "fts-setup", { ...baseParams, model: modelFilter });
+  try {
+    console.error("Building FTS indexes");
+    await execSessionQuery(
+      queryScript,
+      "fts-setup",
+      { ...baseParams, model: modelFilter },
+      {
+        queryDir: ftsQueryDir,
+      },
+    );
+    console.error("Auditing wordlists via FTS");
+    const auditTerms = wordlistEntries.map((e) => e.phrase.toLowerCase()).join(",");
+    const auditRows = await runSessionQuery<FtsAuditRow>(
+      queryScript,
+      "fts-phrase-audit",
+      { terms: auditTerms },
+      { queryDir: ftsQueryDir },
+    );
+    const auditByTerm = new Map(auditRows.map((r) => [r.term, r]));
 
-  console.error("Auditing wordlists via FTS");
-  const auditTerms = wordlistEntries.map((e) => e.phrase.toLowerCase()).join(",");
-  const auditRows = await runQuery<FtsAuditRow>(db, "fts-phrase-audit", { terms: auditTerms });
-  const auditByTerm = new Map(auditRows.map((r) => [r.term, r]));
+    console.error("Fetching model summary");
+    const modelSummary = await runSessionQuery<ModelSummaryRow>(
+      queryScript,
+      "model-summary",
+      baseParams,
+    );
 
-  console.error("Fetching model summary");
-  const modelSummary = await runQuery<ModelSummaryRow>(db, "model-summary", baseParams);
+    console.error("Dumping assistant corpus");
+    const assistantRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
+      ...baseParams,
+      role: "assistant",
+      model: modelFilter,
+      min_chars: 50,
+    });
 
-  console.error("Dumping assistant corpus");
-  const assistantRows = await runQuery<TextRow>(db, "text-export", {
-    ...baseParams,
-    role: "assistant",
-    model: modelFilter,
-    min_chars: 50,
-  });
+    console.error("Dumping user corpus");
+    const userRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
+      ...baseParams,
+      role: "user",
+      min_chars: 50,
+    });
 
-  console.error("Dumping user corpus");
-  const userRows = await runQuery<TextRow>(db, "text-export", {
-    ...baseParams,
-    role: "user",
-    model: undefined,
-    min_chars: 50,
-  });
+    console.error(`Assistant rows: ${assistantRows.length}, user rows: ${userRows.length}`);
 
-  console.error(`Assistant rows: ${assistantRows.length}, user rows: ${userRows.length}`);
+    const ngramSizes = [3, 4];
+    const assistantCorpus = processCorpus(serializeCorpus(assistantRows), ngramSizes);
+    const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
 
-  const ngramSizes = [3, 4];
-  const assistantCorpus = processCorpus(serializeCorpus(assistantRows), ngramSizes);
-  const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
+    const allLifts = computeLift({
+      assistant: assistantCorpus,
+      user: userCorpus,
+      minAssistantCount: { 3: 5, 4: 3 },
+    });
+    const exclusionSet = new Set(wordlistEntries.map((e) => e.phrase));
+    const candidatePhrases = excludePhrases(allLifts, exclusionSet)
+      .filter((r) => r.lift >= minLift)
+      .slice(0, topN);
 
-  const allLifts = computeLift({
-    assistant: assistantCorpus,
-    user: userCorpus,
-    minAssistantCount: { 3: 5, 4: 3 },
-  });
-  const exclusionSet = new Set(wordlistEntries.map((e) => e.phrase));
-  const candidatePhrases = excludePhrases(allLifts, exclusionSet)
-    .filter((r) => r.lift >= minLift)
-    .slice(0, topN);
+    console.error("Fetching correction candidates");
+    const rawCorrections = await runSessionQuery<CorrectionRow>(
+      queryScript,
+      "correction-candidates",
+      { ...baseParams, limit: correctionsLimit },
+    );
+    const corrections = rawCorrections.filter(
+      (c) => !/<(command-name|task-notification|system-reminder)/.test(c.user_snippet),
+    );
 
-  console.error("Fetching correction candidates");
-  const rawCorrections = await runQuery<CorrectionRow>(db, "correction-candidates", {
-    ...baseParams,
-    limit: correctionsLimit,
-  });
-  const corrections = rawCorrections.filter(
-    (c) => !/<(command-name|task-notification|system-reminder)/.test(c.user_snippet),
-  );
+    const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minLift);
 
-  const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minLift);
+    const report = renderReport({
+      generatedAt: today,
+      since,
+      until,
+      modelFilter,
+      projectFilter,
+      minLift,
+      topN,
+      modelSummary,
+      assistantTotalChars: totalChars(assistantRows),
+      userTotalChars: totalChars(userRows),
+      ruleHealth,
+      candidatePhrases,
+      corrections,
+    });
 
-  const report = renderReport({
-    generatedAt: today,
-    since,
-    until,
-    modelFilter,
-    projectFilter,
-    minLift,
-    topN,
-    modelSummary,
-    assistantTotalChars: totalChars(assistantRows),
-    userTotalChars: totalChars(userRows),
-    ruleHealth,
-    candidatePhrases,
-    corrections,
-  });
-
-  mkdirSync(path.dirname(outPath), { recursive: true });
-  await Bun.write(outPath, report);
-  console.error(`Wrote report to ${outPath}`);
-  process.stdout.write(`${outPath}\n`);
-} finally {
-  console.error("Cleaning up FTS indexes");
-  await execQuery(db, "fts-cleanup");
-  db.close();
+    mkdirSync(path.dirname(outPath), { recursive: true });
+    await Bun.write(outPath, report);
+    console.error(`Wrote report to ${outPath}`);
+    process.stdout.write(`${outPath}\n`);
+  } finally {
+    console.error("Cleaning up FTS indexes");
+    await execSessionQuery(queryScript, "fts-cleanup", {}, { queryDir: ftsQueryDir });
+  }
 }
 
 function daysAgo(n: number): string {

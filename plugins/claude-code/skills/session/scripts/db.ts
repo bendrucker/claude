@@ -143,5 +143,14 @@ export async function execQuery(
 ): Promise<void> {
   await setParams(db, params);
   const sql = await readSql(queriesDir, queryName);
-  await db.run(sql);
+  for (const stmt of splitStatements(sql)) {
+    await db.run(stmt);
+  }
+}
+
+function splitStatements(sql: string): string[] {
+  return sql
+    .split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }

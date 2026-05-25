@@ -5,24 +5,24 @@ terms_list AS (
   SELECT input_term, stem(input_term, 'porter') AS term
   FROM raw_terms
 ),
-assistant_stats AS (
+assistant_total AS (
   SELECT SUM(len) AS total_tokens
   FROM fts_main_fts_assistant_corpus.docs
 ),
-user_stats AS (
+user_total AS (
   SELECT SUM(len) AS total_tokens
   FROM fts_main_fts_user_corpus.docs
 ),
 assistant_tf AS (
-  SELECT d.term, SUM(t.tf) AS term_count
+  SELECT d.term, COUNT(*) AS term_count
   FROM fts_main_fts_assistant_corpus.terms t
-  JOIN fts_main_fts_assistant_corpus.dict d ON t.term_id = d.termid
+  JOIN fts_main_fts_assistant_corpus.dict d ON t.termid = d.termid
   GROUP BY d.term
 ),
 user_tf AS (
-  SELECT d.term, SUM(t.tf) AS term_count
+  SELECT d.term, COUNT(*) AS term_count
   FROM fts_main_fts_user_corpus.terms t
-  JOIN fts_main_fts_user_corpus.dict d ON t.term_id = d.termid
+  JOIN fts_main_fts_user_corpus.dict d ON t.termid = d.termid
   GROUP BY d.term
 )
 SELECT
@@ -43,8 +43,8 @@ SELECT
     )
   END AS lift
 FROM terms_list tl
-CROSS JOIN assistant_stats ast
-CROSS JOIN user_stats ust
+CROSS JOIN assistant_total ast
+CROSS JOIN user_total ust
 LEFT JOIN assistant_tf a ON tl.term = a.term
 LEFT JOIN user_tf u ON tl.term = u.term
 ORDER BY lift DESC NULLS LAST;

@@ -23,5 +23,5 @@ CREATE TABLE fts_user_corpus AS
     AND project_filter(s.project_path, getvariable('project'))
     AND length(tc.text) >= 50;
 
-PRAGMA create_fts_index('fts_assistant_corpus', 'id', 'text', stemmer='porter', stopwords='english');
-PRAGMA create_fts_index('fts_user_corpus', 'id', 'text', stemmer='porter', stopwords='english');
+PRAGMA create_fts_index('fts_assistant_corpus', 'id', 'text', stemmer='porter', stopwords='english', overwrite=1);
+PRAGMA create_fts_index('fts_user_corpus', 'id', 'text', stemmer='porter', stopwords='english', overwrite=1);

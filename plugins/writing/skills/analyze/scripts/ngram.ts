@@ -98,6 +98,7 @@ export function computeLift({ assistant, user, minAssistantCount }: LiftInput): 
       const userCount = userNgrams.get(phrase) ?? 0;
       const assistantPerM = perMillion(count, assistant.tokens);
       const userPerM = perMillion(userCount, user.tokens);
+      const smoothedUserPerM = userPerM + perMillion(1, user.tokens);
       rows.push({
         phrase,
         n,
@@ -105,7 +106,7 @@ export function computeLift({ assistant, user, minAssistantCount }: LiftInput): 
         userCount,
         assistantPerM,
         userPerM,
-        lift: userPerM > 0 ? assistantPerM / userPerM : Infinity,
+        lift: assistantPerM / smoothedUserPerM,
       });
     }
   }

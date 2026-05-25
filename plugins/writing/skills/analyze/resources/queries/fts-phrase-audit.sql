@@ -2,7 +2,7 @@ WITH raw_terms AS (
   SELECT unnest(string_split(getvariable('terms')::VARCHAR, ',')) AS input_term
 ),
 terms_list AS (
-  SELECT input_term, stem(input_term, 'porter') AS term
+  SELECT input_term, stem(lower(input_term), 'porter') AS term
   FROM raw_terms
 ),
 assistant_total AS (

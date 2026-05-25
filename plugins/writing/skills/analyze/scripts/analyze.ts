@@ -136,13 +136,14 @@ async function main(): Promise<void> {
 
     console.error(`Assistant rows: ${assistantRows.length}, user rows: ${userRows.length}`);
 
-    const assistantCorpus = processCorpus(serializeCorpus(assistantRows));
-    const userCorpus = processCorpus(serializeCorpus(userRows));
+    const ngramSizes = [3, 4];
+    const assistantCorpus = processCorpus(serializeCorpus(assistantRows), ngramSizes);
+    const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
 
     const allLifts = computeLift({
       assistant: assistantCorpus,
       user: userCorpus,
-      minAssistantCount: { 2: 8, 3: 5, 4: 3 },
+      minAssistantCount: { 3: 5, 4: 3 },
     });
     const exclusionSet = new Set(wordlistEntries.map((e) => e.phrase));
     const candidatePhrases = excludePhrases(allLifts, exclusionSet)
@@ -150,10 +151,14 @@ async function main(): Promise<void> {
       .slice(0, topN);
 
     console.error("Fetching correction candidates");
-    const corrections = await runSessionQuery<CorrectionRow>(queryScript, "correction-candidates", {
-      ...baseParams,
-      limit: correctionsLimit,
-    });
+    const rawCorrections = await runSessionQuery<CorrectionRow>(
+      queryScript,
+      "correction-candidates",
+      { ...baseParams, limit: correctionsLimit },
+    );
+    const corrections = rawCorrections.filter(
+      (c) => !/<(command-name|task-notification|system-reminder)/.test(c.user_snippet),
+    );
 
     const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minLift);
 

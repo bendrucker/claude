@@ -145,7 +145,7 @@ describe("computeLift", () => {
     expect(rows.length).toBe(0);
   });
 
-  test("returns Infinity lift when phrase is absent from user corpus", () => {
+  test("uses Laplace smoothing when phrase is absent from user corpus", () => {
     const assistant = processCorpus("foo bar foo bar foo bar foo bar foo bar");
     const user = processCorpus("completely different words in the user text here now");
     const rows = computeLift({
@@ -155,7 +155,8 @@ describe("computeLift", () => {
     });
     const fooBar = rows.find((r) => r.phrase === "foo bar");
     expect(fooBar).toBeDefined();
-    expect(fooBar?.lift).toBe(Infinity);
+    expect(fooBar?.lift).toBeGreaterThan(0);
+    expect(fooBar?.lift).toBeLessThan(Infinity);
   });
 });
 

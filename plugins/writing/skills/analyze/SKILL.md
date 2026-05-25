@@ -14,12 +14,20 @@ allowed-tools:
 
 Mine the session DuckDB index for assistant writing patterns, compare against the user's voice, and propose a diff to `plugins/writing/wordlists/*.txt`.
 
+## Prerequisites
+
+Requires the `claude-code:session` skill's query script. Locate it before running:
+
+```bash
+SESSION_QUERY=$(find ~/.claude/plugins -path "*/claude-code/skills/session/scripts/query.ts" | head -1)
+```
+
 ## Run
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts --since 2026-04-01 --model '*opus*' --top 50
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts --project bendrucker.me --min-lift 7
+${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-query "$SESSION_QUERY"
+${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-query "$SESSION_QUERY" --since 2026-04-01 --model '*opus*' --top 50
+${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-query "$SESSION_QUERY" --project bendrucker.me --min-lift 7
 ```
 
 Run with `--help` for all flags. Writes a markdown report to `tmp/trope-analysis-<date>.md` (override with `--out`).

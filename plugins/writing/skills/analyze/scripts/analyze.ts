@@ -2,7 +2,6 @@
 import { mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { cli } from "cleye";
-import { stemmer } from "stemmer";
 import {
   type CorrectionRow,
   execSessionQuery,
@@ -12,9 +11,9 @@ import {
   type TextRow,
   totalChars,
 } from "./dump";
-import { type CorpusStats, computeLift, excludePhrases, processCorpus } from "./ngram";
-import { buildRuleHealth, type FtsAuditRow, renderReport, type TermLiftRow } from "./report";
-import { loadWordlists, type WordlistEntry } from "./wordlists";
+import { computeLift, excludePhrases, processCorpus } from "./ngram";
+import { buildRuleHealth, type FtsAuditRow, renderReport } from "./report";
+import { loadWordlists } from "./wordlists";
 
 const argv = cli({
   name: "analyze",
@@ -52,7 +51,8 @@ const argv = cli({
     },
     sessionQuery: {
       type: String,
-      description: "Path to session plugin query.ts (overrides auto-resolution)",
+      description: "Path to session plugin query.ts",
+      required: true as const,
     },
     wordlistsDir: {
       type: String,
@@ -75,94 +75,85 @@ const minLift = argv.flags.minLift;
 const topN = argv.flags.top;
 const correctionsLimit = argv.flags.correctionsLimit;
 
-const queryScript = await resolveQueryScript(argv.flags.sessionQuery);
-const wordlistsDir = argv.flags.wordlistsDir ?? defaultWordlistsDir();
+const queryScript = path.resolve(argv.flags.sessionQuery);
+const wordlistsDir =
+  argv.flags.wordlistsDir ?? path.join(import.meta.dirname, "..", "..", "..", "wordlists");
 const outPath = argv.flags.out ?? path.join("tmp", `trope-analysis-${today}.md`);
 const ftsQueryDir = path.join(import.meta.dirname, "..", "resources", "queries");
+const baseParams = { after_date: since, before_date: until, project: projectFilter ?? undefined };
 
 await main();
 
 async function main(): Promise<void> {
-  process.stderr.write(`Refreshing session index via ${queryScript}\n`);
+  console.error(`Refreshing session index via ${queryScript}`);
   await runSessionQuery(queryScript, "schema", {}, { refresh: true });
 
-  process.stderr.write("Loading current wordlists\n");
+  console.error("Loading current wordlists");
   const wordlistEntries = await loadWordlists(wordlistsDir);
-  process.stderr.write(`Loaded ${wordlistEntries.length} wordlist entries from ${wordlistsDir}\n`);
-
-  process.stderr.write("Building FTS indexes\n");
-  await execSessionQuery(
-    queryScript,
-    "fts-setup",
-    {
-      after_date: since,
-      before_date: until,
-      model: modelFilter,
-      project: projectFilter ?? undefined,
-    },
-    { queryDir: ftsQueryDir },
-  );
+  console.error(`Loaded ${wordlistEntries.length} wordlist entries from ${wordlistsDir}`);
 
   try {
-    process.stderr.write("Computing vocabulary lift via FTS\n");
-    const vocabTerms = await runSessionQuery<TermLiftRow>(
+    console.error("Building FTS indexes");
+    await execSessionQuery(
       queryScript,
-      "fts-term-lift",
+      "fts-setup",
+      { ...baseParams, model: modelFilter },
       {
-        min_count: 5,
-        limit: 100,
+        queryDir: ftsQueryDir,
       },
+    );
+    console.error("Auditing wordlists via FTS");
+    const auditTerms = wordlistEntries.map((e) => e.phrase.toLowerCase()).join(",");
+    const auditRows = await runSessionQuery<FtsAuditRow>(
+      queryScript,
+      "fts-phrase-audit",
+      { terms: auditTerms },
       { queryDir: ftsQueryDir },
     );
+    const auditByTerm = new Map(auditRows.map((r) => [r.term, r]));
 
-    process.stderr.write("Auditing wordlists via FTS\n");
-    const auditByTerm = await auditWordlistsFts(wordlistEntries);
+    console.error("Fetching model summary");
+    const modelSummary = await runSessionQuery<ModelSummaryRow>(
+      queryScript,
+      "model-summary",
+      baseParams,
+    );
 
-    process.stderr.write("Fetching model summary\n");
-    const modelSummary = await runSessionQuery<ModelSummaryRow>(queryScript, "model-summary", {
-      after_date: since,
-      before_date: until,
-      project: projectFilter ?? undefined,
-    });
-
-    process.stderr.write("Dumping assistant corpus\n");
+    console.error("Dumping assistant corpus");
     const assistantRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
+      ...baseParams,
       role: "assistant",
       model: modelFilter,
-      after_date: since,
-      before_date: until,
-      project: projectFilter ?? undefined,
       min_chars: 50,
     });
 
-    process.stderr.write("Dumping user corpus\n");
+    console.error("Dumping user corpus");
     const userRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
+      ...baseParams,
       role: "user",
-      after_date: since,
-      before_date: until,
-      project: projectFilter ?? undefined,
       min_chars: 50,
     });
 
-    process.stderr.write(
-      `Assistant rows: ${assistantRows.length}, user rows: ${userRows.length}\n`,
-    );
+    console.error(`Assistant rows: ${assistantRows.length}, user rows: ${userRows.length}`);
 
     const assistantCorpus = processCorpus(serializeCorpus(assistantRows));
     const userCorpus = processCorpus(serializeCorpus(userRows));
 
-    const candidatePhrases = surfaceCandidates(assistantCorpus, userCorpus, wordlistEntries);
+    const allLifts = computeLift({
+      assistant: assistantCorpus,
+      user: userCorpus,
+      minAssistantCount: { 2: 8, 3: 5, 4: 3 },
+    });
+    const exclusionSet = new Set(wordlistEntries.map((e) => e.phrase));
+    const candidatePhrases = excludePhrases(allLifts, exclusionSet)
+      .filter((r) => r.lift >= minLift)
+      .slice(0, topN);
 
-    process.stderr.write("Fetching correction candidates\n");
+    console.error("Fetching correction candidates");
     const corrections = await runSessionQuery<CorrectionRow>(queryScript, "correction-candidates", {
-      after_date: since,
-      before_date: until,
-      project: projectFilter ?? undefined,
+      ...baseParams,
       limit: correctionsLimit,
     });
-
-    const wordlistStems = new Set(wordlistEntries.map((e) => stemmer(e.phrase.toLowerCase())));
-    const filteredVocab = vocabTerms.filter((t) => !wordlistStems.has(t.term));
 
     const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minLift);
 
@@ -179,67 +170,17 @@ async function main(): Promise<void> {
       userTotalChars: totalChars(userRows),
       ruleHealth,
       candidatePhrases,
-      vocabTerms: filteredVocab,
       corrections,
     });
 
     mkdirSync(path.dirname(outPath), { recursive: true });
     await Bun.write(outPath, report);
-    process.stderr.write(`Wrote report to ${outPath}\n`);
+    console.error(`Wrote report to ${outPath}`);
     process.stdout.write(`${outPath}\n`);
   } finally {
-    process.stderr.write("Cleaning up FTS indexes\n");
+    console.error("Cleaning up FTS indexes");
     await execSessionQuery(queryScript, "fts-cleanup", {}, { queryDir: ftsQueryDir });
   }
-}
-
-async function auditWordlistsFts(entries: WordlistEntry[]): Promise<Map<string, FtsAuditRow>> {
-  const terms = entries.map((e) => e.phrase.toLowerCase()).join(",");
-  const rows = await runSessionQuery<FtsAuditRow>(
-    queryScript,
-    "fts-phrase-audit",
-    {
-      terms,
-    },
-    { queryDir: ftsQueryDir },
-  );
-  const result = new Map<string, FtsAuditRow>();
-  for (const row of rows) {
-    result.set(row.term, row);
-  }
-  return result;
-}
-
-function surfaceCandidates(assistant: CorpusStats, user: CorpusStats, existing: WordlistEntry[]) {
-  const all = computeLift({
-    assistant,
-    user,
-    minAssistantCount: { 2: 8, 3: 5, 4: 3 },
-  });
-  const exclusionSet = new Set(existing.map((e) => e.phrase));
-  const filtered = excludePhrases(all, exclusionSet).filter((r) => r.lift >= minLift);
-  return filtered.slice(0, topN);
-}
-
-async function resolveQueryScript(override: string | undefined): Promise<string> {
-  if (override) return path.resolve(override);
-  const sessionQueryRelPath = path.join("claude-code", "skills", "session", "scripts", "query.ts");
-  const candidates = [
-    process.env.CLAUDE_PLUGIN_ROOT
-      ? path.join(process.env.CLAUDE_PLUGIN_ROOT, "..", sessionQueryRelPath)
-      : null,
-    path.resolve(path.join(import.meta.dirname, "..", "..", "..", ".."), sessionQueryRelPath),
-  ].filter(Boolean) as string[];
-  for (const candidate of candidates) {
-    if (await Bun.file(candidate).exists()) return candidate;
-  }
-  throw new Error(
-    `Could not locate session query script. Tried:\n${candidates.join("\n")}\nPass --session-query <path> to override.`,
-  );
-}
-
-function defaultWordlistsDir(): string {
-  return path.join(import.meta.dirname, "..", "..", "..", "wordlists");
 }
 
 function daysAgo(n: number): string {

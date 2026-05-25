@@ -1,5 +1,9 @@
-WITH terms_list AS (
-  SELECT stem(unnest(string_split(getvariable('terms')::VARCHAR, ',')), 'porter') AS term
+WITH raw_terms AS (
+  SELECT unnest(string_split(getvariable('terms')::VARCHAR, ',')) AS input_term
+),
+terms_list AS (
+  SELECT input_term, stem(input_term, 'porter') AS term
+  FROM raw_terms
 ),
 assistant_stats AS (
   SELECT SUM(len) AS total_tokens
@@ -22,7 +26,7 @@ user_tf AS (
   GROUP BY d.term
 )
 SELECT
-  tl.term,
+  tl.input_term AS term,
   COALESCE(a.term_count, 0) AS assistant_count,
   COALESCE(u.term_count, 0) AS user_count,
   CASE WHEN ast.total_tokens > 0

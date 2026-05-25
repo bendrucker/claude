@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { CorrectionRow, ModelSummaryRow } from "./dump";
-import type { FtsAuditRow, TermLiftRow } from "./report";
+import type { FtsAuditRow } from "./report";
 import { buildRuleHealth, renderReport } from "./report";
 import type { WordlistEntry } from "./wordlists";
 
@@ -17,7 +17,6 @@ const baseInput = {
   userTotalChars: 0,
   ruleHealth: [],
   candidatePhrases: [],
-  vocabTerms: [] as TermLiftRow[],
   corrections: [] as CorrectionRow[],
 };
 
@@ -69,7 +68,6 @@ describe("renderReport", () => {
     const output = renderReport(baseInput);
     expect(output).toContain("# Writing trope analysis");
     expect(output).toContain("## Summary");
-    expect(output).toContain("## Vocabulary Lift");
     expect(output).toContain("## Proposed Wordlist Removals");
     expect(output).toContain("## Proposed Wordlist Additions");
     expect(output).toContain("## Current Rule Health");
@@ -137,34 +135,14 @@ describe("renderReport", () => {
     expect(output).toContain("no, do it differently");
   });
 
-  test("renders vocabulary table with high-lift terms", () => {
-    const output = renderReport({
-      ...baseInput,
-      vocabTerms: [
-        {
-          term: "robust",
-          assistant_count: 42,
-          user_count: 3,
-          assistant_per_m: 120.5,
-          user_per_m: 8.1,
-          lift: 14.9,
-        },
-      ],
-    });
-    expect(output).toContain("| `robust` |");
-    expect(output).toContain("14.9x");
-  });
-
-  test("orders sections: summary, vocabulary, removals, additions, health", () => {
+  test("orders sections: summary, removals, additions, health", () => {
     const output = renderReport(baseInput);
     const summaryIdx = output.indexOf("## Summary");
-    const vocabIdx = output.indexOf("## Vocabulary Lift");
     const removalIdx = output.indexOf("## Proposed Wordlist Removals");
     const additionIdx = output.indexOf("## Proposed Wordlist Additions");
     const healthIdx = output.indexOf("## Current Rule Health");
     expect(summaryIdx).toBeGreaterThan(0);
-    expect(vocabIdx).toBeGreaterThan(summaryIdx);
-    expect(removalIdx).toBeGreaterThan(vocabIdx);
+    expect(removalIdx).toBeGreaterThan(summaryIdx);
     expect(additionIdx).toBeGreaterThan(removalIdx);
     expect(healthIdx).toBeGreaterThan(additionIdx);
   });

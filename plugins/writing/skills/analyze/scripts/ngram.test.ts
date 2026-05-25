@@ -4,8 +4,6 @@ import {
   cleanText,
   computeLift,
   excludePhrases,
-  filterByMinLift,
-  perMillion,
   processCorpus,
   splitSentences,
   tokenizeSentence,
@@ -85,21 +83,9 @@ describe("addNgrams", () => {
   });
 });
 
-describe("perMillion", () => {
-  test("normalizes per million tokens", () => {
-    expect(perMillion(10, 1_000_000)).toBe(10);
-    expect(perMillion(1, 100_000)).toBe(10);
-  });
-
-  test("zero total returns zero", () => {
-    expect(perMillion(5, 0)).toBe(0);
-  });
-});
-
 describe("processCorpus", () => {
-  test("counts tokens, sentences, and ngrams", () => {
+  test("counts tokens and ngrams", () => {
     const stats = processCorpus("Let me check that. Let me verify too.");
-    expect(stats.sentences).toBe(2);
     expect(stats.tokens).toBe(8);
     expect(stats.ngrams.get(2)?.get("let me")).toBe(2);
     expect(stats.ngrams.get(3)?.get("let me check")).toBe(1);
@@ -170,13 +156,6 @@ describe("computeLift", () => {
     const fooBar = rows.find((r) => r.phrase === "foo bar");
     expect(fooBar).toBeDefined();
     expect(fooBar?.lift).toBe(Infinity);
-  });
-});
-
-describe("filterByMinLift", () => {
-  test("drops rows below threshold", () => {
-    const rows = [makeRow("a b", 10), makeRow("c d", 2), makeRow("e f", 6)];
-    expect(filterByMinLift(rows, 5)).toHaveLength(2);
   });
 });
 

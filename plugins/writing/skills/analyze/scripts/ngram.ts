@@ -46,9 +46,6 @@ export function addNgrams(counts: NGramCounts, tokens: string[], n: number): voi
 
 export interface CorpusStats {
   tokens: number;
-  sentences: number;
-  rawChars: number;
-  cleanChars: number;
   ngrams: Map<number, NGramCounts>;
 }
 
@@ -56,15 +53,11 @@ export function processCorpus(text: string, sizes: number[] = [2, 3, 4]): Corpus
   const cleaned = cleanText(text);
   const stats: CorpusStats = {
     tokens: 0,
-    sentences: 0,
-    rawChars: text.length,
-    cleanChars: cleaned.length,
     ngrams: new Map(sizes.map((n) => [n, new Map<string, number>()])),
   };
   for (const sent of splitSentences(cleaned)) {
     const tokens = tokenizeSentence(sent);
     if (tokens.length === 0) continue;
-    stats.sentences += 1;
     stats.tokens += tokens.length;
     for (const n of sizes) {
       const counts = stats.ngrams.get(n);
@@ -74,7 +67,7 @@ export function processCorpus(text: string, sizes: number[] = [2, 3, 4]): Corpus
   return stats;
 }
 
-export function perMillion(count: number, total: number): number {
+function perMillion(count: number, total: number): number {
   if (total === 0) return 0;
   return (count / total) * 1_000_000;
 }
@@ -118,10 +111,6 @@ export function computeLift({ assistant, user, minAssistantCount }: LiftInput): 
   }
   rows.sort((a, b) => b.lift - a.lift);
   return rows;
-}
-
-export function filterByMinLift(rows: LiftRow[], minLift: number): LiftRow[] {
-  return rows.filter((r) => r.lift >= minLift);
 }
 
 export function excludePhrases(rows: LiftRow[], excluded: Set<string>): LiftRow[] {

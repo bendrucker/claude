@@ -8,16 +8,6 @@ export interface TextRow {
   raw_text: string;
 }
 
-export interface PhraseLiftRow {
-  role: "user" | "assistant";
-  model: string | null;
-  messages: number;
-  total_chars: number;
-  phrase_count: number;
-  per_1m_chars: number | null;
-  lift_vs_user: number | null;
-}
-
 export interface CorrectionRow {
   session_id: string;
   project: string | null;

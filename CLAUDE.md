@@ -84,6 +84,8 @@ The root `package.json` contains shared tooling (typescript) and dependencies us
 
 Avoid collecting all dependencies in the root package.json. Each plugin should be self-contained where practical.
 
+Plugins must not import from outside their own directory. No cross-plugin imports, no reaching into `packages/` or root-level modules via relative paths. If two plugins need shared code, extract it to an npm workspace package and declare the dependency in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.
+
 ### Bun
 
 Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing dependencies on first run, eliminating the need to run `bun install` before executing scripts. This simplifies hook execution since hooks run in isolated contexts where `node_modules` may not be readily available.

@@ -80,6 +80,7 @@ export interface LiftRow {
   assistantPerM: number;
   userPerM: number;
   lift: number;
+  sessions?: number;
 }
 
 export interface LiftInput {
@@ -98,7 +99,7 @@ export function computeLift({ assistant, user, minAssistantCount }: LiftInput): 
       const userCount = userNgrams.get(phrase) ?? 0;
       const assistantPerM = perMillion(count, assistant.tokens);
       const userPerM = perMillion(userCount, user.tokens);
-      const smoothedUserPerM = userPerM + perMillion(1, user.tokens);
+      const smoothedUserPerM = user.tokens > 0 ? userPerM + perMillion(1, user.tokens) : 1;
       rows.push({
         phrase,
         n,
@@ -112,6 +113,37 @@ export function computeLift({ assistant, user, minAssistantCount }: LiftInput): 
   }
   rows.sort((a, b) => b.lift - a.lift);
   return rows;
+}
+
+export function computeSessionCount(
+  rows: Array<{ session_id: string; text?: string }>,
+  sizes: number[],
+): Map<string, number> {
+  const phraseSessions = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.text) continue;
+    const cleaned = cleanText(row.text);
+    for (const sent of splitSentences(cleaned)) {
+      const tokens = tokenizeSentence(sent);
+      if (tokens.length === 0) continue;
+      for (const n of sizes) {
+        for (let i = 0; i <= tokens.length - n; i++) {
+          const key = tokens.slice(i, i + n).join(" ");
+          let sessions = phraseSessions.get(key);
+          if (!sessions) {
+            sessions = new Set();
+            phraseSessions.set(key, sessions);
+          }
+          sessions.add(row.session_id);
+        }
+      }
+    }
+  }
+  const spread = new Map<string, number>();
+  for (const [phrase, sessions] of phraseSessions) {
+    spread.set(phrase, sessions.size);
+  }
+  return spread;
 }
 
 export function excludePhrases(rows: LiftRow[], excluded: Set<string>): LiftRow[] {

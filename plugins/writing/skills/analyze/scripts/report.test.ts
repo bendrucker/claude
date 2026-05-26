@@ -14,8 +14,10 @@ const baseInput = {
   topN: 10,
   modelSummary: [] as ModelSummaryRow[],
   assistantTotalChars: 0,
+  deliverableTotalChars: 0,
   userTotalChars: 0,
   ruleHealth: [],
+  structuralAudit: [],
   candidatePhrases: [],
   corrections: [] as CorrectionRow[],
 };
@@ -133,6 +135,37 @@ describe("renderReport", () => {
     });
     expect(output).toContain("### 2026-05-20T10:00:00Z (myproject)");
     expect(output).toContain("no, do it differently");
+  });
+
+  test("labels openers and vocabulary rules with type column", () => {
+    const output = renderReport({
+      ...baseInput,
+      ruleHealth: [
+        {
+          entry: { phrase: "Perfect", source: "openers.txt" },
+          assistantCount: 10,
+          userCount: 2,
+          assistantPerM: 100,
+          userPerM: 20,
+          lift: 5,
+          stillDistinctive: true,
+          noData: false,
+        },
+        {
+          entry: { phrase: "delve into", source: "vocabulary.txt" },
+          assistantCount: 5,
+          userCount: 1,
+          assistantPerM: 50,
+          userPerM: 10,
+          lift: 5,
+          stillDistinctive: true,
+          noData: false,
+        },
+      ],
+    });
+    expect(output).toContain("| type |");
+    expect(output).toMatch(/Perfect.*opener/);
+    expect(output).toMatch(/delve into.*vocabulary/);
   });
 
   test("orders sections: summary, removals, additions, health", () => {

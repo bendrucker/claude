@@ -19,6 +19,8 @@ CREATE TABLE fts_user_corpus AS
   FROM text_content tc
   JOIN sessions s USING (session_id)
   WHERE tc.role = 'user'
+    AND NOT tc.is_subagent
+    AND NOT tc.is_system
     AND date_filter(tc.timestamp, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(s.project_path, getvariable('project'))
     AND length(tc.text) >= 50;

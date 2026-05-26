@@ -149,12 +149,15 @@ WITH unified AS (
     CASE WHEN m.type = 'assistant' THEN (m.data->>'$.message.model') END AS model,
     ci.text AS raw_text,
     ci.source_file,
-    ci.source_line
+    ci.source_line,
+    ci.source_file LIKE '%/subagents/%' AS is_subagent,
+    ci.text LIKE '<%' AS is_system
   FROM content_items ci
   JOIN messages m USING (source_file, source_line)
   WHERE ci.type = 'text'
     AND ci.text IS NOT NULL
     AND length(trim(ci.text)) > 0
+    AND NOT m.is_meta
 
   UNION ALL
 
@@ -166,7 +169,12 @@ WITH unified AS (
     NULL AS model,
     m.content_text AS raw_text,
     m.source_file,
-    m.source_line
+    m.source_line,
+    m.source_file LIKE '%/subagents/%' AS is_subagent,
+    m.content_text LIKE '<%'
+      OR m.content_text LIKE 'Implement the following plan:%'
+      OR m.content_text LIKE 'This session is being continued from a previous conversation%'
+    AS is_system
   FROM messages m
   WHERE m.type = 'user'
     AND m.content_text IS NOT NULL
@@ -185,7 +193,9 @@ SELECT
   ) AS text,
   raw_text,
   source_file,
-  source_line
+  source_line,
+  is_subagent,
+  is_system
 FROM unified;
 
 CREATE OR REPLACE VIEW sessions AS

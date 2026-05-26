@@ -3,6 +3,7 @@ import {
   addNgrams,
   cleanText,
   computeLift,
+  computeSessionCount,
   excludePhrases,
   processCorpus,
   splitSentences,
@@ -157,6 +158,33 @@ describe("computeLift", () => {
     expect(fooBar).toBeDefined();
     expect(fooBar?.lift).toBeGreaterThan(0);
     expect(fooBar?.lift).toBeLessThan(Infinity);
+  });
+});
+
+describe("computeSessionCount", () => {
+  test("counts distinct sessions per n-gram", () => {
+    const rows = [
+      { session_id: "s1", text: "let me check the result" },
+      { session_id: "s2", text: "let me check another thing" },
+      { session_id: "s3", text: "let me check once more" },
+    ];
+    const spread = computeSessionCount(rows, [3]);
+    expect(spread.get("let me check")).toBe(3);
+  });
+
+  test("deduplicates within the same session", () => {
+    const rows = [{ session_id: "s1", text: "let me check. let me check again" }];
+    const spread = computeSessionCount(rows, [3]);
+    expect(spread.get("let me check")).toBe(1);
+  });
+
+  test("skips rows without text", () => {
+    const rows = [
+      { session_id: "s1", text: undefined },
+      { session_id: "s2", text: "some words here now" },
+    ];
+    const spread = computeSessionCount(rows, [3]);
+    expect(spread.size).toBeGreaterThan(0);
   });
 });
 

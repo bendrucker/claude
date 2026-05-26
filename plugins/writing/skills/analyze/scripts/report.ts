@@ -1,5 +1,6 @@
 import type { CorrectionRow, ModelSummaryRow } from "./dump";
 import type { LiftRow } from "./ngram";
+import type { StructuralAuditRow } from "./structural";
 import type { WordlistEntry } from "./wordlists";
 
 export interface FtsAuditRow {
@@ -32,8 +33,10 @@ export interface ReportInput {
   topN: number;
   modelSummary: ModelSummaryRow[];
   assistantTotalChars: number;
+  deliverableTotalChars: number;
   userTotalChars: number;
   ruleHealth: CurrentRuleHealth[];
+  structuralAudit: StructuralAuditRow[];
   candidatePhrases: LiftRow[];
   corrections: CorrectionRow[];
 }
@@ -45,6 +48,7 @@ export function renderReport(input: ReportInput): string {
     renderProposedRemovals(input),
     renderProposedAdditions(input),
     renderRuleHealthTable(input),
+    renderStructuralAudit(input),
     renderCorrections(input),
   ];
   return `${sections.join("\n\n")}\n`;
@@ -68,8 +72,9 @@ function renderSummary(input: ReportInput): string {
   const lines = [
     "## Summary",
     "",
-    `- Assistant corpus: ${fmtNum(input.assistantTotalChars)} chars`,
-    `- User corpus: ${fmtNum(input.userTotalChars)} chars`,
+    `- All assistant text: ${fmtNum(input.assistantTotalChars)} chars`,
+    `- Deliverable prose (Write/Edit/Bash): ${fmtNum(input.deliverableTotalChars)} chars`,
+    `- User text (human only): ${fmtNum(input.userTotalChars)} chars`,
     `- Current wordlist entries audited: ${input.ruleHealth.length}`,
     `- Proposed removals (collapsed lift): ${removals}`,
     `- Proposed additions (new candidates above threshold): ${input.candidatePhrases.length}`,
@@ -128,11 +133,11 @@ function renderProposedAdditions(input: ReportInput): string {
     lines.push("_No additions proposed._");
     return lines.join("\n");
   }
-  lines.push("| phrase | n | assistant count | user count | lift |");
-  lines.push("| --- | --- | --- | --- | --- |");
+  lines.push("| phrase | n | assistant count | user count | sessions | lift |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
   for (const r of input.candidatePhrases) {
     lines.push(
-      `| \`${esc(r.phrase)}\` | ${r.n} | ${r.assistantCount} | ${r.userCount} | ${r.lift.toFixed(1)} |`,
+      `| \`${esc(r.phrase)}\` | ${r.n} | ${r.assistantCount} | ${r.userCount} | ${r.sessions ?? "-"} | ${r.lift.toFixed(1)} |`,
     );
   }
   lines.push("", "```diff");
@@ -154,12 +159,36 @@ function renderRuleHealthTable(input: ReportInput): string {
     lines.push("_No wordlists found at `plugins/writing/wordlists/`._");
     return lines.join("\n");
   }
-  lines.push("| phrase | source | assistant/M | user/M | lift | status |");
-  lines.push("| --- | --- | --- | --- | --- | --- |");
+  lines.push("| phrase | source | type | assistant/M | user/M | lift | status |");
+  lines.push("| --- | --- | --- | --- | --- | --- | --- |");
   for (const r of input.ruleHealth) {
     const status = r.noData ? "no data" : r.stillDistinctive ? "keep" : "remove";
+    const ruleType = ruleTypeLabel(r.entry.source);
     lines.push(
-      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${fmtLift(r.lift)} | ${status} |`,
+      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${ruleType} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${fmtLift(r.lift)} | ${status} |`,
+    );
+  }
+  return lines.join("\n");
+}
+
+function renderStructuralAudit(input: ReportInput): string {
+  const lines = [
+    "## Structural Pattern Audit",
+    "",
+    "Regex-based patterns from the writing hook, run against all model-generated text.",
+    "",
+  ];
+  if (input.structuralAudit.length === 0) {
+    lines.push("_No structural patterns defined._");
+    return lines.join("\n");
+  }
+  lines.push("| pattern | scope | assistant hits | user hits | rows | sessions |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
+  const sorted = [...input.structuralAudit].sort((a, b) => b.assistantHits - a.assistantHits);
+  for (const r of sorted) {
+    const scope = r.sideEffectOnly ? "side-effect" : r.fileOnly ? "file-only" : "all";
+    lines.push(
+      `| ${r.category} | ${scope} | ${r.assistantHits} | ${r.userHits} | ${r.assistantRows} | ${r.assistantSessions} |`,
     );
   }
   return lines.join("\n");
@@ -232,6 +261,12 @@ function fmtPerM(value: number | null): string {
 function fmtLift(value: number | null): string {
   if (value === null) return "-";
   return `${value.toFixed(1)}x`;
+}
+
+function ruleTypeLabel(source: string): string {
+  if (source === "openers.txt") return "opener";
+  if (source === "marketing-verbs.txt") return "weighted";
+  return "vocabulary";
 }
 
 function esc(s: string): string {

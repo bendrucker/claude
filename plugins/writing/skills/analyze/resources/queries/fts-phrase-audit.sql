@@ -38,7 +38,7 @@ SELECT
   CASE WHEN ast.total_tokens > 0 AND ust.total_tokens > 0
     THEN ROUND(
       (COALESCE(a.term_count, 0)::DOUBLE / ast.total_tokens)
-      / GREATEST(COALESCE(u.term_count, 0)::DOUBLE / ust.total_tokens, 1e-9),
+      / (COALESCE(u.term_count, 0)::DOUBLE / ust.total_tokens + 1.0 / ust.total_tokens),
       1
     )
   END AS lift

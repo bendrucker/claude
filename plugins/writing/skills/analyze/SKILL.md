@@ -31,13 +31,30 @@ ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-query <session-query-path> --pr
 
 Run with `--help` for all flags. Writes a markdown report to `tmp/trope-analysis-<date>.md` (override with `--out`).
 
+## Metrics
+
+**Lift**: how distinctive a phrase is to assistant output vs. user text. `lift = rate_assistant / rate_user_smoothed`, where rates are per-million-token frequencies. A lift of 10.0 means the assistant uses the phrase 10x more per token than the user. The `--min-lift` threshold (default 5.0) decides rule health and candidate inclusion.
+
+**Session count**: number of distinct sessions containing a phrase. Candidates require session count >= 3 to filter project-specific jargon that dominates a single session.
+
 ## Output
 
 - Summary stats (corpus sizes, rule count, model breakdown)
 - Proposed removals (rules whose lift collapsed below `--min-lift`)
 - Proposed additions (high-lift n-grams not already covered)
-- Rule health table (every entry with `keep` / `remove` / `no data`)
+- Rule health table (every entry with type, `keep` / `remove` / `no data`)
+- Structural pattern audit (regex-based hook patterns, hit counts across sessions)
 - Correction candidates (long-assistant, short-user pairs suggesting prose pushback)
+
+## Corpora
+
+Three corpora, each serving a different purpose:
+
+- **All model-generated text**: conversational assistant text (`text-export`, role=assistant) combined with deliverable prose (`deliverable-prose.sql`). The session DB's `text_content` view only captures conversational text blocks, not tool inputs (Write/Edit/Bash). The deliverable query fills this gap. The combined corpus is used for n-gram candidates.
+- **Deliverable prose** (`deliverable-prose.sql`): Write/Edit to prose files, Bash commands with `--body`/`--message`/`-m`. Reported in the summary for context.
+- **Human-only user text** (`text-export`, role=user, filtered): the baseline for lift calculation. Filters out system-injected content (skill injections, context compaction summaries, task notifications, system reminders) that arrives as user-role messages but is machine-generated.
+
+The FTS rule health audit uses `text_content` (a view covering both roles) with its own FTS indexes.
 
 ## Workflow
 
@@ -45,4 +62,4 @@ Review the report. Edit `plugins/writing/wordlists/*.txt` by hand, then re-run t
 
 ## Methodology
 
-See [references/methodology.md](references/methodology.md) for query details and tuning guidance.
+See [references/methodology.md](references/methodology.md) for query details, known gaps, and tuning guidance.

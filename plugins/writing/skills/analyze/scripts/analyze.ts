@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { cli } from "cleye";
 import {
   type CorrectionRow,
+  type DeliverableRow,
   execSessionQuery,
   type ModelSummaryRow,
   runSessionQuery,
@@ -11,8 +12,9 @@ import {
   type TextRow,
   totalChars,
 } from "./dump";
-import { computeLift, excludePhrases, processCorpus } from "./ngram";
+import { computeLift, computeSessionCount, excludePhrases, processCorpus } from "./ngram";
 import { buildRuleHealth, type FtsAuditRow, renderReport } from "./report";
+import { auditStructuralPatterns } from "./structural";
 import { loadWordlists } from "./wordlists";
 
 const argv = cli({
@@ -119,7 +121,7 @@ async function main(): Promise<void> {
       baseParams,
     );
 
-    console.error("Dumping assistant corpus");
+    console.error("Dumping all assistant text");
     const assistantRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
       ...baseParams,
       role: "assistant",
@@ -127,18 +129,36 @@ async function main(): Promise<void> {
       min_chars: 50,
     });
 
-    console.error("Dumping user corpus");
+    console.error("Dumping deliverable-prose corpus (Write/Edit/Bash tool inputs)");
+    const deliverableRows = await runSessionQuery<DeliverableRow>(
+      queryScript,
+      "deliverable-prose",
+      baseParams,
+      {
+        queryDir: ftsQueryDir,
+      },
+    );
+
+    console.error("Dumping user corpus (human input only)");
     const userRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
       ...baseParams,
       role: "user",
       min_chars: 50,
+      human_only: "true",
     });
 
-    console.error(`Assistant rows: ${assistantRows.length}, user rows: ${userRows.length}`);
+    console.error(
+      `All assistant: ${assistantRows.length} (${totalChars(assistantRows).toLocaleString()} chars), deliverable: ${deliverableRows.length} (${totalChars(deliverableRows).toLocaleString()} chars), user: ${userRows.length} (${totalChars(userRows).toLocaleString()} chars)`,
+    );
 
+    const allModelText = [...assistantRows, ...deliverableRows];
+    const totalSessions = new Set(allModelText.map((r) => r.session_id)).size;
     const ngramSizes = [3, 4];
-    const assistantCorpus = processCorpus(serializeCorpus(assistantRows), ngramSizes);
+    const assistantCorpus = processCorpus(serializeCorpus(allModelText), ngramSizes);
     const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
+    const sessionCounts = computeSessionCount(allModelText, ngramSizes);
+    const minSessions = Math.max(3, Math.round(totalSessions * 0.05));
+    console.error(`Session threshold: ${minSessions} (${totalSessions} sessions in window)`);
 
     const allLifts = computeLift({
       assistant: assistantCorpus,
@@ -148,6 +168,8 @@ async function main(): Promise<void> {
     const exclusionSet = new Set(wordlistEntries.map((e) => e.phrase));
     const candidatePhrases = excludePhrases(allLifts, exclusionSet)
       .filter((r) => r.lift >= minLift)
+      .filter((r) => (sessionCounts.get(r.phrase) ?? 0) >= minSessions)
+      .map((r) => ({ ...r, sessions: sessionCounts.get(r.phrase) ?? 0 }))
       .slice(0, topN);
 
     console.error("Fetching correction candidates");
@@ -159,6 +181,9 @@ async function main(): Promise<void> {
     const corrections = rawCorrections.filter(
       (c) => !/<(command-name|task-notification|system-reminder)/.test(c.user_snippet),
     );
+
+    console.error("Auditing structural patterns against all model-generated text");
+    const structuralAudit = auditStructuralPatterns(allModelText, userRows);
 
     const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minLift);
 
@@ -172,8 +197,10 @@ async function main(): Promise<void> {
       topN,
       modelSummary,
       assistantTotalChars: totalChars(assistantRows),
+      deliverableTotalChars: totalChars(deliverableRows),
       userTotalChars: totalChars(userRows),
       ruleHealth,
+      structuralAudit,
       candidatePhrases,
       corrections,
     });

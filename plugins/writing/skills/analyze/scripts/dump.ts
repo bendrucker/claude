@@ -6,6 +6,14 @@ export interface TextRow {
   project_path: string | null;
   text: string;
   raw_text: string;
+  is_subagent: boolean;
+  is_system: boolean;
+}
+
+export interface DeliverableRow {
+  session_id: string;
+  text: string;
+  role: "assistant";
 }
 
 export interface CorrectionRow {

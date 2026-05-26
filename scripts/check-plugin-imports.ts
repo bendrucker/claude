@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { readdir } from "node:fs/promises";
-import { dirname, join, resolve, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { Glob } from "bun";
 
 const rootDir = join(import.meta.dirname, "..");

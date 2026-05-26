@@ -151,7 +151,9 @@ WITH unified AS (
     ci.source_file,
     ci.source_line,
     ci.source_file LIKE '%/subagents/%' AS is_subagent,
-    ci.text LIKE '<%' AS is_system
+    ci.text LIKE '<%'
+      OR ci.text LIKE '[Request interrupted%'
+    AS is_system
   FROM content_items ci
   JOIN messages m USING (source_file, source_line)
   WHERE ci.type = 'text'
@@ -172,8 +174,13 @@ WITH unified AS (
     m.source_line,
     m.source_file LIKE '%/subagents/%' AS is_subagent,
     m.content_text LIKE '<%'
+      OR m.content_text LIKE '[Request interrupted%'
       OR m.content_text LIKE 'Implement the following plan:%'
       OR m.content_text LIKE 'This session is being continued from a previous conversation%'
+      OR m.content_text LIKE 'Goal set:%'
+      OR m.content_text LIKE 'Ultraplan %'
+      OR m.content_text LIKE '◇ %'
+      OR m.content_text LIKE '◆ %'
     AS is_system
   FROM messages m
   WHERE m.type = 'user'

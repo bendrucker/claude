@@ -12,6 +12,8 @@ WITH per_message AS (
   JOIN sessions s USING (session_id)
   WHERE date_filter(tc.timestamp, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(s.project_path, getvariable('project'))
+    AND NOT tc.is_subagent
+    AND (tc.role = 'assistant' OR NOT tc.is_system)
   GROUP BY tc.session_id, s.project_path, tc.source_file, tc.source_line, tc.timestamp, tc.role
 ),
 paired AS (

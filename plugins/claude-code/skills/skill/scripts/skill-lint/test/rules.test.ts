@@ -11,6 +11,7 @@ import {
   nameFormat,
   nameLength,
 } from "../rules/frontmatter";
+import { namespaceMismatch, namespaceStutter } from "../rules/namespace";
 import type { RuleResult } from "../types";
 
 const fixturesDir = path.join(import.meta.dirname, "fixtures");
@@ -210,6 +211,63 @@ describe("frontmatter rules", () => {
       const content = parseSkill("---\nallowed-tools: Bash(gh:*), mcp__github\n---\n");
       const result = single(allowedToolsFormat.check(content, ""));
       expect(result.passed).toBe(false);
+    });
+  });
+});
+
+describe("namespace rules", () => {
+  const pluginPath = (plugin: string) => `plugins/${plugin}/skills/some-skill`;
+
+  describe("namespaceMismatch", () => {
+    it("passes when prefix matches plugin", () => {
+      const content = parseSkill("---\nname: github:actions\n---\n");
+      const result = single(namespaceMismatch.check(content, pluginPath("github")));
+      expect(result.passed).toBe(true);
+    });
+
+    it("passes when no prefix", () => {
+      const content = parseSkill("---\nname: actions\n---\n");
+      const result = single(namespaceMismatch.check(content, pluginPath("github")));
+      expect(result.passed).toBe(true);
+    });
+
+    it("fails when prefix mismatches plugin", () => {
+      const content = parseSkill("---\nname: gitlab:foo\n---\n");
+      const result = single(namespaceMismatch.check(content, pluginPath("github")));
+      expect(result.passed).toBe(false);
+    });
+
+    it("skips when not in a plugin directory", () => {
+      const content = parseSkill("---\nname: gitlab:foo\n---\n");
+      const result = single(namespaceMismatch.check(content, "/some/other/path"));
+      expect(result.passed).toBe(true);
+    });
+  });
+
+  describe("namespaceStutter", () => {
+    it("passes for non-stuttering names", () => {
+      const content = parseSkill("---\nname: gitlab:ci\n---\n");
+      const result = single(namespaceStutter.check(content, pluginPath("gitlab")));
+      expect(result.passed).toBe(true);
+    });
+
+    it("warns on stuttering suffix", () => {
+      const content = parseSkill("---\nname: gitlab:gitlab-ci\n---\n");
+      const result = single(namespaceStutter.check(content, pluginPath("gitlab")));
+      expect(result.passed).toBe(false);
+      expect(result.severity).toBe("warn");
+    });
+
+    it("passes when suffix equals plugin name", () => {
+      const content = parseSkill("---\nname: git:git\n---\n");
+      const result = single(namespaceStutter.check(content, pluginPath("git")));
+      expect(result.passed).toBe(true);
+    });
+
+    it("passes when no prefix", () => {
+      const content = parseSkill("---\nname: actions\n---\n");
+      const result = single(namespaceStutter.check(content, pluginPath("github")));
+      expect(result.passed).toBe(true);
     });
   });
 });

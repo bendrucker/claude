@@ -39,11 +39,9 @@ When creating or modifying skills, load the `claude-code:skill` skill for author
 
 ### Naming
 
-The plugin name forms a namespace for its contents (e.g., `gitlab:ci-monitor`). Commands and agents are auto-namespaced by the plugin system — the filename becomes the qualified name (e.g., `ci-monitor.md` in the `gitlab` plugin becomes `gitlab:ci-monitor`). Skills are **not** auto-namespaced — the `name` in YAML frontmatter is used as-is.
+The plugin name forms a namespace for its contents (e.g., `gitlab:ci-monitor`). Commands and agents are auto-namespaced by the plugin system — the filename becomes the qualified name (e.g., `ci-monitor.md` in the `gitlab` plugin becomes `gitlab:ci-monitor`). Skills are auto-prefixed with `plugin-name:` when the frontmatter `name` doesn't already start with that prefix. Including the prefix explicitly is optional but harmless (avoids double-prefixing).
 
-Skills where the name differs from the plugin name must include the `plugin-name:` prefix in frontmatter (e.g., `gitlab:ci`, `things:inbox`). Skip the prefix when name equals plugin name (the primary skill) — `bun:bun` adds no information.
-
-Anti-stuttering applies to the part after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right.
+Anti-stuttering applies to the part after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right. Run `bun run skill-lint` to catch namespace mismatches and stuttering.
 
 ### MCP Tool Naming
 
@@ -73,6 +71,10 @@ Each plugin should have a `README.md` with consistent sections:
 - **Testing**: How to run tests (if the plugin has tests)
 
 Do not include installation instructions or skill activation details—the README is an index, not documentation. Users can read the skill files directly for activation patterns.
+
+### Plugin Metadata
+
+Plugin `settings.json` only supports `agent` and `subagentStatusLine` keys. Don't create schema-only placeholder files. `plugin.json` supports an optional `"$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json"` for editor autocomplete, and `displayName` for human-readable names in the UI.
 
 ### Dependencies
 
@@ -116,6 +118,8 @@ Use rules for language/file-type guidance that Claude should always have when wo
 ## Hooks
 
 See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. This repository includes a Biome PostToolUse hook (`.claude/hooks/biome/`) that runs after file edits to check for lint errors.
+
+Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Matcher fields are not shell commands and should not be quoted. Run `bun scripts/check-hook-quoting.ts` to validate.
 
 ## Testing
 
@@ -196,7 +200,7 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 {
   "matcher": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)",
   "hooks": [
-    { "type": "command", "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts" }
+    { "type": "command", "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts\"" }
   ]
 }
 ```

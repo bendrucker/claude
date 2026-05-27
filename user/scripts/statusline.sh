@@ -78,7 +78,9 @@ render_worktree() {
   local path ci_url repo_url
   path=$(echo "$wt_json" | jq -r '.path')
   repo=$(basename "$path")
-  repo=${repo%%."$branch"}
+  local sanitized_branch
+  sanitized_branch=$(echo "$branch" | tr '/\\' '-')
+  repo=${repo%%."$sanitized_branch"}
 
   ci_url=$(echo "$wt_json" | jq -r '.ci.url // empty')
   local repo_url=""

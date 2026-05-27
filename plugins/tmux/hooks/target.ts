@@ -30,12 +30,10 @@ const targetableCommands = new Set([
   "movew",
 ]);
 
-export function parseTmuxCommand(
-  command: string,
-): { subcommand: string; rest: string } | null {
+export function parseTmuxCommand(command: string): { subcommand: string; rest: string } | null {
   const match = command.match(/^tmux\s+(\S+)(.*)/);
-  if (!match) return null;
-  return { subcommand: match[1], rest: match[2] };
+  if (!match?.[1]) return null;
+  return { subcommand: match[1], rest: match[2] ?? "" };
 }
 
 export function hasExistingTarget(rest: string): boolean {
@@ -51,10 +49,7 @@ export function injectTarget(command: string, pane: string): string | null {
   return `tmux ${parsed.subcommand} -t "${pane}"${parsed.rest}`;
 }
 
-export function processInput(
-  input: PreToolUseHookInput,
-  pane?: string,
-): SyncHookJSONOutput | null {
+export function processInput(input: PreToolUseHookInput, pane?: string): SyncHookJSONOutput | null {
   if (!pane) return null;
 
   const { command } = input.tool_input as { command?: string };

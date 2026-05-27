@@ -1,11 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import {
-  hasExistingTarget,
-  injectTarget,
-  parseTmuxCommand,
-  processInput,
-} from "./target";
+import { hasExistingTarget, injectTarget, parseTmuxCommand, processInput } from "./target";
 
 function mockInput(command: string): PreToolUseHookInput {
   return {
@@ -75,15 +70,11 @@ describe("hasExistingTarget", () => {
 
 describe("injectTarget", () => {
   it("injects target after subcommand", () => {
-    expect(injectTarget("tmux split-window -h -d", "%5")).toBe(
-      'tmux split-window -t "%5" -h -d',
-    );
+    expect(injectTarget("tmux split-window -h -d", "%5")).toBe('tmux split-window -t "%5" -h -d');
   });
 
   it("injects target for alias", () => {
-    expect(injectTarget("tmux splitw -h", "%5")).toBe(
-      'tmux splitw -t "%5" -h',
-    );
+    expect(injectTarget("tmux splitw -h", "%5")).toBe('tmux splitw -t "%5" -h');
   });
 
   it("returns null for non-targetable command", () => {
@@ -99,21 +90,15 @@ describe("injectTarget", () => {
   });
 
   it("injects target for send-keys", () => {
-    expect(injectTarget("tmux send-keys C-c", "%5")).toBe(
-      'tmux send-keys -t "%5" C-c',
-    );
+    expect(injectTarget("tmux send-keys C-c", "%5")).toBe('tmux send-keys -t "%5" C-c');
   });
 
   it("injects target for capture-pane", () => {
-    expect(injectTarget("tmux capture-pane -p", "%5")).toBe(
-      'tmux capture-pane -t "%5" -p',
-    );
+    expect(injectTarget("tmux capture-pane -p", "%5")).toBe('tmux capture-pane -t "%5" -p');
   });
 
   it("does not inject target for display-message", () => {
-    expect(
-      injectTarget("tmux display-message -p '#{pane_id}'", "%5"),
-    ).toBeNull();
+    expect(injectTarget("tmux display-message -p '#{pane_id}'", "%5")).toBeNull();
   });
 
   it("returns null when -t has value attached (no space)", () => {
@@ -131,15 +116,11 @@ describe("processInput", () => {
   });
 
   it("returns null for non-targetable command", () => {
-    expect(
-      processInput(mockInput("tmux list-sessions"), "%5"),
-    ).toBeNull();
+    expect(processInput(mockInput("tmux list-sessions"), "%5")).toBeNull();
   });
 
   it("returns null when -t already present", () => {
-    expect(
-      processInput(mockInput("tmux split-window -t %3 -h"), "%5"),
-    ).toBeNull();
+    expect(processInput(mockInput("tmux split-window -t %3 -h"), "%5")).toBeNull();
   });
 
   it("returns updatedInput and additionalContext for targetable command", () => {
@@ -150,14 +131,15 @@ describe("processInput", () => {
         updatedInput: {
           command: 'tmux split-window -t "%5" -h -d',
         },
-        additionalContext: expect.stringContaining("-t \"%5\""),
+        additionalContext: expect.stringContaining('-t "%5"'),
       },
     });
   });
 
   it("updatedInput contains only command", () => {
     const result = processInput(mockInput("tmux send-keys C-c"), "%5");
-    const updatedInput = result?.hookSpecificOutput?.updatedInput as Record<string, unknown>;
+    const output = result?.hookSpecificOutput as Record<string, unknown>;
+    const updatedInput = output?.updatedInput as Record<string, unknown>;
     expect(Object.keys(updatedInput)).toEqual(["command"]);
   });
 });

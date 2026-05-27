@@ -40,7 +40,7 @@ render_task() {
   case "$status" in
     completed) icon="${green}✓${reset}" ;;
     failed)    icon="${red}✗${reset}" ;;
-    *)         icon="${yellow}▸${reset}" ;;
+    *)         icon="${yellow}▶${reset}" ;;
   esac
 
   if [ -n "$description" ] && [ -n "$type" ]; then

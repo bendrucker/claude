@@ -27,24 +27,26 @@ paired AS (
     LEAD(source_line) OVER w AS next_source_line
   FROM per_message
   WINDOW w AS (PARTITION BY session_id ORDER BY timestamp, source_file, source_line)
+),
+candidates AS (
+  SELECT
+    session_id,
+    SPLIT_PART(session_project_path, '/', -1) AS project,
+    timestamp        AS assistant_timestamp,
+    next_timestamp   AS user_timestamp,
+    chars            AS assistant_chars,
+    next_chars       AS user_chars,
+    LEFT(message_text, 200) AS assistant_snippet,
+    LEFT(next_text, 200)    AS user_snippet,
+    source_file      AS assistant_source_file,
+    source_line      AS assistant_source_line,
+    next_source_file AS user_source_file,
+    next_source_line AS user_source_line
+  FROM paired
+  WHERE role = 'assistant'
+    AND next_role = 'user'
+    AND chars >= COALESCE(getvariable('min_assistant_chars')::BIGINT, 300)
+    AND next_chars <= COALESCE(getvariable('max_user_chars')::BIGINT, 250)
 )
-SELECT
-  session_id,
-  SPLIT_PART(session_project_path, '/', -1) AS project,
-  timestamp        AS assistant_timestamp,
-  next_timestamp   AS user_timestamp,
-  chars            AS assistant_chars,
-  next_chars       AS user_chars,
-  LEFT(message_text, 200) AS assistant_snippet,
-  LEFT(next_text, 200)    AS user_snippet,
-  source_file      AS assistant_source_file,
-  source_line      AS assistant_source_line,
-  next_source_file AS user_source_file,
-  next_source_line AS user_source_line
-FROM paired
-WHERE role = 'assistant'
-  AND next_role = 'user'
-  AND chars >= COALESCE(getvariable('min_assistant_chars')::BIGINT, 300)
-  AND next_chars <= COALESCE(getvariable('max_user_chars')::BIGINT, 250)
-ORDER BY assistant_timestamp DESC
-LIMIT COALESCE(getvariable('limit')::BIGINT, 50);
+SELECT * FROM candidates
+USING SAMPLE reservoir(30 ROWS) REPEATABLE(42);

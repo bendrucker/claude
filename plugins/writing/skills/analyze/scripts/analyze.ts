@@ -60,11 +60,6 @@ const argv = cli({
       type: String,
       description: "Wordlists directory (defaults to plugins/writing/wordlists)",
     },
-    correctionsLimit: {
-      type: Number,
-      description: "Max correction candidates to include",
-      default: 30,
-    },
   },
 });
 
@@ -75,8 +70,6 @@ const modelFilter = argv.flags.model;
 const projectFilter = argv.flags.project ?? null;
 const minLift = argv.flags.minLift;
 const topN = argv.flags.top;
-const correctionsLimit = argv.flags.correctionsLimit;
-
 const queryScript = path.resolve(argv.flags.sessionQuery);
 const wordlistsDir =
   argv.flags.wordlistsDir ?? path.join(import.meta.dirname, "..", "..", "..", "wordlists");
@@ -173,13 +166,11 @@ async function main(): Promise<void> {
       .slice(0, topN);
 
     console.error("Fetching correction candidates");
-    const rawCorrections = await runSessionQuery<CorrectionRow>(
+    const corrections = await runSessionQuery<CorrectionRow>(
       queryScript,
       "correction-candidates",
-      { ...baseParams, limit: correctionsLimit },
-    );
-    const corrections = rawCorrections.filter(
-      (c) => !/<(command-name|task-notification|system-reminder)/.test(c.user_snippet),
+      baseParams,
+      { queryDir: ftsQueryDir },
     );
 
     console.error("Auditing structural patterns against all model-generated text");

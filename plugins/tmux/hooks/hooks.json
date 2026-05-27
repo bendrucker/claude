@@ -22,6 +22,15 @@
         ]
       },
       {
+        "matcher": "Bash(tmux:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/target.ts\""
+          }
+        ]
+      },
+      {
         "matcher": "TeamCreate",
         "hooks": [
           {

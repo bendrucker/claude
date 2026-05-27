@@ -63,31 +63,8 @@ render_lines() {
   segments+=("$parts")
 }
 
-render_pr() {
-  local number url
-  number=$(echo "$input" | jq -r '.pr.number // empty')
-  if [ -z "$number" ]; then
-    return
-  fi
-
-  url=$(echo "$input" | jq -r '.pr.url // empty')
-
-  local link_color=$'\033[36m'
-  local reset=$'\033[0m'
-
-  if [ -n "$url" ]; then
-    local osc_open osc_close
-    osc_open=$(printf '\033]8;;%s\033\\' "$url")
-    osc_close=$(printf '\033]8;;\033\\')
-    segments+=("${link_color}${osc_open}#${number}${osc_close}${reset}")
-  else
-    segments+=("${link_color}#${number}${reset}")
-  fi
-}
-
 render_dial
 render_lines
-render_pr
 
 sep="  "
 output=""

@@ -39,7 +39,7 @@ describe("auditStructuralPatterns", () => {
   });
 
   test("skips rows without text", () => {
-    const rows = [{ session_id: "s1", text: undefined }];
+    const rows: { session_id: string; text?: string }[] = [{ session_id: "s1" }];
     const result = auditStructuralPatterns(rows, []);
     for (const r of result) {
       expect(r.assistantHits).toBe(0);

@@ -179,10 +179,7 @@ describe("computeSessionCount", () => {
   });
 
   test("skips rows without text", () => {
-    const rows = [
-      { session_id: "s1", text: undefined },
-      { session_id: "s2", text: "some words here now" },
-    ];
+    const rows = [{ session_id: "s1" }, { session_id: "s2", text: "some words here now" }];
     const spread = computeSessionCount(rows, [3]);
     expect(spread.size).toBeGreaterThan(0);
   });

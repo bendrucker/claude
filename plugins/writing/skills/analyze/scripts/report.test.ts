@@ -28,10 +28,25 @@ describe("buildRuleHealth", () => {
     { phrase: "missing entry", source: "openers.txt" },
   ];
 
-  test("marks an entry with no data", () => {
+  test("marks an entry with no data when audit row is missing", () => {
     const result = buildRuleHealth(entries, new Map(), 5);
     expect(result[1]?.noData).toBe(true);
     expect(result[1]?.stillDistinctive).toBe(false);
+  });
+
+  test("marks an entry with no data when counts are zero", () => {
+    const audit = new Map<string, FtsAuditRow>();
+    audit.set("let me", {
+      term: "let me",
+      assistant_count: 0,
+      user_count: 0,
+      assistant_per_m: null,
+      user_per_m: null,
+      lift: null,
+    });
+    const result = buildRuleHealth(entries, audit, 5);
+    expect(result[0]?.noData).toBe(true);
+    expect(result[0]?.stillDistinctive).toBe(false);
   });
 
   test("computes lift from FTS audit and decides distinctiveness", () => {

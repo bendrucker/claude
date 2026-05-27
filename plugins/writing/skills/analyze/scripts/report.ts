@@ -248,7 +248,7 @@ export function buildRuleHealth(
   });
 }
 
-function fmtNum(value: number | bigint | null): string {
+function fmtNum(value: number | null): string {
   if (value === null) return "-";
   return Number(value).toLocaleString();
 }

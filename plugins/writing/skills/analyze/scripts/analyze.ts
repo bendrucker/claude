@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { cli } from "cleye";
+import { openSessionDb } from "./db";
 import {
   type CorrectionRow,
   type DeliverableRow,
-  execSessionQuery,
   type ModelSummaryRow,
-  runSessionQuery,
   serializeCorpus,
   type TextRow,
   totalChars,
@@ -51,9 +51,9 @@ const argv = cli({
       type: String,
       description: "Output report path (default: tmp/trope-analysis-<date>.md)",
     },
-    sessionQuery: {
+    sessionDb: {
       type: String,
-      description: "Path to session plugin query.ts",
+      description: "Path to session DuckDB database file",
       required: true as const,
     },
     wordlistsDir: {
@@ -70,18 +70,28 @@ const modelFilter = argv.flags.model;
 const projectFilter = argv.flags.project ?? null;
 const minLift = argv.flags.minLift;
 const topN = argv.flags.top;
-const queryScript = path.resolve(argv.flags.sessionQuery);
+const dbPath = path.resolve(argv.flags.sessionDb ?? "");
 const wordlistsDir =
   argv.flags.wordlistsDir ?? path.join(import.meta.dirname, "..", "..", "..", "wordlists");
 const outPath = argv.flags.out ?? path.join("tmp", `trope-analysis-${today}.md`);
-const ftsQueryDir = path.join(import.meta.dirname, "..", "resources", "queries");
-const baseParams = { after_date: since, before_date: until, project: projectFilter ?? undefined };
+const baseParams: Record<string, string | null> = {
+  after_date: since,
+  before_date: until,
+  project: projectFilter,
+};
 
 await main();
 
 async function main(): Promise<void> {
-  console.error(`Refreshing session index via ${queryScript}`);
-  await runSessionQuery(queryScript, "schema", {}, { refresh: true });
+  const sessionId = process.env.CLAUDE_SESSION_ID ?? "anonymous";
+  const isolatedPath = path.join(
+    process.env.TMPDIR || "/tmp",
+    `session-analyze-${sessionId}.duckdb`,
+  );
+  console.error(`Copying session DB to ${isolatedPath}`);
+  await Bun.write(isolatedPath, Bun.file(dbPath));
+
+  const db = await openSessionDb(isolatedPath);
 
   console.error("Loading current wordlists");
   const wordlistEntries = await loadWordlists(wordlistsDir);
@@ -89,54 +99,33 @@ async function main(): Promise<void> {
 
   try {
     console.error("Building FTS indexes");
-    await execSessionQuery(
-      queryScript,
-      "fts-setup",
-      { ...baseParams, model: modelFilter },
-      {
-        queryDir: ftsQueryDir,
-      },
-    );
+    await db.execQuery("fts-setup", { ...baseParams, model: modelFilter });
+
     console.error("Auditing wordlists via FTS");
     const auditTerms = wordlistEntries.map((e) => e.phrase.toLowerCase()).join(",");
-    const auditRows = await runSessionQuery<FtsAuditRow>(
-      queryScript,
-      "fts-phrase-audit",
-      { terms: auditTerms },
-      { queryDir: ftsQueryDir },
-    );
+    const auditRows = await db.runQuery<FtsAuditRow>("fts-phrase-audit", { terms: auditTerms });
     const auditByTerm = new Map(auditRows.map((r) => [r.term, r]));
 
     console.error("Fetching model summary");
-    const modelSummary = await runSessionQuery<ModelSummaryRow>(
-      queryScript,
-      "model-summary",
-      baseParams,
-    );
+    const modelSummary = await db.runQuery<ModelSummaryRow>("model-summary", baseParams);
 
     console.error("Dumping all assistant text");
-    const assistantRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
+    const assistantRows = await db.runQuery<TextRow>("text-export", {
       ...baseParams,
       role: "assistant",
       model: modelFilter,
-      min_chars: 50,
+      min_chars: "50",
     });
 
     console.error("Dumping deliverable-prose corpus (Write/Edit/Bash tool inputs)");
-    const deliverableRows = await runSessionQuery<DeliverableRow>(
-      queryScript,
-      "deliverable-prose",
-      baseParams,
-      {
-        queryDir: ftsQueryDir,
-      },
-    );
+    const deliverableRows = await db.runQuery<DeliverableRow>("deliverable-prose", baseParams);
 
     console.error("Dumping user corpus (human input only)");
-    const userRows = await runSessionQuery<TextRow>(queryScript, "text-export", {
+    const userRows = await db.runQuery<TextRow>("text-export", {
       ...baseParams,
       role: "user",
-      min_chars: 50,
+      model: null,
+      min_chars: "50",
       human_only: "true",
     });
 
@@ -166,12 +155,7 @@ async function main(): Promise<void> {
       .slice(0, topN);
 
     console.error("Fetching correction candidates");
-    const corrections = await runSessionQuery<CorrectionRow>(
-      queryScript,
-      "correction-candidates",
-      baseParams,
-      { queryDir: ftsQueryDir },
-    );
+    const corrections = await db.runQuery<CorrectionRow>("correction-candidates", baseParams);
 
     console.error("Auditing structural patterns against all model-generated text");
     const structuralAudit = auditStructuralPatterns(allModelText, userRows);
@@ -201,8 +185,8 @@ async function main(): Promise<void> {
     console.error(`Wrote report to ${outPath}`);
     process.stdout.write(`${outPath}\n`);
   } finally {
-    console.error("Cleaning up FTS indexes");
-    await execSessionQuery(queryScript, "fts-cleanup", {}, { queryDir: ftsQueryDir });
+    db.close();
+    await rm(isolatedPath, { force: true });
   }
 }
 

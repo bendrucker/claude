@@ -4,11 +4,11 @@ How each pass of `analyze.ts` works and how to read the report.
 
 ## Dependencies
 
-The analyze script delegates all DuckDB queries to the `claude-code:session` plugin's `query.ts` script, passed via `--session-query`. It never imports or resolves files from other plugins directly.
+The analyze script opens the session DuckDB database directly via `@duckdb/node-api`. The DB path is passed via `--session-db`. The session skill's refresh script must run first to ensure the index is current. All SQL queries live in `resources/queries/` within the analyze skill.
 
 ## Refresh
 
-Calls `query.ts schema --refresh` to force a rescan of `~/.claude/projects/**/*.jsonl`. Subsequent queries see the latest data.
+The agent runs the session skill's `refresh.ts --refresh` before invoking analyze. This forces a rescan of `~/.claude/projects/**/*.jsonl`. The refresh script prints the DB path to stdout, which the agent captures and passes as `--session-db`.
 
 ## Metrics
 

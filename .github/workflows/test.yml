@@ -91,6 +91,9 @@ jobs:
       - name: Check plugin imports
         run: bun scripts/check-plugin-imports.ts
 
+      - name: Check hook quoting
+        run: bun scripts/check-hook-quoting.ts
+
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'
         env:

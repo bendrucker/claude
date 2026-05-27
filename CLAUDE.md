@@ -99,6 +99,10 @@ When resolving `bun.lock` conflicts, regenerate from scratch:
 
 Unlike npm's `package-lock.json`, bun populates integrity hashes for all platforms from the registry, even for packages not downloaded locally. Regenerating from scratch is safe and avoids stale or empty hashes. Do **not** use `git checkout origin/main -- bun.lock && bun install` — this produces empty integrity hashes for platform-specific packages (e.g., `@img/sharp-libvips-linux-x64`), breaking CI on Linux.
 
+### Terminal Colors
+
+Use ANSI colors (0-15) in scripts that produce terminal output. These are remapped by the terminal theme (Catppuccin), so they adapt to both light and dark mode. Avoid 256-color or truecolor escapes for foreground text.
+
 ### Scripts
 
 When writing scripts (hooks, skill CLIs, etc.) that accept arguments:

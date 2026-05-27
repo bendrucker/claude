@@ -62,15 +62,21 @@ The `deliverable-prose.sql` query extracts text from Write/Edit to prose files (
 
 #### User text filtering
 
-User-role messages in Claude Code contain a mix of human input and machine-generated content. The following are filtered out of the user baseline:
+User-role messages in Claude Code contain a mix of human input and machine-generated content. The `text_content` view classifies these with two boolean columns:
 
-- Skill injections ("Base directory for this skill:")
-- Context compaction summaries ("This session is being continued from a previous conversation")
-- Task notifications (`<task-notification>`)
-- Skill/command activations (`<command-name>`)
-- System reminders (`<system-reminder>`)
-- CLAUDE.md context injections (`# claudeMd`)
-- Tool result echoes (`tool_use_id`)
+- `is_subagent`: `source_file` contains `/subagents/` (subagent prompts, task dispatches)
+- `is_system`: prefix-based heuristics for system-injected content
+
+The `is_system` patterns cover:
+
+- XML-tagged injections (`<task-notification>`, `<command-name>`, `<system-reminder>`, etc.)
+- Context compaction summaries (`This session is being continued from a previous conversation`)
+- Plan injections (`Implement the following plan:`)
+- Interruption markers (`[Request interrupted by user]`)
+- Ultraplan/ultrareview UI (`◇ `, `◆ `, `Ultraplan `)
+- Goal injections (`Goal set:`)
+
+Skill injections and hook feedback are excluded earlier by `is_meta=true` in the WHERE clause (787+ messages in a typical 30-day window).
 
 Without this filtering, roughly half the user corpus by character count is machine-generated, which inflates the baseline and suppresses real lift signals.
 
@@ -93,6 +99,35 @@ Each rule in the health table is labeled by how the hook enforces it:
 ## Surface Corrections
 
 Runs `correction-candidates` with `min_assistant_chars=300`, `max_user_chars=250`, `limit=--corrections-limit`. The query finds adjacent message pairs where a long assistant message is followed by a short user reply. Short replies often indicate corrections or pushback.
+
+## Spot-checking with DuckDB sampling
+
+When auditing corpus quality (verifying `is_system`/`is_subagent` classification, checking for pasted machine content in user text), use DuckDB's `USING SAMPLE` clause for stratified random sampling across sessions:
+
+```sql
+-- Sample 20 sessions, then 40 rows within those sessions
+WITH human AS (
+  SELECT tc.*
+  FROM text_content tc
+  WHERE tc.role = 'user'
+    AND NOT tc.is_subagent AND NOT tc.is_system
+    AND length(tc.text) >= 30
+),
+session_pool AS (
+  SELECT DISTINCT session_id
+  FROM human
+  USING SAMPLE reservoir(20 ROWS) REPEATABLE(42)
+)
+SELECT h.session_id, h.text
+FROM human h
+JOIN session_pool USING (session_id)
+USING SAMPLE reservoir(40 ROWS) REPEATABLE(42)
+ORDER BY h.session_id, h.timestamp
+```
+
+`USING SAMPLE reservoir(N ROWS) REPEATABLE(seed)` gives deterministic reservoir sampling. The sample size and seed must be integer literals (expressions and `getvariable()` are not supported in the `SAMPLE` clause). To vary sample sizes, edit the query inline rather than parameterizing.
+
+Stratify by sampling sessions first, then rows within those sessions. Without the session pool step, high-volume sessions dominate the sample and patterns from quieter sessions go unexamined.
 
 ## Tuning
 

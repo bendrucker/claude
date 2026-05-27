@@ -63,6 +63,58 @@ render_lines() {
   segments+=("$parts")
 }
 
+render_worktree() {
+  local wt_json repo branch ahead
+  wt_json=$(wt list statusline --format=json 2>/dev/null | jq -c '.[] | select(.is_current)') || return
+  if [ -z "$wt_json" ]; then
+    return
+  fi
+
+  local dim=$'\033[2m'
+  local reset=$'\033[0m'
+  local cyan=$'\033[36m'
+
+  branch=$(echo "$wt_json" | jq -r '.branch')
+  local path ci_url repo_url
+  path=$(echo "$wt_json" | jq -r '.path')
+  repo=$(basename "$path")
+  repo=${repo%%."$branch"}
+
+  ci_url=$(echo "$wt_json" | jq -r '.ci.url // empty')
+  local repo_url=""
+  if [ -n "$ci_url" ]; then
+    local remote_name
+    remote_name=$(echo "$wt_json" | jq -r '.remote.name // "origin"')
+    repo_url=$(git remote get-url "$remote_name" 2>/dev/null | sed -e 's|^git@\([^:]*\):|https://\1/|' -e 's|\.git$||')
+  fi
+
+  local is_main
+  is_main=$(echo "$wt_json" | jq -r '.is_main')
+
+  local repo_display="$repo"
+  if [ -n "$repo_url" ]; then
+    repo_display=$(printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$repo_url" "$repo")
+  fi
+
+  local label="$repo_display"
+  if [ "$is_main" = "false" ]; then
+    local branch_display="${cyan}${branch}${reset}"
+    if [ -n "$ci_url" ]; then
+      branch_display=$(printf '%s\033]8;;%s\033\\%s\033]8;;\033\\%s' "$cyan" "$ci_url" "$branch" "$reset")
+    fi
+    label+="${dim}/${reset}${branch_display}"
+  fi
+
+  ahead=$(echo "$wt_json" | jq -r '.main.ahead // 0')
+  if [ "$ahead" -gt 0 ]; then
+    segments+=("$label")
+    segments+=("${dim}↑${ahead}${reset}")
+  else
+    segments+=("$label")
+  fi
+}
+
+render_worktree
 render_dial
 render_lines
 

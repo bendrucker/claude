@@ -12,7 +12,7 @@ import {
   type TextRow,
   totalChars,
 } from "./dump";
-import { computeLift, computeSessionCount, excludePhrases, processCorpus } from "./ngram";
+import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
 import { buildRuleHealth, type FtsAuditRow, renderReport } from "./report";
 import { auditStructuralPatterns } from "./structural";
 import { loadWordlists } from "./wordlists";
@@ -136,9 +136,11 @@ async function main(): Promise<void> {
     const allModelText = [...assistantRows, ...deliverableRows];
     const totalSessions = new Set(allModelText.map((r) => r.session_id)).size;
     const ngramSizes = [3, 4];
-    const assistantCorpus = processCorpus(serializeCorpus(allModelText), ngramSizes);
+    const { stats: assistantCorpus, sessionSpread: sessionCounts } = processRows(
+      allModelText,
+      ngramSizes,
+    );
     const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
-    const sessionCounts = computeSessionCount(allModelText, ngramSizes);
     const minSessions = Math.max(3, Math.round(totalSessions * 0.05));
     console.error(`Session threshold: ${minSessions} (${totalSessions} sessions in window)`);
 

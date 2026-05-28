@@ -115,18 +115,30 @@ export function computeLift({ assistant, user, minAssistantCount }: LiftInput): 
   return rows;
 }
 
-export function computeSessionCount(
+export interface ProcessedRows {
+  stats: CorpusStats;
+  sessionSpread: Map<string, number>;
+}
+
+export function processRows(
   rows: Array<{ session_id: string; text?: string }>,
-  sizes: number[],
-): Map<string, number> {
+  sizes: number[] = [2, 3, 4],
+): ProcessedRows {
+  const stats: CorpusStats = {
+    tokens: 0,
+    ngrams: new Map(sizes.map((n) => [n, new Map<string, number>()])),
+  };
   const phraseSessions = new Map<string, Set<string>>();
   for (const row of rows) {
     if (!row.text) continue;
-    const cleaned = cleanText(row.text);
-    for (const sent of splitSentences(cleaned)) {
+    for (const sent of splitSentences(cleanText(row.text))) {
       const tokens = tokenizeSentence(sent);
       if (tokens.length === 0) continue;
+      stats.tokens += tokens.length;
       for (const n of sizes) {
+        const counts = stats.ngrams.get(n);
+        if (!counts) continue;
+        addNgrams(counts, tokens, n);
         for (let i = 0; i <= tokens.length - n; i++) {
           const key = tokens.slice(i, i + n).join(" ");
           let sessions = phraseSessions.get(key);
@@ -139,11 +151,11 @@ export function computeSessionCount(
       }
     }
   }
-  const spread = new Map<string, number>();
+  const sessionSpread = new Map<string, number>();
   for (const [phrase, sessions] of phraseSessions) {
-    spread.set(phrase, sessions.size);
+    sessionSpread.set(phrase, sessions.size);
   }
-  return spread;
+  return { stats, sessionSpread };
 }
 
 export function excludePhrases(rows: LiftRow[], excluded: Set<string>): LiftRow[] {

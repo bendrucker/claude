@@ -114,7 +114,11 @@ export async function ensureIndex(
   }
 }
 
-async function setParams(db: Database, params: Record<string, string | null>): Promise<void> {
+export async function runQuery<T>(
+  db: Database,
+  queryName: string,
+  params: Record<string, string | null> = {},
+): Promise<T[]> {
   for (const [key, value] of Object.entries(params)) {
     if (value === null) {
       await db.run(`SET VARIABLE "${key}" = NULL`);
@@ -122,35 +126,6 @@ async function setParams(db: Database, params: Record<string, string | null>): P
       await db.run(`SET VARIABLE "${key}" = $value`, { value });
     }
   }
-}
-
-export async function runQuery<T>(
-  db: Database,
-  queryName: string,
-  params: Record<string, string | null> = {},
-  queriesDir: string = QUERIES_DIR,
-): Promise<T[]> {
-  await setParams(db, params);
-  const sql = await readSql(queriesDir, queryName);
+  const sql = await readSql(QUERIES_DIR, queryName);
   return db.query<T>(sql);
-}
-
-export async function execQuery(
-  db: Database,
-  queryName: string,
-  params: Record<string, string | null> = {},
-  queriesDir: string = QUERIES_DIR,
-): Promise<void> {
-  await setParams(db, params);
-  const sql = await readSql(queriesDir, queryName);
-  for (const stmt of splitStatements(sql)) {
-    await db.run(stmt);
-  }
-}
-
-function splitStatements(sql: string): string[] {
-  return sql
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
 }

@@ -11,8 +11,7 @@ SELECT
   COUNT(*) AS text_items,
   COUNT(DISTINCT (source_file, source_line)) AS messages,
   COUNT(DISTINCT session_id) AS sessions,
-  SUM(length(text)) AS total_chars,
-  ROUND(AVG(length(text)), 1) AS avg_chars_per_item
+  SUM(length(text)) AS total_chars
 FROM scoped
 GROUP BY model
 ORDER BY total_chars DESC NULLS LAST;

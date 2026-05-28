@@ -61,20 +61,18 @@ bash_prose AS (
     AND project_filter(s.project_path, getvariable('project'))
 )
 
-SELECT session_id, text, 'assistant' AS role
+SELECT session_id, text
 FROM write_prose
 WHERE text IS NOT NULL AND length(trim(text)) >= 30
 
 UNION ALL
 
-SELECT session_id, text, 'assistant' AS role
+SELECT session_id, text
 FROM edit_prose
 WHERE text IS NOT NULL AND length(trim(text)) >= 30
 
 UNION ALL
 
-SELECT session_id, text, 'assistant' AS role
+SELECT session_id, text
 FROM bash_prose
-WHERE text IS NOT NULL AND length(trim(text)) >= 30
-
-ORDER BY session_id;
+WHERE text IS NOT NULL AND length(trim(text)) >= 30;

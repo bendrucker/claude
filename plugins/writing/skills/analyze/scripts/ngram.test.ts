@@ -3,9 +3,9 @@ import {
   addNgrams,
   cleanText,
   computeLift,
-  computeSessionCount,
   excludePhrases,
   processCorpus,
+  processRows,
   splitSentences,
   tokenizeSentence,
 } from "./ngram";
@@ -161,27 +161,36 @@ describe("computeLift", () => {
   });
 });
 
-describe("computeSessionCount", () => {
+describe("processRows", () => {
   test("counts distinct sessions per n-gram", () => {
     const rows = [
       { session_id: "s1", text: "let me check the result" },
       { session_id: "s2", text: "let me check another thing" },
       { session_id: "s3", text: "let me check once more" },
     ];
-    const spread = computeSessionCount(rows, [3]);
-    expect(spread.get("let me check")).toBe(3);
+    const { sessionSpread } = processRows(rows, [3]);
+    expect(sessionSpread.get("let me check")).toBe(3);
   });
 
-  test("deduplicates within the same session", () => {
+  test("deduplicates sessions within the same session", () => {
     const rows = [{ session_id: "s1", text: "let me check. let me check again" }];
-    const spread = computeSessionCount(rows, [3]);
-    expect(spread.get("let me check")).toBe(1);
+    const { stats, sessionSpread } = processRows(rows, [3]);
+    expect(sessionSpread.get("let me check")).toBe(1);
+    expect(stats.ngrams.get(3)?.get("let me check")).toBe(2);
   });
 
   test("skips rows without text", () => {
     const rows = [{ session_id: "s1" }, { session_id: "s2", text: "some words here now" }];
-    const spread = computeSessionCount(rows, [3]);
-    expect(spread.size).toBeGreaterThan(0);
+    const { sessionSpread } = processRows(rows, [3]);
+    expect(sessionSpread.size).toBeGreaterThan(0);
+  });
+
+  test("stats match processCorpus over the same text", () => {
+    const text = "let me check that. let me verify too.";
+    const fromRows = processRows([{ session_id: "s1", text }], [2, 3]).stats;
+    const fromCorpus = processCorpus(text, [2, 3]);
+    expect(fromRows.tokens).toBe(fromCorpus.tokens);
+    expect(fromRows.ngrams.get(2)?.get("let me")).toBe(fromCorpus.ngrams.get(2)?.get("let me"));
   });
 });
 

@@ -238,6 +238,8 @@
   "showClearContextOnPlanAccept": true,
   "autoCompactEnabled": false,
   "preferredNotifChannel": "terminal_bell",
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
   "teammateMode": "auto",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",

@@ -1,5 +1,5 @@
 SET VARIABLE last_import_time = COALESCE(
-  (SELECT last_import FROM meta LIMIT 1),
+  (SELECT last_import FROM meta WHERE host = getvariable('host') LIMIT 1),
   '1970-01-01'::TIMESTAMP
 );
 

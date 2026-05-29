@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
-import { type Database, ensureIndex, getDb, runQuery } from "./db";
+import { $ } from "bun";
+import { type Database, dirExists, ensureIndex, getDb, rebuildViews, runQuery } from "./db";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
 
 function filterParams(overrides: Record<string, string | null> = {}) {
-  return { after_date: null, before_date: null, project: null, ...overrides };
+  return { after_date: null, before_date: null, project: null, host: null, ...overrides };
 }
 
 function queryParams(overrides: Record<string, string | null> = {}) {
@@ -16,11 +17,33 @@ function queryParams(overrides: Record<string, string | null> = {}) {
 
 let db: Database;
 let tmpDir: string;
+let importsDir: string;
+
+async function importFixtureHost(label: string, opts: { source?: string } = {}) {
+  const projects = path.join(importsDir, label, "projects");
+  mkdirSync(projects, { recursive: true });
+  await $`cp -R ${fixturesDir}/. ${projects}`.quiet();
+  await Bun.write(
+    path.join(importsDir, label, "manifest.json"),
+    `${JSON.stringify({
+      host: label,
+      source: opts.source ?? `${label}:.claude/projects/`,
+      imported_at: "2026-01-01T00:00:00Z",
+      policy: { block_egress: true },
+    })}\n`,
+  );
+}
+
+async function reindex() {
+  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir, force: true });
+}
 
 beforeEach(async () => {
   tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-test-"));
+  importsDir = path.join(tmpDir, "imports");
+  mkdirSync(importsDir, { recursive: true });
   db = await getDb(tmpDir);
-  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir });
+  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir });
 });
 
 afterEach(async () => {
@@ -258,7 +281,7 @@ describe("incremental refresh", () => {
     const before = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
-    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir });
+    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir });
     const after = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
@@ -311,7 +334,7 @@ describe("type drift across imports", () => {
     );
     await db.run("DELETE FROM meta");
 
-    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, force: true });
+    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir, force: true });
 
     const [typeRow] = await db.query<{ data_type: string }>(
       "SELECT data_type FROM information_schema.columns WHERE table_name = 'raw' AND column_name = 'data'",
@@ -445,6 +468,7 @@ describe("text-export query", () => {
       before_date: null,
       project: null,
       min_chars: null,
+      host: null,
       ...overrides,
     };
   }
@@ -481,7 +505,13 @@ describe("text-export query", () => {
 
 describe("phrase-lift query", () => {
   function liftParams(overrides: Record<string, string | null> = {}) {
-    return { phrase: "reaching for", after_date: null, before_date: null, ...overrides };
+    return {
+      phrase: "reaching for",
+      after_date: null,
+      before_date: null,
+      host: null,
+      ...overrides,
+    };
   }
 
   it("counts phrase occurrences per role and model", async () => {
@@ -535,12 +565,107 @@ describe("model-summary query", () => {
       model: string;
       messages: bigint;
       total_chars: bigint;
-    }>(db, "model-summary", { after_date: null, before_date: null, project: null });
+    }>(db, "model-summary", { after_date: null, before_date: null, project: null, host: null });
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
       expect(row.model).toBeTruthy();
       expect(Number(row.messages)).toBeGreaterThan(0);
       expect(Number(row.total_chars)).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("cross-machine history", () => {
+  it("tags imported rows with the host across sessions, messages, and content_items", async () => {
+    await importFixtureHost("work");
+    await reindex();
+
+    for (const tbl of ["sessions", "messages", "content_items"]) {
+      const rows = await db.query<{ host: string }>(
+        `SELECT DISTINCT host FROM ${tbl} ORDER BY host`,
+      );
+      expect(rows.map((r) => r.host)).toEqual(["local", "work"]);
+    }
+  });
+
+  it("scopes to a host with host= and spans all hosts without it", async () => {
+    await importFixtureHost("work");
+    await reindex();
+
+    const scoped = await runQuery<{ host: string }>(
+      db,
+      "search",
+      queryParams({ host: "work", query: "error" }),
+    );
+    expect(scoped.length).toBeGreaterThan(0);
+    expect(scoped.every((r) => r.host === "work")).toBe(true);
+
+    const spanned = await runQuery<{ host: string }>(db, "search", queryParams({ query: "error" }));
+    expect(new Set(spanned.map((r) => r.host))).toEqual(new Set(["local", "work"]));
+
+    const scopedStats = await runQuery<{ total_sessions: number }>(
+      db,
+      "stats",
+      filterParams({ host: "work" }),
+    );
+    const allStats = await runQuery<{ total_sessions: number }>(db, "stats", filterParams());
+    expect(Number(allStats[0]?.total_sessions)).toBe(Number(scopedStats[0]?.total_sessions) * 2);
+  });
+
+  it("indexes a host whose files predate the local import (per-host watermark)", async () => {
+    // Push local's watermark past the imported files so they "predate" the local
+    // import. Only a per-host watermark (epoch for a new host) lets archive index;
+    // a shared watermark would skip its now-older files.
+    await db.run("UPDATE meta SET last_import = '2099-01-01'::TIMESTAMP WHERE host = 'local'");
+    await importFixtureHost("archive");
+    await reindex();
+
+    const [row] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM sessions WHERE host = 'archive'",
+    );
+    expect(Number(row?.n)).toBeGreaterThan(0);
+  });
+
+  it("forget removes a host's rows and synced files", async () => {
+    await importFixtureHost("gone");
+    await reindex();
+    const [before] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'gone'",
+    );
+    expect(Number(before?.n)).toBeGreaterThan(0);
+
+    await db.run("DELETE FROM raw WHERE host = $host", { host: "gone" });
+    await db.run("DELETE FROM meta WHERE host = $host", { host: "gone" });
+    await rebuildViews(db);
+    await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
+
+    const [after] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'gone'",
+    );
+    expect(Number(after?.n)).toBe(0);
+    const sessions = await db.query<{ host: string }>(
+      "SELECT DISTINCT host FROM sessions ORDER BY host",
+    );
+    expect(sessions.map((r) => r.host)).toEqual(["local"]);
+    expect(dirExists(path.join(importsDir, "gone"))).toBe(false);
+  });
+
+  it("keeps the same session distinct across hosts without merging or dropping", async () => {
+    await importFixtureHost("alpha");
+    await importFixtureHost("beta");
+    await reindex();
+
+    const hosts = await db.query<{ host: string }>(
+      "SELECT host FROM sessions WHERE session_id = 'basic-session' ORDER BY host",
+    );
+    expect(hosts.map((r) => r.host)).toEqual(["alpha", "beta", "local"]);
+
+    const counts = await db.query<{ host: string; n: bigint }>(
+      "SELECT host, COUNT(*) AS n FROM sessions GROUP BY host ORDER BY host",
+    );
+    expect(counts.map((r) => r.host)).toEqual(["alpha", "beta", "local"]);
+    const distinct = new Set(counts.map((r) => Number(r.n)));
+    expect(distinct.size).toBe(1);
+    expect([...distinct][0]).toBeGreaterThan(0);
   });
 });

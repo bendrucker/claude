@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "table": "^6.9.0"
+  },
   "devDependencies": {
     "@duckdb/node-api": "1.5.0-r.1"
   }

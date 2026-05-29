@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS fts_user_corpus;
 CREATE TABLE fts_assistant_corpus AS
   SELECT row_number() OVER () AS id, text
   FROM text_content tc
-  JOIN sessions s USING (session_id)
+  JOIN sessions s USING (host, session_id)
   WHERE tc.role = 'assistant'
     AND date_filter(tc.timestamp, getvariable('after_date'), getvariable('before_date'))
     AND (tc.model IS NOT NULL AND tc.model GLOB getvariable('model')::VARCHAR)
@@ -17,7 +17,7 @@ CREATE TABLE fts_assistant_corpus AS
 CREATE TABLE fts_user_corpus AS
   SELECT row_number() OVER () AS id, text
   FROM text_content tc
-  JOIN sessions s USING (session_id)
+  JOIN sessions s USING (host, session_id)
   WHERE tc.role = 'user'
     AND NOT tc.is_subagent
     AND NOT tc.is_system

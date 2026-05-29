@@ -11,7 +11,7 @@ write_prose AS (
     ci.session_id,
     (ci.data->>'$.input.content') AS text
   FROM content_items ci
-  JOIN sessions s USING (session_id)
+  JOIN sessions s USING (host, session_id)
   WHERE ci.type = 'tool_use'
     AND ci.name = 'Write'
     AND regexp_matches((ci.data->>'$.input.file_path'), '\.(md|txt|rst|adoc)$')
@@ -28,7 +28,7 @@ edit_prose AS (
     ci.session_id,
     (ci.data->>'$.input.new_string') AS text
   FROM content_items ci
-  JOIN sessions s USING (session_id)
+  JOIN sessions s USING (host, session_id)
   WHERE ci.type = 'tool_use'
     AND ci.name = 'Edit'
     AND regexp_matches((ci.data->>'$.input.file_path'), '\.(md|txt|rst|adoc)$')
@@ -49,7 +49,7 @@ bash_prose AS (
       NULLIF(regexp_extract((ci.data->>'$.input.command'), '(?:-m|--(?:body|message|description|title))\s+''([^'']+)''', 1), '')
     ) AS text
   FROM content_items ci
-  JOIN sessions s USING (session_id)
+  JOIN sessions s USING (host, session_id)
   WHERE ci.type = 'tool_use'
     AND ci.name = 'Bash'
     AND regexp_matches(

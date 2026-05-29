@@ -21,6 +21,7 @@ CREATE TABLE fts_user_corpus AS
   WHERE tc.role = 'user'
     AND NOT tc.is_subagent
     AND NOT tc.is_system
+    AND not_pasted_model(tc.text, COALESCE(getvariable('paste_max_chars')::BIGINT, 2000))
     AND date_filter(tc.timestamp, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(s.project_path, getvariable('project'))
     AND length(tc.text) >= 50;

@@ -39,18 +39,52 @@ Installs DuckDB's FTS extension and materializes per-role corpus tables (`fts_as
 
 Wordlist entries are batch-audited via `fts-phrase-audit.sql`. The query stems each entry with Porter stemming, then looks up term frequencies in both FTS indexes. Returns per-term assistant/user counts, per-million rates, and lift.
 
-A rule is **kept** when the model uses it strictly more per token than the user (`assistant_per_m > user_per_m`) and it appears at least `--min-count` times (default 5). Otherwise the report proposes removal with one of two reasons:
+A rule is **kept** when the model uses it strictly more per token than the comparison baseline (`model_per_m > baseline_per_m`) and it appears at least `--min-count` times (default 5) on its firing surface. Otherwise the report proposes removal with one of two reasons:
 
-- **dead**: fewer than `--min-count` assistant occurrences. The rule rarely fires regardless of distinctiveness.
-- **not distinctive**: the user uses it at least as often per token. The rule would flag the user's own voice.
+- **dead**: fewer than `--min-count` model occurrences on the firing surface. The rule rarely fires regardless of distinctiveness.
+- **not distinctive**: the baseline uses it at least as often per token. The rule would flag the user's own voice.
 
 Removal does **not** use lift. The user baseline is small (often tens of thousands of tokens, even with cross-machine history merged in), so the Laplace smoothing floor (`1/user_total`) dominates: any word the user never types needs a high per-million rate in assistant text just to reach a lift of 5.0. That gate is nearly unreachable for single words, so a pure lift threshold flags the model's strongest surviving tells (`delve`, `comprehensive`, `robust`) for removal. The direct rate comparison is smoothing-free and keeps them.
 
-The audit measures each term in `text_content` (conversational assistant and user text). This is a proxy surface: most wordlist rules fire on deliverables and side-effect inputs, not chat, but the model's chat usage of a term tracks its overall habit closely enough to judge distinctiveness. A consequence: a term both the model and the user say conversationally (`Perfect` as an acknowledgment) reads as not distinctive and is dropped even if it might still open a deliverable.
+#### Per-surface auditing
 
-The proxy breaks entirely for tells that live *only* in deliverables and never in chat. The flowery phrases (`flowery-phrases.txt`) and the soft group (`soft-phrasing.txt`) were curated from PR-body evidence, so the chat-surface audit reports them as `dead` (zero chat hits) or as `not distinctive`. Those verdicts are not authoritative for deliverable-surface rules. Auditing wordlist health against the deliverable corpus directly (not just chat) is the fix, tracked with the rest of the deliverable-aware analyze work.
+Each rule is judged on the surface where the hook fires it, so the audit measures the rule against the corpus it actually polices.
+
+- **Chat-surface rules** (`openers.txt`, the conversational vocabulary, the sycophantic patterns) compare the model's chat assistant text against the user's chat text in `text_content`, via the FTS pass. The model's chat usage of these terms tracks its overall habit. A consequence: a term both the model and the user say conversationally (`Perfect` as an acknowledgment) reads as not distinctive and is dropped even if it might still open a deliverable.
+- **Deliverable-surface rules** (`flowery-phrases.txt` and `soft-phrasing.txt`, both `fileOnly` in the hook) compare the model's deliverable-prose rate against the user's voice-baseline rate. Each entry is stem-matched against the deliverable corpus (the same Porter-stemmed subsequence scan the hook uses) and looked up in the voice profile (`voice-profile.ts`). A phrase frequent in the model's PR bodies and absent from the user's hand-written baseline reads as **keep**, which is the correct verdict: `source of truth`, `escape hatch`, `self-sufficient`, and `fail loudly` each occur dozens of times in deliverable prose and zero times across the 209 pre-AI baseline PRs.
+
+`marketing-verbs.txt` stays on the chat audit even though it reads as deliverable phrasing: its hook group is not `fileOnly`, so it fires on Bash side-effect inputs too, and auditing it against deliverables alone undercounts it (the few deliverable hits are often the user's own meta-discussion of the wordlist file). See `deliverable-audit.ts` for the surface assignment.
+
+When no voice profile is loaded (the local baseline has not been built), deliverable-surface rules fall back to the chat audit so the script still runs. Build the baseline with `ingest-voice.ts` then `voice-profile.ts` (see "Voice baseline" below) to get the deliverable-aware verdicts.
 
 Because removed single words are no longer in the wordlist, a later audit cannot resurface them (the additions pipeline only mines multi-word n-grams). If the model regresses to a removed word, add it back by hand.
+
+## Voice baseline
+
+The user's true deliverable voice is their hand-written, pre-AI pull requests, not their chat. A tell is real if it is frequent in the model's deliverables and absent from this baseline. The baseline is **local-only and never committed**: it lives outside the repository at the plugin data dir (`CLAUDE_PLUGIN_DATA`, else `~/.claude/plugins/data/writing-bendrucker`), resolved by `data-dir.ts`. It is local-only by design because it will grow to include private writing.
+
+#### Ingesting sources
+
+`ingest-voice.ts` normalizes one or more document sources into `voice-baseline/github-prs.txt`, a delimited corpus (`===== <source> (<meta>) =====` per document). Two sources:
+
+- **github**: `gh search prs --author=<user> --merged --json url,body,createdAt`, optionally scoped with `--created`. Designed to add more sources later.
+- **file**: merges an existing delimited corpus (the already-present seed) so the 209-PR baseline does not need re-fetching.
+
+Merging de-duplicates by source pointer, so re-ingesting a range is idempotent.
+
+#### Building the profile
+
+`voice-profile.ts` reads the corpus and writes `voice-baseline/profile.json`: unigram, bigram, and trigram word n-gram counts plus the total token count, built with the same tokenizer (`ngram.ts`) the candidate miner uses. `phraseProfileStat` looks a phrase up in the profile, and phrases longer than a trigram match by their leading trigram. A count of 0 is the strongest "absent from my baseline" signal.
+
+Both the corpus and the profile stay in the local data dir. `analyze.ts` loads the profile read-only via `--data-dir`. Nothing baseline-derived is ever written into the repository.
+
+## Corrective feedback
+
+`corrective-feedback.sql` surfaces labeled-slop moments: short, human-authored user messages that match a frustration lexicon (`frustration.ts`: `wtf`, `ugh`, `flowery`, `verbose`, `cut the`, `reads like`, and similar), paired with the preceding model output as context. These are higher-signal than the inferred long-assistant/short-user correction candidates because the user named a writing problem directly. The lexicon is compiled to a boundary-anchored regex alternation and passed to the query as the `lexicon` variable. Pasted model output is excluded by the same `is_system`/`is_subagent` flags and length ceiling used elsewhere.
+
+## Quote in context
+
+Every candidate phrase and every audited deliverable-surface tell ships with a context window and a source pointer (`quote-context.ts`), so a curation decision is spot-checkable without a separate query. `deliverable-prose.sql` carries `source_file`, `source_line`, and the written `file_path`. `findQuote` locates the first occurrence (exact for n-gram candidates, stemmed fallback for inflected tells) and returns a trimmed window plus the pointer. Quotes can reflect any host in the combined index, so they appear only in the local report under `tmp/`, never in committed content.
 
 ## Surface Candidate Phrases
 

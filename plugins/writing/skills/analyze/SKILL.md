@@ -5,6 +5,7 @@ description: >-
   session history and surfacing candidate phrases. Use when refreshing trope
   detection, reviewing wordlist health, or mining sessions for new AI-writing
   patterns to add or stale rules to remove.
+disable-model-invocation: true
 allowed-tools:
   - Bash
   - Read

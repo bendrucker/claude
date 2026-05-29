@@ -12,7 +12,7 @@ export type PatternMatch = {
   message: string;
 };
 
-type PatternDef = {
+export type PatternDef = {
   tier: PatternTier;
   category: string;
   test: RegExp | ((text: string) => Hits);
@@ -62,7 +62,7 @@ function testResultHits(text: string): Hits {
 const CROSS_SENTENCE_NOT =
   /\b(it|this|that|he|she|they|we|you)\s+(?:is|are|was|were)(?:n't|\s+not)\s+[^.!?]{1,80}[.!?]\s+\1\s+(?:is|are|was|were)\b/gi;
 
-const PATTERNS: PatternDef[] = [
+export const PATTERNS: PatternDef[] = [
   {
     tier: "deny",
     category: "spaced em dash",

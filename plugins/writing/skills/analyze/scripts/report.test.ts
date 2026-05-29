@@ -11,6 +11,7 @@ const baseInput = {
   modelFilter: "*opus*",
   projectFilter: null,
   minLift: 5,
+  minCount: 5,
   topN: 10,
   modelSummary: [] as ModelSummaryRow[],
   assistantTotalChars: 0,
@@ -28,13 +29,14 @@ describe("buildRuleHealth", () => {
     { phrase: "missing entry", source: "openers.txt" },
   ];
 
-  test("marks an entry with no data when audit row is missing", () => {
+  test("marks a missing audit row as dead (no occurrences)", () => {
     const result = buildRuleHealth(entries, new Map(), 5);
     expect(result[1]?.noData).toBe(true);
-    expect(result[1]?.stillDistinctive).toBe(false);
+    expect(result[1]?.status).toBe("remove");
+    expect(result[1]?.removeReason).toBe("dead");
   });
 
-  test("marks an entry with no data when counts are zero", () => {
+  test("marks an entry with zero counts as dead", () => {
     const audit = new Map<string, FtsAuditRow>();
     audit.set("let me", {
       term: "let me",
@@ -46,10 +48,11 @@ describe("buildRuleHealth", () => {
     });
     const result = buildRuleHealth(entries, audit, 5);
     expect(result[0]?.noData).toBe(true);
-    expect(result[0]?.stillDistinctive).toBe(false);
+    expect(result[0]?.status).toBe("remove");
+    expect(result[0]?.removeReason).toBe("dead");
   });
 
-  test("computes lift from FTS audit and decides distinctiveness", () => {
+  test("keeps a rule the model uses more than the user", () => {
     const audit = new Map<string, FtsAuditRow>();
     audit.set("let me", {
       term: "let me",
@@ -60,23 +63,55 @@ describe("buildRuleHealth", () => {
       lift: 10,
     });
     const result = buildRuleHealth(entries, audit, 5);
-    expect(result[0]?.noData).toBe(false);
-    expect(result[0]?.stillDistinctive).toBe(true);
+    expect(result[0]?.status).toBe("keep");
+    expect(result[0]?.removeReason).toBeNull();
     expect(result[0]?.lift).toBeCloseTo(10, 0);
   });
 
-  test("proposes removal when lift drops below threshold", () => {
+  test("keeps a rare-but-distinctive rule even when lift reads low", () => {
+    // The model uses it, the user never does, but the smoothed baseline
+    // compresses lift below the additions threshold. It must still be kept.
+    const audit = new Map<string, FtsAuditRow>();
+    audit.set("let me", {
+      term: "let me",
+      assistant_count: 32,
+      user_count: 0,
+      assistant_per_m: 296.8,
+      user_per_m: 0,
+      lift: 3.0,
+    });
+    const result = buildRuleHealth(entries, audit, 5);
+    expect(result[0]?.status).toBe("keep");
+  });
+
+  test("removes a rule the user uses at least as much (not distinctive)", () => {
     const audit = new Map<string, FtsAuditRow>();
     audit.set("let me", {
       term: "let me",
       assistant_count: 10,
-      user_count: 5,
-      assistant_per_m: 1000,
-      user_per_m: 500,
-      lift: 2,
+      user_count: 40,
+      assistant_per_m: 100,
+      user_per_m: 200,
+      lift: 0.5,
     });
     const result = buildRuleHealth(entries, audit, 5);
-    expect(result[0]?.stillDistinctive).toBe(false);
+    expect(result[0]?.status).toBe("remove");
+    expect(result[0]?.removeReason).toBe("not distinctive");
+  });
+
+  test("removes a rule below the occurrence floor (dead)", () => {
+    const audit = new Map<string, FtsAuditRow>();
+    audit.set("let me", {
+      term: "let me",
+      assistant_count: 2,
+      user_count: 0,
+      assistant_per_m: 18.5,
+      user_per_m: 0,
+      lift: 0.2,
+    });
+    const result = buildRuleHealth(entries, audit, 5);
+    expect(result[0]?.status).toBe("remove");
+    expect(result[0]?.removeReason).toBe("dead");
   });
 });
 
@@ -103,7 +138,8 @@ describe("renderReport", () => {
           assistantPerM: 50,
           userPerM: 100,
           lift: 0.5,
-          stillDistinctive: false,
+          status: "remove",
+          removeReason: "not distinctive",
           noData: false,
         },
       ],
@@ -163,24 +199,26 @@ describe("renderReport", () => {
           assistantPerM: 100,
           userPerM: 20,
           lift: 5,
-          stillDistinctive: true,
+          status: "keep",
+          removeReason: null,
           noData: false,
         },
         {
-          entry: { phrase: "delve into", source: "vocabulary.txt" },
+          entry: { phrase: "tapestry", source: "vocabulary.txt" },
           assistantCount: 5,
           userCount: 1,
           assistantPerM: 50,
           userPerM: 10,
           lift: 5,
-          stillDistinctive: true,
+          status: "keep",
+          removeReason: null,
           noData: false,
         },
       ],
     });
     expect(output).toContain("| type |");
     expect(output).toMatch(/Perfect.*opener/);
-    expect(output).toMatch(/delve into.*vocabulary/);
+    expect(output).toMatch(/tapestry.*vocabulary/);
   });
 
   test("orders sections: summary, removals, additions, health", () => {

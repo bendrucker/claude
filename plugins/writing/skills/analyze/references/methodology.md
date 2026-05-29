@@ -25,7 +25,7 @@ Where rates are per-million-token frequencies and the user rate uses Laplace smo
 - `lift = 1.0` means the phrase appears at equal rates in both corpora.
 - `lift = 10.0` means the assistant uses the phrase 10x more often per token than the user.
 
-The `--min-lift` threshold (default 5.0) decides both rule health (keep vs. remove) and new candidate inclusion.
+The `--min-lift` threshold (default 5.0) gates new candidate phrases. It does **not** decide rule keep/remove (see "Audit Current Wordlists" for why lift is unreliable there).
 
 #### Session count
 
@@ -39,9 +39,16 @@ Installs DuckDB's FTS extension and materializes per-role corpus tables (`fts_as
 
 Wordlist entries are batch-audited via `fts-phrase-audit.sql`. The query stems each entry with Porter stemming, then looks up term frequencies in both FTS indexes. Returns per-term assistant/user counts, per-million rates, and lift.
 
-A phrase with `lift >= --min-lift` keeps its rule. Below that threshold, the report proposes removal.
+A rule is **kept** when the model uses it strictly more per token than the user (`assistant_per_m > user_per_m`) and it appears at least `--min-count` times (default 5). Otherwise the report proposes removal with one of two reasons:
+
+- **dead**: fewer than `--min-count` assistant occurrences. The rule rarely fires regardless of distinctiveness.
+- **not distinctive**: the user uses it at least as often per token. The rule would flag the user's own voice.
+
+Removal does **not** use lift. The user baseline is small (often ~10K tokens), so the Laplace smoothing floor (`1/user_total`, ~99 per million) dominates: any word the user never types needs ~500 per million in assistant text just to reach a lift of 5.0. That gate is nearly unreachable for single words, so a pure lift threshold flags the model's strongest surviving tells (`delve`, `Perfect`, `robust`) for removal. The direct rate comparison is smoothing-free and keeps them.
 
 The audit uses `text_content` (all assistant text, including conversational messages) because wordlist rules fire on all prose surfaces, not just deliverables.
+
+Because removed single words are no longer in the wordlist, a later audit cannot resurface them (the additions pipeline only mines multi-word n-grams). If the model regresses to a removed word, add it back by hand.
 
 ## Surface Candidate Phrases
 
@@ -82,7 +89,9 @@ Without this filtering, roughly half the user corpus by character count is machi
 
 ## Structural Pattern Audit
 
-Runs the regex-based patterns from `tropes.ts` against all assistant text (not just deliverables). Each pattern reports total hits, number of rows containing hits, and session spread. Patterns are labeled by their hook scope (all, file-only, side-effect-only).
+`structural.ts` imports the hook's `PATTERNS` directly from `hooks/tropes.ts` rather than re-declaring them, so the audit cannot drift from what the hook enforces. It keeps only the regex patterns whose source is not a wordlist (stemmed vocabulary and weighted verbs are covered by the FTS pass; `WORDLISTS.openers` is too) and normalizes each to the global flag for accurate counting. Function-based tests (e.g. test-result reporting) are excluded because they cannot be counted by a single regex match.
+
+The patterns run against all assistant text (not just deliverables). Each reports total hits, number of rows containing hits, and session spread. Patterns are labeled by their hook scope (all, file-only, side-effect-only).
 
 This catches structural tropes (semicolons, passive voice, hedging, parallelism) that the n-gram pipeline cannot detect.
 
@@ -131,4 +140,4 @@ Stratify by sampling sessions first, then rows within those sessions. Without th
 
 ## Tuning
 
-Raise `--min-lift` (default 5.0) if the report is too noisy. Lower it if too quiet. N-grams larger than 4 tokens are not currently considered.
+Raise `--min-lift` (default 5.0) if the candidate list is too noisy. Lower it if too quiet. Raise `--min-count` (default 5) to be stricter about what counts as a live rule (more removals tagged dead); lower it to keep rarer rules. N-grams larger than 4 tokens are not currently considered.

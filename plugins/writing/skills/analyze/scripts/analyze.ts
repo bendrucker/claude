@@ -39,8 +39,14 @@ const argv = cli({
     },
     minLift: {
       type: Number,
-      description: "Minimum lift threshold for keep/include decisions",
+      description: "Minimum lift threshold for surfacing new candidate phrases",
       default: 5.0,
+    },
+    minCount: {
+      type: Number,
+      description:
+        "Minimum assistant occurrences for a rule to count as alive (below this is 'dead')",
+      default: 5,
     },
     top: {
       type: Number,
@@ -69,6 +75,7 @@ const until = argv.flags.until ?? today;
 const modelFilter = argv.flags.model;
 const projectFilter = argv.flags.project ?? null;
 const minLift = argv.flags.minLift;
+const minCount = argv.flags.minCount;
 const topN = argv.flags.top;
 const dbPath = path.resolve(argv.flags.sessionDb ?? "");
 const wordlistsDir =
@@ -162,7 +169,7 @@ async function main(): Promise<void> {
     console.error("Auditing structural patterns against all model-generated text");
     const structuralAudit = auditStructuralPatterns(allModelText, userRows);
 
-    const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minLift);
+    const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minCount);
 
     const report = renderReport({
       generatedAt: today,
@@ -171,6 +178,7 @@ async function main(): Promise<void> {
       modelFilter,
       projectFilter,
       minLift,
+      minCount,
       topN,
       modelSummary,
       assistantTotalChars: totalChars(assistantRows),

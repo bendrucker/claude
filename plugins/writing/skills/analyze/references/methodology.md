@@ -55,7 +55,7 @@ Each rule is judged on the surface where the hook fires it, so the audit measure
 
 `marketing-verbs.txt` stays on the chat audit even though it reads as deliverable phrasing: its hook group is not `fileOnly`, so it fires on Bash side-effect inputs too, and auditing it against deliverables alone undercounts it (the few deliverable hits are often the user's own meta-discussion of the wordlist file). See `deliverable-audit.ts` for the surface assignment.
 
-When no voice profile is loaded (the local baseline has not been built), deliverable-surface rules fall back to the chat audit so the script still runs. Build the baseline with `ingest-voice.ts` then `voice-profile.ts` (see "Voice baseline" below) to get the deliverable-aware verdicts.
+When no voice profile is loaded (the local baseline has not been built), deliverable-surface rules are still measured on the deliverable corpus, not the chat audit. The chat audit cannot score them: it stems each entry and joins against single-word FTS tokens, so a multi-word phrase never matches and would read as a false `dead`. Without a baseline the distinctiveness check is skipped, so an alive rule is reported `keep (no baseline)` rather than proposed for removal. Build the baseline with `ingest-voice.ts` then `voice-profile.ts` (see "Voice baseline" below) to get the full deliverable-aware verdicts.
 
 Because removed single words are no longer in the wordlist, a later audit cannot resurface them (the additions pipeline only mines multi-word n-grams). If the model regresses to a removed word, add it back by hand.
 

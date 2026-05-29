@@ -7,8 +7,11 @@
 -- macro additionally drops human-pasted machine prose by shape:
 --
 --   * very long messages (pasted blocks dwarf a typed reply)
---   * third-person self-reference (the literal name "Ben": the user types "I",
---     so "Ben" in a user message is almost always quoted/pasted prose)
+--   * third-person self-reference (the user types "I", so their own name in a
+--     user message is almost always quoted or pasted prose). The name comes
+--     from the 'self_name' variable and the check is case-insensitive. An empty
+--     'self_name' disables this signal, which keeps the macro host-agnostic for
+--     anyone who has not set their name.
 --   * document structure (markdown headers or table rows: the user writes chat
 --     prose, not formatted documents, in their turns)
 --
@@ -16,7 +19,10 @@
 -- tuned without editing the macro.
 CREATE OR REPLACE MACRO not_pasted_model(txt, max_chars) AS (
   length(txt) <= max_chars
-  AND NOT regexp_matches(txt, '\bBen\b')
+  AND (
+    getvariable('self_name') = ''
+    OR NOT regexp_matches(txt, '(?i)\b' || getvariable('self_name') || '\b')
+  )
   AND NOT regexp_matches(txt, '(?m)^\s*#{1,6}\s')
   AND NOT regexp_matches(txt, '(?m)^\s*\|.*\|')
 );

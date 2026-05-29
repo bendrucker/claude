@@ -203,10 +203,21 @@ function renderRuleHealthTable(input: ReportInput): string {
     lines.push("_No wordlists found at `plugins/writing/wordlists/`._");
     return lines.join("\n");
   }
+  if (!input.voiceProfile && input.ruleHealth.some((r) => r.surface === "deliverable")) {
+    lines.push(
+      "Voice profile not loaded: deliverable-surface rules are kept pending a baseline (run `ingest-voice.ts` then `voice-profile.ts` to verify distinctiveness). Their baseline/M reads `-`.",
+      "",
+    );
+  }
   lines.push("| phrase | source | type | surface | model/M | baseline/M | lift | status |");
   lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const r of input.ruleHealth) {
-    const status = r.status === "keep" ? "keep" : `remove (${r.removeReason})`;
+    const status =
+      r.status === "keep"
+        ? r.noData && r.surface === "deliverable"
+          ? "keep (no baseline)"
+          : "keep"
+        : `remove (${r.removeReason})`;
     const ruleType = ruleTypeLabel(r.entry.source);
     lines.push(
       `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${ruleType} | ${r.surface} | ${fmtPerM(r.modelPerM)} | ${fmtPerM(r.baselinePerM)} | ${fmtLift(r.lift)} | ${status} |`,
@@ -279,7 +290,7 @@ function renderCorrectiveFeedback(input: ReportInput): string {
     return lines.join("\n");
   }
   for (const c of input.corrective) {
-    lines.push(`### ${c.timestamp} (${c.project ?? "unknown"}) — matched \`${c.matched_term}\``);
+    lines.push(`### ${c.timestamp} (${c.project ?? "unknown"}): matched \`${c.matched_term}\``);
     lines.push("");
     if (c.context_snippet) {
       lines.push(`Preceding model output (${fmtNum(c.context_chars)} chars):`);
@@ -303,21 +314,23 @@ export interface RuleHealthInput {
 // Audit each rule against the surface where it actually fires. Chat-surface
 // rules (openers, sycophantic patterns, conversational vocabulary) keep the
 // FTS chat comparison: the model's chat usage of a term tracks its habit.
-// Deliverable-surface rules (flowery phrases, soft phrasing, marketing verbs)
-// are judged on the model's deliverable-prose rate versus the user's voice
-// baseline, because those tells live in PR bodies and barely appear in chat.
-// Without the voice baseline, deliverable-surface rules fall back to the chat
-// audit so the script still runs.
+// Deliverable-surface rules (flowery phrases, soft phrasing) are judged on the
+// model's deliverable-prose rate. The chat audit cannot measure them: it stems
+// each entry and joins against single-word FTS tokens, so a multi-word phrase
+// never matches and would read as a false "dead". They are always routed to
+// the deliverable audit. With the voice baseline loaded they also get a
+// distinctiveness check against the user's hand-written voice. Without it the
+// baseline is unknown, so an alive rule is kept rather than proposed for
+// removal (we never recommend dropping a rule we cannot measure).
 export function buildRuleHealth(input: RuleHealthInput): CurrentRuleHealth[] {
   const { entries, chatAudit, deliverableAudit, voiceProfile, minCount, findQuote } = input;
-  const useDeliverable = deliverableAudit !== null && voiceProfile !== null;
 
   return entries.map((entry) => {
-    const onDeliverable = useDeliverable && isDeliverableSurface(entry.source);
+    const onDeliverable = deliverableAudit !== null && isDeliverableSurface(entry.source);
     const surface: AuditSurface = onDeliverable ? "deliverable" : "chat";
     const quote = findQuote ? findQuote(entry, surface) : null;
 
-    if (onDeliverable && deliverableAudit && voiceProfile) {
+    if (onDeliverable && deliverableAudit) {
       return buildDeliverableHealth(entry, deliverableAudit, voiceProfile, minCount, quote);
     }
     return buildChatHealth(entry, chatAudit, minCount, quote);
@@ -355,13 +368,32 @@ function buildChatHealth(
 function buildDeliverableHealth(
   entry: WordlistEntry,
   deliverableAudit: DeliverableAudit,
-  voiceProfile: VoiceProfile,
+  voiceProfile: VoiceProfile | null,
   minCount: number,
   quote: QuoteContext | null,
 ): CurrentRuleHealth {
   const audit = deliverableAudit.byPhrase.get(entry.phrase);
   const modelCount = audit?.count ?? 0;
   const modelPerM = audit?.perMillion ?? 0;
+
+  if (!voiceProfile) {
+    // No baseline loaded. Judge only whether the rule fires on its deliverable
+    // surface; distinctiveness is unmeasurable, so an alive rule is kept.
+    const alive = modelCount >= minCount;
+    return {
+      entry,
+      surface: "deliverable",
+      modelCount,
+      modelPerM,
+      baselinePerM: null,
+      lift: null,
+      status: alive ? "keep" : "remove",
+      removeReason: alive ? null : "dead",
+      noData: true,
+      quote,
+    };
+  }
+
   const baseline = phraseProfileStat(voiceProfile, entry.phrase);
   const baselinePerM = baseline.perMillion;
   const lift = baselinePerM > 0 ? modelPerM / baselinePerM : null;
@@ -439,5 +471,5 @@ function formatQuote(quote: QuoteContext | null): string {
     : quote.sourceFile
       ? `${quote.sourceFile}:${quote.sourceLine ?? "?"}`
       : "(no source pointer)";
-  return `"${quote.window}" — ${pointer}`;
+  return `"${quote.window}" (${pointer})`;
 }

@@ -83,6 +83,12 @@ const argv = cli({
       description: "Length ceiling for human-authored user messages (paste filter)",
       default: 2000,
     },
+    selfName: {
+      type: String,
+      description:
+        "Your name, used to drop pasted prose that refers to you in the third person from the user baseline (case-insensitive; empty disables this signal)",
+      default: "",
+    },
     correctiveLimit: {
       type: Number,
       description: "Max corrective-feedback moments to surface",
@@ -111,6 +117,7 @@ const baseParams: Record<string, string | null> = {
   before_date: until,
   project: projectFilter,
   paste_max_chars: pasteMaxChars,
+  self_name: argv.flags.selfName ?? "",
 };
 
 await main();
@@ -138,13 +145,13 @@ async function main(): Promise<void> {
     );
   } else {
     console.error(
-      `No voice profile found. Run ingest-voice.ts (seed: ${corpusPath(dataDir)}) then voice-profile.ts. Deliverable-surface rules fall back to the chat audit.`,
+      `No voice profile found. Run ingest-voice.ts (seed: ${corpusPath(dataDir)}) then voice-profile.ts. Deliverable-surface rules are kept pending a baseline (distinctiveness unverified) instead of falling back to the chat audit.`,
     );
   }
 
   try {
     console.error("Creating paste filter for the user baseline");
-    await db.execQuery("paste-filter");
+    await db.execQuery("paste-filter", baseParams);
 
     console.error("Building FTS indexes");
     await db.execQuery("fts-setup", { ...baseParams, model: modelFilter });

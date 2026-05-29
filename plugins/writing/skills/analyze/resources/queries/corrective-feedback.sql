@@ -47,6 +47,7 @@ SELECT
   LEFT(prev_text, 400) AS context_snippet
 FROM paired
 WHERE role = 'user'
+  AND prev_role = 'assistant'
   AND NOT is_system
   AND NOT is_subagent
   AND chars <= COALESCE(getvariable('max_user_chars')::BIGINT, 400)

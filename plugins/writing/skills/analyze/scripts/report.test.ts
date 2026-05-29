@@ -178,7 +178,10 @@ describe("buildRuleHealth (deliverable surface)", () => {
     expect(result[0]?.removeReason).toBe("not distinctive");
   });
 
-  test("falls back to chat audit when no voice profile is loaded", () => {
+  test("keeps a deliverable tell pending a baseline when no profile is loaded", () => {
+    // No profile: the multi-word phrase must NOT fall back to the chat audit
+    // (which can't match it and would call it dead). It stays on the deliverable
+    // surface and, being alive there, is kept with distinctiveness unverified.
     const result = buildRuleHealth({
       entries,
       chatAudit: chatAudit("source of truth", {
@@ -192,8 +195,24 @@ describe("buildRuleHealth (deliverable surface)", () => {
       voiceProfile: null,
       minCount: 5,
     });
-    expect(result[0]?.surface).toBe("chat");
+    expect(result[0]?.surface).toBe("deliverable");
+    expect(result[0]?.status).toBe("keep");
+    expect(result[0]?.removeReason).toBeNull();
+    expect(result[0]?.baselinePerM).toBeNull();
+    expect(result[0]?.noData).toBe(true);
+  });
+
+  test("marks a deliverable rule dead when it rarely fires on its own surface (no profile)", () => {
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: new Map(),
+      deliverableAudit: deliverableAudit(0, 0),
+      voiceProfile: null,
+      minCount: 5,
+    });
+    expect(result[0]?.surface).toBe("deliverable");
     expect(result[0]?.status).toBe("remove");
+    expect(result[0]?.removeReason).toBe("dead");
   });
 });
 

@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
 import { isProseFile } from "../../../hooks/markdown";
-import { scanAll, type ScanResult } from "../../../hooks/scan";
+import { type ScanResult, scanAll } from "../../../hooks/scan";
 
 const SKIP_SEGMENTS = ["node_modules", ".git"];
 const MEMORY_PATH = /\/\.claude\/(?:projects\/[^/]+\/memory|plans)\//;

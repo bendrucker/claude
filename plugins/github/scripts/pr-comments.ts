@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { type Author, isBot } from "./reviewers";
 
 const QUERY = `
 query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
@@ -23,6 +24,7 @@ query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
           endCursor
         }
         nodes {
+          id
           isResolved
           isOutdated
           path
@@ -30,7 +32,7 @@ query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
           startLine
           comments(first: 50) {
             nodes {
-              author { login }
+              author { login __typename }
               body
               createdAt
             }
@@ -43,12 +45,13 @@ query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
 `;
 
 export interface Comment {
-  author: { login: string } | null;
+  author: Author | null;
   body: string;
   createdAt: string;
 }
 
 export interface Thread {
+  id: string;
   isResolved: boolean;
   isOutdated: boolean;
   path: string;
@@ -64,6 +67,10 @@ export interface Review {
 }
 
 export type Role = "author" | "reviewer";
+
+export function isBotThread(thread: Thread): boolean {
+  return isBot(thread.comments.nodes[0]?.author);
+}
 
 export function parseUrl(url: string): {
   owner: string;
@@ -93,11 +100,16 @@ export function filterThreads(
     role: Role;
     viewer: string;
     since?: Date | undefined;
+    botsOnly?: boolean | undefined;
   },
 ): Thread[] {
   let filtered = threads.filter((t) => !t.isResolved);
 
-  if (options.role === "reviewer") {
+  if (options.botsOnly) {
+    // Bot threads are opened by the bot, never by the viewer, so this is
+    // mutually exclusive with the reviewer-opener filter below.
+    filtered = filtered.filter(isBotThread);
+  } else if (options.role === "reviewer") {
     // First comment is the thread opener
     filtered = filtered.filter((t) => t.comments.nodes[0]?.author?.login === options.viewer);
   }
@@ -157,7 +169,7 @@ export function formatThreads(
     for (const thread of fileThreads) {
       let lineInfo: string;
       if (thread.startLine) {
-        lineInfo = `Lines ${thread.startLine}\u2013${thread.line}`;
+        lineInfo = `Lines ${thread.startLine}–${thread.line}`;
       } else if (thread.line) {
         lineInfo = `Line ${thread.line}`;
       } else {
@@ -165,7 +177,9 @@ export function formatThreads(
       }
 
       const outdated = thread.isOutdated ? " (outdated)" : "";
-      lines.push(`### ${lineInfo}${outdated}`);
+      const botTag = isBotThread(thread) ? " (bot)" : "";
+      lines.push(`### ${lineInfo}${outdated}${botTag}`);
+      lines.push(`\`${thread.id}\``);
       lines.push("");
 
       for (const comment of thread.comments.nodes) {
@@ -250,6 +264,11 @@ async function main(): Promise<void> {
         type: String,
         description: 'ISO date or "last-review"',
       },
+      botsOnly: {
+        type: Boolean,
+        description: "Only threads opened by an AI review bot",
+        default: false,
+      },
     },
   });
 
@@ -309,7 +328,12 @@ async function main(): Promise<void> {
     }
   }
 
-  const filtered = filterThreads(allThreads, { role, viewer, since });
+  const filtered = filterThreads(allThreads, {
+    role,
+    viewer,
+    since,
+    botsOnly: argv.flags.botsOnly,
+  });
   const output = formatThreads(filtered, totalCount, {
     title: prTitle,
     role,

@@ -19,3 +19,11 @@ One to three sentences is typical. Don't pad replies with filler or restate the 
 ## Match the Reviewer's Detail Level
 
 Short review comments get short replies. Detailed technical feedback deserves a proportional response explaining your reasoning. Don't write a paragraph in response to a one-liner.
+
+## Replying to AI Reviewers
+
+When `--auto` replies to a bot thread, write the reply as a note for any future reader, not a message to the bot:
+
+- **Don't name or address the reviewer.** No "@coderabbitai", no "thanks", no "good bot". The one place a bot is named is the `@<bot>` re-trigger, which is a top-level comment, not a thread reply.
+- **State the resolution, not the dialogue.** "Guarded with a null check" or "Intentional: this path only runs after validation" reads correctly whether a human or a bot raised it.
+- **For a false positive, give the one-line reason** before resolving, so the resolve isn't silent: "Not reachable here, the caller already validates `id`."

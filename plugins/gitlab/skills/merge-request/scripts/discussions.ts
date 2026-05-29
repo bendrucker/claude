@@ -12,6 +12,7 @@ import {
   readBody,
   validateLineInDiff,
 } from "./diff";
+import { isBotUsername } from "./reviewers";
 
 export { parseGlabPaginated } from "./diff";
 
@@ -81,6 +82,7 @@ export type FilterOptions = {
   author?: string;
   resolvable?: boolean;
   unresolved?: boolean;
+  botsOnly?: boolean;
 };
 
 export function filterDiscussions(discussions: Discussion[], opts: FilterOptions): Discussion[] {
@@ -88,6 +90,7 @@ export function filterDiscussions(discussions: Discussion[], opts: FilterOptions
     const note = d.notes[0];
     if (!note) return false;
     if (opts.author && note.author.username !== opts.author) return false;
+    if (opts.botsOnly && !isBotUsername(note.author.username)) return false;
     if (opts.resolvable && !note.resolvable) return false;
     if (opts.unresolved && note.resolved) return false;
     return true;
@@ -113,9 +116,11 @@ function buildFilterOptions(flags: {
   author: string | undefined;
   resolvable: boolean;
   unresolved: boolean;
+  botsOnly: boolean;
 }): FilterOptions {
   const opts: FilterOptions = {};
   if (flags.author) opts.author = flags.author;
+  if (flags.botsOnly) opts.botsOnly = true;
   if (flags.resolvable) opts.resolvable = true;
   if (flags.unresolved) opts.unresolved = true;
   return opts;
@@ -166,6 +171,11 @@ const listCmd = command(
     parameters: ["<iid>"],
     flags: {
       author: { type: String, description: "Filter by author username" },
+      botsOnly: {
+        type: Boolean,
+        description: "Only discussions opened by an AI review bot",
+        default: false,
+      },
       resolvable: { type: Boolean, description: "Only resolvable discussions", default: false },
       unresolved: { type: Boolean, description: "Only unresolved discussions", default: false },
       dedupe: {

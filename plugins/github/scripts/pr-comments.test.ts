@@ -5,6 +5,7 @@ import {
   filterThreads,
   findLastReviewDate,
   formatThreads,
+  isBotThread,
   parseUrl,
   type Review,
   type Role,
@@ -24,6 +25,7 @@ function makeThread(
 ): Thread {
   const { comments, ...rest } = overrides;
   return {
+    id: "PRRT_test",
     isResolved: false,
     isOutdated: false,
     path: "src/index.ts",
@@ -167,6 +169,43 @@ describe("filterThreads", () => {
     });
     expect(result).toHaveLength(1);
   });
+
+  it("keeps only bot-opened threads with botsOnly", () => {
+    const threads = [
+      makeThread({ comments: [makeComment("coderabbitai[bot]", "2025-01-15")] }),
+      makeThread({ comments: [makeComment("bendrucker", "2025-01-15")] }),
+    ];
+    const result = filterThreads(threads, {
+      role: "author",
+      viewer: "bendrucker",
+      botsOnly: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(isBotThread(result[0]!)).toBe(true);
+  });
+
+  it("keeps bot threads in reviewer role (botsOnly overrides opener filter)", () => {
+    const threads = [
+      makeThread({ comments: [makeComment("coderabbitai[bot]", "2025-01-15")] }),
+      makeThread({ comments: [makeComment("DouweM", "2025-01-15")] }),
+    ];
+    const result = filterThreads(threads, {
+      role: "reviewer",
+      viewer: "DouweM",
+      botsOnly: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(isBotThread(result[0]!)).toBe(true);
+  });
+});
+
+describe("isBotThread", () => {
+  it("classifies by the thread opener", () => {
+    const bot = makeThread({ comments: [makeComment("greptileai", "2025-01-15")] });
+    const human = makeThread({ comments: [makeComment("bob", "2025-01-15")] });
+    expect(isBotThread(bot)).toBe(true);
+    expect(isBotThread(human)).toBe(false);
+  });
 });
 
 describe("findLastReviewDate", () => {
@@ -278,13 +317,25 @@ describe("formatThreads", () => {
   it("formats line ranges", () => {
     const threads = [makeThread({ startLine: 10, line: 20 })];
     const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("Lines 10\u201320");
+    expect(output).toContain("Lines 10–20");
   });
 
   it("marks outdated threads", () => {
     const threads = [makeThread({ isOutdated: true })];
     const output = formatThreads(threads, 1, baseOptions);
     expect(output).toContain("(outdated)");
+  });
+
+  it("includes the thread id", () => {
+    const threads = [makeThread({ id: "PRRT_abc123" })];
+    const output = formatThreads(threads, 1, baseOptions);
+    expect(output).toContain("`PRRT_abc123`");
+  });
+
+  it("marks bot-opened threads", () => {
+    const threads = [makeThread({ comments: [makeComment("coderabbitai[bot]", "2025-01-15")] })];
+    const output = formatThreads(threads, 1, baseOptions);
+    expect(output).toContain("(bot)");
   });
 
   it("formats comment bodies as blockquotes", () => {

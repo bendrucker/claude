@@ -1,7 +1,7 @@
 ---
 name: pull-request:babysit
 description: |
-  Monitor a PR's CI, fix trivial failures (lint, types, formatting), and self-cancel when green. Use after pushing when you want hands-off CI monitoring with automatic fixes.
+  Monitor a PR's CI, fix trivial failures (lint, types, formatting), and self-cancel when green. Use after pushing when you want hands-off CI monitoring with automatic fixes. With --merge, drive the PR all the way to merged (handling merge-train/queue kickouts, rebase issues, and re-runs); with --reviews, hand off to AI-review triage after the first green.
 allowed-tools:
   - Monitor
   - TaskStop
@@ -9,6 +9,10 @@ allowed-tools:
   - Bash(git:*)
   - Bash(bun:*)
   - Bash(bunx:*)
+  - Bash(gh:*)
+  - Skill(pull-request:follow-up)
+  - Skill(gitlab:merge-request)
+  - mcp__github
 ---
 
 # Babysit PR
@@ -27,6 +31,11 @@ Delegate CI monitoring to a provider-specific watcher and react to its events wi
 Inspect the remote URL. For a `github.com` remote, invoke the `github:actions-monitor` skill. For a `gitlab.com` remote, invoke the `gitlab:ci-monitor` skill. Each provider skill owns the watcher process (via the `Monitor` tool) and emits a structured JSON event stream describing CI state changes.
 
 Babysit consumes that event stream and reacts with the handlers below. The watcher handles polling, deduping by `(sha, state)`, rate limits, timeouts, and session-scoped lifecycle. Babysit handles fixes, pushes, and reporting. Remember the start SHA captured above so the success handler can summarize work done during the session.
+
+Parse `$ARGUMENTS` for two optional flags, both off by default so plain babysit stays CI-only:
+
+- `--reviews`: after the first green, triage AI-reviewer threads. See [Reviews Hand-off](#reviews-hand-off).
+- `--merge`: don't stop at green; drive the PR to merged. See [Merge Mode](#merge-mode).
 
 ## Event Handlers
 
@@ -48,7 +57,13 @@ For non-trivial failures (logic bugs, design issues, flaky tests, environment-de
 
 #### status: success
 
-Run `git log ${start-sha}..HEAD --oneline` and summarize the commits pushed during the babysit session. Call `TaskStop`.
+Summarize the session: run `git log ${start-sha}..HEAD --oneline` for the commits pushed while babysitting.
+
+Then branch on the flags parsed from `$ARGUMENTS`:
+
+- **`--reviews`**: hand off to AI-review triage before finishing. See [Reviews Hand-off](#reviews-hand-off).
+- **`--merge`**: don't stop here. Drive the PR to merged. See [Merge Mode](#merge-mode).
+- **neither**: report the summary and call `TaskStop`.
 
 #### conflicts
 
@@ -83,6 +98,52 @@ Report and stop. The watcher has already exited.
 #### max-time-reached
 
 Report the event (include `minutes`) and stop. The watcher has already exited.
+
+## Reviews Hand-off
+
+With `--reviews`, after the first green invoke `pull-request:follow-up --auto <pr-url>` to triage AI-reviewer threads (fix, reply, resolve, looping until the reviewer is satisfied). follow-up calls back into babysit for each post-push CI wait, so let it own the review loop. When it returns:
+
+- If `--merge` is also set, proceed to [Merge Mode](#merge-mode).
+- Otherwise report what was addressed and call `TaskStop`.
+
+Human review threads are out of scope here: follow-up lists them and leaves them for you.
+
+## Merge Mode
+
+With `--merge`, drive the PR to **merged** instead of stopping at green. CI green is the entry condition (you reached the success handler); from here, submit the PR to its merge mechanism and recover from kickouts until it lands. GitHub is the primary platform, so GitHub merges run through `gh` directly. All GitLab merge behavior (merge trains, the correct API endpoint, squash) is delegated to the `gitlab:merge-request` skill, which owns it. No `glab` calls live here.
+
+### Check Preconditions
+
+Confirm the PR can merge on its own. If it's blocked on something you can't resolve, report it and `TaskStop`. Don't bypass:
+
+- Missing **human** approvals (you can't self-approve). If a bot review is the blocker and `--reviews` is set, that path already handled it; otherwise report.
+- Branch protection / permission errors, draft state, or requested changes.
+
+Read merge state per platform: GitHub via `gh pr view --json mergeable,mergeStateStatus,reviewDecision,state`; GitLab via the `gitlab:merge-request` skill.
+
+### Submit
+
+Pick the most automated path the repo allows: merge queue/train when configured, else auto-merge, else a direct merge (valid because CI is already green).
+
+- **GitHub**: `gh pr merge <pr-url> --auto --squash` enables auto-merge or queues the PR when a merge queue exists. If `--auto` is rejected (no auto-merge, no queue), merge directly: `gh pr merge <pr-url> --squash`. Prefer squash, then merge, then rebase per `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
+- **GitLab**: delegate to the `gitlab:merge-request` skill. It owns the merge-train-vs-direct decision and squash handling, and routes merge-train projects through the correct API endpoint.
+
+### Watch and Recover
+
+Poll the PR/MR state on an interval until it merges or is kicked out:
+
+- **Merged** (`state: MERGED` / `merged`) → report the merge and `TaskStop`.
+- **Kicked from the train/queue** (pipeline failed on the merge ref, or it was dropped) → diagnose, recover, and re-submit:
+  - **Rebase / merge conflict** → use the [conflicts](#conflicts) handler (reproduce locally, auto-fix lockfiles, report non-trivial conflicts), push, re-submit.
+  - **CI failure** → use the [status: failing](#status-failing) handler (fix trivial, report non-trivial), producing a new SHA; re-submit.
+- **Still pending** → keep waiting; the queue or auto-merge will act once green.
+
+### Stop Conditions
+
+- **Merged** → success, `TaskStop`.
+- **Max merge attempts** (default 3): guards a kicked-then-refixed oscillation. Report and `TaskStop`.
+- **Unrecoverable**: missing human approval, non-trivial CI failure, non-lockfile conflict, or a permissions/protection error → report and `TaskStop`.
+- **PR closed** → report and `TaskStop`.
 
 ## Gotchas
 

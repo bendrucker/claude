@@ -48,7 +48,7 @@ allowed-tools:
 
 #### Voice
 
-Write plainly. Technical precision is good; marketing is not. Match the author's own voice: a developer explaining the change to a reviewer, not selling it.
+Write plainly. Technical precision is good, marketing is not. Match the author's own voice: a developer explaining the change to a reviewer, not selling it.
 
 - Open with a bare present-tense verb: "Adds", "Fixes", "Changes", "Updates". State the mechanism first, then the motivation
 - Use a concrete noun where one exists. Don't reach for a metaphor when the real name is shorter

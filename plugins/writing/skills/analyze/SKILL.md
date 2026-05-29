@@ -53,7 +53,7 @@ Run with `--help` for all flags. Writes a markdown report to `tmp/trope-analysis
 - Structural pattern audit (the hook's regex patterns, hit counts across sessions)
 - Correction candidates (long-assistant, short-user pairs suggesting prose pushback)
 
-A rule the model uses far more than the user is **kept** even when its lift reads low. Lift is not used for removal decisions because the smoothed user baseline (see methodology) compresses it for any word the user never types, which would flag the model's strongest tells (`delve`, `Perfect`, `robust`) for removal.
+A rule the model uses far more than the user is **kept** even when its lift reads low. Lift is not used for removal decisions because the smoothed user baseline (see methodology) compresses it for any word the user never types, which would flag the model's strongest tells (`delve`, `comprehensive`, `robust`) for removal.
 
 ## Corpora
 

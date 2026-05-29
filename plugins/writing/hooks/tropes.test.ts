@@ -217,7 +217,7 @@ describe("scan", () => {
   });
 
   describe("sycophantic opener", () => {
-    const flag = ["Perfect. That works.", "Excellent! Moving on."];
+    const flag = ["Excellent. That works.", "Excellent! Moving on."];
     const allow = [
       "This was a perfect example of the issue.",
       "An excellent question to consider.",
@@ -429,7 +429,7 @@ describe("scan", () => {
 
   describe("sideEffectOnly scoping", () => {
     const conversational = [
-      { text: "Perfect. That works.", category: "sycophantic opener" },
+      { text: "Excellent. That works.", category: "sycophantic opener" },
       { text: "You're right about that.", category: "sycophantic acknowledgment" },
       { text: "Want me to fix the bug?", category: "permission-seeking" },
       { text: "Would you like me to retry?", category: "hedging close" },
@@ -461,8 +461,9 @@ describe("scan", () => {
 
   describe("marketing verbs (weighted)", () => {
     it("does not flag a single low-weight hit", () => {
+      // enhance is 1.5, below the 3.0 threshold on its own.
       expect(
-        scan("This change simplifies the workflow.").find((m) => m.category === "marketing verbs"),
+        scan("This change enhances the workflow.").find((m) => m.category === "marketing verbs"),
       ).toBeUndefined();
     });
 
@@ -474,8 +475,8 @@ describe("scan", () => {
     });
 
     it("flags when stacked verbs clear the threshold", () => {
-      // empower (2.5) + simplify (0.8) = 3.3, above 3.0.
-      const text = "This release empowers users and simplifies deploys.";
+      // empower (2.5) + streamline (1.5) = 4.0, above 3.0.
+      const text = "This release empowers users and streamlines deploys.";
       expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
     });
 

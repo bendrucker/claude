@@ -4,10 +4,13 @@
 # A context-tier reminder fires when the sum of weighted hits in the
 # introduced text reaches the threshold defined in tropes.ts.
 #
-# Curated against session history by writing:analyze. Removed verbs the user
-# uses as much as the model (enable, transform, optimize, unlock, generalize)
-# and verbs the model rarely produces now (streamline, elevate, enhance). With
-# only two entries the list fires only when both stack; revisit the mechanism
-# if it stays inert.
+# Curated against session history by writing:analyze. Every verb here is one the
+# model writes in deliverables and the user never does. `simplify` was dropped
+# because the user writes it far more than the model (normal engineering
+# vocabulary, not promotional). `enhance` and `streamline` were resurfaced once a
+# larger cross-machine corpus showed the model still produces them. Weights are
+# tuned so any two marketing verbs in one passage clear the threshold; a lone
+# verb does not.
 empower 2.5
-simplify 0.8
+enhance 1.5
+streamline 1.5

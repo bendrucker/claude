@@ -145,9 +145,9 @@ describe("loaded WORDLISTS", () => {
   });
 
   it("loads openers", () => {
-    expect("Perfect.".match(WORDLISTS.openers)).not.toBeNull();
+    expect("Excellent.".match(WORDLISTS.openers)).not.toBeNull();
     expect("Excellent! Moving on.".match(WORDLISTS.openers)).not.toBeNull();
-    expect("this was a perfect example".match(WORDLISTS.openers)).toBeNull();
+    expect("an excellent example here".match(WORDLISTS.openers)).toBeNull();
   });
 
   it("loads marketing verbs as weighted stems", () => {

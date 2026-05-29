@@ -44,9 +44,9 @@ A rule is **kept** when the model uses it strictly more per token than the user 
 - **dead**: fewer than `--min-count` assistant occurrences. The rule rarely fires regardless of distinctiveness.
 - **not distinctive**: the user uses it at least as often per token. The rule would flag the user's own voice.
 
-Removal does **not** use lift. The user baseline is small (often ~10K tokens), so the Laplace smoothing floor (`1/user_total`, ~99 per million) dominates: any word the user never types needs ~500 per million in assistant text just to reach a lift of 5.0. That gate is nearly unreachable for single words, so a pure lift threshold flags the model's strongest surviving tells (`delve`, `Perfect`, `robust`) for removal. The direct rate comparison is smoothing-free and keeps them.
+Removal does **not** use lift. The user baseline is small (often tens of thousands of tokens, even with cross-machine history merged in), so the Laplace smoothing floor (`1/user_total`) dominates: any word the user never types needs a high per-million rate in assistant text just to reach a lift of 5.0. That gate is nearly unreachable for single words, so a pure lift threshold flags the model's strongest surviving tells (`delve`, `comprehensive`, `robust`) for removal. The direct rate comparison is smoothing-free and keeps them.
 
-The audit uses `text_content` (all assistant text, including conversational messages) because wordlist rules fire on all prose surfaces, not just deliverables.
+The audit measures each term in `text_content` (conversational assistant and user text). This is a proxy surface: most wordlist rules fire on deliverables and side-effect inputs, not chat, but the model's chat usage of a term tracks its overall habit closely enough to judge distinctiveness. A consequence: a term both the model and the user say conversationally (`Perfect` as an acknowledgment) reads as not distinctive and is dropped even if it might still open a deliverable.
 
 Because removed single words are no longer in the wordlist, a later audit cannot resurface them (the additions pipeline only mines multi-word n-grams). If the model regresses to a removed word, add it back by hand.
 

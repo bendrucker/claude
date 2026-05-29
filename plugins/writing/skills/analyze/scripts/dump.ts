@@ -5,7 +5,23 @@ export interface TextRow {
 
 export interface DeliverableRow {
   session_id: string;
+  source_file: string | null;
+  source_line: number | null;
+  file_path: string | null;
   text: string;
+}
+
+export interface CorrectiveRow {
+  session_id: string;
+  project: string | null;
+  timestamp: string;
+  user_chars: number;
+  user_text: string;
+  user_source_file: string | null;
+  user_source_line: number | null;
+  matched_term: string;
+  context_chars: number | null;
+  context_snippet: string | null;
 }
 
 export interface CorrectionRow {

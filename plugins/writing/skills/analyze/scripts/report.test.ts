@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { CorrectionRow, ModelSummaryRow } from "./dump";
-import type { FtsAuditRow } from "./report";
+import type { DeliverableAudit } from "./deliverable-audit";
+import type { CorrectionRow, CorrectiveRow, ModelSummaryRow } from "./dump";
+import type { CandidatePhrase, FtsAuditRow } from "./report";
 import { buildRuleHealth, renderReport } from "./report";
+import type { VoiceProfile } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 
 const baseInput = {
@@ -17,101 +19,181 @@ const baseInput = {
   assistantTotalChars: 0,
   deliverableTotalChars: 0,
   userTotalChars: 0,
+  voiceProfile: null,
   ruleHealth: [],
   structuralAudit: [],
-  candidatePhrases: [],
+  candidatePhrases: [] as CandidatePhrase[],
   corrections: [] as CorrectionRow[],
+  corrective: [] as CorrectiveRow[],
 };
 
-describe("buildRuleHealth", () => {
+function chatAudit(entry: string, row: Omit<FtsAuditRow, "term">): Map<string, FtsAuditRow> {
+  return new Map([[entry, { term: entry, ...row }]]);
+}
+
+describe("buildRuleHealth (chat surface)", () => {
   const entries: WordlistEntry[] = [
     { phrase: "let me", source: "openers.txt" },
     { phrase: "missing entry", source: "openers.txt" },
   ];
 
   test("marks a missing audit row as dead (no occurrences)", () => {
-    const result = buildRuleHealth(entries, new Map(), 5);
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: new Map(),
+      deliverableAudit: null,
+      voiceProfile: null,
+      minCount: 5,
+    });
     expect(result[1]?.noData).toBe(true);
     expect(result[1]?.status).toBe("remove");
     expect(result[1]?.removeReason).toBe("dead");
   });
 
-  test("marks an entry with zero counts as dead", () => {
-    const audit = new Map<string, FtsAuditRow>();
-    audit.set("let me", {
-      term: "let me",
-      assistant_count: 0,
-      user_count: 0,
-      assistant_per_m: null,
-      user_per_m: null,
-      lift: null,
-    });
-    const result = buildRuleHealth(entries, audit, 5);
-    expect(result[0]?.noData).toBe(true);
-    expect(result[0]?.status).toBe("remove");
-    expect(result[0]?.removeReason).toBe("dead");
-  });
-
   test("keeps a rule the model uses more than the user", () => {
-    const audit = new Map<string, FtsAuditRow>();
-    audit.set("let me", {
-      term: "let me",
-      assistant_count: 50,
-      user_count: 5,
-      assistant_per_m: 5000,
-      user_per_m: 500,
-      lift: 10,
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: chatAudit("let me", {
+        assistant_count: 50,
+        user_count: 5,
+        assistant_per_m: 5000,
+        user_per_m: 500,
+        lift: 10,
+      }),
+      deliverableAudit: null,
+      voiceProfile: null,
+      minCount: 5,
     });
-    const result = buildRuleHealth(entries, audit, 5);
     expect(result[0]?.status).toBe("keep");
+    expect(result[0]?.surface).toBe("chat");
     expect(result[0]?.removeReason).toBeNull();
     expect(result[0]?.lift).toBeCloseTo(10, 0);
   });
 
   test("keeps a rare-but-distinctive rule even when lift reads low", () => {
-    // The model uses it, the user never does, but the smoothed baseline
-    // compresses lift below the additions threshold. It must still be kept.
-    const audit = new Map<string, FtsAuditRow>();
-    audit.set("let me", {
-      term: "let me",
-      assistant_count: 32,
-      user_count: 0,
-      assistant_per_m: 296.8,
-      user_per_m: 0,
-      lift: 3.0,
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: chatAudit("let me", {
+        assistant_count: 32,
+        user_count: 0,
+        assistant_per_m: 296.8,
+        user_per_m: 0,
+        lift: 3.0,
+      }),
+      deliverableAudit: null,
+      voiceProfile: null,
+      minCount: 5,
     });
-    const result = buildRuleHealth(entries, audit, 5);
     expect(result[0]?.status).toBe("keep");
   });
 
   test("removes a rule the user uses at least as much (not distinctive)", () => {
-    const audit = new Map<string, FtsAuditRow>();
-    audit.set("let me", {
-      term: "let me",
-      assistant_count: 10,
-      user_count: 40,
-      assistant_per_m: 100,
-      user_per_m: 200,
-      lift: 0.5,
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: chatAudit("let me", {
+        assistant_count: 10,
+        user_count: 40,
+        assistant_per_m: 100,
+        user_per_m: 200,
+        lift: 0.5,
+      }),
+      deliverableAudit: null,
+      voiceProfile: null,
+      minCount: 5,
     });
-    const result = buildRuleHealth(entries, audit, 5);
     expect(result[0]?.status).toBe("remove");
     expect(result[0]?.removeReason).toBe("not distinctive");
   });
 
   test("removes a rule below the occurrence floor (dead)", () => {
-    const audit = new Map<string, FtsAuditRow>();
-    audit.set("let me", {
-      term: "let me",
-      assistant_count: 2,
-      user_count: 0,
-      assistant_per_m: 18.5,
-      user_per_m: 0,
-      lift: 0.2,
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: chatAudit("let me", {
+        assistant_count: 2,
+        user_count: 0,
+        assistant_per_m: 18.5,
+        user_per_m: 0,
+        lift: 0.2,
+      }),
+      deliverableAudit: null,
+      voiceProfile: null,
+      minCount: 5,
     });
-    const result = buildRuleHealth(entries, audit, 5);
     expect(result[0]?.status).toBe("remove");
     expect(result[0]?.removeReason).toBe("dead");
+  });
+});
+
+describe("buildRuleHealth (deliverable surface)", () => {
+  const entries: WordlistEntry[] = [{ phrase: "source of truth", source: "flowery-phrases.txt" }];
+
+  const profile: VoiceProfile = {
+    documentCount: 1,
+    totalTokens: 1000,
+    ngrams: { "1": {}, "2": {}, "3": {} },
+    generatedAt: "2026-05-24",
+    sources: ["github"],
+  };
+
+  function deliverableAudit(count: number, perMillion: number): DeliverableAudit {
+    return { totalTokens: 100000, byPhrase: new Map([["source of truth", { count, perMillion }]]) };
+  }
+
+  test("keeps a deliverable tell frequent in deliverables and absent from baseline", () => {
+    // The chat audit would call this dead (0 chat hits). The deliverable audit
+    // sees it 78 times in deliverable prose and never in the voice baseline.
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: chatAudit("source of truth", {
+        assistant_count: 0,
+        user_count: 0,
+        assistant_per_m: 0,
+        user_per_m: 0,
+        lift: null,
+      }),
+      deliverableAudit: deliverableAudit(78, 122.7),
+      voiceProfile: profile,
+      minCount: 5,
+    });
+    expect(result[0]?.surface).toBe("deliverable");
+    expect(result[0]?.status).toBe("keep");
+    expect(result[0]?.modelCount).toBe(78);
+    expect(result[0]?.baselinePerM).toBe(0);
+  });
+
+  test("removes a deliverable tell present in the baseline (not distinctive)", () => {
+    const baselineProfile: VoiceProfile = {
+      ...profile,
+      ngrams: { "1": {}, "2": {}, "3": { "source of truth": 200 } },
+    };
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: new Map(),
+      deliverableAudit: deliverableAudit(78, 122.7),
+      voiceProfile: baselineProfile,
+      minCount: 5,
+    });
+    expect(result[0]?.surface).toBe("deliverable");
+    expect(result[0]?.status).toBe("remove");
+    expect(result[0]?.removeReason).toBe("not distinctive");
+  });
+
+  test("falls back to chat audit when no voice profile is loaded", () => {
+    const result = buildRuleHealth({
+      entries,
+      chatAudit: chatAudit("source of truth", {
+        assistant_count: 0,
+        user_count: 0,
+        assistant_per_m: 0,
+        user_per_m: 0,
+        lift: null,
+      }),
+      deliverableAudit: deliverableAudit(78, 122.7),
+      voiceProfile: null,
+      minCount: 5,
+    });
+    expect(result[0]?.surface).toBe("chat");
+    expect(result[0]?.status).toBe("remove");
   });
 });
 
@@ -133,14 +215,15 @@ describe("renderReport", () => {
       ruleHealth: [
         {
           entry,
-          assistantCount: 5,
-          userCount: 10,
-          assistantPerM: 50,
-          userPerM: 100,
+          surface: "chat",
+          modelCount: 5,
+          modelPerM: 50,
+          baselinePerM: 100,
           lift: 0.5,
           status: "remove",
           removeReason: "not distinctive",
           noData: false,
+          quote: null,
         },
       ],
     });
@@ -161,11 +244,38 @@ describe("renderReport", () => {
           assistantPerM: 80,
           userPerM: 5,
           lift: 16,
+          baselineCount: 0,
+          baselinePerM: 0,
+          quote: null,
         },
       ],
     });
     expect(output).toContain("+ reaching for");
     expect(output).toContain("lift=16.0");
+    expect(output).toContain("baseline=0");
+  });
+
+  test("renders corrective-feedback moments with matched term", () => {
+    const output = renderReport({
+      ...baseInput,
+      corrective: [
+        {
+          session_id: "s1",
+          project: "myproject",
+          timestamp: "2026-05-20T10:01:00Z",
+          user_chars: 40,
+          user_text: "ugh this reads like marketing fluff",
+          user_source_file: "f.jsonl",
+          user_source_line: 12,
+          matched_term: "fluff",
+          context_chars: 300,
+          context_snippet: "the model wrote a flowery paragraph",
+        },
+      ],
+    });
+    expect(output).toContain("## Corrective Feedback");
+    expect(output).toContain("matched `fluff`");
+    expect(output).toContain("reads like marketing fluff");
   });
 
   test("renders correction snippets in their own subsections", () => {
@@ -194,25 +304,27 @@ describe("renderReport", () => {
       ruleHealth: [
         {
           entry: { phrase: "Perfect", source: "openers.txt" },
-          assistantCount: 10,
-          userCount: 2,
-          assistantPerM: 100,
-          userPerM: 20,
+          surface: "chat",
+          modelCount: 10,
+          modelPerM: 100,
+          baselinePerM: 20,
           lift: 5,
           status: "keep",
           removeReason: null,
           noData: false,
+          quote: null,
         },
         {
           entry: { phrase: "tapestry", source: "vocabulary.txt" },
-          assistantCount: 5,
-          userCount: 1,
-          assistantPerM: 50,
-          userPerM: 10,
+          surface: "chat",
+          modelCount: 5,
+          modelPerM: 50,
+          baselinePerM: 10,
           lift: 5,
           status: "keep",
           removeReason: null,
           noData: false,
+          quote: null,
         },
       ],
     });

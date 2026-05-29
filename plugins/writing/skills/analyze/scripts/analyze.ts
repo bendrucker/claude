@@ -3,18 +3,25 @@ import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { cli } from "cleye";
+import { corpusPath, profilePath, resolveDataDir } from "./data-dir";
 import { openSessionDb } from "./db";
+import { auditDeliverableCorpus } from "./deliverable-audit";
 import {
   type CorrectionRow,
+  type CorrectiveRow,
   type DeliverableRow,
   type ModelSummaryRow,
   serializeCorpus,
   type TextRow,
   totalChars,
 } from "./dump";
+import { frustrationRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
-import { buildRuleHealth, type FtsAuditRow, renderReport } from "./report";
+import { findQuote } from "./quote-context";
+import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
 import { auditStructuralPatterns } from "./structural";
+import { loadProfile, phraseProfileStat } from "./voice-profile";
+import type { WordlistEntry } from "./wordlists";
 import { loadWordlists } from "./wordlists";
 
 const argv = cli({
@@ -66,6 +73,21 @@ const argv = cli({
       type: String,
       description: "Wordlists directory (defaults to plugins/writing/wordlists)",
     },
+    dataDir: {
+      type: String,
+      description:
+        "Local data dir for the voice baseline (default: CLAUDE_PLUGIN_DATA or ~/.claude/plugins/data/writing-bendrucker)",
+    },
+    pasteMaxChars: {
+      type: Number,
+      description: "Length ceiling for human-authored user messages (paste filter)",
+      default: 2000,
+    },
+    correctiveLimit: {
+      type: Number,
+      description: "Max corrective-feedback moments to surface",
+      default: 25,
+    },
   },
 });
 
@@ -81,10 +103,14 @@ const dbPath = path.resolve(argv.flags.sessionDb ?? "");
 const wordlistsDir =
   argv.flags.wordlistsDir ?? path.join(import.meta.dirname, "..", "..", "..", "wordlists");
 const outPath = argv.flags.out ?? path.join("tmp", `trope-analysis-${today}.md`);
+const dataDir = resolveDataDir(argv.flags.dataDir);
+const pasteMaxChars = String(argv.flags.pasteMaxChars);
+const correctiveLimit = String(argv.flags.correctiveLimit);
 const baseParams: Record<string, string | null> = {
   after_date: since,
   before_date: until,
   project: projectFilter,
+  paste_max_chars: pasteMaxChars,
 };
 
 await main();
@@ -104,7 +130,22 @@ async function main(): Promise<void> {
   const wordlistEntries = await loadWordlists(wordlistsDir);
   console.error(`Loaded ${wordlistEntries.length} wordlist entries from ${wordlistsDir}`);
 
+  console.error(`Loading voice profile from ${profilePath(dataDir)}`);
+  const voiceProfile = await loadProfile(profilePath(dataDir));
+  if (voiceProfile) {
+    console.error(
+      `Voice baseline: ${voiceProfile.documentCount} documents, ${voiceProfile.totalTokens.toLocaleString()} tokens`,
+    );
+  } else {
+    console.error(
+      `No voice profile found. Run ingest-voice.ts (seed: ${corpusPath(dataDir)}) then voice-profile.ts. Deliverable-surface rules fall back to the chat audit.`,
+    );
+  }
+
   try {
+    console.error("Creating paste filter for the user baseline");
+    await db.execQuery("paste-filter");
+
     console.error("Building FTS indexes");
     await db.execQuery("fts-setup", { ...baseParams, model: modelFilter });
 
@@ -164,19 +205,49 @@ async function main(): Promise<void> {
       minAssistantCount: { 3: 5, 4: 3 },
     });
     const exclusionSet = new Set(wordlistEntries.map((e) => e.phrase));
-    const candidatePhrases = excludePhrases(allLifts, exclusionSet)
+    const candidatePhrases: CandidatePhrase[] = excludePhrases(allLifts, exclusionSet)
       .filter((r) => r.lift >= minLift)
       .filter((r) => (sessionCounts.get(r.phrase) ?? 0) >= minSessions)
-      .map((r) => ({ ...r, sessions: sessionCounts.get(r.phrase) ?? 0 }))
-      .slice(0, topN);
+      .slice(0, topN)
+      .map((r) => {
+        const baseline = voiceProfile
+          ? phraseProfileStat(voiceProfile, r.phrase)
+          : { count: 0, perMillion: 0 };
+        return {
+          ...r,
+          sessions: sessionCounts.get(r.phrase) ?? 0,
+          baselineCount: baseline.count,
+          baselinePerM: baseline.perMillion,
+          quote: findQuote(r.phrase, deliverableRows),
+        };
+      });
+
+    console.error("Auditing deliverable corpus for wordlist rules");
+    const deliverableAudit = auditDeliverableCorpus(wordlistEntries, deliverableRows);
 
     console.error("Fetching correction candidates");
     const corrections = await db.runQuery<CorrectionRow>("correction-candidates", baseParams);
 
+    console.error("Fetching corrective feedback (frustration lexicon)");
+    const corrective = await db.runQuery<CorrectiveRow>("corrective-feedback", {
+      ...baseParams,
+      lexicon: frustrationRegex(),
+      max_user_chars: "400",
+      limit: correctiveLimit,
+    });
+
     console.error("Auditing structural patterns against all model-generated text");
     const structuralAudit = auditStructuralPatterns(allModelText, userRows);
 
-    const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minCount);
+    const ruleHealth = buildRuleHealth({
+      entries: wordlistEntries,
+      chatAudit: auditByTerm,
+      deliverableAudit,
+      voiceProfile,
+      minCount,
+      findQuote: (entry: WordlistEntry, surface) =>
+        surface === "deliverable" ? findQuote(entry.phrase, deliverableRows) : null,
+    });
 
     const report = renderReport({
       generatedAt: today,
@@ -191,10 +262,12 @@ async function main(): Promise<void> {
       assistantTotalChars: totalChars(assistantRows),
       deliverableTotalChars: totalChars(deliverableRows),
       userTotalChars: totalChars(userRows),
+      voiceProfile,
       ruleHealth,
       structuralAudit,
       candidatePhrases,
       corrections,
+      corrective,
     });
 
     mkdirSync(path.dirname(outPath), { recursive: true });

@@ -21,6 +21,7 @@ function env() {
     ...process.env,
     CLAUDE_PLUGIN_DATA: tmpDir,
     CLAUDE_PROJECTS_DIR: fixturesDir,
+    CLAUDE_SESSION_IMPORTS_DIR: path.join(tmpDir, "imports"),
   };
 }
 

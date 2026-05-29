@@ -2,6 +2,7 @@ WITH scoped AS (
   SELECT role, model, text
   FROM text_content
   WHERE date_filter(timestamp, getvariable('after_date'), getvariable('before_date'))
+    AND host_filter(host, getvariable('host'))
     AND (role = 'assistant' OR (NOT is_subagent AND NOT is_system))
 ),
 counts AS (

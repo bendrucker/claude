@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS raw (
+  host            VARCHAR,
   session_id      VARCHAR,
   type            VARCHAR,
   project_path    VARCHAR,
@@ -16,5 +17,6 @@ CREATE TABLE IF NOT EXISTS raw (
 );
 
 CREATE TABLE IF NOT EXISTS meta (
+  host            VARCHAR,
   last_import     TIMESTAMP
 );

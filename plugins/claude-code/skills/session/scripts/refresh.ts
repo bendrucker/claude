@@ -1,10 +1,8 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
-import * as path from "node:path";
-import { ensureIndex, getDb } from "./db";
+import { ensureIndex, getDataDir, getDb, sessionDbPath } from "./db";
 
-const dataDir =
-  process.env.CLAUDE_PLUGIN_DATA || path.join(process.env.TMPDIR || "/tmp", "claude-session");
+const dataDir = getDataDir();
 mkdirSync(dataDir, { recursive: true });
 
 const refresh = process.argv.includes("--refresh");
@@ -16,4 +14,4 @@ try {
   db.close();
 }
 
-process.stdout.write(`${path.join(dataDir, "session.duckdb")}\n`);
+process.stdout.write(`${sessionDbPath(dataDir)}\n`);

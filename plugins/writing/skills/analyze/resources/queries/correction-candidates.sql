@@ -1,5 +1,6 @@
 WITH per_message AS (
   SELECT
+    tc.host,
     tc.session_id,
     s.project_path AS session_project_path,
     tc.source_file,
@@ -9,12 +10,12 @@ WITH per_message AS (
     string_agg(tc.text, E'\n' ORDER BY tc.source_line) AS message_text,
     SUM(length(tc.text)) AS chars
   FROM text_content tc
-  JOIN sessions s USING (session_id)
+  JOIN sessions s USING (host, session_id)
   WHERE date_filter(tc.timestamp, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(s.project_path, getvariable('project'))
     AND NOT tc.is_subagent
     AND (tc.role = 'assistant' OR NOT tc.is_system)
-  GROUP BY tc.session_id, s.project_path, tc.source_file, tc.source_line, tc.timestamp, tc.role
+  GROUP BY tc.host, tc.session_id, s.project_path, tc.source_file, tc.source_line, tc.timestamp, tc.role
 ),
 paired AS (
   SELECT
@@ -26,7 +27,7 @@ paired AS (
     LEAD(source_file) OVER w AS next_source_file,
     LEAD(source_line) OVER w AS next_source_line
   FROM per_message
-  WINDOW w AS (PARTITION BY session_id ORDER BY timestamp, source_file, source_line)
+  WINDOW w AS (PARTITION BY host, session_id ORDER BY timestamp, source_file, source_line)
 ),
 candidates AS (
   SELECT

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { exec } from "node:child_process";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 import type {
   PostToolUseHookInput,
@@ -88,20 +89,53 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   return [...files];
 }
 
-export async function runBiomeCheck(filePath: string): Promise<string | null> {
+// Biome derives its project root from the working directory. Running from an
+// ancestor of a nested git worktree makes Biome discover that worktree's own
+// root biome.json and reject the pair as a nested root configuration, so it
+// never lints the file. Running from inside the file's own working tree scopes
+// Biome to the config that governs the file and avoids the collision. Files
+// outside any git repository fall back to Biome's default resolution.
+async function biomeWorkingTree(filePath: string): Promise<string | undefined> {
   try {
-    await execAsync(`biome check "${filePath}"`);
+    const { stdout } = await execAsync("git rev-parse --show-toplevel", {
+      cwd: dirname(filePath),
+    });
+    return stdout.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// A non-zero exit can mean Biome could not resolve its configuration rather than
+// that the file has lint findings. That is an environment problem, not a code
+// issue, so the hook reports nothing instead of blocking on it.
+export function isConfigurationError(output: string): boolean {
+  return (
+    output.includes("Found a nested root configuration") ||
+    output.includes("configuration resulted in errors")
+  );
+}
+
+export async function runBiomeCheck(filePath: string): Promise<string | null> {
+  const cwd = await biomeWorkingTree(filePath);
+  try {
+    await execAsync(`biome check "${filePath}"`, cwd ? { cwd } : undefined);
     return null;
   } catch (error) {
     const execError = error as { stdout?: string; stderr?: string };
     const output = (execError.stdout || "") + (execError.stderr || "");
+    if (isConfigurationError(output)) {
+      console.error(`[biome] Skipping ${filePath}: could not resolve Biome configuration.`);
+      return null;
+    }
     return output.trim() || null;
   }
 }
 
 export async function runBiomeFix(filePath: string): Promise<void> {
+  const cwd = await biomeWorkingTree(filePath);
   try {
-    await execAsync(`biome check --write "${filePath}"`);
+    await execAsync(`biome check --write "${filePath}"`, cwd ? { cwd } : undefined);
   } catch {
     // biome check --write exits non-zero if there are unfixable issues
   }

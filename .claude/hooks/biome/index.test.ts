@@ -8,6 +8,7 @@ import type {
   StopHookInput,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
+  isConfigurationError,
   parseTranscript,
   processInput,
   processPostToolUse,
@@ -113,6 +114,29 @@ describe("biome hook", () => {
       const result = await runBiomeCheck(filePath);
       expect(result).not.toBeNull();
       expect(result).toContain("noDuplicateObjectKeys");
+    });
+  });
+
+  describe("isConfigurationError", () => {
+    it("detects a nested root configuration error", () => {
+      expect(
+        isConfigurationError(
+          "× Found a nested root configuration, but there's already a root configuration.",
+        ),
+      ).toBe(true);
+    });
+
+    it("detects a generic configuration error", () => {
+      expect(
+        isConfigurationError("× Biome exited because the configuration resulted in errors."),
+      ).toBe(true);
+    });
+
+    it("does not treat lint findings as configuration errors", () => {
+      expect(isConfigurationError("lint/suspicious/noDuplicateObjectKeys")).toBe(false);
+      expect(isConfigurationError("Formatter would have printed the following content")).toBe(
+        false,
+      );
     });
   });
 

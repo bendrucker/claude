@@ -4,12 +4,12 @@ import { rm } from "node:fs/promises";
 import * as path from "node:path";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
-const queryScript = path.join(import.meta.dirname, "query.ts");
+const refreshScript = path.join(import.meta.dirname, "refresh.ts");
 
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "query-integration-"));
+  tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "refresh-integration-"));
 });
 
 afterEach(async () => {
@@ -25,7 +25,7 @@ function env() {
 }
 
 async function run(...args: string[]) {
-  const proc = Bun.spawn(["bun", queryScript, ...args], {
+  const proc = Bun.spawn(["bun", refreshScript, ...args], {
     env: env(),
     stdout: "pipe",
     stderr: "pipe",
@@ -38,28 +38,24 @@ async function run(...args: string[]) {
   return { stdout, stderr, exitCode };
 }
 
-describe("query.ts", () => {
-  it("lists sessions", async () => {
-    const { stdout, exitCode } = await run("SELECT session_id FROM sessions ORDER BY session_id");
+describe("refresh.ts", () => {
+  it("prints the database path to stdout", async () => {
+    const { stdout, exitCode } = await run();
     expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
-  });
-
-  it("runs named queries", async () => {
-    const { stdout, exitCode } = await run("stats");
-    expect(exitCode).toBe(0);
-    expect(stdout).toMatchSnapshot();
+    expect(stdout.trim()).toEndWith("session.duckdb");
+    expect(stdout.trim()).toStartWith(tmpDir);
   });
 
   it("is idempotent across repeated runs", async () => {
-    const first = await run("SELECT COUNT(*) as n FROM sessions");
-    const second = await run("SELECT COUNT(*) as n FROM sessions");
+    const first = await run();
+    const second = await run();
     expect(first.stdout).toBe(second.stdout);
+    expect(second.exitCode).toBe(0);
   });
 
-  it("exits with error when no argument is provided", async () => {
-    const { stderr, exitCode } = await run();
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain("Usage:");
+  it("accepts --refresh flag", async () => {
+    const { stdout, exitCode } = await run("--refresh");
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toEndWith("session.duckdb");
   });
 });

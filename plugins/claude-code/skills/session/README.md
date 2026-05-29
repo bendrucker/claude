@@ -5,8 +5,8 @@ Search and analyze Claude Code conversation history using a DuckDB index over JS
 ## Contents
 
 - `SKILL.md` - Skill definition with schema docs and usage examples
-- `scripts/query.ts` - CLI entry point for running queries
-- `scripts/db.ts` - DuckDB index and query logic
+- `scripts/refresh.ts` - CLI entry point; refreshes the index and prints the DB path
+- `scripts/db.ts` - DuckDB index, schema, and query logic
 - `resources/schema/` - Table and view definitions (ordered, run on startup)
 - `resources/queries/` - Parameterized SQL for built-in queries
 - `resources/import.sql` - JSONL parsing and flattening

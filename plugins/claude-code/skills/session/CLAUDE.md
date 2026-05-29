@@ -36,4 +36,4 @@ DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` because `=` binds t
 ### Callers
 
 - `db.ts`: orchestrates migration, schema, refresh, import, views.
-- `query.ts`: CLI entry point.
+- `refresh.ts`: CLI entry point. Runs `ensureIndex`, prints DB path to stdout.

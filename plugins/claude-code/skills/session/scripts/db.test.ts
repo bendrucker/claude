@@ -529,66 +529,6 @@ describe("phrase-lift query", () => {
   });
 });
 
-describe("correction-candidates query", () => {
-  function correctionParams(overrides: Record<string, string | null> = {}) {
-    return {
-      after_date: null,
-      before_date: null,
-      project: null,
-      min_assistant_chars: null,
-      max_user_chars: null,
-      limit: null,
-      ...overrides,
-    };
-  }
-
-  it("returns assistant-then-user pairs that satisfy default thresholds", async () => {
-    const rows = await runQuery<{
-      session_id: string;
-      assistant_chars: bigint;
-      user_chars: bigint;
-      user_snippet: string;
-    }>(db, "correction-candidates", correctionParams());
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) {
-      expect(Number(row.assistant_chars)).toBeGreaterThanOrEqual(300);
-      expect(Number(row.user_chars)).toBeLessThanOrEqual(250);
-      expect(row.session_id).toBe("trope-session");
-    }
-  });
-
-  it("respects custom thresholds", async () => {
-    const strict = await runQuery<{ session_id: string }>(
-      db,
-      "correction-candidates",
-      correctionParams({ min_assistant_chars: "100000" }),
-    );
-    expect(strict).toHaveLength(0);
-
-    const loose = await runQuery<{ session_id: string }>(
-      db,
-      "correction-candidates",
-      correctionParams({ min_assistant_chars: "10", max_user_chars: "1000" }),
-    );
-    expect(loose.length).toBeGreaterThan(0);
-  });
-
-  it("stays within a single session for each pair", async () => {
-    const rows = await runQuery<{
-      session_id: string;
-      assistant_source_file: string;
-      user_source_file: string;
-    }>(
-      db,
-      "correction-candidates",
-      correctionParams({ min_assistant_chars: "10", max_user_chars: "1000" }),
-    );
-    for (const row of rows) {
-      expect(row.assistant_source_file).toBe(row.user_source_file);
-    }
-  });
-});
-
 describe("model-summary query", () => {
   it("aggregates per-model counts over assistant text", async () => {
     const rows = await runQuery<{

@@ -224,6 +224,12 @@ export const PATTERNS: PatternDef[] = [
   },
   {
     tier: "context",
+    category: "filler",
+    test: /\b(?:it's worth noting that|importantly|interestingly|it should be noted|as mentioned|in terms of)\b/gi,
+    message: (matched) => `"${matched}" is filler. Cut it.`,
+  },
+  {
+    tier: "context",
     category: "I understand",
     test: /\bi\s+understand\b/gi,
     sideEffectOnly: true,

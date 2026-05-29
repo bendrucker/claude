@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { collectFiles, scanFiles, shouldSkip, toGlob } from "./scan";
@@ -36,17 +37,17 @@ describe("toGlob", () => {
 describe("collectFiles and scanFiles", () => {
   let dir: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), "writing-scan-"));
-    writeFileSync(join(dir, "dirty.md"), "We delve into a robust tapestry of ideas.\n");
-    writeFileSync(join(dir, "clean.md"), "The function reads input and writes output.\n");
-    writeFileSync(join(dir, "code.ts"), "const serves = 1; // serves as nothing\n");
+    await Bun.write(join(dir, "dirty.md"), "We delve into a robust tapestry of ideas.\n");
+    await Bun.write(join(dir, "clean.md"), "The function reads input and writes output.\n");
+    await Bun.write(join(dir, "code.ts"), "const serves = 1; // serves as nothing\n");
     mkdirSync(join(dir, "node_modules", "pkg"), { recursive: true });
-    writeFileSync(join(dir, "node_modules", "pkg", "readme.md"), "We delve into the tapestry.\n");
+    await Bun.write(join(dir, "node_modules", "pkg", "readme.md"), "We delve into the tapestry.\n");
   });
 
-  afterAll(() => {
-    rmSync(dir, { recursive: true, force: true });
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
   });
 
   it("collects prose files and skips non-prose and node_modules", async () => {

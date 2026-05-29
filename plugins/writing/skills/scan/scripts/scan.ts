@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { statSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
@@ -18,14 +18,14 @@ export function shouldSkip(path: string): boolean {
 }
 
 export function toGlob(input: string): { cwd: string; pattern: string } {
-  let isDir = false;
+  // readdirSync throws ENOTDIR on a file and ENOENT on a missing path, so a
+  // successful call is the directory signal. (statSync is disallowed by biome.)
   try {
-    isDir = statSync(input).isDirectory();
+    readdirSync(input);
+    return { cwd: input, pattern: "**/*" };
   } catch {
-    isDir = false;
+    return { cwd: ".", pattern: input };
   }
-  if (isDir) return { cwd: input, pattern: "**/*" };
-  return { cwd: ".", pattern: input };
 }
 
 export async function collectFiles(input: string): Promise<string[]> {

@@ -418,6 +418,24 @@ describe("scan", () => {
     });
   });
 
+  describe("filler", () => {
+    it("flags: 'it's worth noting that'", () => {
+      expect(
+        firstByTier(scan("It's worth noting that the cache is cold."), "context")?.category,
+      ).toBe("filler");
+    });
+
+    it("flags: 'in terms of'", () => {
+      expect(firstByTier(scan("In terms of latency, it improved."), "context")?.category).toBe(
+        "filler",
+      );
+    });
+
+    it("allows prose without filler markers", () => {
+      expect(scan("The cache starts cold.").find((m) => m.category === "filler")).toBeUndefined();
+    });
+  });
+
   describe("I understand", () => {
     it("flags: 'I understand the issue'", () => {
       expect(firstByTier(scan("I understand the issue."), "context")?.category).toBe(

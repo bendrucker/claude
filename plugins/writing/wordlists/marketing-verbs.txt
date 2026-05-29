@@ -4,21 +4,10 @@
 # A context-tier reminder fires when the sum of weighted hits in the
 # introduced text reaches the threshold defined in tropes.ts.
 #
-# Promotional and vague verbs (high weight).
+# Curated against session history by writing:analyze. Removed verbs the user
+# uses as much as the model (enable, transform, optimize, unlock, generalize)
+# and verbs the model rarely produces now (streamline, elevate, enhance). With
+# only two entries the list fires only when both stack; revisit the mechanism
+# if it stays inert.
 empower 2.5
-streamline 2.5
-generalize 2.5
-#
-# Figurative motion verbs (medium-high weight).
-unlock 2.0
-elevate 2.0
-#
-# Borderline figurative; commonly legitimate but worth counting.
-transform 1.5
-enhance 1.5
-optimize 1.2
-#
-# Often legitimate technical usage; low weight so they accumulate only
-# when stacked with stronger entries.
-enable 0.8
 simplify 0.8

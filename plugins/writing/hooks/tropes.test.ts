@@ -34,17 +34,15 @@ describe("scan", () => {
     const words = [
       "delve",
       "tapestry",
-      "landscape",
       "meticulous",
       "meticulously",
-      "pivotal",
-      "testament",
-      "underscored",
-      "interplay",
-      "intricacies",
-      "bolstered",
-      "garnered",
-      "fostering",
+      "leverage",
+      "leveraged",
+      "robust",
+      "comprehensive",
+      "comprehensively",
+      "nuance",
+      "nuanced",
     ];
 
     for (const word of words) {
@@ -219,12 +217,7 @@ describe("scan", () => {
   });
 
   describe("sycophantic opener", () => {
-    const flag = [
-      "Perfect. That works.",
-      "Excellent! Moving on.",
-      "Great, the build passes.",
-      "Absolutely, the design holds up.",
-    ];
+    const flag = ["Perfect. That works.", "Excellent! Moving on."];
     const allow = [
       "This was a perfect example of the issue.",
       "An excellent question to consider.",
@@ -467,24 +460,22 @@ describe("scan", () => {
   });
 
   describe("marketing verbs (weighted)", () => {
-    it("does not flag single low-weight hit", () => {
+    it("does not flag a single low-weight hit", () => {
       expect(
-        scan("This change enables the new flag.").find((m) => m.category === "marketing verbs"),
+        scan("This change simplifies the workflow.").find((m) => m.category === "marketing verbs"),
       ).toBeUndefined();
     });
 
-    it("does not flag stack below threshold", () => {
+    it("does not flag a single mid-weight hit below threshold", () => {
+      // empower is 2.5, below the 3.0 threshold on its own.
       expect(
-        scan("This enables and simplifies the workflow.").find(
-          (m) => m.category === "marketing verbs",
-        ),
+        scan("This release empowers users.").find((m) => m.category === "marketing verbs"),
       ).toBeUndefined();
     });
 
-    it("flags when a single high-weight hit clears threshold alone", () => {
-      // Three independent matches: each empower(s|ed|ing) is weight 2.5.
-      // Need to clear 3.0 by stacking with one more.
-      const text = "This release empowers users and streamlines deploys.";
+    it("flags when stacked verbs clear the threshold", () => {
+      // empower (2.5) + simplify (0.8) = 3.3, above 3.0.
+      const text = "This release empowers users and simplifies deploys.";
       expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
     });
 

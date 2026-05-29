@@ -135,13 +135,13 @@ describe("weightedStemHits", () => {
 describe("loaded WORDLISTS", () => {
   it("loads vocabulary as stemmed matcher", () => {
     expect(WORDLISTS.vocabulary("we delve into the data").count).toBeGreaterThan(0);
-    expect(WORDLISTS.vocabulary("the myriad options").count).toBeGreaterThan(0);
+    expect(WORDLISTS.vocabulary("a robust solution").count).toBeGreaterThan(0);
   });
 
   it("matches inflected vocabulary via stemming", () => {
     expect(WORDLISTS.vocabulary("done meticulously").count).toBeGreaterThan(0);
-    expect(WORDLISTS.vocabulary("she garnered support").count).toBeGreaterThan(0);
-    expect(WORDLISTS.vocabulary("by fostering growth").count).toBeGreaterThan(0);
+    expect(WORDLISTS.vocabulary("she leveraged the data").count).toBeGreaterThan(0);
+    expect(WORDLISTS.vocabulary("a nuanced take").count).toBeGreaterThan(0);
   });
 
   it("loads openers", () => {

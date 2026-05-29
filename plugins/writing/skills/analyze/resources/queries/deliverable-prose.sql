@@ -9,6 +9,9 @@ WITH hook_excluded AS (
 write_prose AS (
   SELECT
     ci.session_id,
+    ci.source_file,
+    ci.source_line,
+    (ci.data->>'$.input.file_path') AS file_path,
     (ci.data->>'$.input.content') AS text
   FROM content_items ci
   JOIN sessions s USING (host, session_id)
@@ -26,6 +29,9 @@ write_prose AS (
 edit_prose AS (
   SELECT
     ci.session_id,
+    ci.source_file,
+    ci.source_line,
+    (ci.data->>'$.input.file_path') AS file_path,
     (ci.data->>'$.input.new_string') AS text
   FROM content_items ci
   JOIN sessions s USING (host, session_id)
@@ -43,6 +49,9 @@ edit_prose AS (
 bash_prose AS (
   SELECT
     ci.session_id,
+    ci.source_file,
+    ci.source_line,
+    NULL AS file_path,
     COALESCE(
       NULLIF(regexp_extract((ci.data->>'$.input.command'), '<<''?\w+''?\n([\s\S]+)\n\w+', 1), ''),
       NULLIF(regexp_extract((ci.data->>'$.input.command'), '(?:-m|--(?:body|message|description|title))\s+"([^"]+)"', 1), ''),
@@ -61,18 +70,18 @@ bash_prose AS (
     AND project_filter(s.project_path, getvariable('project'))
 )
 
-SELECT session_id, text
+SELECT session_id, source_file, source_line, file_path, text
 FROM write_prose
 WHERE text IS NOT NULL AND length(trim(text)) >= 30
 
 UNION ALL
 
-SELECT session_id, text
+SELECT session_id, source_file, source_line, file_path, text
 FROM edit_prose
 WHERE text IS NOT NULL AND length(trim(text)) >= 30
 
 UNION ALL
 
-SELECT session_id, text
+SELECT session_id, source_file, source_line, file_path, text
 FROM bash_prose
 WHERE text IS NOT NULL AND length(trim(text)) >= 30;

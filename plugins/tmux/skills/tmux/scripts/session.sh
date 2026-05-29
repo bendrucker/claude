@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
 MAX_TITLE=48
 
 trunc() {
@@ -18,7 +20,7 @@ target="${1:-}"
 current_window=""
 if [ -z "$target" ]; then
   [ -z "${TMUX_PANE:-}" ] && { echo 'no session target' >&2; exit 1; }
-  info=$(tmux display-message -t "$TMUX_PANE" -p "#{session_name}${TAB}#{window_index}" 2>/dev/null) || { echo 'session lookup failed' >&2; exit 1; }
+  info=$(tmux display-message -t "$TMUX_PANE" -p "#{session_name}${TAB}#{window_index}" 2>/dev/null) || lookup_failed session
   IFS=$'\t' read -r target current_window <<< "$info"
 fi
 

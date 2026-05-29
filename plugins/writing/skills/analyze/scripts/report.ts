@@ -298,7 +298,8 @@ function fmtLift(value: number | null): string {
 
 function ruleTypeLabel(source: string): string {
   if (source === "openers.txt") return "opener";
-  if (source === "marketing-verbs.txt") return "weighted";
+  if (source === "marketing-verbs.txt" || source === "soft-phrasing.txt") return "weighted";
+  if (source === "flowery-phrases.txt") return "phrase";
   return "vocabulary";
 }
 

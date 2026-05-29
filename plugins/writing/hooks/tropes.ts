@@ -1,5 +1,11 @@
 import { isProseFile } from "./markdown";
-import { type Hits, type StemmedWeight, WORDLISTS, weightedStemHits } from "./wordlists";
+import {
+  type Hits,
+  type StemmedWeight,
+  stemmedPhraseHits,
+  WORDLISTS,
+  weightedStemHits,
+} from "./wordlists";
 
 export type PatternTier = "deny" | "context";
 
@@ -136,6 +142,14 @@ export const PATTERNS: PatternDef[] = [
   },
   {
     tier: "context",
+    category: "flowery phrasing",
+    test: (text) => stemmedPhraseHits(text, WORDLISTS.floweryPhrases),
+    fileOnly: true,
+    message: (matched) =>
+      `"${matched}" is stock phrasing the model reaches for. State the mechanism plainly.`,
+  },
+  {
+    tier: "context",
     category: "parallelism",
     test: /\bnot (?:just|only) .{1,50}, but (?:also )?/gi,
     message: () =>
@@ -218,6 +232,7 @@ export const PATTERNS: PatternDef[] = [
 ];
 
 const MARKETING_VERB_THRESHOLD = 3.0;
+const SOFT_PHRASING_THRESHOLD = 3.0;
 
 const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
   {
@@ -227,6 +242,15 @@ const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
     threshold: MARKETING_VERB_THRESHOLD,
     message: (examples) =>
       `Marketing verbs stack up (${examples.join(", ")}). Describe concretely what changed instead of promotional framing.`,
+  },
+  {
+    tier: "context",
+    category: "soft phrasing",
+    entries: WORDLISTS.softPhrasing,
+    threshold: SOFT_PHRASING_THRESHOLD,
+    fileOnly: true,
+    message: (examples) =>
+      `Soft phrasing piles up (${examples.join(", ")}). These read as filler. Describe what the code does plainly.`,
   },
 ];
 

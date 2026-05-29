@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import {
   compilePlainWordlist,
+  compileStemmedPhrases,
   compileStemmedWordlist,
   compileWeightedStems,
+  stemmedPhraseHits,
   WORDLISTS,
   weightedStemHits,
 } from "./wordlists";
@@ -132,6 +134,35 @@ describe("weightedStemHits", () => {
   });
 });
 
+describe("compileStemmedPhrases / stemmedPhraseHits", () => {
+  const phrases = compileStemmedPhrases("source of truth\nescape hatch\nfail loudly\n");
+
+  it("matches the exact phrase", () => {
+    expect(stemmedPhraseHits("a single source of truth here", phrases).count).toBe(1);
+  });
+
+  it("matches inflected, hyphenated, and cased variants via stemming", () => {
+    expect(stemmedPhraseHits("the canonical sources of truth", phrases).count).toBe(1);
+    expect(stemmedPhraseHits("stored as source-of-truth metadata", phrases).count).toBe(1);
+    expect(stemmedPhraseHits("treat it as the Source Of Truth", phrases).count).toBe(1);
+    expect(stemmedPhraseHits("the test fails loudly", phrases).count).toBe(1);
+  });
+
+  it("requires contiguous order, not scattered words", () => {
+    expect(stemmedPhraseHits("the truth about the data source", phrases).count).toBe(0);
+    expect(stemmedPhraseHits("a hatch you can escape through", phrases).count).toBe(0);
+  });
+
+  it("reports the original phrase as the sample", () => {
+    expect(stemmedPhraseHits("added an escape hatch", phrases).sample).toBe("escape hatch");
+  });
+
+  it("ignores comments and blank lines", () => {
+    const compiled = compileStemmedPhrases("# header\n\nsource of truth\n");
+    expect(compiled.length).toBe(1);
+  });
+});
+
 describe("loaded WORDLISTS", () => {
   it("loads vocabulary as stemmed matcher", () => {
     expect(WORDLISTS.vocabulary("we delve into the data").count).toBeGreaterThan(0);
@@ -154,5 +185,16 @@ describe("loaded WORDLISTS", () => {
     expect(WORDLISTS.marketingVerbs.length).toBeGreaterThan(0);
     const result = weightedStemHits("this empowers users", WORDLISTS.marketingVerbs);
     expect(result.totalWeight).toBeGreaterThan(2);
+  });
+
+  it("loads soft phrasing as weighted stems", () => {
+    expect(WORDLISTS.softPhrasing.length).toBeGreaterThan(0);
+    const result = weightedStemHits("this runs cleanly and exits cleanly", WORDLISTS.softPhrasing);
+    expect(result.totalWeight).toBeGreaterThan(2);
+  });
+
+  it("loads flowery phrases as stemmed token sequences", () => {
+    expect(WORDLISTS.floweryPhrases.map((p) => p.original)).toContain("source of truth");
+    expect(WORDLISTS.floweryPhrases.every((p) => p.stems.length > 0)).toBe(true);
   });
 });

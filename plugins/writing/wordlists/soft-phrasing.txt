@@ -1,0 +1,19 @@
+# Soft phrasing tells, weighted by how strongly they read as filler.
+# Format: <word> <weight>
+# Matching uses a Porter stemmer, so inflected forms are caught automatically.
+# A context-tier reminder fires when the sum of weighted hits in the introduced
+# text reaches the threshold defined in tropes.ts, so a lone benign use never
+# fires.
+#
+# Added from the hand-written PR-body baseline (writing:analyze): the model
+# writes `cleanly` far more than the user (0 of the user's 209 pre-AI PRs) and
+# it has legitimate uses ("strips cleanly"), so it is weighted to fire only when
+# it stacks rather than on a single occurrence.
+#
+# `owns` and `carries` were considered and rejected: the verb forms are absent
+# from the user's PRs, but the stem `own` also matches the possessive "its own"
+# (14 uses in the baseline), so the bare stem would flag the user's own voice.
+# The audit agrees (not distinctive). The ownership metaphor ("code owns its X")
+# is a real deliverable tell but needs a precise matcher, deferred to the
+# deliverable-aware audit work.
+cleanly 1.5

@@ -48,6 +48,8 @@ Removal does **not** use lift. The user baseline is small (often tens of thousan
 
 The audit measures each term in `text_content` (conversational assistant and user text). This is a proxy surface: most wordlist rules fire on deliverables and side-effect inputs, not chat, but the model's chat usage of a term tracks its overall habit closely enough to judge distinctiveness. A consequence: a term both the model and the user say conversationally (`Perfect` as an acknowledgment) reads as not distinctive and is dropped even if it might still open a deliverable.
 
+The proxy breaks entirely for tells that live *only* in deliverables and never in chat. The flowery phrases (`flowery-phrases.txt`) and the soft group (`soft-phrasing.txt`) were curated from PR-body evidence, so the chat-surface audit reports them as `dead` (zero chat hits) or as `not distinctive`. Those verdicts are not authoritative for deliverable-surface rules. Auditing wordlist health against the deliverable corpus directly (not just chat) is the fix, tracked with the rest of the deliverable-aware analyze work.
+
 Because removed single words are no longer in the wordlist, a later audit cannot resurface them (the additions pipeline only mines multi-word n-grams). If the model regresses to a removed word, add it back by hand.
 
 ## Surface Candidate Phrases

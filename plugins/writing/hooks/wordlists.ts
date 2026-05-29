@@ -86,6 +86,50 @@ export function compileWeightedStems(content: string): StemmedWeight[] {
   return entries;
 }
 
+export type StemmedPhrase = { stems: string[]; original: string };
+
+export function compileStemmedPhrases(content: string): StemmedPhrase[] {
+  const phrases: StemmedPhrase[] = [];
+  for (const line of parseLines(content)) {
+    const stems = (line.toLowerCase().match(WORD_TOKEN) ?? []).map((word) => stemmer(word));
+    if (stems.length > 0) phrases.push({ stems, original: line });
+  }
+  return phrases;
+}
+
+// Count contiguous occurrences of `needle` within `haystack` (non-overlapping).
+function countSubsequence(haystack: string[], needle: string[]): number {
+  if (needle.length === 0) return 0;
+  let count = 0;
+  for (let i = 0; i + needle.length <= haystack.length; i++) {
+    let matched = true;
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) {
+      count++;
+      i += needle.length - 1;
+    }
+  }
+  return count;
+}
+
+export function stemmedPhraseHits(text: string, phrases: StemmedPhrase[]): Hits {
+  const tokens = (text.toLowerCase().match(WORD_TOKEN) ?? []).map((word) => stemmer(word));
+  let count = 0;
+  let sample = "";
+  for (const phrase of phrases) {
+    const occurrences = countSubsequence(tokens, phrase.stems);
+    if (occurrences === 0) continue;
+    count += occurrences;
+    if (!sample) sample = phrase.original;
+  }
+  return { count, sample };
+}
+
 export function weightedStemHits(text: string, entries: StemmedWeight[]): WeightedHits {
   const words = text.match(WORD_TOKEN) ?? [];
   const stemCounts = new Map<string, number>();
@@ -115,13 +159,17 @@ export type LoadedWordlists = {
   vocabulary: (text: string) => Hits;
   openers: RegExp;
   marketingVerbs: StemmedWeight[];
+  softPhrasing: StemmedWeight[];
+  floweryPhrases: StemmedPhrase[];
 };
 
 async function load(): Promise<LoadedWordlists> {
-  const [vocabularySrc, openersSrc, marketingSrc] = await Promise.all([
+  const [vocabularySrc, openersSrc, marketingSrc, softSrc, flowerySrc] = await Promise.all([
     readWordlist("vocabulary.txt"),
     readWordlist("openers.txt"),
     readWordlist("marketing-verbs.txt"),
+    readWordlist("soft-phrasing.txt"),
+    readWordlist("flowery-phrases.txt"),
   ]);
 
   const vocabulary = compileStemmedWordlist(vocabularySrc);
@@ -134,8 +182,10 @@ async function load(): Promise<LoadedWordlists> {
   if (!openers) throw new Error("openers.txt produced no entries");
 
   const marketingVerbs = compileWeightedStems(marketingSrc);
+  const softPhrasing = compileWeightedStems(softSrc);
+  const floweryPhrases = compileStemmedPhrases(flowerySrc);
 
-  return { vocabulary, openers, marketingVerbs };
+  return { vocabulary, openers, marketingVerbs, softPhrasing, floweryPhrases };
 }
 
 export const WORDLISTS: LoadedWordlists = await load();

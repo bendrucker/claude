@@ -486,6 +486,70 @@ describe("scan", () => {
       expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
     });
   });
+
+  describe("flowery phrasing", () => {
+    const flag = [
+      "this keeps a single source of truth",
+      "the canonical sources of truth live here",
+      "stored as source-of-truth metadata",
+      "treat it as the Source Of Truth",
+      "added an escape hatch for power users",
+      "two escape hatches remain",
+      "the module is fully self-sufficient",
+      "the fixture is self sufficient",
+      "the assertion fails loudly on drift",
+      "it failed loudly during CI",
+    ];
+    const allow = [
+      "the truth about the data source is unclear",
+      "a hatch you can escape through",
+      "loudly proclaimed the failure",
+    ];
+    for (const text of flag) {
+      it(`flags ${JSON.stringify(text)}`, () => {
+        expect(firstByTier(scan(text), "context")?.category).toBe("flowery phrasing");
+      });
+    }
+    for (const text of allow) {
+      it(`allows ${JSON.stringify(text)}`, () => {
+        expect(scan(text).find((m) => m.category === "flowery phrasing")).toBeUndefined();
+      });
+    }
+    it("does not fire in non-prose file context", () => {
+      expect(
+        scan("a single source of truth", "module.ts", "file").find(
+          (m) => m.category === "flowery phrasing",
+        ),
+      ).toBeUndefined();
+    });
+    it("fires in prose file context", () => {
+      expect(
+        firstByTier(scan("a single source of truth", "README.md", "file"), "context")?.category,
+      ).toBe("flowery phrasing");
+    });
+  });
+
+  describe("soft phrasing (weighted)", () => {
+    it("does not flag a lone soft word", () => {
+      // cleanly is 1.5, below the 3.0 threshold on its own.
+      expect(
+        scan("the fixtures strip cleanly").find((m) => m.category === "soft phrasing"),
+      ).toBeUndefined();
+    });
+
+    it("flags when soft words stack", () => {
+      // Two occurrences of cleanly (1.5 each) = 3.0, at the threshold.
+      const text = "the migration runs cleanly and the tests strip cleanly";
+      expect(firstByTier(scan(text), "context")?.category).toBe("soft phrasing");
+    });
+
+    it("does not fire in non-prose file context", () => {
+      const text = "the migration runs cleanly and the tests strip cleanly";
+      expect(
+        scan(text, "module.ts", "file").find((m) => m.category === "soft phrasing"),
+      ).toBeUndefined();
+    });
+  });
 });
 
 describe("firstByTier", () => {

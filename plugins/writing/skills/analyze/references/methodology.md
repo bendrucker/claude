@@ -54,8 +54,8 @@ Because removed single words are no longer in the wordlist, a later audit cannot
 
 Pulls two corpora:
 
-- **All model-generated text**: conversational assistant text from `text-export` (filtered by `--model`) combined with deliverable prose from `deliverable-prose.sql`. The `text_content` view only captures `type='text'` content items (conversational output), not `type='tool_use'` (Write/Edit/Bash tool inputs). The deliverable-prose query fills this gap. The combined corpus is used for n-gram candidates. The structural pattern audit runs against conversational text only.
-- **Human-only user text** (`text-export` with `role=user`, filtered): the baseline corpus for lift calculation. Excludes system-injected content that arrives as user-role messages: skill injections, context compaction summaries, task notifications, system reminders, and CLAUDE.md context.
+- **Deliverable prose** (`deliverable-prose.sql`): the model's file writes (`.md`/`.txt`/`.rst`/`.adoc`) and Bash commit/PR/MR bodies. This is the n-gram candidate corpus, because these are the surfaces the hook scans. Conversational assistant text is deliberately excluded: the hook never sees the model's chat, so mining it floods the candidate list with narration (`now let me`, `let me check`) at enormous lift that no rule can act on. Scoping to deliverables surfaces only phrasing that could become an enforceable rule.
+- **Human-only user text** (`text-export` with `role=user`, filtered): the baseline for lift. The human doesn't write via Write/Edit, so this is their chat voice; lift therefore contrasts the model's deliverable phrasing against the human's natural voice. Excludes system-injected user-role content: skill injections, context compaction summaries, task notifications, system reminders, and CLAUDE.md context.
 
 The n-gram code in `ngram.ts` strips markdown/code artifacts, URLs, table lines, headers, and code-shaped identifiers from both corpora.
 
@@ -65,7 +65,7 @@ Minimum assistant counts per n-gram size (3-grams: 5, 4-grams: 3) are hardcoded 
 
 #### Deliverable prose
 
-The `deliverable-prose.sql` query extracts text from Write/Edit to prose files (`.md`, `.txt`, `.rst`, `.adoc`) and Bash commands with `--body`/`--message`/`--description`/`--title`/`-m`. It excludes paths the hook skips (memory, plan, wordlist files). For Bash, it extracts heredoc content and quoted flag values via regex. This corpus is reported in the summary for sizing context but is not used for n-gram candidates.
+The `deliverable-prose.sql` query extracts text from Write/Edit to prose files (`.md`, `.txt`, `.rst`, `.adoc`) and Bash commands with `--body`/`--message`/`--description`/`--title`/`-m`. It excludes paths the hook skips (memory, plan, wordlist files). For Bash, it extracts heredoc content and quoted flag values via regex. This is the corpus the n-gram candidate miner runs on (see above); the all-assistant `text-export` corpus is still pulled for the structural audit and summary sizing.
 
 #### User text filtering
 

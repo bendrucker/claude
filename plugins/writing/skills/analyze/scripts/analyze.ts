@@ -141,15 +141,22 @@ async function main(): Promise<void> {
     );
 
     const allModelText = [...assistantRows, ...deliverableRows];
-    const totalSessions = new Set(allModelText.map((r) => r.session_id)).size;
     const ngramSizes = [3, 4];
+    // Mine candidates from deliverable prose only (file writes and Bash
+    // commit/PR/MR bodies), not conversational assistant text. The hook scans
+    // deliverables and side-effect inputs, never the model's chat, so chat
+    // narration ("now let me", "let me check") would otherwise dominate the
+    // candidate list with phrases the hook can never act on.
     const { stats: assistantCorpus, sessionSpread: sessionCounts } = processRows(
-      allModelText,
+      deliverableRows,
       ngramSizes,
     );
     const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
-    const minSessions = Math.max(3, Math.round(totalSessions * 0.05));
-    console.error(`Session threshold: ${minSessions} (${totalSessions} sessions in window)`);
+    const candidateSessions = new Set(deliverableRows.map((r) => r.session_id)).size;
+    const minSessions = Math.max(3, Math.round(candidateSessions * 0.05));
+    console.error(
+      `Session threshold: ${minSessions} (${candidateSessions} deliverable sessions in window)`,
+    );
 
     const allLifts = computeLift({
       assistant: assistantCorpus,

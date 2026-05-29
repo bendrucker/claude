@@ -45,6 +45,18 @@ allowed-tools:
   - Design decisions and judgment calls: use "I" so it's clear you made the call ("I chose X over Y because…", "I kept the old endpoint to avoid a breaking change")
 - If the PR is directly motivated by an issue, reference it at the end of the opening summary (`Closes #N`, `Fixes #N`, or just `#N` if not closing). Related issues mentioned for context belong in a `## References` section. Never drop issue refs at the bottom of the body without a section
 - **Wrap all code identifiers with backticks**: function names, class names, file paths, endpoints, status codes, etc.
+
+#### Voice
+
+Write plainly. Technical precision is good; marketing is not. Match the author's own voice: a developer explaining the change to a reviewer, not selling it.
+
+- Open with a bare present-tense verb: "Adds", "Fixes", "Changes", "Updates". State the mechanism first, then the motivation
+- Use a concrete noun where one exists. Don't reach for a metaphor when the real name is shorter
+- Length tracks substance. A one-line change gets a one-line body. Don't pad
+- Hedge and name rejected alternatives honestly ("I doubt anyone has hit this", "I chose X over Y because…", "unrelated, required to run tests")
+- Avoid model flourishes: "source of truth", "fail loudly", "escape hatch", "wires up", "cleanly". The antithesis construction ("X instead of Y") is usually padding
+- Load the `writing` skill for the full set of tropes to avoid
+
 - Use `##` sections for larger changes. See [`sections.md`](sections.md) for detailed guidance on:
   - `## Issue` - Root cause analysis and issue linking
   - `## Changes` - High-level description of changes

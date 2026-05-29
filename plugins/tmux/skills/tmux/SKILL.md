@@ -16,7 +16,7 @@ hooks:
       hooks:
         - type: command
           command: |
-            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
+            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow"}}'
 ---
 
 # tmux

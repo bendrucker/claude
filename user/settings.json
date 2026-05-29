@@ -171,7 +171,8 @@
     "network": {
       "allowLocalBinding": true,
       "allowUnixSockets": [
-        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
+        "~/.tmux"
       ]
     },
     "filesystem": {

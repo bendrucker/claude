@@ -2,12 +2,17 @@ import { describe, expect, it } from "bun:test";
 import { firstByTier, type PatternMatch, scan, stripCode } from "./tropes";
 
 describe("stripCode", () => {
-  it("removes fenced code blocks", () => {
-    expect(stripCode("Before\n```\ndelve into code\n```\nAfter")).toBe("Before\n\nAfter");
+  it("replaces fenced code blocks with their newline count", () => {
+    expect(stripCode("Before\n```\ndelve into code\n```\nAfter")).toBe("Before\n\n\n\nAfter");
   });
 
-  it("removes inline code", () => {
-    expect(stripCode("The `delve` function is useful")).toBe("The  function is useful");
+  it("replaces inline code with equal-width spaces", () => {
+    expect(stripCode("The `delve` function is useful")).toBe("The         function is useful");
+  });
+
+  it("preserves line count for fenced blocks", () => {
+    const input = "line1\n```\ncode line\ncode line\n```\nline6";
+    expect(stripCode(input).split("\n")).toHaveLength(input.split("\n").length);
   });
 
   it("preserves non-code text", () => {

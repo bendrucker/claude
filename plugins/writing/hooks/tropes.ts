@@ -27,7 +27,7 @@ export type PatternDef = {
   sideEffectOnly?: boolean;
 };
 
-type WeightedPatternGroup = {
+export type WeightedPatternGroup = {
   tier: PatternTier;
   category: string;
   entries: StemmedWeight[];
@@ -234,7 +234,7 @@ export const PATTERNS: PatternDef[] = [
 const MARKETING_VERB_THRESHOLD = 3.0;
 const SOFT_PHRASING_THRESHOLD = 3.0;
 
-const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
+export const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
   {
     tier: "context",
     category: "marketing verbs",
@@ -254,8 +254,20 @@ const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
   },
 ];
 
+function countNewlines(text: string): number {
+  let count = 0;
+  for (const char of text) {
+    if (char === "\n") count++;
+  }
+  return count;
+}
+
+// Replace code with whitespace that preserves both line and column offsets, so a
+// match index in the stripped text maps back to the same position in the source.
 export function stripCode(text: string): string {
-  return text.replace(FENCED_CODE_BLOCK, "").replace(INLINE_CODE, "");
+  return text
+    .replace(FENCED_CODE_BLOCK, (block) => "\n".repeat(countNewlines(block)))
+    .replace(INLINE_CODE, (code) => " ".repeat(code.length));
 }
 
 function patternHits(stripped: string, def: PatternDef): Hits {

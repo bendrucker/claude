@@ -7,7 +7,7 @@ Stick to active voice. Don't use passive ("X was added"). Rewrite so something i
 - Self-evident description of what the PR does: PR-as-subject is fine ("Adds retry logic") or subject-elided in bullets ("Added retry logic", "Extracted the helper")
 - Design decisions and judgment calls: use "I" so it's clear you made the call ("I chose X over Y because…")
 
-Keep the prose plain. Technical terms are fine. Marketing phrasing and model flourishes ("source of truth", "fail loudly", "escape hatch", "cleanly") are not. Load the `writing` skill for the full set of tropes to avoid.
+Keep the prose plain. Technical terms are fine. Marketing phrasing and model flourishes (`source of truth`, `fail loudly`, `escape hatch`, `cleanly`) are not. Load the `writing` skill for the full set of tropes to avoid.
 
 ## Issue
 

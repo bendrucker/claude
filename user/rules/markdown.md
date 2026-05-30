@@ -8,7 +8,7 @@ paths:
 
 ## Prose
 
-Load the `writing` skill for tone and style rules (AI trope avoidance, em dashes, vocabulary, voice). Follow those rules rather than duplicating them here.
+Load the `writing:writing` skill for tone and style rules (AI trope avoidance, em dashes, vocabulary, voice). Follow those rules rather than duplicating them here.
 
 ## Structure
 

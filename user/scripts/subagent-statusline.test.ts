@@ -74,12 +74,7 @@ describe("renderTask", () => {
   });
 
   test("meta combines elapsed and tokens", () => {
-    const out = renderTask(
-      { id: "a", name: "x", startTime: 0, tokenCount: 1500 },
-      null,
-      now,
-      null,
-    );
+    const out = renderTask({ id: "a", name: "x", startTime: 0, tokenCount: 1500 }, null, now, null);
     expect(strip(out.content)).toContain("· 1m 5s · 1.5k");
   });
 

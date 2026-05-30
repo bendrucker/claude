@@ -30,6 +30,7 @@ Customizations (skills, hooks, wordlists, agents, rules, permissions) cost token
 - When executing build commands, output to `/dev/null` to avoid creating binaries.
 - Store temporary files in `tmp/` directory.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
+- Run `git push` (and other git commands that need SSH signing) as the top-level Bash command, not nested inside `cd … && git push` or a wrapper script. `excludedCommands` (`git:*`) matches only the top-level command, so nested git inherits the sandbox profile and cannot reach the Secretive SSH-signing socket.
 
 ### Bash `!` Escaping Bug
 

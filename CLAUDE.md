@@ -167,7 +167,7 @@ This disables the installed user settings and loads `user/settings.json` from th
 
 ## Verification
 
-Run `scripts/check-marketplace.sh` to verify all plugin directories are listed in `marketplace.json`. This check runs in CI and should pass before merging.
+Run `bun scripts/check-marketplace.ts` to verify all plugin directories are listed in `marketplace.json`. This check runs in CI and should pass before merging.
 
 ### Skill Linting
 

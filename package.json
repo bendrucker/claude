@@ -23,8 +23,7 @@
     "plugins/gitlab",
     "plugins/vscode",
     "packages/validate",
-    "packages/launch",
-    "packages/claude-tool",
+    "packages/marketplace",
     "plugins/tmux",
     "plugins/mac",
     "plugins/x-callback-url",
@@ -50,6 +49,7 @@
     "gray-matter": "^4.0.3"
   },
   "dependencies": {
+    "@bendrucker/claude-marketplace": "workspace:*",
     "typescript": "^5.9.3",
     "url-pattern": "^1.0.3"
   },

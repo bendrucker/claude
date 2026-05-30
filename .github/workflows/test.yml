@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Test packages
+        run: bun test packages/
+
       - name: Validate settings
         run: bun packages/validate/settings.ts
 
@@ -80,7 +83,7 @@ jobs:
         run: bun packages/validate/marketplace.ts
 
       - name: Check marketplace completeness
-        run: ./scripts/check-marketplace.sh
+        run: bun scripts/check-marketplace.ts
 
       - name: Check MCP hook matchers
         run: bun scripts/check-mcp-matchers.ts
@@ -99,7 +102,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! output=$(./scripts/check-enabled-plugins.sh 2>&1); then
+          if ! output=$(bun scripts/check-enabled-plugins.ts 2>&1); then
             gh pr comment ${{ github.event.pull_request.number }} --body "⚠️ **Warning:** Some marketplace plugins are not enabled in \`.claude/settings.json\`:
 
           \`\`\`

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { loadPlugins } from "@bendrucker/claude-marketplace";
 import { Glob } from "bun";
 
 const rootDir = join(import.meta.dirname, "..");
@@ -14,8 +14,8 @@ async function getPluginDirs(): Promise<string[]> {
     return args.map((arg) => resolve(arg));
   }
 
-  const entries = await readdir(pluginsDir, { withFileTypes: true });
-  return entries.filter((e) => e.isDirectory()).map((e) => join(pluginsDir, e.name));
+  const plugins = await loadPlugins();
+  return plugins.flatMap((p) => (p.dir ? [p.dir] : []));
 }
 
 async function checkPlugin(pluginDir: string): Promise<string[]> {

@@ -1,10 +1,8 @@
 #!/usr/bin/env bun
 
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { loadPlugins } from "@bendrucker/claude-marketplace";
 import { Glob } from "bun";
-
-const pluginsDir = join(import.meta.dirname, "..", "plugins");
 
 async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
   const deps = new Set<string>();
@@ -58,16 +56,15 @@ async function getImportedPackages(pluginDir: string): Promise<Set<string>> {
 
 let failed = false;
 
-for (const entry of await readdir(pluginsDir, { withFileTypes: true })) {
-  if (!entry.isDirectory()) continue;
+for (const plugin of await loadPlugins()) {
+  if (!plugin.dir) continue;
 
-  const pluginDir = join(pluginsDir, entry.name);
-  const declared = await getPluginDeps(pluginDir);
-  const imported = await getImportedPackages(pluginDir);
+  const declared = await getPluginDeps(plugin.dir);
+  const imported = await getImportedPackages(plugin.dir);
 
   for (const pkg of imported) {
     if (!declared.has(pkg) && !declared.has(`@types/${pkg}`)) {
-      console.error(`${entry.name}: missing dependency "${pkg}"`);
+      console.error(`${plugin.name}: missing dependency "${pkg}"`);
       failed = true;
     }
   }

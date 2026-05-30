@@ -302,6 +302,17 @@ describe("formatThreads", () => {
     expect(output).toContain("Showing threads started by @DouweM");
   });
 
+  it("shows the bot header for botsOnly, not the reviewer-opener header", () => {
+    const output = formatThreads([], 10, {
+      ...baseOptions,
+      role: "reviewer",
+      viewer: "DouweM",
+      botsOnly: true,
+    });
+    expect(output).toContain("Showing threads opened by AI review bots");
+    expect(output).not.toContain("Showing threads started by");
+  });
+
   it("groups threads by file", () => {
     const threads = [
       makeThread({ path: "src/a.ts", line: 10 }),

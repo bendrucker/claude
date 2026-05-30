@@ -139,13 +139,15 @@ export function findLastReviewDate(reviews: Review[], viewer: string, role: Role
 export function formatThreads(
   threads: Thread[],
   totalCount: number,
-  options: { title: string; role: Role; viewer: string },
+  options: { title: string; role: Role; viewer: string; botsOnly?: boolean },
 ): string {
   const lines: string[] = [];
   lines.push(`# ${options.title}`);
   lines.push("");
   lines.push(`${threads.length} unresolved of ${totalCount} total threads`);
-  if (options.role === "reviewer") {
+  if (options.botsOnly) {
+    lines.push("Showing threads opened by AI review bots");
+  } else if (options.role === "reviewer") {
     lines.push(`Showing threads started by @${options.viewer}`);
   }
   lines.push("");
@@ -338,6 +340,7 @@ async function main(): Promise<void> {
     title: prTitle,
     role,
     viewer,
+    botsOnly: argv.flags.botsOnly,
   });
 
   console.log(output);

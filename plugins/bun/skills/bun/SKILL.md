@@ -1,7 +1,6 @@
 ---
 name: bun
 description: Bun runtime patterns. Use when running bun commands, working with package.json/bun.lock, writing TypeScript scripts under Bun, or developing Claude Code plugins.
-user-invocable: false
 ---
 
 # Bun

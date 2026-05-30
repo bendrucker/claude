@@ -1,6 +1,6 @@
 ---
 name: gitlab:ci
-description: Working with GitLab CI/CD pipelines and jobs. Use when viewing pipelines, debugging jobs, or validating CI configuration.
+description: Authoring and validating GitLab CI configuration. Use when editing `.gitlab-ci.yml`, structuring pipeline stages and jobs, or running `glab ci lint`. For pipeline/job failure investigation, use gitlab:ci-monitor.
 ---
 # GitLab CI/CD
 

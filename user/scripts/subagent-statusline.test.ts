@@ -85,12 +85,7 @@ describe("renderTask", () => {
   });
 
   test("truncates wide-character text within the column budget", () => {
-    const out = renderTask(
-      { id: "a", description: "日本語のテスト説明文がとても長い" },
-      12,
-      now,
-      null,
-    );
+    const out = renderTask({ id: "a", description: "🚀".repeat(10) }, 12, now, null);
     expect(Bun.stringWidth(out.content)).toBeLessThanOrEqual(12);
     expect(strip(out.content)).toContain("…");
   });

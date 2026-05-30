@@ -16,195 +16,29 @@ The [`user/`](user/) directory contains user-level Claude Code configuration tha
 
 ## Curation
 
-Every customization (skill, hook, wordlist entry, agent, rule, permission) costs tokens on every session that touches it. Adding is cheap, accumulation is silent, and removal has no natural trigger. Without one, the configuration only grows, and sessions pay tokens for things that may no longer matter.
-
-Before adding a customization, define how it gets removed:
-
-- What evidence will show it's earning its cost?
-- What evidence will show it isn't?
-- Where does that evidence surface?
-
-Detectors of model behavior need particular care. Models drift and rules lose value. Pair detection with a path to evolve or retire.
-
-## Plugin Architecture
-
-Each plugin in `plugins/` contains:
-- `.claude-plugin/plugin.json`: Plugin metadata
-- `skills/`: Skill definitions with `SKILL.md` and reference files
-- `hooks/`: Optional hook definitions (`hooks.json`)
-- `commands/`: Optional slash commands
-- `agents/`: Optional agent definitions
-
-When creating or modifying skills, load the `claude-code:skill` skill for authoring best practices, structure conventions, and content features.
-
-### Naming
-
-The plugin name forms a namespace for its contents (e.g., `gitlab:ci-monitor`). Commands and agents are auto-namespaced by the plugin system — the filename becomes the qualified name (e.g., `ci-monitor.md` in the `gitlab` plugin becomes `gitlab:ci-monitor`). Skills are auto-prefixed with `plugin-name:` when the frontmatter `name` doesn't already start with that prefix. Including the prefix explicitly is optional but harmless (avoids double-prefixing).
-
-Anti-stuttering applies to the part after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right. Run `bun run skill-lint` to catch namespace mismatches and stuttering.
-
-### MCP Tool Naming
-
-MCP tools appear with three naming patterns depending on how the server is connected:
-
-| Pattern | Format | Example |
-|---------|--------|---------|
-| Local | `mcp__<server>__<tool>` | `mcp__linear__create_issue` |
-| Plugin | `mcp__plugin_<pluginName>_<server>__<tool>` | `mcp__plugin_linear_linear__create_issue` |
-| Claude AI | `mcp__claude_ai_<DisplayName>__<tool>` | `mcp__claude_ai_Linear__save_issue` |
-
-Claude AI display names differ from server names (e.g., `Linear` not `linear`) and cannot be derived programmatically. Tool names may also differ between variants — Linear uses `save_issue` instead of `create_issue`/`update_issue`. Known mappings:
-
-| Server | Display Name | Local Tool | Claude AI Tool |
-|--------|-------------|------------|----------------|
-| `linear` | `Linear` | `create_issue` | `save_issue` |
-| `linear` | `Linear` | `update_issue` | `save_issue` |
-
-Hook matchers must include all three patterns for matched tools. Skill `allowed-tools` needs the `mcp__claude_ai_<Name>` prefix. Run `bun scripts/check-mcp-matchers.ts` to validate hook matchers include all variants.
-
-### Plugin READMEs
-
-Each plugin should have a `README.md` with consistent sections:
-
-- **Title**: `# Plugin Name` with a one-line description
-- **Contents**: List what the plugin provides (skills, hooks, agents, commands)
-- **Testing**: How to run tests (if the plugin has tests)
-
-Do not include installation instructions or skill activation details—the README is an index, not documentation. Users can read the skill files directly for activation patterns.
-
-### Plugin Metadata
-
-Plugin `settings.json` only supports `agent` and `subagentStatusLine` keys. Don't create schema-only placeholder files. `plugin.json` supports an optional `"$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json"` for editor autocomplete, and `displayName` for human-readable names in the UI.
-
-### Dependencies
-
-The root `package.json` contains shared tooling (typescript) and dependencies used across multiple plugins (e.g., `url-pattern`). Plugin-specific dependencies belong in their own `package.json`:
-
-- Create `plugins/<name>/package.json` for plugin-specific dependencies
-- Add the plugin to the root `workspaces` array
-- Run `bun install` to link the workspace
-
-Avoid collecting all dependencies in the root package.json. Each plugin should be self-contained where practical.
-
-Plugins must not import from outside their own directory. No cross-plugin imports, no reaching into `packages/` or root-level modules via relative paths. If two plugins need shared code, extract it to an npm workspace package and declare the dependency in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.
-
-### Bun
-
-Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing dependencies on first run, eliminating the need to run `bun install` before executing scripts. This simplifies hook execution since hooks run in isolated contexts where `node_modules` may not be readily available.
-
-### Lockfile Conflicts
-
-When resolving `bun.lock` conflicts, regenerate from scratch:
-
-1. Delete the lockfile: `rm bun.lock`
-2. Run `bun install` to generate a fresh lockfile
-
-Unlike npm's `package-lock.json`, bun populates integrity hashes for all platforms from the registry, even for packages not downloaded locally. Regenerating from scratch is safe and avoids stale or empty hashes. Do **not** use `git checkout origin/main -- bun.lock && bun install` — this produces empty integrity hashes for platform-specific packages (e.g., `@img/sharp-libvips-linux-x64`), breaking CI on Linux.
-
-### Terminal Colors
-
-Use ANSI colors (0-15) in scripts that produce terminal output. These are remapped by the terminal theme (Catppuccin), so they adapt to both light and dark mode. Avoid 256-color or truecolor escapes for foreground text.
-
-### Scripts
-
-When writing scripts (hooks, skill CLIs, etc.) that accept arguments:
-
-- **Argument parsing**: Use [cleye](https://github.com/privatenumber/cleye) for type-safe argument parsing with automatic `--help` generation
-- **Table output**: Use the `table` package for formatted terminal table output. Do not use `markdown-table` or similar GFM-oriented packages — script output is displayed in a terminal, not rendered as markdown.
-- **Ancestor paths**: Use `join(import.meta.dirname, "..")` to resolve parent directories. Avoid `dirname()` on a dirname—explicit `".."` is clearer.
+Every customization (skill, hook, wordlist entry, agent, rule, permission) costs tokens on every session that touches it. Adding is cheap, accumulation is silent, and removal has no natural trigger. Before adding one, define how it gets removed: what evidence shows it's earning its cost, what evidence shows it isn't, and where that evidence surfaces. Detectors of model behavior need particular care: models drift and rules lose value, so pair detection with a path to evolve or retire.
 
 ## Rules
 
-The `user/rules/` directory contains rule files that auto-inject based on file extension matching via `paths` frontmatter. Rules are symlinked to `~/.claude/rules/` alongside the rest of `user/`.
+Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-injects when you touch matching files (via `paths` frontmatter), so it stays out of this always-on file:
 
-Use rules for language/file-type guidance that Claude should always have when working with matching files (e.g., Go testing patterns, Python type hints). Use skills for workflow-specific knowledge that requires explicit activation (e.g., Linear issue management, Things task creation).
+- [`plugins.md`](.claude/rules/plugins.md) (`plugins/**`): plugin architecture, naming, MCP tool naming, READMEs, metadata, dependencies
+- [`scripts.md`](.claude/rules/scripts.md) (`**/*.ts`): Bun runtime, script conventions, terminal colors, sandbox/nested-command pattern
+- [`hooks.md`](.claude/rules/hooks.md) (`**/hooks.json`, `**/hooks/**`): hook guidance, quoting, MCP matcher validation
+- [`settings.md`](.claude/rules/settings.md) (`**/settings*.json`): permission paths, sandbox and `excludedCommands`
+- [`testing.md`](.claude/rules/testing.md) (test and workflow files): testing conventions, CI structure
+- [`lockfile.md`](.claude/rules/lockfile.md) (`bun.lock`, `**/package.json`): lockfile conflict resolution
 
-## Hooks
-
-See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. This repository includes a Biome PostToolUse hook (`.claude/hooks/biome/`) that runs after file edits to check for lint errors.
-
-Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Matcher fields are not shell commands and should not be quoted. Run `bun scripts/check-hook-quoting.ts` to validate.
-
-## Testing
-
-Plugins use `bun test` for tests. Run all tests with `bun test` or filter by plugin with `bun test plugins/<name>`.
-
-After making changes to plugin scripts, run them directly to verify they work end-to-end, not just via unit tests. For example, after editing `plugins/mac/scripts/jxa.ts`, run `bun plugins/mac/scripts/jxa.ts <app> <script>` with real arguments to confirm the CLI works. Unit tests alone may miss integration issues like argument parsing failures that only surface at runtime.
-
-### CI Structure
-
-Tests run per-plugin in the CI matrix for:
-- **Parallelization**: Integration tests can take seconds; running in parallel across plugins is faster
-- **Clear feedback**: Failed tests clearly indicate which plugin has the issue
-
-Root-level tests (e.g., `hooks/`) run in a dedicated job since they're not part of any plugin.
-
-### Conventions
-
-- **`bun test` runs all unit tests**: Bun auto-discovers `*.test.ts` files. Integration tests (`*.integration.ts`) are not auto-discovered and can be run by passing paths explicitly (e.g., `bun test plugins/<name>/tests/file.integration.ts`).
-- **No `.js` imports in TypeScript**: Import from `./module` not `./module.js`. The bundler/runtime handles resolution.
-- **Prefer skills over agents**: Skills are invocable via the Skill tool. Agents require the Task tool. If something should be directly invocable, make it a skill.
-
-### Local Plugin Testing
-
-To test a plugin end-to-end without publishing, use `--plugin-dir` with `--setting-sources local` to isolate from user/project settings:
-
-```bash
-claude --plugin-dir ./plugins/<name> --setting-sources local
-```
-
-This loads only the specified plugin directory, bypassing marketplace-installed versions. Use this workflow to verify skills, hooks, and scripts work correctly before committing.
-
-### Testing User Settings
-
-To test changes to `user/settings.json` before installing:
-
-```bash
-./dev.sh
-```
-
-This disables the installed user settings and loads `user/settings.json` from the working copy instead. Any additional arguments are passed to `claude`.
+`user/rules/` (note: under `user/`, not `.claude/`) holds rules that apply across all repos and get symlinked to `~/.claude/rules/`. Use those for language/file-type guidance Claude should always have. Use skills for workflow-specific knowledge that requires explicit activation.
 
 ## Verification
 
-Run `scripts/check-marketplace.sh` to verify all plugin directories are listed in `marketplace.json`. This check runs in CI and should pass before merging.
-
-### Skill Linting
-
-Skills are validated with `bun run skill-lint`:
-
-```bash
-bun run skill-lint "plugins/<name>/skills/*"
-```
-
-This validates SKILL.md frontmatter (name, description) and checks reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
+- `scripts/check-marketplace.sh`: verifies all plugin directories are listed in `marketplace.json`. Runs in CI.
+- `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 
 ## Workflow
 
 - The `user/` directory is symlinked to `~/.claude/`. New files are immediately available.
 - Plugin changes take effect immediately in new Claude sessions.
-
-## Settings
-
-User-level settings live in `user/settings.json` (plugins, permissions, sandbox). Project-level settings live in `.claude/settings.json` (biome hook). See the [settings documentation](https://docs.anthropic.com/en/docs/claude-code/settings) for available options.
-
-### Permission Paths
-
-Permission patterns starting with `/` are relative to the settings file, not absolute filesystem paths. Use `//` for absolute paths:
-
-- `Edit(tmp/**)` → `<cwd>/tmp/**` (relative to current directory)
-- `Edit(//tmp/**)` → `/tmp/**` (absolute)
-- `Edit(~/.config/**)` → home directory (tilde expansion works)
-
-### Sandbox and Nested Commands
-
-`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. The convention is a per-plugin PreToolUse hook scoped to the wrapping `bun ${CLAUDE_PLUGIN_ROOT}/scripts/...:*` matcher that emits `dangerouslyDisableSandbox: true`. See [`plugins/things/hooks/`](plugins/things/hooks/) and [`plugins/x-callback-url/hooks/`](plugins/x-callback-url/hooks/) for canonical examples:
-
-```json
-{
-  "matcher": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)",
-  "hooks": [
-    { "type": "command", "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts\"" }
-  ]
-}
-```
+- To test a plugin in isolation: `claude --plugin-dir ./plugins/<name> --setting-sources local`.
+- To test `user/settings.json` before installing: `./dev.sh` (any extra args pass through to `claude`).

@@ -126,6 +126,10 @@ describe("isSandboxBlockedHandoff", () => {
     expect(isSandboxBlockedHandoff("kLSApplicationNotFoundErr (-10810)")).toBe(true);
   });
 
+  test("matches bare -10673 code", () => {
+    expect(isSandboxBlockedHandoff("NSOSStatusErrorDomain error -10673")).toBe(true);
+  });
+
   test("matches LSOpenURLsWithRole line on its own", () => {
     expect(isSandboxBlockedHandoff("LSOpenURLsWithRole failed")).toBe(true);
   });
@@ -141,5 +145,10 @@ describe("isSandboxBlockedHandoff", () => {
   test("does not match -10810 embedded in a larger number", () => {
     expect(isSandboxBlockedHandoff("some unrelated number 999-108100 here")).toBe(false);
     expect(isSandboxBlockedHandoff("error -108101 something else")).toBe(false);
+  });
+
+  test("does not match -10673 embedded in a larger number", () => {
+    expect(isSandboxBlockedHandoff("some unrelated number 999-106730 here")).toBe(false);
+    expect(isSandboxBlockedHandoff("error -106731 something else")).toBe(false);
   });
 });

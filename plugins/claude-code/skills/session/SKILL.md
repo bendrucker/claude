@@ -1,6 +1,6 @@
 ---
 name: claude-code:session
-description: Introspect on your own Claude Code usage and history (session ID, duration, tokens consumed, tool usage patterns, time per project, recent activity summaries, or searching past conversations). Use whenever the user asks about their Claude Code activity ("what's my session ID?", "how many tokens today?", "what did I work on this week?", "find that conversation where I set up X", "am I overusing Bash?"). Do NOT use for general codebase search, git log queries, or arbitrary databases.
+description: Query Claude Code session history via a DuckDB index over `~/.claude/projects/**/*.jsonl`. Use when the user asks about Claude Code activity ("how many tokens today?", "what did I work on this week?"), or when you would otherwise read, grep, or jq session transcripts directly from `~/.claude/projects/`. Do NOT use for general codebase search, git log queries, or arbitrary databases.
 allowed-tools:
   - Bash
   - Read

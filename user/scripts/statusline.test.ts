@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
 import {
   buildStatusLine,
   dialColor,
@@ -10,31 +9,113 @@ import {
   type WorktreeData,
 } from "./statusline";
 
-// Strip ANSI SGR and OSC 8 sequences, matching the golden-fixture comparison:
-// styleText uses attribute-specific resets (\x1b[39m) where bash uses \x1b[0m,
-// so raw bytes differ but the visible status line must match exactly.
+// Strip ANSI SGR and OSC 8 sequences so unit assertions read against the visible
+// glyphs rather than the escape wrappers.
 function strip(s: string): string {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping terminal escapes
   return s.replace(/\x1b\[[0-9;]*m/g, "").replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, "");
 }
 
-interface Fixture {
+interface RenderCase {
   name: string;
   columns: number;
   stdin: Parameters<typeof buildStatusLine>[0];
   worktree: WorktreeData | null;
 }
 
-const fixturesDir = join(import.meta.dirname, "fixtures");
-const manifest = (await Bun.file(join(fixturesDir, "manifest.json")).json()) as Fixture[];
+const mainWt: WorktreeData = {
+  branch: "main",
+  path: "/Users/ben/src/myrepo",
+  isMain: true,
+  ciUrl: null,
+  repoUrl: null,
+  ahead: 0,
+};
 
-describe("golden parity", () => {
-  for (const fx of manifest) {
-    test(fx.name, async () => {
-      const want = await Bun.file(join(fixturesDir, `${fx.name}.out`)).text();
-      const got = buildStatusLine(fx.stdin, fx.columns, fx.worktree);
-      expect(strip(got)).toBe(strip(want));
-      expect(Bun.stringWidth(got)).toBe(Bun.stringWidth(want));
+const redundantWt: WorktreeData = {
+  branch: "worktree-abc123",
+  path: "/Users/ben/src/abc123.worktree-abc123",
+  isMain: false,
+  ciUrl: null,
+  repoUrl: null,
+  ahead: 0,
+};
+
+function featureWt(ahead: number): WorktreeData {
+  return {
+    branch: "feature/long-branch-name-that-needs-eliding-eventually",
+    path: "/Users/ben/src/myrepo",
+    isMain: false,
+    ciUrl: "https://github.com/ben/myrepo/actions/runs/1",
+    repoUrl: "https://github.com/ben/myrepo",
+    ahead,
+  };
+}
+
+const cases: RenderCase[] = [
+  // Dial ramp and color thresholds.
+  ...[0, 39, 40, 64, 65, 79, 80, 100].map((pct) => ({
+    name: `dial-${pct}`,
+    columns: 80,
+    stdin: { context_window: { used_percentage: pct } },
+    worktree: null,
+  })),
+  // exceeds_200k color escalation.
+  ...[30, 44, 45, 70].map((pct) => ({
+    name: `dial-exceeds-${pct}`,
+    columns: 80,
+    stdin: { context_window: { used_percentage: pct }, exceeds_200k_tokens: true },
+    worktree: null,
+  })),
+  { name: "no-dial", columns: 80, stdin: {}, worktree: null },
+  {
+    name: "lines-added",
+    columns: 80,
+    stdin: { cost: { total_lines_added: 5, total_lines_removed: 0 } },
+    worktree: null,
+  },
+  {
+    name: "lines-removed",
+    columns: 80,
+    stdin: { cost: { total_lines_added: 0, total_lines_removed: 3 } },
+    worktree: null,
+  },
+  {
+    name: "lines-both",
+    columns: 80,
+    stdin: { cost: { total_lines_added: 12, total_lines_removed: 7 } },
+    worktree: null,
+  },
+  // Worktree label across widths: main, feature (elision + ahead), redundancy collapse.
+  ...[40, 60, 80, 120].map((columns) => ({
+    name: `wt-main-${columns}`,
+    columns,
+    stdin: {},
+    worktree: mainWt,
+  })),
+  ...[40, 60, 80, 120].map((columns) => ({
+    name: `wt-feature-${columns}`,
+    columns,
+    stdin: {},
+    worktree: featureWt(3),
+  })),
+  { name: "wt-redundant", columns: 80, stdin: {}, worktree: redundantWt },
+  // Full layout: dial + lines + worktree sharing the budget.
+  ...[40, 60, 80, 120].map((columns) => ({
+    name: `combined-${columns}`,
+    columns,
+    stdin: {
+      context_window: { used_percentage: 72 },
+      cost: { total_lines_added: 120, total_lines_removed: 45 },
+    },
+    worktree: featureWt(2),
+  })),
+];
+
+describe("rendered output", () => {
+  for (const c of cases) {
+    test(c.name, () => {
+      expect(buildStatusLine(c.stdin, c.columns, c.worktree)).toMatchSnapshot();
     });
   }
 });

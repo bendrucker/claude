@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatElapsed, formatTokens, renderTask } from "./subagent-statusline";
+import { formatElapsed, formatTokens, renderTask, type Task } from "./subagent-statusline";
 
 function strip(s: string): string {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping terminal escapes
@@ -87,4 +87,83 @@ describe("renderTask", () => {
   test("id passes through", () => {
     expect(renderTask({ id: "task-7", name: "x" }, null, now, null).id).toBe("task-7");
   });
+});
+
+describe("rendered content", () => {
+  const now = 65_000;
+
+  const cases: Array<{
+    name: string;
+    task: Task;
+    columns: number | null;
+    agentType: string | null;
+  }> = [
+    {
+      name: "running",
+      task: { id: "a", name: "builder", status: "running" },
+      columns: null,
+      agentType: null,
+    },
+    {
+      name: "completed-tokens",
+      task: { id: "a", description: "deploy to prod", status: "completed", tokenCount: 1500 },
+      columns: null,
+      agentType: null,
+    },
+    {
+      name: "failed",
+      task: { id: "a", name: "reviewer", status: "failed" },
+      columns: null,
+      agentType: null,
+    },
+    {
+      name: "remote",
+      task: { id: "a", description: "remote build", status: "running", type: "remote_agent" },
+      columns: null,
+      agentType: null,
+    },
+    {
+      name: "explore-glyph",
+      task: { id: "a", description: "search", status: "running" },
+      columns: null,
+      agentType: "Explore",
+    },
+    {
+      name: "plan-glyph",
+      task: { id: "a", description: "design", status: "running" },
+      columns: null,
+      agentType: "Plan",
+    },
+    {
+      name: "guide-glyph",
+      task: { id: "a", description: "docs", status: "running" },
+      columns: null,
+      agentType: "claude-code-guide",
+    },
+    {
+      name: "full-meta-remote-explore",
+      task: {
+        id: "a",
+        description: "build the parser",
+        status: "running",
+        type: "remote_agent",
+        startTime: 0,
+        tokenCount: 2300,
+      },
+      columns: null,
+      agentType: "Explore",
+    },
+    {
+      name: "truncated",
+      task: { id: "a", description: "a really long description that overflows", status: "running" },
+      columns: 30,
+      agentType: null,
+    },
+  ];
+
+  for (const c of cases) {
+    test(c.name, () => {
+      expect(renderTask(c.task, c.columns, now, c.agentType).content).toMatchSnapshot();
+    });
+  }
 });

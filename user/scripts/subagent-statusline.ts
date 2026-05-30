@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { styleText } from "node:util";
 import { purposeGlyphs, remoteGlyph } from "./glyphs";
 
-interface Task {
+export interface Task {
   id: string;
   description?: string;
   type?: string;

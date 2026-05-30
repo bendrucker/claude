@@ -20,7 +20,7 @@ This skill assumes the `hunk-review` skill is loaded — it owns the CLI mechani
    - `hunk diff main...HEAD` — branch changes vs. main
    - `hunk show HEAD` — the latest commit
 2. **Wait for the user to finish annotating.** Do not poll. Let the user say they're done before reading comments.
-3. **Read their notes.** `hunk session comment list --repo . --json`. The author is the user, not the agent — these are change requests, not narration.
+3. **Read their notes.** `hunk session comment list --repo .`. The author is the user, not the agent — these are change requests, not narration.
 4. **Apply each comment.** For every entry:
    - Read the referenced file at the indicated line(s)
    - Make the requested change with Edit

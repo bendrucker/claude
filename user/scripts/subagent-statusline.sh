@@ -7,9 +7,28 @@ red=$'\033[31m'
 dim=$'\033[2m'
 reset=$'\033[0m'
 
-# Origin glyphs: desktop for local agents, cloud for remote agents.
+# Purpose glyphs mark the agent kind (Explore/Plan/guide); cloud always marks
+# remote agents. Untyped kinds (general-purpose, unknown) get no purpose glyph.
 # Generated via python3 because macOS bash 3.2 lacks \u escapes.
-read -r local_glyph remote_glyph < <(python3 -c "print(chr(0xF108), chr(0xF0C2))")
+read -r explore_glyph plan_glyph guide_glyph remote_glyph \
+  < <(python3 -c "print(chr(0xF002), chr(0xF0EA), chr(0xF02D), chr(0xF0C2))")
+
+# The subagentStatusLine payload omits the agent kind, but each task id keys a
+# sidecar the harness writes next to the subagent transcript. Resolve it scoped
+# to the current project's sessions (derived from $PWD, the session cwd the
+# status line runs in) so we never scan unrelated projects. A miss yields an
+# empty type and the purpose glyph is simply skipped (the prune signal if the
+# harness ever changes this layout).
+project_dir="$HOME/.claude/projects/$(printf '%s' "$PWD" | sed 's#[/.]#-#g')"
+
+agent_type_for() {
+  local id=$1 meta
+  for meta in "$project_dir"/*/subagents/agent-"$id".meta.json; do
+    [ -f "$meta" ] || continue
+    jq -r '.agentType // empty' "$meta" 2>/dev/null
+    return
+  done
+}
 
 format_elapsed() {
   local start_ms=$1 now_ms elapsed_s mins secs
@@ -29,10 +48,18 @@ format_tokens() {
   fi
 }
 
-# Reads status_icon, origin_glyph, text, and meta from the calling render_task
-# scope (bash dynamic scoping).
+# Reads status_icon, purpose_glyph, remote_marker, text, and meta from the
+# calling render_task scope (bash dynamic scoping). The purpose glyph leads, the
+# cloud marker follows, so origin stays visible without displacing the kind.
 build_content() {
-  local body="${status_icon} ${origin_glyph} ${text}"
+  local body="${status_icon}"
+  if [ -n "$purpose_glyph" ]; then
+    body+=" ${purpose_glyph}"
+  fi
+  if [ -n "$remote_marker" ]; then
+    body+=" ${remote_marker}"
+  fi
+  body+=" ${text}"
   if [ -n "$meta" ]; then
     body+=" ${dim}${meta}${reset}"
   fi
@@ -42,7 +69,7 @@ build_content() {
 render_task() {
   local task=$1
   local columns=$2
-  local id description type name status start_time token_count status_icon origin_glyph text meta content
+  local id description type name status start_time token_count status_icon agent_type purpose_glyph remote_marker text meta content
   id=$(echo "$task" | jq -r '.id')
   description=$(echo "$task" | jq -r '.description // empty')
   type=$(echo "$task" | jq -r '.type // empty')
@@ -57,10 +84,20 @@ render_task() {
     *)         status_icon="${yellow}▶${reset}" ;;
   esac
 
-  # .type is the agent origin (local_agent or remote_agent), not the agent kind.
+  # The agent kind drives the purpose glyph; untyped kinds get none.
+  agent_type=$(agent_type_for "$id")
+  case "$agent_type" in
+    Explore)           purpose_glyph="${dim}${explore_glyph}${reset}" ;;
+    Plan)              purpose_glyph="${dim}${plan_glyph}${reset}" ;;
+    claude-code-guide) purpose_glyph="${dim}${guide_glyph}${reset}" ;;
+    *)                 purpose_glyph="" ;;
+  esac
+
+  # .type is the agent origin (local_agent or remote_agent). Cloud always marks
+  # remote agents; local agents carry no origin marker.
   case "$type" in
-    remote_agent) origin_glyph="${dim}${remote_glyph}${reset}" ;;
-    *)            origin_glyph="${dim}${local_glyph}${reset}" ;;
+    remote_agent) remote_marker="${dim}${remote_glyph}${reset}" ;;
+    *)            remote_marker="" ;;
   esac
 
   text="${description:-${name:-agent}}"

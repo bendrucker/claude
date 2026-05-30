@@ -139,15 +139,21 @@ describe("formatError", () => {
 
   for (const fixture of fixtures) {
     it(fixture.name, () => {
-      const original = process.env.CI;
+      // isCI() reads both CI and GITHUB_ACTIONS; control both so the ambient
+      // CI environment (GITHUB_ACTIONS=true on Actions) cannot leak in.
+      const original = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
       process.env.CI = fixture.ci ? "true" : "";
+      process.env.GITHUB_ACTIONS = fixture.ci ? "true" : "";
 
       try {
         const result = formatError(fixture.file, fixture.error as ErrorObject);
         expect(result).toBe(fixture.expected);
       } finally {
-        if (original === undefined) delete process.env.CI;
-        else process.env.CI = original;
+        for (const key of ["CI", "GITHUB_ACTIONS"] as const) {
+          const value = original[key];
+          if (value === undefined) delete process.env[key];
+          else process.env[key] = value;
+        }
       }
     });
   }

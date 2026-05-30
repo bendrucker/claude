@@ -12,7 +12,7 @@ import {
   readBody,
   validateLineInDiff,
 } from "./diff";
-import { isBotUsername } from "./reviewers";
+import { isReviewTarget, loadExtraReviewers } from "./reviewers";
 
 export { parseGlabPaginated } from "./diff";
 
@@ -82,7 +82,8 @@ export type FilterOptions = {
   author?: string;
   resolvable?: boolean;
   unresolved?: boolean;
-  botsOnly?: boolean;
+  bots?: boolean;
+  extra?: Set<string>;
 };
 
 export function filterDiscussions(discussions: Discussion[], opts: FilterOptions): Discussion[] {
@@ -90,7 +91,7 @@ export function filterDiscussions(discussions: Discussion[], opts: FilterOptions
     const note = d.notes[0];
     if (!note) return false;
     if (opts.author && note.author.username !== opts.author) return false;
-    if (opts.botsOnly && !isBotUsername(note.author.username)) return false;
+    if (opts.bots && !isReviewTarget(note.author.username, opts.extra)) return false;
     if (opts.resolvable && !note.resolvable) return false;
     if (opts.unresolved && note.resolved) return false;
     return true;
@@ -112,15 +113,18 @@ export function deduplicateDiscussions(discussions: Discussion[]): Discussion[] 
   return [...seen.values()];
 }
 
-function buildFilterOptions(flags: {
+async function buildFilterOptions(flags: {
   author: string | undefined;
   resolvable: boolean;
   unresolved: boolean;
-  botsOnly: boolean;
-}): FilterOptions {
+  bots: boolean;
+}): Promise<FilterOptions> {
   const opts: FilterOptions = {};
   if (flags.author) opts.author = flags.author;
-  if (flags.botsOnly) opts.botsOnly = true;
+  if (flags.bots) {
+    opts.bots = true;
+    opts.extra = await loadExtraReviewers();
+  }
   if (flags.resolvable) opts.resolvable = true;
   if (flags.unresolved) opts.unresolved = true;
   return opts;
@@ -171,9 +175,10 @@ const listCmd = command(
     parameters: ["<iid>"],
     flags: {
       author: { type: String, description: "Filter by author username" },
-      botsOnly: {
+      bots: {
         type: Boolean,
-        description: "Only discussions opened by an AI review bot",
+        description:
+          "Only review-bot discussions (plus usernames in $CLAUDE_PLUGIN_DATA/reviewers.txt)",
         default: false,
       },
       resolvable: { type: Boolean, description: "Only resolvable discussions", default: false },
@@ -195,7 +200,7 @@ const listCmd = command(
     const raw = await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
     let discussions = parseGlabPaginated(raw) as Discussion[];
 
-    discussions = filterDiscussions(discussions, buildFilterOptions(parsed.flags));
+    discussions = filterDiscussions(discussions, await buildFilterOptions(parsed.flags));
 
     if (parsed.flags.dedupe) {
       discussions = deduplicateDiscussions(discussions);

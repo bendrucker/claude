@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { type Author, isBot } from "./reviewers";
+import { type Author, isBot, isReviewTarget, loadExtraReviewers } from "./reviewers";
 
 const QUERY = `
 query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
@@ -100,15 +100,16 @@ export function filterThreads(
     role: Role;
     viewer: string;
     since?: Date | undefined;
-    botsOnly?: boolean | undefined;
+    bots?: boolean | undefined;
+    extra?: Set<string> | undefined;
   },
 ): Thread[] {
   let filtered = threads.filter((t) => !t.isResolved);
 
-  if (options.botsOnly) {
-    // Bot threads are opened by the bot, never by the viewer, so this is
-    // mutually exclusive with the reviewer-opener filter below.
-    filtered = filtered.filter(isBotThread);
+  if (options.bots) {
+    // Review targets (API bots plus opted-in reviewers) open their own threads,
+    // never the viewer's, so this replaces the reviewer-opener filter below.
+    filtered = filtered.filter((t) => isReviewTarget(t.comments.nodes[0]?.author, options.extra));
   } else if (options.role === "reviewer") {
     // First comment is the thread opener
     filtered = filtered.filter((t) => t.comments.nodes[0]?.author?.login === options.viewer);
@@ -139,14 +140,14 @@ export function findLastReviewDate(reviews: Review[], viewer: string, role: Role
 export function formatThreads(
   threads: Thread[],
   totalCount: number,
-  options: { title: string; role: Role; viewer: string; botsOnly?: boolean },
+  options: { title: string; role: Role; viewer: string; bots?: boolean },
 ): string {
   const lines: string[] = [];
   lines.push(`# ${options.title}`);
   lines.push("");
   lines.push(`${threads.length} unresolved of ${totalCount} total threads`);
-  if (options.botsOnly) {
-    lines.push("Showing threads opened by AI review bots");
+  if (options.bots) {
+    lines.push("Showing review-bot and opted-in reviewer threads");
   } else if (options.role === "reviewer") {
     lines.push(`Showing threads started by @${options.viewer}`);
   }
@@ -266,9 +267,9 @@ async function main(): Promise<void> {
         type: String,
         description: 'ISO date or "last-review"',
       },
-      botsOnly: {
+      bots: {
         type: Boolean,
-        description: "Only threads opened by an AI review bot",
+        description: "Only review-bot threads (plus logins in $CLAUDE_PLUGIN_DATA/reviewers.txt)",
         default: false,
       },
     },
@@ -334,13 +335,14 @@ async function main(): Promise<void> {
     role,
     viewer,
     since,
-    botsOnly: argv.flags.botsOnly,
+    bots: argv.flags.bots,
+    extra: argv.flags.bots ? await loadExtraReviewers() : undefined,
   });
   const output = formatThreads(filtered, totalCount, {
     title: prTitle,
     role,
     viewer,
-    botsOnly: argv.flags.botsOnly,
+    bots: argv.flags.bots,
   });
 
   console.log(output);

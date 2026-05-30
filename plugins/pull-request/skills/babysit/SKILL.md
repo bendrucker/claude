@@ -110,40 +110,16 @@ Human review threads are out of scope here: follow-up lists them and leaves them
 
 ## Merge Mode
 
-With `--merge`, drive the PR to **merged** instead of stopping at green. CI green is the entry condition (you reached the success handler); from here, submit the PR to its merge mechanism and recover from kickouts until it lands. GitHub is the primary platform, so GitHub merges run through `gh` directly. All GitLab merge behavior (merge trains, the correct API endpoint, squash) is delegated to the `gitlab:merge-request` skill, which owns it. No `glab` calls live here.
+With `--merge`, don't stop at green; drive the PR to **merged**. CI green is the entry condition; from here, submit to the repo's merge mechanism and recover from kickouts until it lands. GitHub merges run through `gh` directly; delegate all GitLab merge behavior (trains, endpoint, squash) to the `gitlab:merge-request` skill.
 
-### Check Preconditions
+First confirm the PR can merge on its own. Don't bypass blocks you can't resolve: missing **human** approval (you can't self-approve; if a bot was the blocker and `--reviews` ran, it's already handled), branch protection, draft state, or requested changes. Report and `TaskStop`. Read state via `gh pr view --json mergeable,mergeStateStatus,reviewDecision,state` (GitLab: `gitlab:merge-request`).
 
-Confirm the PR can merge on its own. If it's blocked on something you can't resolve, report it and `TaskStop`. Don't bypass:
+Submit by the most automated path the repo allows (merge queue/train, else auto-merge, else direct, valid since CI is green):
 
-- Missing **human** approvals (you can't self-approve). If a bot review is the blocker and `--reviews` is set, that path already handled it; otherwise report.
-- Branch protection / permission errors, draft state, or requested changes.
+- **GitHub**: `gh pr merge <pr-url> --auto --squash` enables auto-merge or queues the PR. If `--auto` is rejected, merge directly: `gh pr merge <pr-url> --squash`. Prefer squash → merge → rebase per `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
+- **GitLab**: delegate to the `gitlab:merge-request` skill.
 
-Read merge state per platform: GitHub via `gh pr view --json mergeable,mergeStateStatus,reviewDecision,state`; GitLab via the `gitlab:merge-request` skill.
-
-### Submit
-
-Pick the most automated path the repo allows: merge queue/train when configured, else auto-merge, else a direct merge (valid because CI is already green).
-
-- **GitHub**: `gh pr merge <pr-url> --auto --squash` enables auto-merge or queues the PR when a merge queue exists. If `--auto` is rejected (no auto-merge, no queue), merge directly: `gh pr merge <pr-url> --squash`. Prefer squash, then merge, then rebase per `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
-- **GitLab**: delegate to the `gitlab:merge-request` skill. It owns the merge-train-vs-direct decision and squash handling, and routes merge-train projects through the correct API endpoint.
-
-### Watch and Recover
-
-Poll the PR/MR state on an interval until it merges or is kicked out:
-
-- **Merged** (`state: MERGED` / `merged`) → report the merge and `TaskStop`.
-- **Kicked from the train/queue** (pipeline failed on the merge ref, or it was dropped) → diagnose, recover, and re-submit:
-  - **Rebase / merge conflict** → use the [conflicts](#conflicts) handler (reproduce locally, auto-fix lockfiles, report non-trivial conflicts), push, re-submit.
-  - **CI failure** → use the [status: failing](#status-failing) handler (fix trivial, report non-trivial), producing a new SHA; re-submit.
-- **Still pending** → keep waiting; the queue or auto-merge will act once green.
-
-### Stop Conditions
-
-- **Merged** → success, `TaskStop`.
-- **Max merge attempts** (default 3): guards a kicked-then-refixed oscillation. Report and `TaskStop`.
-- **Unrecoverable**: missing human approval, non-trivial CI failure, non-lockfile conflict, or a permissions/protection error → report and `TaskStop`.
-- **PR closed** → report and `TaskStop`.
+Then poll until it merges or is kicked out. On a kickout, diagnose and re-submit: a rebase/merge conflict routes through the [conflicts](#conflicts) handler, a CI failure through [status: failing](#status-failing) (each produces a new SHA). Stop on: merged (success); 3 submit attempts (re-submits included, an oscillation guard); an unrecoverable block (missing human approval, non-trivial CI failure, non-lockfile conflict, permissions); or PR closed.
 
 ## Gotchas
 

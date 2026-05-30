@@ -12,9 +12,9 @@ import {
   type Thread,
 } from "./pr-comments";
 
-function makeComment(login: string, date: string, body = "comment"): Comment {
+function makeComment(login: string, date: string, body = "comment", typename = "User"): Comment {
   return {
-    author: { login },
+    author: { login, __typename: typename },
     body,
     createdAt: `${date}T00:00:00Z`,
   };
@@ -170,29 +170,44 @@ describe("filterThreads", () => {
     expect(result).toHaveLength(1);
   });
 
-  it("keeps only bot-opened threads with botsOnly", () => {
+  it("keeps only review-target threads with bots", () => {
     const threads = [
-      makeThread({ comments: [makeComment("coderabbitai[bot]", "2025-01-15")] }),
+      makeThread({ comments: [makeComment("copilot", "2025-01-15", "comment", "Bot")] }),
       makeThread({ comments: [makeComment("bendrucker", "2025-01-15")] }),
     ];
     const result = filterThreads(threads, {
       role: "author",
       viewer: "bendrucker",
-      botsOnly: true,
+      bots: true,
     });
     expect(result).toHaveLength(1);
     expect(isBotThread(result[0]!)).toBe(true);
   });
 
-  it("keeps bot threads in reviewer role (botsOnly overrides opener filter)", () => {
+  it("includes opted-in reviewers from extra with bots", () => {
     const threads = [
-      makeThread({ comments: [makeComment("coderabbitai[bot]", "2025-01-15")] }),
+      makeThread({ comments: [makeComment("jacob", "2025-01-15")] }),
+      makeThread({ comments: [makeComment("bendrucker", "2025-01-15")] }),
+    ];
+    const result = filterThreads(threads, {
+      role: "author",
+      viewer: "bendrucker",
+      bots: true,
+      extra: new Set(["jacob"]),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.comments.nodes[0]!.author?.login).toBe("jacob");
+  });
+
+  it("keeps review-target threads in reviewer role (bots overrides opener filter)", () => {
+    const threads = [
+      makeThread({ comments: [makeComment("copilot", "2025-01-15", "comment", "Bot")] }),
       makeThread({ comments: [makeComment("DouweM", "2025-01-15")] }),
     ];
     const result = filterThreads(threads, {
       role: "reviewer",
       viewer: "DouweM",
-      botsOnly: true,
+      bots: true,
     });
     expect(result).toHaveLength(1);
     expect(isBotThread(result[0]!)).toBe(true);
@@ -200,8 +215,10 @@ describe("filterThreads", () => {
 });
 
 describe("isBotThread", () => {
-  it("classifies by the thread opener", () => {
-    const bot = makeThread({ comments: [makeComment("greptileai", "2025-01-15")] });
+  it("classifies by the thread opener's API type", () => {
+    const bot = makeThread({
+      comments: [makeComment("greptile-apps", "2025-01-15", "comment", "Bot")],
+    });
     const human = makeThread({ comments: [makeComment("bob", "2025-01-15")] });
     expect(isBotThread(bot)).toBe(true);
     expect(isBotThread(human)).toBe(false);
@@ -302,14 +319,14 @@ describe("formatThreads", () => {
     expect(output).toContain("Showing threads started by @DouweM");
   });
 
-  it("shows the bot header for botsOnly, not the reviewer-opener header", () => {
+  it("shows the bot header for bots, not the reviewer-opener header", () => {
     const output = formatThreads([], 10, {
       ...baseOptions,
       role: "reviewer",
       viewer: "DouweM",
-      botsOnly: true,
+      bots: true,
     });
-    expect(output).toContain("Showing threads opened by AI review bots");
+    expect(output).toContain("Showing review-bot and opted-in reviewer threads");
     expect(output).not.toContain("Showing threads started by");
   });
 
@@ -344,7 +361,9 @@ describe("formatThreads", () => {
   });
 
   it("marks bot-opened threads", () => {
-    const threads = [makeThread({ comments: [makeComment("coderabbitai[bot]", "2025-01-15")] })];
+    const threads = [
+      makeThread({ comments: [makeComment("coderabbitai", "2025-01-15", "comment", "Bot")] }),
+    ];
     const output = formatThreads(threads, 1, baseOptions);
     expect(output).toContain("(bot)");
   });

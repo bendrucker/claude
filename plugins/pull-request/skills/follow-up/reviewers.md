@@ -32,9 +32,8 @@ This @-mention is the only place a bot is named. Thread replies never name or th
 
 ## Adding a Reviewer
 
-Bot detection is a hardcoded allowlist constant in each provider plugin's `reviewers.ts`, not branching logic. Adding a reviewer is a one-line source edit:
+Common reviewers need no maintenance: GitHub reports `__typename: "Bot"` for App and bot accounts, and GitLab service accounts follow the `*-bot` / `*_bot` convention (`group_<id>_bot` for CodeRabbit). Whatever those signals catch is handled automatically.
 
-- **GitHub**: append a stable login fragment to `GITHUB_BOT_LOGINS` in the `github` plugin's `reviewers.ts`. Unlisted GitHub bots are still caught by `__typename == "Bot"`.
-- **GitLab**: append a username fragment to `GITLAB_BOT_USERNAMES` in the `gitlab` plugin's `reviewers.ts`. Service accounts ending in `-bot`/`_bot` (including `group_<id>_bot`) match automatically.
+For an account they miss (a GitLab bot with an off-convention username) or a human reviewer you want the loop to triage, add one username per line to `reviewers.txt` in that plugin's data directory (`$CLAUDE_PLUGIN_DATA`, e.g. `~/.claude/plugins/data/github-bendrucker/reviewers.txt`). Blank lines and `#` comments are ignored, and the list only ever adds to the structural detection.
 
 Then add a satisfaction signal and re-trigger phrase for the new reviewer here.

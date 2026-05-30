@@ -1,31 +1,43 @@
+import { join } from "node:path";
+
 export interface Author {
   login: string;
   __typename?: string;
 }
 
-// Login allowlist for AI review bots that GraphQL surfaces as `User` rather than
-// `Bot` (GitHub Apps and `[bot]` accounts). Matching is substring-based against
-// the normalized login, so `coderabbitai[bot]`, `github-copilot[bot]`, and
-// `greptile-apps[bot]` all match their seed. Add a new reviewer by appending its
-// stable login fragment here; unlisted bots are still caught by the
-// `__typename === "Bot"` rule in `isBot`.
-export const GITHUB_BOT_LOGINS = [
-  "coderabbitai",
-  "copilot", // copilot-pull-request-reviewer, github-copilot[bot]
-  "greptile", // greptile-apps[bot], greptileai
-];
-
-function normalizeLogin(login: string): string {
-  return login.toLowerCase().replace(/\[bot\]$/, "");
-}
-
-export function isBotLogin(login: string): boolean {
-  const normalized = normalizeLogin(login);
-  return GITHUB_BOT_LOGINS.some((seed) => normalized.includes(seed));
-}
-
+// GitHub classifies bot accounts natively: GraphQL reports `__typename: "Bot"`
+// for GitHub Apps and bot users (Copilot, CodeRabbit, Greptile, and the rest).
+// Trust it instead of maintaining a login allowlist.
 export function isBot(author: Author | null | undefined): boolean {
+  return author?.__typename === "Bot";
+}
+
+// Logins to triage beyond what the API types as a bot: a reviewer the API ever
+// surfaces as a User, or a human you want the autonomous loop to act on. One
+// login per line in `$CLAUDE_PLUGIN_DATA/reviewers.txt`; blank lines and `#`
+// comments are ignored. Absent file or unset env yields an empty set.
+export async function loadExtraReviewers(): Promise<Set<string>> {
+  const dataDir = process.env.CLAUDE_PLUGIN_DATA;
+  if (!dataDir) return new Set();
+  const file = Bun.file(join(dataDir, "reviewers.txt"));
+  if (!(await file.exists())) return new Set();
+  return parseReviewers(await file.text());
+}
+
+export function parseReviewers(contents: string): Set<string> {
+  return new Set(
+    contents
+      .split("\n")
+      .map((line) => line.replace(/#.*/, "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function isReviewTarget(
+  author: Author | null | undefined,
+  extra: Set<string> = new Set(),
+): boolean {
   if (!author) return false;
-  if (author.__typename === "Bot") return true;
-  return isBotLogin(author.login);
+  if (isBot(author)) return true;
+  return extra.has(author.login.toLowerCase());
 }

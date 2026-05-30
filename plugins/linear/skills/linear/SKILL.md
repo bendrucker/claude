@@ -19,6 +19,8 @@ Choose the right tool for the task:
 1. **MCP tools** - Use for simple operations (create/update/query single issues, basic filters)
 2. **`linear api` CLI** - Use for complex queries, bulk operations, or anything not supported by MCP tools
 
+The MCP `save_issue` tool cannot manage issue relations. Passing an existing `id` with `blocks`/`blockedBy` errors with `title is required when creating an issue`. Route relation changes through `linear api` using the `issueRelationCreate` mutation (see `api.md`).
+
 ## Conventions
 
 ### Issue References

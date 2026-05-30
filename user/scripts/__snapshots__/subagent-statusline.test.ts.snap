@@ -1,0 +1,19 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`rendered content running 1`] = `"\x1B[33m▶\x1B[39m builder"`;
+
+exports[`rendered content completed-tokens 1`] = `"\x1B[32m✓\x1B[39m deploy to prod \x1B[2m· 1.5k\x1B[22m"`;
+
+exports[`rendered content failed 1`] = `"\x1B[31m✗\x1B[39m reviewer"`;
+
+exports[`rendered content remote 1`] = `"\x1B[33m▶\x1B[39m \x1B[2m\x1B[22m remote build"`;
+
+exports[`rendered content explore-glyph 1`] = `"\x1B[33m▶\x1B[39m \x1B[2m\x1B[22m search"`;
+
+exports[`rendered content plan-glyph 1`] = `"\x1B[33m▶\x1B[39m \x1B[2m\x1B[22m design"`;
+
+exports[`rendered content guide-glyph 1`] = `"\x1B[33m▶\x1B[39m \x1B[2m\x1B[22m docs"`;
+
+exports[`rendered content full-meta-remote-explore 1`] = `"\x1B[33m▶\x1B[39m \x1B[2m\x1B[22m \x1B[2m\x1B[22m build the parser \x1B[2m· 1m 5s · 2.3k\x1B[22m"`;
+
+exports[`rendered content truncated 1`] = `"\x1B[33m▶\x1B[39m a really long description t…"`;

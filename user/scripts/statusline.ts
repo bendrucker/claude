@@ -1,0 +1,262 @@
+#!/usr/bin/env bun
+import { basename } from "node:path";
+import { styleText } from "node:util";
+import { dialGlyph } from "./glyphs";
+
+interface StatusInput {
+  context_window?: { used_percentage?: number | null };
+  exceeds_200k_tokens?: boolean;
+  cost?: { total_lines_added?: number; total_lines_removed?: number };
+}
+
+// A styled, ordered piece of the worktree label. `text` is the visible content
+// that elision shortens; `pre`/`suf` are escape wrappers (color, OSC 8 link)
+// kept intact around whatever text survives.
+export interface Span {
+  text: string;
+  pre: string;
+  suf: string;
+}
+
+export interface WorktreeData {
+  branch: string;
+  path: string;
+  isMain: boolean;
+  ciUrl: string | null;
+  repoUrl: string | null;
+  ahead: number;
+}
+
+type DialColor = "green" | "yellow" | "redBright" | "red";
+
+const SEP = "  ";
+
+// OSC 8 hyperlink open/close. Emitted unconditionally: the status line's stdout
+// is piped while still rendered, so TTY-gated link helpers would drop the link.
+function osc8Open(url: string): string {
+  return `\x1b]8;;${url}\x1b\\`;
+}
+const OSC8_CLOSE = "\x1b]8;;\x1b\\";
+
+// styleText wraps a whole string; spans need the open/close codes separately so
+// each surviving piece of elided text keeps its color. Split them off a sentinel.
+function styleFragments(style: Parameters<typeof styleText>[0]): { open: string; close: string } {
+  const [open, close] = styleText(style, "\0").split("\0");
+  return { open: open ?? "", close: close ?? "" };
+}
+
+const DIM = styleFragments(["dim"]);
+const CYAN = styleFragments("cyan");
+
+export function dialColor(pct: number, exceeds: boolean): DialColor {
+  let color: DialColor;
+  if (pct < 40) color = "green";
+  else if (pct < 65) color = "yellow";
+  else if (pct < 80) color = "redBright";
+  else color = "red";
+
+  if (exceeds) {
+    if (color === "green") color = "yellow";
+    else if (color === "yellow" && pct >= 45) color = "red";
+  }
+  return color;
+}
+
+export function dialIndex(pct: number): number {
+  const idx = Math.floor((pct * 7) / 100);
+  return idx > 7 ? 7 : idx;
+}
+
+export function dialSegment(input: StatusInput): string | null {
+  const pct = input.context_window?.used_percentage;
+  if (pct == null) return null;
+
+  const intPct = Math.round(pct);
+  const color = dialColor(intPct, input.exceeds_200k_tokens === true);
+  return styleText(color, dialGlyph(dialIndex(intPct)));
+}
+
+export function linesSegment(input: StatusInput): string | null {
+  const added = input.cost?.total_lines_added ?? 0;
+  const removed = input.cost?.total_lines_removed ?? 0;
+  if (added === 0 && removed === 0) return null;
+
+  const parts: string[] = [];
+  if (added > 0) parts.push(styleText("green", `+${added}`));
+  if (removed > 0) parts.push(styleText("red", `-${removed}`));
+  return parts.join(" ");
+}
+
+// Middle-elide ordered spans to a visible-width budget, preserving the start of
+// the first span and the end of the last with a single `…` between. Operates on
+// codepoint arrays so multi-byte branch names elide on character boundaries.
+export function elideSpans(spans: Span[], budget: number): string {
+  const chars = spans.map((s) => [...s.text]);
+  const total = chars.reduce((sum, c) => sum + c.length, 0);
+
+  if (total <= budget) {
+    return spans.map((s) => `${s.pre}${s.text}${s.suf}`).join("");
+  }
+
+  const keep = Math.max(1, budget - 1);
+  const head = Math.floor((keep + 1) / 2);
+  const tail = keep - head;
+  const tailStart = total - tail;
+
+  let pos = 0;
+  let out = "";
+  let ellipsisDone = false;
+  spans.forEach((span, i) => {
+    const c = chars[i] ?? [];
+    const spanStart = pos;
+    const spanEnd = pos + c.length;
+    let piece = "";
+
+    if (spanStart < head) {
+      const hEnd = Math.min(head, spanEnd);
+      piece += c.slice(0, hEnd - spanStart).join("");
+    }
+
+    if (spanEnd > tailStart) {
+      const tBegin = Math.max(tailStart, spanStart);
+      if (!ellipsisDone) {
+        piece += "…";
+        ellipsisDone = true;
+      }
+      piece += c.slice(tBegin - spanStart, spanEnd - spanStart).join("");
+    }
+
+    if (piece) out += `${span.pre}${piece}${span.suf}`;
+    pos = spanEnd;
+  });
+
+  if (!ellipsisDone) out += "…";
+  return out;
+}
+
+// Collapse the repo≈branch redundancy: when the repo name is a prefix or suffix
+// of the sanitized branch, the branch already carries the repo. Worktrunk names
+// branches worktree-<id> against a <id> worktree, so the repo is a suffix.
+function showRepo(repo: string, sanitizedBranch: string): boolean {
+  if (!repo) return true;
+  return !(sanitizedBranch.startsWith(repo) || sanitizedBranch.endsWith(repo));
+}
+
+export function formatWorktree(data: WorktreeData, budget: number): string[] {
+  const sanitizedBranch = data.branch.replace(/[/\\]/g, "-");
+  let repo = basename(data.path);
+  const repoSuffix = `.${sanitizedBranch}`;
+  if (repo.endsWith(repoSuffix)) repo = repo.slice(0, -repoSuffix.length);
+
+  const repoPre = data.repoUrl ? osc8Open(data.repoUrl) : "";
+  const repoSuf = data.repoUrl ? OSC8_CLOSE : "";
+
+  const spans: Span[] = [];
+  if (data.isMain) {
+    spans.push({ text: repo, pre: repoPre, suf: repoSuf });
+  } else {
+    if (showRepo(repo, sanitizedBranch)) {
+      spans.push({ text: repo, pre: repoPre, suf: repoSuf });
+      spans.push({ text: "/", pre: DIM.open, suf: DIM.close });
+    }
+    const branchPre = data.ciUrl ? CYAN.open + osc8Open(data.ciUrl) : CYAN.open;
+    const branchSuf = data.ciUrl ? OSC8_CLOSE + CYAN.close : CYAN.close;
+    spans.push({ text: data.branch, pre: branchPre, suf: branchSuf });
+  }
+
+  const aheadSeg = data.ahead > 0 ? styleText(["dim"], `↑${data.ahead}`) : "";
+
+  // Reserve room for the ahead segment (and its separator) before eliding.
+  const labelBudget = aheadSeg ? budget - Bun.stringWidth(aheadSeg) - SEP.length : budget;
+
+  const segments: string[] = [];
+  if (labelBudget < 3) {
+    if (aheadSeg) segments.push(aheadSeg);
+    return segments;
+  }
+
+  segments.push(elideSpans(spans, labelBudget));
+  if (aheadSeg) segments.push(aheadSeg);
+  return segments;
+}
+
+export function buildStatusLine(
+  input: StatusInput,
+  columns: number,
+  worktree: WorktreeData | null,
+): string {
+  const segments: string[] = [];
+
+  const dial = dialSegment(input);
+  if (dial) segments.push(dial);
+  const lines = linesSegment(input);
+  if (lines) segments.push(lines);
+
+  // Fixed segments (dials) are measured first and never elided; the worktree
+  // label takes whatever width remains so the dial stays visible at any width.
+  let fixedWidth = 0;
+  segments.forEach((s, i) => {
+    if (i > 0) fixedWidth += SEP.length;
+    fixedWidth += Bun.stringWidth(s);
+  });
+
+  const worktreeBudget = columns - fixedWidth - SEP.length - 1;
+  if (worktree) segments.push(...formatWorktree(worktree, worktreeBudget));
+
+  return segments.join(SEP);
+}
+
+function resolveWorktree(): WorktreeData | null {
+  try {
+    const wt = Bun.spawnSync(["wt", "list", "statusline", "--format=json"]);
+    if (!wt.success) return null;
+
+    const list = JSON.parse(wt.stdout.toString()) as Array<{
+      is_current?: boolean;
+      is_main?: boolean;
+      branch?: string;
+      path?: string;
+      ci?: { url?: string };
+      remote?: { name?: string };
+      main?: { ahead?: number };
+    }>;
+    const cur = list.find((w) => w.is_current);
+    if (!cur) return null;
+
+    const ciUrl = cur.ci?.url ?? null;
+    let repoUrl: string | null = null;
+    if (ciUrl) {
+      const git = Bun.spawnSync(["git", "remote", "get-url", cur.remote?.name ?? "origin"]);
+      const raw = git.success ? git.stdout.toString().trim() : "";
+      if (raw) repoUrl = raw.replace(/^git@([^:]*):/, "https://$1/").replace(/\.git$/, "");
+    }
+
+    return {
+      branch: cur.branch ?? "",
+      path: cur.path ?? "",
+      isMain: cur.is_main === true,
+      ciUrl,
+      repoUrl,
+      ahead: cur.main?.ahead ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+if (import.meta.main) {
+  // Empty or malformed stdin renders nothing rather than crashing to a blank
+  // line, matching the bash original's tolerance of bad input.
+  const raw = await Bun.stdin.text();
+  let input: StatusInput | null = null;
+  try {
+    if (raw.trim()) input = JSON.parse(raw) as StatusInput;
+  } catch {
+    input = null;
+  }
+  if (input) {
+    const parsed = Number(process.env.COLUMNS);
+    const columns = Number.isInteger(parsed) && parsed > 0 ? parsed : 80;
+    process.stdout.write(buildStatusLine(input, columns, resolveWorktree()));
+  }
+}

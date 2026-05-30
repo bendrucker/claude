@@ -227,11 +227,11 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/scripts/statusline.sh"
+    "command": "~/.claude/scripts/statusline.ts"
   },
   "subagentStatusLine": {
     "type": "command",
-    "command": "~/.claude/scripts/subagent-statusline.sh"
+    "command": "~/.claude/scripts/subagent-statusline.ts"
   },
   "skipAutoPermissionPrompt": true,
   "alwaysThinkingEnabled": true,

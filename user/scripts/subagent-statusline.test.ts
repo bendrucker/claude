@@ -3,7 +3,7 @@ import { formatElapsed, formatTokens, renderTask, type Task } from "./subagent-s
 
 function strip(s: string): string {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping terminal escapes
-  return s.replace(/\x1b\[[0-9;]*m/g, "");
+  return s.replace(/\x1b\[[0-9;]*m/g, "").replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, "");
 }
 
 describe("formatElapsed", () => {
@@ -81,6 +81,17 @@ describe("renderTask", () => {
   test("truncates text to columns", () => {
     const out = renderTask({ id: "a", description: "x".repeat(80) }, 20, now, null);
     expect(Bun.stringWidth(out.content)).toBeLessThanOrEqual(20);
+    expect(strip(out.content)).toContain("…");
+  });
+
+  test("truncates wide-character text within the column budget", () => {
+    const out = renderTask(
+      { id: "a", description: "日本語のテスト説明文がとても長い" },
+      12,
+      now,
+      null,
+    );
+    expect(Bun.stringWidth(out.content)).toBeLessThanOrEqual(12);
     expect(strip(out.content)).toContain("…");
   });
 

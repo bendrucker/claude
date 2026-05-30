@@ -137,8 +137,8 @@ export function elideSpans(spans: Span[], budget: number): string {
 // Collapse the repo≈branch redundancy: when the repo name is a prefix or suffix
 // of the sanitized branch, the branch already carries the repo. Worktrunk names
 // branches worktree-<id> against a <id> worktree, so the repo is a suffix.
-function showRepo(repo: string, sanitizedBranch: string, isMain: boolean): boolean {
-  if (isMain || !repo) return true;
+function showRepo(repo: string, sanitizedBranch: string): boolean {
+  if (!repo) return true;
   return !(sanitizedBranch.startsWith(repo) || sanitizedBranch.endsWith(repo));
 }
 
@@ -155,7 +155,7 @@ export function formatWorktree(data: WorktreeData, budget: number): string[] {
   if (data.isMain) {
     spans.push({ text: repo, pre: repoPre, suf: repoSuf });
   } else {
-    if (showRepo(repo, sanitizedBranch, data.isMain)) {
+    if (showRepo(repo, sanitizedBranch)) {
       spans.push({ text: repo, pre: repoPre, suf: repoSuf });
       spans.push({ text: "/", pre: DIM.open, suf: DIM.close });
     }

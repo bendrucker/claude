@@ -8,11 +8,11 @@ export function dialGlyph(idx: number): string {
 }
 
 // Purpose glyphs mark the agent kind. Untyped kinds get no glyph.
-export const purposeGlyphs = {
-  Explore: String.fromCodePoint(0xf002),
-  Plan: String.fromCodePoint(0xf0ea),
-  "claude-code-guide": String.fromCodePoint(0xf02d),
-} as const;
+export const purposeGlyphs = new Map<string, string>([
+  ["Explore", String.fromCodePoint(0xf002)],
+  ["Plan", String.fromCodePoint(0xf0ea)],
+  ["claude-code-guide", String.fromCodePoint(0xf02d)],
+]);
 
 // Cloud marker for remote agents.
 export const remoteGlyph = String.fromCodePoint(0xf0c2);

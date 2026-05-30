@@ -28,6 +28,20 @@ export function formatTokens(count: number): string {
   return count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count);
 }
 
+// Slice to a display-width budget, stopping before any character that would
+// exceed it. Width-aware so multi-cell glyphs (CJK, emoji) never overflow.
+function sliceToWidth(s: string, maxWidth: number): string {
+  let width = 0;
+  let out = "";
+  for (const ch of s) {
+    const w = Bun.stringWidth(ch);
+    if (width + w > maxWidth) break;
+    width += w;
+    out += ch;
+  }
+  return out;
+}
+
 function statusIcon(status: string): string {
   switch (status) {
     case "completed":
@@ -42,10 +56,7 @@ function statusIcon(status: string): string {
 // The agent kind drives the purpose glyph; untyped kinds (general-purpose,
 // unknown) get none.
 function purposeGlyph(agentType: string | null): string {
-  const glyph =
-    agentType && agentType in purposeGlyphs
-      ? purposeGlyphs[agentType as keyof typeof purposeGlyphs]
-      : null;
+  const glyph = agentType ? purposeGlyphs.get(agentType) : undefined;
   return glyph ? styleText(["dim"], glyph) : "";
 }
 
@@ -89,7 +100,7 @@ export function renderTask(
       const overflow = visible - columns;
       const textMax = Bun.stringWidth(text) - overflow - 1;
       if (textMax > 0) {
-        text = `${[...text].slice(0, textMax).join("")}…`;
+        text = `${sliceToWidth(text, textMax)}…`;
         content = build(text);
       }
     }

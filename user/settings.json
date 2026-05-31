@@ -184,7 +184,8 @@
         "~/src/go/pkg/mod",
         "~/src/go/pkg/sumdb",
         "~/.bun/install",
-        "~/.local/share/uv"
+        "~/.local/share/uv",
+        "~/.local/share/graphite"
       ]
     },
     "excludedCommands": [

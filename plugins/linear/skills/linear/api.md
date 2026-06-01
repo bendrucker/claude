@@ -105,27 +105,6 @@ linear api 'mutation($id: String!, $input: IssueUpdateInput!) {
 }' --variable id=ISSUE_ID --variables-json '{"input": {"stateId": "STATE_ID"}}'
 ```
 
-**Create issue relation:**
-
-The MCP `save_issue` tool cannot set relations, so create them here. To mark one issue as blocking another, pass the blocking issue as `issueId` and the blocked issue as `relatedIssueId` with `type: "blocks"`:
-
-```bash
-linear api 'mutation($input: IssueRelationCreateInput!) {
-  issueRelationCreate(input: $input) {
-    success
-    issueRelation { id type }
-  }
-}' --variables-json '{
-  "input": {
-    "issueId": "BLOCKING_ISSUE_ID",
-    "relatedIssueId": "BLOCKED_ISSUE_ID",
-    "type": "blocks"
-  }
-}'
-```
-
-Other relation types include `related` and `duplicate`. A `blocks` relation from A to B is equivalent to a `blockedBy` relation from B to A.
-
 ## Key Concepts
 
 - **Team IDs**: Required for most operations involving issues and projects

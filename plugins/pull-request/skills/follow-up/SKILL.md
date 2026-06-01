@@ -2,11 +2,15 @@
 name: pull-request:follow-up
 description: >
   Follow up on review feedback you received on a PR/MR: check resolution state, find silent
-  resolves, draft replies. Use when checking what review comments need responses, investigating
-  how threads were resolved, or drafting follow-up replies.
+  resolves, draft replies. With --auto, autonomously triage AI-reviewer (bot) threads and loop
+  until the reviewer is satisfied. Use when checking what review comments need responses,
+  investigating how threads were resolved, drafting replies, or clearing a bot review hands-off.
 allowed-tools:
+  - Bash(git:*)
   - Bash(gh:*)
-  - Bash(glab:*)
+  - Skill(github:pr-comments)
+  - Skill(gitlab:merge-request)
+  - Skill(pull-request:babysit)
   - mcp__github
 ---
 
@@ -14,42 +18,52 @@ allowed-tools:
 
 Follow up on review feedback for: $ARGUMENTS
 
-## Workflow
+Parse the URL and flags from `$ARGUMENTS`. GitHub URLs contain `github.com`; GitLab URLs contain the instance hostname. GitHub is primary: work through `gh`, `mcp__github`, and `github:*` skills directly. Delegate all GitLab behavior to `gitlab:merge-request` (no `glab` calls here).
 
-Parse the URL from `$ARGUMENTS` to determine the platform. GitHub URLs contain `github.com`, GitLab URLs contain the GitLab instance hostname.
+- `--auto`: autonomously triage **bot** threads, looping until the reviewer is satisfied (see [The Autonomous Loop](#the-autonomous-loop)).
+- `--include-human-nits`: under `--auto`, also act on **human** threads, but only trivial high-confidence changes (typos, renames, one-liners). Off by default.
 
-### Fetch Threads
+## Default Workflow (Gated)
 
-Gather all resolvable discussion threads (both resolved and unresolved).
+Without `--auto`, stay read-only: fetch, classify, draft, and **check with me before posting or resolving**.
 
-**GitHub**: Use the `github:pr-comments` skill's script to fetch threads. Run with `--role author` to get all unresolved threads. For resolved threads, use the GraphQL API via `gh api graphql` to query `pullRequest.reviewThreads` with both `isResolved: true` and `isResolved: false`.
+Fetch all resolvable threads (resolved and unresolved) via `github:pr-comments` (`--role author`) or `gitlab:merge-request`, then classify each:
 
-**GitLab**: Use the `gitlab:merge-request` skill's discussions script to fetch threads. Run with `--resolvable` to get all resolvable discussions, then partition by resolution state.
+- **Unresolved / no reply**
+- **Unresolved / replied**
+- **Resolved / with reply**
+- **Resolved / silent**: resolved with no author reply; flag these, they hide context
 
-### Classify Threads
+For unresolved threads, diff the comment's creation date against HEAD to see whether later commits already addressed the feedback. Draft replies per [replies.md](replies.md).
 
-Sort each thread into one of four buckets:
+## The Autonomous Loop
 
-- **Unresolved / no reply**: Reviewer left feedback, author hasn't responded
-- **Unresolved / replied**: Author responded but thread remains open
-- **Resolved / with reply**: Thread resolved after a reply (normal flow)
-- **Resolved / silent**: Thread resolved without any author reply (needs attention)
+With `--auto`, drive bot threads to closure without asking. Partition threads with each provider's `--bots` filter (`github:pr-comments`, `gitlab:merge-request`): fetch once filtered for the bot set, once unfiltered to see the human threads you're leaving alone. Add new reviewers per [reviewers.md](reviewers.md).
 
-### Present Summary
+Triage each bot thread:
 
-Show a table with counts per category. List each unresolved thread with the file, line, and a one-line summary of the feedback.
+- **Actionable** → fix in the working tree, batching across threads
+- **Noise / false positive** → reply with a one-line reason and resolve
+- **Unsure** → collect to escalate; don't guess
 
-### Check Commit Coverage
+Then run each round:
 
-For unresolved threads, check whether subsequent commits addressed the feedback by examining the diff between the review comment's creation date and HEAD. Indicate which threads appear addressed by code changes vs. which still need action.
+1. Apply batched fixes, commit, push **once** (one new SHA to re-review).
+2. Reply-and-resolve the noise threads (`github:pr-comments` or `gitlab:merge-request` do both in one call).
+3. Escalate the unsure threads and pause **that subset only**; actionable pushes proceed.
+4. Hand CI back to `pull-request:babysit` (it owns CI, stops at green).
+5. Re-fetch bot threads to poll for the re-review. If none lands within ~5 min of green, post one top-level `@<bot>` re-trigger and reset the timer.
 
-### Draft Replies
+Loop until: the reviewer's satisfaction signal hits on HEAD ([reviewers.md](reviewers.md)); no new bot threads for two rounds after a green push; max 4 rounds (oscillation guard); the idle timeout outlasts the re-trigger; or the PR closes/merges.
 
-Help draft follow-up replies for threads that need responses. See [replies.md](replies.md) for tone guidelines.
+babysit and follow-up compose both directions: `babysit --reviews` hands off to this loop after its first green, and this loop calls babysit between rounds. The entry point is the outer one.
+
+On stop, report fixes, replies/resolves, and escalations. If the reviewer is satisfied, suggest the next action (human review, merge train, auto-merge) but don't perform it unless asked. `pull-request:babysit --merge` drives to merged.
 
 ## Guardrails
 
-- **Check with me** before posting any comments or resolving threads.
-- **Don't resolve threads** without posting a reply first: silent resolution hides context.
-- **Flag silently resolved threads** so I can decide whether to reopen or add a belated reply.
-- **Match my writing style**: you're replying as me, not a generic assistant.
+The gated default requires checking before any post or resolve. `--auto` lifts this for **bot threads only**; human threads stay gated unless `--include-human-nits`. Always:
+
+- Resolve only after replying; silent resolves hide context.
+- Never name or thank the bot in a reply; write it as a note for any reader. The `@<bot>` re-trigger is the one exception.
+- Match my writing style; you're replying as me.

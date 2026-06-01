@@ -58,6 +58,19 @@ describe("filterDiscussions", () => {
     expect(result[0]?.id).toBe("1");
   });
 
+  it("keeps structural bots and listed reviewers with bots", () => {
+    const discussions = [
+      makeDiscussion("1", { author: { username: "group_123_bot" } }),
+      makeDiscussion("2", { author: { username: "coderabbitai" } }),
+      makeDiscussion("3", { author: { username: "alice" } }),
+    ];
+    const result = filterDiscussions(discussions, {
+      bots: true,
+      extra: new Set(["coderabbitai"]),
+    });
+    expect(result.map((d) => d.id)).toEqual(["1", "2"]);
+  });
+
   it("skips discussions with empty notes", () => {
     const discussions: Discussion[] = [{ id: "1", notes: [] }];
     const result = filterDiscussions(discussions, {});

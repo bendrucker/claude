@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { type Author, isBot, isReviewTarget, loadExtraReviewers } from "./reviewers";
 
 const QUERY = `
 query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
@@ -23,6 +24,7 @@ query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
           endCursor
         }
         nodes {
+          id
           isResolved
           isOutdated
           path
@@ -30,7 +32,7 @@ query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
           startLine
           comments(first: 50) {
             nodes {
-              author { login }
+              author { login __typename }
               body
               createdAt
             }
@@ -43,12 +45,13 @@ query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
 `;
 
 export interface Comment {
-  author: { login: string } | null;
+  author: Author | null;
   body: string;
   createdAt: string;
 }
 
 export interface Thread {
+  id: string;
   isResolved: boolean;
   isOutdated: boolean;
   path: string;
@@ -64,6 +67,10 @@ export interface Review {
 }
 
 export type Role = "author" | "reviewer";
+
+export function isBotThread(thread: Thread): boolean {
+  return isBot(thread.comments.nodes[0]?.author);
+}
 
 export function parseUrl(url: string): {
   owner: string;
@@ -93,11 +100,17 @@ export function filterThreads(
     role: Role;
     viewer: string;
     since?: Date | undefined;
+    bots?: boolean | undefined;
+    extra?: Set<string> | undefined;
   },
 ): Thread[] {
   let filtered = threads.filter((t) => !t.isResolved);
 
-  if (options.role === "reviewer") {
+  if (options.bots) {
+    // Review targets (API bots plus opted-in reviewers) open their own threads,
+    // never the viewer's, so this replaces the reviewer-opener filter below.
+    filtered = filtered.filter((t) => isReviewTarget(t.comments.nodes[0]?.author, options.extra));
+  } else if (options.role === "reviewer") {
     // First comment is the thread opener
     filtered = filtered.filter((t) => t.comments.nodes[0]?.author?.login === options.viewer);
   }
@@ -127,13 +140,15 @@ export function findLastReviewDate(reviews: Review[], viewer: string, role: Role
 export function formatThreads(
   threads: Thread[],
   totalCount: number,
-  options: { title: string; role: Role; viewer: string },
+  options: { title: string; role: Role; viewer: string; bots?: boolean },
 ): string {
   const lines: string[] = [];
   lines.push(`# ${options.title}`);
   lines.push("");
   lines.push(`${threads.length} unresolved of ${totalCount} total threads`);
-  if (options.role === "reviewer") {
+  if (options.bots) {
+    lines.push("Showing review-bot and opted-in reviewer threads");
+  } else if (options.role === "reviewer") {
     lines.push(`Showing threads started by @${options.viewer}`);
   }
   lines.push("");
@@ -157,7 +172,7 @@ export function formatThreads(
     for (const thread of fileThreads) {
       let lineInfo: string;
       if (thread.startLine) {
-        lineInfo = `Lines ${thread.startLine}\u2013${thread.line}`;
+        lineInfo = `Lines ${thread.startLine}–${thread.line}`;
       } else if (thread.line) {
         lineInfo = `Line ${thread.line}`;
       } else {
@@ -165,7 +180,9 @@ export function formatThreads(
       }
 
       const outdated = thread.isOutdated ? " (outdated)" : "";
-      lines.push(`### ${lineInfo}${outdated}`);
+      const botTag = isBotThread(thread) ? " (bot)" : "";
+      lines.push(`### ${lineInfo}${outdated}${botTag}`);
+      lines.push(`\`${thread.id}\``);
       lines.push("");
 
       for (const comment of thread.comments.nodes) {
@@ -250,6 +267,11 @@ async function main(): Promise<void> {
         type: String,
         description: 'ISO date or "last-review"',
       },
+      bots: {
+        type: Boolean,
+        description: "Only review-bot threads (plus logins in $CLAUDE_PLUGIN_DATA/reviewers.txt)",
+        default: false,
+      },
     },
   });
 
@@ -309,11 +331,18 @@ async function main(): Promise<void> {
     }
   }
 
-  const filtered = filterThreads(allThreads, { role, viewer, since });
+  const filtered = filterThreads(allThreads, {
+    role,
+    viewer,
+    since,
+    bots: argv.flags.bots,
+    extra: argv.flags.bots ? await loadExtraReviewers() : undefined,
+  });
   const output = formatThreads(filtered, totalCount, {
     title: prTitle,
     role,
     viewer,
+    bots: argv.flags.bots,
   });
 
   console.log(output);

@@ -19,7 +19,7 @@
       "expected_output": "Draft replies for each unresolved thread that match the author's writing style and follow reply tone guidelines",
       "files": [],
       "expectations": [
-        "The skill detects GitLab from the URL and uses glab/discussions script",
+        "The skill detects GitLab from the URL and delegates to the gitlab:merge-request skill",
         "Unresolved threads are fetched and summarized before drafting",
         "Draft replies follow the tone guidelines in replies.md",
         "The skill asks for confirmation before posting any comments"

@@ -32,9 +32,9 @@ describe("formatTokens", () => {
 describe("renderTask", () => {
   const now = 65_000;
 
-  test("status colors the type glyph: gray running, green done, red failed", () => {
+  test("dims the in-progress gray glyph; finished green/red stay vivid", () => {
     expect(renderTask({ id: "a", status: "running" }, null, now, null).content).toContain(
-      styleText("gray", genericGlyph),
+      styleText(["gray", "dim"], genericGlyph),
     );
     expect(renderTask({ id: "a", status: "completed" }, null, now, null).content).toContain(
       styleText("green", genericGlyph),
@@ -80,6 +80,24 @@ describe("renderTask", () => {
   test("meta combines elapsed and tokens", () => {
     const out = renderTask({ id: "a", name: "x", startTime: 0, tokenCount: 1500 }, null, now, null);
     expect(strip(out.content)).toContain("· 1m 5s · 1.5k");
+  });
+
+  test("type name trails after the meta as dim text", () => {
+    const out = renderTask(
+      { id: "a", description: "search", startTime: 0, tokenCount: 1500 },
+      null,
+      now,
+      "Explore",
+    );
+    expect(strip(out.content)).toContain("· 1m 5s · 1.5k · Explore");
+    expect(out.content).toContain(styleText(["dim"], "· 1m 5s · 1.5k · Explore"));
+  });
+
+  test("type name drops on narrow terminals while the description survives", () => {
+    const out = renderTask({ id: "a", description: "search the parser" }, 24, now, "Explore");
+    expect(Bun.stringWidth(out.content)).toBeLessThanOrEqual(24);
+    expect(strip(out.content)).toContain("search the parser");
+    expect(strip(out.content)).not.toContain("Explore");
   });
 
   test("truncates text to columns", () => {

@@ -56,10 +56,13 @@ function statusColor(status: string): "gray" | "green" | "red" {
 }
 
 // The agent kind drives the glyph; untyped kinds (general-purpose, unknown)
-// fall back to the generic robot. Its color carries the run status.
+// fall back to the generic robot. Color carries the run status. The in-progress
+// gray dims to recede behind the title; finished green/red stay vivid so a
+// terminal state reads at a glance.
 function typeIcon(agentType: string | null, status: string): string {
   const glyph = (agentType ? purposeGlyphs.get(agentType) : undefined) ?? genericGlyph;
-  return styleText(statusColor(status), glyph);
+  const color = statusColor(status);
+  return styleText(color === "gray" ? [color, "dim"] : color, glyph);
 }
 
 // .type is the agent origin. Cloud always marks remote agents; local agents
@@ -79,29 +82,37 @@ export function renderTask(
   const icon = typeIcon(agentType, task.status ?? "running");
   const marker = remoteMarker(task.type);
 
-  let meta = "";
-  if (task.startTime != null) meta += `· ${formatElapsed(task.startTime, now)} `;
-  if ((task.tokenCount ?? 0) > 0) meta += `· ${formatTokens(task.tokenCount ?? 0)}`;
+  const metaParts: string[] = [];
+  if (task.startTime != null) metaParts.push(formatElapsed(task.startTime, now));
+  if ((task.tokenCount ?? 0) > 0) metaParts.push(formatTokens(task.tokenCount ?? 0));
 
-  const build = (text: string): string => {
+  // The type name trails as dim text after the meta. The icon already conveys
+  // the kind, so a narrow terminal can drop the name without losing it.
+  const build = (text: string, withType: boolean): string => {
     let body = icon;
     if (marker) body += ` ${marker}`;
-    body += ` ${text}`;
-    if (meta) body += ` ${styleText(["dim"], meta)}`;
+    body += `  ${text}`;
+    const trailing = [...metaParts];
+    if (withType && agentType) trailing.push(agentType);
+    if (trailing.length) {
+      body += ` ${styleText(["dim"], trailing.map((part) => `· ${part}`).join(" "))}`;
+    }
     return body;
   };
 
   let text = task.description || task.name || "agent";
-  let content = build(text);
+  let content = build(text, true);
 
-  if (columns != null) {
+  if (columns != null && Bun.stringWidth(content) > columns) {
+    // Shed the optional type name first; the icon keeps the kind visible.
+    if (agentType) content = build(text, false);
     const visible = Bun.stringWidth(content);
     if (visible > columns) {
       const overflow = visible - columns;
       const textMax = Bun.stringWidth(text) - overflow - 1;
       if (textMax > 0) {
         text = `${sliceToWidth(text, textMax)}…`;
-        content = build(text);
+        content = build(text, false);
       }
     }
   }

@@ -227,6 +227,7 @@
     "command": "~/.claude/scripts/subagent-statusline.ts"
   },
   "skipAutoPermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "alwaysThinkingEnabled": true,
   "spinnerTipsEnabled": false,
   "showClearContextOnPlanAccept": true,

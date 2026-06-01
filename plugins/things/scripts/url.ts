@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// claude:dangerouslyDisableSandbox: hands off to Launch Services (open/xcall) for Things URL schemes
 
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -69,7 +70,9 @@ export async function buildUrl(command: string, params: Map<string, string>): Pr
 }
 
 export function isSandboxBlockedHandoff(stderr: string): boolean {
-  return /procNotFound|LSOpenURLsWithRole|(?<![\d-])-10810(?!\d)/i.test(stderr);
+  return /procNotFound|LSOpenURLsWithRole|(?<![\d-])-10810(?!\d)|(?<![\d-])-10673(?!\d)/i.test(
+    stderr,
+  );
 }
 
 export async function openUrl(
@@ -91,7 +94,7 @@ export async function openUrl(
       const stderr = error.stderr.toString();
       if (isSandboxBlockedHandoff(stderr)) {
         throw new Error(
-          `Things URL handoff was blocked by the Claude Code sandbox (LaunchServices procNotFound / -10810). The things plugin's PreToolUse hook should disable the sandbox for this script; verify the hook is registered, or rerun the calling tool with sandbox disabled. Original stderr: ${stderr.trim()}`,
+          `Things URL handoff was blocked by the Claude Code sandbox (LaunchServices procNotFound / -10810 / -10673). The mac plugin's sandbox hook should disable the sandbox when this script carries the claude:dangerouslyDisableSandbox marker; verify the mac plugin is installed, or rerun the calling tool with sandbox disabled. Original stderr: ${stderr.trim()}`,
         );
       }
     }

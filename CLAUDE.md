@@ -198,13 +198,15 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 
 ### Sandbox and Nested Commands
 
-`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. The convention is a per-plugin PreToolUse hook scoped to the wrapping `bun ${CLAUDE_PLUGIN_ROOT}/scripts/...:*` matcher that emits `dangerouslyDisableSandbox: true`. See [`plugins/things/hooks/`](plugins/things/hooks/) and [`plugins/x-callback-url/hooks/`](plugins/x-callback-url/hooks/) for canonical examples:
+`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls.
 
-```json
-{
-  "matcher": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)",
-  "hooks": [
-    { "type": "command", "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts\"" }
-  ]
-}
+`${CLAUDE_PLUGIN_ROOT}` does NOT expand in hook `matcher` fields (it only expands in `command` strings). A matcher like `Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)` is compared literally against the resolved cache path (`bun /Users/.../plugins/cache/.../scripts/foo.ts`), never matches, and the hook never fires. Do not use `${CLAUDE_PLUGIN_ROOT}` in matchers.
+
+The working mechanism is the `mac` plugin's marker-based sandbox hook. It uses a broad `Bash|Monitor` matcher and reads the head of the invoked `bun`/`node` script for the comment `claude:dangerouslyDisableSandbox`. When present, it injects `dangerouslyDisableSandbox: true`. This is layout-independent, so it works regardless of the cache `<hash>` path. Add the marker after the shebang of any top-level script that hands off to Launch Services:
+
+```ts
+#!/usr/bin/env bun
+// claude:dangerouslyDisableSandbox: <reason>
 ```
+
+The marker requires the `mac` plugin installed and only fires for interpreters in its `SCRIPT_INTERPRETERS` set (`bun`, `node`). See [`plugins/mac/README.md`](plugins/mac/README.md) for canonical docs.

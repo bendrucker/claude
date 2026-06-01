@@ -10,7 +10,7 @@
 - Prefer meaningful anchor text over raw URLs.
 - Use bullet points for lists, checklists if I ask for tasks.
 - Use code comments ONLY to clarify code that is not self-explanatory to OTHER readers. If you need to explain the code, do so in a separate message before editing.
-- Load the `writing` skill before writing any long-form prose for others (PR comments, review feedback, documents, issue descriptions, Slack messages). The skill enforces tone and style rules that must be followed.
+- Load the `writing:writing` skill before writing any long-form prose for others (PR comments, review feedback, documents, issue descriptions, Slack messages). The skill enforces tone and style rules that must be followed.
 
 ## Organization
 

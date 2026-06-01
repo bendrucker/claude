@@ -106,16 +106,6 @@ async function biomeWorkingTree(filePath: string): Promise<string | undefined> {
   }
 }
 
-// A non-zero exit can mean Biome could not resolve its configuration rather than
-// that the file has lint findings. That is an environment problem, not a code
-// issue, so the hook reports nothing instead of blocking on it.
-export function isConfigurationError(output: string): boolean {
-  return (
-    output.includes("Found a nested root configuration") ||
-    output.includes("configuration resulted in errors")
-  );
-}
-
 export async function runBiomeCheck(filePath: string): Promise<string | null> {
   const cwd = await biomeWorkingTree(filePath);
   try {
@@ -124,10 +114,6 @@ export async function runBiomeCheck(filePath: string): Promise<string | null> {
   } catch (error) {
     const execError = error as { stdout?: string; stderr?: string };
     const output = (execError.stdout || "") + (execError.stderr || "");
-    if (isConfigurationError(output)) {
-      console.error(`[biome] Skipping ${filePath}: could not resolve Biome configuration.`);
-      return null;
-    }
     return output.trim() || null;
   }
 }

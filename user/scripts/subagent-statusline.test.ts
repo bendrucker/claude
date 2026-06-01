@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { styleText } from "node:util";
+import { genericGlyph, purposeGlyphs } from "./glyphs";
 import { formatElapsed, formatTokens, renderTask, type Task } from "./subagent-statusline";
 
 function strip(s: string): string {
@@ -30,15 +32,15 @@ describe("formatTokens", () => {
 describe("renderTask", () => {
   const now = 65_000;
 
-  test("status icons", () => {
-    expect(strip(renderTask({ id: "a", status: "completed" }, null, now, null).content)).toContain(
-      "✓",
+  test("status colors the type glyph: gray running, green done, red failed", () => {
+    expect(renderTask({ id: "a", status: "running" }, null, now, null).content).toContain(
+      styleText("gray", genericGlyph),
     );
-    expect(strip(renderTask({ id: "a", status: "failed" }, null, now, null).content)).toContain(
-      "✗",
+    expect(renderTask({ id: "a", status: "completed" }, null, now, null).content).toContain(
+      styleText("green", genericGlyph),
     );
-    expect(strip(renderTask({ id: "a", status: "running" }, null, now, null).content)).toContain(
-      "▶",
+    expect(renderTask({ id: "a", status: "failed" }, null, now, null).content).toContain(
+      styleText("red", genericGlyph),
     );
   });
 
@@ -55,11 +57,13 @@ describe("renderTask", () => {
     expect(strip(out.content)).not.toContain("builder");
   });
 
-  test("purpose glyph from agent type, none when untyped", () => {
+  test("type glyph from agent type, generic fallback when untyped", () => {
     const explore = strip(renderTask({ id: "a", name: "x" }, null, now, "Explore").content);
-    expect(explore).toContain(String.fromCodePoint(0xf002));
+    expect(explore).toContain(purposeGlyphs.get("Explore") ?? "");
+    expect(explore).not.toContain(genericGlyph);
     const untyped = strip(renderTask({ id: "a", name: "x" }, null, now, "general-purpose").content);
-    expect(untyped).not.toContain(String.fromCodePoint(0xf002));
+    expect(untyped).toContain(genericGlyph);
+    expect(untyped).not.toContain(purposeGlyphs.get("Explore") ?? "");
   });
 
   test("remote marker only for remote_agent", () => {

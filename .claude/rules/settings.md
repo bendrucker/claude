@@ -17,4 +17,4 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 
 ## Sandbox and Nested Commands
 
-`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. The convention is a per-plugin PreToolUse hook that emits `dangerouslyDisableSandbox: true`. See [`scripts.md`](scripts.md) for the matcher pattern and canonical examples.
+`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. The working mechanism is the `mac` plugin's marker-based sandbox hook, which reads a `claude:dangerouslyDisableSandbox` comment from the invoked script. See [`scripts.md`](scripts.md) for the mechanism and canonical examples.

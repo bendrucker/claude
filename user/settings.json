@@ -184,7 +184,8 @@
         "~/src/go/pkg/mod",
         "~/src/go/pkg/sumdb",
         "~/.bun/install",
-        "~/.local/share/uv"
+        "~/.local/share/uv",
+        "~/.local/share/graphite"
       ]
     },
     "excludedCommands": [
@@ -198,12 +199,10 @@
       "wt:*",
       "claude:*",
       "agent-browser:*",
-      "bun link:*",
       "pbcopy:*",
       "pbpaste:*",
       "security:*",
       "defaults:*",
-      "launchctl:*",
       "screencapture:*",
       "say:*",
       "afplay:*",
@@ -212,14 +211,7 @@
       "open:*",
       "osascript:*",
       "shortcuts:*",
-      "swift:*",
-      "xcrun:*",
-      "mdfind:*",
-      "mdls:*",
-      "xattr:*",
       "dscl:*",
-      "plutil:*",
-      "tmux:*",
       "git:*",
       "gh:*",
       "code:*"

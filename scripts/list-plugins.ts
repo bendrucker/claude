@@ -1,13 +1,5 @@
 import { parseArgs } from "node:util";
-
-interface PluginEntry {
-  name: string;
-  source: string | { source: string; repo: string };
-}
-
-interface Marketplace {
-  plugins: PluginEntry[];
-}
+import { loadPlugins } from "@bendrucker/claude-marketplace";
 
 interface CiConfig {
   runner?: string;
@@ -19,10 +11,8 @@ interface PluginMatrix {
 }
 
 async function getLocalPlugins(): Promise<string[]> {
-  const marketplace: Marketplace = await Bun.file(".claude-plugin/marketplace.json").json();
-  return marketplace.plugins
-    .filter((p): p is PluginEntry & { source: string } => typeof p.source === "string")
-    .map((p) => p.name);
+  const plugins = await loadPlugins();
+  return plugins.filter((p) => p.listing?.local).map((p) => p.name);
 }
 
 async function readCiConfig(plugin: string): Promise<CiConfig> {

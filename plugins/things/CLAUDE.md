@@ -10,7 +10,7 @@ JXA scripts run via `osascript`, which requires Apple Events mach-lookup service
 - Formatter (`scripts/format-output.ts`): reads JSON from stdin, outputs tables or passes through `--json`
 - JXA execution: invoke the `mac:jxa-run` skill, which validates `Application("Things3")` scope via AST
 
-Sandbox bypass is handled by a PreToolUse hook in `hooks/hooks.json`. The matcher narrows to plugin scripts via `Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)`.
+Sandbox bypass is handled by the `mac` plugin's marker-based sandbox hook. Top-level scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`) carry a `// claude:dangerouslyDisableSandbox` comment after the shebang. The mac hook reads the invoked script's head and injects `dangerouslyDisableSandbox: true`. `${CLAUDE_PLUGIN_ROOT}` does NOT expand in hook matcher fields, so a per-plugin `Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)` matcher never fires. See [`plugins/mac/README.md`](../mac/README.md).
 
 ## JXA Script Conventions
 
@@ -27,7 +27,7 @@ Biome linting is disabled for `scripts/jxa/` files via the root `biome.json` ove
 
 ## Reorder Script
 
-`scripts/reorder.ts` is a bun TypeScript script that reuses `url.ts` exports (`getAuthToken`, `buildUrl`). It opens Things URLs via `open -g` to reorder items. Unlike the JXA scripts, it does not use `osascript` — sandbox bypass comes from the plugin PreToolUse hook in `hooks/hooks.json`.
+`scripts/reorder.ts` is a bun TypeScript script that reuses `url.ts` exports (`getAuthToken`, `buildUrl`). It opens Things URLs via `open -g` to reorder items. Unlike the JXA scripts, it does not use `osascript`. Sandbox bypass comes from the `mac` plugin's marker hook, which detects the `claude:dangerouslyDisableSandbox` comment in the script head.
 
 ## What NOT to Do
 

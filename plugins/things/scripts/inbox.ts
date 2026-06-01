@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// claude:dangerouslyDisableSandbox: hands off to Launch Services (open/xcall) for Things URL schemes
 
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";

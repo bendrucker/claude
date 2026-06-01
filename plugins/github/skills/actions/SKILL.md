@@ -1,9 +1,9 @@
 ---
 name: github:actions
 description: >-
-  GitHub Actions CI/CD workflow development and run monitoring. Use when creating
-  or editing .github/workflows YAML files, configuring triggers, jobs, matrix strategies,
-  caching, or artifacts. Also covers gh CLI for monitoring runs, viewing logs, and debugging failures.
+  Authoring GitHub Actions workflows. Use when creating or editing .github/workflows
+  YAML files, configuring triggers, jobs, matrix strategies, caching, or artifacts.
+  For monitoring runs and debugging failures, use github:actions-monitor.
 user-invocable: true
 ---
 

@@ -2,7 +2,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { styleText } from "node:util";
-import { purposeGlyphs, remoteGlyph } from "./glyphs";
+import { genericGlyph, purposeGlyphs, remoteGlyph } from "./glyphs";
 
 export interface Task {
   id: string;
@@ -42,22 +42,24 @@ function sliceToWidth(s: string, maxWidth: number): string {
   return out;
 }
 
-function statusIcon(status: string): string {
+// Status drives the icon color: gray while running, green on success, red on
+// failure. Folding status into the type glyph drops the separate status column.
+function statusColor(status: string): "gray" | "green" | "red" {
   switch (status) {
     case "completed":
-      return styleText("green", "✓");
+      return "green";
     case "failed":
-      return styleText("red", "✗");
+      return "red";
     default:
-      return styleText("yellow", "▶");
+      return "gray";
   }
 }
 
-// The agent kind drives the purpose glyph; untyped kinds (general-purpose,
-// unknown) get none.
-function purposeGlyph(agentType: string | null): string {
-  const glyph = agentType ? purposeGlyphs.get(agentType) : undefined;
-  return glyph ? styleText(["dim"], glyph) : "";
+// The agent kind drives the glyph; untyped kinds (general-purpose, unknown)
+// fall back to the generic robot. Its color carries the run status.
+function typeIcon(agentType: string | null, status: string): string {
+  const glyph = (agentType ? purposeGlyphs.get(agentType) : undefined) ?? genericGlyph;
+  return styleText(statusColor(status), glyph);
 }
 
 // .type is the agent origin. Cloud always marks remote agents; local agents
@@ -66,16 +68,15 @@ function remoteMarker(type: string | undefined): string {
   return type === "remote_agent" ? styleText(["dim"], remoteGlyph) : "";
 }
 
-// The purpose glyph leads, the cloud marker follows, so origin stays visible
-// without displacing the kind.
+// The status-colored type glyph leads, the cloud marker follows, so origin
+// stays visible without displacing the kind.
 export function renderTask(
   task: Task,
   columns: number | null,
   now: number,
   agentType: string | null,
 ): { id: string; content: string } {
-  const icon = statusIcon(task.status ?? "running");
-  const glyph = purposeGlyph(agentType);
+  const icon = typeIcon(agentType, task.status ?? "running");
   const marker = remoteMarker(task.type);
 
   let meta = "";
@@ -84,7 +85,6 @@ export function renderTask(
 
   const build = (text: string): string => {
     let body = icon;
-    if (glyph) body += ` ${glyph}`;
     if (marker) body += ` ${marker}`;
     body += ` ${text}`;
     if (meta) body += ` ${styleText(["dim"], meta)}`;

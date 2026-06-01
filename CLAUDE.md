@@ -33,7 +33,7 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 
 ## Verification
 
-- `scripts/check-marketplace.sh`: verifies all plugin directories are listed in `marketplace.json`. Runs in CI.
+- `bun scripts/check-marketplace.ts`: verifies all plugin directories are listed in `marketplace.json`. Runs in CI.
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 
 ## Workflow

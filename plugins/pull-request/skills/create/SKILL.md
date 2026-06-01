@@ -51,6 +51,17 @@ allowed-tools:
   - `## Testing` - Test coverage insights
   - `## References` - Related links and issues
 
+#### Voice
+
+Write plainly. Technical precision is good, marketing is not. Match the author's own voice: a developer explaining the change to a reviewer, not selling it.
+
+- Open with a bare present-tense verb: "Adds", "Fixes", "Changes", "Updates". State the mechanism first, then the motivation
+- Use a concrete noun where one exists. A metaphor is rarely shorter than the real name
+- Length tracks substance. A one-line change gets a one-line body. Don't pad
+- Hedge and name rejected alternatives honestly ("I doubt anyone has hit this", "I chose X over Y because…", "unrelated, required to run tests")
+- Avoid model flourishes: `source of truth`, `fail loudly`, `escape hatch`, `wires up`, `cleanly`. The antithesis construction (`X instead of Y`) is usually padding
+- Load the `writing` skill for the full set of tropes to avoid
+
 ## Template
 
 When a PR template is provided in context above, follow its structure instead of the default body format:

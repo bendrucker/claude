@@ -1,6 +1,8 @@
 ---
 name: git
-description: Git workflow and branching best practices. Use when working with git commands, creating branches, or pushing changes.
+description: >-
+  Core git usage (commit messages, topic branches, push safety rules).
+  For stacked branch workflows use git-town; for merge/rebase conflicts use git:conflicts.
 ---
 
 # Git

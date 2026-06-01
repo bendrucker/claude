@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildJsonPayload, coerceAttributes } from "./url";
+import { buildJsonPayload, coerceAttributes, isSandboxBlockedHandoff } from "./url";
 
 describe("buildJsonPayload", () => {
   test("single ID produces correct structure", () => {
@@ -110,5 +110,45 @@ describe("coerceAttributes", () => {
         { type: "checklist-item", attributes: { title: "Item 2" } },
       ],
     });
+  });
+});
+
+describe("isSandboxBlockedHandoff", () => {
+  test("matches procNotFound message", () => {
+    expect(
+      isSandboxBlockedHandoff(
+        "LSOpenURLsWithRole() failed for the application /Applications/Things3.app with error -10810.\nprocNotFound: no eligible process with specified descriptor",
+      ),
+    ).toBe(true);
+  });
+
+  test("matches bare -10810 code", () => {
+    expect(isSandboxBlockedHandoff("kLSApplicationNotFoundErr (-10810)")).toBe(true);
+  });
+
+  test("matches bare -10673 code", () => {
+    expect(isSandboxBlockedHandoff("NSOSStatusErrorDomain error -10673")).toBe(true);
+  });
+
+  test("matches LSOpenURLsWithRole line on its own", () => {
+    expect(isSandboxBlockedHandoff("LSOpenURLsWithRole failed")).toBe(true);
+  });
+
+  test("does not match unrelated stderr", () => {
+    expect(isSandboxBlockedHandoff("some other error from open")).toBe(false);
+  });
+
+  test("does not match empty stderr", () => {
+    expect(isSandboxBlockedHandoff("")).toBe(false);
+  });
+
+  test("does not match -10810 embedded in a larger number", () => {
+    expect(isSandboxBlockedHandoff("some unrelated number 999-108100 here")).toBe(false);
+    expect(isSandboxBlockedHandoff("error -108101 something else")).toBe(false);
+  });
+
+  test("does not match -10673 embedded in a larger number", () => {
+    expect(isSandboxBlockedHandoff("some unrelated number 999-106730 here")).toBe(false);
+    expect(isSandboxBlockedHandoff("error -106731 something else")).toBe(false);
   });
 });

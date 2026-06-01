@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
-import { type Database, ensureIndex, getDb, runQuery } from "./db";
+import { $ } from "bun";
+import { type Database, dirExists, ensureIndex, getDb, rebuildViews, runQuery } from "./db";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
 
 function filterParams(overrides: Record<string, string | null> = {}) {
-  return { after_date: null, before_date: null, project: null, ...overrides };
+  return { after_date: null, before_date: null, project: null, host: null, ...overrides };
 }
 
 function queryParams(overrides: Record<string, string | null> = {}) {
@@ -16,11 +17,33 @@ function queryParams(overrides: Record<string, string | null> = {}) {
 
 let db: Database;
 let tmpDir: string;
+let importsDir: string;
+
+async function importFixtureHost(label: string, opts: { source?: string } = {}) {
+  const projects = path.join(importsDir, label, "projects");
+  mkdirSync(projects, { recursive: true });
+  await $`cp -R ${fixturesDir}/. ${projects}`.quiet();
+  await Bun.write(
+    path.join(importsDir, label, "manifest.json"),
+    `${JSON.stringify({
+      host: label,
+      source: opts.source ?? `${label}:.claude/projects/`,
+      imported_at: "2026-01-01T00:00:00Z",
+      policy: { block_egress: true },
+    })}\n`,
+  );
+}
+
+async function reindex() {
+  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir, force: true });
+}
 
 beforeEach(async () => {
   tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-test-"));
+  importsDir = path.join(tmpDir, "imports");
+  mkdirSync(importsDir, { recursive: true });
   db = await getDb(tmpDir);
-  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir });
+  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir });
 });
 
 afterEach(async () => {
@@ -258,7 +281,7 @@ describe("incremental refresh", () => {
     const before = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
-    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir });
+    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir });
     const after = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
@@ -311,7 +334,7 @@ describe("type drift across imports", () => {
     );
     await db.run("DELETE FROM meta");
 
-    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, force: true });
+    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir, force: true });
 
     const [typeRow] = await db.query<{ data_type: string }>(
       "SELECT data_type FROM information_schema.columns WHERE table_name = 'raw' AND column_name = 'data'",
@@ -366,5 +389,283 @@ describe("discovery", () => {
         "summary",
       ]),
     );
+  });
+});
+
+describe("text_content view", () => {
+  it("excludes tool_use and tool_result content items", async () => {
+    const rows = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM text_content WHERE raw_text ILIKE '%tool_use%' OR raw_text ILIKE '%tool_result%'",
+    );
+    const toolRows = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM content_items WHERE type IN ('tool_use', 'tool_result')",
+    );
+    expect(toolRows[0]!.n).toBeGreaterThan(0n);
+    expect(rows[0]!.n).toBe(0n);
+  });
+
+  it("filters out empty text items", async () => {
+    const rows = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM text_content WHERE raw_text IS NULL OR length(trim(raw_text)) = 0",
+    );
+    expect(rows[0]!.n).toBe(0n);
+  });
+
+  it("populates role from the parent message", async () => {
+    const rows = await db.query<{ role: string }>(
+      "SELECT DISTINCT role FROM text_content ORDER BY role",
+    );
+    expect(rows.map((r) => r.role)).toEqual(["assistant", "user"]);
+  });
+
+  it("populates model on assistant rows and leaves it null on user rows", async () => {
+    const assistant = await db.query<{ model: string | null }>(
+      "SELECT model FROM text_content WHERE role = 'assistant' AND session_id = 'trope-session' LIMIT 1",
+    );
+    expect(assistant[0]?.model).toContain("claude");
+
+    const user = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM text_content WHERE role = 'user' AND model IS NOT NULL",
+    );
+    expect(user[0]!.n).toBe(0n);
+  });
+
+  it("strips fenced code blocks from text but preserves raw_text", async () => {
+    const rows = await db.query<{ text: string; raw_text: string }>(
+      "SELECT text, raw_text FROM text_content WHERE session_id = 'trope-session' AND raw_text ILIKE '%```%' LIMIT 1",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.raw_text).toContain("```");
+    expect(rows[0]!.text).not.toContain("```");
+    expect(rows[0]!.text).not.toContain("function authenticate");
+  });
+
+  it("strips inline backtick code from text", async () => {
+    const rows = await db.query<{ text: string; raw_text: string }>(
+      "SELECT text, raw_text FROM text_content WHERE session_id = 'trope-session' AND raw_text ILIKE '%`authenticate()`%' LIMIT 1",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.raw_text).toContain("`authenticate()`");
+    expect(rows[0]!.text).not.toContain("`authenticate()`");
+    expect(rows[0]!.text).not.toContain("authenticate()");
+  });
+
+  it("retains source_file and source_line for traceability", async () => {
+    const rows = await db.query<{ source_file: string; source_line: bigint }>(
+      "SELECT source_file, source_line FROM text_content WHERE session_id = 'trope-session' LIMIT 1",
+    );
+    expect(rows[0]!.source_file).toContain("trope.jsonl");
+    expect(Number(rows[0]!.source_line)).toBeGreaterThan(0);
+  });
+});
+
+describe("text-export query", () => {
+  function exportParams(overrides: Record<string, string | null> = {}) {
+    return {
+      role: null,
+      model: null,
+      after_date: null,
+      before_date: null,
+      project: null,
+      min_chars: null,
+      host: null,
+      ...overrides,
+    };
+  }
+
+  it("returns rows filtered by role", async () => {
+    const rows = await runQuery<{ role: string }>(
+      db,
+      "text-export",
+      exportParams({ role: "user" }),
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(row.role).toBe("user");
+  });
+
+  it("filters by model glob", async () => {
+    const rows = await runQuery<{ model: string }>(
+      db,
+      "text-export",
+      exportParams({ model: "claude-opus-*" }),
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(row.model).toContain("opus");
+  });
+
+  it("filters by min_chars on cleaned text", async () => {
+    const rows = await runQuery<{ text: string }>(
+      db,
+      "text-export",
+      exportParams({ min_chars: "200" }),
+    );
+    for (const row of rows) expect(row.text.length).toBeGreaterThanOrEqual(200);
+  });
+});
+
+describe("phrase-lift query", () => {
+  function liftParams(overrides: Record<string, string | null> = {}) {
+    return {
+      phrase: "reaching for",
+      after_date: null,
+      before_date: null,
+      host: null,
+      ...overrides,
+    };
+  }
+
+  it("counts phrase occurrences per role and model", async () => {
+    const rows = await runQuery<{
+      role: string;
+      model: string | null;
+      phrase_count: bigint;
+    }>(db, "phrase-lift", liftParams());
+
+    const assistant = rows.find((r) => r.role === "assistant" && r.model?.includes("opus"));
+    expect(assistant).toBeDefined();
+    expect(Number(assistant!.phrase_count)).toBeGreaterThanOrEqual(3);
+
+    const user = rows.find((r) => r.role === "user");
+    expect(user).toBeDefined();
+    expect(Number(user!.phrase_count)).toBe(0);
+  });
+
+  it("is case-insensitive", async () => {
+    const lower = await runQuery<{ phrase_count: bigint }>(
+      db,
+      "phrase-lift",
+      liftParams({ phrase: "reaching for" }),
+    );
+    const upper = await runQuery<{ phrase_count: bigint }>(
+      db,
+      "phrase-lift",
+      liftParams({ phrase: "REACHING FOR" }),
+    );
+    const sum = (rows: { phrase_count: bigint }[]) =>
+      rows.reduce((acc, r) => acc + Number(r.phrase_count), 0);
+    expect(sum(lower)).toBe(sum(upper));
+    expect(sum(lower)).toBeGreaterThan(0);
+  });
+
+  it("computes per_1m_chars for rows with phrase occurrences", async () => {
+    const rows = await runQuery<{
+      role: string;
+      model: string | null;
+      per_1m_chars: number | null;
+    }>(db, "phrase-lift", liftParams());
+    const assistant = rows.find((r) => r.role === "assistant" && r.model?.includes("opus"));
+    expect(assistant!.per_1m_chars).not.toBeNull();
+    expect(assistant!.per_1m_chars!).toBeGreaterThan(0);
+  });
+});
+
+describe("model-summary query", () => {
+  it("aggregates per-model counts over assistant text", async () => {
+    const rows = await runQuery<{
+      model: string;
+      messages: bigint;
+      total_chars: bigint;
+    }>(db, "model-summary", { after_date: null, before_date: null, project: null, host: null });
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.model).toBeTruthy();
+      expect(Number(row.messages)).toBeGreaterThan(0);
+      expect(Number(row.total_chars)).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("cross-machine history", () => {
+  it("tags imported rows with the host across sessions, messages, and content_items", async () => {
+    await importFixtureHost("work");
+    await reindex();
+
+    for (const tbl of ["sessions", "messages", "content_items"]) {
+      const rows = await db.query<{ host: string }>(
+        `SELECT DISTINCT host FROM ${tbl} ORDER BY host`,
+      );
+      expect(rows.map((r) => r.host)).toEqual(["local", "work"]);
+    }
+  });
+
+  it("scopes to a host with host= and spans all hosts without it", async () => {
+    await importFixtureHost("work");
+    await reindex();
+
+    const scoped = await runQuery<{ host: string }>(
+      db,
+      "search",
+      queryParams({ host: "work", query: "error" }),
+    );
+    expect(scoped.length).toBeGreaterThan(0);
+    expect(scoped.every((r) => r.host === "work")).toBe(true);
+
+    const spanned = await runQuery<{ host: string }>(db, "search", queryParams({ query: "error" }));
+    expect(new Set(spanned.map((r) => r.host))).toEqual(new Set(["local", "work"]));
+
+    const scopedStats = await runQuery<{ total_sessions: number }>(
+      db,
+      "stats",
+      filterParams({ host: "work" }),
+    );
+    const allStats = await runQuery<{ total_sessions: number }>(db, "stats", filterParams());
+    expect(Number(allStats[0]?.total_sessions)).toBe(Number(scopedStats[0]?.total_sessions) * 2);
+  });
+
+  it("indexes a host whose files predate the local import (per-host watermark)", async () => {
+    // Push local's watermark past the imported files so they "predate" the local
+    // import. Only a per-host watermark (epoch for a new host) lets archive index;
+    // a shared watermark would skip its now-older files.
+    await db.run("UPDATE meta SET last_import = '2099-01-01'::TIMESTAMP WHERE host = 'local'");
+    await importFixtureHost("archive");
+    await reindex();
+
+    const [row] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM sessions WHERE host = 'archive'",
+    );
+    expect(Number(row?.n)).toBeGreaterThan(0);
+  });
+
+  it("forget removes a host's rows and synced files", async () => {
+    await importFixtureHost("gone");
+    await reindex();
+    const [before] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'gone'",
+    );
+    expect(Number(before?.n)).toBeGreaterThan(0);
+
+    await db.run("DELETE FROM raw WHERE host = $host", { host: "gone" });
+    await db.run("DELETE FROM meta WHERE host = $host", { host: "gone" });
+    await rebuildViews(db);
+    await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
+
+    const [after] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'gone'",
+    );
+    expect(Number(after?.n)).toBe(0);
+    const sessions = await db.query<{ host: string }>(
+      "SELECT DISTINCT host FROM sessions ORDER BY host",
+    );
+    expect(sessions.map((r) => r.host)).toEqual(["local"]);
+    expect(dirExists(path.join(importsDir, "gone"))).toBe(false);
+  });
+
+  it("keeps the same session distinct across hosts without merging or dropping", async () => {
+    await importFixtureHost("alpha");
+    await importFixtureHost("beta");
+    await reindex();
+
+    const hosts = await db.query<{ host: string }>(
+      "SELECT host FROM sessions WHERE session_id = 'basic-session' ORDER BY host",
+    );
+    expect(hosts.map((r) => r.host)).toEqual(["alpha", "beta", "local"]);
+
+    const counts = await db.query<{ host: string; n: bigint }>(
+      "SELECT host, COUNT(*) AS n FROM sessions GROUP BY host ORDER BY host",
+    );
+    expect(counts.map((r) => r.host)).toEqual(["alpha", "beta", "local"]);
+    const distinct = new Set(counts.map((r) => Number(r.n)));
+    expect(distinct.size).toBe(1);
+    expect([...distinct][0]).toBeGreaterThan(0);
   });
 });

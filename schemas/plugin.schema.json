@@ -69,6 +69,25 @@
     "lspServers": {
       "$ref": "#/$defs/pathOrObject",
       "description": "LSP config path or inline config"
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Plugins required by this plugin",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "version": { "type": "string" },
+              "marketplace": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
     }
   },
   "$defs": {

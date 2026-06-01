@@ -6,10 +6,29 @@ const RESOURCES_DIR = path.join(import.meta.dirname, "..", "resources");
 const SCHEMA_DIR = path.join(RESOURCES_DIR, "schema");
 const QUERIES_DIR = path.join(RESOURCES_DIR, "queries");
 
+export const LOCAL_HOST = "local";
+
 export interface Database {
   run(sql: string, params?: Record<string, string | null>): Promise<void>;
   query<T>(sql: string, params?: Record<string, string | null>): Promise<T[]>;
   close(): void;
+}
+
+export interface HostPolicy {
+  block_egress?: boolean;
+}
+
+export interface Manifest {
+  host: string;
+  source: string;
+  imported_at: string;
+  policy: HostPolicy;
+}
+
+export interface HostEntry {
+  host: string;
+  glob: string;
+  policy: HostPolicy;
 }
 
 async function createDatabase(dbPath: string): Promise<Database> {
@@ -40,7 +59,7 @@ async function readSql(dir: string, name: string): Promise<string> {
   return Bun.file(path.join(dir, `${name}.sql`)).text();
 }
 
-function getProjectsGlob(projectsDir?: string): string {
+function getLocalGlob(projectsDir?: string): string {
   const dir = projectsDir || process.env.CLAUDE_PROJECTS_DIR;
   if (dir) return path.join(dir, "**", "*.jsonl");
 
@@ -48,6 +67,96 @@ function getProjectsGlob(projectsDir?: string): string {
     throw new Error("Cannot locate projects directory: set CLAUDE_PROJECTS_DIR or HOME");
   }
   return path.join(process.env.HOME, ".claude", "projects", "**", "*.jsonl");
+}
+
+export function getImportsDir(importsDir?: string): string {
+  const dir = importsDir || process.env.CLAUDE_SESSION_IMPORTS_DIR;
+  if (dir) return dir;
+
+  if (!process.env.HOME) {
+    throw new Error("Cannot locate imports directory: set CLAUDE_SESSION_IMPORTS_DIR or HOME");
+  }
+  return path.join(process.env.HOME, ".claude", "session-imports");
+}
+
+export function importRoot(label: string, importsDir?: string): string {
+  return path.join(getImportsDir(importsDir), label);
+}
+
+export function getDataDir(): string {
+  return (
+    process.env.CLAUDE_PLUGIN_DATA || path.join(process.env.TMPDIR || "/tmp", "claude-session")
+  );
+}
+
+export function sessionDbPath(dataDir: string): string {
+  return path.join(dataDir, "session.duckdb");
+}
+
+export function dirExists(target: string): boolean {
+  try {
+    readdirSync(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface ImportedHost {
+  label: string;
+  root: string;
+  manifestPath: string;
+  manifest: Manifest;
+}
+
+function readDirEntries(dir: string) {
+  try {
+    return readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
+export async function listImportedHosts(importsDir?: string): Promise<ImportedHost[]> {
+  const root = getImportsDir(importsDir);
+  const hosts: ImportedHost[] = [];
+  for (const entry of readDirEntries(root)) {
+    if (!entry.isDirectory()) continue;
+    const hostRoot = path.join(root, entry.name);
+    const manifestPath = path.join(hostRoot, "manifest.json");
+    try {
+      const manifest: unknown = await Bun.file(manifestPath).json();
+      hosts.push({
+        label: entry.name,
+        root: hostRoot,
+        manifestPath,
+        manifest: manifest as Manifest,
+      });
+    } catch {
+      // No manifest (or invalid JSON) means this directory is not a registered host.
+    }
+  }
+  return hosts;
+}
+
+export async function enumerateHosts(
+  options: { projectsDir?: string; importsDir?: string } = {},
+): Promise<HostEntry[]> {
+  const hosts: HostEntry[] = [
+    { host: LOCAL_HOST, glob: getLocalGlob(options.projectsDir), policy: {} },
+  ];
+
+  for (const imported of await listImportedHosts(options.importsDir)) {
+    // The directory name is the canonical label (forget.ts/hosts.ts/importRoot all
+    // key on it); the manifest's host field is informational and may be hand-edited.
+    hosts.push({
+      host: imported.label,
+      glob: path.join(imported.root, "projects", "**", "*.jsonl"),
+      policy: imported.manifest.policy ?? {},
+    });
+  }
+
+  return hosts;
 }
 
 async function applySchema(db: Database): Promise<void> {
@@ -61,56 +170,74 @@ async function applySchema(db: Database): Promise<void> {
 }
 
 async function migrateIfNeeded(db: Database): Promise<void> {
-  const [row] = await db.query<{ ok: boolean }>(`
-    SELECT EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema = 'main' AND table_name = 'raw' AND column_name = 'data'
-    ) AS ok
+  const [row] = await db.query<{ has_data: boolean; has_host: boolean }>(`
+    SELECT
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'main' AND table_name = 'raw' AND column_name = 'data'
+      ) AS has_data,
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'main' AND table_name = 'raw' AND column_name = 'host'
+      ) AS has_host
   `);
-  if (row?.ok) return;
-  await db.run("DROP TABLE IF EXISTS messages");
+  if (row?.has_data && row?.has_host) return;
   await db.run("DROP TABLE IF EXISTS content_items");
   await db.run("DROP TABLE IF EXISTS raw");
   await db.run("DROP TABLE IF EXISTS meta");
 }
 
 export async function getDb(dataDir: string): Promise<Database> {
-  const dbPath = path.join(dataDir, "session.duckdb");
-  return createDatabase(dbPath);
+  return createDatabase(sessionDbPath(dataDir));
+}
+
+export async function ensureSchema(db: Database): Promise<void> {
+  await migrateIfNeeded(db);
+  await applySchema(db);
+}
+
+export async function rebuildViews(db: Database): Promise<void> {
+  await db.run(await readSql(RESOURCES_DIR, "views"));
 }
 
 export async function ensureIndex(
   db: Database,
-  options: { projectsDir?: string; force?: boolean; dataDir?: string } = {},
+  options: { projectsDir?: string; importsDir?: string; force?: boolean; dataDir?: string } = {},
 ): Promise<void> {
-  if (!options.force && options.dataDir) {
-    const sessionId = process.env.CLAUDE_SESSION_ID;
-    if (sessionId) {
-      const marker = path.join(options.dataDir, `.refreshed-${sessionId}`);
-      if (await Bun.file(marker).exists()) return;
-    }
+  const sessionId = process.env.CLAUDE_SESSION_ID;
+  const marker =
+    options.dataDir && sessionId
+      ? path.join(options.dataDir, `.refreshed-${sessionId}`)
+      : undefined;
+
+  if (!options.force && marker && (await Bun.file(marker).exists())) return;
+
+  await ensureSchema(db);
+
+  let imported = false;
+  for (const entry of await enumerateHosts(options)) {
+    await db.run("SET VARIABLE host = $host", { host: entry.host });
+    await db.run("SET VARIABLE projects_glob = $glob", { glob: entry.glob });
+    await db.run(await readSql(RESOURCES_DIR, "refresh"));
+
+    const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
+    if (!row || row.n === 0n) continue;
+
+    await db.run("SET VARIABLE source = getvariable('changed_files')");
+    await db.run(await readSql(RESOURCES_DIR, "import"));
+    imported = true;
   }
 
-  await migrateIfNeeded(db);
-  await applySchema(db);
+  if (imported) {
+    await rebuildViews(db);
+  }
 
-  const glob = getProjectsGlob(options.projectsDir);
+  // Clear the per-host indexing variable so a query reusing this connection without
+  // an explicit host param spans all hosts rather than inheriting the last one.
+  await db.run("SET VARIABLE host = NULL");
 
-  await db.run("SET VARIABLE projects_glob = $glob", { glob });
-  await db.run(await readSql(RESOURCES_DIR, "refresh"));
-
-  const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
-  if (!row || row.n === 0n) return;
-
-  await db.run("SET VARIABLE source = getvariable('changed_files')");
-  await db.run(await readSql(RESOURCES_DIR, "import"));
-  await db.run(await readSql(RESOURCES_DIR, "views"));
-
-  if (options.dataDir) {
-    const sessionId = process.env.CLAUDE_SESSION_ID;
-    if (sessionId) {
-      await Bun.write(path.join(options.dataDir, `.refreshed-${sessionId}`), "");
-    }
+  if (marker) {
+    await Bun.write(marker, "");
   }
 }
 

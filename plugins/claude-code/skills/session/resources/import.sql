@@ -1,5 +1,6 @@
 CREATE OR REPLACE TEMP TABLE new_raw AS
 SELECT
+  getvariable('host')                                 AS host,
   json->>'$.sessionId'                                AS session_id,
   json->>'$.type'                                     AS type,
   json->>'$.cwd'                                      AS project_path,
@@ -28,11 +29,14 @@ SET VARIABLE changed_sessions = (
 
 CREATE OR REPLACE TABLE raw AS
 SELECT * FROM raw
-WHERE session_id NOT IN (SELECT unnest(getvariable('changed_sessions'))::VARCHAR)
+WHERE NOT (
+  host = getvariable('host')
+  AND session_id IN (SELECT unnest(getvariable('changed_sessions'))::VARCHAR)
+)
 UNION ALL
 SELECT * FROM new_raw;
 
 DROP TABLE new_raw;
 
-DELETE FROM meta;
-INSERT INTO meta VALUES (CURRENT_TIMESTAMP);
+DELETE FROM meta WHERE host = getvariable('host');
+INSERT INTO meta VALUES (getvariable('host'), CURRENT_TIMESTAMP);

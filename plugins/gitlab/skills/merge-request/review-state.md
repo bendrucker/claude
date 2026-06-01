@@ -16,15 +16,18 @@ mutation($projectPath: ID!, $iid: String!) {
 ```bash
 glab api graphql \
   -f query='mutation($projectPath: ID!, $iid: String!) { mergeRequestRequestChanges(input: { projectPath: $projectPath, iid: $iid }) { mergeRequest { iid } errors } }' \
-  -F projectPath=$(glab repo view --output json | jq -r '.fullPath') \
-  -F iid=<iid>
+  -f projectPath=$(glab repo view --output json | jq -r '.path_with_namespace') \
+  -f iid=<iid>
 ```
 
 **Requirements:**
 - Premium/Ultimate tier
 - Caller must be assigned as a reviewer on the MR (fails with "Reviewer not found" otherwise)
 
-**Common mistake:** `projectPath` is typed `ID!`, not `String!`. Using `String!` causes a type mismatch error.
+**Common mistakes:**
+- `projectPath` is typed `ID!`, not `String!`. Using `String!` causes a type mismatch error.
+- Use `-f` (raw string) for `iid`, not `-F`. `-F` coerces numeric-looking values to int, which fails against `String!`.
+- `glab repo view --output json` returns `path_with_namespace`, not `fullPath`.
 
 ## Remove Request Changes
 
@@ -60,9 +63,9 @@ user_id=$(glab api "users?username=<username>" | jq -r '.[0].id')
 
 glab api graphql \
   -f query='mutation($projectPath: ID!, $iid: String!, $userId: UserID!) { mergeRequestReviewerRereview(input: { projectPath: $projectPath, iid: $iid, userId: $userId }) { errors } }' \
-  -F projectPath=$(glab repo view --output json | jq -r '.fullPath') \
-  -F iid=<iid> \
-  -F userId="gid://gitlab/User/$user_id"
+  -f projectPath=$(glab repo view --output json | jq -r '.path_with_namespace') \
+  -f iid=<iid> \
+  -f userId="gid://gitlab/User/$user_id"
 ```
 
 **Gotchas:**

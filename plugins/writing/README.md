@@ -1,12 +1,30 @@
 # Writing
 
-Writing style enforcement hooks and AI trope detection.
+Writing style enforcement and slop detection for prose output (PR descriptions, review comments, Slack messages, documentation). Catches AI-generated and human writing patterns that read as vague, promotional, or templated.
 
 ## Contents
 
 - **Hooks**: Numbered heading detection, heading style enforcement, AI writing trope detection (em dashes, vocabulary, copula avoidance, promotional language, parallelism, semicolons)
-- **Skills**: `writing` system reminder for prose writing guidelines, `writing:review` multi-agent document review
+- **Skills**: `writing` system reminder for prose writing guidelines, `writing:analyze` session-history-based trope ruleset curation, `writing:review` multi-agent document review
 - **Agents**: `content`, `style`, `artifacts` (conditional review lenses)
+
+## Wordlists
+
+Trope patterns that take the form of a list of words live as line-delimited files under [`wordlists/`](wordlists/).
+
+#### Stemmed Wordlists
+
+One word per line. Matching uses a Porter stemmer (`stemmer` npm package), so inflected forms are caught automatically from base entries. `#` comments and blank lines are ignored. Multi-word and hyphenated phrases are not supported in stemmed wordlists (the stemmer tokenizes on word boundaries). Use inline regex patterns in `tropes.ts` for phrase matching.
+
+#### Plain Wordlists (Regex)
+
+Used for openers and let-me-verbs where the match depends on position context (line start, "let me" prefix). One entry per line, compiled to a regex alternation with configurable prefix/suffix.
+
+#### Weighted Wordlists
+
+`<word> <weight>` per line. Uses the same Porter stemmer as vocabulary. The hook accumulates the weighted total of hits and reminds when the total clears a threshold.
+
+The loader lives in [`hooks/wordlists.ts`](hooks/wordlists.ts). Compiled patterns are exposed via the `WORDLISTS` constant and consumed by `tropes.ts`.
 
 ## Hook Commands
 

@@ -21,6 +21,15 @@ Choose the right tool for the task:
 
 ## Conventions
 
+#### Creating vs Updating
+
+The Claude.ai Linear connector exposes a single tool, `save_issue`, for both creating and updating issues:
+
+- **Create**: omit the issue id. `title` is **required** (omitting it produces "title is required when creating an issue").
+- **Update**: supply the issue id. `title` is optional.
+
+The local and plugin variants use separate tools (`create_issue` and `update_issue`). The examples below use those names. When connected via the Claude.ai connector, substitute `save_issue` and apply the preconditions above.
+
 ### Issue References
 
 When writing text that references other issues (descriptions, comments, updates), never use bare identifiers like `ENG-123`. Linear auto-renders issue URLs as inline preview components, so use the full URL:

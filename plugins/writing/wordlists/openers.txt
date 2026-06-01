@@ -1,0 +1,12 @@
+# Sycophantic affirmation openers at line/sentence start.
+# Matched at the start of a line (or after a newline) followed by terminal
+# punctuation or comma. See wordlists.ts loader for compilation rules.
+Perfect
+Excellent
+Great
+Wonderful
+Absolutely
+Fantastic
+Amazing
+Awesome
+Brilliant

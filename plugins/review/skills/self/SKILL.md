@@ -2,6 +2,7 @@
 name: review:self
 description: |
   Self-review your own code changes using Hunk. You annotate lines in the Hunk TUI; Claude reads your comments via `hunk session comment list` and applies the requested edits.
+disable-model-invocation: true
 allowed-tools:
   - "Bash(hunk session:*)"
 ---

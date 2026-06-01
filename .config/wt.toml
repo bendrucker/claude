@@ -1,0 +1,5 @@
+# Link workspace deps (@bendrucker/*) so bun scripts and hooks resolve them
+# immediately. bun's auto-install only fetches registry packages, not
+# workspace:* specifiers, so a fresh worktree needs `bun install` to create the
+# node_modules symlinks. Runs in the background to avoid blocking session start.
+post-start = "bun install"

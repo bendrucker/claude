@@ -52,4 +52,4 @@ repos:
         language: system
         files: ^(plugins/|\.claude-plugin/marketplace\.json)
         pass_filenames: false
-        entry: scripts/check-marketplace.sh
+        entry: bun scripts/check-marketplace.ts

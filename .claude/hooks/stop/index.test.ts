@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseTranscript } from ".";
+import type { StopHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { parseTranscript, processStop } from ".";
 
 let tempDir: string;
 
@@ -92,5 +93,38 @@ describe("parseTranscript", () => {
     );
 
     expect(await parseTranscript(transcriptPath)).toEqual([]);
+  });
+});
+
+describe("processStop", () => {
+  const originalRemoteEnv = process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE;
+
+  afterEach(() => {
+    if (originalRemoteEnv === undefined) {
+      delete process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE;
+    } else {
+      process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE = originalRemoteEnv;
+    }
+  });
+
+  it("skips prek when running in a remote environment", async () => {
+    const filePath = join(tempDir, "remote-skip.ts");
+    await Bun.write(filePath, "export {}");
+
+    const transcriptPath = join(tempDir, "transcript-remote.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+    process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE = "cloud_default";
+
+    const input: StopHookInput = {
+      hook_event_name: "Stop",
+      session_id: "test",
+      transcript_path: transcriptPath,
+      cwd: tempDir,
+      stop_hook_active: false,
+      permission_mode: "default",
+    };
+
+    expect(await processStop(input)).toBeNull();
   });
 });

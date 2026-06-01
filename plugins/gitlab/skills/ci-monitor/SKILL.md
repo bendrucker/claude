@@ -1,7 +1,6 @@
 ---
 name: gitlab:ci-monitor
-description: |
-  Investigate GitLab CI pipeline failures and extract diagnostic information. Use when watching MR CI, main-branch build-and-deploy, or a specific pipeline (including manually-triggered pipelines). Identifies failing jobs, extracts relevant error output, and returns a concise summary.
+description: Investigate GitLab CI pipeline failures and extract diagnostics. Use when watching MR CI, branch builds, or specific pipelines.
 allowed-tools:
   - Monitor
   - TaskStop

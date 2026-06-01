@@ -6,17 +6,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/context.ts"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/context.ts\""
           }
         ]
       }
     ],
     "PreToolUse": [
       {
+        "matcher": "Bash|Edit|Write|MultiEdit|mcp__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts --clear"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts\" --clear"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(tmux:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/target.ts\""
           }
         ]
       },
@@ -25,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/team-workaround.ts --setup"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/team-workaround.ts\" --setup"
           }
         ]
       }
@@ -36,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts\""
           }
         ]
       }
@@ -46,11 +56,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts --background-only"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts\" --background-only"
           },
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/team-workaround.ts --teardown"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/team-workaround.ts\" --teardown"
           }
         ]
       }

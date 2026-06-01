@@ -1,7 +1,6 @@
 ---
 name: github:actions-monitor
-description: |
-  Monitor GitHub Actions workflow runs for a PR, a branch, or a specific run (including `workflow_dispatch` triggers) and extract failure diagnostics. Use when watching PR CI, main-branch build-and-deploy, or a specific workflow run (including `workflow_dispatch` triggers). Identifies failing jobs, extracts relevant error output, and returns a concise summary.
+description: Monitor GitHub Actions runs and extract failure diagnostics. Use when watching PR CI, branch builds, or specific workflow runs.
 allowed-tools:
   - Monitor
   - TaskStop

@@ -1,10 +1,8 @@
 ---
 name: raycast
-description: >-
-  Raycast extension development patterns and API. Use when working with @raycast/api imports,
-  package.json files with Raycast commands/tools, npx ray commands, or building Raycast extensions
-  with React and TypeScript.
-user-invocable: false
+description: Raycast extension development. Use when working with @raycast/api imports, Raycast commands/tools, or building extensions.
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Raycast

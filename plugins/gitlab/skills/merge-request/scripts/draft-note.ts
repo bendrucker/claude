@@ -132,7 +132,9 @@ const submitCmd = command(
       await $`glab api projects/:id/merge_requests/${mr}/approve -X POST -f sha=${refs.head_sha}`.text();
       console.error("Approved MR");
     } else if (parsed.flags.requestChanges) {
-      const projectPath = (await $`glab repo view --output json | jq -r '.fullPath'`.text()).trim();
+      const projectPath = (
+        await $`glab repo view --output json | jq -r '.path_with_namespace'`.text()
+      ).trim();
       const query = `mutation($projectPath: ID!, $iid: String!) {
         mergeRequestRequestChanges(input: { projectPath: $projectPath, iid: $iid }) {
           mergeRequest { iid }
@@ -140,7 +142,7 @@ const submitCmd = command(
         }
       }`;
       const gqlResult =
-        await $`glab api graphql -f query=${query} -F projectPath=${projectPath} -F iid=${String(mr)}`.json();
+        await $`glab api graphql -f query=${query} -f projectPath=${projectPath} -f iid=${String(mr)}`.json();
       const payload = gqlResult?.data?.mergeRequestRequestChanges;
       if (payload?.errors?.length) {
         console.error(`Request changes failed: ${payload.errors.join(", ")}`);

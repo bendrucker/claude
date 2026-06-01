@@ -7,16 +7,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts write"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts\" write"
           },
           {
             "type": "command",
-            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts\"",
             "if": "Write(**/*.md)"
           },
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\""
           }
         ]
       },
@@ -25,16 +25,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts edit"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts\" edit"
           },
           {
             "type": "command",
-            "command": "bun install --cwd ${CLAUDE_PLUGIN_ROOT} 2>/dev/null; bun ${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts\"",
             "if": "Edit(**/*.md)"
           },
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\""
           }
         ]
       },
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\""
           }
         ]
       },
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts"
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\""
           }
         ]
       }

@@ -79,7 +79,6 @@
     ]
   },
   "enabledPlugins": {
-    "pr-review-toolkit@claude-plugins-official": true,
     "go@bendrucker": true,
     "mac@bendrucker": true,
     "git@bendrucker": true,
@@ -109,7 +108,6 @@
     "playground@claude-plugins-official": true,
     "linear-cli@linear-cli": true,
     "tmux@bendrucker": true,
-    "agent-browser@agent-browser": true,
     "bun@bendrucker": true,
     "git-town@bendrucker": true,
     "mermaid@bendrucker": true,
@@ -149,7 +147,7 @@
       "source": {
         "source": "github",
         "repo": "max-sixty/worktrunk",
-        "ref": "v0.44.0"
+        "ref": "v0.52.0"
       }
     },
     "linear-cli": {
@@ -163,7 +161,7 @@
       "source": {
         "source": "github",
         "repo": "vercel-labs/agent-browser",
-        "ref": "v0.26.0"
+        "ref": "v0.27.0"
       }
     }
   },
@@ -173,7 +171,8 @@
     "network": {
       "allowLocalBinding": true,
       "allowUnixSockets": [
-        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
+        "~/.tmux"
       ]
     },
     "filesystem": {
@@ -184,7 +183,9 @@
         "~/Library/Caches/go-build",
         "~/src/go/pkg/mod",
         "~/src/go/pkg/sumdb",
-        "~/.bun/install"
+        "~/.bun/install",
+        "~/.local/share/uv",
+        "~/.local/share/graphite"
       ]
     },
     "excludedCommands": [
@@ -198,12 +199,10 @@
       "wt:*",
       "claude:*",
       "agent-browser:*",
-      "bun link:*",
       "pbcopy:*",
       "pbpaste:*",
       "security:*",
       "defaults:*",
-      "launchctl:*",
       "screencapture:*",
       "say:*",
       "afplay:*",
@@ -212,29 +211,30 @@
       "open:*",
       "osascript:*",
       "shortcuts:*",
-      "swift:*",
-      "xcrun:*",
-      "mdfind:*",
-      "mdls:*",
-      "xattr:*",
       "dscl:*",
-      "plutil:*",
-      "tmux:*",
       "git:*",
       "gh:*",
+      "linear:*",
       "code:*"
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/scripts/statusline.sh"
+    "command": "~/.claude/scripts/statusline.ts"
+  },
+  "subagentStatusLine": {
+    "type": "command",
+    "command": "~/.claude/scripts/subagent-statusline.ts"
   },
   "skipAutoPermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "alwaysThinkingEnabled": true,
   "spinnerTipsEnabled": false,
   "showClearContextOnPlanAccept": true,
   "autoCompactEnabled": false,
   "preferredNotifChannel": "terminal_bell",
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
   "teammateMode": "auto",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",

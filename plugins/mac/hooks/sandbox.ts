@@ -4,14 +4,18 @@ import { basename } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
-type BashInput = { command: string };
+type ToolInput = { command: string };
 
 const SHELL_OPERATORS = /\s*(?:&&|\|\||[|;])\s*/;
+const SCRIPT_INTERPRETERS = new Set(["bun", "node"]);
+const SCRIPT_MARKER = "claude:dangerouslyDisableSandbox";
 
-export function extractCommands(command: string): string[] {
+export type Invocation = { cmd: string; scriptArg?: string };
+
+export function extractCommands(command: string): Invocation[] {
   const segments = command.split(SHELL_OPERATORS);
   const seen = new Set<string>();
-  const result: string[] = [];
+  const result: Invocation[] = [];
 
   for (const segment of segments) {
     const trimmed = segment.trim().replace(/^[()]+|[()]+$/g, "");
@@ -29,24 +33,40 @@ export function extractCommands(command: string): string[] {
     if (!cmd) continue;
 
     const name = basename(cmd);
-    if (!seen.has(name)) {
-      seen.add(name);
-      result.push(cmd);
+    if (seen.has(name)) continue;
+    seen.add(name);
+
+    const invocation: Invocation = { cmd };
+    if (SCRIPT_INTERPRETERS.has(name)) {
+      const next = tokens[i + 1];
+      if (next && !next.startsWith("-")) {
+        invocation.scriptArg = next;
+      }
     }
+    result.push(invocation);
   }
 
   return result;
 }
 
-export async function hasGoBuildInfo(path: string): Promise<boolean> {
+async function readHead(path: string, length = 65536): Promise<Buffer | null> {
   try {
     const file = Bun.file(path);
-    const slice = file.slice(0, 65536);
-    const bytes = Buffer.from(await slice.arrayBuffer());
-    return bytes.includes("__go_buildinfo");
+    const slice = file.slice(0, length);
+    return Buffer.from(await slice.arrayBuffer());
   } catch {
-    return false;
+    return null;
   }
+}
+
+export async function hasGoBuildInfo(path: string): Promise<boolean> {
+  const head = await readHead(path);
+  return head ? head.includes("__go_buildinfo") : false;
+}
+
+export async function hasBypassMarker(path: string): Promise<boolean> {
+  const head = await readHead(path);
+  return head ? head.includes(SCRIPT_MARKER) : false;
 }
 
 export async function isGoBinary(command: string): Promise<boolean> {
@@ -71,13 +91,16 @@ export async function processInput(
   if (platform !== "darwin") return null;
 
   const toolInput = input.tool_input as Record<string, unknown>;
-  const { command } = toolInput as BashInput;
+  const { command } = toolInput as ToolInput;
   if (!command) return null;
 
-  const commands = extractCommands(command);
+  const invocations = extractCommands(command);
 
-  for (const cmd of commands) {
+  for (const { cmd, scriptArg } of invocations) {
     if (await isGoBinary(cmd)) {
+      return disableSandbox(toolInput);
+    }
+    if (scriptArg && (await hasBypassMarker(scriptArg))) {
       return disableSandbox(toolInput);
     }
   }

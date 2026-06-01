@@ -217,6 +217,283 @@ describe("scan", () => {
   it("returns empty for clean prose", () => {
     expect(scan("The function processes input and returns a result.")).toHaveLength(0);
   });
+
+  describe("sycophantic opener", () => {
+    const flag = [
+      "Perfect. That works.",
+      "Excellent! Moving on.",
+      "Great, the build passes.",
+      "Absolutely, the design holds up.",
+    ];
+    const allow = [
+      "This was a perfect example of the issue.",
+      "An excellent question to consider.",
+      "It is great that the migration shipped.",
+    ];
+
+    for (const text of flag) {
+      it(`flags: "${text}"`, () => {
+        expect(firstByTier(scan(text), "deny")?.category).toBe("sycophantic opener");
+      });
+    }
+
+    for (const text of allow) {
+      it(`allows: "${text}"`, () => {
+        expect(scan(text).find((m) => m.category === "sycophantic opener")).toBeUndefined();
+      });
+    }
+  });
+
+  describe("sycophantic acknowledgment", () => {
+    it("flags: You're right", () => {
+      expect(firstByTier(scan("You're right, that was wrong."), "deny")?.category).toBe(
+        "sycophantic acknowledgment",
+      );
+    });
+
+    it("flags: You're absolutely right", () => {
+      expect(firstByTier(scan("You're absolutely right about that."), "deny")?.category).toBe(
+        "sycophantic acknowledgment",
+      );
+    });
+
+    it("allows: turn right", () => {
+      expect(
+        scan("Turn right at the corner.").find((m) => m.category === "sycophantic acknowledgment"),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("permission-seeking", () => {
+    it("flags: want me to fix", () => {
+      expect(firstByTier(scan("Want me to fix the bug?"), "deny")?.category).toBe(
+        "permission-seeking",
+      );
+    });
+
+    it("allows: they want me there", () => {
+      expect(
+        scan("They want me there by noon.").find((m) => m.category === "permission-seeking"),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("hedging close", () => {
+    it("flags: would you like", () => {
+      expect(firstByTier(scan("Would you like me to retry?"), "deny")?.category).toBe(
+        "hedging close",
+      );
+    });
+  });
+
+  describe("reaching for", () => {
+    const flag = [
+      "Open a sibling pane rather than reaching for Bash.",
+      "Reach for the linter before the formatter.",
+    ];
+    for (const text of flag) {
+      it(`flags: "${text}"`, () => {
+        expect(firstByTier(scan(text), "deny")?.category).toBe("reaching for");
+      });
+    }
+  });
+
+  describe("cross-sentence not-X", () => {
+    it("flags: It isn't X. It is Y.", () => {
+      expect(firstByTier(scan("It isn't broken. It is slow."), "context")?.category).toBe(
+        "cross-sentence not-X",
+      );
+    });
+
+    it("allows: single-sentence negation", () => {
+      expect(
+        scan("It isn't broken.").find((m) => m.category === "cross-sentence not-X"),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("passive PR summary", () => {
+    it("flags in markdown: 'is added'", () => {
+      expect(
+        firstByTier(scan("Retry logic is added to the HTTP client.", "pr.md"), "context")?.category,
+      ).toBe("passive PR summary");
+    });
+
+    it("flags in markdown: 'was refactored'", () => {
+      expect(
+        firstByTier(scan("The cache layer was refactored last week.", "pr.md"), "context")
+          ?.category,
+      ).toBe("passive PR summary");
+    });
+
+    it("skips in code files", () => {
+      expect(
+        scan("retry logic is added to the http client", "index.ts").find(
+          (m) => m.category === "passive PR summary",
+        ),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("tests cover preamble", () => {
+    it("flags: 'Tests cover ...'", () => {
+      expect(
+        firstByTier(scan("Tests cover error handling for malformed JSON."), "context")?.category,
+      ).toBe("tests cover preamble");
+    });
+
+    it("allows: 'Added tests covering ...'", () => {
+      expect(
+        scan("Added tests covering the error handling for malformed JSON.").find(
+          (m) => m.category === "tests cover preamble",
+        ),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("path bullet", () => {
+    it("flags in markdown", () => {
+      expect(
+        firstByTier(scan("- **src/foo.ts**: refactors the helper", "doc.md"), "context")?.category,
+      ).toBe("path bullet");
+    });
+
+    it("skips in code files", () => {
+      expect(
+        scan("- **src/foo.ts**: refactors the helper", "index.ts").find(
+          (m) => m.category === "path bullet",
+        ),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("trailing hedge", () => {
+    it("flags in markdown: 'regardless.' at line end", () => {
+      expect(
+        firstByTier(
+          scan("It keeps the running shells stale regardless.\nNext sentence.", "doc.md"),
+          "context",
+        )?.category,
+      ).toBe("trailing hedge");
+    });
+  });
+
+  describe("label bold", () => {
+    it("flags in markdown: '**Why:**' label", () => {
+      expect(firstByTier(scan("**Why:** the diff is small", "doc.md"), "context")?.category).toBe(
+        "label bold",
+      );
+    });
+
+    it("skips in code files", () => {
+      expect(
+        scan("**Why:** the diff is small", "index.ts").find((m) => m.category === "label bold"),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("dig into", () => {
+    it("flags: 'dig into the codebase'", () => {
+      expect(firstByTier(scan("Let's dig into the codebase."), "context")?.category).toBe(
+        "dig into",
+      );
+    });
+
+    it("flags: 'dive into the data'", () => {
+      expect(firstByTier(scan("We'll dive into the data later."), "context")?.category).toBe(
+        "dig into",
+      );
+    });
+  });
+
+  describe("hedging observation", () => {
+    it("flags: looks like", () => {
+      expect(firstByTier(scan("This looks like a regression."), "context")?.category).toBe(
+        "hedging observation",
+      );
+    });
+
+    it("flags: appears to", () => {
+      expect(firstByTier(scan("The fix appears to hold."), "context")?.category).toBe(
+        "hedging observation",
+      );
+    });
+  });
+
+  describe("I understand", () => {
+    it("flags: 'I understand the issue'", () => {
+      expect(firstByTier(scan("I understand the issue."), "context")?.category).toBe(
+        "I understand",
+      );
+    });
+
+    it("allows: 'do you understand'", () => {
+      expect(
+        scan("Do you understand the issue?").find((m) => m.category === "I understand"),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("sideEffectOnly scoping", () => {
+    const conversational = [
+      { text: "Perfect. That works.", category: "sycophantic opener" },
+      { text: "You're right about that.", category: "sycophantic acknowledgment" },
+      { text: "Want me to fix the bug?", category: "permission-seeking" },
+      { text: "Would you like me to retry?", category: "hedging close" },
+      { text: "I understand the issue.", category: "I understand" },
+    ];
+
+    for (const { text, category } of conversational) {
+      it(`fires without context: "${text.slice(0, 40)}"`, () => {
+        expect(scan(text).find((m) => m.category === category)).toBeDefined();
+      });
+
+      it(`fires in sideEffect context: "${text.slice(0, 40)}"`, () => {
+        expect(
+          scan(text, undefined, "sideEffect").find((m) => m.category === category),
+        ).toBeDefined();
+      });
+
+      it(`skips in file context: "${text.slice(0, 40)}"`, () => {
+        expect(scan(text, undefined, "file").find((m) => m.category === category)).toBeUndefined();
+      });
+    }
+
+    it("non-conversational patterns still fire in file context", () => {
+      expect(
+        firstByTier(scan("The tapestry of the project", undefined, "file"), "deny")?.category,
+      ).toBe("AI vocabulary");
+    });
+  });
+
+  describe("marketing verbs (weighted)", () => {
+    it("does not flag single low-weight hit", () => {
+      expect(
+        scan("This change enables the new flag.").find((m) => m.category === "marketing verbs"),
+      ).toBeUndefined();
+    });
+
+    it("does not flag stack below threshold", () => {
+      expect(
+        scan("This enables and simplifies the workflow.").find(
+          (m) => m.category === "marketing verbs",
+        ),
+      ).toBeUndefined();
+    });
+
+    it("flags when a single high-weight hit clears threshold alone", () => {
+      // Three independent matches: each empower(s|ed|ing) is weight 2.5.
+      // Need to clear 3.0 by stacking with one more.
+      const text = "This release empowers users and streamlines deploys.";
+      expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
+    });
+
+    it("flags repeated high-weight hits", () => {
+      // Two occurrences of empower (2.5 each) = 5.0, well above 3.0.
+      const text = "This empowers teams. That empowers customers.";
+      expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
+    });
+  });
 });
 
 describe("firstByTier", () => {

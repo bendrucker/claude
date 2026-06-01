@@ -3,7 +3,8 @@ name: opentelemetry
 description: >-
   OpenTelemetry instrumentation conventions. Use when instrumenting code with
   spans, setting up tracing, or writing trace tests.
-user-invocable: false
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # OpenTelemetry

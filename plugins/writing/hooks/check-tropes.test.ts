@@ -99,9 +99,9 @@ describe("plan files", () => {
     expect(await processInput(input)).toBeNull();
   });
 
-  it("still denies non-plan files with spaced em dash", async () => {
-    const output = await getDecision(mockWrite("This \u2014 is bad"));
-    expect(output?.permissionDecision).toBe("deny");
+  it("returns reminder for non-plan files with spaced em dash", async () => {
+    const result = await processInput(mockWrite("This \u2014 is bad"));
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 });
 
@@ -118,6 +118,29 @@ describe("memory files", () => {
     const input = mockEdit("This \u2014 is bad");
     (input.tool_input as Record<string, unknown>).file_path = memoryPath;
     expect(await processInput(input)).toBeNull();
+  });
+});
+
+describe("wordlist files", () => {
+  it("skips Write to wordlist file containing flagged vocabulary", async () => {
+    const input = mockWrite("delve\ntapestry\nbolstered\n");
+    (input.tool_input as Record<string, unknown>).file_path =
+      "/Users/test/plugins/writing/wordlists/vocabulary.txt";
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("skips Edit to wordlist file", async () => {
+    const input = mockEdit("delve\nadded entry\n");
+    (input.tool_input as Record<string, unknown>).file_path =
+      "/Users/test/plugins/writing/wordlists/vocabulary.txt";
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("does not skip non-wordlist .txt files", async () => {
+    const input = mockWrite("delve into the data is the way forward.");
+    (input.tool_input as Record<string, unknown>).file_path = "/tmp/notes.txt";
+    const result = await processInput(input);
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 });
 
@@ -144,14 +167,16 @@ describe("semicolon file scoping", () => {
 });
 
 describe("Write/Edit", () => {
-  it("denies Write with spaced em dash", async () => {
-    const output = await getDecision(mockWrite("This \u2014 is bad"));
-    expect(output?.permissionDecision).toBe("deny");
+  it("returns reminder for Write with spaced em dash", async () => {
+    const result = await processInput(mockWrite("This \u2014 is bad"));
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    const ctx = (result?.hookSpecificOutput as { additionalContext: string }).additionalContext;
+    expect(ctx).toContain("follow-up Edit");
   });
 
-  it("asks on Edit with spaced em dash", async () => {
-    const output = await getDecision(mockEdit("This \u2014 is bad"));
-    expect(output?.permissionDecision).toBe("ask");
+  it("returns reminder for Edit with spaced em dash", async () => {
+    const result = await processInput(mockEdit("This \u2014 is bad"));
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
   it("ignores flagged content in Edit old_string", async () => {
@@ -162,10 +187,10 @@ describe("Write/Edit", () => {
     expect(await processInput(input)).toBeNull();
   });
 
-  it("asks on Edit when old_string is clean but new_string has em dash", async () => {
+  it("returns reminder when old_string is clean but new_string has em dash", async () => {
     const input = mockEdit("This \u2014 is bad", "clean original text here");
-    const output = await getDecision(input);
-    expect(output?.permissionDecision).toBe("ask");
+    const result = await processInput(input);
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
   it("returns context for promotional language", async () => {
@@ -182,6 +207,62 @@ describe("Write/Edit", () => {
   });
 });
 
+describe("diff-aware filtering", () => {
+  it("ignores Edit that preserves a pre-existing em dash", async () => {
+    const input = mockEdit(
+      "Title \u2014 kept verbatim, with extra detail added.",
+      "Title \u2014 kept verbatim.",
+    );
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("flags Edit that adds a second em dash beyond what old_string had", async () => {
+    const input = mockEdit(
+      "Title \u2014 kept, and now another \u2014 added phrase.",
+      "Title \u2014 kept verbatim.",
+    );
+    const result = await processInput(input);
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("ignores MultiEdit that preserves pre-existing AI vocabulary", async () => {
+    const input = mockMultiEdit([
+      {
+        old_string: "We delve into the intricacies of the system.",
+        new_string: "We delve into the intricacies of the new system, with examples.",
+      },
+    ]);
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("ignores Write that preserves an em dash already in the file", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trope-diff-"));
+    const file = join(dir, "doc.md");
+    await Bun.write(file, "Title \u2014 already here in the existing file.\n");
+    const input = mockWrite("Title \u2014 already here in the existing file.\nAdded line.\n");
+    (input.tool_input as Record<string, unknown>).file_path = file;
+    const result = await processInput(input);
+    await rm(dir, { recursive: true, force: true });
+    expect(result).toBeNull();
+  });
+
+  it("flags Write that adds a new em dash beyond what file had", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trope-diff-"));
+    const file = join(dir, "doc.md");
+    await Bun.write(file, "Title \u2014 already here.\n");
+    const input = mockWrite("Title \u2014 already here.\nNow another \u2014 line.\n");
+    (input.tool_input as Record<string, unknown>).file_path = file;
+    const result = await processInput(input);
+    await rm(dir, { recursive: true, force: true });
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("skips sycophantic opener in file Edit (sideEffectOnly)", async () => {
+    const input = mockEdit("Perfect. Let me proceed.\nNext line.", "Next line.");
+    expect(await processInput(input)).toBeNull();
+  });
+});
+
 describe("MultiEdit", () => {
   it("returns null when all old_string values are flagged but new_string values are clean", async () => {
     const input = mockMultiEdit([
@@ -191,13 +272,13 @@ describe("MultiEdit", () => {
     expect(await processInput(input)).toBeNull();
   });
 
-  it("asks when any new_string contains a spaced em dash", async () => {
+  it("returns reminder when any new_string contains a spaced em dash", async () => {
     const input = mockMultiEdit([
       { old_string: "clean original text here", new_string: "clean replacement text here" },
       { old_string: "more clean original content", new_string: "bad \u2014 replacement here" },
     ]);
-    const output = await getDecision(input);
-    expect(output?.permissionDecision).toBe("ask");
+    const result = await processInput(input);
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
   it("returns null for fully clean MultiEdit", async () => {

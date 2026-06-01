@@ -13,4 +13,22 @@ Tmux session, window, and pane awareness for Claude Code.
 
 A SessionStart hook detects whether Claude is running inside tmux and writes session/window/pane identifiers to `CLAUDE_ENV_FILE`. These env vars are available in all subsequent Bash calls.
 
-The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only, navigation, layout) and disables the sandbox for all tmux calls. The safe command list is maintained in [`safe-commands.json`](skills/tmux/resources/safe-commands.json).
+The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only, navigation, layout). The safe command list is maintained in [`safe-commands.json`](skills/tmux/resources/safe-commands.json).
+
+## Sandbox
+
+Claude Code's Bash sandbox blocks Unix socket connections, including tmux's control socket. The skill's scripts run sandboxed, so without an exception they fail with `pane lookup failed`.
+
+Allow the socket's directory in your user settings (`~/.claude/settings.json`):
+
+```json
+{
+  "sandbox": {
+    "network": {
+      "allowUnixSockets": ["~/.tmux"]
+    }
+  }
+}
+```
+
+An `allowUnixSockets` entry matches a path and everything beneath it, so allowing the directory covers every socket regardless of the server's per-user socket name. Find yours with `tmux display-message -p '#{socket_path}'`. The default location varies by platform (often under `$TMPDIR`); set `TMUX_TMPDIR` to pin it somewhere stable like `~/.tmux`.

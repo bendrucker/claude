@@ -86,12 +86,7 @@ export class Ledger {
       branch: this.branch,
       records: [...this.records.values()],
     };
-    const tmp = `${this.path}.${process.pid}.tmp`;
-    await Bun.write(tmp, `${JSON.stringify(data, null, 2)}\n`);
-    const moved = Bun.spawnSync(["mv", tmp, this.path]);
-    if (moved.exitCode !== 0) {
-      throw new Error(`Failed to move ${tmp} to ${this.path}: ${moved.stderr.toString()}`);
-    }
+    await Bun.write(this.path, `${JSON.stringify(data, null, 2)}\n`);
   }
 
   async upsert(note: HunkNote): Promise<LedgerRecord> {

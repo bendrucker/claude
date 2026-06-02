@@ -61,25 +61,27 @@ export function filterReviewQueue(currentUser: CurrentUser): ReviewQueueEntry[] 
     .map((node) => ({ url: node.webUrl, reference: node.reference, title: node.title }));
 }
 
-cli(
-  {
-    name: "review-queue",
-    flags: {},
-  },
-  async () => {
-    const result = (await $`glab api graphql -f query=${QUERY}`.json()) as {
-      data?: { currentUser?: CurrentUser | null };
-      errors?: Array<{ message: string }>;
-    };
-    if (result.errors?.length) {
-      console.error(`GraphQL errors: ${result.errors.map((e) => e.message).join("; ")}`);
-      process.exit(1);
-    }
-    const currentUser = result.data?.currentUser;
-    if (!currentUser) {
-      console.error("No currentUser in GraphQL response (is glab authenticated?)");
-      process.exit(1);
-    }
-    console.log(JSON.stringify(filterReviewQueue(currentUser), null, 2));
-  },
-);
+if (import.meta.main) {
+  cli(
+    {
+      name: "review-queue",
+      flags: {},
+    },
+    async () => {
+      const result = (await $`glab api graphql -f query=${QUERY}`.json()) as {
+        data?: { currentUser?: CurrentUser | null };
+        errors?: Array<{ message: string }>;
+      };
+      if (result.errors?.length) {
+        console.error(`GraphQL errors: ${result.errors.map((e) => e.message).join("; ")}`);
+        process.exit(1);
+      }
+      const currentUser = result.data?.currentUser;
+      if (!currentUser) {
+        console.error("No currentUser in GraphQL response (is glab authenticated?)");
+        process.exit(1);
+      }
+      console.log(JSON.stringify(filterReviewQueue(currentUser), null, 2));
+    },
+  );
+}

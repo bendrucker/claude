@@ -6,6 +6,7 @@ allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)
   - mcp__github
+  - WebFetch
   - Skill(code-review)
   - Skill(review:hunk)
 ---
@@ -20,6 +21,7 @@ If not on the branch, first run `gh pr checkout` to switch.
 
 - **Must** check with me before submitting. Show file comments and review comment.
 - **Don't** insist on commenting on every PR. Propose approving with no comment if everything looks good.
+- **Don't** run Python, Ruby, or other interpreters for library introspection. Use Read to examine source files or WebFetch to read documentation instead.
 - **Do** match my writing style. You're commenting as me, not a generic AI assistant.
 - **Do** present technical questions to me for ambiguous code. Don't proceed until you understand fully.
 

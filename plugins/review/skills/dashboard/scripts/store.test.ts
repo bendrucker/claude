@@ -31,25 +31,18 @@ function makeReview(overrides: Partial<Review> = {}): Review {
 
 describe("store", () => {
   let tmpDir: string;
-  const originalEnv = process.env.CLAUDE_PLUGIN_DATA;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "store-test-"));
-    process.env.CLAUDE_PLUGIN_DATA = tmpDir;
   });
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true });
-    if (originalEnv === undefined) {
-      delete process.env.CLAUDE_PLUGIN_DATA;
-    } else {
-      process.env.CLAUDE_PLUGIN_DATA = originalEnv;
-    }
   });
 
   describe("readState", () => {
     test("returns empty reviews when no file exists", async () => {
-      expect(await readState()).toEqual({ reviews: [] });
+      expect(await readState(tmpDir)).toEqual({ reviews: [] });
     });
 
     test("reads and parses valid state file", async () => {
@@ -58,7 +51,7 @@ describe("store", () => {
       mkdirSync(dir, { recursive: true });
       await Bun.write(join(dir, "state.json"), JSON.stringify(state));
 
-      expect(await readState()).toEqual(state);
+      expect(await readState(tmpDir)).toEqual(state);
     });
 
     test("throws on malformed JSON missing reviews array", async () => {
@@ -66,7 +59,7 @@ describe("store", () => {
       mkdirSync(dir, { recursive: true });
       await Bun.write(join(dir, "state.json"), JSON.stringify({ something: "else" }));
 
-      expect(readState()).rejects.toThrow("Invalid state file");
+      expect(readState(tmpDir)).rejects.toThrow("Invalid state file");
     });
   });
 
@@ -83,8 +76,8 @@ describe("store", () => {
         ],
       };
 
-      await writeState(state);
-      expect(await readState()).toEqual(state);
+      await writeState(state, tmpDir);
+      expect(await readState(tmpDir)).toEqual(state);
     });
   });
 
@@ -93,7 +86,7 @@ describe("store", () => {
       const dir = join(tmpDir, "review-dashboard");
       await expect(readdir(dir)).rejects.toThrow();
 
-      await writeState({ reviews: [] });
+      await writeState({ reviews: [] }, tmpDir);
 
       await expect(readdir(dir)).resolves.toBeDefined();
     });
@@ -187,15 +180,47 @@ describe("store", () => {
     });
   });
 
-  describe("CLAUDE_PLUGIN_DATA unset", () => {
-    test("readState throws", () => {
+  describe("no dataDir and no CLAUDE_PLUGIN_DATA", () => {
+    const originalEnv = process.env.CLAUDE_PLUGIN_DATA;
+
+    beforeEach(() => {
       delete process.env.CLAUDE_PLUGIN_DATA;
-      expect(readState()).rejects.toThrow("CLAUDE_PLUGIN_DATA is not set");
+    });
+
+    afterEach(() => {
+      if (originalEnv === undefined) {
+        delete process.env.CLAUDE_PLUGIN_DATA;
+      } else {
+        process.env.CLAUDE_PLUGIN_DATA = originalEnv;
+      }
+    });
+
+    test("readState throws", () => {
+      expect(readState()).rejects.toThrow("dataDir is required");
     });
 
     test("writeState throws", () => {
-      delete process.env.CLAUDE_PLUGIN_DATA;
-      expect(writeState({ reviews: [] })).rejects.toThrow("CLAUDE_PLUGIN_DATA is not set");
+      expect(writeState({ reviews: [] })).rejects.toThrow("dataDir is required");
+    });
+  });
+
+  describe("falls back to CLAUDE_PLUGIN_DATA", () => {
+    const originalEnv = process.env.CLAUDE_PLUGIN_DATA;
+
+    beforeEach(() => {
+      process.env.CLAUDE_PLUGIN_DATA = tmpDir;
+    });
+
+    afterEach(() => {
+      if (originalEnv === undefined) {
+        delete process.env.CLAUDE_PLUGIN_DATA;
+      } else {
+        process.env.CLAUDE_PLUGIN_DATA = originalEnv;
+      }
+    });
+
+    test("readState uses CLAUDE_PLUGIN_DATA when no dataDir provided", async () => {
+      expect(await readState()).toEqual({ reviews: [] });
     });
   });
 });

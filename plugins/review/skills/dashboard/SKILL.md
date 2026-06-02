@@ -57,10 +57,10 @@ Ask the user where the repo is cloned locally. If it's not cloned, clone it firs
 #### Spawn
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/spawn.ts <pr-url> --repo-path <local-path>
+bun ${CLAUDE_SKILL_DIR}/scripts/spawn.ts <pr-url> --repo-path <local-path> --data-dir ${CLAUDE_PLUGIN_DATA} --context "<PR metadata: title, author, description summary>"
 ```
 
-`spawn.ts` handles `--worktree` for branch isolation, tmux layout computation, and state tracking. Panes cycle in groups of 3: one horizontal split (new column at 70% width for the first, equal width after), then two vertical splits stacking within the column.
+`spawn.ts` handles `--worktree` for branch isolation, tmux layout computation, and state tracking. Pass `--context` with PR metadata (title, author, description summary) so the spawned review session has immediate context. Panes cycle in groups of 3: one horizontal split (new column at 70% width for the first, equal width after), then two vertical splits stacking within the column.
 
 Before spawning the first pane, resize the orchestrator to a sidebar:
 
@@ -73,7 +73,7 @@ tmux resize-pane -t $TMUX_PANE -x 30%
 #### Summary
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/state.ts list
+bun ${CLAUDE_SKILL_DIR}/scripts/state.ts list --data-dir ${CLAUDE_PLUGIN_DATA}
 ```
 
 #### Sync Completed Reviews
@@ -81,7 +81,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/state.ts list
 Detect exited panes and mark them completed:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/state.ts sync
+bun ${CLAUDE_SKILL_DIR}/scripts/state.ts sync --data-dir ${CLAUDE_PLUGIN_DATA}
 ```
 
 #### Quick Glance

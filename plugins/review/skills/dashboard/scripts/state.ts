@@ -22,20 +22,26 @@ const argv = cli({
   flags: {
     url: { type: String, description: "PR/MR URL" },
     json: { type: Boolean, description: "Output as JSON", default: false },
+    dataDir: {
+      type: String,
+      description: "Data directory for persistent state (defaults to CLAUDE_PLUGIN_DATA)",
+    },
   },
 });
+
+const dataDir = argv.flags.dataDir;
 
 const command = argv._.command;
 
 switch (command) {
   case "init": {
-    await writeState({ reviews: [] });
+    await writeState({ reviews: [] }, dataDir);
     console.log("State initialized");
     break;
   }
 
   case "list": {
-    const state = await readState();
+    const state = await readState(dataDir);
     if (argv.flags.json) {
       console.log(JSON.stringify(state.reviews, null, 2));
     } else if (state.reviews.length === 0) {
@@ -59,15 +65,15 @@ switch (command) {
       console.error("--url is required for remove");
       process.exit(1);
     }
-    const state = await readState();
+    const state = await readState(dataDir);
     const removed = removeReview(state, url);
-    await writeState(state);
+    await writeState(state, dataDir);
     console.log(`Removed ${removed} review(s)`);
     break;
   }
 
   case "sync": {
-    const state = await readState();
+    const state = await readState(dataDir);
     const livePanes = getLivePaneIds();
     let updated = 0;
     for (const review of state.reviews) {
@@ -76,7 +82,7 @@ switch (command) {
         updated++;
       }
     }
-    await writeState(state);
+    await writeState(state, dataDir);
     console.log(`Synced: ${updated} review(s) marked completed`);
     break;
   }

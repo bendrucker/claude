@@ -3,6 +3,7 @@
 import { cli } from "cleye";
 import { table } from "table";
 import { completeReview, readState, removeReview, writeState } from "./store";
+import { removeWorktree } from "./worktree";
 
 function getLivePaneIds(): Set<string> {
   const proc = Bun.spawnSync(["tmux", "list-panes", "-a", "-F", "#{pane_id}"], {
@@ -75,15 +76,29 @@ switch (command) {
   case "sync": {
     const state = await readState(dataDir);
     const livePanes = getLivePaneIds();
-    let updated = 0;
+    let completed = 0;
+    let worktreesRemoved = 0;
+    const failures: string[] = [];
     for (const review of state.reviews) {
       if (review.status === "active" && !livePanes.has(review.paneId)) {
         completeReview(state, review.paneId);
-        updated++;
+        completed++;
+        const result = removeWorktree(review.repoPath, review.paneName);
+        if (result.status === "removed") {
+          worktreesRemoved++;
+        } else if (result.status === "failed") {
+          failures.push(`${review.paneName}: ${result.error}`);
+        }
       }
     }
     await writeState(state, dataDir);
-    console.log(`Synced: ${updated} review(s) marked completed`);
+    console.log(`Synced: ${completed} completed, ${worktreesRemoved} worktrees removed`);
+    if (failures.length > 0) {
+      console.error(`Failed to remove ${failures.length} worktree(s):`);
+      for (const failure of failures) {
+        console.error(`  ${failure}`);
+      }
+    }
     break;
   }
 

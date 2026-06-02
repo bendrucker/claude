@@ -40,7 +40,15 @@ const state = await readState(dataDir);
 const activeReviews = state.reviews.filter((r) => r.status === "active");
 const splitArgs = layoutArgs(activeReviews.length, activeReviews.at(-1)?.paneId);
 
-const claudeArgs = ["claude", "--worktree", "--session-id", sessionId, "--name", paneName];
+const claudeArgs = [
+  "claude",
+  "--worktree",
+  paneName,
+  "--session-id",
+  sessionId,
+  "--name",
+  paneName,
+];
 
 const prompt = argv.flags.context
   ? `${argv.flags.context}\n\n/review:peer ${url}`

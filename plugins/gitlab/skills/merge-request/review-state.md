@@ -95,3 +95,36 @@ REST `reviewers[].state` only returns `"active"`. Use GraphQL:
 ```
 
 `reviewState` values: `UNREVIEWED`, `REVIEW_STARTED`, `REQUESTED_CHANGES`, `APPROVED`.
+
+## Review Queue (Cross-Project)
+
+The REST queue (`scope=reviews_for_me`) reports every reviewer as `active`, so it cannot tell which MRs you have already approved or sent back. GraphQL's `reviewRequestedMergeRequests` plus per-reviewer `reviewState` is the only way to scope the queue to MRs awaiting your first review.
+
+```graphql
+{
+  currentUser {
+    username
+    reviewRequestedMergeRequests(state: opened) {
+      nodes {
+        reference
+        webUrl
+        title
+        reviewers {
+          nodes {
+            username
+            mergeRequestInteraction {
+              reviewState
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Keep nodes where the reviewer whose `username` equals `currentUser.username` has `reviewState === "UNREVIEWED"`. That is the canonical "awaiting my first review" bucket, the analog of GitHub's `gh search prs --review-requested=@me`. [`scripts/review-queue.ts`](scripts/review-queue.ts) runs the query and applies the filter, emitting `[{ url, reference, title }]` as JSON:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
+```

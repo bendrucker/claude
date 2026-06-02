@@ -165,9 +165,9 @@ describe("validateInDiff", () => {
 
   test("accepts an old-side deletion anchor", () => {
     const parsed = parseDiff(DELETION_DIFF);
-    expect(
-      validateInDiff(note({ filePath: "old.txt", oldRange: [11, 11] }), parsed),
-    ).toEqual({ ok: true });
+    expect(validateInDiff(note({ filePath: "old.txt", oldRange: [11, 11] }), parsed)).toEqual({
+      ok: true,
+    });
   });
 
   test("rejects a file not present in the diff", () => {

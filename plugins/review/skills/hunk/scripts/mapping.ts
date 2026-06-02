@@ -93,32 +93,36 @@ export function parseDiff(diffText: string): ParsedDiff {
 
     const gitMatch = GIT_HEADER.exec(line);
     if (gitMatch) {
+      const oldFromHeader = gitMatch[1];
       const newPath = gitMatch[2];
-      currentKey = newPath;
-      current = { newLines: new Set(), oldLines: new Set() };
-      if (gitMatch[1] !== gitMatch[2]) current.oldPath = gitMatch[1];
-      files.set(currentKey, current);
-      renameFrom = undefined;
+      if (oldFromHeader !== undefined && newPath !== undefined) {
+        currentKey = newPath;
+        current = { newLines: new Set(), oldLines: new Set() };
+        if (oldFromHeader !== newPath) current.oldPath = oldFromHeader;
+        files.set(currentKey, current);
+        renameFrom = undefined;
+      }
       continue;
     }
 
     const renameFromMatch = RENAME_FROM.exec(line);
     if (renameFromMatch) {
       renameFrom = renameFromMatch[1];
-      if (current) current.oldPath = renameFrom;
+      if (current && renameFrom !== undefined) current.oldPath = renameFrom;
       continue;
     }
 
     const renameToMatch = RENAME_TO.exec(line);
     if (renameToMatch && current) {
-      rename(renameToMatch[1]);
-      if (renameFrom) current.oldPath = renameFrom;
+      const toPath = renameToMatch[1];
+      if (toPath !== undefined) rename(toPath);
+      if (renameFrom !== undefined) current.oldPath = renameFrom;
       continue;
     }
 
     if (line.startsWith("--- ")) {
       const oldMatch = OLD_PATH.exec(line);
-      if (oldMatch && current) {
+      if (oldMatch && oldMatch[1] !== undefined && current) {
         const oldPath = stripDevNull(oldMatch[1]);
         if (oldPath && currentKey && oldPath !== currentKey) current.oldPath = oldPath;
       }
@@ -127,7 +131,7 @@ export function parseDiff(diffText: string): ParsedDiff {
 
     if (line.startsWith("+++ ")) {
       const newMatch = NEW_PATH.exec(line);
-      if (newMatch && current) {
+      if (newMatch && newMatch[1] !== undefined && current) {
         const newPath = stripDevNull(newMatch[1]);
         if (newPath && currentKey && newPath !== currentKey) {
           if (current.oldPath === undefined) {
@@ -144,7 +148,6 @@ export function parseDiff(diffText: string): ParsedDiff {
       oldLine = Number(hunkMatch[1]);
       newLine = Number(hunkMatch[3]);
       inHunk = true;
-      continue;
     }
   }
 
@@ -272,15 +275,15 @@ const mapCmd = command(
 
     if (platform !== "github" && platform !== "gitlab") {
       console.error("--platform must be github or gitlab");
-      process.exit(1);
+      return process.exit(1);
     }
-    if (!notes || !diff || !commit) {
+    if (notes === undefined || diff === undefined || commit === undefined) {
       console.error("--notes, --diff, and --commit are required");
-      process.exit(1);
+      return process.exit(1);
     }
-    if (platform === "gitlab" && (!base || !start)) {
+    if (platform === "gitlab" && (base === undefined || start === undefined)) {
       console.error("gitlab requires --base and --start");
-      process.exit(1);
+      return process.exit(1);
     }
 
     let noteList: HunkNote[];
@@ -290,7 +293,7 @@ const mapCmd = command(
       diffText = await Bun.file(diff).text();
     } catch (error) {
       console.error((error as Error).message);
-      process.exit(1);
+      return process.exit(1);
     }
 
     const parsedDiff = parseDiff(diffText);
@@ -305,12 +308,14 @@ const mapCmd = command(
       }
       if (platform === "github") {
         payloads.push(toGitHubComment(note, { commitId: commit }));
-      } else {
+      } else if (base !== undefined && start !== undefined) {
         const fileDiff = parsedDiff.get(note.filePath);
+        const opts: { newPath: string; oldPath?: string } = { newPath: note.filePath };
+        if (fileDiff?.oldPath !== undefined) opts.oldPath = fileDiff.oldPath;
         const position = toGitLabPosition(
           note,
-          { base_sha: base as string, head_sha: commit, start_sha: start as string },
-          { newPath: note.filePath, oldPath: fileDiff?.oldPath },
+          { base_sha: base, head_sha: commit, start_sha: start },
+          opts,
         );
         payloads.push({ body: note.body, position });
       }

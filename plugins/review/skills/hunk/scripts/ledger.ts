@@ -1,5 +1,5 @@
 import { cli, command } from "cleye";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { table } from "table";
@@ -57,40 +57,44 @@ export class Ledger {
     this.branch = opts.branch;
     this.now = opts.now ?? (() => new Date().toISOString());
     this.path = join(this.dir, `${sanitize(opts.repo)}__${sanitize(opts.branch)}.json`);
-    this.records = this.load();
+    this.records = new Map();
+  }
+
+  static async open(opts: LedgerOptions): Promise<Ledger> {
+    const ledger = new Ledger(opts);
+    ledger.records = await ledger.load();
+    return ledger;
   }
 
   get filePath(): string {
     return this.path;
   }
 
-  private load(): Map<string, LedgerRecord> {
-    let raw: string;
-    try {
-      raw = readFileSync(this.path, "utf8");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return new Map();
-      }
-      throw error;
+  private async load(): Promise<Map<string, LedgerRecord>> {
+    const file = Bun.file(this.path);
+    if (!(await file.exists())) {
+      return new Map();
     }
-    const data = JSON.parse(raw) as LedgerFile;
+    const data = JSON.parse(await file.text()) as LedgerFile;
     return new Map(data.records.map((record) => [record.noteId, record]));
   }
 
-  private persist(): void {
-    mkdirSync(this.dir, { recursive: true });
+  private async persist(): Promise<void> {
+    await mkdir(this.dir, { recursive: true });
     const data: LedgerFile = {
       repo: this.repo,
       branch: this.branch,
       records: [...this.records.values()],
     };
     const tmp = `${this.path}.${process.pid}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`);
-    renameSync(tmp, this.path);
+    await Bun.write(tmp, `${JSON.stringify(data, null, 2)}\n`);
+    const moved = Bun.spawnSync(["mv", tmp, this.path]);
+    if (moved.exitCode !== 0) {
+      throw new Error(`Failed to move ${tmp} to ${this.path}: ${moved.stderr.toString()}`);
+    }
   }
 
-  upsert(note: HunkNote): LedgerRecord {
+  async upsert(note: HunkNote): Promise<LedgerRecord> {
     const existing = this.records.get(note.noteId);
     const anchor = deriveAnchor(note);
     const record: LedgerRecord = {
@@ -108,11 +112,14 @@ export class Ledger {
       record.ref = existing.ref;
     }
     this.records.set(note.noteId, record);
-    this.persist();
+    await this.persist();
     return record;
   }
 
-  markResolved(noteId: string, info?: { action?: string; ref?: string }): LedgerRecord {
+  async markResolved(
+    noteId: string,
+    info?: { action?: string; ref?: string },
+  ): Promise<LedgerRecord> {
     const record = this.records.get(noteId);
     if (!record) {
       throw new Error(`No ledger record for note ${noteId}`);
@@ -125,7 +132,7 @@ export class Ledger {
       record.ref = info.ref;
     }
     record.updatedAt = this.now();
-    this.persist();
+    await this.persist();
     return record;
   }
 
@@ -163,19 +170,23 @@ function git(args: string[]): string | undefined {
   return out === "" ? undefined : out;
 }
 
-function resolveLedger(flags: { repo?: string; branch?: string; dir?: string }): Ledger {
+function resolveLedger(flags: {
+  repo?: string | undefined;
+  branch?: string | undefined;
+  dir?: string | undefined;
+}): Promise<Ledger> {
   const repo = flags.repo ?? git(["rev-parse", "--show-toplevel"]);
   const branch = flags.branch ?? git(["branch", "--show-current"]);
   const dir = flags.dir ?? defaultLedgerDir();
   if (!repo) {
     console.error("Could not determine repo; pass --repo");
-    process.exit(1);
+    return process.exit(1);
   }
   if (!branch) {
     console.error("Could not determine branch; pass --branch");
-    process.exit(1);
+    return process.exit(1);
   }
-  return new Ledger({ dir, repo, branch });
+  return Ledger.open({ dir, repo, branch });
 }
 
 function parseNotes(raw: string): HunkNote[] {
@@ -222,12 +233,12 @@ const resolveCmd = command(
       ref: { type: String, description: "Reference (e.g. commit sha)" },
     },
   },
-  (parsed) => {
-    const ledger = resolveLedger(parsed.flags);
-    const record = ledger.markResolved(parsed._.noteId, {
-      action: parsed.flags.action,
-      ref: parsed.flags.ref,
-    });
+  async (parsed) => {
+    const ledger = await resolveLedger(parsed.flags);
+    const info: { action?: string; ref?: string } = {};
+    if (parsed.flags.action !== undefined) info.action = parsed.flags.action;
+    if (parsed.flags.ref !== undefined) info.ref = parsed.flags.ref;
+    const record = await ledger.markResolved(parsed._.noteId, info);
     console.error(`Resolved ${record.noteId}`);
   },
 );
@@ -238,10 +249,10 @@ const upsertCmd = command(
     flags: { ...storageFlags },
   },
   async (parsed) => {
-    const ledger = resolveLedger(parsed.flags);
+    const ledger = await resolveLedger(parsed.flags);
     const notes = parseNotes(await Bun.stdin.text());
     for (const note of notes) {
-      ledger.upsert(note);
+      await ledger.upsert(note);
     }
     console.error(`Upserted ${notes.length} note(s)`);
   },
@@ -257,8 +268,8 @@ const listCmd = command(
       json: { type: Boolean, description: "Emit JSON", default: false },
     },
   },
-  (parsed) => {
-    const ledger = resolveLedger(parsed.flags);
+  async (parsed) => {
+    const ledger = await resolveLedger(parsed.flags);
     let records = ledger.all();
     if (parsed.flags.open) records = records.filter((r) => !r.resolved);
     if (parsed.flags.resolved) records = records.filter((r) => r.resolved);
@@ -272,7 +283,7 @@ const reconcileCmd = command(
     flags: { ...storageFlags },
   },
   async (parsed) => {
-    const ledger = resolveLedger(parsed.flags);
+    const ledger = await resolveLedger(parsed.flags);
     const raw = (await Bun.stdin.text()).trim();
     let noteIds: string[];
     if (raw.startsWith("[") || raw.startsWith("{")) {

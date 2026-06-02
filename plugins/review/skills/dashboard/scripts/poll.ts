@@ -5,11 +5,13 @@ import { readState } from "./store";
 
 type QueueEntry = { url: string };
 
-// Run a command that prints a JSON array of `{ url }` and return the URLs. A
-// failed fetch (network, auth, an unconfigured platform) yields an empty list
-// so one platform's outage never stalls the poll.
-async function fetchUrls(cmd: string[]): Promise<string[]> {
-  const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
+// Run a review-queue command that prints a JSON array of `{ url }` and return
+// the URLs. The dashboard knows nothing about any platform: each source is just
+// a command supplied by the caller. A failed command (network, auth, an
+// unconfigured source) yields an empty list, so one source's outage never
+// stalls the poll.
+async function fetchUrls(command: string): Promise<string[]> {
+  const proc = Bun.spawn(["sh", "-c", command], { stdout: "pipe", stderr: "pipe" });
   if ((await proc.exited) !== 0) {
     return [];
   }
@@ -21,7 +23,7 @@ async function fetchUrls(cmd: string[]): Promise<string[]> {
   }
 }
 
-// New reviews are the fetched URLs not already tracked, deduped across platforms
+// New reviews are the fetched URLs not already tracked, deduped across sources
 // and kept in fetch order.
 export function newUrls(fetched: string[], tracked: ReadonlySet<string>): string[] {
   const result: string[] = [];
@@ -39,9 +41,10 @@ if (import.meta.main) {
     name: "poll",
     flags: {
       dataDir: { type: String, description: "Data directory (defaults to CLAUDE_PLUGIN_DATA)" },
-      gitlabQueue: {
-        type: String,
-        description: "Path to the gitlab plugin's review-queue.ts (omit to poll GitHub only)",
+      queue: {
+        type: [String],
+        description:
+          "Review-queue command emitting [{ url }] JSON; repeat once per platform source",
       },
     },
   });
@@ -49,18 +52,9 @@ if (import.meta.main) {
   const tracked = new Set(
     (await readState(argv.flags.dataDir)).reviews.map((review) => review.url),
   );
-  const github = await fetchUrls([
-    "gh",
-    "search",
-    "prs",
-    "--review-requested=@me",
-    "--state=open",
-    "--json",
-    "url",
-  ]);
-  const gitlab = argv.flags.gitlabQueue ? await fetchUrls(["bun", argv.flags.gitlabQueue]) : [];
+  const fetched = (await Promise.all(argv.flags.queue.map(fetchUrls))).flat();
 
-  for (const url of newUrls([...github, ...gitlab], tracked)) {
+  for (const url of newUrls(fetched, tracked)) {
     console.log(url);
   }
 }

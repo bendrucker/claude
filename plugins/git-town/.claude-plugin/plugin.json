@@ -1,8 +1,0 @@
-{
-  "name": "git-town",
-  "description": "Branch workflow automation with git-town",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  }
-}

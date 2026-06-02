@@ -109,7 +109,6 @@
     "linear-cli@linear-cli": true,
     "tmux@bendrucker": true,
     "bun@bendrucker": true,
-    "git-town@bendrucker": true,
     "mermaid@bendrucker": true,
     "tech-spec@bendrucker": true,
     "typescript-lsp@claude-plugins-official": true,

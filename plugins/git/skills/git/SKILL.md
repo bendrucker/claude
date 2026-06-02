@@ -2,7 +2,7 @@
 name: git
 description: >-
   Core git usage (commit messages, topic branches, push safety rules).
-  For stacked branch workflows use git-town; for merge/rebase conflicts use git:conflicts.
+  For merge/rebase conflicts use git:conflicts.
 ---
 
 # Git

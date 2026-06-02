@@ -120,23 +120,25 @@ The `Monitor` command does the polling itself and emits one line per newly-arriv
 
 #### Wire the Review-Queue Sources
 
-`poll.ts` knows no platforms. Each `--queue` is a command that emits an UNREVIEWED queue as `[{ url }]` JSON, one flag per source:
+`poll.ts` knows no platforms. Each `--queue` is a command that emits an UNREVIEWED queue as `[{ url }]` JSON. Pass one per platform you want polled, and omit the rest:
 
 - GitHub: `gh search prs --review-requested=@me --state=open --json url`.
-- A platform plugin that owns its own queue: load its skill and pass the command it documents. For GitLab, load `gitlab:merge-request` and pass `bun <its review-queue.ts path>` (its `${CLAUDE_SKILL_DIR}/scripts/review-queue.ts`). The query stays owned by that plugin; the dashboard only invokes the command it hands back.
+- GitLab: load `gitlab:merge-request` and pass `bun <ABS>`, where `<ABS>` is the absolute path the gitlab docs resolve to for `scripts/review-queue.ts` (for example `/Users/you/.claude/plugins/cache/.../gitlab/skills/merge-request/scripts/review-queue.ts`). Write the resolved path out in full. Do not reuse `${CLAUDE_SKILL_DIR}` from the examples below: it points at this dashboard skill, not gitlab, so it would resolve to the wrong directory.
 
-Pass a `--queue` for each platform you want polled, and omit the ones you don't.
+A platform plugin that owns its queue keeps the query; the dashboard only runs the command it hands back.
 
 #### Arm the Monitor
 
-Pass this command to `Monitor` with `persistent: true` and a descriptive label. Each iteration prunes finished reviews (`sync`), then `poll.ts` prints the URLs of UNREVIEWED reviews not already tracked. Each printed URL is one event:
+Pass this command to `Monitor` with `persistent: true` and a descriptive label. Each iteration prunes finished reviews (`sync`), then `poll.ts` prints the URLs of UNREVIEWED reviews not already tracked. Each printed URL is one event.
+
+`${CLAUDE_SKILL_DIR}` below is the dashboard's own directory (where `poll.ts` and `state.ts` live). The GitLab `--queue` uses a full absolute path instead, since it points into a different skill:
 
 ```bash
 while true; do
   bun ${CLAUDE_SKILL_DIR}/scripts/state.ts sync --data-dir ${CLAUDE_PLUGIN_DATA} >/dev/null || true
   bun ${CLAUDE_SKILL_DIR}/scripts/poll.ts --data-dir ${CLAUDE_PLUGIN_DATA} \
     --queue "gh search prs --review-requested=@me --state=open --json url" \
-    --queue "bun /abs/path/to/gitlab/skills/merge-request/scripts/review-queue.ts" || true
+    --queue "bun <ABS>" || true
   sleep 300
 done
 ```

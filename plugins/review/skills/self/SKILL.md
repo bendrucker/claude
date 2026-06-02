@@ -1,82 +1,54 @@
 ---
 name: review:self
 description: |
-  Self-review your own code changes using a visual diff viewer. Opens a GitHub-style web UI where you can add comments on changed lines. Comments are returned to Claude for action.
+  Self-review your own changes in a live Hunk session before committing or opening a PR. You annotate changed lines in the terminal and your comments come back to Claude as edits to apply. Replaces the difit web UI. Use for "review my changes", "self review", "let me look at the diff before committing".
 disable-model-invocation: true
 allowed-tools:
-  - "Bash(bunx difit:*)"
-  - "Bash(git diff:*)"
-hooks:
-  PreToolUse:
-    - matcher: "Bash(bunx difit:*)|Bash(git diff:*)"
-      hooks:
-        - type: command
-          command: |
-            cat | jq '
-              if (.tool_input.command | test("bunx difit"))
-              then {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {dangerouslyDisableSandbox: true}}}
-              else {}
-              end'
+  - Skill(review:hunk)
+  - Read
+  - Edit
+  - Bash(hunk:*)
+  - Bash(git:*)
+  - Bash(jq:*)
 ---
 
 # Self Review
 
-Review your own code changes before committing or requesting peer review.
+I review my own changes in Hunk; you read my comments back and apply them. The live session is
+the buffer: I annotate lines, you edit. Nothing lives in a hand-edited JSON file.
 
-## Usage
+Load `review:hunk` for all session mechanics (launch, seeding, read-back, the ledger). This
+skill is the inbound loop on top of it.
 
-### Direct mode
+## Target
 
-```bash
-bunx difit $ARGUMENTS
-```
+Default to the working tree. Override with $ARGUMENTS (`staged`, `main...HEAD`, `HEAD`).
 
-Common arguments:
-- `staged` — Staged changes only
-- `working` — Unstaged changes only
-- `@ main` — Compare HEAD with main branch
+## Loop
 
-### Stdin mode
+1. **Launch** via `review:hunk`: open the target diff in a sibling tmux pane with
+   `--watch --agent-notes`.
+2. **Self-critique (optional)**: offer to flag your own concerns as agent notes first, so I see
+   your read alongside mine. Skip if I decline.
+3. **Hand off**: I add comments at lines (the `c` key) in the Hunk pane.
+   - **Batch**: I tell you when I am done.
+   - **Live**: if I ask to work as I go, arm monitor mode (`review:hunk` Monitor section) and
+     act on each comment as it lands, holding the applied edits for my review.
+4. **Collect**: `hunk session comment list --type user --json`.
+5. **Apply**: for each comment, read the referenced file and lines, then make the edit.
+   `--watch` reloads the diff as you go.
+6. **Resolve, don't delete**: mark each applied note resolved with `review:hunk`'s ledger CLI
+   (`ledger.ts resolve <noteId> --action ...`), keyed by `noteId`. The note stays visible and
+   nothing is lost. The ledger is the source of truth for open vs resolved, since `--watch`
+   orphans rather than resolves. Sync the current notes with `ledger.ts upsert` first, and use
+   `ledger.ts list --open` to report what remains.
+7. **Repeat** until I say done, then summarize what changed and what is still open (from the
+   ledger).
 
-Pipe a git diff for full control over the diff content:
+## Guidelines
 
-```bash
-git diff $ARGUMENTS | bunx difit
-```
-
-Common arguments:
-- `HEAD` — All uncommitted changes (staged + unstaged)
-- `--merge-base main` — Changes since diverging from main
-
-Use stdin mode for all uncommitted changes (`git diff HEAD`) or when using git diff flags (e.g., `--merge-base`, revision ranges).
-
-## Workflow
-
-1. Run `difit` with the target diff
-2. User reviews in the browser and adds comments on specific lines
-3. When the user closes the browser tab, comments are output to stdout
-4. Parse the comments and apply the requested changes
-
-## Comment Format
-
-Comments are output in this format:
-
-```
-📝 Comments from review session:
-==================================================
-path/to/file.ts:L42
-Comment text here
-=====
-path/to/other.ts:L10-L20
-Comment on a range of lines
-==================================================
-Total comments: 2
-```
-
-## Applying Feedback
-
-For each comment:
-1. Read the referenced file and lines
-2. Understand the requested change
-3. Apply the edit using the Edit tool
-4. Confirm the change was made correctly
+- Apply comments in file order, but ask before any change that is ambiguous or that you would
+  push back on.
+- A note you disagree with stays open: leave it and tell me why rather than silently resolving
+  it.
+- When done, offer next steps (commit, peer review, PR) without taking them unprompted.

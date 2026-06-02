@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { runHook } from "@bendrucker/claude-hook";
 
 export type CreateIssueInput = {
   title?: string;
@@ -33,23 +33,6 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   };
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[linear/default-state] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook(processInput, "linear/default-state");
 }

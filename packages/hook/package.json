@@ -1,0 +1,9 @@
+{
+  "name": "@bendrucker/claude-hook",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "dependencies": {
+    "@constellos/claude-code-kit": "^0.4.0"
+  }
+}

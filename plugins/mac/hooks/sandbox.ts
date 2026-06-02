@@ -2,7 +2,7 @@
 
 import { basename } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { runHook } from "@bendrucker/claude-hook";
 
 type ToolInput = { command: string };
 
@@ -108,23 +108,6 @@ export async function processInput(
   return null;
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[mac/sandbox] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = await processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook(processInput, "mac/sandbox");
 }

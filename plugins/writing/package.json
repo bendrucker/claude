@@ -4,7 +4,7 @@
   "type": "module",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.25",
-    "@constellos/claude-code-kit": "^0.4.0",
+    "@bendrucker/claude-hook": "workspace:*",
     "ap-style-title-case": "^2.0.0",
     "@duckdb/node-api": "1.5.0-r.1",
     "cleye": "^2.2.1",

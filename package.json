@@ -24,6 +24,7 @@
     "plugins/vscode",
     "packages/validate",
     "packages/marketplace",
+    "packages/hook",
     "plugins/tmux",
     "plugins/mac",
     "plugins/x-callback-url",

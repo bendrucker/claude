@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.25",
+    "@bendrucker/claude-hook": "workspace:*",
     "cleye": "^1.3.2"
   }
 }

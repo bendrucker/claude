@@ -4,6 +4,6 @@
   "type": "module",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.25",
-    "@constellos/claude-code-kit": "^0.4.0"
+    "@bendrucker/claude-hook": "workspace:*"
   }
 }

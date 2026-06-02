@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { runHook } from "@bendrucker/claude-hook";
 import type { Heading, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
@@ -153,25 +153,7 @@ Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
   }
 }
 
-async function main(): Promise<void> {
-  const mode = (process.argv[2] || "write") as Mode;
-
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[style/numbering] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = await processInput(input, mode);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  const mode = (process.argv[2] || "write") as Mode;
+  runHook((input: PreToolUseHookInput) => processInput(input, mode), "style/numbering");
 }

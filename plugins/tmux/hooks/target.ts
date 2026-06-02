@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { runHook } from "@bendrucker/claude-hook";
 
 const targetableCommands = new Set([
   "split-window",
@@ -69,23 +69,9 @@ export function processInput(input: PreToolUseHookInput, pane?: string): SyncHoo
   };
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[tmux/target] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = processInput(input, process.env.TMUX_PANE);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook(
+    (input: PreToolUseHookInput) => processInput(input, process.env.TMUX_PANE),
+    "tmux/target",
+  );
 }

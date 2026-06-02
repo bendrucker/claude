@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { runHook } from "@bendrucker/claude-hook";
 import { apStyleTitleCase } from "ap-style-title-case";
 import type { Heading, Paragraph, Strong, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
@@ -122,23 +122,6 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   return null;
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[style/headings] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook(processInput, "style/headings");
 }

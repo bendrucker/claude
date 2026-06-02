@@ -4,6 +4,27 @@ import { cli } from "cleye";
 import { table } from "table";
 import { completeReview, readState, removeReview, writeState } from "./store";
 
+// Reclaim a completed review's worktree through Worktrunk. `wt remove --force`
+// removes the worktree (including untracked files), runs its pre-remove hooks,
+// and deletes the branch when it has no unmerged commits. The branch is the
+// review's paneName (the name spawn.ts created it under), so removal needs no
+// lookup. Returns the wt stderr on failure rather than throwing, so one stuck
+// worktree never blocks the rest of a sync.
+async function removeWorktree(
+  repoPath: string,
+  branch: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const proc = Bun.spawn(["wt", "remove", branch, "--force"], {
+    cwd: repoPath,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if ((await proc.exited) === 0) {
+    return { ok: true };
+  }
+  return { ok: false, error: (await new Response(proc.stderr).text()).trim() };
+}
+
 function getLivePaneIds(): Set<string> {
   const proc = Bun.spawnSync(["tmux", "list-panes", "-a", "-F", "#{pane_id}"], {
     stdout: "pipe",
@@ -75,15 +96,29 @@ switch (command) {
   case "sync": {
     const state = await readState(dataDir);
     const livePanes = getLivePaneIds();
-    let updated = 0;
+    let completed = 0;
+    let worktreesRemoved = 0;
+    const failures: string[] = [];
     for (const review of state.reviews) {
       if (review.status === "active" && !livePanes.has(review.paneId)) {
         completeReview(state, review.paneId);
-        updated++;
+        completed++;
+        const result = await removeWorktree(review.repoPath, review.paneName);
+        if (result.ok) {
+          worktreesRemoved++;
+        } else {
+          failures.push(`${review.paneName}: ${result.error}`);
+        }
       }
     }
     await writeState(state, dataDir);
-    console.log(`Synced: ${updated} review(s) marked completed`);
+    console.log(`Synced: ${completed} completed, ${worktreesRemoved} worktrees removed`);
+    if (failures.length > 0) {
+      console.error(`Failed to remove ${failures.length} worktree(s):`);
+      for (const failure of failures) {
+        console.error(`  ${failure}`);
+      }
+    }
     break;
   }
 

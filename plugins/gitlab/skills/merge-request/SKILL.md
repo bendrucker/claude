@@ -70,6 +70,14 @@ glab api projects/:id/merge_requests/10/blocks/<block-id> -X DELETE
 
 Submit review feedback as draft notes that accumulate before publishing. See [review.md](review.md) for the draft notes workflow, code suggestions, and approvals.
 
+Fetch the MRs awaiting your first review across all projects (the `UNREVIEWED` bucket; REST's `scope=reviews_for_me` cannot filter by review state). Emits `[{ url, reference, title }]` as JSON:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
+```
+
+See [review-state.md](review-state.md) for the underlying GraphQL query and filter.
+
 ## Discussions
 
 Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md](discussions.md) for the discussions script, resolution workflow, and pagination pitfalls.
@@ -81,6 +89,6 @@ Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md
 ## Reference Files
 
 - [review.md](review.md) - Draft notes review workflow
-- [review-state.md](review-state.md) - GraphQL mutations for review decisions
+- [review-state.md](review-state.md) - GraphQL mutations for review decisions and the cross-project review queue
 - [discussions.md](discussions.md) - Discussion threads and resolution
 - [stack.md](stack.md) - Stacked diff workflow

@@ -35,16 +35,16 @@ Every customization costs tokens on every session. Before adding one, define how
 
 The Bash tool escapes `!` to `\!`, breaking `jq !=`, `awk !~`, and similar operators ([#2941](https://github.com/anthropics/claude-code/issues/2941), [#10335](https://github.com/anthropics/claude-code/issues/10335)). For `jq`, use `| not` instead of `!=`. For any script, pass it via heredoc to bypass inline escaping.
 
-## Stacked PRs
-
-Stacked branches use git-town. See the `git-town:git-town` skill for commands (`append`, `sync --stack`, `propose --stack`) and shipping order.
-
 ## Worktrees
 
 I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 
 - For creating or entering a worktree, use the `worktrunk:wt-switch-create` skill. It re-roots the session into a new worktree (optionally in another repo), runs an optional task, and acts as a targeted command for the common case. Prefer it over the generic skill whenever the task is worktree creation, including anywhere you would otherwise delegate worktree creation to Worktrunk.
 - For everything else (pruning, listing, removing, running hooks, editing config, and general `wt` questions), use the generic `worktrunk:worktrunk` skill.
+
+## Stacked PRs
+
+I work in stacks routinely. Each branch lives in its own Worktrunk worktree (see Worktrees above). Restack with `wt sync`, a custom extension that rebases each branch onto its parent in dependency order. Useful flags: `--fetch` to pull the base first, `--push` to update remotes after rebasing, `--prune` to remove integrated worktrees. Run `wt sync --dry-run` to preview the plan.
 
 ## Personal Details
 

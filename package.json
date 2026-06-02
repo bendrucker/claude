@@ -27,7 +27,8 @@
     "plugins/tmux",
     "plugins/mac",
     "plugins/x-callback-url",
-    "plugins/review"
+    "plugins/review",
+    ".claude/skills/agent-ideas"
   ],
   "scripts": {
     "build": "tsc --noEmit",

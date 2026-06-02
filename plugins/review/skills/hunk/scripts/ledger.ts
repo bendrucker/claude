@@ -1,9 +1,9 @@
-import { cli, command } from "cleye";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { cli, command } from "cleye";
 import { table } from "table";
-import { type AnchorSide, type HunkNote, deriveAnchor } from "./note";
+import { type AnchorSide, deriveAnchor, type HunkNote } from "./note";
 
 export type { AnchorSide, HunkNote, NoteSource } from "./note";
 

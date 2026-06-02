@@ -1,5 +1,5 @@
 import { cli, command } from "cleye";
-import { type Anchor, type HunkNote, deriveAnchor } from "./note";
+import { type Anchor, deriveAnchor, type HunkNote } from "./note";
 
 export type { Anchor, HunkNote } from "./note";
 

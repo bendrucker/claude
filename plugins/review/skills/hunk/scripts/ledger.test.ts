@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type HunkNote, Ledger, defaultLedgerDir } from "./ledger";
+import { defaultLedgerDir, type HunkNote, Ledger } from "./ledger";
 
 function makeNote(overrides: Partial<HunkNote> = {}): HunkNote {
   return {

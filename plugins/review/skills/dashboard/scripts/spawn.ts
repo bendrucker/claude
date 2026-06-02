@@ -40,26 +40,34 @@ const state = await readState(dataDir);
 const activeReviews = state.reviews.filter((r) => r.status === "active");
 const splitArgs = layoutArgs(activeReviews.length, activeReviews.at(-1)?.paneId);
 
-const claudeArgs = [
-  "claude",
-  "--worktree",
-  paneName,
-  "--session-id",
-  sessionId,
-  "--name",
-  paneName,
-];
-
 const prompt = argv.flags.context
   ? `${argv.flags.context}\n\n/review:peer ${url}`
   : `/review:peer ${url}`;
 
-claudeArgs.push(prompt);
+// Create the review's worktree through Worktrunk and launch claude inside it.
+// `wt switch --create <paneName>` makes the branch (named for the review, so
+// `sync` removes it later by the same stored name), and `-x claude` execs the
+// review session in the new worktree. Args after `--` are shell-escaped by wt,
+// so the prompt passes through intact.
+const wtArgs = [
+  "wt",
+  "switch",
+  "--create",
+  paneName,
+  "-x",
+  "claude",
+  "--",
+  "--session-id",
+  sessionId,
+  "--name",
+  paneName,
+  prompt,
+];
 
-const claudeCmd = claudeArgs.map((arg) => Bun.$.escape(arg)).join(" ");
+const wtCmd = wtArgs.map((arg) => Bun.$.escape(arg)).join(" ");
 
 const result = Bun.spawnSync(
-  ["tmux", "split-window", ...splitArgs, "-c", repoPath, "-P", "-F", "#{pane_id}", claudeCmd],
+  ["tmux", "split-window", ...splitArgs, "-c", repoPath, "-P", "-F", "#{pane_id}", wtCmd],
   { stdout: "pipe", stderr: "pipe" },
 );
 

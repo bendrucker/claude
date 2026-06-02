@@ -3,7 +3,27 @@
 import { cli } from "cleye";
 import { table } from "table";
 import { completeReview, readState, removeReview, writeState } from "./store";
-import { removeWorktree } from "./worktree";
+
+// Reclaim a completed review's worktree through Worktrunk. `wt remove --force`
+// removes the worktree (including untracked files), runs its pre-remove hooks,
+// and deletes the branch when it has no unmerged commits. The branch is the
+// review's paneName (the name spawn.ts created it under), so removal needs no
+// lookup. Returns the wt stderr on failure rather than throwing, so one stuck
+// worktree never blocks the rest of a sync.
+async function removeWorktree(
+  repoPath: string,
+  branch: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const proc = Bun.spawn(["wt", "remove", branch, "--force"], {
+    cwd: repoPath,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if ((await proc.exited) === 0) {
+    return { ok: true };
+  }
+  return { ok: false, error: (await new Response(proc.stderr).text()).trim() };
+}
 
 function getLivePaneIds(): Set<string> {
   const proc = Bun.spawnSync(["tmux", "list-panes", "-a", "-F", "#{pane_id}"], {
@@ -83,10 +103,10 @@ switch (command) {
       if (review.status === "active" && !livePanes.has(review.paneId)) {
         completeReview(state, review.paneId);
         completed++;
-        const result = removeWorktree(review.repoPath, review.paneName);
-        if (result.status === "removed") {
+        const result = await removeWorktree(review.repoPath, review.paneName);
+        if (result.ok) {
           worktreesRemoved++;
-        } else if (result.status === "failed") {
+        } else {
           failures.push(`${review.paneName}: ${result.error}`);
         }
       }

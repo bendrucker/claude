@@ -1,18 +1,8 @@
-import { reportAndExit, validateFile } from "./validate";
+import { runEntry, runValidation } from "./run";
 
-async function main() {
-  const file = ".claude-plugin/marketplace.json";
-
-  console.log(`• ${file}`);
-
-  const result = await validateFile(file, "schemas/marketplace.schema.json");
-
-  console.log("");
-  reportAndExit(result);
-  console.log("Validation passed.");
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runEntry(() =>
+  runValidation({
+    files: [".claude-plugin/marketplace.json"],
+    schema: "schemas/marketplace.schema.json",
+  }),
+);

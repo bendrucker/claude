@@ -116,26 +116,34 @@ Periodically run `state.ts sync` to detect completed reviews. When all reviews a
 
 The interactive flow above is the default: fetch once, present, ask, spawn. The loop is the opt-in hands-off mode. It polls the UNREVIEWED queues on an interval and spawns a session for each newly-arrived review without prompting, so the queue drains itself while you work elsewhere.
 
-The `Monitor` command does the polling itself and emits one line per newly-arrived review; you react to each event by spawning. `poll.ts` owns the fetch-and-diff: it reads the tracked URLs from state, queries both platforms' UNREVIEWED queues, and prints the URLs not already tracked. `Monitor` is not a bare metronome.
+The `Monitor` command does the polling itself and emits one line per newly-arrived review; you react to each event by spawning. `poll.ts` owns the fetch-and-diff: it reads the tracked URLs from state, runs each `--queue` source command, and prints the URLs not already tracked. `Monitor` is not a bare metronome.
 
-#### Resolve the GitLab Queue Script
+#### Wire the Review-Queue Sources
 
-`poll.ts` runs the gitlab plugin's own `review-queue.ts` directly, so resolve its path once before arming the monitor: load `gitlab:merge-request` and note the absolute path of its `scripts/review-queue.ts` (its `${CLAUDE_SKILL_DIR}/scripts/review-queue.ts`). Pass that path as `--gitlab-queue` below. This keeps the queue's GraphQL owned by the gitlab plugin; the dashboard only invokes the resolved script. Omit `--gitlab-queue` to poll GitHub only.
+`poll.ts` knows no platforms. Each `--queue` is a command that emits an UNREVIEWED queue as `[{ url }]` JSON. Pass one per platform you want polled, and omit the rest:
+
+- GitHub: `gh search prs --review-requested=@me --state=open --json url`.
+- GitLab: load `gitlab:merge-request` and pass `bun <ABS>`, where `<ABS>` is the absolute path the gitlab docs resolve to for `scripts/review-queue.ts` (for example `/Users/you/.claude/plugins/cache/.../gitlab/skills/merge-request/scripts/review-queue.ts`). Write the resolved path out in full. Do not reuse `${CLAUDE_SKILL_DIR}` from the examples below: it points at this dashboard skill, not gitlab, so it would resolve to the wrong directory.
+
+A platform plugin that owns its queue keeps the query; the dashboard only runs the command it hands back.
 
 #### Arm the Monitor
 
-Pass this command to `Monitor` with `persistent: true` and a descriptive label. Each iteration prunes finished reviews (`sync`), then `poll.ts` prints the URLs of UNREVIEWED reviews not already tracked. Each printed URL is one event:
+Pass this command to `Monitor` with `persistent: true` and a descriptive label. Each iteration prunes finished reviews (`sync`), then `poll.ts` prints the URLs of UNREVIEWED reviews not already tracked. Each printed URL is one event.
+
+`${CLAUDE_SKILL_DIR}` below is the dashboard's own directory (where `poll.ts` and `state.ts` live). The GitLab `--queue` uses a full absolute path instead, since it points into a different skill:
 
 ```bash
-GLQ=/abs/path/to/gitlab/skills/merge-request/scripts/review-queue.ts
 while true; do
   bun ${CLAUDE_SKILL_DIR}/scripts/state.ts sync --data-dir ${CLAUDE_PLUGIN_DATA} >/dev/null || true
-  bun ${CLAUDE_SKILL_DIR}/scripts/poll.ts --data-dir ${CLAUDE_PLUGIN_DATA} --gitlab-queue "$GLQ" || true
+  bun ${CLAUDE_SKILL_DIR}/scripts/poll.ts --data-dir ${CLAUDE_PLUGIN_DATA} \
+    --queue "gh search prs --review-requested=@me --state=open --json url" \
+    --queue "bun <ABS>" || true
   sleep 300
 done
 ```
 
-`sync`'s output is suppressed so that only new-review URLs become events. Its worktree-removal failures flow to the monitor's output file, readable with `Read` if a prune fails. `poll.ts` treats a failed fetch as an empty queue, so one platform's outage never stalls the loop.
+`sync`'s output is suppressed so that only new-review URLs become events. Its worktree-removal failures flow to the monitor's output file, readable with `Read` if a prune fails. `poll.ts` treats a failed source as an empty queue, so one source's outage never stalls the loop.
 
 #### React to Each Event
 
@@ -143,6 +151,6 @@ For each emitted URL, spawn a session without prompting, reusing [Resolve the Lo
 
 #### Pacing and Stopping
 
-- A 300s interval is a reasonable floor. Reviews arrive over minutes-to-hours, and both queues hit rate-limited remote APIs. Shorten only when you expect a burst.
+- A 300s interval is a reasonable floor. Reviews arrive over minutes-to-hours, and the queue sources hit rate-limited remote APIs. Shorten only when you expect a burst.
 - Call `TaskStop` on the `Monitor` task to stop early.
 - The loop runs until you stop it. Surface a summary when the queue is empty across several consecutive intervals, but keep polling unless told otherwise (a re-request can re-add a review at any time).

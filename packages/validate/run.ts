@@ -1,5 +1,5 @@
-import type Ajv from "ajv";
 import { join } from "node:path";
+import type Ajv from "ajv";
 import {
   createValidator,
   loadSchema,

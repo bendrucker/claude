@@ -7,9 +7,9 @@ import {
   initialState,
   isNotFoundError,
   normalizePipelineStatus,
+  type Probe,
   parseMrUrl,
   parseProject,
-  type Probe,
   registerApiError,
 } from "./watch";
 

@@ -31,6 +31,7 @@
   ],
   "scripts": {
     "build": "tsc --noEmit",
+    "check": "biome check",
     "format": "biome format --write",
     "format:check": "biome format",
     "lint": "biome lint",

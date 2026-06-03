@@ -4,7 +4,11 @@ Triage GitLab todos inbox by action type.
 
 ## Query
 
-Load the `gitlab:todos` skill. Query pending todos.
+List pending todos:
+
+```bash
+glab api /todos --paginate | jq '[.[] | select(.state == "pending")]'
+```
 
 ## Group by Action
 

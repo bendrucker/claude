@@ -12,7 +12,6 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 - **ci-monitor**: Watch an MR's CI and stream state events; invokes the logs agent on failures
 - **api**: REST and GraphQL API access
 - **docs**: Navigating GitLab documentation
-- **todos**: Managing GitLab todos inbox (notifications)
 
 ### Agents
 

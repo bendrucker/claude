@@ -330,11 +330,39 @@ describe("pr-closed", () => {
     const { events } = advance([{ probe: baseProbe({ prState: "CLOSED" }) }]);
     expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
   });
+
+  it("emits status:success before pr-closed when merged with success checks and lastState not success", () => {
+    const { events } = advance([
+      { probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) },
+    ]);
+    const statusIdx = events.findIndex((e) => e.type === "status");
+    const closedIdx = events.findIndex((e) => e.type === "pr-closed");
+    expect(statusIdx).toBeGreaterThanOrEqual(0);
+    expect(events[statusIdx]).toMatchObject({ type: "status", state: "success", sha: "s1" });
+    expect(closedIdx).toBeGreaterThan(statusIdx);
+  });
+
+  it("emits only pr-closed when merged with success checks and lastState already success", () => {
+    const initial: WatcherState = { ...initialState(), lastState: "success", lastSha: "s1" };
+    const { events } = advance(
+      [{ probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) }],
+      { initial },
+    );
+    expect(events).toEqual([{ type: "pr-closed" }]);
+  });
+
+  it("emits only pr-closed when merged with failing checks (no false success)", () => {
+    const { events } = advance([
+      { probe: baseProbe({ prState: "MERGED", state: "failing", sha: "s1" }) },
+    ]);
+    expect(events.find((e) => e.type === "status")).toBeUndefined();
+    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
+  });
 });
 
 describe("computeInterval", () => {
-  it("returns default when no durations", () => {
-    expect(computeInterval([])).toBe(180);
+  it("returns fast poll floor when no durations (first PR on branch)", () => {
+    expect(computeInterval([])).toBe(30);
   });
 
   it("adds buffer and clamps to minimum", () => {

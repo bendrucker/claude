@@ -159,8 +159,8 @@ describe("isNotFoundError", () => {
 });
 
 describe("computeInterval", () => {
-  it("defaults to 180 when no data", () => {
-    expect(computeInterval([])).toBe(180);
+  it("returns fast poll floor when no data (first PR on branch)", () => {
+    expect(computeInterval([])).toBe(30);
   });
 
   it("adds a 30 second buffer to the average", () => {
@@ -285,14 +285,45 @@ describe("deriveEvents", () => {
     expect(events).toEqual([{ type: "pr-closed" }]);
   });
 
-  it("emits pr-closed when the MR is merged", () => {
+  it("emits pr-closed when the MR is merged (lastState already success)", () => {
+    const initial = { ...initialState(), lastState: "success" as const, lastSha: "sha1" };
     const { events } = deriveEvents(
       makeProbe({ mrState: "merged", state: "success" }),
-      initialState(),
+      initial,
       0,
       15,
     );
     expect(events).toEqual([{ type: "pr-closed" }]);
+  });
+
+  it("emits status:success before pr-closed when merged and lastState not success", () => {
+    const { events } = deriveEvents(
+      makeProbe({ mrState: "merged", state: "success", sha: "sha1", runId: "100" }),
+      initialState(),
+      0,
+      15,
+    );
+    const statusIdx = events.findIndex((e) => e.type === "status");
+    const closedIdx = events.findIndex((e) => e.type === "pr-closed");
+    expect(statusIdx).toBeGreaterThanOrEqual(0);
+    expect(events[statusIdx]).toEqual({
+      type: "status",
+      state: "success",
+      sha: "sha1",
+      run_id: "100",
+    });
+    expect(closedIdx).toBeGreaterThan(statusIdx);
+  });
+
+  it("emits only pr-closed when merged with failing checks (no false success)", () => {
+    const { events } = deriveEvents(
+      makeProbe({ mrState: "merged", state: "failing" }),
+      initialState(),
+      0,
+      15,
+    );
+    expect(events.find((e) => e.type === "status")).toBeUndefined();
+    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
   });
 });
 

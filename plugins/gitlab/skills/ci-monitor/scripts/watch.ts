@@ -6,6 +6,7 @@ import { cli } from "cleye";
 import UrlPattern from "url-pattern";
 
 const DEFAULT_INTERVAL_SECONDS = 180;
+const NO_HISTORY_INTERVAL_SECONDS = 30;
 
 export type StatusState = "running" | "failing" | "success";
 export type InternalState = StatusState | "queued";
@@ -64,6 +65,16 @@ export function deriveEvents(
   let next: WatcherState = { ...state };
 
   if (probe.mrState === "closed" || probe.mrState === "merged") {
+    const emitStateTerminal = mapToEmitState(probe.state);
+    if (emitStateTerminal === "success" && next.lastState !== "success") {
+      events.push({
+        type: "status",
+        state: "success",
+        sha: probe.sha,
+        run_id: probe.runId,
+      });
+      next = { ...next, lastSha: probe.sha, lastState: "success" };
+    }
     events.push({ type: "pr-closed" });
     return { events, state: next };
   }
@@ -209,7 +220,7 @@ export function normalizePipelineStatus(status: string): InternalState {
 }
 
 export function computeInterval(durationsSeconds: number[]): number {
-  if (durationsSeconds.length === 0) return DEFAULT_INTERVAL_SECONDS;
+  if (durationsSeconds.length === 0) return NO_HISTORY_INTERVAL_SECONDS;
   const avg = durationsSeconds.reduce((a, b) => a + b, 0) / durationsSeconds.length;
   const buffered = avg + 30;
   return Math.min(600, Math.max(30, Math.round(buffered)));

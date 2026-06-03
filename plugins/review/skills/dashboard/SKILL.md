@@ -116,7 +116,7 @@ Periodically run `state.ts sync` to detect completed reviews. When all reviews a
 
 The interactive flow above is the default: fetch once, present, ask, spawn. The loop is the opt-in hands-off mode. It polls the UNREVIEWED queues on an interval and spawns a session for each newly-arrived review without prompting, so the queue drains itself while you work elsewhere.
 
-The `Monitor` command does the polling itself and emits one line per newly-arrived review; you react to each event by spawning. `poll.ts` owns the fetch-and-diff: it reads the tracked URLs from state, runs each `--queue` source command, and prints the URLs not already tracked. `Monitor` is not a bare metronome.
+The `Monitor` command does the polling itself and emits one line per newly-arrived review; you react to each event by spawning. `watch.ts` owns the loop: each interval it syncs completed reviews, then runs the fetch-and-diff (read tracked URLs from state, run each `--queue` source command, print the URLs not already tracked). `Monitor` is not a bare metronome.
 
 #### Wire the Review-Queue Sources
 
@@ -129,21 +129,26 @@ A platform plugin that owns its queue keeps the query; the dashboard only runs t
 
 #### Arm the Monitor
 
-Pass this command to `Monitor` with `persistent: true` and a descriptive label. Each iteration prunes finished reviews (`sync`), then `poll.ts` prints the URLs of UNREVIEWED reviews not already tracked. Each printed URL is one event.
+Pass this command to `Monitor` with `persistent: true` and a descriptive label. `watch.ts` runs a single long-lived bun process: each iteration syncs completed reviews, fetches all `--queue` sources, and prints one URL per line for every newly-arrived review. Each printed URL is one event.
 
-`${CLAUDE_SKILL_DIR}` below is the dashboard's own directory (where `poll.ts` and `state.ts` live). The GitLab `--queue` uses a full absolute path instead, since it points into a different skill:
+`${CLAUDE_SKILL_DIR}` below is the dashboard's own directory (where `watch.ts` lives). The GitLab `--queue` uses a full absolute path instead, since it points into a different skill:
 
 ```bash
-while true; do
-  bun ${CLAUDE_SKILL_DIR}/scripts/state.ts sync --data-dir ${CLAUDE_PLUGIN_DATA} >/dev/null || true
-  bun ${CLAUDE_SKILL_DIR}/scripts/poll.ts --data-dir ${CLAUDE_PLUGIN_DATA} \
-    --queue "gh search prs --review-requested=@me --state=open --json url" \
-    --queue "bun <ABS>" || true
-  sleep 300
-done
+bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts \
+  --data-dir ${CLAUDE_PLUGIN_DATA} \
+  --interval 300 \
+  --queue "gh search prs --review-requested=@me --state=open --json url" \
+  --queue "bun <ABS>"
 ```
 
-`sync`'s output is suppressed so that only new-review URLs become events. Its worktree-removal failures flow to the monitor's output file, readable with `Read` if a prune fails. `poll.ts` treats a failed source as an empty queue, so one source's outage never stalls the loop.
+A failed source emits a `{"type":"source-error",...}` line to stderr and contributes zero URLs, so one source's outage never stalls the loop. Sync errors go to stderr as `{"type":"sync-error",...}`. Neither is suppressed.
+
+#### Monitor Reliability
+
+Two rules for any command you hand `Monitor`:
+
+- Pass a **single long-lived process** that sleeps internally via `setTimeout`, not a shell `while/sleep` loop. This is a temporary workaround for a macOS `Monitor` bug: the eval context strips `PATH` (so `sleep` and `date` are not found) and kills backgrounded children with `nice(5) failed: operation not permitted`. When that harness bug is fixed, shell loops should work again.
+- **Never suppress poll output** with `>/dev/null` or `|| true`. A silent poll is indistinguishable from "nothing new"; emit a structured line on error so failures are visible.
 
 #### React to Each Event
 

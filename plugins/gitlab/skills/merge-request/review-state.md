@@ -131,27 +131,15 @@ bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
 
 ## Review Inbox (Next-Actor Triage)
 
-The cross-project queue above filters to `UNREVIEWED` and answers "what awaits my first review." The triage read uses the same `reviewRequestedMergeRequests` query but keeps every entry where you are a reviewer, then groups by next actor so you can see what is on your plate versus the author's. Match your reviewer entry the same way the queue does: the reviewer whose `username` equals `currentUser.username`, then read its `reviewState`.
-
-#### Next Actor by Review State
+The cross-project queue above filters to `UNREVIEWED`. To triage everything you are a reviewer on, run the same `reviewRequestedMergeRequests` query without that filter, match your `username` as the queue does, and group by `reviewState`:
 
 | `reviewState` | Next actor |
 |---------------|-----------|
-| `UNREVIEWED` | You. The true inbox: awaiting your first review. Maps to the dashboard "Review requests" and [`scripts/review-queue.ts`](scripts/review-queue.ts). |
-| `REVIEW_STARTED` | You, mid-review. In progress, not yet submitted. |
-| `REQUESTED_CHANGES` | Author's court until they re-request. |
-| `APPROVED` | Off your plate. |
+| `UNREVIEWED` | You. Awaiting your first review. |
+| `REVIEW_STARTED` | You. Review in progress, not yet submitted. |
+| `REQUESTED_CHANGES` | Author, until they re-request. |
+| `APPROVED` | Nobody. Off your plate. |
 
-The API never returns `REVIEWED`. The web UI label "Reviewed" surfaces as `REVIEW_STARTED` or `REQUESTED_CHANGES` in the API, so a reader who saw "Reviewed" knows the API name.
+The API never returns `REVIEWED`; the web UI's "Reviewed" label maps to `REVIEW_STARTED` or `REQUESTED_CHANGES`.
 
-#### Re-Request Flip-Back
-
-Requesting changes or approving moves the MR out of your `UNREVIEWED` bucket. The author's re-request (the [`mergeRequestReviewerRereview`](#re-request-review) mutation) resets your entry to `UNREVIEWED` and re-surfaces it as a fresh inbox item.
-
-#### Why This Beats the Todos Inbox
-
-A dismissed todo records that you dismissed the notification, not that you handled the review. Re-requests do not reliably regenerate a todo, so the [todos inbox](../todos/SKILL.md) drifts out of sync with the actual review state. `reviewState` is the authoritative per-MR signal.
-
-#### Relation to `review:dashboard`
-
-The `review:dashboard` UNREVIEWED fetch is the spawn-a-session surface for the `UNREVIEWED` row. This triage read is the broader read-and-group view across every state.
+A re-request ([`mergeRequestReviewerRereview`](#re-request-review)) resets your entry to `UNREVIEWED` and re-surfaces the MR. Triage off `reviewState` rather than the [todos inbox](../todos/SKILL.md): a dismissed todo does not mean the review is handled, and re-requests do not reliably regenerate one.

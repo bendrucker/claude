@@ -29,6 +29,7 @@ const gitlabWatchScript = join(
   "scripts",
   "watch.ts",
 );
+const jxaScript = join(repoRoot, "plugins", "mac", "scripts", "jxa.ts");
 
 describe("isGoBinary", () => {
   test("gh is a Go binary", async () => {
@@ -51,6 +52,10 @@ describe("hasBypassMarker", () => {
 
   test("gitlab ci-monitor watch.ts carries the marker", async () => {
     expect(await hasBypassMarker(gitlabWatchScript)).toBe(true);
+  });
+
+  test("mac jxa.ts carries the marker", async () => {
+    expect(await hasBypassMarker(jxaScript)).toBe(true);
   });
 });
 
@@ -100,5 +105,14 @@ describe("processInput", () => {
       "darwin",
     );
     expect(result).not.toBeNull();
+  });
+
+  test("disables sandbox for mac jxa.ts", async () => {
+    const result = await processInput(makeInput(`bun ${jxaScript} Finder 'app.name()'`), "darwin");
+    expect(result).not.toBeNull();
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
   });
 });

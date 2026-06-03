@@ -21,11 +21,12 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --unresol
 # Deduplicate threads across diff versions
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --dedupe
 
-# Table output
+# Compact triage views
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 ```
 
-JSON and table are the two supported output formats.
+Three output formats are supported: `json` (default), `digest`, and `table`.
 
 #### JSON output schema
 
@@ -44,16 +45,18 @@ The default (`--format json`) is a flat array of summary objects, one per discus
 
 `file` and `line` are omitted entirely for general (non-inline) discussions, so handle them as optional. `lineRange` is always present but is `null` unless the comment spans multiple lines.
 
-#### jq triage
+#### Compact triage
 
-Print `id`, `file:line`, resolution state, and a truncated body per discussion:
+For triage, prefer a compact format over the full JSON. Both truncate each body to `--truncate` characters (default 80); raise it when bodies are clipped too aggressively.
+
+`--format digest` prints one line per discussion: id, location (`file:line`, `file:start-end` for ranges, or `-` when not positioned), resolution state, and a truncated body.
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> | \
-  jq -r '.[] | "\(.id[0:12])  \(.file // "-"):\(.line // "-")  [\(if .resolved then "resolved" else "open" end)]  \(.body[0:60] | gsub("\n";" "))"'
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest --truncate 120
 ```
 
-`--format table` is the compact one-shot triage view. It prints ID, Author, Resolved, Location (`file:line` or `file:start-end` for ranges), and a truncated body without any jq:
+`--format table` shows the same fields as bordered columns, plus the author.
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table

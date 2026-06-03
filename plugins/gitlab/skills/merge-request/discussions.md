@@ -25,6 +25,40 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --dedupe
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 ```
 
+JSON and table are the two supported output formats.
+
+#### JSON output schema
+
+The default (`--format json`) is a flat array of summary objects, one per discussion (the first note of each thread). It is not the raw GitLab `{ notes: [...] }` shape, so query the top-level fields directly.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | Discussion id, pass to `resolve` |
+| `author` | string | Username of the first note's author |
+| `body` | string | Full body of the first note |
+| `resolved` | boolean | Flattened from `notes[0].resolved` (see Resolution status location) |
+| `resolvable` | boolean | Whether the thread can be resolved |
+| `file` | string (optional) | Present only for positioned (inline) comments |
+| `line` | number (optional) | Present only for positioned (inline) comments |
+| `lineRange` | `{ start, end }` or `null` | `null` for single-line and non-positioned comments |
+
+`file` and `line` are omitted entirely for general (non-inline) discussions, so handle them as optional. `lineRange` is always present but is `null` unless the comment spans multiple lines.
+
+#### jq triage
+
+Print `id`, `file:line`, resolution state, and a truncated body per discussion:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> | \
+  jq -r '.[] | "\(.id[0:12])  \(.file // "-"):\(.line // "-")  [\(if .resolved then "resolved" else "open" end)]  \(.body[0:60] | gsub("\n";" "))"'
+```
+
+`--format table` is the compact one-shot triage view. It prints ID, Author, Resolved, Location (`file:line` or `file:start-end` for ranges), and a truncated body without any jq:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
+```
+
 ### Resolve
 
 ```bash

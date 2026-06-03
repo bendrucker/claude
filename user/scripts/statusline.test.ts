@@ -3,7 +3,9 @@ import {
   buildStatusLine,
   dialColor,
   dialIndex,
+  dialSegment,
   elideSpans,
+  exceeds200k,
   formatWorktree,
   type Span,
   type WorktreeData,
@@ -60,11 +62,13 @@ const cases: RenderCase[] = [
     stdin: { context_window: { used_percentage: pct } },
     worktree: null,
   })),
-  // exceeds_200k color escalation.
+  // exceeds_200k color escalation, driven by live current_usage.
   ...[30, 44, 45, 70].map((pct) => ({
     name: `dial-exceeds-${pct}`,
     columns: 80,
-    stdin: { context_window: { used_percentage: pct }, exceeds_200k_tokens: true },
+    stdin: {
+      context_window: { used_percentage: pct, current_usage: { input_tokens: 250_000 } },
+    },
     worktree: null,
   })),
   { name: "no-dial", columns: 80, stdin: {}, worktree: null },
@@ -138,6 +142,45 @@ describe("dialColor", () => {
     expect(dialColor(45, true)).toBe("red"); // yellow -> red (>= 45)
     expect(dialColor(70, true)).toBe("redBright"); // redBright unaffected
     expect(dialColor(85, true)).toBe("red"); // red unaffected
+  });
+});
+
+describe("exceeds200k", () => {
+  test("sums the live current_usage token breakdown", () => {
+    expect(exceeds200k({ context_window: { current_usage: { input_tokens: 250_000 } } })).toBe(
+      true,
+    );
+    expect(
+      exceeds200k({
+        context_window: {
+          current_usage: {
+            input_tokens: 100_000,
+            cache_read_input_tokens: 90_000,
+            output_tokens: 20_000,
+          },
+        },
+      }),
+    ).toBe(true);
+    expect(exceeds200k({ context_window: { current_usage: { input_tokens: 150_000 } } })).toBe(
+      false,
+    );
+    expect(exceeds200k({ context_window: {} })).toBe(false);
+    expect(exceeds200k({})).toBe(false);
+  });
+
+  test("color de-escalates with position after compaction shrinks the context", () => {
+    // Before compaction: large context, escalated color.
+    const before = dialSegment({
+      context_window: { used_percentage: 85, current_usage: { input_tokens: 850_000 } },
+    });
+    // After compaction: used_percentage drops and current_usage shrinks together,
+    // so both the glyph (position) and its color reset.
+    const after = dialSegment({
+      context_window: { used_percentage: 10, current_usage: { input_tokens: 100_000 } },
+    });
+    expect(strip(before ?? "")).not.toBe(strip(after ?? ""));
+    // The post-compaction dial uses the un-escalated color for its low percentage.
+    expect(after).toBe(dialSegment({ context_window: { used_percentage: 10 } }));
   });
 });
 

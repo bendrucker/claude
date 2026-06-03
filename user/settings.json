@@ -332,7 +332,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/scripts/statusline.ts"
+    "command": "/Users/ben/.vibe-island/bin/vibe-island-statusline-chain"
   },
   "subagentStatusLine": {
     "type": "command",

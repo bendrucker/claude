@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildStatusLine,
   dialColor,
   dialIndex,
   dialSegment,
   elideSpans,
+  emitRateLimits,
   exceeds200k,
   formatWorktree,
   type Span,
@@ -266,5 +271,34 @@ describe("formatWorktree redundancy collapse", () => {
   test("budget too small with no ahead yields nothing", () => {
     const out = formatWorktree({ ...base, isMain: true, branch: "main", path: "/x/myrepo" }, 2);
     expect(out).toEqual([]);
+  });
+});
+
+describe("emitRateLimits", () => {
+  const limits = {
+    five_hour: { used_percentage: 0, resets_at: 1780524600 },
+    seven_day: { used_percentage: 33, resets_at: 1780898400 },
+  };
+
+  test("writes rate_limits to a nested path, creating dirs", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "rl-"));
+    try {
+      const target = join(dir, "nested", "rl.json");
+      await emitRateLimits({ rate_limits: limits }, target);
+      expect(await Bun.file(target).json()).toEqual(limits);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("no rate_limits is a no-op", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "rl-"));
+    try {
+      const target = join(dir, "rl.json");
+      await emitRateLimits({}, target);
+      expect(await Bun.file(target).exists()).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -40,20 +40,20 @@ exports[`rendered output wt-main-80 1`] = `"myrepo"`;
 
 exports[`rendered output wt-main-120 1`] = `"myrepo"`;
 
-exports[`rendered output wt-feature-40 1`] = `"\x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/l…iding-eventually\x1B]8;;\x1B\\\x1B[39m  \x1B[2m↑3\x1B[22m"`;
+exports[`rendered output wt-feature-40 1`] = `"\x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/lo…liding-eventually\x1B]8;;\x1B\\\x1B[39m \x1B[2m↑3\x1B[22m"`;
 
-exports[`rendered output wt-feature-60 1`] = `"\x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch…t-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m  \x1B[2m↑3\x1B[22m"`;
+exports[`rendered output wt-feature-60 1`] = `"\x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-…at-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m \x1B[2m↑3\x1B[22m"`;
 
-exports[`rendered output wt-feature-80 1`] = `"\x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-name-that-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m  \x1B[2m↑3\x1B[22m"`;
+exports[`rendered output wt-feature-80 1`] = `"\x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-name-that-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m \x1B[2m↑3\x1B[22m"`;
 
-exports[`rendered output wt-feature-120 1`] = `"\x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-name-that-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m  \x1B[2m↑3\x1B[22m"`;
+exports[`rendered output wt-feature-120 1`] = `"\x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-name-that-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m \x1B[2m↑3\x1B[22m"`;
 
 exports[`rendered output wt-redundant 1`] = `"\x1B[36mworktree-abc123\x1B[39m"`;
 
-exports[`rendered output combined-40 1`] = `"\x1B[91m󰪣\x1B[39m  \x1B[32m+120\x1B[39m \x1B[31m-45\x1B[39m  \x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feat…eventually\x1B]8;;\x1B\\\x1B[39m  \x1B[2m↑2\x1B[22m"`;
+exports[`rendered output combined-40 1`] = `"\x1B[91m󰪣\x1B[39m \x1B[32m+120\x1B[39m \x1B[31m-45\x1B[39m \x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\featu…g-eventually\x1B]8;;\x1B\\\x1B[39m \x1B[2m↑2\x1B[22m"`;
 
-exports[`rendered output combined-60 1`] = `"\x1B[91m󰪣\x1B[39m  \x1B[32m+120\x1B[39m \x1B[31m-45\x1B[39m  \x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-b…s-eliding-eventually\x1B]8;;\x1B\\\x1B[39m  \x1B[2m↑2\x1B[22m"`;
+exports[`rendered output combined-60 1`] = `"\x1B[91m󰪣\x1B[39m \x1B[32m+120\x1B[39m \x1B[31m-45\x1B[39m \x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-br…eds-eliding-eventually\x1B]8;;\x1B\\\x1B[39m \x1B[2m↑2\x1B[22m"`;
 
-exports[`rendered output combined-80 1`] = `"\x1B[91m󰪣\x1B[39m  \x1B[32m+120\x1B[39m \x1B[31m-45\x1B[39m  \x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-name-that-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m  \x1B[2m↑2\x1B[22m"`;
+exports[`rendered output combined-80 1`] = `"\x1B[91m󰪣\x1B[39m \x1B[32m+120\x1B[39m \x1B[31m-45\x1B[39m \x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-name-that-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m \x1B[2m↑2\x1B[22m"`;
 
-exports[`rendered output combined-120 1`] = `"\x1B[91m󰪣\x1B[39m  \x1B[32m+120\x1B[39m \x1B[31m-45\x1B[39m  \x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-name-that-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m  \x1B[2m↑2\x1B[22m"`;
+exports[`rendered output combined-120 1`] = `"\x1B[91m󰪣\x1B[39m \x1B[32m+120\x1B[39m \x1B[31m-45\x1B[39m \x1B]8;;https://github.com/ben/myrepo\x1B\\myrepo\x1B]8;;\x1B\\\x1B[2m/\x1B[22m\x1B[36m\x1B]8;;https://github.com/ben/myrepo/actions/runs/1\x1B\\feature/long-branch-name-that-needs-eliding-eventually\x1B]8;;\x1B\\\x1B[39m \x1B[2m↑2\x1B[22m"`;

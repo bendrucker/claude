@@ -2,6 +2,7 @@
 
 import { exec } from "node:child_process";
 import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type {
   PostToolUseHookInput,
@@ -42,13 +43,33 @@ async function fileExists(filePath: string): Promise<boolean> {
   return Bun.file(filePath).exists();
 }
 
-async function hasBiome(): Promise<boolean> {
+// Biome ships as a devDependency, so its binary lives in the module graph
+// rather than on PATH (`bun run` adds node_modules/.bin, but `bun test` and
+// direct hook invocation do not). Resolve it through the package and run it
+// with bun, falling back to a global install only when the package is absent.
+function localBiome(): string | null {
+  try {
+    return fileURLToPath(import.meta.resolve("@biomejs/biome/bin/biome"));
+  } catch {
+    return null;
+  }
+}
+
+async function biomeCommand(): Promise<string | null> {
+  const local = localBiome();
+  if (local) {
+    return `bun "${local}"`;
+  }
   try {
     await execAsync("command -v biome");
-    return true;
+    return "biome";
   } catch {
-    return false;
+    return null;
   }
+}
+
+async function hasBiome(): Promise<boolean> {
+  return (await biomeCommand()) !== null;
 }
 
 export async function parseTranscript(transcriptPath: string): Promise<string[]> {
@@ -107,9 +128,13 @@ async function biomeWorkingTree(filePath: string): Promise<string | undefined> {
 }
 
 export async function runBiomeCheck(filePath: string): Promise<string | null> {
+  const command = await biomeCommand();
+  if (!command) {
+    return null;
+  }
   const cwd = await biomeWorkingTree(filePath);
   try {
-    await execAsync(`biome check "${filePath}"`, cwd ? { cwd } : undefined);
+    await execAsync(`${command} check "${filePath}"`, cwd ? { cwd } : undefined);
     return null;
   } catch (error) {
     const execError = error as { stdout?: string; stderr?: string };
@@ -119,9 +144,13 @@ export async function runBiomeCheck(filePath: string): Promise<string | null> {
 }
 
 export async function runBiomeFix(filePath: string): Promise<void> {
+  const command = await biomeCommand();
+  if (!command) {
+    return;
+  }
   const cwd = await biomeWorkingTree(filePath);
   try {
-    await execAsync(`biome check --write "${filePath}"`, cwd ? { cwd } : undefined);
+    await execAsync(`${command} check --write "${filePath}"`, cwd ? { cwd } : undefined);
   } catch {
     // biome check --write exits non-zero if there are unfixable issues
   }

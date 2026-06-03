@@ -51,15 +51,18 @@ function patchSchema(schema: SchemaObject): void {
   }
 }
 
-export async function validate(cwd: string): Promise<Map<string, string[]>> {
-  const schema = await fetchSchema();
-  if (!schema) return new Map();
+export async function validate(
+  cwd: string,
+  schema?: object | null,
+): Promise<Map<string, string[]>> {
+  const resolved = schema ?? (await fetchSchema());
+  if (!resolved) return new Map();
 
-  patchSchema(schema as SchemaObject);
+  patchSchema(resolved as SchemaObject);
 
   const ajv = new Ajv({ allErrors: true, strict: false });
   addFormats(ajv);
-  const validateFn = ajv.compile(schema);
+  const validateFn = ajv.compile(resolved);
 
   const errors = new Map<string, string[]>();
 

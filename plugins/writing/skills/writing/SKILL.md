@@ -36,7 +36,7 @@ The hook enforces these automatically. Vocabulary and marketing-verb lists are i
 
 #### Outbound Email and Messages
 
-- Don't write human-facing email in a punchy journalistic cadence: dramatic one-sentence paragraphs, rhetorical question then answer ("The result? X."), or escalating triads. Founders and colleagues don't write this way, so it reads as ghostwritten and therefore deceptive. Match the sender's plain voice.
+- Don't write human-facing email in a punchy journalistic cadence: dramatic one-sentence paragraphs, rhetorical question then answer ("The result? X."), or escalating triads. Match the sender's plain voice.
 
 ## Voice
 

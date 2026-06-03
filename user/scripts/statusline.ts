@@ -48,7 +48,7 @@ export interface WorktreeData {
 
 type DialColor = "green" | "yellow" | "redBright" | "red";
 
-const SEP = "  ";
+const SEP = " ";
 
 // OSC 8 hyperlink open/close. Emitted unconditionally: the status line's stdout
 // is piped while still rendered, so TTY-gated link helpers would drop the link.

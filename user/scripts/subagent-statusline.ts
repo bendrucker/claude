@@ -103,7 +103,7 @@ export function renderTask(
   const build = (text: string, withType: boolean): string => {
     let body = icon;
     if (marker) body += ` ${marker}`;
-    body += `  ${text}`;
+    body += ` ${text}`;
     const trailing = [...metaParts];
     if (withType && agentType) trailing.push(agentType);
     if (trailing.length) {

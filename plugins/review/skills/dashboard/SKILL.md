@@ -145,11 +145,10 @@ A failed source emits a `{"type":"source-error",...}` line to stderr and contrib
 
 #### Monitor Reliability
 
-Three rules that apply here and anywhere you hand a shell command to `Monitor`:
+Two rules for any command you hand `Monitor`:
 
-- Pass a **single long-lived process** that sleeps internally via `setTimeout`. Never a shell `while/sleep` loop: Monitor's eval context strips `PATH`, so `sleep` and `date` are not found, and backgrounded children are killed by `nice(5) failed: operation not permitted`.
-- **Never suppress poll output** with `>/dev/null` or `|| true`. If a poll is silent, it is indistinguishable from "nothing new." Emit a structured line on error so failures are visible.
-- Prefer **REST over GraphQL** for CI/review state under the Claude Code sandbox (`gh api repos/<o>/<r>/commits/<sha>/check-runs` works; `gh pr view --json statusCheckRollup` fails intermittently with TLS certificate errors).
+- Pass a **single long-lived process** that sleeps internally via `setTimeout`, not a shell `while/sleep` loop. This is a temporary workaround for a macOS `Monitor` bug: the eval context strips `PATH` (so `sleep` and `date` are not found) and kills backgrounded children with `nice(5) failed: operation not permitted`. When that harness bug is fixed, shell loops should work again.
+- **Never suppress poll output** with `>/dev/null` or `|| true`. A silent poll is indistinguishable from "nothing new"; emit a structured line on error so failures are visible.
 
 #### React to Each Event
 

@@ -9,13 +9,25 @@ export type BashInput = {
 
 const READ_ONLY_SUBCOMMANDS = new Set(["list"]);
 const REPLACED_SUBCOMMANDS = new Set(["add", "remove"]);
+const TMP_TARGET = /^(\.\/)?tmp\//;
+
+export function isThrowawayAdd(command: string): boolean {
+  const after = command.split(/\bgit\s+worktree\s+add\b/)[1];
+  if (after === undefined) return false;
+  return after.split(/\s+/).some((tok) => TMP_TARGET.test(tok));
+}
 
 export function formatDenyOutput(subcommand: string): SyncHookJSONOutput {
+  const base = `Use the worktrunk skill (/worktrunk) instead of \`git worktree ${subcommand}\`.`;
+  const reason =
+    subcommand === "add"
+      ? `${base} For a throwaway verification checkout, add it under \`tmp/\`.`
+      : base;
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: `Use the worktrunk skill (/worktrunk) instead of \`git worktree ${subcommand}\`.`,
+      permissionDecisionReason: reason,
     },
   };
 }
@@ -43,6 +55,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
     return null;
   }
   if (READ_ONLY_SUBCOMMANDS.has(subcommand)) {
+    return null;
+  }
+  if (subcommand === "add" && isThrowawayAdd(command)) {
     return null;
   }
   if (REPLACED_SUBCOMMANDS.has(subcommand)) {

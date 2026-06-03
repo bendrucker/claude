@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// claude:dangerouslyDisableSandbox: osascript hands off to LaunchServices/Apple Events, which the command sandbox blocks
 
 import * as acorn from "acorn";
 

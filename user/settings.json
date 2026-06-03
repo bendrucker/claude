@@ -351,6 +351,7 @@
   "env": {
     "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_STATUSLINE_RATE_LIMITS_PATH": "~/.vibe-island/cache/rl.json",
     "TMPDIR": "/tmp",
     "TMPPREFIX": "/tmp/claude/zsh",
     "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}",

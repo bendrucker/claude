@@ -4,21 +4,21 @@ Per-reviewer "satisfied" signals for the `--auto` loop, plus how to add a review
 
 ## Satisfaction Signals
 
-Match the latest review from each bot. Treat a reviewer as done when its signal appears **on the current HEAD** (a stale signal from an earlier SHA does not count).
+Third-party reviewers converge on one shape: each leaves a single summary comment, edited in place across review cycles, holding both the satisfaction signal and sometimes actionable items that never become inline threads. Read the summary, not just the thread list:
 
-#### CodeRabbit (GitLab `group_<id>_bot`, GitHub `coderabbitai`)
+- Select the summary comment by `updated_at`, not `created_at`. The current signal is an edit to a comment created rounds ago, so newest-created points at the wrong one.
+- Treat the summary body as a thread source. A thread-count check alone reads an unfinished review, with actionable items parked in the summary, as satisfied.
 
-Each review summary includes a line `Actionable comments posted: N`. Satisfied when `N` is `0` and no new unresolved bot threads remain. CodeRabbit may also leave non-blocking "nitpick" or "LGTM" notes; nitpicks are noise unless obviously correct.
+A reviewer is done when its latest summary on the current HEAD reports nothing actionable and no unresolved bot threads remain. A stale signal from an earlier SHA does not count. Each vendor phrases "none left" differently; use the string as a fast path, fall back to the thread count:
 
-#### Greptile (GitHub `greptile-apps[bot]` / `greptileai`)
+- **CodeRabbit** (GitHub `coderabbitai`, GitLab `group_<id>_bot`): `Actionable comments posted: 0`. Nitpick and LGTM notes are noise unless obviously correct.
+- **Greptile** (GitHub `greptile-apps[bot]` / `greptileai`): top confidence score (e.g. `5/5`); actionable items live in its "fix all with AI" section.
 
-Greptile posts a confidence score (e.g. `5/5`) with its summary. Satisfied at the top score with no outstanding actionable comments. A lower score with comments means another round.
+> Verify these strings against recent PR history when a reviewer's wording drifts. The reliable cross-cutting signal is **zero new actionable bot threads on the current HEAD after a re-review**.
 
-#### GitHub Copilot (`copilot-pull-request-reviewer` / `github-copilot[bot]`)
+#### Copilot
 
-Copilot's review states it has no remaining feedback (e.g. "Copilot reviewed N files and found no issues" / "no further comments") or returns a review with zero new inline threads. Satisfied when the latest Copilot review on HEAD adds no actionable threads.
-
-> Verify these exact strings against recent PR history when a reviewer's wording drifts. The reliable cross-cutting signal is **zero new actionable bot threads on the current HEAD after a re-review**. Use the literal strings as a fast path, and fall back to the thread count.
+GitHub Copilot (`copilot-pull-request-reviewer` / `github-copilot[bot]`) diverges: it posts a fresh native GitHub review each cycle instead of editing one comment in place, so take its latest review by submission, not by `updated_at`. Satisfied when that review on the current HEAD adds no actionable threads ("reviewed N files and found no issues" / "no further comments").
 
 ## Re-triggering an Idle Reviewer
 

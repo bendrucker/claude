@@ -332,6 +332,30 @@ hooks:
 - **Imperative Form**: Use "Run script" not "You should run"
 - **Avoid Time-Sensitive Info**: Use "Old Patterns" sections for deprecated methods
 
+## Anti-Patterns
+
+### Tool Overlap Confuses the Model
+
+Exposing several near-duplicate tools makes Claude pick the wrong one. Three "fetch" variants or two "search" tools force a choice the model often gets wrong. Consolidate overlapping capabilities into a single parameterized tool, where an argument selects behavior.
+
+```yaml
+# Avoid: near-duplicate tools competing for the same job
+allowed-tools: [Bash(fetch-url:*), Bash(fetch-json:*), Bash(fetch-html:*)]
+```
+
+```yaml
+# Preferred: one tool, an argument selects behavior
+allowed-tools: [Bash(fetch:*)]
+```
+
+The same overlap appears at the skill level. Two near-duplicate skills whose `description` fields overlap compete to trigger, the activation equivalent of tool overlap. Prefer one skill with a `$ARGUMENTS`-selected mode over splitting it into rivals that race to activate.
+
+### Over-Prescription Lowers Quality
+
+Prompts that micromanage the exact sequence of tool calls degrade output and become brittle. Spelling out every call ties the skill to one path, so any change upstream breaks it. Prefer high-level guidance that states the goal and the constraints, then trust the model to sequence the work.
+
+This is the operational elaboration of [Don't Railroad Claude](../SKILL.md) and the appropriate-freedom principle: give Claude the outcome and let it choose the steps. When a skill keeps accreting prescriptive steps to patch failures, the fix is usually a clearer goal or a helper script, not more steps.
+
 ## Executable Code
 
 - Handle errors explicitly (don't punt to Claude)

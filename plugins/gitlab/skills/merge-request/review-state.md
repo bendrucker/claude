@@ -142,4 +142,4 @@ The cross-project queue above filters to `UNREVIEWED`. To triage everything you 
 
 The API never returns `REVIEWED`; the web UI's "Reviewed" label maps to `REVIEW_STARTED` or `REQUESTED_CHANGES`.
 
-A re-request ([`mergeRequestReviewerRereview`](#re-request-review)) resets your entry to `UNREVIEWED` and re-surfaces the MR. Triage off `reviewState` rather than the [todos inbox](../todos/SKILL.md): a dismissed todo does not mean the review is handled, and re-requests do not reliably regenerate one.
+A re-request ([`mergeRequestReviewerRereview`](#re-request-review)) resets your entry to `UNREVIEWED` and re-surfaces the MR. Triage off `reviewState` rather than the GitLab todos inbox: a dismissed todo does not mean the review is handled, and re-requests do not reliably regenerate one.

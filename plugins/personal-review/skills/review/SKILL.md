@@ -109,7 +109,6 @@ Items deferred from GitHub/Linear:
 - `things:url` — Update Things items, reorder Today list
 - `things:inbox` — Quick captures
 - `github:notifications` — Notification triage
-- `gitlab:todos` — Todo triage
 - `linear:notifications` — Notification triage
 
 ## Future

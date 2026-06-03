@@ -71,6 +71,18 @@ function remoteMarker(type: string | undefined): string {
   return type === "remote_agent" ? styleText(["dim"], remoteGlyph) : "";
 }
 
+// Descriptions arrive prefixed with the agent type (e.g. "Plan: design the
+// API"), which the trailing dim type name already conveys. Drop the redundant
+// prefix and sentence-case what remains so the title reads cleanly.
+export function formatDescription(description: string, agentType: string | null): string {
+  let text = description;
+  if (agentType) {
+    const prefix = `${agentType}: `;
+    if (text.toLowerCase().startsWith(prefix.toLowerCase())) text = text.slice(prefix.length);
+  }
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 // The status-colored type glyph leads, the cloud marker follows, so origin
 // stays visible without displacing the kind.
 export function renderTask(
@@ -100,7 +112,9 @@ export function renderTask(
     return body;
   };
 
-  let text = task.description || task.name || "agent";
+  let text = task.description
+    ? formatDescription(task.description, agentType)
+    : task.name || "agent";
   let content = build(text, true);
 
   if (columns != null && Bun.stringWidth(content) > columns) {

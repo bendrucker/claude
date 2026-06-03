@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { styleText } from "node:util";
 import { genericGlyph, purposeGlyphs } from "./glyphs";
-import { formatElapsed, formatTokens, renderTask, type Task } from "./subagent-statusline";
+import {
+  formatDescription,
+  formatElapsed,
+  formatTokens,
+  renderTask,
+  type Task,
+} from "./subagent-statusline";
 
 function strip(s: string): string {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping terminal escapes
@@ -29,6 +35,28 @@ describe("formatTokens", () => {
   });
 });
 
+describe("formatDescription", () => {
+  test("strips the agent-type prefix and sentence-cases the rest", () => {
+    expect(formatDescription("Plan: review:self comprehension variant", "Plan")).toBe(
+      "Review:self comprehension variant",
+    );
+    expect(formatDescription("Plan: worktree hook escape hatch", "Plan")).toBe(
+      "Worktree hook escape hatch",
+    );
+  });
+
+  test("sentence-cases even when no prefix is present", () => {
+    expect(formatDescription("search the parser", "Explore")).toBe("Search the parser");
+    expect(formatDescription("deploy to prod", null)).toBe("Deploy to prod");
+  });
+
+  test("only strips a leading prefix matching the agent type", () => {
+    expect(formatDescription("review:self comprehension variant", "Plan")).toBe(
+      "Review:self comprehension variant",
+    );
+  });
+});
+
 describe("renderTask", () => {
   const now = 65_000;
 
@@ -53,7 +81,7 @@ describe("renderTask", () => {
 
   test("description preferred over name", () => {
     const out = renderTask({ id: "a", description: "do thing", name: "builder" }, null, now, null);
-    expect(strip(out.content)).toContain("do thing");
+    expect(strip(out.content)).toContain("Do thing");
     expect(strip(out.content)).not.toContain("builder");
   });
 
@@ -96,7 +124,7 @@ describe("renderTask", () => {
   test("type name drops on narrow terminals while the description survives", () => {
     const out = renderTask({ id: "a", description: "search the parser" }, 24, now, "Explore");
     expect(Bun.stringWidth(out.content)).toBeLessThanOrEqual(24);
-    expect(strip(out.content)).toContain("search the parser");
+    expect(strip(out.content)).toContain("Search the parser");
     expect(strip(out.content)).not.toContain("Explore");
   });
 

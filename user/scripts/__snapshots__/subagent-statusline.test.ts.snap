@@ -2,18 +2,18 @@
 
 exports[`rendered content running 1`] = `"\x1B[90m\x1B[2m󰚩\x1B[22m\x1B[39m  builder"`;
 
-exports[`rendered content completed-tokens 1`] = `"\x1B[32m󰚩\x1B[39m  deploy to prod \x1B[2m· 1.5k\x1B[22m"`;
+exports[`rendered content completed-tokens 1`] = `"\x1B[32m󰚩\x1B[39m  Deploy to prod \x1B[2m· 1.5k\x1B[22m"`;
 
 exports[`rendered content failed 1`] = `"\x1B[31m󰚩\x1B[39m  reviewer"`;
 
-exports[`rendered content remote 1`] = `"\x1B[90m\x1B[2m󰚩\x1B[22m\x1B[39m \x1B[2m\x1B[22m  remote build"`;
+exports[`rendered content remote 1`] = `"\x1B[90m\x1B[2m󰚩\x1B[22m\x1B[39m \x1B[2m\x1B[22m  Remote build"`;
 
-exports[`rendered content explore-glyph 1`] = `"\x1B[90m\x1B[2m\x1B[22m\x1B[39m  search \x1B[2m· Explore\x1B[22m"`;
+exports[`rendered content explore-glyph 1`] = `"\x1B[90m\x1B[2m\x1B[22m\x1B[39m  Search \x1B[2m· Explore\x1B[22m"`;
 
-exports[`rendered content plan-glyph 1`] = `"\x1B[90m\x1B[2m\x1B[22m\x1B[39m  design \x1B[2m· Plan\x1B[22m"`;
+exports[`rendered content plan-glyph 1`] = `"\x1B[90m\x1B[2m\x1B[22m\x1B[39m  Design \x1B[2m· Plan\x1B[22m"`;
 
-exports[`rendered content guide-glyph 1`] = `"\x1B[90m\x1B[2m\x1B[22m\x1B[39m  docs \x1B[2m· claude-code-guide\x1B[22m"`;
+exports[`rendered content guide-glyph 1`] = `"\x1B[90m\x1B[2m\x1B[22m\x1B[39m  Docs \x1B[2m· claude-code-guide\x1B[22m"`;
 
-exports[`rendered content full-meta-remote-explore 1`] = `"\x1B[90m\x1B[2m\x1B[22m\x1B[39m \x1B[2m\x1B[22m  build the parser \x1B[2m· 1m 5s · 2.3k · Explore\x1B[22m"`;
+exports[`rendered content full-meta-remote-explore 1`] = `"\x1B[90m\x1B[2m\x1B[22m\x1B[39m \x1B[2m\x1B[22m  Build the parser \x1B[2m· 1m 5s · 2.3k · Explore\x1B[22m"`;
 
-exports[`rendered content truncated 1`] = `"\x1B[90m\x1B[2m󰚩\x1B[22m\x1B[39m  a really long description …"`;
+exports[`rendered content truncated 1`] = `"\x1B[90m\x1B[2m󰚩\x1B[22m\x1B[39m  A really long description …"`;

@@ -132,3 +132,5 @@ The Bash tool escapes `!` to `\!`. Use `| not` in jq filters (e.g. `select(.x ==
 The watcher dedupes by `(sha, state)`. A `failing` event for a SHA older than `git rev-parse HEAD` means a fix was already pushed; ignore it.
 
 Babysit is session-scoped. If the session ends, the watcher process ends with it. Re-invoke this skill from a new session to resume monitoring.
+
+Whatever you hand `Monitor`, follow the Monitor Reliability rules in `review:dashboard`: a single long-lived process that sleeps internally (never a shell `while/sleep` loop, which breaks on macOS); never suppress poll output, so a silent poll is never mistaken for "nothing new"; prefer REST (`gh api repos/<o>/<r>/commits/<sha>/check-runs`) over GraphQL (`gh pr view --json statusCheckRollup`) for CI state under the sandbox, where GraphQL TLS verification fails intermittently.

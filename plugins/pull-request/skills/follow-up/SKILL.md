@@ -67,3 +67,5 @@ The gated default requires checking before any post or resolve. `--auto` lifts t
 - Resolve only after replying; silent resolves hide context.
 - Never name or thank the bot in a reply; write it as a note for any reader. The `@<bot>` re-trigger is the one exception.
 - Match my writing style; you're replying as me.
+
+When polling review or CI state under the sandbox, prefer REST (`gh api repos/<o>/<r>/commits/<sha>/check-runs`) over GraphQL (`gh pr view --json statusCheckRollup`): GraphQL TLS verification fails intermittently there. See the Monitor Reliability rules in `review:dashboard`.

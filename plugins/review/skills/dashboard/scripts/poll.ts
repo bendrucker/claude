@@ -5,21 +5,29 @@ import { readState } from "./store";
 
 type QueueEntry = { url: string };
 
+export type FetchResult = { ok: true; urls: string[] } | { ok: false; reason: string };
+
 // Run a review-queue command that prints a JSON array of `{ url }` and return
-// the URLs. The dashboard knows nothing about any platform: each source is just
-// a command supplied by the caller. A failed command (network, auth, an
-// unconfigured source) yields an empty list, so one source's outage never
-// stalls the poll.
-async function fetchUrls(command: string): Promise<string[]> {
+// a discriminated result. A failed command (network, auth, an unconfigured
+// source) is reported via ok:false so callers can emit a visible error; the
+// caller decides whether to treat a failure as zero URLs.
+export async function fetchUrls(command: string): Promise<FetchResult> {
   const proc = Bun.spawn(["sh", "-c", command], { stdout: "pipe", stderr: "pipe" });
-  if ((await proc.exited) !== 0) {
-    return [];
+  const [exit, stdoutText, stderrText] = await Promise.all([
+    proc.exited,
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  if (exit !== 0) {
+    const detail = stderrText.trim() || `exited with code ${exit}`;
+    return { ok: false, reason: detail };
   }
   try {
-    const entries = JSON.parse(await new Response(proc.stdout).text()) as QueueEntry[];
-    return entries.map((entry) => entry.url);
-  } catch {
-    return [];
+    const entries = JSON.parse(stdoutText) as QueueEntry[];
+    return { ok: true, urls: entries.map((entry) => entry.url) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason: `JSON parse failed: ${message}` };
   }
 }
 
@@ -52,7 +60,22 @@ if (import.meta.main) {
   const tracked = new Set(
     (await readState(argv.flags.dataDir)).reviews.map((review) => review.url),
   );
-  const fetched = (await Promise.all(argv.flags.queue.map(fetchUrls))).flat();
+
+  const results = await Promise.all(argv.flags.queue.map(fetchUrls));
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (!result) continue;
+    if (!result.ok) {
+      console.error(
+        JSON.stringify({
+          type: "source-error",
+          source: argv.flags.queue[i],
+          detail: result.reason,
+        }),
+      );
+    }
+  }
+  const fetched = results.flatMap((r) => (r.ok ? r.urls : []));
 
   for (const url of newUrls(fetched, tracked)) {
     console.log(url);

@@ -34,6 +34,10 @@ The hook enforces these automatically. Vocabulary and marketing-verb lists are i
 - No trailing hedge adverbs ("regardless.", "nonetheless.").
 - No cross-sentence negation ("It isn't X. It is Y."). Combine or drop the negation.
 
+#### Outbound Email and Messages
+
+- Don't write human-facing email in a punchy journalistic cadence: dramatic one-sentence paragraphs, rhetorical question then answer ("The result? X."), or escalating triads. Founders and colleagues don't write this way, so it reads as ghostwritten and therefore deceptive. Match the sender's plain voice.
+
 ## Voice
 
 Direct, conversational. Every sentence should teach something new. Cut words that restate the obvious.

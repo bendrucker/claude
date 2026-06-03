@@ -21,9 +21,9 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 
 ## Sandbox Trust Model
 
-The sandbox is egress control, not filesystem lockdown: credentials stay outside it, so they cannot be exfiltrated. Broad filesystem writes are fine, but a new host, socket, or network-reaching escaped command widens the egress surface and needs justification.
+The sandbox is egress control, not filesystem lockdown. Credentials stay outside its reach, so a sandboxed process cannot exfiltrate them. Broad filesystem writes are fine, but a new host, socket, or network-reaching escaped command widens the egress surface and needs justification.
 
-#### Hosts (`network`, mirrored by `WebFetch(domain:...)`)
+### Hosts (`WebFetch(domain:...)` Permissions)
 
 - Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`.
 - Docs and source: `docs.anthropic.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`.
@@ -31,11 +31,11 @@ The sandbox is egress control, not filesystem lockdown: credentials stay outside
 
 `api.anthropic.com` is the known exfil-capable host (it accepts uploads). It stays because the agent needs the model API.
 
-#### Sockets and writes
+### Sockets and Writes
 
 `allowUnixSockets`: the Secretive SSH agent is a signing channel (keys stay in the Secure Enclave), `~/.tmux` is local IPC. `allowLocalBinding` is loopback-only. `filesystem.allowWrite` covers caches and scratch, not credential stores: `/tmp`, `~/.cache`, `~/.terraform.d/plugin-cache`, `~/Library/Caches/go-build`, `~/src/go/pkg/{mod,sumdb}`, `~/.bun/install`, `~/.local/share/uv`, `~/.local/share/graphite`.
 
-#### Escaped commands (`excludedCommands`)
+### Escaped Commands (`excludedCommands`)
 
 Run outside the sandbox; only the top-level command matches (see [Sandbox and Nested Commands](#sandbox-and-nested-commands)).
 
@@ -43,4 +43,4 @@ Run outside the sandbox; only the top-level command matches (see [Sandbox and Ne
 - macOS host integration (`mac` plugin): `open`, `osascript`, `shortcuts`, `pbcopy`, `pbpaste`, `security`, `defaults`, `screencapture`, `say`, `afplay`, `diskutil`, `networksetup`, `dscl`. Host APIs the sandbox cannot model.
 - Local session tooling: `wt`, `claude`, `agent-browser`, `code`. Worktree, session, and editor control that stays local.
 
-A new host needs its secret kept outside the sandbox, and never add an upload-capable one casually. A new escaped command must fit a group above, or stay sandboxed if it reaches the network without its own auth.
+A new host needs its secret kept outside the sandbox, and never add an upload-capable one casually. A new escaped command must fit a group above. If it reaches the network without its own auth, keep it sandboxed.

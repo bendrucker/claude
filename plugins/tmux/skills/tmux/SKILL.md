@@ -11,7 +11,7 @@ hooks:
     - matcher: "Bash(tmux:*)"
       hooks:
         - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/scripts/safe-command.sh"
+          command: "bash ${CLAUDE_PLUGIN_ROOT}/skills/tmux/scripts/safe-command.sh"
     - matcher: "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/:*)"
       hooks:
         - type: command

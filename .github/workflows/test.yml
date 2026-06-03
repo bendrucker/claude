@@ -223,7 +223,7 @@ jobs:
   plugins:
     needs: [validate, plugin]
     runs-on: ubuntu-latest
-    if: always()
+    if: ${{ !cancelled() }}
     steps:
       - name: Check plugin results
         run: |

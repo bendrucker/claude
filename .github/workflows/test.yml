@@ -54,7 +54,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run tests
-        run: bun test ./.claude/hooks ./.claude/skills user/hooks user/scripts user/skills
+        run: bun test ./.claude ./user
 
   validate:
     runs-on: ubuntu-latest

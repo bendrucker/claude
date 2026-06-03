@@ -128,3 +128,18 @@ Keep nodes where the reviewer whose `username` equals `currentUser.username` has
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
 ```
+
+## Review Inbox (Next-Actor Triage)
+
+The cross-project queue above filters to `UNREVIEWED`. To triage everything you are a reviewer on, run the same `reviewRequestedMergeRequests` query without that filter, match your `username` as the queue does, and group by `reviewState`:
+
+| `reviewState` | Next actor |
+|---------------|-----------|
+| `UNREVIEWED` | You. Awaiting your first review. |
+| `REVIEW_STARTED` | You. Review in progress, not yet submitted. |
+| `REQUESTED_CHANGES` | Author, until they re-request. |
+| `APPROVED` | Nobody. Off your plate. |
+
+The API never returns `REVIEWED`; the web UI's "Reviewed" label maps to `REVIEW_STARTED` or `REQUESTED_CHANGES`.
+
+A re-request ([`mergeRequestReviewerRereview`](#re-request-review)) resets your entry to `UNREVIEWED` and re-surfaces the MR. Triage off `reviewState` rather than the GitLab todos inbox: a dismissed todo does not mean the review is handled, and re-requests do not reliably regenerate one.

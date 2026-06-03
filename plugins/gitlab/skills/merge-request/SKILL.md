@@ -78,6 +78,8 @@ bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
 
 See [review-state.md](review-state.md) for the underlying GraphQL query and filter.
 
+To group all your review-requested MRs by next actor (not just the `UNREVIEWED` slice), see [Review Inbox (Next-Actor Triage)](review-state.md#review-inbox-next-actor-triage) in review-state.md.
+
 ## Discussions
 
 Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md](discussions.md) for the discussions script, resolution workflow, and pagination pitfalls.
@@ -89,6 +91,6 @@ Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md
 ## Reference Files
 
 - [review.md](review.md) - Draft notes review workflow
-- [review-state.md](review-state.md) - GraphQL mutations for review decisions and the cross-project review queue
+- [review-state.md](review-state.md) - GraphQL mutations for review decisions, the cross-project review queue, and next-actor triage
 - [discussions.md](discussions.md) - Discussion threads and resolution
 - [stack.md](stack.md) - Stacked diff workflow

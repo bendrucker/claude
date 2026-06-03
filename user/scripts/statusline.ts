@@ -3,9 +3,15 @@ import { basename } from "node:path";
 import { styleText } from "node:util";
 import { dialGlyph } from "./glyphs";
 
+interface CurrentUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
 interface StatusInput {
-  context_window?: { used_percentage?: number | null };
-  exceeds_200k_tokens?: boolean;
+  context_window?: { used_percentage?: number | null; current_usage?: CurrentUsage | null };
   cost?: { total_lines_added?: number; total_lines_removed?: number };
 }
 
@@ -67,12 +73,27 @@ export function dialIndex(pct: number): number {
   return idx > 7 ? 7 : idx;
 }
 
+// Claude Code's top-level `exceeds_200k_tokens` reflects the most recent API
+// response and is not recomputed on compaction, so it stays true after the
+// context shrinks. Derive it from the live `current_usage` instead, the same
+// source as `used_percentage`, so the dial's color and position reset together.
+export function exceeds200k(input: StatusInput): boolean {
+  const usage = input.context_window?.current_usage;
+  if (!usage) return false;
+  const total =
+    (usage.input_tokens ?? 0) +
+    (usage.output_tokens ?? 0) +
+    (usage.cache_creation_input_tokens ?? 0) +
+    (usage.cache_read_input_tokens ?? 0);
+  return total > 200_000;
+}
+
 export function dialSegment(input: StatusInput): string | null {
   const pct = input.context_window?.used_percentage;
   if (pct == null) return null;
 
   const intPct = Math.round(pct);
-  const color = dialColor(intPct, input.exceeds_200k_tokens === true);
+  const color = dialColor(intPct, exceeds200k(input));
   return styleText(color, dialGlyph(dialIndex(intPct)));
 }
 

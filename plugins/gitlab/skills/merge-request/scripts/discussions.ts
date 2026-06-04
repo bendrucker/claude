@@ -43,7 +43,7 @@ export type Discussion = {
   notes: Note[];
 };
 
-type DiscussionSummary = {
+export type DiscussionSummary = {
   id: string;
   author: string;
   body: string;
@@ -53,6 +53,8 @@ type DiscussionSummary = {
   line?: number;
   lineRange?: { start: number; end: number } | null;
 };
+
+export const DEFAULT_BODY_TRUNCATE = 80;
 
 function summarize(d: Discussion): DiscussionSummary | null {
   const note = d.notes[0];
@@ -76,6 +78,45 @@ function summarize(d: Discussion): DiscussionSummary | null {
   const line = note.position?.new_line ?? note.position?.old_line;
   if (line) result.line = line;
   return result;
+}
+
+export function truncateBody(body: string, max: number): string {
+  const collapsed = body.replace(/\s+/g, " ").trim();
+  if (max <= 0 || collapsed.length <= max) return collapsed;
+  return `${collapsed.slice(0, max - 1)}…`;
+}
+
+export function formatLocation(s: DiscussionSummary): string {
+  if (!s.file) return "";
+  const loc = s.lineRange ? `${s.lineRange.start}-${s.lineRange.end}` : String(s.line ?? "");
+  return loc ? `${s.file}:${loc}` : s.file;
+}
+
+const LOCATION_MAX_WIDTH = 40;
+
+export function formatDigest(summaries: DiscussionSummary[], truncate: number): string {
+  const rows = summaries.map((s) => ({
+    id: s.id.slice(0, 12),
+    location: formatLocation(s) || "-",
+    state: s.resolved ? "[resolved]" : "[open]",
+    body: truncateBody(s.body, truncate),
+  }));
+  const locWidth = Math.min(Math.max(0, ...rows.map((r) => r.location.length)), LOCATION_MAX_WIDTH);
+  const stateWidth = Math.max(0, ...rows.map((r) => r.state.length));
+  return rows
+    .map((r) => `${r.id}  ${r.location.padEnd(locWidth)}  ${r.state.padEnd(stateWidth)}  ${r.body}`)
+    .join("\n");
+}
+
+export function formatTable(summaries: DiscussionSummary[], truncate: number): string {
+  const rows = summaries.map((s) => [
+    s.id.slice(0, 12),
+    s.author,
+    s.resolved ? "yes" : "no",
+    formatLocation(s),
+    truncateBody(s.body, truncate),
+  ]);
+  return table([["ID", "Author", "Resolved", "Location", "Body"], ...rows]);
 }
 
 export type FilterOptions = {
@@ -190,8 +231,13 @@ const listCmd = command(
       },
       format: {
         type: String,
-        description: "Output format: json or table",
+        description: "Output format: json, table, or digest",
         default: "json",
+      },
+      truncate: {
+        type: Number,
+        description: "Max body length for table and digest output",
+        default: DEFAULT_BODY_TRUNCATE,
       },
     },
   },
@@ -209,19 +255,9 @@ const listCmd = command(
     const summaries = discussions.map(summarize).filter((s): s is DiscussionSummary => s !== null);
 
     if (parsed.flags.format === "table") {
-      const formatLocation = (s: DiscussionSummary) => {
-        if (!s.file) return "";
-        const loc = s.lineRange ? `${s.lineRange.start}-${s.lineRange.end}` : String(s.line ?? "");
-        return loc ? `${s.file}:${loc}` : s.file;
-      };
-      const rows = summaries.map((s) => [
-        s.id.slice(0, 12),
-        s.author,
-        s.resolved ? "yes" : "no",
-        formatLocation(s),
-        s.body.slice(0, 60),
-      ]);
-      console.log(table([["ID", "Author", "Resolved", "Location", "Body"], ...rows]));
+      console.log(formatTable(summaries, parsed.flags.truncate));
+    } else if (parsed.flags.format === "digest") {
+      console.log(formatDigest(summaries, parsed.flags.truncate));
     } else {
       console.log(JSON.stringify(summaries, null, 2));
     }

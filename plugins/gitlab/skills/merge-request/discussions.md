@@ -21,7 +21,44 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --unresol
 # Deduplicate threads across diff versions
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --dedupe
 
-# Table output
+# Compact triage views
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
+```
+
+Three output formats are supported: `json` (default), `digest`, and `table`.
+
+#### JSON output schema
+
+The default (`--format json`) is a flat array of summary objects, one per discussion (the first note of each thread). It is not the raw GitLab `{ notes: [...] }` shape, so query the top-level fields directly.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | Discussion id, pass to `resolve` |
+| `author` | string | Username of the first note's author |
+| `body` | string | Full body of the first note |
+| `resolved` | boolean | Flattened from `notes[0].resolved` (see Resolution status location) |
+| `resolvable` | boolean | Whether the thread can be resolved |
+| `file` | string (optional) | Present only for positioned (inline) comments |
+| `line` | number (optional) | Present only for positioned (inline) comments |
+| `lineRange` | `{ start, end }` or `null` | `null` for single-line and non-positioned comments |
+
+`file` and `line` are omitted entirely for general (non-inline) discussions, so handle them as optional. `lineRange` is always present but is `null` unless the comment spans multiple lines.
+
+#### Compact triage
+
+For triage, prefer a compact format over the full JSON. Both truncate each body to `--truncate` characters (default 80); raise it when bodies are clipped too aggressively.
+
+`--format digest` prints one line per discussion: id, location (`file:line`, `file:start-end` for ranges, or `-` when not positioned), resolution state, and a truncated body.
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest --truncate 120
+```
+
+`--format table` shows the same fields as bordered columns, plus the author.
+
+```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 ```
 

@@ -17,6 +17,11 @@ export function isMemoryPath(filePath: string): boolean {
   return MEMORY_PATH_PATTERN.test(resolve(filePath));
 }
 
+export function isPlanPath(filePath: string): boolean {
+  const home = process.env.HOME ?? "";
+  return home !== "" && filePath.startsWith(`${home}/.claude/plans/`);
+}
+
 export function isMarkdownFile(ext: string): boolean {
   return ext === "md" || ext === "markdown";
 }

@@ -17,6 +17,7 @@ import {
   getExtension,
   isMarkdownFile,
   isMemoryPath,
+  isPlanPath,
   type SyncHookJSONOutput,
   type WriteInput,
 } from "./markdown";
@@ -34,6 +35,10 @@ type AstGrepMatch = {
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function isPlanMode(input: PreToolUseHookInput): boolean {
+  return input.permission_mode === "plan";
+}
 
 export function checkMarkdown(content: string): string | null {
   const ast = fromMarkdown(content);
@@ -127,6 +132,8 @@ export async function processInput(
   }
 
   if (isMemoryPath(filePath)) return null;
+  if (isPlanPath(filePath)) return null;
+  if (isPlanMode(input)) return null;
 
   const ext = getExtension(filePath);
   let match: string | null = null;
@@ -146,11 +153,12 @@ ${match}
 
 Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
 
-  if (mode === "write") {
-    return formatDecision("deny", reason);
-  } else {
+  if (mode === "edit") {
     return formatDecision("ask", `This edit introduces numbered sequences. ${reason}`);
   }
+
+  const decision = isMarkdownFile(ext) ? "ask" : "deny";
+  return formatDecision(decision, reason);
 }
 
 async function main(): Promise<void> {

@@ -1,12 +1,5 @@
-# Single-word AI vocabulary deny list.
-# One entry per line. Matching uses a Porter stemmer, so inflected forms
-# (e.g., "meticulously", "leveraged") are caught automatically.
-#
-# Curated against session history by writing:analyze. Each entry below is one
-# the model uses far more than the user and still produces regularly. Words the
-# model has stopped using (landscape, paradigm, synergy, myriad, ...) were
-# removed as dead weight. The additions pipeline only surfaces multi-word
-# phrases, so a single word that regresses must be re-added by hand.
+# Single-word AI vocabulary deny list, one entry per line.
+# Stemmed, so inflected forms (e.g., "meticulously", "leveraged") are caught.
 delve
 tapestry
 meticulous

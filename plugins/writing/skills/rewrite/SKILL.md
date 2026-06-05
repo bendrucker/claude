@@ -1,9 +1,10 @@
 ---
 name: writing:rewrite
 description: >-
-  Rewrite text in direct, concise style. Use when you have functional content
-  (an explanation, a draft message, notes) that needs to read as polished prose
-  before sending. Strips AI voice, slop, and filler while preserving meaning.
+  Rewrite a draft message, explanation, or note to strip AI voice, slop, and
+  filler while preserving meaning. Use to polish functional prose before
+  sending.
+argument-hint: "[file path or text; omit to read input from the clipboard]"
 user-invocable: true
 context: fork
 allowed-tools:
@@ -19,7 +20,7 @@ Rewrite input text to match the style rules in [references/style-rules.md](refer
 
 $ARGUMENTS
 
-Read input from one of these sources, checked in order:
+Read input from one of these sources:
 
 #### File Path
 
@@ -29,9 +30,7 @@ If `$ARGUMENTS` is a path to an existing file, read the file contents.
 
 If `$ARGUMENTS` contains text, use it directly.
 
-#### Clipboard
-
-If `$ARGUMENTS` is empty, read from the clipboard with `pbpaste`.
+If `$ARGUMENTS` is empty, ask for the text to rewrite. You may offer to read it from the clipboard.
 
 ## Lint
 
@@ -64,4 +63,4 @@ Do not add, remove, or restructure the content's meaning. The output should conv
 
 Display the rewritten text directly. Do not wrap it in a code block unless the input was code.
 
-If the user asks, copy the result to the clipboard with `pbcopy`.
+If the user asks, copy the result to the clipboard.

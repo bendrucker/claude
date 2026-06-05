@@ -1,20 +1,4 @@
-# Flowery multi-word phrases the model reaches for in deliverable prose.
-# One phrase per line. Matching stems each word (Porter) and looks for the
-# stemmed token sequence, so inflection, spacing, and hyphenation are caught
-# automatically. "sources of truth", "source-of-truth", and "Source Of Truth"
-# all match "source of truth". "fails loudly" matches "fail loudly". A
-# context-tier reminder fires on the first occurrence in introduced prose.
-#
-# Added from the hand-written PR-body baseline (writing:analyze). Each phrase
-# appears in the model's PR/MR/commit bodies and zero times across the user's
-# 209 pre-AI pull requests. These are distinctive enough to flag on a single
-# use. The softer single-word tells live in soft-phrasing.txt.
-#
-# Matching is a stemmed subsequence scan: robust, exact, no false positives in
-# benchmarking. If this list ever grows into the thousands via mining, the
-# documented word-interior n-gram prefilter (see references/methodology.md) is a
-# transparent accelerator. At present scale the per-invocation process floor
-# dwarfs match time, so the plain scan is preferred.
+# Flowery multi-word phrases, one per line. Stemmed subsequence match catches inflection, spacing, and hyphenation.
 source of truth
 escape hatch
 self-sufficient

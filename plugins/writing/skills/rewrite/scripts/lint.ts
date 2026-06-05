@@ -2,7 +2,10 @@
 import { join } from "node:path";
 import { stemmer } from "stemmer";
 
-const WORDLISTS_DIR = join(import.meta.dirname, "..", "..", "..", "wordlists");
+const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+const WORDLISTS_DIR = pluginRoot
+  ? join(pluginRoot, "wordlists")
+  : join(import.meta.dirname, "..", "..", "..", "wordlists");
 
 const WORD_TOKEN = /[a-zA-Z]+/g;
 

@@ -26,7 +26,7 @@ DB_PATH=$(<session-skill-dir>/scripts/refresh.ts --refresh)
 
 The refresh script prints the resolved DB path to stdout.
 
-Build the local voice baseline once (and refresh it as new writing accumulates). It is the comparison surface for deliverable-aware rule health. The baseline is local-only and never committed; it lives at `CLAUDE_PLUGIN_DATA` (else `~/.claude/plugins/data/writing-bendrucker`).
+Build the local voice baseline once (and refresh it as new writing accumulates). It is the comparison surface for deliverable-aware rule health. The baseline is local-only and never committed. It is stored in the plugin data directory (`CLAUDE_PLUGIN_DATA`, else `~/.claude/plugins/data/writing-bendrucker`).
 
 ```bash
 # Seed from the already-present delimited corpus (no re-fetch needed)
@@ -60,7 +60,7 @@ Run with `--help` for all flags. `--data-dir` overrides where the voice baseline
 ## Output
 
 - Summary stats (corpus sizes, voice-baseline size, rule count, model breakdown)
-- Proposed removals, each tagged **dead** (model produced it fewer than `--min-count` times on its firing surface) or **not distinctive** (baseline uses it at least as often as the model)
+- Proposed removals, each tagged **dead** (model produced it fewer than `--min-count` times on the surface where the hook fires it) or **not distinctive** (baseline uses it at least as often as the model)
 - Proposed additions (high-lift n-grams not already covered), each with its voice-baseline rate and a spot-checkable quote
 - Rule health table (every entry with type, audit surface, and `keep` / `remove (reason)`), plus deliverable quotes for the deliverable-surface tells
 - Structural pattern audit (the hook's regex patterns, hit counts across sessions)

@@ -363,15 +363,23 @@ describe("collectText", () => {
 });
 
 describe("Bash/MCP processInput", () => {
-  it("flags MCP tool input with spaced em dash as context", async () => {
+  it("denies MCP tool input with spaced em dash", async () => {
     const result = await processInput(
       mockMcp("mcp__linear__save_issue", {
         title: "Fix the bug",
         description: "This feature \u2014 which was added last week \u2014 is broken",
       }),
     );
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+  });
+
+  it("denies a spaced em dash even on a non-prose tool", async () => {
+    const result = await processInput(
+      mockMcp("mcp__db__execute", {
+        statement: "Filter the rows \u2014 the pending ones \u2014 before the update runs",
+      }),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
   });
 
   it("flags Bash body-file with AI vocabulary as context", async () => {
@@ -389,6 +397,36 @@ describe("Bash/MCP processInput", () => {
     if (result) {
       expect(result.hookSpecificOutput).not.toHaveProperty("permissionDecision");
     }
+  });
+
+  it("flags AI vocabulary on a prose-bearing tool as context", async () => {
+    const result = await processInput(
+      mockMcp("mcp__linear__save_issue", {
+        title: "Login fails",
+        summary: "We delve into the intricacies of the auth flow here",
+      }),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+  });
+
+  it("ignores AI vocabulary on a non-prose tool with a non-prose key", async () => {
+    const result = await processInput(
+      mockMcp("mcp__db__execute", {
+        statement: "We delve into the rows and underscore the totals here",
+      }),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("flags AI vocabulary on a non-prose tool with a prose key", async () => {
+    const result = await processInput(
+      mockMcp("mcp__db__execute", {
+        description: "We delve into the rows and underscore the totals here",
+      }),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
   });
 
   it("returns null for clean MCP input", async () => {

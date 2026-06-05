@@ -59,7 +59,7 @@ function testResultHits(text: string): Hits {
       if (!match) continue;
       const after = s.slice(match.index + match[0].length).trim();
       if (DETERMINERS.test(after)) continue;
-      return { count: 1, sample: "" };
+      return { count: 1, sample: match[0] };
     }
   }
   return { count: 0, sample: "" };

@@ -18,9 +18,21 @@ describe("shouldSkip", () => {
     expect(shouldSkip("plugins/writing/wordlists/vocabulary.txt")).toBe(true);
   });
 
+  it("skips top-level-relative wordlist files", () => {
+    expect(shouldSkip("wordlists/vocabulary.txt")).toBe(true);
+  });
+
+  it("skips absolute wordlist files", () => {
+    expect(shouldSkip("/repo/wordlists/vocabulary.txt")).toBe(true);
+  });
+
+  it("does not skip a non-wordlists directory ending in wordlists", () => {
+    expect(shouldSkip("docs/mywordlists/vocabulary.txt")).toBe(false);
+  });
+
   it("skips memory and plan paths", () => {
     expect(shouldSkip("/home/u/.claude/projects/proj/memory/MEMORY.md")).toBe(true);
-    expect(shouldSkip("/home/u/.claude/plans/feature.md")).toBe(true);
+    expect(shouldSkip(`${process.env.HOME}/.claude/plans/feature.md`)).toBe(true);
   });
 
   it("keeps ordinary prose", () => {

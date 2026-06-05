@@ -21,8 +21,8 @@ Report AI writing tropes already present in repository prose. This audits text i
 `$ARGUMENTS` must include an explicit path: a directory or a glob. There is no implicit whole-repo scan.
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/scan.ts "docs/**/*.md"
-${CLAUDE_SKILL_DIR}/scripts/scan.ts path/to/directory
+bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts "docs/**/*.md"
+bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts path/to/directory
 ```
 
 Run with `--help` for all flags. The scanner walks the path, keeps prose files (`.md`, `.markdown`, `.txt`, `.mdx`, `.rst`, `.adoc`), and skips `node_modules`, `.git`, wordlists, and memory/plan paths.

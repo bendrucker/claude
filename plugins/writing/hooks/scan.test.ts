@@ -82,6 +82,14 @@ describe("scanAll", () => {
     expect(match?.line).toBe(4);
   });
 
+  it("reports the real line and column for a test-result match", () => {
+    const text = "First line.\nSecond line.\nAll 8 tests pass now.";
+    const match = scanAll(text).find((r) => r.category === "test result reporting");
+    expect(match).toBeDefined();
+    expect(match?.line).toBe(3);
+    expect(match?.col).toBe(1);
+  });
+
   it("returns empty for clean prose", () => {
     expect(scanAll("The function reads input and writes output.")).toHaveLength(0);
   });

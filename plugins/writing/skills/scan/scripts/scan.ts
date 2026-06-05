@@ -3,16 +3,15 @@ import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
-import { isProseFile } from "../../../hooks/markdown";
+import { isMemoryPath, isPlanPath, isProseFile } from "../../../hooks/markdown";
 import { type ScanResult, scanAll } from "../../../hooks/scan";
 
 const SKIP_SEGMENTS = ["node_modules", ".git"];
-const MEMORY_PATH = /\/\.claude\/(?:projects\/[^/]+\/memory|plans)\//;
-const WORDLIST_PATH = /\/wordlists\/[^/]+\.txt$/;
+const WORDLIST_PATH = /(?:^|\/)wordlists\/[^/]+\.txt$/;
 
 export function shouldSkip(path: string): boolean {
   if (SKIP_SEGMENTS.some((seg) => path.split("/").includes(seg))) return true;
-  if (MEMORY_PATH.test(path)) return true;
+  if (isMemoryPath(path) || isPlanPath(path)) return true;
   if (WORDLIST_PATH.test(path)) return true;
   return false;
 }
@@ -53,17 +52,17 @@ export async function scanFiles(files: string[]): Promise<FileViolations[]> {
   return results;
 }
 
-function printViolations(results: FileViolations[]): void {
-  for (const { path, violations } of results) {
-    for (const v of violations) {
-      console.log(`${path}:${v.line}:${v.col}: ${v.category}: ${v.message}`);
-    }
-  }
-}
-
 function relativeLabel(path: string): string {
   const rel = relative(".", path);
   return rel.startsWith("..") ? path : rel;
+}
+
+function printViolations(results: FileViolations[]): void {
+  for (const { path, violations } of results) {
+    for (const v of violations) {
+      console.log(`${relativeLabel(path)}:${v.line}:${v.col}: ${v.category}: ${v.message}`);
+    }
+  }
 }
 
 function printSummary(results: FileViolations[]): void {

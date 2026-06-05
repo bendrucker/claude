@@ -1,5 +1,6 @@
 ---
 name: improve-claude-code
+disable-model-invocation: true
 description: |
   Triage and batch-implement Claude-tagged Things todos as PRs for the claude config repo.
   Use when the user wants to work on their Claude Code improvement backlog, process Things todos tagged claude-code, or batch-implement configuration changes.

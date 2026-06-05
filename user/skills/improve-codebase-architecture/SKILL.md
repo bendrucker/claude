@@ -1,5 +1,6 @@
 ---
 name: improve-codebase-architecture
+disable-model-invocation: true
 description: Find deepening opportunities in a codebase. Use when the user wants to improve architecture, find refactoring opportunities, consolidate tightly-coupled modules, or make a codebase more testable and AI-navigable.
 ---
 

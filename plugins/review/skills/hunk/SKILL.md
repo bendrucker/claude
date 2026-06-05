@@ -1,5 +1,6 @@
 ---
 name: review:hunk
+disable-model-invocation: true
 description: >
   Drive Hunk, the terminal diff viewer, as a live local review surface in tmux. Use when
   reviewing changes through Hunk: launching a session, seeding agent notes, collecting inline

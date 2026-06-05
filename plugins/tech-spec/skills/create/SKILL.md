@@ -1,5 +1,6 @@
 ---
 name: tech-spec:create
+disable-model-invocation: true
 description: |
   Create a technical specification through interactive planning and expert review. Use when starting a new feature or project that needs documented architecture, implementation approach, and design decisions. Invoke with product requirements (PRD, brief, or similar).
 ---

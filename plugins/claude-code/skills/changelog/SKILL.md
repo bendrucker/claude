@@ -1,5 +1,6 @@
 ---
 name: claude-code:changelog
+disable-model-invocation: true
 description: Review Claude Code release notes for changes relevant to the user's skills, plugins, and tool usage. Use when the user asks "what's new in Claude Code?", "check for updates", "release notes", "new features", "what changed recently?", or wants to stay current with Claude Code.
 allowed-tools:
   - Bash(gh api graphql:*)

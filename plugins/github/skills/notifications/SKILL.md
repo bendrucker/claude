@@ -1,5 +1,6 @@
 ---
 name: github:notifications
+disable-model-invocation: true
 description: Managing GitHub notifications inbox. Use when listing, filtering, or triaging notifications (mark read, done, unsubscribe).
 ---
 

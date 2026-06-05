@@ -1,5 +1,6 @@
 ---
 name: x-callback-url:xcall
+disable-model-invocation: true
 description: Call x-callback-url schemes from the CLI synchronously. Use when invoking macOS app URL schemes (Things, Bear, OmniFocus, etc.).
 allowed-tools:
   - Bash

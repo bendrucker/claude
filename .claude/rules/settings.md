@@ -33,7 +33,7 @@ The sandbox is egress control, not filesystem lockdown. Credentials stay outside
 
 ### Sockets and Writes
 
-`allowUnixSockets`: the Secretive SSH agent is a signing channel (keys stay in the Secure Enclave), `~/.tmux` is local IPC. `allowLocalBinding` is loopback-only. `filesystem.allowWrite` covers caches and scratch, not credential stores: `/tmp`, `~/.cache`, `~/.terraform.d/plugin-cache`, `~/Library/Caches/go-build`, `~/src/go/pkg/{mod,sumdb}`, `~/.bun/install`, `~/.local/share/uv`, `~/.local/share/graphite`.
+`allowUnixSockets`: the Secretive SSH agent is a signing channel (keys stay in the Secure Enclave), `~/.tmux` is local IPC. `allowLocalBinding` is loopback-only. `filesystem.allowWrite` covers caches and scratch, not credential stores: `/tmp`, `~/.tmux` (tmux creates response sockets under `~/.tmux/tmux-$UID/`, a filesystem write that `allowUnixSockets` does not grant), `.claude/worktrees` (relative to the repo root, so agent worktrees the harness checks out under `<repo>/.claude/worktrees/agent-*` are writable from their own cwd), `~/.cache`, `~/.terraform.d/plugin-cache`, `~/Library/Caches/go-build`, `~/src/go/pkg/{mod,sumdb}`, `~/.bun/install`, `~/.local/share/uv`, `~/.local/share/graphite`.
 
 ### Escaped Commands (`excludedCommands`)
 

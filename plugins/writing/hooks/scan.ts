@@ -1,10 +1,10 @@
 import { isProseFile } from "./markdown";
 import {
-  type PatternDef,
   PATTERNS,
+  type PatternDef,
   stripCode,
-  type WeightedPatternGroup,
   WEIGHTED_PATTERNS,
+  type WeightedPatternGroup,
 } from "./tropes";
 import { weightedStemHits } from "./wordlists";
 

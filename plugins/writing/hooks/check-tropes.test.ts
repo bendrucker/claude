@@ -363,23 +363,32 @@ describe("collectText", () => {
 });
 
 describe("Bash/MCP processInput", () => {
-  it("denies MCP tool input with spaced em dash", async () => {
+  it("flags MCP tool input with spaced em dash as context", async () => {
     const result = await processInput(
       mockMcp("mcp__linear__save_issue", {
         title: "Fix the bug",
         description: "This feature \u2014 which was added last week \u2014 is broken",
       }),
     );
-    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
   });
 
-  it("denies Bash body-file with AI vocabulary", async () => {
+  it("flags Bash body-file with AI vocabulary as context", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
     const file = join(dir, "body.md");
     await Bun.write(file, "We must delve into the issue");
     const result = await processInput(mockBash(`gh pr create --body-file ${file}`));
     await rm(dir, { recursive: true, force: true });
-    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+  });
+
+  it("does not deny Bash commands containing flagged tokens as literals", async () => {
+    const result = await processInput(mockBash('gh pr create --title "Rename underscore field"'));
+    if (result) {
+      expect(result.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+    }
   });
 
   it("returns null for clean MCP input", async () => {
@@ -422,6 +431,7 @@ describe("Bash/MCP processInput", () => {
         payload: { body: "We delve into the system for a while longer" },
       }),
     );
-    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
   });
 });

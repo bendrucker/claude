@@ -2,7 +2,7 @@
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import { formatContext, formatDecision, isMemoryPath, type SyncHookJSONOutput } from "./markdown";
+import { formatContext, isMemoryPath, type SyncHookJSONOutput } from "./markdown";
 import { firstByTier, type PatternMatch, type ScanContext, scan, scanIntroduced } from "./tropes";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
@@ -196,11 +196,8 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJS
   const combined = texts.join("\n");
   const matches = scan(combined, undefined, "sideEffect");
 
-  const deny = firstByTier(matches, "deny");
-  if (deny) return formatDecision("deny", deny.message);
-
-  const context = firstByTier(matches, "context");
-  if (context) return formatContext(context.message);
+  const match = firstByTier(matches, "deny") ?? firstByTier(matches, "context");
+  if (match) return formatContext(match.message);
 
   return null;
 }

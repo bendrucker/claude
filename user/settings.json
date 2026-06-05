@@ -290,6 +290,8 @@
     "filesystem": {
       "allowWrite": [
         "/tmp",
+        "~/.tmux",
+        ".claude/worktrees",
         "~/.terraform.d/plugin-cache",
         "~/.cache",
         "~/Library/Caches/go-build",

@@ -33,7 +33,11 @@ The sandbox is egress control, not filesystem lockdown. Credentials stay outside
 
 ### Sockets and Writes
 
-`allowUnixSockets`: the Secretive SSH agent is a signing channel (keys stay in the Secure Enclave), `~/.tmux` is local IPC. `allowLocalBinding` is loopback-only. `filesystem.allowWrite` covers caches and scratch, not credential stores: `/tmp`, `~/.cache`, `~/.terraform.d/plugin-cache`, `~/Library/Caches/go-build`, `~/src/go/pkg/{mod,sumdb}`, `~/.bun/install`, `~/.local/share/uv`, `~/.local/share/graphite`.
+Treat this section as a trust model, not an exhaustive mirror of `settings.json`.
+
+- `allowUnixSockets` should be local IPC endpoints where secret material never leaves a dedicated agent (for example, signing daemons or tmux sockets).
+- `allowLocalBinding` should stay loopback-only.
+- `filesystem.allowWrite` should allow only scratch/cache/worktree paths that tools must mutate, and never credential stores or broad home-directory globs.
 
 ### Escaped Commands (`excludedCommands`)
 

@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\""
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\""
           }
         ]
       }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\"",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\"",
             "if": "Edit(**/*.ts)|Edit(**/*.tsx)|Edit(**/*.js)|Edit(**/*.jsx)|Edit(**/*.json)|Edit(**/*.jsonc)|Write(**/*.ts)|Write(**/*.tsx)|Write(**/*.js)|Write(**/*.jsx)|Write(**/*.json)|Write(**/*.jsonc)"
           }
         ]
@@ -69,15 +69,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\""
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\""
           },
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/plugin-imports\""
+            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/plugin-imports\""
           },
           {
             "type": "command",
-            "command": "PREK_HOME=\"$CLAUDE_PROJECT_DIR/.prek\" bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop\""
+            "command": "PREK_HOME=\"$CLAUDE_PROJECT_DIR/.prek\" sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop\""
           }
         ]
       }

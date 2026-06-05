@@ -106,7 +106,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ~/.claude/hooks/worktree",
+            "command": "sh ~/.claude/hooks/run.sh ~/.claude/hooks/worktree",
             "if": "Bash(git worktree *)"
           }
         ]
@@ -116,7 +116,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun ~/.claude/hooks/webfetch-block"
+            "command": "sh ~/.claude/hooks/run.sh ~/.claude/hooks/webfetch-block"
           }
         ]
       },

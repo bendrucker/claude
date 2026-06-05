@@ -29,14 +29,12 @@ Use `records`, `fields`, `schema`, and `keys` whenever a dimension needs a path 
 
 ## Grounding
 
-Grounding is mandatory, not optional. A prior run overturned four of its own headline findings at this step: the Stop-hook latency was a work-repo `make test-unit` hook rather than portable config, the permission prompts were already absorbed by the allowlist, the trope file-op block was already fixed, and the compactions were all manual. Raw query findings go stale within a week against a config that changes weekly.
+Grounding is required. Raw query findings can go stale if config changes.
 
 Re-check every candidate against the live files under `/Users/ben/src/bendrucker/claude`. Drop the candidate if the config already addresses it; downgrade it if the evidence is thin or host-skewed. Carry two fields per candidate:
 
 - `grounded` (boolean): the finding survived the re-check against live config.
 - `confidence` (high/medium/low): how strong the grounded evidence is.
-
-Two rules this step encodes, because the same mistakes recur:
 
 - Hooks run in parallel. Never sum hook durations as wall-clock; the cost the user waits on is the single slowest hook plus a fixed per-process overhead, not the sum across matching hooks. `hook-origin-split`'s `total_s` is aggregate process work, not latency.
 - Split friction into the part a setting can change and the part it cannot. `ExitPlanMode` and `AskUserQuestion` rejections are not allowlistable. Compound commands defeat `excludedCommands` prefix matching. Counting raw rejections without that split inflates the actionable set.
@@ -51,9 +49,9 @@ The index spans every machine. `local` is this machine; imported hosts carry the
 - Default to `host = 'local'` for any config-change candidate. The config you are changing is this machine's. Use other hosts only as corroborating aggregate ("this also shows up on `work`"), never as the sole evidence for a local change.
 - Never paste raw `content`, `command`, `stdout`, or `text` from an egress-blocked host verbatim into a digest, a todo, a PR, or anything else that leaves the machine. Quote `local` rows when you need a literal; cite imported hosts as counts only.
 
-## Tier-2 Catalog
+## Full Catalog
 
-Six discovery queries ship as SQL in `resources/queries/` but stay out of `SKILL.md`'s always-relevant catalog. They take the same `after_date`/`before_date`/`project`/`host` params as the rest.
+Additional queries available in `resources/queries/`:
 
 - `hook-origin-split`: split hook wall-clock between portable shared config and per-repo project hooks. Measure your config, not someone's `make test-unit`.
 - `already-allowed-still-prompting`: Bash prompts matching a `permissions.allow` pattern you pass as `allow_glob`. A non-empty result is an allowlist pattern mismatch, usually a compound command.
@@ -61,5 +59,3 @@ Six discovery queries ship as SQL in `resources/queries/` but stay out of `SKILL
 - `catalog-reinjection-thrash-sessions`: sessions re-injecting the full skill catalog and deferred-tools delta many times, with an estimated token total. The thrash detector. Tune via `min_injections`.
 - `top-sessions-by-output`: sessions ranked by total output tokens, the runaway or unattended-session detector. Tune via `limit`.
 - `stop-hook-noop-detector`: Stop hooks that never produce stdout, a decision, or a non-zero exit. Pure-overhead removal candidates.
-
-A Tier-2 query earns its file by being non-obvious or complex and likely to recur. If one goes unreferenced by any discovery run over a quarter, drop it back to inline.

@@ -5,6 +5,7 @@ description: >-
   directory or set of files (READMEs, docs, skill files, proposals) for slop
   already committed, rather than rewriting one input. Reports every match with
   file, line, and column.
+argument-hint: <path-or-glob>
 user-invocable: true
 allowed-tools:
   - Bash

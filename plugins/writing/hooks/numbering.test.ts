@@ -290,19 +290,19 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 describe("processInput with markdown", () => {
   it('detects "# 1. Introduction"', async () => {
     const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
-    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecision).toBe("ask");
     expect(output?.permissionDecisionReason).toContain("1. Introduction");
   });
 
   it('detects "## Step 2: Setup"', async () => {
     const output = await getOutput(mockWriteInput("docs.md", "## Step 2: Setup"), "write");
-    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecision).toBe("ask");
     expect(output?.permissionDecisionReason).toContain("Step 2");
   });
 
   it('detects "### Phase 3"', async () => {
     const output = await getOutput(mockWriteInput("guide.markdown", "### Phase 3"), "write");
-    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecision).toBe("ask");
     expect(output?.permissionDecisionReason).toContain("Phase 3");
   });
 
@@ -361,8 +361,50 @@ describe("memory files", () => {
     expect(output).toBeNull();
   });
 
-  it("still denies non-memory markdown with numbered heading", async () => {
+  it("still asks on non-memory markdown with numbered heading", async () => {
     const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
-    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecision).toBe("ask");
+  });
+});
+
+describe("plan files", () => {
+  const planPath = `${process.env.HOME}/.claude/plans/feature.md`;
+
+  it("skips Write to plan markdown with numbered heading", async () => {
+    const output = await getOutput(mockWriteInput(planPath, "# 1. Introduction"), "write");
+    expect(output).toBeNull();
+  });
+
+  it("skips Edit to plan markdown with numbered heading", async () => {
+    const output = await getOutput(mockEditInput(planPath, "# 1. Introduction"), "edit");
+    expect(output).toBeNull();
+  });
+
+  it("still asks on non-plan markdown with numbered heading", async () => {
+    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
+    expect(output?.permissionDecision).toBe("ask");
+  });
+});
+
+describe("plan mode", () => {
+  function mockPlanModeWrite(filePath: string, content: string): PreToolUseHookInput {
+    return { ...mockWriteInput(filePath, content), permission_mode: "plan" };
+  }
+
+  it("skips Write with numbered heading when permission_mode is plan", async () => {
+    const output = await getOutput(mockPlanModeWrite("README.md", "# 1. Introduction"), "write");
+    expect(output).toBeNull();
+  });
+
+  it("still asks when permission_mode is not plan", async () => {
+    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
+    expect(output?.permissionDecision).toBe("ask");
+  });
+});
+
+describe("markdown ask tier", () => {
+  it("asks rather than denies on markdown Write", async () => {
+    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
+    expect(output?.permissionDecision).toBe("ask");
   });
 });

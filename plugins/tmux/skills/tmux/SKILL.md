@@ -31,7 +31,11 @@ Use `$TMUX_PANE` to identify the current pane and target adjacent ones.
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/window.sh`
 
-Use `left`/`top` coordinates to resolve spatial references within the current window (LHS = lowest `left`, RHS = highest `left`, top = lowest `top`, bottom = highest `top`). When describing layouts, draw ASCII box diagrams showing pane positions and sizes.
+Each pane line ends with its geometry as `@<left>,<top> <width>x<height>`, in cell coordinates from the window's top-left. Resolve spatial references from these: LHS = lowest `left`, RHS = highest `left`, top = lowest `top`, bottom = highest `top`. When describing layouts, draw ASCII box diagrams from the positions and sizes.
+
+### Worktrees and Parallel Panes
+
+Panes in a git repo show their branch and whether the checkout is a linked `(worktree)` or the primary `(main)` one. When the user refers to work by branch or worktree ("the pane on the X branch", "the worktree for Y", "the other pane, which is ready"), match the reference to a pane's branch and dispatch to it with `send-keys` (or treat it as already running) rather than entering a worktree of your own. A pane already sitting in a worktree is set up for parallel work; hand off to it instead of duplicating the checkout.
 
 ## Session
 

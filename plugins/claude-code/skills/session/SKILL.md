@@ -27,13 +27,36 @@ ${CLAUDE_SKILL_DIR}/scripts/refresh.ts --refresh
 
 ### Querying
 
-After refresh, query the DB with the `duckdb` CLI or any DuckDB client. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL.
+After refresh, query the DB with the `duckdb` CLI or any DuckDB client. Querying never writes, so open `-readonly`: it takes no lock, so it never contends with a refresh or another query. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL.
 
 ```bash
 DB_PATH=$(${CLAUDE_SKILL_DIR}/scripts/refresh.ts)
-duckdb "$DB_PATH" "SELECT model, SUM(output_tokens) FROM messages WHERE type = 'assistant' GROUP BY model"
-duckdb "$DB_PATH" < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
+duckdb -readonly "$DB_PATH" "SELECT model, SUM(output_tokens) FROM messages WHERE type = 'assistant' GROUP BY model"
+duckdb -readonly "$DB_PATH" < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
 ```
+
+### Parallel Queries (Workflows)
+
+To investigate the corpus with a fan-out of agents (breadth search for leads, then a depth pass per lead), refresh once up front and have every agent open the index read-only:
+
+```bash
+DB=$(${CLAUDE_SKILL_DIR}/scripts/refresh.ts --refresh)        # orchestrator, once
+duckdb -readonly "$DB" < ${CLAUDE_SKILL_DIR}/resources/queries/activity.sql   # agents, in parallel
+```
+
+`refresh.ts` takes an exclusive write lock, so it must run alone; two refreshes (or any two read-write opens) at once fail with a lock conflict. A read-only open takes no lock, so any number of agents query the same file concurrently. Hand the resolved `$DB` path to the agents and never let a fanned-out agent call `refresh.ts`. Queries read a shared file, so the agents need no worktree.
+
+Params work the same from the CLI: `getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare `duckdb -readonly "$DB" < query.sql` runs unfiltered. Prepend `SET VARIABLE` lines to scope it:
+
+```bash
+duckdb -readonly "$DB" <<'SQL'
+SET VARIABLE after_date = '2026-05-01';
+SET VARIABLE hook = '*tropes*';
+.read ${CLAUDE_SKILL_DIR}/resources/queries/hook-blocks.sql
+SQL
+```
+
+Breadth-first leads come from the survey surfaces (`records` taxonomy, `fields` for schema inference, `activity`, `hooks`, `diagnostics`, `skill-activity`); a depth pass is then custom read-only SQL over whatever table or view the survey pointed at.
 
 ## Named Queries
 
@@ -54,6 +77,13 @@ Every query also takes an optional `host` param. Omit it to span every machine (
 - `model-summary`: assistant text item/message/char counts per model. Params: `after_date`, `before_date`, `project`.
 - `schema`: list every column in every table/view. Use this first when you don't know what's available.
 - `keys`: sample which top-level JSON keys appear in `raw.data` (the unstructured part), with occurrence counts.
+- `hooks`: hook activity and performance, one row per hook (keyed by command). Runs, blocks, asks, errors, cancelled, context injections, friction rate, p50/p95 duration. Params: `event` (hook event filter), `hook` (glob on command/name), `after_date`, `before_date`, `project`.
+- `hook-blocks`: hook overfiring analysis. Blocking events grouped by hook and normalized reason signature, with `storm_sessions` (sessions blocked 2+ times by the same signature) and `max_burst`. Params: `hook` (glob), `after_date`, `before_date`, `project`.
+- `activity`: session interaction profile, separating human signals (prompts, interruptions) from automated ones (auto-continuations, scheduled fires, queued goals), plus compactions, API retries, hook friction, and permission-mode distribution. Params: `after_date`, `before_date`, `project`.
+- `diagnostics`: recurring type-checker/linter/LSP diagnostics grouped by source/severity/code, with file and session spread. The signal for systematic mistakes. Params: `after_date`, `before_date`, `project`.
+- `files`: file hotspots, the files read and edited most across sessions. Params: `limit`, `after_date`, `before_date`, `project`.
+- `skill-activity`: work attributed to each skill (assistant turns, sessions, input/output/cache tokens). Swap `attribution_skill` for `attribution_plugin`/`attribution_agent` in the SQL to re-cut. Params: `after_date`, `before_date`, `project`.
+- `fields`: schema discovery by inference. Enumerates JSON keys at a path for records of a kind, with each value's JSON type and a count (divergent types appear as multiple rows). Params: `kind` (glob on `records.kind`, or null for all), `path` (JSON path, e.g. `$` or `$.attachment`), `after_date`, `before_date`, `project`.
 
 ## Cross-Machine History
 
@@ -109,12 +139,20 @@ Imported corpora are a hot place for secrets in tool output and pasted text. Pat
 
 Every table and view carries a `host` column (`local` for this machine, the label for imported ones). The `sessions` view adds `project_id` (`host || ':' || project_path`) for cross-host project identity.
 
-- `raw`: one row per JSONL line. Pinned scalar columns (`host`, `session_id`, `type`, `project_path`, `git_branch`, `is_meta`, `is_sidechain`, `duration_ms`, `timestamp`, `summary`, `input_tokens`, `output_tokens`, `source_file`, `source_line`) plus a `data JSON` column that holds the full original line.
-- `messages`: view over `raw` filtered to `type IN ('user', 'assistant')`, with a derived `content_text` (string-form messages only) and a `summary` joined from summary rows.
-- `content_items`: one row per element of `data->'$.message.content'`, with pinned columns (`type`, `name`, `id`, `tool_use_id`, `text`, `content`, `is_error`) plus `data JSON` (the content item) and `tool_use_result JSON` (merged from the parent message).
+- `raw`: one row per JSONL line, **every record type** (chat, attachments, system events, permission modes, titles, queue ops, snapshots, and more), not just user/assistant. Pinned scalar columns (`host`, `session_id`, `type`, `project_path`, `git_branch`, `is_meta`, `is_sidechain`, `duration_ms`, `timestamp`, `summary`, `input_tokens`, `output_tokens`, `source_file`, `source_line`) plus a `data JSON` column that holds the full original line. Pinned numerics use `TRY_CAST`, so a divergent value type yields NULL rather than failing the import.
+- `records`: universal union over `raw`, one row per line, with a normalized `kind` label (`type`, plus `subtype`/attachment kind when present) and the cross-cutting dimensions (`uuid`, `parent_uuid`, `permission_mode`, `version`, `slug`, `is_meta`, `is_sidechain`) every record may carry, plus full `data`. The anti-blindness backbone: `SELECT kind, COUNT(*) FROM records GROUP BY kind` is the whole taxonomy; reach into `data->>'$.path'` for anything not pinned. Use the `fields` query to discover those paths.
+- `attachments`: one row per `attachment` record (the richest non-chat category: hooks, diagnostics, skill/tool listings, plan/auto mode, queued commands, command permissions). Columns: `kind` (attachment subtype), `hook_name`, `hook_event`, `tool_use_id`, `attachment JSON` (full payload), `data`.
+- `system_events`: one row per `system` record. `subtype`, `level`, `content`, `duration_ms`, `message_count`, and per-subtype fields: stop-hook (`hook_count`, `prevented_continuation`, `stop_reason`), compaction (`compact_trigger`, `compact_pre_tokens`, `compact_duration_ms`), API errors (`error_code`, `retry_attempt`).
+- `hook_events`: one row per `hook_*` attachment (every event: PreToolUse, PostToolUse, Stop, SessionStart, UserPromptSubmit, PermissionRequest). `kind`, `hook_event`, `hook_name`, `command` (exact script), `exit_code`, `duration_ms`, `decision` (allow/ask/deny, parsed from the stdout JSON of a hook_success when the hook returns a permission decision), `reason`, `additional_context`, `blocked` (boolean), plus `stdout`/`stderr`/`content`/`blocking_error`.
+- `hook_blocks`: the friction surface, `hook_events` filtered to events that stopped or interrupted a tool call or the model. `decision` is deny/ask/block; `reason` is the surfaced message. Find overfiring hooks here (high counts, repeated blocks within a session).
+- `messages`: view over `raw` filtered to `type IN ('user', 'assistant')`, with a derived `content_text` (string-form messages only), `model`, token columns (`input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens`), attribution columns (`attribution_skill`, `attribution_plugin`, `attribution_agent`, `attribution_mcp_server`, `attribution_mcp_tool`), and a `summary` joined from summary rows.
+- `content_items`: one row per element of `data->'$.message.content'`, with pinned columns (`type`, `name`, `id`, `tool_use_id`, `text`, `content`, `is_error`), the parent's attribution (`attribution_skill`/`plugin`/`agent`), plus `data JSON` (the content item) and `tool_use_result JSON` (merged from the parent message).
+- `diagnostics`: one row per type-checker/linter/LSP diagnostic surfaced in-session. Columns: `file`, `severity`, `source`, `code`, `message`. Unnested from `diagnostics` attachments.
+- `file_operations`: one row per `Read`/`Write`/`Edit`/`MultiEdit`/`NotebookEdit`, with `operation`, `file_path`, and attribution. What you work on, and under which skill/plugin/agent.
+- `pr_links`: pull requests opened from a session. Columns: `pr_number`, `repository`, `url`, `session_id`. Join to `sessions` to connect work to shipped outcomes.
 - `text_content`: one row per prose text item across user and assistant messages. Columns: `session_id`, `timestamp`, `role`, `model` (NULL for user), `project_path`, `text` (fenced and inline-backtick code stripped), `raw_text`, `source_file`, `source_line`.
 - `sessions`: aggregated session-level stats (start/end time, duration, message counts).
-- `tool_calls`: one row per tool use.
+- `tool_calls`: one row per tool use, with `file_path` and `command` (from the tool input) and attribution (`attribution_skill`/`plugin`/`agent`).
 - `tool_errors`: tool results where `is_error` is true, joined with the originating tool call. `error_type` is `rejection` or `failure`.
 - `permission_requests`: tool calls the user rejected.
 - `sandbox_bypasses`: Bash calls that used `dangerouslyDisableSandbox=true`, with back-links to retried failures.

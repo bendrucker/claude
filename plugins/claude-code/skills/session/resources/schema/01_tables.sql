@@ -20,3 +20,11 @@ CREATE TABLE IF NOT EXISTS meta (
   host            VARCHAR,
   last_import     TIMESTAMP
 );
+
+-- Tracks the ingestion schema version. When db.ts bumps INDEX_VERSION past the
+-- stored value, migrateIfNeeded drops the cache so the next run re-ingests every
+-- JSONL line under the current import logic (e.g. when ingestion stops filtering
+-- record types). Single-row table.
+CREATE TABLE IF NOT EXISTS index_meta (
+  version         INTEGER
+);

@@ -669,3 +669,208 @@ describe("cross-machine history", () => {
     expect([...distinct][0]).toBeGreaterThan(0);
   });
 });
+
+describe("lossless ingestion", () => {
+  it("ingests non-chat record types into raw", async () => {
+    const rows = await db.query<{ type: string }>("SELECT DISTINCT type FROM raw ORDER BY type");
+    const types = rows.map((r) => r.type);
+    for (const t of ["attachment", "system", "permission-mode", "queue-operation"]) {
+      expect(types).toContain(t);
+    }
+  });
+
+  it("exposes the full record taxonomy via the records view", async () => {
+    const rows = await db.query<{ kind: string; n: bigint }>(
+      "SELECT kind, COUNT(*) AS n FROM records GROUP BY kind",
+    );
+    const kinds = new Set(rows.map((r) => r.kind));
+    expect(kinds).toContain("attachment:hook_success");
+    expect(kinds).toContain("system:compact_boundary");
+    expect(kinds).toContain("permission-mode");
+  });
+});
+
+describe("hook_events", () => {
+  it("parses a deny decision and reason from the stdout JSON of a hook_success", async () => {
+    const [row] = await db.query<{
+      decision: string;
+      reason: string;
+      command: string;
+      blocked: boolean;
+    }>(
+      "SELECT decision, reason, command, blocked FROM hook_events WHERE tool_use_id = 'hk-write-1' AND kind = 'hook_success'",
+    );
+    expect(row?.decision).toBe("deny");
+    expect(row?.reason).toContain("numbered sequences");
+    expect(row?.command).toContain("numbering.ts");
+    expect(row?.blocked).toBe(true);
+  });
+
+  it("unwraps the message from a hook_blocking_error", async () => {
+    const [row] = await db.query<{ reason: string; blocked: boolean }>(
+      "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error'",
+    );
+    expect(row?.reason).toBe("Biome check failed. Auto-fix was attempted but issues remain.");
+    expect(row?.blocked).toBe(true);
+  });
+
+  it("classifies an ask decision as a non-blocking interruption", async () => {
+    const rows = await db.query<{ decision: string }>(
+      "SELECT decision FROM hook_events WHERE command LIKE '%check-tropes%'",
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(r.decision).toBe("ask");
+  });
+});
+
+describe("hook_blocks view", () => {
+  it("surfaces deny, ask, and block decisions", async () => {
+    const rows = await db.query<{ decision: string }>("SELECT decision FROM hook_blocks");
+    const decisions = new Set(rows.map((r) => r.decision));
+    expect(decisions).toContain("deny");
+    expect(decisions).toContain("ask");
+    expect(decisions).toContain("block");
+  });
+});
+
+describe("hooks query", () => {
+  it("aggregates runs, blocks, and asks per hook", async () => {
+    const rows = await runQuery<{ hook: string; runs: bigint; blocks: bigint; asks: bigint }>(
+      db,
+      "hooks",
+      filterParams({ event: null, hook: null }),
+    );
+    const tropes = rows.find((r) => r.hook.includes("check-tropes"));
+    expect(tropes).toBeDefined();
+    expect(Number(tropes?.asks)).toBe(2);
+    const numbering = rows.find((r) => r.hook.includes("numbering.ts write"));
+    expect(Number(numbering?.blocks)).toBe(1);
+  });
+
+  it("filters by hook glob", async () => {
+    const rows = await runQuery<{ hook: string }>(
+      db,
+      "hooks",
+      filterParams({ event: null, hook: "*check-tropes*" }),
+    );
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.hook).toContain("check-tropes");
+  });
+});
+
+describe("hook-blocks query", () => {
+  it("groups by signature and counts repeat storms within a session", async () => {
+    const rows = await runQuery<{
+      hook: string;
+      blocks: bigint;
+      asks: bigint;
+      storm_sessions: bigint;
+      max_burst: bigint;
+    }>(db, "hook-blocks", filterParams({ hook: null }));
+    const emdash = rows.find((r) => r.hook.includes("check-tropes"));
+    expect(Number(emdash?.blocks)).toBe(2);
+    expect(Number(emdash?.asks)).toBe(2);
+    // Both em-dash asks land in one session, so it is a storm of burst 2.
+    expect(Number(emdash?.storm_sessions)).toBe(1);
+    expect(Number(emdash?.max_burst)).toBe(2);
+  });
+});
+
+describe("fields discovery query", () => {
+  it("enumerates the keys of an attachment kind via schema inference", async () => {
+    const rows = await runQuery<{ field: string; json_type: string }>(
+      db,
+      "fields",
+      filterParams({ kind: "attachment:hook_success", path: "$.attachment" }),
+    );
+    const fields = new Set(rows.map((r) => r.field));
+    for (const f of ["command", "exitCode", "stdout", "hookEvent"]) {
+      expect(fields).toContain(f);
+    }
+  });
+});
+
+describe("activity query", () => {
+  it("counts human and automated interaction signals", async () => {
+    const rows = await runQuery<{ signal: string; count: bigint }>(db, "activity", filterParams());
+    const bySignal = new Map(rows.map((r) => [r.signal, Number(r.count)]));
+    expect(bySignal.get("interruptions")).toBe(1);
+    expect(bySignal.get("auto-continuations")).toBe(1);
+    expect(bySignal.get("compactions")).toBe(1);
+    expect(bySignal.get("mode: auto")).toBe(1);
+    expect(bySignal.get("mode: plan")).toBe(1);
+  });
+});
+
+describe("diagnostics view and query", () => {
+  it("unnests one row per diagnostic with severity, source, and code", async () => {
+    const rows = await db.query<{ severity: string; source: string; code: string; file: string }>(
+      "SELECT severity, source, code, file FROM diagnostics ORDER BY severity",
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.severity).toBe("Error");
+    expect(rows[0]?.source).toBe("ty");
+    expect(rows[0]?.code).toBe("unresolved-import");
+    expect(rows[0]?.file).toBe("/Users/test/project/app.py");
+  });
+
+  it("groups recurring diagnostics by code", async () => {
+    const rows = await runQuery<{ code: string; occurrences: bigint; files: bigint }>(
+      db,
+      "diagnostics",
+      filterParams(),
+    );
+    const imp = rows.find((r) => r.code === "unresolved-import");
+    expect(Number(imp?.occurrences)).toBe(1);
+    expect(Number(imp?.files)).toBe(1);
+  });
+});
+
+describe("file_operations view and files query", () => {
+  it("captures file edits with the attributed skill", async () => {
+    const [row] = await db.query<{ operation: string; attribution_skill: string }>(
+      "SELECT operation, attribution_skill FROM file_operations WHERE file_path = '/Users/test/project/doc.md' AND operation = 'Write'",
+    );
+    expect(row?.operation).toBe("Write");
+    expect(row?.attribution_skill).toBe("writing:writing");
+  });
+
+  it("ranks files by edits", async () => {
+    const rows = await runQuery<{ file_path: string; edits: bigint }>(
+      db,
+      "files",
+      filterParams({ limit: "20" }),
+    );
+    const doc = rows.find((r) => r.file_path === "/Users/test/project/doc.md");
+    expect(Number(doc?.edits)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("pr_links view", () => {
+  it("links a session to the PR it produced", async () => {
+    const [row] = await db.query<{ pr_number: bigint; repository: string; session_id: string }>(
+      "SELECT pr_number, repository, session_id FROM pr_links WHERE session_id = 'hooks-session'",
+    );
+    expect(Number(row?.pr_number)).toBe(42);
+    expect(row?.repository).toBe("test/project");
+  });
+});
+
+describe("attribution and skill-activity query", () => {
+  it("exposes attribution on tool_calls", async () => {
+    const [row] = await db.query<{ attribution_skill: string }>(
+      "SELECT attribution_skill FROM tool_calls WHERE tool_id = 'hk-write-1'",
+    );
+    expect(row?.attribution_skill).toBe("writing:writing");
+  });
+
+  it("aggregates attributed work and tokens per skill", async () => {
+    const rows = await runQuery<{ skill: string; assistant_turns: bigint }>(
+      db,
+      "skill-activity",
+      filterParams(),
+    );
+    const writing = rows.find((r) => r.skill === "writing:writing");
+    expect(Number(writing?.assistant_turns)).toBeGreaterThanOrEqual(1);
+  });
+});

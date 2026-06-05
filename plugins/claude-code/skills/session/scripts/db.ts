@@ -8,6 +8,11 @@ const QUERIES_DIR = path.join(RESOURCES_DIR, "queries");
 
 export const LOCAL_HOST = "local";
 
+// Bump when the ingestion logic changes in a way that requires re-reading every
+// JSONL line (not just newly-modified files). migrateIfNeeded drops the cache when
+// the stored version is older. v2: raw ingests all record types, not just chat.
+export const INDEX_VERSION = 2;
+
 export interface Database {
   run(sql: string, params?: Record<string, string | null>): Promise<void>;
   query<T>(sql: string, params?: Record<string, string | null>): Promise<T[]>;
@@ -169,8 +174,15 @@ async function applySchema(db: Database): Promise<void> {
   }
 }
 
+async function dropCache(db: Database): Promise<void> {
+  await db.run("DROP TABLE IF EXISTS content_items");
+  await db.run("DROP TABLE IF EXISTS raw");
+  await db.run("DROP TABLE IF EXISTS meta");
+  await db.run("DROP TABLE IF EXISTS index_meta");
+}
+
 async function migrateIfNeeded(db: Database): Promise<void> {
-  const [row] = await db.query<{ has_data: boolean; has_host: boolean }>(`
+  const [row] = await db.query<{ has_data: boolean; has_host: boolean; has_version: boolean }>(`
     SELECT
       EXISTS (
         SELECT 1 FROM information_schema.columns
@@ -179,12 +191,26 @@ async function migrateIfNeeded(db: Database): Promise<void> {
       EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'main' AND table_name = 'raw' AND column_name = 'host'
-      ) AS has_host
+      ) AS has_host,
+      EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'main' AND table_name = 'index_meta'
+      ) AS has_version
   `);
-  if (row?.has_data && row?.has_host) return;
-  await db.run("DROP TABLE IF EXISTS content_items");
-  await db.run("DROP TABLE IF EXISTS raw");
-  await db.run("DROP TABLE IF EXISTS meta");
+  // Querying index_meta is only safe once the table exists.
+  const version = row?.has_version
+    ? Number(
+        (
+          await db.query<{ version: number }>(
+            "SELECT COALESCE(MAX(version), 0) AS version FROM index_meta",
+          )
+        )[0]?.version ?? 0,
+      )
+    : 0;
+  // A pre-host schema (missing data/host) or an older ingestion version both mean
+  // the cache predates the current import logic; drop it so the next run rebuilds.
+  if (row?.has_data && row?.has_host && version >= INDEX_VERSION) return;
+  await dropCache(db);
 }
 
 export async function getDb(dataDir: string): Promise<Database> {
@@ -194,6 +220,8 @@ export async function getDb(dataDir: string): Promise<Database> {
 export async function ensureSchema(db: Database): Promise<void> {
   await migrateIfNeeded(db);
   await applySchema(db);
+  await db.run("DELETE FROM index_meta");
+  await db.run(`INSERT INTO index_meta VALUES (${INDEX_VERSION})`);
 }
 
 export async function rebuildViews(db: Database): Promise<void> {

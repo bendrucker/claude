@@ -31,7 +31,7 @@ Ask the user which items to work on (numbers, ranges like `1-3`, or `all`). Cap 
 
 Each todo's notes embed the originating session as `Session: <uuid>`. For every selected todo, parse that UUID and use the `claude-code:session` skill to pull the original context: what you were doing, the commands that ran, and the errors that prompted the todo. This is richer than the todo's prose summary and grounds each plan in the real failure.
 
-Query `messages` / `content_items` / `text_content` filtered by `WHERE session_id = '<uuid>'`. Do not filter by `host`: many todos come from the work machine, whose corpus is imported as a separate host, and omitting the filter spans every machine. Distill the result to a few lines per todo and pass it to the matching `Plan` agent alongside the title and notes.
+Refresh the index once (`refresh.ts --refresh`), then look up each todo's session over the shared file with `duckdb -readonly "$DB"` (see the session skill's "Parallel queries" section). Read-only opens take no lock, so a batch of lookups runs concurrently without contending; never re-refresh per todo. Query `messages` / `content_items` / `text_content` filtered by `WHERE session_id = '<uuid>'`. Do not filter by `host`: many todos come from the work machine, whose corpus is imported as a separate host, and omitting the filter spans every machine. Distill the result to a few lines per todo and pass it to the matching `Plan` agent alongside the title and notes.
 
 If the UUID is absent from the index (not yet imported, or the index needs a refresh), proceed with notes only and say so for that todo.
 

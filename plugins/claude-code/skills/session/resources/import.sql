@@ -5,13 +5,13 @@ SELECT
   json->>'$.type'                                     AS type,
   json->>'$.cwd'                                      AS project_path,
   json->>'$.gitBranch'                                AS git_branch,
-  COALESCE(CAST(json->>'$.isMeta'      AS BOOLEAN), false) AS is_meta,
-  COALESCE(CAST(json->>'$.isSidechain' AS BOOLEAN), false) AS is_sidechain,
-  CAST(json->>'$.durationMs' AS BIGINT)               AS duration_ms,
-  CAST(json->>'$.timestamp'  AS TIMESTAMP)            AS timestamp,
+  COALESCE(TRY_CAST(json->>'$.isMeta'      AS BOOLEAN), false) AS is_meta,
+  COALESCE(TRY_CAST(json->>'$.isSidechain' AS BOOLEAN), false) AS is_sidechain,
+  TRY_CAST(json->>'$.durationMs' AS BIGINT)           AS duration_ms,
+  TRY_CAST(json->>'$.timestamp'  AS TIMESTAMP)        AS timestamp,
   json->>'$.summary'                                  AS summary,
-  CAST(json->>'$.message.usage.input_tokens'  AS BIGINT) AS input_tokens,
-  CAST(json->>'$.message.usage.output_tokens' AS BIGINT) AS output_tokens,
+  TRY_CAST(json->>'$.message.usage.input_tokens'  AS BIGINT) AS input_tokens,
+  TRY_CAST(json->>'$.message.usage.output_tokens' AS BIGINT) AS output_tokens,
   filename                                            AS source_file,
   ROW_NUMBER() OVER (PARTITION BY filename)           AS source_line,
   json                                                AS data
@@ -20,18 +20,17 @@ FROM read_json_objects(
   format='newline_delimited',
   ignore_errors=true,
   filename=true
-)
-WHERE json->>'$.type' IN ('user', 'assistant', 'summary');
-
-SET VARIABLE changed_sessions = (
-  SELECT COALESCE(LIST(DISTINCT session_id), []) FROM new_raw
 );
 
+-- Dedup by source_file (the exact reimport unit), not session_id: subagent files
+-- carry their parent's sessionId, and several record types (summary, started, result)
+-- carry none, so a session-scoped delete would drop unrelated rows or accumulate
+-- duplicates. Replacing exactly the re-read files is correct on both counts.
 CREATE OR REPLACE TABLE raw AS
 SELECT * FROM raw
 WHERE NOT (
   host = getvariable('host')
-  AND session_id IN (SELECT unnest(getvariable('changed_sessions'))::VARCHAR)
+  AND source_file IN (SELECT unnest(getvariable('source'))::VARCHAR)
 )
 UNION ALL
 SELECT * FROM new_raw;

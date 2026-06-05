@@ -2,8 +2,8 @@
 name: improve-claude-code
 disable-model-invocation: true
 description: |
-  Triage and batch-implement Claude-tagged Things todos as PRs for the claude config repo.
-  Use when the user wants to work on their Claude Code improvement backlog, process Things todos tagged claude-code, or batch-implement configuration changes.
+  Triage and batch-implement Claude-tagged Things todos as PRs for the claude config repo, or discover improvement candidates from session history.
+  Use when the user wants to work on their Claude Code improvement backlog, process Things todos tagged claude-code, batch-implement configuration changes, or mine session history for grounded config-change candidates (Discover mode).
 allowed-tools:
   - Skill(things:jxa)
   - Skill(things:url)
@@ -17,7 +17,69 @@ allowed-tools:
 
 Work through the `claude-code` Things backlog: fetch todos, triage with the user, then plan and implement each in parallel as separate PRs.
 
+The backlog has two sources. The user files todos tagged `claude-code` by hand (and `agent-ideas` files external-harvest ideas in the same shape). **Discover mode** adds a second source: it mines this machine's session history for config-change candidates, grounds them against the live config, and files the keepers as `claude-code` todos. Both sources feed the one implement loop below. Discover is upstream of triage, not a replacement for it.
+
 All Things interaction goes through the `things:jxa` and `things:url` skills (never inline JXA). PRs go through `pull-request:create` (never `gh pr create`).
+
+## Discover
+
+Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers. Discover never auto-implements and never auto-files: filing is an explicit user choice, implementing is a separate run of the loop below. The engine is the `claude-code:session` skill's fan-out, whose `references/discovery.md` carries the full recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
+
+#### Refresh
+
+Run the session skill's `scripts/refresh.ts --refresh` once, alone (it takes an exclusive write lock), and capture the printed `$DB` path. Hand that path to every agent, and never let a fanned-out agent refresh.
+
+#### Fan-Out
+
+Launch one `Task` agent per dimension (hook latency, hook blocks, permissions and sandbox, context tax, tokens, turns and compaction, skill economy), the same mining fan-out `agent-ideas` uses. Give each agent the `$DB` path and point it at `references/discovery.md`. Each agent runs its dimension's named queries (by name, read-only) plus any inline rollups, and returns structured candidate findings **plus the exact SQL it ran**. Read-only opens take no lock, so the agents never contend.
+
+#### Grounding
+
+Mandatory. Launch one or more grounding agents that re-check every candidate against the live files under `/Users/ben/src/bendrucker/claude`. Drop anything the config already addresses. Downgrade anything thin or host-skewed. Carry `grounded` (boolean) and `confidence` (high/medium/low) per candidate. Raw query findings go stale within a week against a config that changes weekly: a prior run overturned four of its own headline findings here. See the grounding rules in `references/discovery.md` (hooks run in parallel, so never sum durations as wall-clock, and split friction into what a setting can fix and what it cannot).
+
+#### Dedup
+
+Fingerprint each candidate (see [Fingerprint](#fingerprint)). Then query Things via `things:jxa` for every `claude-code`-tagged todo and recently-completed (logbook) todo, and scan their notes for `Discovery: <fp>`. Mark each candidate:
+
+- `already-filed`: fingerprint found in an open `claude-code` todo.
+- `already-shipped`: fingerprint found in a completed todo (the annotate phase removes the `claude-code` tag on a shipped todo, so the marker persists in notes or the logbook).
+- `new`: fingerprint not found.
+
+Suppress `already-filed` and `already-shipped` from the actionable set; still count them in the digest tail. Things is the ledger: there is no separate dedup store.
+
+#### Digest
+
+The only guaranteed output. Write `tmp/claude-discovery-digest-<YYYY-Www>.md`, ranked and grouped high to low confidence. Each entry shows the finding, its grounding note, the SQL that produced it, and its dedup status. Default `host=local` for config-change candidates; cite imported hosts as corroborating counts only, never pasting raw `content`/`command`/`stdout` from an egress-blocked host (see host safety in `references/discovery.md`). **Never auto-file from this step.**
+
+#### File the Keepers
+
+Present the actionable (new, grounded) candidates and ask the user which to file (numbers, ranges like `1-3`, or `all`), mirroring the triage UX below. For each selected candidate, create one Things todo via `things:url`, tagged `claude-code`:
+
+- **Title**: `[discovery] <finding title>`
+- **Notes**: the pitch, then the SQL/evidence, then `Discovery: <fingerprint>` on its own line.
+
+One todo per candidate, not one blob. Filing lands findings in the same backlog the implement loop already drains.
+
+#### Hand Off
+
+Report how many todos landed. The existing triage, plan, implement, PR, CI, and annotate phases run on them later, unchanged. Filing is the default terminal action of Discover mode; implementing is a separate, explicit choice (run the loop below when ready).
+
+#### Cadence
+
+On-demand is primary: invoke this skill in Discover mode at your terminal. A weekly run is optional and must run **locally** (a `/loop` or `/schedule` trigger on this machine). The session DB and the `duckdb` CLI live here, so the `agent-ideas` headless-then-teleport bridge does not apply (that works only because RSS is public). This is a documented option, not built infrastructure.
+
+#### Fingerprint
+
+The dedup identity. Compute `sha256(finding_type + '|' + normalized_target)` truncated to 12 chars:
+
+```bash
+printf '%s' "hook-noop|team-workaround.ts" | shasum -a 256 | cut -c1-12
+```
+
+- `finding_type` is a stable slug for the class of finding (`hook-noop`, `permission-allowlist-miss`, `repeat-read`, `sandbox-deny`).
+- `normalized_target` is the specific config object the finding is about (a hook script basename, a permission pattern, a skill name), **never** a count or a date, so re-runs of the same underlying finding collapse to one identity.
+
+Filed todos carry `Discovery: <fingerprint>` in notes. The dedup step extracts those markers from Things and suppresses matches. Suppressing *dismissed* findings (surfaced but not filed) is deferred: dismissed findings reappear as `new` until filed.
 
 ## Fetch and Triage
 

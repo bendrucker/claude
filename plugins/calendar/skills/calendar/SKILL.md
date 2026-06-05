@@ -1,5 +1,6 @@
 ---
 name: calendar
+disable-model-invocation: true
 description: Reading and managing macOS Calendar events. Use when checking schedules, finding events, creating meetings, or answering questions about availability.
 allowed-tools: [Bash(swift:*)]
 hooks:

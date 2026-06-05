@@ -1,5 +1,6 @@
 ---
 name: linear:notifications
+disable-model-invocation: true
 description: Managing Linear notifications inbox. Use when listing, filtering, or triaging Linear notifications.
 allowed-tools:
   - mcp__linear

@@ -2,12 +2,17 @@ import { describe, expect, it } from "bun:test";
 import { firstByTier, type PatternMatch, scan, stripCode } from "./tropes";
 
 describe("stripCode", () => {
-  it("removes fenced code blocks", () => {
-    expect(stripCode("Before\n```\ndelve into code\n```\nAfter")).toBe("Before\n\nAfter");
+  it("replaces fenced code blocks with their newline count", () => {
+    expect(stripCode("Before\n```\ndelve into code\n```\nAfter")).toBe("Before\n\n\n\nAfter");
   });
 
-  it("removes inline code", () => {
-    expect(stripCode("The `delve` function is useful")).toBe("The  function is useful");
+  it("replaces inline code with equal-width spaces", () => {
+    expect(stripCode("The `delve` function is useful")).toBe("The         function is useful");
+  });
+
+  it("preserves line count for fenced blocks", () => {
+    const input = "line1\n```\ncode line\ncode line\n```\nline6";
+    expect(stripCode(input).split("\n")).toHaveLength(input.split("\n").length);
   });
 
   it("preserves non-code text", () => {
@@ -410,6 +415,24 @@ describe("scan", () => {
       expect(firstByTier(scan("The fix appears to hold."), "context")?.category).toBe(
         "hedging observation",
       );
+    });
+  });
+
+  describe("filler", () => {
+    it("flags: 'it's worth noting that'", () => {
+      expect(
+        firstByTier(scan("It's worth noting that the cache is cold."), "context")?.category,
+      ).toBe("filler");
+    });
+
+    it("flags: 'in terms of'", () => {
+      expect(firstByTier(scan("In terms of latency, it improved."), "context")?.category).toBe(
+        "filler",
+      );
+    });
+
+    it("allows prose without filler markers", () => {
+      expect(scan("The cache starts cold.").find((m) => m.category === "filler")).toBeUndefined();
     });
   });
 

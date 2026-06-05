@@ -229,6 +229,7 @@
         "cleye": "^2.2.1",
         "mdast-util-from-markdown": "^2.0.2",
         "stemmer": "^2.0.1",
+        "table": "^6.9.0",
         "unist-util-visit": "^5.1.0",
       },
       "devDependencies": {

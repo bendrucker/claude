@@ -27,7 +27,7 @@ export type PatternDef = {
   sideEffectOnly?: boolean;
 };
 
-type WeightedPatternGroup = {
+export type WeightedPatternGroup = {
   tier: PatternTier;
   category: string;
   entries: StemmedWeight[];
@@ -59,7 +59,7 @@ function testResultHits(text: string): Hits {
       if (!match) continue;
       const after = s.slice(match.index + match[0].length).trim();
       if (DETERMINERS.test(after)) continue;
-      return { count: 1, sample: "" };
+      return { count: 1, sample: match[0] };
     }
   }
   return { count: 0, sample: "" };
@@ -224,6 +224,12 @@ export const PATTERNS: PatternDef[] = [
   },
   {
     tier: "context",
+    category: "filler",
+    test: /\b(?:it's worth noting that|importantly|interestingly|it should be noted|as mentioned|in terms of)\b/gi,
+    message: (matched) => `"${matched}" is filler. Cut it.`,
+  },
+  {
+    tier: "context",
     category: "I understand",
     test: /\bi\s+understand\b/gi,
     sideEffectOnly: true,
@@ -234,7 +240,7 @@ export const PATTERNS: PatternDef[] = [
 const MARKETING_VERB_THRESHOLD = 3.0;
 const SOFT_PHRASING_THRESHOLD = 3.0;
 
-const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
+export const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
   {
     tier: "context",
     category: "marketing verbs",
@@ -254,8 +260,20 @@ const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
   },
 ];
 
+function countNewlines(text: string): number {
+  let count = 0;
+  for (const char of text) {
+    if (char === "\n") count++;
+  }
+  return count;
+}
+
+// Replace code with whitespace that preserves both line and column offsets, so a
+// match index in the stripped text maps back to the same position in the source.
 export function stripCode(text: string): string {
-  return text.replace(FENCED_CODE_BLOCK, "").replace(INLINE_CODE, "");
+  return text
+    .replace(FENCED_CODE_BLOCK, (block) => "\n".repeat(countNewlines(block)))
+    .replace(INLINE_CODE, (code) => " ".repeat(code.length));
 }
 
 function patternHits(stripped: string, def: PatternDef): Hits {

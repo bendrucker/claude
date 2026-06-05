@@ -58,6 +58,8 @@ SQL
 
 Breadth-first leads come from the survey surfaces (`records` taxonomy, `fields` for schema inference, `activity`, `hooks`, `diagnostics`, `skill-activity`); a depth pass is then custom read-only SQL over whatever table or view the survey pointed at.
 
+For self-improvement discovery (fanning out over the whole corpus to mine config-change candidates, then grounding them against the live config), [`references/discovery.md`](references/discovery.md) carries the full recipe: the dimension-to-query cheat sheet, the mandatory grounding pass, the host-safety rules, and the Tier-2 query catalog (six discovery queries shipped as SQL but kept out of the catalog above).
+
 ## Named Queries
 
 Built-in queries in `resources/queries/` run by name with `SET VARIABLE` params. Prefer these over writing SQL from scratch.
@@ -84,6 +86,10 @@ Every query also takes an optional `host` param. Omit it to span every machine (
 - `files`: file hotspots, the files read and edited most across sessions. Params: `limit`, `after_date`, `before_date`, `project`.
 - `skill-activity`: work attributed to each skill (assistant turns, sessions, input/output/cache tokens). Swap `attribution_skill` for `attribution_plugin`/`attribution_agent` in the SQL to re-cut. Params: `after_date`, `before_date`, `project`.
 - `fields`: schema discovery by inference. Enumerates JSON keys at a path for records of a kind, with each value's JSON type and a count (divergent types appear as multiple rows). Params: `kind` (glob on `records.kind`, or null for all), `path` (JSON path, e.g. `$` or `$.attachment`), `after_date`, `before_date`, `project`.
+- `hook-block-then-retry-success`: per hook, blocks that were retried away by a same-hook success in the same session within N seconds (noise vs genuine redirect). Params: `hook` (glob on command/name), `within_seconds` (default 300), `after_date`, `before_date`, `project`, `host`.
+- `repeat-read-waste`: fraction of Reads that re-read an already-read file in the same session, and the char/token cost re-injected. Params: `after_date`, `before_date`, `project`, `host`.
+- `skill-auto-vs-explicit`: per skill, model-auto (empty args) vs explicit/slash invocations, the core `disable-model-invocation` lever. Params: `min_calls` (default 1), `after_date`, `before_date`, `project`, `host`.
+- `sandbox-bypass-effective-command`: top `dangerouslyDisableSandbox` commands normalized to their real verb after stripping a leading `cd <path>` wrapper (`excludedCommands` candidates). Params: `min_count` (default 5), `after_date`, `before_date`, `project`, `host`.
 
 ## Cross-Machine History
 

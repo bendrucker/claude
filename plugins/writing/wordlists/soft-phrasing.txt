@@ -1,0 +1,3 @@
+# Soft phrasing filler tells, weighted by strength. Format: <word> <weight>
+# Stemmed; fires when weighted hits reach the threshold in tropes.ts.
+cleanly 1.5

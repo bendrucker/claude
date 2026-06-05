@@ -12,6 +12,8 @@ export interface FtsAuditRow {
   lift: number | null;
 }
 
+export type RemoveReason = "dead" | "not distinctive";
+
 export interface CurrentRuleHealth {
   entry: WordlistEntry;
   assistantCount: number;
@@ -19,7 +21,8 @@ export interface CurrentRuleHealth {
   assistantPerM: number | null;
   userPerM: number | null;
   lift: number | null;
-  stillDistinctive: boolean;
+  status: "keep" | "remove";
+  removeReason: RemoveReason | null;
   noData: boolean;
 }
 
@@ -30,6 +33,7 @@ export interface ReportInput {
   modelFilter: string;
   projectFilter: string | null;
   minLift: number;
+  minCount: number;
   topN: number;
   modelSummary: ModelSummaryRow[];
   assistantTotalChars: number;
@@ -62,13 +66,17 @@ function renderHeader(input: ReportInput): string {
     `Window: ${input.since} to ${input.until}`,
     `Model filter: \`${input.modelFilter}\``,
     `Project filter: ${project}`,
-    `Min lift threshold: ${fmtLift(input.minLift)}`,
+    `Min lift threshold (additions): ${fmtLift(input.minLift)}`,
+    `Min occurrences to count as alive: ${input.minCount}`,
     `Top N candidates: ${input.topN}`,
   ].join("\n");
 }
 
 function renderSummary(input: ReportInput): string {
-  const removals = input.ruleHealth.filter((r) => !r.noData && !r.stillDistinctive).length;
+  const removable = input.ruleHealth.filter((r) => r.status === "remove");
+  const dead = removable.filter((r) => r.removeReason === "dead").length;
+  const notDistinctive = removable.filter((r) => r.removeReason === "not distinctive").length;
+  const keep = input.ruleHealth.length - removable.length;
   const lines = [
     "## Summary",
     "",
@@ -76,7 +84,8 @@ function renderSummary(input: ReportInput): string {
     `- Deliverable prose (Write/Edit/Bash): ${fmtNum(input.deliverableTotalChars)} chars`,
     `- User text (human only): ${fmtNum(input.userTotalChars)} chars`,
     `- Current wordlist entries audited: ${input.ruleHealth.length}`,
-    `- Proposed removals (collapsed lift): ${removals}`,
+    `- Rules kept (distinctive and alive): ${keep}`,
+    `- Proposed removals: ${removable.length} (dead: ${dead}, not distinctive: ${notDistinctive})`,
     `- Proposed additions (new candidates above threshold): ${input.candidatePhrases.length}`,
     `- Correction candidates surfaced: ${input.corrections.length}`,
   ];
@@ -97,26 +106,35 @@ function renderProposedRemovals(input: ReportInput): string {
   const lines = [
     "## Proposed Wordlist Removals",
     "",
-    "Rules whose assistant-vs-user lift dropped below the threshold.",
+    "Two reasons a rule earns removal:",
+    "",
+    `- **dead**: the model produced it fewer than ${input.minCount} times in the window, so the rule rarely fires.`,
+    "- **not distinctive**: the user uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.",
+    "",
+    "A rule the model uses far more than the user is **kept** even when its lift reads low, because the smoothed user baseline (see methodology) compresses lift for any word the user never types.",
     "",
   ];
   const removable = input.ruleHealth
-    .filter((r) => !r.noData && !r.stillDistinctive)
-    .sort((a, b) => (a.lift ?? 0) - (b.lift ?? 0));
+    .filter((r) => r.status === "remove")
+    .sort(
+      (a, b) =>
+        reasonRank(a.removeReason) - reasonRank(b.removeReason) ||
+        (a.assistantPerM ?? 0) - (b.assistantPerM ?? 0),
+    );
   if (removable.length === 0) {
     lines.push("_No removals proposed._");
     return lines.join("\n");
   }
-  lines.push("| phrase | source | assistant/M | user/M | lift |");
-  lines.push("| --- | --- | --- | --- | --- |");
+  lines.push("| phrase | source | reason | assistant/M | user/M | lift |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
   for (const r of removable) {
     lines.push(
-      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${fmtLift(r.lift)} |`,
+      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${r.removeReason} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${fmtLift(r.lift)} |`,
     );
   }
   lines.push("", "```diff");
   for (const r of removable) {
-    lines.push(`- ${r.entry.phrase}  # was lift=${fmtLift(r.lift)}, source=${r.entry.source}`);
+    lines.push(`- ${r.entry.phrase}  # ${r.removeReason}, source=${r.entry.source}`);
   }
   lines.push("```");
   return lines.join("\n");
@@ -152,7 +170,7 @@ function renderRuleHealthTable(input: ReportInput): string {
   const lines = [
     "## Current Rule Health",
     "",
-    "Full audit of every wordlist entry. Check phrases with marginal lift.",
+    "Full audit of every wordlist entry. `remove` rules are either dead or not distinctive (see Proposed Removals).",
     "",
   ];
   if (input.ruleHealth.length === 0) {
@@ -162,7 +180,7 @@ function renderRuleHealthTable(input: ReportInput): string {
   lines.push("| phrase | source | type | assistant/M | user/M | lift | status |");
   lines.push("| --- | --- | --- | --- | --- | --- | --- |");
   for (const r of input.ruleHealth) {
-    const status = r.noData ? "no data" : r.stillDistinctive ? "keep" : "remove";
+    const status = r.status === "keep" ? "keep" : `remove (${r.removeReason})`;
     const ruleType = ruleTypeLabel(r.entry.source);
     lines.push(
       `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${ruleType} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${fmtLift(r.lift)} | ${status} |`,
@@ -219,33 +237,48 @@ function renderCorrections(input: ReportInput): string {
 export function buildRuleHealth(
   entries: WordlistEntry[],
   auditByTerm: Map<string, FtsAuditRow>,
-  minLift: number,
+  minCount: number,
 ): CurrentRuleHealth[] {
   return entries.map((entry) => {
     const row = auditByTerm.get(entry.phrase.toLowerCase());
-    if (!row || (row.assistant_count === 0 && row.user_count === 0)) {
-      return {
-        entry,
-        assistantCount: 0,
-        userCount: 0,
-        assistantPerM: null,
-        userPerM: null,
-        lift: null,
-        stillDistinctive: false,
-        noData: true,
-      };
+    const assistantCount = row?.assistant_count ?? 0;
+    const userCount = row?.user_count ?? 0;
+    const assistantPerM = row?.assistant_per_m ?? null;
+    const userPerM = row?.user_per_m ?? null;
+    const lift = row?.lift ?? null;
+    const noData = !row || (assistantCount === 0 && userCount === 0);
+
+    const alive = assistantCount >= minCount;
+    const distinctive = (assistantPerM ?? 0) > (userPerM ?? 0);
+
+    let status: "keep" | "remove" = "keep";
+    let removeReason: RemoveReason | null = null;
+    if (!alive) {
+      status = "remove";
+      removeReason = "dead";
+    } else if (!distinctive) {
+      status = "remove";
+      removeReason = "not distinctive";
     }
+
     return {
       entry,
-      assistantCount: row.assistant_count,
-      userCount: row.user_count,
-      assistantPerM: row.assistant_per_m,
-      userPerM: row.user_per_m,
-      lift: row.lift,
-      stillDistinctive: row.lift !== null && row.lift >= minLift,
-      noData: false,
+      assistantCount,
+      userCount,
+      assistantPerM,
+      userPerM,
+      lift,
+      status,
+      removeReason,
+      noData,
     };
   });
+}
+
+function reasonRank(reason: RemoveReason | null): number {
+  if (reason === "dead") return 0;
+  if (reason === "not distinctive") return 1;
+  return 2;
 }
 
 function fmtNum(value: number | null): string {
@@ -265,7 +298,8 @@ function fmtLift(value: number | null): string {
 
 function ruleTypeLabel(source: string): string {
   if (source === "openers.txt") return "opener";
-  if (source === "marketing-verbs.txt") return "weighted";
+  if (source === "marketing-verbs.txt" || source === "soft-phrasing.txt") return "weighted";
+  if (source === "flowery-phrases.txt") return "phrase";
   return "vocabulary";
 }
 

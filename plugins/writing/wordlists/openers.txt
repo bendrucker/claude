@@ -1,12 +1,8 @@
 # Sycophantic affirmation openers at line/sentence start.
 # Matched at the start of a line (or after a newline) followed by terminal
 # punctuation or comma. See wordlists.ts loader for compilation rules.
-Perfect
+#
+# Curated against session history by writing:analyze. Entries the user uses as
+# much as the model (Great, Absolutely, Perfect) or that the model has stopped
+# producing (Wonderful, Fantastic, Amazing, Awesome, Brilliant) were removed.
 Excellent
-Great
-Wonderful
-Absolutely
-Fantastic
-Amazing
-Awesome
-Brilliant

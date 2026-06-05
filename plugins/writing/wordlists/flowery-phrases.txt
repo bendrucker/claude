@@ -1,0 +1,5 @@
+# Flowery multi-word phrases, one per line. Stemmed subsequence match catches inflection, spacing, and hyphenation.
+source of truth
+escape hatch
+self-sufficient
+fail loudly

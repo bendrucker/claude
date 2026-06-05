@@ -1,5 +1,5 @@
-const FENCED_CODE = /```[\s\S]*?```/g;
-const INLINE_CODE = /`[^`]+`/g;
+import { PATTERNS, stripCode } from "../../../hooks/tropes";
+import { WORDLISTS } from "../../../hooks/wordlists";
 
 export interface StructuralPattern {
   category: string;
@@ -8,50 +8,27 @@ export interface StructuralPattern {
   sideEffectOnly?: boolean;
 }
 
-export const STRUCTURAL_PATTERNS: StructuralPattern[] = [
-  { category: "spaced em dash", pattern: / — /g },
-  { category: "copula avoidance", pattern: /\b(?:serves|stands) as\b/gi },
-  { category: "reaching for", pattern: /\breach(?:ing|es|ed)?\s+for\b/gi },
-  {
-    category: "promotional language",
-    pattern: /\b(boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b/gi,
-  },
-  { category: "parallelism", pattern: /\bnot (?:just|only) .{1,50}, but (?:also )?/gi },
-  {
-    category: "cross-sentence not-X",
-    pattern:
-      /\b(it|this|that|he|she|they|we|you)\s+(?:is|are|was|were)(?:n't|\s+not)\s+[^.!?]{1,80}[.!?]\s+\1\s+(?:is|are|was|were)\b/gi,
-  },
-  { category: "semicolon overuse", pattern: /;[^;]*;[^;]*;/g, fileOnly: true },
-  {
-    category: "passive PR summary",
-    pattern:
-      /\b(?:is|was|are|were)\s+(?:added|updated|removed|refactored|introduced|created|deleted|modified|improved)\b/gi,
-    fileOnly: true,
-  },
-  { category: "tests cover preamble", pattern: /^Tests\s+(?:cover|verify|ensure|validate)\b/gm },
-  { category: "path bullet", pattern: /^\s*-\s*\*\*[^*\n]+\*\*\s*:\s*/gm, fileOnly: true },
-  {
-    category: "trailing hedge",
-    pattern: /\b(?:regardless|nonetheless|anyway)\.\s*(?:$|\n)/gim,
-    fileOnly: true,
-  },
-  { category: "label bold", pattern: /^\s*\*\*[A-Z][A-Za-z ]+(?::\*\*|\*\*:)\s/gm, fileOnly: true },
-  { category: "dig into", pattern: /\b(?:dig|dive|wade)\s+into\b/gi },
-  { category: "hedging observation", pattern: /\b(?:looks|appears|seems)\s+(?:like|to)\b/gi },
-  {
-    category: "sycophantic acknowledgment",
-    pattern: /\byou(?:'re|\s+are)\s+(?:absolutely\s+|completely\s+)?right\b/gi,
-    sideEffectOnly: true,
-  },
-  { category: "permission-seeking", pattern: /\bwant\s+me\s+to\s+\w+/gi, sideEffectOnly: true },
-  { category: "hedging close", pattern: /\bwould\s+you\s+like\b/gi, sideEffectOnly: true },
-  { category: "I understand", pattern: /\bi\s+understand\b/gi, sideEffectOnly: true },
-];
-
-function stripCode(text: string): string {
-  return text.replace(FENCED_CODE, "").replace(INLINE_CODE, "");
+function globalize(pattern: RegExp): RegExp {
+  return new RegExp(
+    pattern.source,
+    pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`,
+  );
 }
+
+// Derived from the hook's regex patterns so the audit cannot drift from what
+// the hook enforces. Wordlist-backed and function tests are excluded: stemmed
+// vocabulary and weighted verbs are covered by the FTS pass, openers compile to
+// WORDLISTS.openers (also FTS-covered), and function tests cannot be counted by
+// a single regex match.
+export const STRUCTURAL_PATTERNS: StructuralPattern[] = PATTERNS.filter(
+  (def): def is typeof def & { test: RegExp } =>
+    def.test instanceof RegExp && def.test !== WORDLISTS.openers,
+).map((def) => ({
+  category: def.category,
+  pattern: globalize(def.test),
+  fileOnly: def.fileOnly ?? false,
+  sideEffectOnly: def.sideEffectOnly ?? false,
+}));
 
 function countHits(text: string, pattern: RegExp): number {
   pattern.lastIndex = 0;

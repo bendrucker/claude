@@ -40,18 +40,20 @@ Run with `--help` for all flags. Writes a markdown report to `tmp/trope-analysis
 
 ## Metrics
 
-**Lift**: how distinctive a phrase is to assistant output vs. user text. `lift = rate_assistant / rate_user_smoothed`, where rates are per-million-token frequencies. A lift of 10.0 means the assistant uses the phrase 10x more per token than the user. The `--min-lift` threshold (default 5.0) decides rule health and candidate inclusion.
+**Lift**: how distinctive a phrase is to assistant output vs. user text. `lift = rate_assistant / rate_user_smoothed`, where rates are per-million-token frequencies. A lift of 10.0 means the assistant uses the phrase 10x more per token than the user. The `--min-lift` threshold (default 5.0) gates new candidate phrases only. Rule keep/remove uses a direct rate comparison plus `--min-count`, not lift (see methodology for why).
 
 **Session count**: number of distinct sessions containing a phrase. Candidates require session count >= 3 to filter project-specific jargon that dominates a single session.
 
 ## Output
 
 - Summary stats (corpus sizes, rule count, model breakdown)
-- Proposed removals (rules whose lift collapsed below `--min-lift`)
+- Proposed removals, each tagged **dead** (model produced it fewer than `--min-count` times) or **not distinctive** (user uses it at least as often as the model)
 - Proposed additions (high-lift n-grams not already covered)
-- Rule health table (every entry with type, `keep` / `remove` / `no data`)
-- Structural pattern audit (regex-based hook patterns, hit counts across sessions)
+- Rule health table (every entry with type and `keep` / `remove (reason)`)
+- Structural pattern audit (the hook's regex patterns, hit counts across sessions)
 - Correction candidates (long-assistant, short-user pairs suggesting prose pushback)
+
+A rule the model uses far more than the user is **kept** even when its lift reads low. Lift is not used for removal decisions because the smoothed user baseline (see methodology) compresses it for any word the user never types, which would flag the model's strongest tells (`delve`, `comprehensive`, `robust`) for removal.
 
 ## Corpora
 

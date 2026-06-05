@@ -25,7 +25,7 @@ Where rates are per-million-token frequencies and the user rate uses Laplace smo
 - `lift = 1.0` means the phrase appears at equal rates in both corpora.
 - `lift = 10.0` means the assistant uses the phrase 10x more often per token than the user.
 
-The `--min-lift` threshold (default 5.0) decides both rule health (keep vs. remove) and new candidate inclusion.
+The `--min-lift` threshold (default 5.0) gates new candidate phrases. It does **not** decide rule keep/remove (see "Audit Current Wordlists" for why lift is unreliable there).
 
 #### Session count
 
@@ -39,16 +39,25 @@ Installs DuckDB's FTS extension and materializes per-role corpus tables (`fts_as
 
 Wordlist entries are batch-audited via `fts-phrase-audit.sql`. The query stems each entry with Porter stemming, then looks up term frequencies in both FTS indexes. Returns per-term assistant/user counts, per-million rates, and lift.
 
-A phrase with `lift >= --min-lift` keeps its rule. Below that threshold, the report proposes removal.
+A rule is **kept** when the model uses it strictly more per token than the user (`assistant_per_m > user_per_m`) and it appears at least `--min-count` times (default 5). Otherwise the report proposes removal with one of two reasons:
 
-The audit uses `text_content` (all assistant text, including conversational messages) because wordlist rules fire on all prose surfaces, not just deliverables.
+- **dead**: fewer than `--min-count` assistant occurrences. The rule rarely fires regardless of distinctiveness.
+- **not distinctive**: the user uses it at least as often per token. The rule would flag the user's own voice.
+
+Removal does **not** use lift. The user baseline is small (often tens of thousands of tokens, even with cross-machine history merged in), so the Laplace smoothing floor (`1/user_total`) dominates: any word the user never types needs a high per-million rate in assistant text just to reach a lift of 5.0. That gate is nearly unreachable for single words, so a pure lift threshold flags the model's strongest surviving tells (`delve`, `comprehensive`, `robust`) for removal. The direct rate comparison is smoothing-free and keeps them.
+
+The audit measures each term in `text_content` (conversational assistant and user text). This is a proxy surface: most wordlist rules fire on deliverables and side-effect inputs, not chat, but the model's chat usage of a term tracks its overall habit closely enough to judge distinctiveness. A consequence: a term both the model and the user say conversationally (`Perfect` as an acknowledgment) reads as not distinctive and is dropped even if it might still open a deliverable.
+
+The proxy breaks entirely for tells that live *only* in deliverables and never in chat. The flowery phrases (`flowery-phrases.txt`) and the soft group (`soft-phrasing.txt`) were curated from PR-body evidence, so the chat-surface audit reports them as `dead` (zero chat hits) or as `not distinctive`. Those verdicts are not authoritative for deliverable-surface rules. Auditing wordlist health against the deliverable corpus directly (not just chat) is the fix, tracked with the rest of the deliverable-aware analyze work.
+
+Because removed single words are no longer in the wordlist, a later audit cannot resurface them (the additions pipeline only mines multi-word n-grams). If the model regresses to a removed word, add it back by hand.
 
 ## Surface Candidate Phrases
 
 Pulls two corpora:
 
-- **All model-generated text**: conversational assistant text from `text-export` (filtered by `--model`) combined with deliverable prose from `deliverable-prose.sql`. The `text_content` view only captures `type='text'` content items (conversational output), not `type='tool_use'` (Write/Edit/Bash tool inputs). The deliverable-prose query fills this gap. The combined corpus is used for n-gram candidates. The structural pattern audit runs against conversational text only.
-- **Human-only user text** (`text-export` with `role=user`, filtered): the baseline corpus for lift calculation. Excludes system-injected content that arrives as user-role messages: skill injections, context compaction summaries, task notifications, system reminders, and CLAUDE.md context.
+- **Deliverable prose** (`deliverable-prose.sql`): the model's file writes (`.md`/`.txt`/`.rst`/`.adoc`) and Bash commit/PR/MR bodies. This is the n-gram candidate corpus, because these are the surfaces the hook scans. Conversational assistant text is deliberately excluded: the hook never sees the model's chat, so mining it floods the candidate list with narration (`now let me`, `let me check`) at enormous lift that no rule can act on. Scoping to deliverables surfaces only phrasing that could become an enforceable rule.
+- **Human-only user text** (`text-export` with `role=user`, filtered): the baseline for lift. The human doesn't write via Write/Edit, so this is their chat voice; lift therefore contrasts the model's deliverable phrasing against the human's natural voice. Excludes system-injected user-role content: skill injections, context compaction summaries, task notifications, system reminders, and CLAUDE.md context.
 
 The n-gram code in `ngram.ts` strips markdown/code artifacts, URLs, table lines, headers, and code-shaped identifiers from both corpora.
 
@@ -58,7 +67,7 @@ Minimum assistant counts per n-gram size (3-grams: 5, 4-grams: 3) are hardcoded 
 
 #### Deliverable prose
 
-The `deliverable-prose.sql` query extracts text from Write/Edit to prose files (`.md`, `.txt`, `.rst`, `.adoc`) and Bash commands with `--body`/`--message`/`--description`/`--title`/`-m`. It excludes paths the hook skips (memory, plan, wordlist files). For Bash, it extracts heredoc content and quoted flag values via regex. This corpus is reported in the summary for sizing context but is not used for n-gram candidates.
+The `deliverable-prose.sql` query extracts text from Write/Edit to prose files (`.md`, `.txt`, `.rst`, `.adoc`) and Bash commands with `--body`/`--message`/`--description`/`--title`/`-m`. It excludes paths the hook skips (memory, plan, wordlist files). For Bash, it extracts heredoc content and quoted flag values via regex. This is the corpus the n-gram candidate miner runs on (see above); the all-assistant `text-export` corpus is still pulled for the structural audit and summary sizing.
 
 #### User text filtering
 
@@ -82,7 +91,9 @@ Without this filtering, roughly half the user corpus by character count is machi
 
 ## Structural Pattern Audit
 
-Runs the regex-based patterns from `tropes.ts` against all assistant text (not just deliverables). Each pattern reports total hits, number of rows containing hits, and session spread. Patterns are labeled by their hook scope (all, file-only, side-effect-only).
+`structural.ts` imports the hook's `PATTERNS` directly from `hooks/tropes.ts` rather than re-declaring them, so the audit cannot drift from what the hook enforces. It keeps only the regex patterns whose source is not a wordlist (stemmed vocabulary and weighted verbs are covered by the FTS pass; `WORDLISTS.openers` is too) and normalizes each to the global flag for accurate counting. Function-based tests (e.g. test-result reporting) are excluded because they cannot be counted by a single regex match.
+
+The patterns run against all assistant text (not just deliverables). Each reports total hits, number of rows containing hits, and session spread. Patterns are labeled by their hook scope (all, file-only, side-effect-only).
 
 This catches structural tropes (semicolons, passive voice, hedging, parallelism) that the n-gram pipeline cannot detect.
 
@@ -131,4 +142,4 @@ Stratify by sampling sessions first, then rows within those sessions. Without th
 
 ## Tuning
 
-Raise `--min-lift` (default 5.0) if the report is too noisy. Lower it if too quiet. N-grams larger than 4 tokens are not currently considered.
+Raise `--min-lift` (default 5.0) if the candidate list is too noisy. Lower it if too quiet. Raise `--min-count` (default 5) to be stricter about what counts as a live rule (more removals tagged dead); lower it to keep rarer rules. N-grams larger than 4 tokens are not currently considered.

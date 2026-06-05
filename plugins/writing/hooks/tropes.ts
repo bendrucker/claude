@@ -1,5 +1,11 @@
 import { isProseFile } from "./markdown";
-import { type Hits, type StemmedWeight, WORDLISTS, weightedStemHits } from "./wordlists";
+import {
+  type Hits,
+  type StemmedWeight,
+  stemmedPhraseHits,
+  WORDLISTS,
+  weightedStemHits,
+} from "./wordlists";
 
 export type PatternTier = "deny" | "context";
 
@@ -12,7 +18,7 @@ export type PatternMatch = {
   message: string;
 };
 
-type PatternDef = {
+export type PatternDef = {
   tier: PatternTier;
   category: string;
   test: RegExp | ((text: string) => Hits);
@@ -62,7 +68,7 @@ function testResultHits(text: string): Hits {
 const CROSS_SENTENCE_NOT =
   /\b(it|this|that|he|she|they|we|you)\s+(?:is|are|was|were)(?:n't|\s+not)\s+[^.!?]{1,80}[.!?]\s+\1\s+(?:is|are|was|were)\b/gi;
 
-const PATTERNS: PatternDef[] = [
+export const PATTERNS: PatternDef[] = [
   {
     tier: "deny",
     category: "spaced em dash",
@@ -133,6 +139,14 @@ const PATTERNS: PatternDef[] = [
     test: /\b(boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b/gi,
     message: (matched) =>
       `"${matched}" reads as promotional AI language. Consider a more neutral word.`,
+  },
+  {
+    tier: "context",
+    category: "flowery phrasing",
+    test: (text) => stemmedPhraseHits(text, WORDLISTS.floweryPhrases),
+    fileOnly: true,
+    message: (matched) =>
+      `"${matched}" is stock phrasing the model reaches for. State the mechanism plainly.`,
   },
   {
     tier: "context",
@@ -218,6 +232,7 @@ const PATTERNS: PatternDef[] = [
 ];
 
 const MARKETING_VERB_THRESHOLD = 3.0;
+const SOFT_PHRASING_THRESHOLD = 3.0;
 
 const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
   {
@@ -227,6 +242,15 @@ const WEIGHTED_PATTERNS: WeightedPatternGroup[] = [
     threshold: MARKETING_VERB_THRESHOLD,
     message: (examples) =>
       `Marketing verbs stack up (${examples.join(", ")}). Describe concretely what changed instead of promotional framing.`,
+  },
+  {
+    tier: "context",
+    category: "soft phrasing",
+    entries: WORDLISTS.softPhrasing,
+    threshold: SOFT_PHRASING_THRESHOLD,
+    fileOnly: true,
+    message: (examples) =>
+      `Soft phrasing piles up (${examples.join(", ")}). These read as filler. Describe what the code does plainly.`,
   },
 ];
 

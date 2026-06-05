@@ -39,8 +39,14 @@ const argv = cli({
     },
     minLift: {
       type: Number,
-      description: "Minimum lift threshold for keep/include decisions",
+      description: "Minimum lift threshold for surfacing new candidate phrases",
       default: 5.0,
+    },
+    minCount: {
+      type: Number,
+      description:
+        "Minimum assistant occurrences for a rule to count as alive (below this is 'dead')",
+      default: 5,
     },
     top: {
       type: Number,
@@ -69,6 +75,7 @@ const until = argv.flags.until ?? today;
 const modelFilter = argv.flags.model;
 const projectFilter = argv.flags.project ?? null;
 const minLift = argv.flags.minLift;
+const minCount = argv.flags.minCount;
 const topN = argv.flags.top;
 const dbPath = path.resolve(argv.flags.sessionDb ?? "");
 const wordlistsDir =
@@ -134,15 +141,22 @@ async function main(): Promise<void> {
     );
 
     const allModelText = [...assistantRows, ...deliverableRows];
-    const totalSessions = new Set(allModelText.map((r) => r.session_id)).size;
     const ngramSizes = [3, 4];
+    // Mine candidates from deliverable prose only (file writes and Bash
+    // commit/PR/MR bodies), not conversational assistant text. The hook scans
+    // deliverables and side-effect inputs, never the model's chat, so chat
+    // narration ("now let me", "let me check") would otherwise dominate the
+    // candidate list with phrases the hook can never act on.
     const { stats: assistantCorpus, sessionSpread: sessionCounts } = processRows(
-      allModelText,
+      deliverableRows,
       ngramSizes,
     );
     const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
-    const minSessions = Math.max(3, Math.round(totalSessions * 0.05));
-    console.error(`Session threshold: ${minSessions} (${totalSessions} sessions in window)`);
+    const candidateSessions = new Set(deliverableRows.map((r) => r.session_id)).size;
+    const minSessions = Math.max(3, Math.round(candidateSessions * 0.05));
+    console.error(
+      `Session threshold: ${minSessions} (${candidateSessions} deliverable sessions in window)`,
+    );
 
     const allLifts = computeLift({
       assistant: assistantCorpus,
@@ -162,7 +176,7 @@ async function main(): Promise<void> {
     console.error("Auditing structural patterns against all model-generated text");
     const structuralAudit = auditStructuralPatterns(allModelText, userRows);
 
-    const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minLift);
+    const ruleHealth = buildRuleHealth(wordlistEntries, auditByTerm, minCount);
 
     const report = renderReport({
       generatedAt: today,
@@ -171,6 +185,7 @@ async function main(): Promise<void> {
       modelFilter,
       projectFilter,
       minLift,
+      minCount,
       topN,
       modelSummary,
       assistantTotalChars: totalChars(assistantRows),

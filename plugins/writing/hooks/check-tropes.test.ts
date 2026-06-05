@@ -258,7 +258,7 @@ describe("diff-aware filtering", () => {
   });
 
   it("skips sycophantic opener in file Edit (sideEffectOnly)", async () => {
-    const input = mockEdit("Perfect. Let me proceed.\nNext line.", "Next line.");
+    const input = mockEdit("Excellent. Let me proceed.\nNext line.", "Next line.");
     expect(await processInput(input)).toBeNull();
   });
 });

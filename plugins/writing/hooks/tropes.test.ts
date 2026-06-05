@@ -34,17 +34,15 @@ describe("scan", () => {
     const words = [
       "delve",
       "tapestry",
-      "landscape",
       "meticulous",
       "meticulously",
-      "pivotal",
-      "testament",
-      "underscored",
-      "interplay",
-      "intricacies",
-      "bolstered",
-      "garnered",
-      "fostering",
+      "leverage",
+      "leveraged",
+      "robust",
+      "comprehensive",
+      "comprehensively",
+      "nuance",
+      "nuanced",
     ];
 
     for (const word of words) {
@@ -219,12 +217,7 @@ describe("scan", () => {
   });
 
   describe("sycophantic opener", () => {
-    const flag = [
-      "Perfect. That works.",
-      "Excellent! Moving on.",
-      "Great, the build passes.",
-      "Absolutely, the design holds up.",
-    ];
+    const flag = ["Excellent. That works.", "Excellent! Moving on."];
     const allow = [
       "This was a perfect example of the issue.",
       "An excellent question to consider.",
@@ -436,7 +429,7 @@ describe("scan", () => {
 
   describe("sideEffectOnly scoping", () => {
     const conversational = [
-      { text: "Perfect. That works.", category: "sycophantic opener" },
+      { text: "Excellent. That works.", category: "sycophantic opener" },
       { text: "You're right about that.", category: "sycophantic acknowledgment" },
       { text: "Want me to fix the bug?", category: "permission-seeking" },
       { text: "Would you like me to retry?", category: "hedging close" },
@@ -467,23 +460,22 @@ describe("scan", () => {
   });
 
   describe("marketing verbs (weighted)", () => {
-    it("does not flag single low-weight hit", () => {
+    it("does not flag a single low-weight hit", () => {
+      // enhance is 1.5, below the 3.0 threshold on its own.
       expect(
-        scan("This change enables the new flag.").find((m) => m.category === "marketing verbs"),
+        scan("This change enhances the workflow.").find((m) => m.category === "marketing verbs"),
       ).toBeUndefined();
     });
 
-    it("does not flag stack below threshold", () => {
+    it("does not flag a single mid-weight hit below threshold", () => {
+      // empower is 2.5, below the 3.0 threshold on its own.
       expect(
-        scan("This enables and simplifies the workflow.").find(
-          (m) => m.category === "marketing verbs",
-        ),
+        scan("This release empowers users.").find((m) => m.category === "marketing verbs"),
       ).toBeUndefined();
     });
 
-    it("flags when a single high-weight hit clears threshold alone", () => {
-      // Three independent matches: each empower(s|ed|ing) is weight 2.5.
-      // Need to clear 3.0 by stacking with one more.
+    it("flags when stacked verbs clear the threshold", () => {
+      // empower (2.5) + streamline (1.5) = 4.0, above 3.0.
       const text = "This release empowers users and streamlines deploys.";
       expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
     });
@@ -492,6 +484,70 @@ describe("scan", () => {
       // Two occurrences of empower (2.5 each) = 5.0, well above 3.0.
       const text = "This empowers teams. That empowers customers.";
       expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
+    });
+  });
+
+  describe("flowery phrasing", () => {
+    const flag = [
+      "this keeps a single source of truth",
+      "the canonical sources of truth live here",
+      "stored as source-of-truth metadata",
+      "treat it as the Source Of Truth",
+      "added an escape hatch for power users",
+      "two escape hatches remain",
+      "the module is fully self-sufficient",
+      "the fixture is self sufficient",
+      "the assertion fails loudly on drift",
+      "it failed loudly during CI",
+    ];
+    const allow = [
+      "the truth about the data source is unclear",
+      "a hatch you can escape through",
+      "loudly proclaimed the failure",
+    ];
+    for (const text of flag) {
+      it(`flags ${JSON.stringify(text)}`, () => {
+        expect(firstByTier(scan(text), "context")?.category).toBe("flowery phrasing");
+      });
+    }
+    for (const text of allow) {
+      it(`allows ${JSON.stringify(text)}`, () => {
+        expect(scan(text).find((m) => m.category === "flowery phrasing")).toBeUndefined();
+      });
+    }
+    it("does not fire in non-prose file context", () => {
+      expect(
+        scan("a single source of truth", "module.ts", "file").find(
+          (m) => m.category === "flowery phrasing",
+        ),
+      ).toBeUndefined();
+    });
+    it("fires in prose file context", () => {
+      expect(
+        firstByTier(scan("a single source of truth", "README.md", "file"), "context")?.category,
+      ).toBe("flowery phrasing");
+    });
+  });
+
+  describe("soft phrasing (weighted)", () => {
+    it("does not flag a lone soft word", () => {
+      // cleanly is 1.5, below the 3.0 threshold on its own.
+      expect(
+        scan("the fixtures strip cleanly").find((m) => m.category === "soft phrasing"),
+      ).toBeUndefined();
+    });
+
+    it("flags when soft words stack", () => {
+      // Two occurrences of cleanly (1.5 each) = 3.0, at the threshold.
+      const text = "the migration runs cleanly and the tests strip cleanly";
+      expect(firstByTier(scan(text), "context")?.category).toBe("soft phrasing");
+    });
+
+    it("does not fire in non-prose file context", () => {
+      const text = "the migration runs cleanly and the tests strip cleanly";
+      expect(
+        scan(text, "module.ts", "file").find((m) => m.category === "soft phrasing"),
+      ).toBeUndefined();
     });
   });
 });

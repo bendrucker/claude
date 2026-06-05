@@ -9,7 +9,10 @@ export interface StructuralPattern {
 }
 
 function globalize(pattern: RegExp): RegExp {
-  return pattern.flags.includes("g") ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
+  return new RegExp(
+    pattern.source,
+    pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`,
+  );
 }
 
 // Derived from the hook's regex patterns so the audit cannot drift from what

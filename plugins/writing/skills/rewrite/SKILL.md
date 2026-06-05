@@ -46,11 +46,15 @@ Or pass a file path directly:
 bun ${CLAUDE_SKILL_DIR}/scripts/lint.ts path/to/file.md
 ```
 
-The script outputs one violation per line (`line:col: category: message`). Fix every reported violation. Re-run until the output is clean.
+The script outputs one finding per line (`line:col: category: message`).
+
+Fix every hard tell (em dash, copula avoidance, hedging, filler, vocabulary, and the other fixed-phrase categories), then re-run until those are clean.
+
+Treat `marketing verb` findings as advisory. The script flags each one, but the live hook only objects when their weighted sum is high enough, so a lone marketing verb may be fine. Consider each in context and replace the ones that read as promotional rather than driving the count to zero.
 
 ## Rewriting
 
-Fix all lint violations, then apply the structural rules from [references/style-rules.md](references/style-rules.md):
+Clear the lint findings as described above, then apply the structural rules from [references/style-rules.md](references/style-rules.md):
 
 - Breaking long compound sentences into shorter ones
 - Converting passive voice to active

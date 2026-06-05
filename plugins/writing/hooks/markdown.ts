@@ -17,6 +17,12 @@ export function isMemoryPath(filePath: string): boolean {
   return MEMORY_PATH_PATTERN.test(resolve(filePath));
 }
 
+const PLAN_PATH_PATTERN = /\/\.claude\/plans\//;
+
+export function isPlanPath(filePath: string): boolean {
+  return PLAN_PATH_PATTERN.test(resolve(filePath));
+}
+
 export function isMarkdownFile(ext: string): boolean {
   return ext === "md" || ext === "markdown";
 }

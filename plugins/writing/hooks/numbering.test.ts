@@ -366,3 +366,25 @@ describe("memory files", () => {
     expect(output?.permissionDecision).toBe("deny");
   });
 });
+
+describe("plan files", () => {
+  const planPath = `${process.env.HOME}/.claude/plans/some-plan.md`;
+
+  it("skips Write to a plan with numbered heading", async () => {
+    const output = await getOutput(mockWriteInput(planPath, "# Phase 1: Setup"), "write");
+    expect(output).toBeNull();
+  });
+
+  it("skips Edit to a plan with numbered heading", async () => {
+    const output = await getOutput(mockEditInput(planPath, "## Step 2: Build"), "edit");
+    expect(output).toBeNull();
+  });
+
+  it("still denies a numbered heading staged in a project tmp directory", async () => {
+    const output = await getOutput(
+      mockWriteInput(`${process.cwd()}/tmp/pr-body.md`, "# 1. Summary"),
+      "write",
+    );
+    expect(output?.permissionDecision).toBe("deny");
+  });
+});

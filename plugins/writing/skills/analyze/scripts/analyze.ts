@@ -15,7 +15,7 @@ import {
   type TextRow,
   totalChars,
 } from "./dump";
-import { frustrationRegex } from "./frustration";
+import { escapeRegex, frustrationRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
 import { findQuote } from "./quote-context";
 import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
@@ -117,7 +117,9 @@ const baseParams: Record<string, string | null> = {
   before_date: until,
   project: projectFilter,
   paste_max_chars: pasteMaxChars,
-  self_name: argv.flags.selfName ?? "",
+  // Escape regex metacharacters: the paste filter interpolates this into an RE2
+  // pattern (\b...\b), so a literal name with metachars must match literally.
+  self_name: escapeRegex(argv.flags.selfName ?? ""),
 };
 
 await main();

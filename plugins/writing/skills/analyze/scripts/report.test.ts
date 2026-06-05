@@ -131,6 +131,8 @@ describe("buildRuleHealth (deliverable surface)", () => {
     documentCount: 1,
     totalTokens: 1000,
     ngrams: { "1": {}, "2": {}, "3": {} },
+    stemmedNgrams: { "1": {}, "2": {}, "3": {} },
+    totalStemmedTokens: 1000,
     generatedAt: "2026-05-24",
     sources: ["github"],
   };
@@ -164,7 +166,7 @@ describe("buildRuleHealth (deliverable surface)", () => {
   test("removes a deliverable tell present in the baseline (not distinctive)", () => {
     const baselineProfile: VoiceProfile = {
       ...profile,
-      ngrams: { "1": {}, "2": {}, "3": { "source of truth": 200 } },
+      stemmedNgrams: { "1": {}, "2": {}, "3": { "sourc of truth": 200 } },
     };
     const result = buildRuleHealth({
       entries,

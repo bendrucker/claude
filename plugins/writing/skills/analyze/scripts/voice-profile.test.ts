@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { buildProfileFromCorpus, phraseProfileStat } from "./voice-profile";
+import {
+  buildProfileFromCorpus,
+  phraseProfileStat,
+  phraseProfileStatStemmed,
+} from "./voice-profile";
 
 const corpus = `===== https://github.com/o/r/pull/1 (2020-01-01, +1/-0) =====
 The change updates the cache layer. It updates the cache layer twice.
@@ -45,5 +49,30 @@ describe("phraseProfileStat", () => {
   test("returns zero against an empty profile", () => {
     const empty = buildProfileFromCorpus("", "2026-05-24");
     expect(phraseProfileStat(empty, "anything").count).toBe(0);
+  });
+});
+
+describe("phraseProfileStatStemmed", () => {
+  const inflected = `===== https://github.com/o/r/pull/1 (2020-01-01, +1/-0) =====
+The handler fails loudly on bad input. A second guard also fails loudly.
+`;
+  const profile = buildProfileFromCorpus(inflected, "2026-05-24");
+
+  test("matches an inflected baseline phrase against the rule stem", () => {
+    // The baseline says "fails loudly" twice; the wordlist rule is "fail
+    // loudly". Stemming both sides makes them match, so the rule is correctly
+    // seen as present in the voice baseline (count 2), not absent.
+    const stat = phraseProfileStatStemmed(profile, "fail loudly");
+    expect(stat.count).toBe(2);
+    expect(stat.perMillion).toBeGreaterThan(0);
+  });
+
+  test("returns zero for a phrase absent from the stemmed baseline", () => {
+    expect(phraseProfileStatStemmed(profile, "source of truth").count).toBe(0);
+  });
+
+  test("returns zero against an empty profile", () => {
+    const empty = buildProfileFromCorpus("", "2026-05-24");
+    expect(phraseProfileStatStemmed(empty, "fail loudly").count).toBe(0);
   });
 });

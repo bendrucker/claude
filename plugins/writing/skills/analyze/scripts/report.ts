@@ -4,7 +4,7 @@ import type { LiftRow } from "./ngram";
 import type { QuoteContext } from "./quote-context";
 import type { StructuralAuditRow } from "./structural";
 import type { VoiceProfile } from "./voice-profile";
-import { phraseProfileStat } from "./voice-profile";
+import { phraseProfileStatStemmed } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 
 export interface FtsAuditRow {
@@ -131,7 +131,7 @@ function renderProposedRemovals(input: ReportInput): string {
     `- **dead**: the model produced it fewer than ${input.minCount} times in the window on the surface where the rule fires, so the rule rarely fires.`,
     "- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.",
     "",
-    "Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing, marketing verbs) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.",
+    "Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.",
     "",
   ];
   const removable = input.ruleHealth
@@ -394,7 +394,7 @@ function buildDeliverableHealth(
     };
   }
 
-  const baseline = phraseProfileStat(voiceProfile, entry.phrase);
+  const baseline = phraseProfileStatStemmed(voiceProfile, entry.phrase);
   const baselinePerM = baseline.perMillion;
   const lift = baselinePerM > 0 ? modelPerM / baselinePerM : null;
   const noData = modelCount === 0 && baseline.count === 0;

@@ -30,11 +30,11 @@ Build the local voice baseline once (and refresh it as new writing accumulates).
 
 ```bash
 # Seed from the already-present delimited corpus (no re-fetch needed)
-${CLAUDE_SKILL_DIR}/scripts/ingest-voice.ts --source file --file <data-dir>/voice-baseline/github-prs.txt
+bun ${CLAUDE_SKILL_DIR}/scripts/ingest-voice.ts --source file --file <data-dir>/voice-baseline/github-prs.txt
 # Or fetch fresh merged PRs (designed to add more sources later)
-${CLAUDE_SKILL_DIR}/scripts/ingest-voice.ts --source github --author <user> --created 2019-01-01..2025-01-01
+bun ${CLAUDE_SKILL_DIR}/scripts/ingest-voice.ts --source github --author <user> --created 2019-01-01..2025-01-01
 # Build the profile the audit reads
-${CLAUDE_SKILL_DIR}/scripts/voice-profile.ts
+bun ${CLAUDE_SKILL_DIR}/scripts/voice-profile.ts
 ```
 
 If no profile exists, analyze still runs: deliverable-surface rules fall back to the chat audit and the report flags the baseline as not loaded.
@@ -44,9 +44,9 @@ If no profile exists, analyze still runs: deliverable-surface rules fall back to
 Pass the DB path via `--session-db`:
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH"
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --since 2026-04-01 --model '*opus*' --top 50
-${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --project bendrucker.me --min-lift 7
+bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH"
+bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --since 2026-04-01 --model '*opus*' --top 50
+bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --project bendrucker.me --min-lift 7
 ```
 
 Run with `--help` for all flags. `--data-dir` overrides where the voice baseline is read from (default: `CLAUDE_PLUGIN_DATA` or `~/.claude/plugins/data/writing-bendrucker`). Writes a markdown report to `tmp/trope-analysis-<date>.md` (override with `--out`). The report may quote any host in the combined index, so keep it under `tmp/` and never paste host-specific content into committed work.

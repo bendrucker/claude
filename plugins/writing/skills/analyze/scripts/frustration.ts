@@ -22,7 +22,7 @@ export const FRUSTRATION_TERMS = [
   "sounds like",
 ];
 
-function escapeRegex(literal: string): string {
+export function escapeRegex(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 

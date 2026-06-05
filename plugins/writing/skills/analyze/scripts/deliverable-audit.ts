@@ -2,7 +2,7 @@ import { stemmer } from "stemmer";
 import { cleanText } from "./ngram";
 import type { WordlistEntry } from "./wordlists";
 
-const WORD_TOKEN = /[a-zA-Z]+/g;
+export const WORD_TOKEN = /[a-zA-Z]+/g;
 
 // Rules the hook fires *exclusively* on deliverable prose (file writes and
 // PR/MR/commit bodies): the flowery-phrase phrase group and the soft-phrasing
@@ -22,14 +22,21 @@ export function isDeliverableSurface(source: string): boolean {
   return DELIVERABLE_SOURCES.has(source);
 }
 
-function stemTokens(text: string): string[] {
+export function stemTokens(text: string): string[] {
   return (cleanText(text).toLowerCase().match(WORD_TOKEN) ?? []).map((w) => stemmer(w));
+}
+
+// Stem a wordlist phrase into its needle tokens. Unlike stemTokens it does not
+// run cleanText, because a wordlist entry is already clean prose, matching how
+// auditDeliverableCorpus builds its needles.
+export function stemPhrase(phrase: string): string[] {
+  return (phrase.toLowerCase().match(WORD_TOKEN) ?? []).map((w) => stemmer(w));
 }
 
 // Count non-overlapping occurrences of a stemmed token subsequence, matching
 // how the hook's stemmedPhraseHits / compileStemmedWordlist scan deliverable
 // text. Single-word entries reduce to a token-membership count.
-function countSubsequence(haystack: string[], needle: string[]): number {
+export function countSubsequence(haystack: string[], needle: string[]): number {
   if (needle.length === 0) return 0;
   let count = 0;
   for (let i = 0; i + needle.length <= haystack.length; i++) {
@@ -68,7 +75,7 @@ export function auditDeliverableCorpus(
 ): DeliverableAudit {
   const needles = entries.map((e) => ({
     phrase: e.phrase,
-    stems: (e.phrase.toLowerCase().match(WORD_TOKEN) ?? []).map((w) => stemmer(w)),
+    stems: stemPhrase(e.phrase),
   }));
   const counts = new Map<string, number>();
   for (const n of needles) counts.set(n.phrase, 0);

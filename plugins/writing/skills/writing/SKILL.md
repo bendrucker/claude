@@ -19,6 +19,7 @@ The hook enforces these automatically. Vocabulary and marketing-verb lists are i
 - Avoid semicolons. Prefer shorter sentences or commas.
 - Don't structure bullets as `- **path/to/file**: description`.
 - Use `####` headers instead of `**Label:**` for labeled subsections.
+- Headings name the topic in a couple of words. No verbs, no `Topic: clause`, no sentence-shaped headings. Move the explanation into the body.
 
 #### Word Choice
 

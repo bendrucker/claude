@@ -35,6 +35,7 @@ For `writing:style`, also inject these writing preferences (sub-agents cannot se
 - Avoid copula avoidance ("X is Y" not fancy alternatives)
 - Prefer shorter sentences over semicolons
 - Direct, conversational tone
+- Headings are short noun-phrase topic labels, not sentences. Flag a heading that contains a finite verb, reads as a `Topic: explanatory clause`, or is otherwise a full clause. Cut to the noun phrase; push the explanation into the first sentence.
 
 ## Synthesize
 

@@ -3,7 +3,7 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { checkBoldAsHeading, checkTitleCase, processInput } from "./headings";
+import { checkBoldAsHeading, checkSentenceHeading, checkTitleCase, processInput } from "./headings";
 
 function mockWriteInput(filePath: string, content: string): PreToolUseHookInput {
   return {
@@ -90,6 +90,125 @@ describe("checkBoldAsHeading", () => {
   }
 });
 
+const sentenceHeadingCases: { description: string; content: string; match: boolean }[] = [
+  {
+    description: "topic colon with linking verb",
+    content: "## The Cache Layer: Redis Holds the Session State",
+    match: true,
+  },
+  {
+    description: "subject plus linking verb",
+    content: "## Latency Is the Main Bottleneck",
+    match: true,
+  },
+  {
+    description: "colon clause with not an",
+    content: "## Rollback: A Safety Net, Not an Undo Button",
+    match: true,
+  },
+  {
+    description: "colon clause with is the default",
+    content: "## Caching Strategy: Write-Through Is the Default",
+    match: true,
+  },
+  {
+    description: "relative clause with how/handle",
+    content: "## Prior Art: How Other Brokers Handle This",
+    match: true,
+  },
+  {
+    description: "imperative opener build",
+    content: "## Build Against the Documented Limits",
+    match: true,
+  },
+  {
+    description: "relative clause with that and keep",
+    content: "## Joints That Keep the Prototype From Becoming Debt",
+    match: true,
+  },
+  {
+    description: "imperative list document/stabilize/expose",
+    content: "## Document, Stabilize, and Expose the Internal Cache API",
+    match: true,
+  },
+  {
+    description: "parenthetical with trailing clause and linking verb",
+    content: "## Token Exchange (RFC 8693) So the Proxy Never Holds a User Token",
+    match: true,
+  },
+  { description: "short topic label", content: "## Cache Layer", match: false },
+  { description: "short topic label prior art", content: "## Prior Art", match: false },
+  { description: "short topic label blast radius", content: "## Blast Radius", match: false },
+  { description: "short topic label error taxonomy", content: "## Error Taxonomy", match: false },
+  {
+    description: "topic with parenthetical citation",
+    content: "## Token Exchange (RFC 8693)",
+    match: false,
+  },
+  { description: "single word size", content: "## Size", match: false },
+  { description: "single word proposal", content: "## Proposal", match: false },
+  { description: "imperative two words below threshold", content: "## Build Now", match: false },
+  { description: "enumerator stage", content: "## Stage 1: Context Gathering", match: false },
+  { description: "enumerator step", content: "## Step 1: Read the Transcript", match: false },
+  { description: "enumerator phase", content: "## Phase: Calendar", match: false },
+  { description: "enumerator example", content: "## Example: Blog Schema", match: false },
+  {
+    description: "enumerator pattern",
+    content: "## Pattern 2: Domain-specific organization",
+    match: false,
+  },
+  {
+    description: "documented miss: 5 words, of-phrase, no verb",
+    content: "## Blast Radius of a Leaked Key",
+    match: false,
+  },
+  {
+    description: "documented miss: verb-less, 4 words after stripping parenthetical",
+    content: "## Machine-Readable Internal Error Taxonomy (Client vs Server Cases)",
+    match: false,
+  },
+  {
+    description: "documented miss: colon clause whose verb is outside the linking set",
+    content: "## Refresh: Now Supported at the Edge, Unconfirmed for the Client",
+    match: false,
+  },
+  {
+    description: "documented miss: long verb-less noun phrase",
+    content: "## Programmatic, Conformant Schema Registration Guidance for Multi-Tenant Setups",
+    match: false,
+  },
+  {
+    description: "long noun-phrase title with no verb",
+    content: "## Architecture Review: CLI Command Package Layout",
+    match: false,
+  },
+  {
+    description: "ticket-prefixed task heading",
+    content: "## ABC-1234: Defer eager view binding in the loader",
+    match: false,
+  },
+  {
+    description: "interrogative rationale label with linking verb",
+    content: "## Why the Default Is Unsafe",
+    match: false,
+  },
+  { description: "interrogative section label", content: "## What was wrong", match: false },
+  { description: "inline-code-only heading", content: "## `context: fork`", match: false },
+];
+
+describe("checkSentenceHeading", () => {
+  for (const { description, content, match } of sentenceHeadingCases) {
+    it(description, () => {
+      const result = checkSentenceHeading(content);
+      if (match) {
+        expect(result).not.toBeNull();
+      } else {
+        expect(result).toBeNull();
+      }
+    });
+  }
+});
+
 describe("processInput", () => {
   it("returns title case guidance", () => {
     const output = getOutput(mockWriteInput("README.md", "# introduction"));
@@ -99,6 +218,15 @@ describe("processInput", () => {
   it("returns bold-as-heading guidance", () => {
     const output = getOutput(mockWriteInput("README.md", "**Configuration:**\nSome text"));
     expect(output?.additionalContext).toContain("markdown heading");
+  });
+
+  it("returns sentence-heading guidance", () => {
+    const output = getOutput(mockWriteInput("README.md", "## Latency Is the Main Bottleneck"));
+    expect(output?.additionalContext).toContain("first sentence");
+  });
+
+  it("returns null for a short noun-phrase heading", () => {
+    expect(getOutput(mockWriteInput("README.md", "# Cache Layer"))).toBeNull();
   });
 
   it("skips non-markdown files", () => {

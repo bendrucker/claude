@@ -1,6 +1,7 @@
 ---
 name: mac:jxa-run
 description: Execute JXA scripts scoped to a macOS application. Use when running JXA expressions or script files against an app via osascript. Validates Application() scope via AST.
+argument-hint: <app> <expression-or-script-file>
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts:*)"
 hooks:

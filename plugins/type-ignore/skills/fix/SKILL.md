@@ -2,6 +2,7 @@
 name: type-ignore:fix
 disable-model-invocation: true
 description: Fix type errors instead of ignoring them. Use when cleaning up type ignores across files or batch-fixing type errors.
+argument-hint: <file-or-glob>
 context: fork
 agent: general-purpose
 allowed-tools:

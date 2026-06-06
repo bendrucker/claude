@@ -1,6 +1,7 @@
 ---
 name: github:actions-monitor
 description: Monitor GitHub Actions runs and extract failure diagnostics. Use when watching PR CI, branch builds, or specific workflow runs.
+argument-hint: "[pr-url | branch | run-id]"
 allowed-tools:
   - Monitor
   - TaskStop

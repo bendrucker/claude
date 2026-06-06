@@ -1,6 +1,7 @@
 ---
 name: gitlab:ci-monitor
 description: Investigate GitLab CI pipeline failures and extract diagnostics. Use when watching MR CI, branch builds, or specific pipelines.
+argument-hint: "[mr-url | branch | pipeline-id]"
 allowed-tools:
   - Monitor
   - TaskStop

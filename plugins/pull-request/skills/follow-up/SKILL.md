@@ -5,6 +5,7 @@ description: >
   resolves, draft replies. With --auto, autonomously triage AI-reviewer (bot) threads and loop
   until the reviewer is satisfied. Use when checking what review comments need responses,
   investigating how threads were resolved, drafting replies, or clearing a bot review hands-off.
+argument-hint: "[pr-url] [--auto]"
 allowed-tools:
   - Bash(git:*)
   - Bash(gh:*)

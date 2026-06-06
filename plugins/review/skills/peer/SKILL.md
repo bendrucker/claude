@@ -2,6 +2,7 @@
 name: review:peer
 description: |
   Review a pull request when requested by a peer. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes. Supports GitHub and GitLab.
+argument-hint: <pr-url-or-number>
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)

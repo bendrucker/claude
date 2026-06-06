@@ -1,6 +1,7 @@
 ---
 name: github:pr-comments
 description: Fetch, reply to, and resolve review threads on a GitHub pull request. Use when checking what review feedback needs addressing, whether threads are resolved, replying to review comments, or clearing AI-reviewer threads after acting on them.
+argument-hint: "<pr-url> [--role author|reviewer] [--bots]"
 allowed-tools:
   ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts:*)", "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts:*)"]
 hooks:

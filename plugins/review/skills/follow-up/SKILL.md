@@ -4,6 +4,7 @@ description: >
   Follow up on a PR/MR you reviewed: check whether your comments were addressed, find silently
   resolved threads, and decide whether to re-review or approve.
   Use after leaving review feedback to see if the author acted on it.
+argument-hint: <pr-url>
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)

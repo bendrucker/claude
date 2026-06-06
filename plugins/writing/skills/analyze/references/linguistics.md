@@ -46,7 +46,43 @@ Flag rates on the session heading corpus (2,858 unique headings, 2025-12-08 to 2
 | np-test:natural | 688 | 24.1% | 79.7% |
 | hybrid:natural | 324 | 11.3% | 91.4% |
 
-Flag rate alone does not decide anything: the baseline's 5.3% includes documented misses, and a candidate flagging more could be finding real clauses or hallucinating them. The labeled sample (below) settles which.
+Flag rate alone does not decide anything: the baseline's 5.3% includes documented misses, and a candidate flagging more could be finding real clauses or hallucinating them. The labeled sample settles which.
+
+## Labeled Sample Results
+
+A 499-row labeled sample (200 disagreement-biased rows plus a 299-row uniform random subset), labeled by grammatical form. Label distribution: 367 noun-phrase, 66 imperative, 29 fragment, 23 clause, 15 interrogative. Precision/recall on the random subset (the unbiased view), where `clause` and `imperative` count as should-flag:
+
+| classifier | precision | 95% CI | recall |
+|---|---|---|---|
+| baseline | 76.9% | 49.7..91.8 | 20.8% |
+| finite-verb:compromise | 41.4% | 25.5..59.3 | 25.0% |
+| np-test:compromise | 41.0% | 30.8..52.1 | 66.7% |
+| hybrid:compromise | 57.1% | 42.2..70.9 | 50.0% |
+| finite-verb:wink | 62.5% | 38.6..81.5 | 20.8% |
+| np-test:wink | 40.7% | 28.7..54.0 | 45.8% |
+| hybrid:wink | 73.9% | 53.5..87.5 | 35.4% |
+| finite-verb:natural | 70.6% | 46.9..86.7 | 25.0% |
+| np-test:natural | 45.2% | 33.4..57.5 | 58.3% |
+| hybrid:natural | 79.2% | 59.5..90.8 | 39.6% |
+
+What the numbers say:
+
+- The baseline is precision-tuned and recall-starved: it misses four of five true sentence headings, mostly imperatives (the dominant positive class at 66 of 104 labeled positives) that fall outside its nine-opener word set.
+- `hybrid:natural` is the only candidate meeting the promotion bar on point estimates: precision at or above baseline with roughly double the recall. The intervals overlap heavily (24 flags in the random subset), so this is direction, not a verdict.
+- The expected winner per #744, `hybrid:compromise`, loses on precision: compromise's eagerness to read terse Title Case tokens as verbs produces more false positives than the conservative Brill tagger in `natural`. Tagger conservatism beats tagger richness for this job.
+- The `np-test` family buys its recall (58–71%) with unacceptable precision (40–45%).
+
+No promotion happens on these numbers. The next step is a larger labeled pass concentrated on the leader's flags, plus dependency weight as a promotion factor: a hook tagger ships to every plugin install, and `natural` is a far heavier package than `compromise`.
+
+## Synthetic Corpus Results
+
+Ten generated documents (design docs, a postmortem, an evaluation, rollout/capacity/testing plans) yielded 114 unique headings containing zero true sentence headings: untreated model output did not produce the trope at this sample size, so the synthetic corpus measures false positives, not recall. The baseline flagged nothing. Candidates produced 1–15 false positives each, all on conventional heading shapes, and because the corpus is egress-clean the failures can be quoted:
+
+- Numbered section headings ("3.1 Unit Tests", "8. API Contract"): a plural head noun reads as a finite verb with the section number as its subject.
+- Trailing participle labels ("Lessons Learned"): the participle fails the noun-phrase parse.
+- Colon-prefixed noun phrases ("Testing Strategy: Payments Reconciliation Service").
+
+These shapes are tuning targets for the candidates (bare section-number enumerators, heading-final plural-noun verbs) and committable as regression fixtures.
 
 ## Eval Harness
 
@@ -91,7 +127,7 @@ A tagger-backed classifier replaces `classifyHeadingBaseline` in the hook only w
 - recall strictly greater than baseline recall
 - zero regressions on the committed seed (`linguistics/heading.test.ts`)
 
-Expected winner per #744 is `hybrid`: it keeps the heuristic's structure and replaces only the word sets. Until a candidate meets the bar, the hook keeps the heuristic and the linguistics layer surfaces through the analyze and review skills.
+The hybrid family leads as #744 predicted, keeping the heuristic's structure and replacing only the word sets, but with `natural` doing the tagging rather than the expected `compromise` (see Labeled Sample Results). Until a candidate clears the bar with a tight enough interval, the hook keeps the heuristic and the linguistics layer surfaces through the analyze and review skills.
 
 ## Trope Pattern Inventory
 

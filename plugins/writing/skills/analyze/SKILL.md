@@ -72,3 +72,5 @@ Review the report. Edit `plugins/writing/wordlists/*.txt` by hand, then re-run t
 ## Methodology
 
 See [references/methodology.md](references/methodology.md) for query details, known gaps, and tuning guidance.
+
+See [references/linguistics.md](references/linguistics.md) for the POS tagger evaluation behind `scripts/headings-eval.ts`: classifier comparison, synthetic corpus generation, promotion criteria, and dependency earn/retire rules.

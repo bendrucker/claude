@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { CLASSIFIERS, finiteVerbClassifier, hybridClassifier, npTestClassifier } from "./classifiers";
+import {
+  CLASSIFIERS,
+  finiteVerbClassifier,
+  hybridClassifier,
+  npTestClassifier,
+} from "./classifiers";
 import { compromiseTagger } from "./compromise";
 import { seedCases } from "./heading.test";
 

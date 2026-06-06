@@ -1,7 +1,7 @@
 import winkPOS from "wink-pos-tagger";
 import { mapPenn } from "./penn";
-import { CODE_SENTINEL, type TaggedSentence } from "./tags";
 import type { Tagger } from "./tagger";
+import { CODE_SENTINEL, type TaggedSentence } from "./tags";
 
 const tagger = winkPOS();
 

@@ -14,8 +14,8 @@ import {
 } from "./heading";
 import { naturalTagger } from "./natural";
 import { preprocessHeading } from "./preprocess";
-import type { CoarseTag, TaggedToken } from "./tags";
 import type { Tagger } from "./tagger";
+import type { CoarseTag, TaggedToken } from "./tags";
 import { winkTagger } from "./wink";
 
 const NOUN_PHRASE: HeadingVerdict = { kind: "noun-phrase", flagged: false, evidence: [] };

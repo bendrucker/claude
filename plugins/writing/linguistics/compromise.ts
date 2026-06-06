@@ -1,13 +1,13 @@
 import nlp from "compromise";
+import type { Tagger } from "./tagger";
 import {
   CODE_SENTINEL,
-  type CoarseTag,
   COPULA_FORMS,
+  type CoarseTag,
   FINITE_COPULAS,
   type TaggedSentence,
   type TaggedToken,
 } from "./tags";
-import type { Tagger } from "./tagger";
 
 interface CompromiseTerm {
   text: string;

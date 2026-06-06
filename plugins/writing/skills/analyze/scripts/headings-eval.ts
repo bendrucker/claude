@@ -61,7 +61,9 @@ export function extractHeadings(markdown: string): string[] {
   return headings;
 }
 
-export function dedupeHeadings(rows: Array<{ session_id: string; text?: string }>): HeadingRecord[] {
+export function dedupeHeadings(
+  rows: Array<{ session_id: string; text?: string }>,
+): HeadingRecord[] {
   const byHeading = new Map<string, { occurrences: number; sessions: Set<string> }>();
   for (const row of rows) {
     if (!row.text) continue;
@@ -272,10 +274,7 @@ async function corpusFromSessionDb(
   params: { after_date: string; before_date: string; project: string | null },
 ): Promise<DeliverableRow[]> {
   const sessionId = process.env.CLAUDE_SESSION_ID ?? "anonymous";
-  const isolatedPath = path.join(
-    process.env.TMPDIR || "/tmp",
-    `headings-eval-${sessionId}.duckdb`,
-  );
+  const isolatedPath = path.join(process.env.TMPDIR || "/tmp", `headings-eval-${sessionId}.duckdb`);
   console.error(`Copying session DB to ${isolatedPath}`);
   await Bun.write(isolatedPath, Bun.file(dbPath));
 

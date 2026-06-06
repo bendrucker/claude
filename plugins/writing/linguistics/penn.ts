@@ -1,4 +1,4 @@
-import { type CoarseTag, COPULA_FORMS } from "./tags";
+import { COPULA_FORMS, type CoarseTag } from "./tags";
 
 export interface PennMapping {
   tag: CoarseTag;

@@ -1,7 +1,7 @@
 import natural from "natural";
 import { mapPenn } from "./penn";
-import { CODE_SENTINEL, type TaggedSentence } from "./tags";
 import type { Tagger } from "./tagger";
+import { CODE_SENTINEL, type TaggedSentence } from "./tags";
 
 const lexicon = new natural.Lexicon("EN", "NN", "NNP");
 const ruleSet = new natural.RuleSet("EN");

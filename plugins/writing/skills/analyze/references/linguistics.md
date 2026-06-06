@@ -111,7 +111,7 @@ claude -p --no-session-persistence --setting-sources project \
 - `--no-session-persistence` keeps the run out of the session index, so generation does not pollute the corpora the analyze skill mines.
 - `--setting-sources project` from a scratch directory drops the user-level writing instructions, so the output is the model's untreated style, the thing the detectors target.
 - The output is egress-clean: generated for this purpose, safe to quote in PRs and commit as fixtures.
-- Regenerating per model release turns the corpus into a drift tracker. Vocabulary tells change between models ("you're absolutely right" gave way to other verbal tics); the structural detectors should hold across regenerations, and a regression shows up as a recall drop.
+- Regenerating per model release turns the corpus into a drift tracker. Vocabulary tells change between models, but the structural detectors should hold across regenerations, and a regression shows up as a recall drop.
 
 Vary the document type (design doc, postmortem, evaluation, rollout plan, capacity plan) so heading styles vary. Evaluate with `--docs`:
 

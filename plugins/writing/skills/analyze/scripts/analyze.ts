@@ -17,6 +17,7 @@ import {
 } from "./dump";
 import { escapeRegex, frustrationRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
+import { type PosSignatureRow, processPosRows } from "./pos-ngram";
 import { findQuote } from "./quote-context";
 import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
 import { auditStructuralPatterns } from "./structural";
@@ -59,6 +60,16 @@ const argv = cli({
       type: Number,
       description: "Top N candidate phrases to surface",
       default: 30,
+    },
+    posMinLift: {
+      type: Number,
+      description: "Minimum lift threshold for structural (POS tag sequence) signatures",
+      default: 2.0,
+    },
+    posTop: {
+      type: Number,
+      description: "Top N structural signatures to surface",
+      default: 20,
     },
     out: {
       type: String,
@@ -234,6 +245,26 @@ async function main(): Promise<void> {
     console.error("Auditing deliverable corpus for wordlist rules");
     const deliverableAudit = auditDeliverableCorpus(wordlistEntries, deliverableRows);
 
+    console.error("Computing structural signatures (POS tag sequences)");
+    const posAssistant = processPosRows(deliverableRows);
+    const posUser = processPosRows(userRows);
+    // Tag sequences draw from an alphabet of ~17 tags, so they are far
+    // denser than word n-grams; the floors are higher to compensate.
+    const posLifts = computeLift({
+      assistant: posAssistant.stats,
+      user: posUser.stats,
+      minAssistantCount: { 3: 30, 4: 15, 5: 8 },
+    });
+    const structuralSignatures: PosSignatureRow[] = posLifts
+      .filter((r) => r.lift >= argv.flags.posMinLift)
+      .filter((r) => (posAssistant.sessionSpread.get(r.phrase) ?? 0) >= minSessions)
+      .map((r) => ({
+        ...r,
+        sessions: posAssistant.sessionSpread.get(r.phrase) ?? 0,
+        example: posAssistant.examples.get(r.phrase) ?? null,
+      }))
+      .slice(0, argv.flags.posTop);
+
     console.error("Fetching correction candidates");
     const corrections = await db.runQuery<CorrectionRow>("correction-candidates", baseParams);
 
@@ -274,6 +305,7 @@ async function main(): Promise<void> {
       voiceProfile,
       ruleHealth,
       structuralAudit,
+      structuralSignatures,
       candidatePhrases,
       corrections,
       corrective,

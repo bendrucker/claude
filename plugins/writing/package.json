@@ -8,6 +8,7 @@
     "ap-style-title-case": "^2.0.0",
     "@duckdb/node-api": "1.5.0-r.1",
     "cleye": "^2.2.1",
+    "compromise": "^14.15.1",
     "mdast-util-from-markdown": "^2.0.2",
     "stemmer": "^2.0.1",
     "table": "^6.9.0",
@@ -15,8 +16,6 @@
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4",
-    "compromise": "^14.15.1",
-    "natural": "^8.1.1",
-    "wink-pos-tagger": "^2.2.2"
+    "natural": "^8.1.1"
   }
 }

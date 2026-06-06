@@ -16,7 +16,6 @@ import { naturalTagger } from "./natural";
 import { preprocessHeading } from "./preprocess";
 import type { Tagger } from "./tagger";
 import type { CoarseTag, TaggedToken } from "./tags";
-import { winkTagger } from "./wink";
 
 const NOUN_PHRASE: HeadingVerdict = { kind: "noun-phrase", flagged: false, evidence: [] };
 
@@ -203,7 +202,7 @@ export function hybridClassifier(tagger: Tagger): HeadingClassifier {
   };
 }
 
-const TAGGERS: Tagger[] = [compromiseTagger, winkTagger, naturalTagger];
+const TAGGERS: Tagger[] = [compromiseTagger, naturalTagger];
 
 export const CLASSIFIERS: HeadingClassifier[] = [
   baselineClassifier,

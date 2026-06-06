@@ -1,6 +1,7 @@
 import { type DeliverableAudit, isDeliverableSurface } from "./deliverable-audit";
 import type { CorrectionRow, CorrectiveRow, ModelSummaryRow } from "./dump";
 import type { LiftRow } from "./ngram";
+import type { PosSignatureRow } from "./pos-ngram";
 import type { QuoteContext } from "./quote-context";
 import type { StructuralAuditRow } from "./structural";
 import type { VoiceProfile } from "./voice-profile";
@@ -50,6 +51,7 @@ export interface ReportInput {
   voiceProfile: VoiceProfile | null;
   ruleHealth: CurrentRuleHealth[];
   structuralAudit: StructuralAuditRow[];
+  structuralSignatures: PosSignatureRow[];
   candidatePhrases: CandidatePhrase[];
   corrections: CorrectionRow[];
   corrective: CorrectiveRow[];
@@ -70,6 +72,7 @@ export function renderReport(input: ReportInput): string {
     renderProposedAdditions(input),
     renderRuleHealthTable(input),
     renderStructuralAudit(input),
+    renderStructuralSignatures(input),
     renderCorrectiveFeedback(input),
     renderCorrections(input),
   ];
@@ -251,6 +254,27 @@ function renderStructuralAudit(input: ReportInput): string {
     const scope = r.sideEffectOnly ? "side-effect" : r.fileOnly ? "file-only" : "all";
     lines.push(
       `| ${r.category} | ${scope} | ${r.assistantHits} | ${r.userHits} | ${r.assistantRows} | ${r.assistantSessions} |`,
+    );
+  }
+  return lines.join("\n");
+}
+
+function renderStructuralSignatures(input: ReportInput): string {
+  const lines = [
+    "## Structural Signatures",
+    "",
+    "Coarse POS tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.",
+    "",
+  ];
+  if (input.structuralSignatures.length === 0) {
+    lines.push("_No structural signatures above threshold._");
+    return lines.join("\n");
+  }
+  lines.push("| shape | n | assistant/M | user/M | sessions | lift | example |");
+  lines.push("| --- | --- | --- | --- | --- | --- | --- |");
+  for (const r of input.structuralSignatures) {
+    lines.push(
+      `| \`${r.phrase}\` | ${r.n} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${r.sessions ?? "-"} | ${r.lift.toFixed(1)} | ${r.example ? esc(truncate(r.example, 100)) : "-"} |`,
     );
   }
   return lines.join("\n");
@@ -472,4 +496,9 @@ function formatQuote(quote: QuoteContext | null): string {
       ? `${quote.sourceFile}:${quote.sourceLine ?? "?"}`
       : "(no source pointer)";
   return `"${quote.window}" (${pointer})`;
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1)}…`;
 }

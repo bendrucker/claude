@@ -64,6 +64,7 @@ Run with `--help` for all flags. `--data-dir` overrides where the voice baseline
 - Proposed additions (high-lift n-grams not already covered), each with its voice-baseline rate and a spot-checkable quote
 - Rule health table (every entry with type, audit surface, and `keep` / `remove (reason)`), plus deliverable quotes for the deliverable-surface tells
 - Structural pattern audit (the hook's regex patterns, hit counts across sessions)
+- Structural signatures (POS tag sequences distinctive to the model's deliverable prose; word-independent, so they survive vocabulary drift between model releases)
 - Corrective feedback (short human messages naming a writing problem, with the preceding model output)
 - Correction candidates (long-assistant, short-user pairs suggesting prose pushback)
 

@@ -22,6 +22,7 @@ const baseInput = {
   voiceProfile: null,
   ruleHealth: [],
   structuralAudit: [],
+  structuralSignatures: [],
   candidatePhrases: [] as CandidatePhrase[],
   corrections: [] as CorrectionRow[],
   corrective: [] as CorrectiveRow[],
@@ -226,7 +227,29 @@ describe("renderReport", () => {
     expect(output).toContain("## Proposed Wordlist Removals");
     expect(output).toContain("## Proposed Wordlist Additions");
     expect(output).toContain("## Current Rule Health");
+    expect(output).toContain("## Structural Signatures");
     expect(output).toContain("## Correction Candidates");
+  });
+
+  test("renders structural signature rows with example sentences", () => {
+    const output = renderReport({
+      ...baseInput,
+      structuralSignatures: [
+        {
+          phrase: "COPULA PART DET NOUN",
+          n: 4,
+          assistantCount: 40,
+          userCount: 2,
+          assistantPerM: 120,
+          userPerM: 10,
+          lift: 8.4,
+          sessions: 6,
+          example: "This is not a cache, it is a ledger",
+        },
+      ],
+    });
+    expect(output).toContain("`COPULA PART DET NOUN`");
+    expect(output).toContain("This is not a cache, it is a ledger");
   });
 
   test("renders proposed-removals diff block when entries collapse", () => {

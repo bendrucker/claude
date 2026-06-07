@@ -3,9 +3,12 @@
 --   paginated:      the read passed `offset`/`limit` (chunked reading of a large file)
 --   sidechain:      the read happened in a subagent (parallel fan-out loads shared files
 --                   by design); may also be paginated, the two columns overlap
---   after_own_edit: main-thread, unpaginated, but the session edited the file first
---                   (refreshing post-edit state)
---   true_repeats:   main-thread, unpaginated, never edited: the actual context tax
+--   after_own_edit: main-thread, unpaginated, but the session edited the file since
+--                   the previous main-thread read (refreshing post-edit state)
+--   true_repeats:   main-thread, unpaginated, no intervening edit: the actual context tax
+-- The actionable buckets require a prior main-thread read: a subagent's read shares the
+-- parent session id, so without that gate the main thread's first read of a file a
+-- subagent touched would count as a repeat even though nothing was re-injected.
 -- Only `true_repeats` (and arguably `after_own_edit`) is actionable waste; a headline
 -- repeat percentage without this split mostly measures pagination and fan-out
 -- architecture.
@@ -41,6 +44,21 @@ ranked AS (
       PARTITION BY host, session_id, file_path
       ORDER BY timestamp, source_line
     ) AS rn,
+    COUNT(*) FILTER (WHERE NOT is_sidechain) OVER (
+      PARTITION BY host, session_id, file_path
+      ORDER BY timestamp, source_line
+      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+    ) AS prior_main_reads,
+    MAX(timestamp) FILTER (WHERE NOT is_sidechain) OVER (
+      PARTITION BY host, session_id, file_path
+      ORDER BY timestamp, source_line
+      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+    ) AS prev_main_read_ts
+  FROM reads r
+),
+classified AS (
+  SELECT
+    r.*,
     EXISTS (
       SELECT 1 FROM tool_calls e
       WHERE e.host = r.host
@@ -48,8 +66,9 @@ ranked AS (
         AND e.file_path = r.file_path
         AND e.tool_name IN ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
         AND e.timestamp <= r.timestamp
+        AND e.timestamp > r.prev_main_read_ts
     ) AS after_own_edit
-  FROM reads r
+  FROM ranked r
 )
 SELECT
   host,
@@ -58,13 +77,13 @@ SELECT
   ROUND(100.0 * COUNT(*) FILTER (WHERE rn > 1) / COUNT(*), 1) AS repeat_pct,
   COUNT(*) FILTER (WHERE rn > 1 AND paginated)    AS paginated,
   COUNT(*) FILTER (WHERE rn > 1 AND is_sidechain) AS sidechain,
-  COUNT(*) FILTER (WHERE rn > 1 AND NOT paginated AND NOT is_sidechain AND after_own_edit)
+  COUNT(*) FILTER (WHERE prior_main_reads >= 1 AND NOT paginated AND NOT is_sidechain AND after_own_edit)
     AS after_own_edit,
-  COUNT(*) FILTER (WHERE rn > 1 AND NOT paginated AND NOT is_sidechain AND NOT after_own_edit)
+  COUNT(*) FILTER (WHERE prior_main_reads >= 1 AND NOT paginated AND NOT is_sidechain AND NOT after_own_edit)
     AS true_repeats,
-  ROUND(SUM(chars) FILTER (WHERE rn > 1 AND NOT paginated AND NOT is_sidechain AND NOT after_own_edit) / 4.0 / 1000.0, 1)
+  ROUND(SUM(chars) FILTER (WHERE prior_main_reads >= 1 AND NOT paginated AND NOT is_sidechain AND NOT after_own_edit) / 4.0 / 1000.0, 1)
     AS true_repeat_ktokens,
   ROUND(SUM(chars) FILTER (WHERE rn > 1) / 4.0 / 1000.0, 1) AS repeat_ktokens
-FROM ranked
+FROM classified
 GROUP BY host
 ORDER BY host;

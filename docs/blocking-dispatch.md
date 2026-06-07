@@ -61,7 +61,7 @@ Continuing the current work depends on your answer and Claude cannot reason its 
 
 #### High-stakes action
 
-Claude is about to take an action whose blast radius warrants approval even when Claude could proceed. The gated set is deploys and releases, and external sends (email, Slack, public posts). Force-push and history rewrite, and production database migrations, are gated by default. Destructive deletes and money or payment actions are deliberately not gated for now, recorded as a choice to revisit.
+Claude is about to take an action whose blast radius warrants approval even when Claude could proceed. The gated set is deploys and releases, external sends (email, Slack, public posts), money and payment actions, and destructive deletion of cloud resources, infrastructure, or data (dropping a table or database, tearing down a resource). Force-push and history rewrite, and production database migrations, are gated by default. Git branch hygiene is explicitly not gated: deleting local or remote branches and cleaning up worktrees run without confirmation, since they are routine and recoverable, and GitHub auto-delete already handles merged remote branches.
 
 Everything else is non-blocking.
 
@@ -71,7 +71,7 @@ Claude picks the form per finding, routing by confidence and blast radius.
 
 #### Ready, safe fix
 
-Auto-open a draft PR through `pull-request:create`, then file a non-blocking capture so you review it later. The draft state is the safety gate, the PR is a proposal in your review queue, not finished work. A draft opens only when all three hold: tests pass locally, edits stay within the task's files and scope, and lint and formatting are clean. Anything failing the bar becomes a captured suggestion instead.
+Auto-open a draft PR through `pull-request:create`, then drop a Things capture with the PR link so it joins your inbox triage. The draft state is the safety gate, the PR is a proposal in your review queue, not finished work. A draft opens only when all three hold: tests pass locally, edits stay within the task's files and scope, and lint and formatting are clean. Anything failing the bar becomes a captured suggestion instead.
 
 #### Needs a decision, must persist
 
@@ -111,7 +111,7 @@ Tag plain `Claude` for your normal inbox pass.
 
 ### Trigger scope
 
-Reactive plus light proactive. Claude dispatches things it runs into while doing the task you gave it, and flags an obvious adjacent problem it notices in passing (a clear bug in a file it just edited). It does not actively scan for dispatchable issues beyond the task.
+Reactive plus light proactive. Claude dispatches things it runs into while doing the task you gave it, and flags an obvious adjacent problem in a file it edited this session. It does not flag issues in files it only read, and it does not scan the repo for problems beyond the task.
 
 ### Diagram
 
@@ -140,9 +140,9 @@ flowchart TD
 
 1. Claude encounters a finding mid-session, or reaches a high-stakes action. It represents the finding as a node in the native task graph, and for a stuck case links the downstream resume task with `addBlockedBy`.
 2. The router classifies. Stuck or high-stakes marks it blocking. Otherwise non-blocking.
-3. **Non-blocking, ready fix.** When tests pass, the change stays in scope, and lint is clean, Claude auto-opens a draft PR and files a capture so it surfaces in your review pass.
+3. **Non-blocking, ready fix.** When tests pass, the change stays in scope, and lint is clean, Claude auto-opens a draft PR and drops a Things capture with the PR link so it surfaces in your inbox triage.
 4. **Non-blocking, FYI.** Otherwise Claude captures a todo through `things:inbox`, tagged by domain, carrying the `Session: <uuid>` marker for traceback.
-5. **Blocking, reachable.** When a human can respond interactively (an interactive terminal, or a web or mobile remote-control session where push lands), Claude calls `AskUserQuestion`. A high-stakes gate shows the diff or command and offers approve, deny, or edit first. A stuck case asks the decision question. Push is the attention signal. The response clears the block.
+5. **Blocking, reachable.** When a human can respond interactively (an interactive terminal, or a web or mobile remote-control session where push lands), Claude calls `AskUserQuestion`. A high-stakes gate shows the diff or command and offers approve, deny, or edit first. A denial halts the action and Claude asks what to do instead rather than guessing. A stuck case asks the decision question. Push is the attention signal. The response clears the block.
 6. **Blocking, headless.** When no interactive channel exists, Claude does not call `AskUserQuestion` into the void. It files a durable blocking issue, Linear for work or GitHub for personal, with the dependency set so it is queryable (`is:blocked`), and attaches a teleport doorway so you can resume the exact session to respond.
 
 ### Design decisions
@@ -151,18 +151,18 @@ flowchart TD
 |----------|--------|--------------|-----------|-------|
 | Blocking model | Native task-graph edge (`addBlockedBy`) | A custom blocking tag on Things items | The edge encodes the semantics with no parallel state. Resolving the blocker makes the downstream task actionable. | Requires v2.1.142+. Flat `TodoWrite` fallback on older versions. |
 | Router home | User-level skill under `user/skills` | `claude-code` plugin skill, standalone plugin | Orchestrates your personal Things, teleport, GitHub, and Linear, like `improve-claude-code`. Not meant to be shared. | Mirrors your existing meta-workflows. |
-| Blocking triggers | Stuck plus high-stakes | Stuck only, or ask on any meaningful decision | Keeps interrupts rare and high-signal while gating irreversible-ish actions. | Gated set below. Deletes and money left out for now, revisit. |
-| High-stakes set | Deploys and releases, external sends, force-push, prod migrations | Add deletes, money | Your selection. Force-push and prod migrations gated by default. | Deletes and money flagged as a deliberate non-gate. |
+| Blocking triggers | Stuck plus high-stakes | Stuck only, or ask on any meaningful decision | Keeps interrupts rare and high-signal while gating costly actions. | Gated set below. |
+| High-stakes set | Deploys and releases, external sends, money and payments, destructive cloud or data deletion, force-push, prod migrations | Gate git branch ops too | Gates costly or irreversible actions. | Git branch and worktree cleanup explicitly never gated, they must run uninterrupted. |
 | Blocking transport | `AskUserQuestion` plus push | Two-way Channel, bare push | Your choice. No new infrastructure, push lands on web and mobile. | Unsafe in headless, Skill, and SDK contexts. Fallback below. |
 | Headless fallback | Durable blocking issue plus teleport doorway | Stall on `AskUserQuestion` | `AskUserQuestion` returns empty answers with no TTY, so a headless gate would proceed on nothing. | `is:blocked` makes the queue queryable. |
-| Gate interaction | Approve, deny, or edit first, with the diff or command shown | Open question, notify with cancel window | Fast to act on from your phone, and a person other than the actor decides. | Decision (stuck) cases still ask an open question. |
+| Gate interaction | Approve, deny, or edit first, with the diff or command shown | Open question, notify with cancel window | Fast to act on from your phone, and a person other than the actor decides. | A denial halts and asks what to do instead. Decision (stuck) cases ask an open question. |
 | Form selection | Claude picks per finding | Always capture, capture-or-PR-only | Routes by confidence and blast radius. | Safe-PR bar below. |
 | Safe-PR bar | Tests pass, in scope, lint clean | Add reversible or no-migration | A draft is reversible by closing, so the migration condition was redundant. | All three required to auto-open. |
-| PR autonomy | Auto-open draft, notify | Whitelist only, always confirm | Maximizes autonomy, the draft state is the safety net. | Notify through a capture in your review pass. |
+| PR autonomy | Auto-open draft, notify | Whitelist only, always confirm | Maximizes autonomy, the draft state is the safety net. | Notify through a Things capture carrying the PR link. |
 | Durable sink | Linear for work, GitHub for personal | Always one tracker | Matches where you already triage: Linear for the day job, GitHub for personal repos. | Inferred from the git remote, ask when unsure. |
 | Attention surface | Things and GitHub for personal, Linear for work | Single Things pane, native per system | Each dispatch lands where you already look, no cross-posting. | Work items do not echo into Things. |
 | Existing lanes | Generalize, reuse markers | Keep separate, fold later | Dispatch is the umbrella, `improve-claude-code` and `agent-ideas` keep draining config findings unchanged. | Reuses `Session` and fingerprint markers. |
-| Trigger scope | Reactive plus light proactive | Reactive only, proactive scanning | Catches obvious adjacent bugs without hunting or burning tokens. | No scanning beyond the task. |
+| Trigger scope | Reactive plus light proactive, edited files only | Reactive only, read-or-edited files, proactive scanning | Catches obvious adjacent bugs without hunting or burning tokens. | Only files Claude edited this session, no repo scan. |
 
 ### Durability ladder
 
@@ -238,9 +238,8 @@ Drive classification from the native task graph using `addBlockedBy` edges. Gate
 
 ## Open questions
 
-1. **Deletes and money gating.** Left out of the high-stakes set for now. Confirm after living with it whether destructive deletes or payment actions should join.
-2. **Light-proactive boundary.** What counts as an obvious adjacent problem worth flagging versus scope creep, in concrete terms.
-3. **Work remote list.** The specific org or host that marks a remote as the day job, for the Linear routing.
+1. **Work remote list.** The specific org or host that marks a remote as the day job, for the Linear routing. Supplied at build time.
+2. **Reachability detection.** The concrete signal Claude uses to tell an interactive session (safe for `AskUserQuestion`) from a headless one (take the durable fallback).
 
 ## References
 

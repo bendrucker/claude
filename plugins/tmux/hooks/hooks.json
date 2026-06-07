@@ -29,15 +29,6 @@
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/target.ts\""
           }
         ]
-      },
-      {
-        "matcher": "TeamCreate",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/team-workaround.ts\" --setup"
-          }
-        ]
       }
     ],
     "Notification": [
@@ -57,10 +48,6 @@
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts\" --background-only"
-          },
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/team-workaround.ts\" --teardown"
           }
         ]
       }

@@ -1,6 +1,6 @@
 ---
 name: claude-code:session
-description: Query Claude Code session history via a DuckDB index over `~/.claude/projects/**/*.jsonl`. Use when the user asks about Claude Code activity ("how many tokens today?", "what did I work on this week?"), or when you would otherwise read, grep, or jq session transcripts directly from `~/.claude/projects/`. Do NOT use for general codebase search, git log queries, or arbitrary databases.
+description: Query Claude Code session history via a DuckDB index over `~/.claude/projects/`. Use when asked about Claude Code activity ("how many tokens today?", "what did I work on this week?") or instead of reading, grepping, or jq-ing session transcripts. Not for codebase search, git log queries, or arbitrary databases.
 allowed-tools:
   - Bash
   - Read
@@ -27,7 +27,7 @@ ${CLAUDE_SKILL_DIR}/scripts/refresh.ts --refresh
 
 ### Querying
 
-After refresh, query the DB with the `duckdb` CLI or any DuckDB client. Querying never writes, so open `-readonly`: it takes no lock, so it never contends with a refresh or another query. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL.
+After refresh, query the DB with the `duckdb` CLI or any DuckDB client. Querying never writes, so open `-readonly`: it takes no lock, so it never contends with a refresh or another query. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works; `getvariable('limit')` is unaffected.
 
 ```bash
 DB_PATH=$(${CLAUDE_SKILL_DIR}/scripts/refresh.ts)
@@ -87,7 +87,7 @@ Every query also takes an optional `host` param. Omit it to span every machine (
 - `skill-activity`: work attributed to each skill (assistant turns, sessions, input/output/cache tokens). Swap `attribution_skill` for `attribution_plugin`/`attribution_agent` in the SQL to re-cut. Params: `after_date`, `before_date`, `project`.
 - `fields`: schema discovery by inference. Enumerates JSON keys at a path for records of a kind, with each value's JSON type and a count (divergent types appear as multiple rows). Params: `kind` (glob on `records.kind`, or null for all), `path` (JSON path, e.g. `$` or `$.attachment`), `after_date`, `before_date`, `project`.
 - `hook-block-then-retry-success`: per hook, blocks that were retried away by a same-hook success in the same session within N seconds (noise vs genuine redirect). Params: `hook` (glob on command/name), `within_seconds` (default 300), `after_date`, `before_date`, `project`, `host`.
-- `repeat-read-waste`: fraction of Reads that re-read an already-read file in the same session, and the char/token cost re-injected. Params: `after_date`, `before_date`, `project`, `host`.
+- `repeat-read-waste`: repeat Reads (same file re-read within a session) decomposed by cause: paginated (`offset`/`limit` chunking), sidechain (subagent fan-out), after-own-edit, and true repeats (the actionable context tax), with char/token cost. Params: `after_date`, `before_date`, `project`, `host`.
 - `skill-auto-vs-explicit`: per skill, model-auto (empty args) vs explicit/slash invocations, the core `disable-model-invocation` lever. Params: `min_calls` (default 1), `after_date`, `before_date`, `project`, `host`.
 - `sandbox-bypass-effective-command`: top `dangerouslyDisableSandbox` commands normalized to their real verb after stripping a leading `cd <path>` wrapper (`excludedCommands` candidates). Params: `min_count` (default 5), `after_date`, `before_date`, `project`, `host`.
 
@@ -152,6 +152,7 @@ Every table and view carries a `host` column (`local` for this machine, the labe
 - `hook_events`: one row per `hook_*` attachment (every event: PreToolUse, PostToolUse, Stop, SessionStart, UserPromptSubmit, PermissionRequest). `kind`, `hook_event`, `hook_name`, `command` (exact script), `exit_code`, `duration_ms`, `decision` (allow/ask/deny, parsed from the stdout JSON of a hook_success when the hook returns a permission decision), `reason`, `additional_context`, `blocked` (boolean), plus `stdout`/`stderr`/`content`/`blocking_error`.
 - `hook_blocks`: the friction surface, `hook_events` filtered to events that stopped or interrupted a tool call or the model. `decision` is deny/ask/block; `reason` is the surfaced message. Find overfiring hooks here (high counts, repeated blocks within a session).
 - `messages`: view over `raw` filtered to `type IN ('user', 'assistant')`, with a derived `content_text` (string-form messages only), `model`, token columns (`input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens`), attribution columns (`attribution_skill`, `attribution_plugin`, `attribution_agent`, `attribution_mcp_server`, `attribution_mcp_tool`), and a `summary` joined from summary rows.
+- `message_usage`: one row per assistant message with deduped token columns (`input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens` as MAX per message id), plus `model`, attribution columns, and `content_rows` (raw row count). **Sum tokens from here, not from `raw`/`messages`**: every content-block row repeats the parent message's usage, so per-row sums inflate totals 2-3.5x.
 - `content_items`: one row per element of `data->'$.message.content'`, with pinned columns (`type`, `name`, `id`, `tool_use_id`, `text`, `content`, `is_error`), the parent's attribution (`attribution_skill`/`plugin`/`agent`), plus `data JSON` (the content item) and `tool_use_result JSON` (merged from the parent message).
 - `diagnostics`: one row per type-checker/linter/LSP diagnostic surfaced in-session. Columns: `file`, `severity`, `source`, `code`, `message`. Unnested from `diagnostics` attachments.
 - `file_operations`: one row per `Read`/`Write`/`Edit`/`MultiEdit`/`NotebookEdit`, with `operation`, `file_path`, and attribution. What you work on, and under which skill/plugin/agent.

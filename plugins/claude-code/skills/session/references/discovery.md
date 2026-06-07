@@ -37,7 +37,7 @@ Re-check every candidate against the live files under `/Users/ben/src/bendrucker
 - `confidence` (high/medium/low): how strong the grounded evidence is.
 
 - Hooks run in parallel. Never sum hook durations as wall-clock; the cost the user waits on is the single slowest hook plus a fixed per-process overhead, not the sum across matching hooks. `hook-origin-split`'s `total_s` is aggregate process work, not latency.
-- Split friction into the part a setting can change and the part it cannot. `ExitPlanMode` and `AskUserQuestion` rejections are not allowlistable. Compound commands defeat `excludedCommands` prefix matching. Counting raw rejections without that split inflates the actionable set.
+- Split friction into the part a setting can change and the part it cannot. `ExitPlanMode` and `AskUserQuestion` rejections are not allowlistable; the named `permissions` and `errors` queries already exclude them, so only custom SQL over `permission_requests`/`tool_errors` needs that filter. Compound commands defeat `excludedCommands` prefix matching. Counting raw rejections without that split inflates the actionable set.
 
 Verify any claim about harness behavior against the primary Claude Code docs, not a paraphrase, before grounding a finding on it.
 

@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { loadPlugins } from "@bendrucker/claude-marketplace";
+import { loadPlugins } from "../packages/marketplace/index";
 
 interface CiConfig {
   runner?: string;

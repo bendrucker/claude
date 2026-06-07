@@ -9,7 +9,9 @@ Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs
 
 #### Workspace Dependencies
 
-Auto-install does not cover `workspace:*` specifiers. Scripts that import workspace packages (`@bendrucker/*`) need `bun install` first to create the `node_modules` symlinks; without it they fail with `Cannot find module`. The project Worktrunk `post-start` hook (`.config/wt.toml`) runs `bun install` for new worktrees so this resolves automatically.
+Auto-install does not cover `workspace:*` specifiers. Scripts that import workspace packages (`@bendrucker/*`) need `bun install` first to create the `node_modules` symlinks; without it they fail with `Cannot find module`. The project Worktrunk `post-start` hook (`.config/wt.toml`) runs `bun install` for new worktrees so this resolves automatically, but it does not cover `Agent(isolation='worktree')` worktrees, which skip wt hooks.
+
+Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` code via relative paths (e.g. `../packages/marketplace/index`) instead of the `@bendrucker/*` specifier, so it runs in fresh worktrees without install. Reserve workspace specifiers for distributed plugin code, which cannot use relative imports across the plugin boundary.
 
 # Script Conventions
 

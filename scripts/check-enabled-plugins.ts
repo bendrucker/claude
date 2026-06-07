@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { loadPlugins } from "@bendrucker/claude-marketplace";
+import { loadPlugins } from "../packages/marketplace/index";
 
 const plugins = await loadPlugins();
 const missing = plugins.filter((p) => p.listing && !p.enabled).map((p) => p.name);

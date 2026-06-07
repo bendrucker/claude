@@ -7,9 +7,10 @@ export type BashInput = {
   command?: string;
 };
 
-const READ_ONLY_SUBCOMMANDS = new Set(["list"]);
+const ALLOWED_SUBCOMMANDS = new Set(["list", "prune", "unlock"]);
 const REPLACED_SUBCOMMANDS = new Set(["add", "remove"]);
 const TMP_TARGET = /^(\.\/)?tmp\//;
+const AGENT_WORKTREE_TARGET = /(^|\/)\.claude\/worktrees\//;
 
 export function isThrowawayAdd(command: string): boolean {
   const after = command.split(/\bgit\s+worktree\s+add\b/)[1];
@@ -17,12 +18,20 @@ export function isThrowawayAdd(command: string): boolean {
   return after.split(/\s+/).some((tok) => TMP_TARGET.test(tok));
 }
 
+export function isThrowawayRemove(command: string): boolean {
+  const after = command.split(/\bgit\s+worktree\s+remove\b/)[1];
+  if (after === undefined) return false;
+  return after.split(/\s+/).some((tok) => TMP_TARGET.test(tok) || AGENT_WORKTREE_TARGET.test(tok));
+}
+
 export function formatDenyOutput(subcommand: string): SyncHookJSONOutput {
   const base = `Use the worktrunk skill (/worktrunk) instead of \`git worktree ${subcommand}\`.`;
   const reason =
     subcommand === "add"
       ? `${base} For a throwaway verification checkout, add it under \`tmp/\`.`
-      : base;
+      : subcommand === "remove"
+        ? `${base} Throwaway worktrees under \`tmp/\` or \`.claude/worktrees/\` may be removed directly.`
+        : base;
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
@@ -54,10 +63,13 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   if (!subcommand) {
     return null;
   }
-  if (READ_ONLY_SUBCOMMANDS.has(subcommand)) {
+  if (ALLOWED_SUBCOMMANDS.has(subcommand)) {
     return null;
   }
   if (subcommand === "add" && isThrowawayAdd(command)) {
+    return null;
+  }
+  if (subcommand === "remove" && isThrowawayRemove(command)) {
     return null;
   }
   if (REPLACED_SUBCOMMANDS.has(subcommand)) {

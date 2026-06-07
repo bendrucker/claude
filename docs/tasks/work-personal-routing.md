@@ -15,9 +15,9 @@ Spec: [Work versus personal routing](../blocking-dispatch.md#work-versus-persona
 A classifier that maps the current repo to a tracker:
 
 - Read the git remote.
-- A day-job org or host routes to Linear.
-- A personal GitHub repo routes to GitHub Issues.
-- When the remote is ambiguous or absent, ask once and carry the answer for the session.
+- A remote matching a configured work pattern routes to Linear.
+- Anything else routes to GitHub Issues.
+- When no mapping is configured or the remote matches nothing, ask once and carry the answer for the session.
 
 #### Out of scope
 
@@ -25,13 +25,13 @@ The actuators that file into GitHub or Linear (their own tasks). This task answe
 
 #### Approach
 
-Resolve the day-job org or host identifier (spec open question 1) and match the remote against it. Keep the mapping in one place the actuators read. Fail toward asking rather than guessing when the remote does not clearly match either side.
+The work-remote mapping is proprietary and must not be committed to this public repository, since it identifies an employer. The skill reads the patterns from private local config, a gitignored file or an environment variable, and ships only the mechanism. The current rule is a match against a public-SaaS host, no custom domain. Keep the resolved mapping in one place the actuators read. Fail toward asking rather than guessing when the remote does not clearly match.
 
 #### Acceptance criteria
 
-- [ ] A work remote routes to Linear, a personal GitHub remote to GitHub.
-- [ ] An ambiguous remote triggers a single question, then is remembered.
-- [ ] The day-job identifier is recorded in one place.
+- [ ] A work remote routes to Linear, any other remote to GitHub.
+- [ ] An unmatched or unconfigured remote triggers a single question, then is remembered.
+- [ ] No work-host identity appears in committed files. The mapping lives in private local config.
 
 #### References
 

@@ -4,7 +4,7 @@ Decide whether a human can answer interactively right now, so the gate knows whe
 
 #### Context
 
-Spec: [Blocking gate transport](../blocking-dispatch.md#blocking-gate-transport). `AskUserQuestion` returns empty answers with no TTY, so a headless gate would proceed on nothing. This is open question 2 in the spec.
+Spec: [Blocking gate transport](../blocking-dispatch.md#blocking-gate-transport) and [Resolved mechanics](../blocking-dispatch.md#resolved-mechanics). `AskUserQuestion` returns empty answers with no TTY, so a headless gate would proceed on nothing.
 
 #### Depends on
 
@@ -25,7 +25,7 @@ The gate interaction itself. This task only answers can-a-human-respond-now.
 
 #### Approach
 
-Settle the concrete signal during implementation. Candidates: a TTY check, the presence and values of `CLAUDE_*` environment variables that mark headless or remote-control mode, and the run mode exposed to hooks. Verify against the known empty-answer behavior in headless, Skill, and SDK contexts (claude-code [#29547](https://github.com/anthropics/claude-code/issues/29547), [#29733](https://github.com/anthropics/claude-code/issues/29733)) so the detector fails safe toward headless when unsure.
+No documented flag marks headless directly, so combine signals and fail safe. Treat the session as interactive when `CLAUDE_CODE_REMOTE` is `true` (web or mobile remote control), or when stdin and stdout are both a TTY (`[ -t 0 ] && [ -t 1 ]`, a local interactive terminal). Otherwise treat it as headless: a `-p` run, a scheduled or `/loop` trigger, or a subagent. Subagents and skills never call `AskUserQuestion` regardless. This matches the known empty-answer behavior in headless, Skill, and SDK contexts (claude-code [#29547](https://github.com/anthropics/claude-code/issues/29547), [#29733](https://github.com/anthropics/claude-code/issues/29733)).
 
 #### Acceptance criteria
 
@@ -35,5 +35,5 @@ Settle the concrete signal during implementation. Candidates: a TTY check, the p
 
 #### References
 
-- [blocking-dispatch.md, open questions](../blocking-dispatch.md#open-questions)
+- [blocking-dispatch.md, resolved mechanics](../blocking-dispatch.md#resolved-mechanics)
 - claude-code empty-answer issues [#29547](https://github.com/anthropics/claude-code/issues/29547), [#29733](https://github.com/anthropics/claude-code/issues/29733)

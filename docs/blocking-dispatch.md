@@ -83,7 +83,9 @@ Capture a todo through `things:inbox`, tagged by domain (see lanes below).
 
 ### Work versus personal routing
 
-Read the git remote. Your day-job org or host routes durable blocks to Linear. Personal GitHub repos route to GitHub Issues. When the remote is ambiguous or absent, ask once and carry the answer.
+Read the git remote and match it against a configured work-remote mapping. A remote that matches a work pattern routes durable blocks to Linear, anything else routes to GitHub Issues. When no mapping is configured or the remote matches nothing, ask once and carry the answer.
+
+The mapping is proprietary. It identifies an employer, so it must not be committed to this public repository. The skill ships only the mechanism and reads the patterns from private local config (a gitignored file or an environment variable). The committed code never names the work host. The current rule is a public-SaaS host match, no custom domain.
 
 ### Where dispatches land
 
@@ -160,6 +162,8 @@ flowchart TD
 | Safe-PR bar | Tests pass, in scope, lint clean | Add reversible or no-migration | A draft is reversible by closing, so the migration condition was redundant. | All three required to auto-open. |
 | PR autonomy | Auto-open draft, notify | Whitelist only, always confirm | Maximizes autonomy, the draft state is the safety net. | Notify through a Things capture carrying the PR link. |
 | Durable sink | Linear for work, GitHub for personal | Always one tracker | Matches where you already triage: Linear for the day job, GitHub for personal repos. | Inferred from the git remote, ask when unsure. |
+| Routing config | Private local config, uncommitted | Hardcode the work host in the skill | The work-host identity is proprietary and cannot ship in a public repo. | Gitignored file or env var. Skill ships the mechanism only. |
+| Reachability check | `CLAUDE_CODE_REMOTE` or TTY, fail safe to headless | A single mode flag (none exists) | No documented flag marks headless directly, so combine the remote signal and a TTY test. | Subagents and skills never call `AskUserQuestion`. |
 | Attention surface | Things and GitHub for personal, Linear for work | Single Things pane, native per system | Each dispatch lands where you already look, no cross-posting. | Work items do not echo into Things. |
 | Existing lanes | Generalize, reuse markers | Keep separate, fold later | Dispatch is the umbrella, `improve-claude-code` and `agent-ideas` keep draining config findings unchanged. | Reuses `Session` and fingerprint markers. |
 | Trigger scope | Reactive plus light proactive, edited files only | Reactive only, read-or-edited files, proactive scanning | Catches obvious adjacent bugs without hunting or burning tokens. | Only files Claude edited this session, no repo scan. |
@@ -208,7 +212,7 @@ For GitHub, create the issue through the `github` MCP server, then set the depen
 
 ### Blocking gate transport
 
-Call `AskUserQuestion` only when a human is reachable interactively. For a high-stakes gate, present the diff or command with approve, deny, and edit-first options. For a stuck decision, ask the question. Detect the headless case and divert to the durable issue plus teleport doorway, which protects against the documented empty-answer behavior of `AskUserQuestion` in headless, Skill, and SDK contexts (claude-code [#29547](https://github.com/anthropics/claude-code/issues/29547), [#29733](https://github.com/anthropics/claude-code/issues/29733)).
+Call `AskUserQuestion` only when a human is reachable interactively. Detect reachability with a fail-safe check: treat the session as interactive when `CLAUDE_CODE_REMOTE` is `true` (web or mobile remote control) or stdin and stdout are both a TTY, and headless otherwise. Subagents and skills never call `AskUserQuestion`. For a high-stakes gate, present the diff or command with approve, deny, and edit-first options. For a stuck decision, ask the question. In the headless case, divert to the durable issue plus teleport doorway, which protects against the documented empty-answer behavior of `AskUserQuestion` in headless, Skill, and SDK contexts (claude-code [#29547](https://github.com/anthropics/claude-code/issues/29547), [#29733](https://github.com/anthropics/claude-code/issues/29733)).
 
 ### Relationship to existing lanes
 
@@ -236,10 +240,15 @@ Project blocking findings that must survive as `blocked_by` issues, Linear for w
 
 Drive classification from the native task graph using `addBlockedBy` edges. Gate on version with a flat-list fallback.
 
-## Open questions
+## Resolved mechanics
 
-1. **Work remote list.** The specific org or host that marks a remote as the day job, for the Linear routing. Supplied at build time.
-2. **Reachability detection.** The concrete signal Claude uses to tell an interactive session (safe for `AskUserQuestion`) from a headless one (take the durable fallback).
+#### Work remote identity
+
+A remote on the public-SaaS work host routes to Linear. The host identity is proprietary, so it lives in private local config (gitignored file or environment variable), never in the committed skill.
+
+#### Reachability detection
+
+No documented flag marks headless directly. Treat the session as interactive when `CLAUDE_CODE_REMOTE` is `true` or stdin and stdout are both a TTY, headless otherwise, failing safe toward headless. Subagents and skills never call `AskUserQuestion`.
 
 ## References
 

@@ -188,7 +188,7 @@ Durable, queryable dependencies with webhooks. The destination when a block must
 
 ### Dispatch router
 
-A user-level skill under `user/skills`, alongside `improve-claude-code` and `agent-ideas`. It owns no storage. It classifies a finding, applies the form heuristic, and calls existing skills as actuators. Keeping it a router avoids a parallel task store and reuses the markers and conventions already in place.
+A user-level skill under `user/skills`, alongside `improve-claude-code` (`agent-ideas` follows the same patterns but lives in `.claude/skills`). Unlike `improve-claude-code`, which is deliberately user-invoked (`disable-model-invocation: true`), dispatch is model-invocable so it can fire reactively mid-task. It owns no storage. It classifies a finding, applies the form heuristic, and calls existing skills as actuators. Keeping it a router avoids a parallel task store and reuses the markers and conventions already in place.
 
 ### Classification from the native graph
 
@@ -208,7 +208,7 @@ For GitHub, create the issue through the `github` MCP server, then set the depen
 
 #### FYI capture
 
-`things:inbox` with the `Session: <uuid>` marker, tagged `claude-code` for config findings or plain `Claude` otherwise.
+`things:inbox` with the `Session: <uuid>` marker. Add `--tag claude-code` for config findings. General findings need no tag, since `things:inbox` applies the `Claude` tag automatically.
 
 ### Blocking gate transport
 

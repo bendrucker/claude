@@ -8,9 +8,10 @@ Spec: [Blocking gate transport](../blocking-dispatch.md#blocking-gate-transport)
 
 #### Depends on
 
-- `dispatch-skill-scaffold.md`
 - `reachability-detection.md`
 - `high-stakes-classifier.md`
+
+Both pull in `dispatch-skill-scaffold.md` transitively.
 
 #### Scope
 

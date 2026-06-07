@@ -16,8 +16,8 @@ Spec: [Non-blocking lanes](../blocking-dispatch.md#non-blocking-lanes) and [Wher
 The capture path for a finding that is non-blocking and not a ready fix:
 
 - Call `things:inbox` with a concise title and self-sufficient notes.
-- Tag `claude-code` when the finding is about Claude configuration, so `improve-claude-code` drains it. Tag plain `Claude` otherwise.
-- Stamp the `Session: <uuid>` marker and run the dedup check.
+- Add `--tag claude-code` when the finding is about Claude configuration, so `improve-claude-code` drains it. For a general finding add no extra tag: `things:inbox` always applies the `Claude` tag automatically.
+- Pass `--session-id ${CLAUDE_SESSION_ID}` and stamp the `Session: <uuid>` marker, then run the dedup check.
 
 #### Out of scope
 
@@ -25,7 +25,7 @@ The classification that decides a finding is FYI rather than a fix or a block. T
 
 #### Approach
 
-Reuse `things:inbox` exactly as `agent-ideas` does, including `--tag` and `--session-id`. Decide the domain tag from whether the finding targets the Claude config repo. Keep notes self-sufficient, since a capture is read later out of context.
+Reuse `things:inbox` exactly as `agent-ideas` does in Capture Keepers, including `--tag` and `--session-id`. Remember the `Claude` tag is automatic, so only the config lane adds a tag. Decide the domain tag from whether the finding targets the Claude config repo. Keep notes self-sufficient, since a capture is read later out of context.
 
 #### Acceptance criteria
 

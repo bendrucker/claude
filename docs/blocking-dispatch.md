@@ -6,7 +6,7 @@ Claude works across many autonomous sessions and regularly finds things worth su
 
 Two capabilities are missing:
 
-1. A distinction between **blocking** dispatch (Claude is parked and needs you before it can proceed) and **non-blocking** dispatch (an FYI you handle whenever).
+1. A distinction between **blocking** dispatch (Claude is parked and needs you before it can proceed, or it is about to take a high-stakes action) and **non-blocking** dispatch (an FYI you handle whenever).
 2. An explicit choice of dispatch **form**. Dispatch does not always mean the task is done. Sometimes the right output is a captured todo, sometimes a filed issue, sometimes a ready-made pull request.
 
 The goal is one model that lets Claude classify a finding, pick the form, and reach you through the right channel, while staying autonomous the rest of the time.
@@ -17,7 +17,7 @@ Two findings from the prior-art research shape the design.
 
 #### The native task graph now models blocking
 
-Claude Code's native task tools (v2.1.142+, Agent SDK 0.3.142+) added first-class dependencies: `TaskCreate` plus `TaskUpdate` with `addBlockedBy` and `addBlocks`. A blocking relationship is a real edge in the graph, not a flag. The graph is session-scoped (persisted under `~/.claude`), so it captures Claude's own reasoning about what blocks what, but it does not reach you or persist across systems on its own. This is the "native dependency graph" worth leaning on.
+Claude Code's native task tools (v2.1.142+, Agent SDK 0.3.142+) added first-class dependencies: `TaskCreate` plus `TaskUpdate` with `addBlockedBy` and `addBlocks`. A blocking relationship is a real edge in the graph, not a flag. The graph is session-scoped (persisted under `~/.claude`), so it captures Claude's own reasoning about what blocks what, but it does not reach you or persist across systems on its own. This is the native dependency graph the design leans on.
 
 #### Durable dependencies exist only in some trackers
 
@@ -31,64 +31,138 @@ Of the systems available here, the ability to express "this item blocks downstre
 | Things 3 | No | Containment only (project, heading, checklist) |
 | Apple Reminders | No | Subtask hierarchy only |
 
-Things, the current default sink, cannot express a dependency at all. That constraint pushes durable blocking work onto GitHub or Linear, and keeps Things as the FYI lane.
+Things, the current default sink, cannot express a dependency at all. That constraint keeps Things as the FYI lane and pushes durable blocking work onto GitHub (personal) or Linear (work).
 
 ## Architecture
 
-The native task graph is the spine. Dispatch reads a node from that graph and projects it outward, choosing a transport (how it reaches you) and a form (what artifact it becomes). Blocking versus non-blocking is read from the graph rather than asserted: a node with a dependent "resume" task that the session cannot complete without is blocking, a leaf node with no dependents is non-blocking.
+The native task graph is the spine. Dispatch reads a node from that graph and projects it outward, choosing a transport (how it reaches you) and a form (what artifact it becomes). The blocking nature is read from the graph or from the action at hand, rather than asserted.
 
 Three concepts stay separate, following the cross-framework vocabulary:
 
 #### Gate
 
-A blocking dependency. The session cannot complete past this node until you answer. Transport: `AskUserQuestion` plus mobile push.
+A blocking dependency. The session cannot complete past this node until you respond. Two triggers: Claude is stuck, or Claude is about to take a high-stakes action. Transport: `AskUserQuestion` plus mobile push.
 
 #### Notification
 
-A one-way FYI. Claude proceeds or ends. Transport: a Things capture, or a PR for a ready fix.
+A one-way FYI. Claude proceeds or ends. Transport: a Things capture, or a draft PR for a ready fix.
 
 #### Handoff
 
 A transfer of context so you can resume where Claude stopped. Transport: the teleport doorway (`claude --teleport <session>`) already used by `agent-ideas`.
 
+### Classification
+
+A finding is blocking when either condition holds:
+
+#### Stuck
+
+Continuing the current work depends on your answer and Claude cannot reason its way through. Modeled as a real edge: the downstream resume task is `blockedBy` the finding.
+
+#### High-stakes action
+
+Claude is about to take an action whose blast radius warrants approval even when Claude could proceed. The gated set is deploys and releases, and external sends (email, Slack, public posts). Force-push and history rewrite, and production database migrations, are gated by default. Destructive deletes and money or payment actions are deliberately not gated for now, recorded as a choice to revisit.
+
+Everything else is non-blocking.
+
+### Form selection
+
+Claude picks the form per finding, routing by confidence and blast radius.
+
+#### Ready, safe fix
+
+Auto-open a draft PR through `pull-request:create`, then file a non-blocking capture so you review it later. The draft state is the safety gate, the PR is a proposal in your review queue, not finished work. A draft opens only when all three hold: tests pass locally, edits stay within the task's files and scope, and lint and formatting are clean. Anything failing the bar becomes a captured suggestion instead.
+
+#### Needs a decision, must persist
+
+File a durable blocking issue. Work findings go to Linear, personal findings to GitHub, decided by the git remote (see routing below).
+
+#### Pure FYI
+
+Capture a todo through `things:inbox`, tagged by domain (see lanes below).
+
+### Work versus personal routing
+
+Read the git remote. Your day-job org or host routes durable blocks to Linear. Personal GitHub repos route to GitHub Issues. When the remote is ambiguous or absent, ask once and carry the answer.
+
+### Where dispatches land
+
+Two surfaces, each matching where you already look.
+
+#### Personal
+
+FYIs, personal-repo blocks, and Claude-opened PRs consolidate so the Things inbox and your GitHub notifications cover them.
+
+#### Work
+
+Work dispatches stay in Linear, where your day-job triage already lives. Dispatch does not duplicate them into Things.
+
+### Non-blocking lanes
+
+Reuse the lanes you already drain rather than inventing a triage workflow.
+
+#### Config findings
+
+Tag `claude-code` so `improve-claude-code` picks them up, unchanged.
+
+#### General findings
+
+Tag plain `Claude` for your normal inbox pass.
+
+### Trigger scope
+
+Reactive plus light proactive. Claude dispatches things it runs into while doing the task you gave it, and flags an obvious adjacent problem it notices in passing (a clear bug in a file it just edited). It does not actively scan for dispatchable issues beyond the task.
+
 ### Diagram
 
 ```mermaid
 flowchart TD
-    F[Claude finds something worth surfacing] --> G{Model in native task graph}
-    G -->|Leaf, no dependents| N[Non-blocking]
-    G -->|Resume task blockedBy this node| B[Blocking]
+    F[Claude finds something or is about to act] --> C{Blocking?}
+    C -->|Stuck, cannot proceed| B[Blocking]
+    C -->|High-stakes action| B
+    C -->|Neither| N[Non-blocking]
 
-    N --> NF{Ready, safe fix?}
-    NF -->|Yes| PR[Open draft PR via pull-request:create]
-    NF -->|No, just FYI| CAP[Capture to Things via things:inbox]
+    N --> NF{Ready and safe fix?}
+    NF -->|Tests pass, in scope, lint clean| PR[Auto-open draft PR]
+    NF -->|No| CAP[Capture to Things by domain tag]
 
-    B --> BR{Reachable interactively now?}
-    BR -->|Yes, terminal or remote-control| ASK[AskUserQuestion plus push]
-    BR -->|No, headless routine| DUR[File blocked_by issue on GitHub or Linear]
-    DUR --> DOOR[Attach teleport doorway]
-    ASK -->|Answer| RES[Resume session, clear the block]
+    B --> BR{Reachable interactively?}
+    BR -->|Yes| ASK[AskUserQuestion plus push]
+    BR -->|No, headless| W{Work or personal?}
+    W -->|Work remote| LIN[Linear blocks issue]
+    W -->|Personal repo| GH[GitHub blocked_by issue]
+    LIN --> DOOR[Attach teleport doorway]
+    GH --> DOOR
+    ASK -->|Approve or answer| RES[Proceed or resume session]
 ```
 
 ### Data flow
 
-1. Claude encounters a finding mid-session and represents it as a node in the native task graph. If continuing the current work depends on it, Claude links the downstream "resume" task with `addBlockedBy`.
-2. The dispatch router reads the node. A dependent resume task marks it blocking. A leaf marks it non-blocking.
-3. **Non-blocking, ready fix.** When the fix is safe and confidence is high, Claude opens a draft PR through `pull-request:create`. The PR is the dispatch object, a proposal parked in your review queue, not finished work.
-4. **Non-blocking, FYI.** Otherwise Claude captures a todo through `things:inbox`, carrying the `Session: <uuid>` marker for traceback.
-5. **Blocking, reachable.** When a human can answer interactively (an interactive terminal, or a web or mobile remote-control session where push lands), Claude calls `AskUserQuestion`. The push notification is the attention signal. The answer clears the block and the session resumes.
-6. **Blocking, headless.** When no interactive channel exists, Claude does not call `AskUserQuestion` into the void. It files a `blocked_by` issue on GitHub or Linear so the dependency persists and is queryable (`is:blocked`), and attaches a teleport doorway so you can resume the exact session to answer.
+1. Claude encounters a finding mid-session, or reaches a high-stakes action. It represents the finding as a node in the native task graph, and for a stuck case links the downstream resume task with `addBlockedBy`.
+2. The router classifies. Stuck or high-stakes marks it blocking. Otherwise non-blocking.
+3. **Non-blocking, ready fix.** When tests pass, the change stays in scope, and lint is clean, Claude auto-opens a draft PR and files a capture so it surfaces in your review pass.
+4. **Non-blocking, FYI.** Otherwise Claude captures a todo through `things:inbox`, tagged by domain, carrying the `Session: <uuid>` marker for traceback.
+5. **Blocking, reachable.** When a human can respond interactively (an interactive terminal, or a web or mobile remote-control session where push lands), Claude calls `AskUserQuestion`. A high-stakes gate shows the diff or command and offers approve, deny, or edit first. A stuck case asks the decision question. Push is the attention signal. The response clears the block.
+6. **Blocking, headless.** When no interactive channel exists, Claude does not call `AskUserQuestion` into the void. It files a durable blocking issue, Linear for work or GitHub for personal, with the dependency set so it is queryable (`is:blocked`), and attaches a teleport doorway so you can resume the exact session to respond.
 
 ### Design decisions
 
 | Decision | Choice | Alternatives | Rationale | Notes |
 |----------|--------|--------------|-----------|-------|
-| Blocking model | Native task-graph edge (`addBlockedBy`) | A custom blocking tag or flag on Things items | The edge encodes the semantics with no parallel state. Resolving the blocker makes the downstream task actionable. | Requires Claude Code v2.1.142+. Falls back to flat `TodoWrite` on older versions. |
-| Blocking transport | `AskUserQuestion` plus push | Two-way Channel (Telegram, iMessage), bare mobile push | Your choice. No new infrastructure, push already lands on web and mobile. | Constraint below: unsafe in headless, Skill, and SDK contexts. |
-| Headless blocking fallback | Durable `blocked_by` issue plus teleport doorway | Stall on `AskUserQuestion` | `AskUserQuestion` returns empty answers with no TTY, so a headless gate would silently proceed on nothing. A durable issue survives and the doorway resumes the session. | GitHub `is:blocked` makes the queue queryable. |
-| Form selection | Claude picks per finding | Always capture, you escalate. Capture or PR only. | Your choice. Routes by confidence and blast radius: safe fix to PR, decision to issue, FYI to capture. | PR auto-open guardrail is an open question below. |
-| FYI sink | Things via `things:inbox` | GitHub issue for everything | Things has no dependency primitive, which is fine for leaves. Reuses session attribution and the clickable URL. | Durable or blocking work climbs to GitHub or Linear. |
-| Durable blocking sink | GitHub Issues (`blocked_by`), Linear (`blocks`) | Things, Claude native graph | Only these two persist a queryable dependency outside the session and emit webhooks. | GitHub `gh` CLI lacks native flags, so script the REST or GraphQL API. |
+| Blocking model | Native task-graph edge (`addBlockedBy`) | A custom blocking tag on Things items | The edge encodes the semantics with no parallel state. Resolving the blocker makes the downstream task actionable. | Requires v2.1.142+. Flat `TodoWrite` fallback on older versions. |
+| Router home | User-level skill under `user/skills` | `claude-code` plugin skill, standalone plugin | Orchestrates your personal Things, teleport, GitHub, and Linear, like `improve-claude-code`. Not meant to be shared. | Mirrors your existing meta-workflows. |
+| Blocking triggers | Stuck plus high-stakes | Stuck only, or ask on any meaningful decision | Keeps interrupts rare and high-signal while gating irreversible-ish actions. | Gated set below. Deletes and money left out for now, revisit. |
+| High-stakes set | Deploys and releases, external sends, force-push, prod migrations | Add deletes, money | Your selection. Force-push and prod migrations gated by default. | Deletes and money flagged as a deliberate non-gate. |
+| Blocking transport | `AskUserQuestion` plus push | Two-way Channel, bare push | Your choice. No new infrastructure, push lands on web and mobile. | Unsafe in headless, Skill, and SDK contexts. Fallback below. |
+| Headless fallback | Durable blocking issue plus teleport doorway | Stall on `AskUserQuestion` | `AskUserQuestion` returns empty answers with no TTY, so a headless gate would proceed on nothing. | `is:blocked` makes the queue queryable. |
+| Gate interaction | Approve, deny, or edit first, with the diff or command shown | Open question, notify with cancel window | Fast to act on from your phone, and a person other than the actor decides. | Decision (stuck) cases still ask an open question. |
+| Form selection | Claude picks per finding | Always capture, capture-or-PR-only | Routes by confidence and blast radius. | Safe-PR bar below. |
+| Safe-PR bar | Tests pass, in scope, lint clean | Add reversible or no-migration | A draft is reversible by closing, so the migration condition was redundant. | All three required to auto-open. |
+| PR autonomy | Auto-open draft, notify | Whitelist only, always confirm | Maximizes autonomy, the draft state is the safety net. | Notify through a capture in your review pass. |
+| Durable sink | Linear for work, GitHub for personal | Always one tracker | Matches where you already triage: Linear for the day job, GitHub for personal repos. | Inferred from the git remote, ask when unsure. |
+| Attention surface | Things and GitHub for personal, Linear for work | Single Things pane, native per system | Each dispatch lands where you already look, no cross-posting. | Work items do not echo into Things. |
+| Existing lanes | Generalize, reuse markers | Keep separate, fold later | Dispatch is the umbrella, `improve-claude-code` and `agent-ideas` keep draining config findings unchanged. | Reuses `Session` and fingerprint markers. |
+| Trigger scope | Reactive plus light proactive | Reactive only, proactive scanning | Catches obvious adjacent bugs without hunting or burning tokens. | No scanning beyond the task. |
 
 ### Durability ladder
 
@@ -104,21 +178,17 @@ Real dependencies, but ephemeral and session-scoped. Drives Claude's internal cl
 
 #### GitHub or Linear
 
-Durable, queryable dependencies with webhooks. The destination when a block must survive the session or coordinate work across systems.
-
-Blocking work that must survive climbs to GitHub or Linear. Blocking work answerable now stays in-session on `AskUserQuestion` plus push. FYI stays in Things.
+Durable, queryable dependencies with webhooks. The destination when a block must survive the session.
 
 ## Implementation
 
 ### Dispatch router
 
-A thin `dispatch` skill that classifies a finding and routes it. It owns no storage. It reads the native task graph to decide blocking versus non-blocking, applies the form heuristic, and calls existing skills as actuators. Keeping it a router avoids a parallel task store and reuses the markers and conventions already in place.
-
-Candidate home: a skill inside the `claude-code` plugin, or a small standalone `dispatch` plugin if it grows actuator-specific code. Resolve during the planning interview (see open questions).
+A user-level skill under `user/skills`, alongside `improve-claude-code` and `agent-ideas`. It owns no storage. It classifies a finding, applies the form heuristic, and calls existing skills as actuators. Keeping it a router avoids a parallel task store and reuses the markers and conventions already in place.
 
 ### Classification from the native graph
 
-Gate the integration on Claude Code v2.1.142+. When present, Claude models a blocking finding by creating the finding task and linking the downstream resume task with `addBlockedBy`. The router treats any node with a dependent resume task as blocking. On older versions, fall back to a flat list and an explicit blocking marker, with reduced fidelity.
+Gate the integration on Claude Code v2.1.142+. When present, Claude models a stuck finding by creating the finding task and linking the downstream resume task with `addBlockedBy`. The router treats any node with a dependent resume task as blocking, and adds the high-stakes action check on top. On older versions, fall back to a flat list and an explicit blocking marker.
 
 ### Form actuators
 
@@ -126,7 +196,7 @@ Reuse existing skills rather than reimplementing delivery.
 
 #### Ready fix
 
-`pull-request:create` opens the PR. Follow the Copilot model: a draft PR is a reviewable proposal, not merged work.
+`pull-request:create` opens the draft once the safe-PR bar passes. Follow the draft-as-proposal model.
 
 #### Durable issue
 
@@ -134,44 +204,43 @@ For GitHub, create the issue through the `github` MCP server, then set the depen
 
 #### FYI capture
 
-`things:inbox` with the `Session: <uuid>` marker, consistent with `improve-claude-code` and `agent-ideas`.
+`things:inbox` with the `Session: <uuid>` marker, tagged `claude-code` for config findings or plain `Claude` otherwise.
 
 ### Blocking gate transport
 
-Call `AskUserQuestion` only when a human is reachable interactively. Detect the headless case and take the fallback path: a durable `blocked_by` issue plus a teleport doorway in the issue body. This protects against the documented empty-answer behavior of `AskUserQuestion` in headless, Skill, and SDK contexts (claude-code [#29547](https://github.com/anthropics/claude-code/issues/29547), [#29733](https://github.com/anthropics/claude-code/issues/29733)).
+Call `AskUserQuestion` only when a human is reachable interactively. For a high-stakes gate, present the diff or command with approve, deny, and edit-first options. For a stuck decision, ask the question. Detect the headless case and divert to the durable issue plus teleport doorway, which protects against the documented empty-answer behavior of `AskUserQuestion` in headless, Skill, and SDK contexts (claude-code [#29547](https://github.com/anthropics/claude-code/issues/29547), [#29733](https://github.com/anthropics/claude-code/issues/29733)).
 
-### Traceback and dedup
+### Relationship to existing lanes
 
-Carry the existing markers so dispatched items trace back and deduplicate the same way the current backlog does. `Session: <uuid>` links to the originating session for `claude-code:session` reconstruction. A fingerprint marker, as in `improve-claude-code`, suppresses re-filing the same finding.
+Dispatch generalizes the capture pattern that `improve-claude-code` and `agent-ideas` already use. It reuses their `Session: <uuid>` and fingerprint markers, so those workflows keep draining `claude-code`-tagged config findings without change. Dispatch adds the blocking and PR forms on top.
 
 ### Curation
 
-Per the repository curation rule, define removal up front. This feature earns its cost if dispatched blocking items get answered faster than the old single-lane captures, and if Claude-opened PRs land without rework. It is not earning its cost if blocking dispatches pile up unanswered, or if the form heuristic routinely picks the wrong artifact and you correct it. Both signals surface in the Things backlog and the PR review queue. Revisit after the first batch of real dispatches.
+Per the repository curation rule, define removal up front. This earns its cost if blocking dispatches get answered faster than the old single-lane captures, and if Claude-opened drafts land without rework. It is not earning its cost if blocking items pile up unanswered, or if the form heuristic routinely misroutes and you correct it. Both signals surface in the Things backlog and the PR review queue. Revisit after the first batch of real dispatches.
 
 ## Milestones
 
 #### Form heuristic and FYI lane
 
-Classify findings and route non-blocking ones. Safe fixes to draft PRs through `pull-request:create`, everything else to `things:inbox`. Delivers "Claude picks the form" with no new infrastructure.
+Classify findings and route non-blocking ones. Safe fixes to draft PRs, everything else to `things:inbox` by domain tag. Delivers Claude picking the form with no new infrastructure.
 
 #### Blocking gate
 
-Add the blocking path through `AskUserQuestion` plus push, with the headless guard that diverts to the fallback rather than stalling.
+Add the blocking path through `AskUserQuestion` plus push, covering both the stuck decision and the high-stakes approve, deny, or edit gate, with the headless guard that diverts to the fallback.
 
 #### Durable blocking
 
-Project blocking findings that must survive as `blocked_by` issues on GitHub, then Linear. Attach teleport doorways. Makes the blocking queue queryable through `is:blocked`.
+Project blocking findings that must survive as `blocked_by` issues, Linear for work and GitHub for personal, routed by remote. Attach teleport doorways.
 
 #### Native graph as spine
 
-Drive classification from the native task graph rather than heuristics, using `addBlockedBy` edges. Gate on version with a flat-list fallback.
+Drive classification from the native task graph using `addBlockedBy` edges. Gate on version with a flat-list fallback.
 
 ## Open questions
 
-1. **Router home.** A skill in the `claude-code` plugin, or a standalone `dispatch` plugin?
-2. **PR auto-open.** Should the form heuristic ever open a PR without asking, given the preference for autonomy, or always confirm before the PR form?
-3. **GitHub versus Linear default** for durable blocking when both are viable for a finding.
-4. **Marker reuse.** Adopt the `improve-claude-code` fingerprint scheme directly, or define a dispatch-specific marker?
+1. **Deletes and money gating.** Left out of the high-stakes set for now. Confirm after living with it whether destructive deletes or payment actions should join.
+2. **Light-proactive boundary.** What counts as an obvious adjacent problem worth flagging versus scope creep, in concrete terms.
+3. **Work remote list.** The specific org or host that marks a remote as the day job, for the Linear routing.
 
 ## References
 

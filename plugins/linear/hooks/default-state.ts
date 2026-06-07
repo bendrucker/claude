@@ -4,6 +4,7 @@ import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/clau
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export type CreateIssueInput = {
+  id?: string;
   title?: string;
   team?: string;
   state?: string;
@@ -15,17 +16,21 @@ export function getDefaultState(assignee: string | undefined): string {
 }
 
 export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { state, assignee } = input.tool_input as CreateIssueInput;
+  const { id, state, assignee } = input.tool_input as CreateIssueInput;
 
-  // Only modify if state is not set
-  if (state) {
+  // An id means this is an update (claude.ai save_issue handles both);
+  // never inject a default state into updates.
+  if (id || state) {
     return null;
   }
   const defaultState = getDefaultState(assignee);
 
+  // updatedInput is only honored alongside permissionDecision: "allow";
+  // without it the harness ignores the modification entirely.
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
+      permissionDecision: "allow",
       updatedInput: {
         state: defaultState,
       },

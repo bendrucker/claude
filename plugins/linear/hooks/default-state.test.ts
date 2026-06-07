@@ -37,6 +37,7 @@ describe("processInput", () => {
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
+        permissionDecision: "allow",
         updatedInput: {
           state: "Backlog",
         },
@@ -49,6 +50,7 @@ describe("processInput", () => {
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
+        permissionDecision: "allow",
         updatedInput: {
           state: "Todo",
         },
@@ -61,6 +63,7 @@ describe("processInput", () => {
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
+        permissionDecision: "allow",
         updatedInput: {
           state: "Backlog",
         },
@@ -87,6 +90,13 @@ describe("processInput", () => {
     expect(output).toBeNull();
   });
 
+  it("does not modify updates (input has an issue id)", () => {
+    const output = processInput(
+      mockInput({ id: "abc-123", title: "Renamed issue" }, "mcp__claude_ai_Linear__save_issue"),
+    );
+    expect(output).toBeNull();
+  });
+
   it("works with Claude AI MCP tool name pattern", () => {
     const output = processInput(
       mockInput({ title: "Test issue", team: "ENG" }, "mcp__claude_ai_Linear__save_issue"),
@@ -94,6 +104,7 @@ describe("processInput", () => {
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
+        permissionDecision: "allow",
         updatedInput: {
           state: "Backlog",
         },
@@ -108,6 +119,7 @@ describe("processInput", () => {
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
+        permissionDecision: "allow",
         updatedInput: {
           state: "Backlog",
         },

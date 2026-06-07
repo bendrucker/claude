@@ -133,19 +133,19 @@ describe("ensure.ts", () => {
       expect(await hasNewline(filePath)).toBe(true);
     });
 
-    it("preserves existing newline", async () => {
+    it("silently preserves existing newline", async () => {
       const filePath = join(testDir, "with_newline.txt");
       await Bun.write(filePath, "content\n");
       const message = await ensureTrailingNewline(filePath);
-      expect(message).toBe("File already has trailing newline");
+      expect(message).toBeNull();
       expect(await hasNewline(filePath)).toBe(true);
     });
 
-    it("skips empty files", async () => {
+    it("silently skips empty files", async () => {
       const filePath = join(testDir, "empty.txt");
       await Bun.write(filePath, "");
       const message = await ensureTrailingNewline(filePath);
-      expect(message).toBe("File is empty, skipping");
+      expect(message).toBeNull();
     });
 
     it("returns null for nonexistent file", async () => {
@@ -160,6 +160,20 @@ describe("ensure.ts", () => {
       const output = await ensureInput(mockPostToolInput(filePath));
       const hookOutput = output?.hookSpecificOutput as PostToolUseHookSpecificOutput | undefined;
       expect(hookOutput?.additionalContext).toContain("Added trailing newline");
+    });
+
+    it("returns null when file already has trailing newline", async () => {
+      const filePath = join(testDir, "with_newline.txt");
+      await Bun.write(filePath, "content\n");
+      const output = await ensureInput(mockPostToolInput(filePath));
+      expect(output).toBeNull();
+    });
+
+    it("returns null for empty file", async () => {
+      const filePath = join(testDir, "empty.txt");
+      await Bun.write(filePath, "");
+      const output = await ensureInput(mockPostToolInput(filePath));
+      expect(output).toBeNull();
     });
   });
 });

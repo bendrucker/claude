@@ -16,7 +16,8 @@ export function getDefaultState(assignee: string | undefined): string {
 }
 
 export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { id, state, assignee } = input.tool_input as CreateIssueInput;
+  const toolInput = input.tool_input as CreateIssueInput & Record<string, unknown>;
+  const { id, state, assignee } = toolInput;
 
   // An id means this is an update (claude.ai save_issue handles both);
   // never inject a default state into updates.
@@ -25,13 +26,17 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   }
   const defaultState = getDefaultState(assignee);
 
-  // updatedInput is only honored alongside permissionDecision: "allow";
-  // without it the harness ignores the modification entirely.
+  // updatedInput is honored with permissionDecision "allow" or "ask".
+  // "ask" would prompt on every matched create even when the tool is
+  // otherwise allowlisted, so auto-allow at the cost of the prompt.
+  // updatedInput replaces the entire input object, so echo back every
+  // original field alongside the injected state.
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "allow",
       updatedInput: {
+        ...toolInput,
         state: defaultState,
       },
     },

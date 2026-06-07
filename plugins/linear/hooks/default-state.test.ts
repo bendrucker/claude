@@ -39,6 +39,8 @@ describe("processInput", () => {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         updatedInput: {
+          title: "Test issue",
+          team: "ENG",
           state: "Backlog",
         },
       },
@@ -52,6 +54,9 @@ describe("processInput", () => {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         updatedInput: {
+          title: "Test issue",
+          team: "ENG",
+          assignee: "me",
           state: "Todo",
         },
       },
@@ -65,6 +70,9 @@ describe("processInput", () => {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         updatedInput: {
+          title: "Test issue",
+          team: "ENG",
+          assignee: "",
           state: "Backlog",
         },
       },
@@ -106,6 +114,8 @@ describe("processInput", () => {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         updatedInput: {
+          title: "Test issue",
+          team: "ENG",
           state: "Backlog",
         },
       },
@@ -121,6 +131,27 @@ describe("processInput", () => {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         updatedInput: {
+          title: "Test issue",
+          team: "ENG",
+          state: "Backlog",
+        },
+      },
+    });
+  });
+
+  it("preserves fields beyond the typed subset", () => {
+    const output = processInput(
+      mockInput({ title: "Test issue", team: "ENG", labels: ["bug"], priority: 2 }),
+    );
+    expect(output).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        updatedInput: {
+          title: "Test issue",
+          team: "ENG",
+          labels: ["bug"],
+          priority: 2,
           state: "Backlog",
         },
       },

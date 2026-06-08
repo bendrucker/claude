@@ -264,6 +264,19 @@ describe("namespace rules", () => {
       expect(result.passed).toBe(true);
     });
 
+    it("permits the entry-skill convention (plugin:plugin)", () => {
+      const content = parseSkill("---\nname: writing:writing\n---\n");
+      const result = single(namespaceStutter.check(content, pluginPath("writing")));
+      expect(result.passed).toBe(true);
+    });
+
+    it("warns on redundant-suffix stutter (plugin:plugin-foo)", () => {
+      const content = parseSkill("---\nname: writing:writing-analyze\n---\n");
+      const result = single(namespaceStutter.check(content, pluginPath("writing")));
+      expect(result.passed).toBe(false);
+      expect(result.severity).toBe("warn");
+    });
+
     it("passes when no prefix", () => {
       const content = parseSkill("---\nname: actions\n---\n");
       const result = single(namespaceStutter.check(content, pluginPath("github")));

@@ -77,6 +77,9 @@ export const namespaceStutter: Rule = {
     }
 
     const suffix = name.slice(colonIndex + 1);
+    // Exact `plugin:plugin` (suffix === plugin) is the intentional entry-skill
+    // convention and is permitted. Only the redundant-suffix form
+    // (`plugin:plugin-foo`) stutters, so the check requires a trailing hyphen.
     if (suffix.startsWith(`${plugin}-`)) {
       return {
         rule: "namespace-stutter",

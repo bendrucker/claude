@@ -578,15 +578,15 @@ describe("scan", () => {
 describe("firstByTier", () => {
   it("finds first deny match", () => {
     const matches: PatternMatch[] = [
-      { tier: "context", category: "test", matched: "x", message: "x" },
-      { tier: "deny", category: "test", matched: "y", message: "y" },
+      { tier: "context", category: "test", matched: "x", message: "x", structural: false },
+      { tier: "deny", category: "test", matched: "y", message: "y", structural: false },
     ];
     expect(firstByTier(matches, "deny")?.matched).toBe("y");
   });
 
   it("returns undefined when tier not found", () => {
     const matches: PatternMatch[] = [
-      { tier: "context", category: "test", matched: "x", message: "x" },
+      { tier: "context", category: "test", matched: "x", message: "x", structural: false },
     ];
     expect(firstByTier(matches, "deny")).toBeUndefined();
   });

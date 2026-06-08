@@ -1,6 +1,7 @@
 ---
 name: agent-ideas
 description: Harvest agent-tooling ideas from prominent developers.
+disable-model-invocation: true
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/fetch.ts:*)
   - Read

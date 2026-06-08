@@ -8,6 +8,13 @@ import UrlPattern from "url-pattern";
 const DEFAULT_INTERVAL_SECONDS = 180;
 const NO_HISTORY_INTERVAL_SECONDS = 30;
 
+// GitLab computes mergeability asynchronously: `has_conflicts` is only valid
+// once `merge_status` settles. While `unchecked`/`checking`, conflicts read as
+// false. Re-querying the MR drives that computation, so the watcher re-polls a
+// bounded number of times before deciding the platform is undecided.
+const MERGE_STATUS_UNKNOWN_RETRIES = 4;
+const MERGE_STATUS_RECHECK_SECONDS = 5;
+
 export type StatusState = "running" | "failing" | "success";
 export type InternalState = StatusState | "queued";
 export type MrState = "opened" | "closed" | "merged" | "locked";
@@ -17,17 +24,43 @@ export type Probe = {
   state: InternalState;
   runId: string | null;
   hasConflicts: boolean;
+  mergeStatus: string;
+  detailedMergeStatus: string;
   mrState: MrState;
 };
 
 export type Event =
   | { type: "status"; state: StatusState; sha: string; run_id: string | null }
   | { type: "conflicts"; sha: string }
+  | { type: "mergeable-unknown"; sha: string }
   | { type: "queued-timeout"; minutes: number }
   | { type: "api-error"; consecutive: number }
   | { type: "rate-limited"; retry_after: string }
   | { type: "pr-closed" }
+  | { type: "merged" }
   | { type: "max-time-reached"; minutes: number };
+
+// `has_conflicts` is GitLab's authoritative conflict flag; `detailed_merge_status`
+// reads "conflict" for the same condition and can lead the flag, so checking both
+// is belt-and-suspenders. Mergeability is undetermined while merge status is still
+// being computed (`unchecked`/`checking`/`preparing`).
+function isUndeterminedMergeStatus(mergeStatus: string, detailedMergeStatus: string): boolean {
+  return (
+    mergeStatus === "unchecked" ||
+    mergeStatus === "checking" ||
+    detailedMergeStatus === "checking" ||
+    detailedMergeStatus === "unchecked" ||
+    detailedMergeStatus === "preparing"
+  );
+}
+
+export function probeIsConflict(probe: Probe): boolean {
+  return probe.hasConflicts || probe.detailedMergeStatus === "conflict";
+}
+
+export function probeIsUndetermined(probe: Probe): boolean {
+  return isUndeterminedMergeStatus(probe.mergeStatus, probe.detailedMergeStatus);
+}
 
 export type WatcherState = {
   lastSha: string | null;
@@ -37,6 +70,7 @@ export type WatcherState = {
   apiErrorCount: number;
   apiErrorEmittedAt: number | null;
   emittedConflictsForSha: string | null;
+  mergeableUnknownEmittedForSha: string | null;
 };
 
 export function initialState(): WatcherState {
@@ -48,6 +82,7 @@ export function initialState(): WatcherState {
     apiErrorCount: 0,
     apiErrorEmittedAt: null,
     emittedConflictsForSha: null,
+    mergeableUnknownEmittedForSha: null,
   };
 }
 
@@ -75,7 +110,7 @@ export function deriveEvents(
       });
       next = { ...next, lastSha: probe.sha, lastState: "success" };
     }
-    events.push({ type: "pr-closed" });
+    events.push(probe.mrState === "merged" ? { type: "merged" } : { type: "pr-closed" });
     return { events, state: next };
   }
 
@@ -97,9 +132,14 @@ export function deriveEvents(
     };
   }
 
-  if (probe.hasConflicts && next.emittedConflictsForSha !== probe.sha) {
-    events.push({ type: "conflicts", sha: probe.sha });
-    next = { ...next, emittedConflictsForSha: probe.sha };
+  if (probeIsConflict(probe)) {
+    if (next.emittedConflictsForSha !== probe.sha) {
+      events.push({ type: "conflicts", sha: probe.sha });
+      next = { ...next, emittedConflictsForSha: probe.sha };
+    }
+  } else if (probeIsUndetermined(probe) && next.mergeableUnknownEmittedForSha !== probe.sha) {
+    events.push({ type: "mergeable-unknown", sha: probe.sha });
+    next = { ...next, mergeableUnknownEmittedForSha: probe.sha };
   }
 
   if (probe.state === "queued") {
@@ -231,9 +271,11 @@ const execOptions: ExecSyncOptions = {
   stdio: ["pipe", "pipe", "pipe"],
 };
 
-type ExecResult =
+export type ExecResult =
   | { ok: true; stdout: string }
   | { ok: false; stderr: string; rateLimited: boolean; retryAfter: string };
+
+export type ExecFn = (command: string) => ExecResult;
 
 function exec(command: string): ExecResult {
   try {
@@ -267,6 +309,8 @@ type MrMetadata = {
   sha: string;
   sourceBranch: string;
   hasConflicts: boolean;
+  mergeStatus: string;
+  detailedMergeStatus: string;
   state: MrState;
 };
 
@@ -274,8 +318,12 @@ type MrMetadataResult =
   | { ok: true; metadata: MrMetadata }
   | { ok: false; rateLimited: boolean; retryAfter: string };
 
-function fetchMrMetadata(projectEncoded: string, iid: number): MrMetadataResult {
-  const result = exec(`glab api projects/${projectEncoded}/merge_requests/${iid}`);
+function fetchMrMetadata(
+  projectEncoded: string,
+  iid: number,
+  run: ExecFn = exec,
+): MrMetadataResult {
+  const result = run(`glab api projects/${projectEncoded}/merge_requests/${iid}`);
   if (!result.ok) {
     return { ok: false, rateLimited: result.rateLimited, retryAfter: result.retryAfter };
   }
@@ -284,10 +332,13 @@ function fetchMrMetadata(projectEncoded: string, iid: number): MrMetadataResult 
     const sha = typeof parsed.sha === "string" ? parsed.sha : "";
     const sourceBranch = typeof parsed.source_branch === "string" ? parsed.source_branch : "";
     const hasConflicts = parsed.has_conflicts === true;
+    const mergeStatus = typeof parsed.merge_status === "string" ? parsed.merge_status : "";
+    const detailedMergeStatus =
+      typeof parsed.detailed_merge_status === "string" ? parsed.detailed_merge_status : "";
     const state = (typeof parsed.state === "string" ? parsed.state : "opened") as MrState;
     return {
       ok: true,
-      metadata: { sha, sourceBranch, hasConflicts, state },
+      metadata: { sha, sourceBranch, hasConflicts, mergeStatus, detailedMergeStatus, state },
     };
   } catch (err) {
     console.error(
@@ -295,6 +346,47 @@ function fetchMrMetadata(projectEncoded: string, iid: number): MrMetadataResult 
     );
     return { ok: false, rateLimited: false, retryAfter: "" };
   }
+}
+
+export type MergeStatus = {
+  hasConflicts: boolean;
+  mergeStatus: string;
+  detailedMergeStatus: string;
+};
+
+// Re-poll the MR until GitLab settles its merge status or the retry budget runs
+// out. The act of querying nudges GitLab's background computation, so repeated
+// reads converge to a definite value. Returns the last value seen; still
+// undetermined after the cap means the caller should fall back to a local merge
+// dry-run.
+export async function resolveMergeStatus(
+  projectEncoded: string,
+  iid: number,
+  run: ExecFn = exec,
+  sleepFn: (ms: number) => Promise<void> = sleep,
+): Promise<MergeStatus> {
+  let current: MergeStatus = {
+    hasConflicts: false,
+    mergeStatus: "unchecked",
+    detailedMergeStatus: "",
+  };
+  for (let attempt = 0; attempt < MERGE_STATUS_UNKNOWN_RETRIES; attempt += 1) {
+    const result = fetchMrMetadata(projectEncoded, iid, run);
+    if (result.ok) {
+      current = {
+        hasConflicts: result.metadata.hasConflicts,
+        mergeStatus: result.metadata.mergeStatus,
+        detailedMergeStatus: result.metadata.detailedMergeStatus,
+      };
+      if (!isUndeterminedMergeStatus(current.mergeStatus, current.detailedMergeStatus)) {
+        return current;
+      }
+    }
+    if (attempt < MERGE_STATUS_UNKNOWN_RETRIES - 1) {
+      await sleepFn(MERGE_STATUS_RECHECK_SECONDS * 1000);
+    }
+  }
+  return current;
 }
 
 type PipelineSummary = { id: string; status: InternalState; sha: string } | null;
@@ -365,6 +457,8 @@ function probeMr(projectEncoded: string, iid: number, cachedBranch: string | nul
       state: pipelineState,
       runId,
       hasConflicts: mr.metadata.hasConflicts,
+      mergeStatus: mr.metadata.mergeStatus,
+      detailedMergeStatus: mr.metadata.detailedMergeStatus,
       mrState: mr.metadata.state,
     },
   };
@@ -429,6 +523,8 @@ function probePipelineId(projectEncoded: string, pipelineId: string): ProbedById
       state: pipeline.pipeline.status,
       runId: pipeline.pipeline.id,
       hasConflicts: false,
+      mergeStatus: "",
+      detailedMergeStatus: "",
       mrState: "opened",
     },
   };
@@ -448,6 +544,8 @@ function probeBranch(projectEncoded: string, branch: string): Probed {
       state: p?.status ?? "running",
       runId: p?.id ?? null,
       hasConflicts: false,
+      mergeStatus: "",
+      detailedMergeStatus: "",
       mrState: "opened",
     },
   };
@@ -513,6 +611,7 @@ function isTerminal(events: Event[], mode: RunTarget["mode"]): boolean {
   return events.some(
     (e) =>
       e.type === "pr-closed" ||
+      e.type === "merged" ||
       (e.type === "status" && e.state === "success") ||
       (mode === "pipeline-id" && e.type === "status" && e.state === "failing"),
   );
@@ -587,7 +686,19 @@ async function run(options: RunOptions): Promise<void> {
     } else {
       state = clearApiErrors(state);
       if (result.sourceBranch) branch = result.sourceBranch;
-      const outcome = deriveEvents(result.probe, state, now, options.queuedTimeoutMinutes);
+      // Settle merge status before deriving events so `conflicts` lands in the
+      // same cycle as a stale `success`, ahead of the terminal return below.
+      let probe = result.probe;
+      if (target.mode === "mr" && iid !== null && probeIsUndetermined(probe)) {
+        const resolved = await resolveMergeStatus(projectEncoded, iid, exec, sleep);
+        probe = {
+          ...probe,
+          hasConflicts: resolved.hasConflicts,
+          mergeStatus: resolved.mergeStatus,
+          detailedMergeStatus: resolved.detailedMergeStatus,
+        };
+      }
+      const outcome = deriveEvents(probe, state, now, options.queuedTimeoutMinutes);
       state = outcome.state;
       for (const event of outcome.events) emit(event);
       if (isTerminal(outcome.events, target.mode)) return;

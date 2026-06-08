@@ -77,6 +77,16 @@
             "timeout": 86400
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "async": false,
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
+            "timeout": 300,
+            "type": "command"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -88,6 +98,26 @@
             "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "async": true,
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
+            "type": "command"
+          }
+        ],
+        "matcher": "AskUserQuestion"
+      },
+      {
+        "hooks": [
+          {
+            "async": true,
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
+            "type": "command"
+          }
+        ],
+        "matcher": "ExitPlanMode"
       }
     ],
     "PreCompact": [
@@ -148,6 +178,15 @@
             "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "async": true,
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
+            "type": "command"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -156,6 +195,15 @@
           {
             "type": "command",
             "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "async": true,
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
+            "type": "command"
           }
         ]
       }
@@ -188,6 +236,15 @@
             "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "async": true,
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
+            "type": "command"
+          }
+        ]
       }
     ]
   },
@@ -206,7 +263,6 @@
     "pull-request@bendrucker": true,
     "interview@bendrucker": true,
     "github@claude-plugins-official": true,
-    "astral@astral-sh": true,
     "personal-review@bendrucker": true,
     "x-callback-url@bendrucker": true,
     "calendar@bendrucker": true,
@@ -273,7 +329,7 @@
       "source": {
         "source": "github",
         "repo": "vercel-labs/agent-browser",
-        "ref": "v0.27.0"
+        "ref": "v0.27.1"
       }
     }
   },
@@ -284,14 +340,14 @@
       "allowLocalBinding": true,
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
-        "~/.tmux"
+        "~/.tmux",
+        "/tmp/claude"
       ]
     },
     "filesystem": {
       "allowWrite": [
         "/tmp",
         "~/.tmux",
-        ".claude/worktrees",
         "~/.terraform.d/plugin-cache",
         "~/.cache",
         "~/Library/Caches/go-build",

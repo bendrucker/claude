@@ -1,6 +1,6 @@
 ---
 name: cleye
-description: Type-safe CLI argument parsing with cleye. Use when writing CLI scripts, adding flags or parameters to Bun scripts, or parsing command-line arguments.
+description: Type-safe CLI argument parsing with cleye, the standard parser for this repo's Bun scripts. Use when writing or editing any script that takes arguments (flags, positional parameters, subcommands, --help) instead of reading existing scripts for the pattern.
 ---
 
 # cleye
@@ -75,27 +75,50 @@ flags: {
 
 Kebab-case flags (`--dry-run`) become camelCase properties (`argv.flags.dryRun`).
 
+## Help Text
+
+Set `help.description` on `cli()` for a summary line above the generated usage block:
+
+```ts
+const argv = cli({
+  name: "scan",
+  parameters: ["<path>"],
+  help: {
+    description: "Scan repository prose for AI writing tropes.",
+  },
+  flags: { ... },
+});
+```
+
 ## Subcommands
 
-Pass to `cli()` via the `commands` array using the `command()` helper:
+Define each subcommand as a named `command()` const with its callback, pass them via the `commands` array, and give the root `cli()` a callback that shows help when no subcommand matches:
 
 ```ts
 import { cli, command } from "cleye";
 
-const argv = cli({
-  name: "tool",
-  commands: [
-    command({ name: "build", flags: { watch: Boolean } }, (argv) => {
-      console.log(argv.flags.watch);
-    }),
-  ],
-});
-```
+const replyCmd = command(
+  {
+    name: "reply",
+    parameters: ["<thread-id>"],
+    flags: {
+      body: { type: String, description: "Reply text" },
+    },
+  },
+  async (parsed) => {
+    console.log(parsed._.threadId, parsed.flags.body);
+  },
+);
 
-For manual dispatch (used in this codebase), pass `args` as the third argument:
-
-```ts
-const argv = cli({ name: "errors", flags: { ... } }, undefined, args);
+cli(
+  {
+    name: "review-threads",
+    commands: [replyCmd],
+  },
+  (parsed) => {
+    parsed.showHelp();
+  },
+);
 ```
 
 ## Conventions

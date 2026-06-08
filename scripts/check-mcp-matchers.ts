@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { enabledPluginNames, loadPlugins } from "@bendrucker/claude-marketplace";
+import { enabledPluginNames, loadPlugins } from "../packages/marketplace/index";
 
 const MCP_PATTERN = /^mcp__(?!plugin_)(?!claude_ai_)(\w+)__(.+)$/;
 

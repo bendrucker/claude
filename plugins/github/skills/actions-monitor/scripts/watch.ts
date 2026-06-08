@@ -8,25 +8,56 @@ import UrlPattern from "url-pattern";
 const DEFAULT_INTERVAL_SECONDS = 180;
 const NO_HISTORY_INTERVAL_SECONDS = 30;
 
+// GitHub computes mergeability asynchronously: right after the base branch
+// advances, `mergeable`/`mergeStateStatus` read UNKNOWN until a background job
+// settles. Re-querying drives that computation, so the watcher re-polls a
+// bounded number of times before deciding the platform is undecided.
+const MERGEABLE_UNKNOWN_RETRIES = 4;
+const MERGEABLE_RECHECK_SECONDS = 5;
+
 export type StatusState = "running" | "failing" | "success";
 export type InternalState = StatusState | "queued";
+
+export type MergeStateStatus =
+  | "BEHIND"
+  | "BLOCKED"
+  | "CLEAN"
+  | "DIRTY"
+  | "DRAFT"
+  | "HAS_HOOKS"
+  | "UNKNOWN"
+  | "UNSTABLE";
 
 export type Probe = {
   sha: string;
   state: InternalState;
   runId: string | null;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+  mergeStateStatus: MergeStateStatus;
   prState: "OPEN" | "CLOSED" | "MERGED";
 };
 
 export type Event =
   | { type: "status"; state: StatusState; sha: string; run_id: string | null }
   | { type: "conflicts"; sha: string }
+  | { type: "mergeable-unknown"; sha: string }
   | { type: "queued-timeout"; minutes: number }
   | { type: "api-error"; consecutive: number }
   | { type: "rate-limited"; retry_after: string }
   | { type: "pr-closed" }
+  | { type: "merged" }
   | { type: "max-time-reached"; minutes: number };
+
+// A conflict is definite when either signal says so; mergeability is
+// undetermined while either signal is UNKNOWN. The two probes are
+// belt-and-suspenders: `mergeable` and `mergeStateStatus` can lag each other.
+export function probeIsConflict(probe: Probe): boolean {
+  return probe.mergeable === "CONFLICTING" || probe.mergeStateStatus === "DIRTY";
+}
+
+export function probeIsUndetermined(probe: Probe): boolean {
+  return probe.mergeable === "UNKNOWN" || probe.mergeStateStatus === "UNKNOWN";
+}
 
 export type WatcherState = {
   lastSha: string | null;
@@ -36,6 +67,7 @@ export type WatcherState = {
   apiErrorCount: number;
   apiErrorEmittedAt: number | null;
   emittedConflictsForSha: string | null;
+  mergeableUnknownEmittedForSha: string | null;
 };
 
 export function initialState(): WatcherState {
@@ -47,6 +79,7 @@ export function initialState(): WatcherState {
     apiErrorCount: 0,
     apiErrorEmittedAt: null,
     emittedConflictsForSha: null,
+    mergeableUnknownEmittedForSha: null,
   };
 }
 
@@ -74,7 +107,7 @@ export function deriveEvents(
       });
       next = { ...next, lastSha: probe.sha, lastState: "success" };
     }
-    events.push({ type: "pr-closed" });
+    events.push(probe.prState === "MERGED" ? { type: "merged" } : { type: "pr-closed" });
     return { events, state: next };
   }
 
@@ -96,9 +129,14 @@ export function deriveEvents(
     };
   }
 
-  if (probe.mergeable === "CONFLICTING" && next.emittedConflictsForSha !== probe.sha) {
-    events.push({ type: "conflicts", sha: probe.sha });
-    next = { ...next, emittedConflictsForSha: probe.sha };
+  if (probeIsConflict(probe)) {
+    if (next.emittedConflictsForSha !== probe.sha) {
+      events.push({ type: "conflicts", sha: probe.sha });
+      next = { ...next, emittedConflictsForSha: probe.sha };
+    }
+  } else if (probeIsUndetermined(probe) && next.mergeableUnknownEmittedForSha !== probe.sha) {
+    events.push({ type: "mergeable-unknown", sha: probe.sha });
+    next = { ...next, mergeableUnknownEmittedForSha: probe.sha };
   }
 
   if (probe.state === "queued") {
@@ -237,6 +275,59 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export type Mergeability = {
+  mergeable: Probe["mergeable"];
+  mergeStateStatus: MergeStateStatus;
+};
+
+function parseMergeability(stdout: string): Mergeability | null {
+  try {
+    const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    const mergeable =
+      typeof parsed.mergeable === "string" && parsed.mergeable
+        ? (parsed.mergeable as Probe["mergeable"])
+        : "UNKNOWN";
+    const mergeStateStatus =
+      typeof parsed.mergeStateStatus === "string" && parsed.mergeStateStatus
+        ? (parsed.mergeStateStatus as MergeStateStatus)
+        : "UNKNOWN";
+    return { mergeable, mergeStateStatus };
+  } catch {
+    return null;
+  }
+}
+
+function mergeabilityUndetermined(m: Mergeability): boolean {
+  return m.mergeable === "UNKNOWN" || m.mergeStateStatus === "UNKNOWN";
+}
+
+// Re-poll mergeability until GitHub settles it or the retry budget runs out.
+// The act of querying `gh pr view --json mergeable,mergeStateStatus` nudges
+// GitHub's background computation, so repeated reads converge to a definite
+// value. Returns the last value seen; still-undetermined after the cap means
+// the caller should fall back to a local merge dry-run.
+export async function resolveMergeable(
+  prNumber: number,
+  run: ExecFn = exec,
+  sleepFn: (ms: number) => Promise<void> = sleep,
+): Promise<Mergeability> {
+  let current: Mergeability = { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" };
+  for (let attempt = 0; attempt < MERGEABLE_UNKNOWN_RETRIES; attempt += 1) {
+    const result = run(`gh pr view ${prNumber} --json mergeable,mergeStateStatus`);
+    if (result.ok) {
+      const parsed = parseMergeability(result.stdout);
+      if (parsed) {
+        current = parsed;
+        if (!mergeabilityUndetermined(current)) return current;
+      }
+    }
+    if (attempt < MERGEABLE_UNKNOWN_RETRIES - 1) {
+      await sleepFn(MERGEABLE_RECHECK_SECONDS * 1000);
+    }
+  }
+  return current;
+}
+
 // `gh pr checks --json` exposes a unified `state` (status when in-flight,
 // conclusion when complete) and a normalized `bucket` ("pass" | "fail" |
 // "cancel" | "pending" | "skipping"). It does NOT expose `conclusion`. Use
@@ -288,7 +379,9 @@ export type Probed =
   | { kind: "not-found"; stderr: string };
 
 export function probePr(prNumber: number, run: ExecFn = exec): Probed {
-  const prResult = run(`gh pr view ${prNumber} --json headRefOid,headRefName,state,mergeable`);
+  const prResult = run(
+    `gh pr view ${prNumber} --json headRefOid,headRefName,state,mergeable,mergeStateStatus`,
+  );
   if (!prResult.ok) {
     return {
       kind: "error",
@@ -301,6 +394,7 @@ export function probePr(prNumber: number, run: ExecFn = exec): Probed {
   let branch = "";
   let prState: Probe["prState"] = "OPEN";
   let mergeable: Probe["mergeable"] = "UNKNOWN";
+  let mergeStateStatus: MergeStateStatus = "UNKNOWN";
   try {
     const parsed = JSON.parse(prResult.stdout) as Record<string, unknown>;
     if (typeof parsed.headRefOid === "string") sha = parsed.headRefOid;
@@ -308,6 +402,9 @@ export function probePr(prNumber: number, run: ExecFn = exec): Probed {
     if (typeof parsed.state === "string") prState = parsed.state as Probe["prState"];
     if (typeof parsed.mergeable === "string" && parsed.mergeable) {
       mergeable = parsed.mergeable as Probe["mergeable"];
+    }
+    if (typeof parsed.mergeStateStatus === "string" && parsed.mergeStateStatus) {
+      mergeStateStatus = parsed.mergeStateStatus as MergeStateStatus;
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -360,7 +457,7 @@ export function probePr(prNumber: number, run: ExecFn = exec): Probed {
   return {
     kind: "ok",
     branch,
-    probe: { sha, state, runId, mergeable, prState },
+    probe: { sha, state, runId, mergeable, mergeStateStatus, prState },
   };
 }
 
@@ -380,6 +477,7 @@ function buildRunProbe(run: Record<string, unknown>, fallbackRunId: string | nul
     state: deriveRunListState({ status, conclusion }),
     runId,
     mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
     prState: "OPEN",
   };
 }
@@ -570,7 +668,18 @@ async function run(options: RunOptions): Promise<void> {
     } else {
       state = clearApiErrors(state);
       if (result.branch) branch = result.branch;
-      const outcome = deriveEvents(result.probe, state, now, options.queuedTimeoutMinutes);
+      // Settle mergeability before deriving events so `conflicts` lands in the
+      // same cycle as a stale `success`, ahead of the terminal return below.
+      let probe = result.probe;
+      if (options.mode === "pr" && prNumber !== null && probeIsUndetermined(probe)) {
+        const resolved = await resolveMergeable(prNumber, exec, sleep);
+        probe = {
+          ...probe,
+          mergeable: resolved.mergeable,
+          mergeStateStatus: resolved.mergeStateStatus,
+        };
+      }
+      const outcome = deriveEvents(probe, state, now, options.queuedTimeoutMinutes);
       state = outcome.state;
       for (const event of outcome.events) emit(event);
 
@@ -581,6 +690,7 @@ async function run(options: RunOptions): Promise<void> {
       const terminal = outcome.events.find(
         (e) =>
           e.type === "pr-closed" ||
+          e.type === "merged" ||
           (e.type === "status" && e.state === "success") ||
           (options.mode === "run-id" && e.type === "status" && e.state === "failing"),
       );

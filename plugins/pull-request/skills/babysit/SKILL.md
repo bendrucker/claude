@@ -1,7 +1,6 @@
 ---
 name: pull-request:babysit
-description: |
-  Monitor a PR's CI, fix trivial failures (lint, types, formatting), and self-cancel when green. Use after pushing when you want hands-off CI monitoring with automatic fixes. With --merge, drive the PR all the way to merged (handling merge-train/queue kickouts, rebase issues, and re-runs); with --reviews, hand off to AI-review triage after the first green.
+description: Monitor a PR's CI, fix trivial failures, and self-cancel when green; --merge drives to merged, --reviews hands off to AI-review triage.
 argument-hint: "[--merge] [--reviews]"
 allowed-tools:
   - Monitor
@@ -38,6 +37,10 @@ Parse `$ARGUMENTS` for two optional flags, both off by default so plain babysit 
 - `--reviews`: after the first green, triage AI-reviewer threads. See [Reviews Hand-off](#reviews-hand-off).
 - `--merge`: don't stop at green; drive the PR to merged. See [Merge Mode](#merge-mode).
 
+## Bounds
+
+Every wait babysit performs runs through a watcher, including the post-submit merge wait ([Merge Mode](#merge-mode)); babysit has no poll loop of its own. The watcher enforces the wall clock (`--max-minutes`, default 60), poll interval, and dedup, so pass `--max-minutes` through when the user supplies one. After a watcher emits `max-time-reached` it has exited: report and stop, never re-arm a fresh watcher. If babysit runs under `/loop`, the loop owns repetition, not babysit.
+
 ## Event Handlers
 
 #### status: running
@@ -57,6 +60,8 @@ For trivial failures (lint, type, format, lockfile), attempt a fix. Reproduce th
 For non-trivial failures (logic bugs, design issues, flaky tests, environment-dependent behavior), report the logs agent's summary and log-file path, then call `TaskStop`.
 
 #### status: success
+
+Green on a conflicting PR is stale: if a `conflicts` or unresolved `mergeable-unknown` event arrived for the current SHA, address it (per [conflicts](#conflicts) or [mergeable-unknown](#mergeable-unknown)) before treating green as done.
 
 Summarize the session: run `git log ${start-sha}..HEAD --oneline` for the commits pushed while babysitting.
 
@@ -80,6 +85,19 @@ If the conflicting paths are only lockfiles (`bun.lock`, etc.) or generated file
 
 Otherwise, report the conflicting file list and call `TaskStop`. Do not invoke `gh` or `glab` here; git alone is enough.
 
+#### mergeable-unknown
+
+The platform could not determine mergeability after its own bounded re-polling, so run the authoritative local check with the same dry-run as [conflicts](#conflicts):
+
+```
+git fetch origin <base>
+git merge origin/<base> --no-commit --no-ff
+git diff --name-only --diff-filter=U
+git merge --abort
+```
+
+If the dry-run surfaces conflicting paths, route them through the [conflicts](#conflicts) logic (lockfiles or generated files → regenerate, commit, push; source → report and `TaskStop`). If the merge is clean, report that the PR is mergeable and keep watching.
+
 #### queued-timeout
 
 Report the event (include `minutes`) and wait. The watcher continues polling.
@@ -94,11 +112,15 @@ Report `retry_after` and wait. The watcher resumes polling once the window elaps
 
 #### pr-closed
 
-Report and stop. The watcher has already exited.
+The PR closed without merging, or its source branch no longer exists. Report and stop. The watcher has already exited.
+
+#### merged
+
+The PR landed. In [Merge Mode](#merge-mode) this is the success terminal: report the merge and the work done since the start SHA, then stop. The watcher has already exited.
 
 #### max-time-reached
 
-Report the event (include `minutes`) and stop. The watcher has already exited.
+Report the event (include `minutes`) and the work done since the start SHA, then stop. The watcher has already exited; do not re-arm (see [Bounds](#bounds)).
 
 ## Reviews Hand-off
 
@@ -120,7 +142,15 @@ Submit by the most automated path the repo allows (merge queue/train, else auto-
 - **GitHub**: `gh pr merge <pr-url> --auto --squash` enables auto-merge or queues the PR. If `--auto` is rejected, merge directly: `gh pr merge <pr-url> --squash`. Prefer squash → merge → rebase per `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
 - **GitLab**: delegate to the `gitlab:merge-request` skill.
 
-Then poll until it merges or is kicked out. On a kickout, diagnose and re-submit: a rebase/merge conflict routes through the [conflicts](#conflicts) handler, a CI failure through [status: failing](#status-failing) (each produces a new SHA). Stop on: merged (success); 3 submit attempts (re-submits included, an oscillation guard); an unrecoverable block (missing human approval, non-trivial CI failure, non-lockfile conflict, permissions); or PR closed.
+Then watch the merge through the monitor rather than polling by hand: invoke the provider's monitor skill again on the PR and react to its events. The watcher enforces the interval and the wall clock, so this phase stays bounded like the CI wait (see [Bounds](#bounds)) and babysit owns no loop here. React to:
+
+- `merged`: the PR landed. Report success and `TaskStop`.
+- `conflicts`: route through the [conflicts](#conflicts) handler, then re-submit. Counts as a submit attempt.
+- `status: failing`: route through the [status: failing](#status-failing) handler; the pushed fix produces a new SHA, then re-submit. Counts as a submit attempt.
+- `pr-closed`: the PR closed without merging. Report and `TaskStop`.
+- `max-time-reached`: report and `TaskStop`; do not re-arm.
+
+Stop re-submitting after 3 attempts (re-submits included, an oscillation guard) or an unrecoverable block (missing human approval, non-trivial CI failure, non-lockfile conflict, permissions).
 
 ## Gotchas
 

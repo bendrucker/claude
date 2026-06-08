@@ -17,8 +17,6 @@ type Route = {
   suggestion: (params: Record<string, string>) => string;
 };
 
-const SUFFIX = "Run /github:gh for more patterns.";
-
 // Allow dots and other valid URL characters in segment values
 const patternOptions = { segmentValueCharset: "a-zA-Z0-9-_.~%" };
 
@@ -26,37 +24,37 @@ const routes: Route[] = [
   {
     pattern: new UrlPattern("actions/runs/:runId/job/:jobId"),
     type: "job",
-    suggestion: ({ jobId }) => `Use: gh run view --job ${jobId} --log. ${SUFFIX}`,
+    suggestion: ({ jobId }) => `Use: gh run view --job ${jobId} --log.`,
   },
   {
     pattern: new UrlPattern("actions/runs/:runId"),
     type: "run",
-    suggestion: ({ runId }) => `Use: gh run view ${runId}. ${SUFFIX}`,
+    suggestion: ({ runId }) => `Use: gh run view ${runId}.`,
   },
   {
     pattern: new UrlPattern("issues/:number"),
     type: "issue",
-    suggestion: ({ number }) => `Use: gh issue view ${number}. ${SUFFIX}`,
+    suggestion: ({ number }) => `Use: gh issue view ${number}.`,
   },
   {
     pattern: new UrlPattern("pull/:number"),
     type: "pr",
-    suggestion: ({ number }) => `Use: gh pr view ${number}. ${SUFFIX}`,
+    suggestion: ({ number }) => `Use: gh pr view ${number}.`,
   },
   {
     pattern: new UrlPattern("blob/:ref/*"),
     type: "file",
-    suggestion: () => `Use: gh api to fetch file contents. ${SUFFIX}`,
+    suggestion: () => `Use: gh api to fetch file contents.`,
   },
   {
     pattern: new UrlPattern("tree/:ref"),
     type: "file",
-    suggestion: () => `Use: gh api to fetch file contents. ${SUFFIX}`,
+    suggestion: () => `Use: gh api to fetch file contents.`,
   },
   {
     pattern: new UrlPattern("tree/:ref/*"),
     type: "file",
-    suggestion: () => `Use: gh api to fetch file contents. ${SUFFIX}`,
+    suggestion: () => `Use: gh api to fetch file contents.`,
   },
 ];
 
@@ -90,7 +88,7 @@ export function parseGitHubUrl(url: string): { type: string; suggestion: string 
     if (subpath === "") {
       return {
         type: "repo",
-        suggestion: `Use: gh repo view [<repository>]. ${SUFFIX}`,
+        suggestion: `Use: gh repo view [<repository>].`,
       };
     }
 
@@ -112,7 +110,7 @@ export function parseGitHubUrl(url: string): { type: string; suggestion: string 
   if (baseMatch) {
     return {
       type: "repo",
-      suggestion: `Use: gh repo view [<repository>]. ${SUFFIX}`,
+      suggestion: `Use: gh repo view [<repository>].`,
     };
   }
 
@@ -142,7 +140,7 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   if (isRawGitHubUrl(url)) {
     return formatOutput(
       "deny",
-      `Use: gh api repos/{owner}/{repo}/contents/{path}?ref={ref} to fetch raw file contents. ${SUFFIX}`,
+      `Use: gh api repos/{owner}/{repo}/contents/{path}?ref={ref} to fetch raw file contents.`,
     );
   }
 

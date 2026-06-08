@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { tmux, tmuxQuery } from "./tmux";
 
 const argv = cli({
   name: "notification",
@@ -17,16 +18,6 @@ const argv = cli({
     },
   },
 });
-
-function tmux(...args: string[]): void {
-  Bun.spawnSync(["tmux", ...args], { stderr: "inherit" });
-}
-
-function tmuxQuery(...args: string[]): string | null {
-  const proc = Bun.spawnSync(["tmux", ...args], { stdout: "pipe", stderr: "inherit" });
-  if (proc.exitCode !== 0) return null;
-  return proc.stdout.toString().trim();
-}
 
 function paneOptionKey(pane: string): string {
   return `@claude_notification_${pane.replace("%", "")}`;

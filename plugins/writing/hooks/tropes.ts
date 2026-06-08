@@ -16,6 +16,7 @@ export type PatternMatch = {
   category: string;
   matched: string;
   message: string;
+  structural: boolean;
 };
 
 export type PatternDef = {
@@ -25,6 +26,7 @@ export type PatternDef = {
   message: (matched: string) => string;
   fileOnly?: boolean;
   sideEffectOnly?: boolean;
+  structural?: boolean;
 };
 
 export type WeightedPatternGroup = {
@@ -72,6 +74,7 @@ export const PATTERNS: PatternDef[] = [
   {
     tier: "deny",
     category: "spaced em dash",
+    structural: true,
     test: / — /g,
     message: () =>
       "Spaced em dashes ( — ) are an AI writing tell. Use unspaced em dashes (—), commas, colons, or parentheses instead.",
@@ -315,6 +318,7 @@ export function scanIntroduced(
       category: def.category,
       matched: newHits.sample,
       message: def.message(newHits.sample),
+      structural: def.structural ?? false,
     });
     seenTiers.add(def.tier);
   }
@@ -333,6 +337,7 @@ export function scanIntroduced(
       category: group.category,
       matched: newWeighted.samples[0] ?? "",
       message: group.message(newWeighted.samples, newWeighted.totalWeight),
+      structural: false,
     });
     seenTiers.add(group.tier);
   }

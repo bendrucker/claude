@@ -40,16 +40,40 @@ function isProse(value: string): boolean {
   return /\s/.test(value);
 }
 
-function extractProse(value: unknown, key?: string): string[] {
+type ProseEntry = { key: string | undefined; value: string };
+
+function extractProseEntries(value: unknown, key?: string): ProseEntry[] {
   if (shouldSkipKey(key)) return [];
-  if (typeof value === "string") return isProse(value) ? [value] : [];
-  if (Array.isArray(value)) return value.flatMap((item) => extractProse(item, key));
+  if (typeof value === "string") return isProse(value) ? [{ key, value }] : [];
+  if (Array.isArray(value)) return value.flatMap((item) => extractProseEntries(item, key));
   if (typeof value === "object" && value !== null) {
     return Object.entries(value).flatMap(([childKey, childValue]) =>
-      extractProse(childValue, childKey),
+      extractProseEntries(childValue, childKey),
     );
   }
   return [];
+}
+
+function extractProse(value: unknown, key?: string): string[] {
+  return extractProseEntries(value, key).map((entry) => entry.value);
+}
+
+const PROSE_TOOL_PATTERN =
+  /\b(?:issue|ticket|story|epic|document|doc|page|wiki|note|comment|message|post|reply|thread|discussion|review|article|memo)\b/;
+
+const PROSE_KEY_PATTERN =
+  /\b(?:description|body|content|text|title|summary|comment|message|note|details)\b/;
+
+function tokenize(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+}
+
+function isProseTool(toolName: string): boolean {
+  return PROSE_TOOL_PATTERN.test(tokenize(toolName));
+}
+
+function isProseKey(key: string | undefined): boolean {
+  return key !== undefined && PROSE_KEY_PATTERN.test(tokenize(key));
 }
 
 function extractBodyFilePath(command: string): string | null {
@@ -146,6 +170,17 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   return extractProse(toolInput);
 }
 
+async function collectLexicalText(input: PreToolUseHookInput): Promise<string[]> {
+  const toolName = input.tool_name;
+
+  if (toolName === "Bash") return collectText(input);
+
+  const toolInput = input.tool_input as Record<string, unknown>;
+  const entries = extractProseEntries(toolInput);
+  if (isProseTool(toolName)) return entries.map((entry) => entry.value);
+  return entries.filter((entry) => isProseKey(entry.key)).map((entry) => entry.value);
+}
+
 function isPlanFile(input: PreToolUseHookInput): boolean {
   const filePath = (input.tool_input as Record<string, unknown>).file_path;
   if (typeof filePath !== "string") return false;
@@ -198,14 +233,15 @@ async function processFileOp(input: PreToolUseHookInput): Promise<SyncHookJSONOu
 async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   const texts = await collectText(input);
   if (texts.length === 0) return null;
-  const combined = texts.join("\n");
-  const matches = scan(combined, undefined, "sideEffect");
 
-  const deny = firstByTier(matches, "deny");
-  if (deny) return formatDecision("deny", deny.message);
+  const structural = firstByTier(scan(texts.join("\n"), undefined, "sideEffect"), "deny");
+  if (structural?.structural) return formatDecision("deny", structural.message);
 
-  const context = firstByTier(matches, "context");
-  if (context) return formatContext(context.message);
+  const lexical = await collectLexicalText(input);
+  if (lexical.length === 0) return null;
+  const matches = scan(lexical.join("\n"), undefined, "sideEffect");
+  const match = firstByTier(matches, "deny") ?? firstByTier(matches, "context");
+  if (match) return formatContext(match.message);
 
   return null;
 }

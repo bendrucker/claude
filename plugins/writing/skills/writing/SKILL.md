@@ -14,9 +14,9 @@ The hook enforces these automatically. Vocabulary and marketing-verb lists are i
 
 #### Structure
 
-- Never use spaced em dashes (` — `). Use commas, colons, or parentheses.
+- Never use spaced em dashes (` — `).
 - Avoid "not just X, but also Y" parallelism. Simplify.
-- Avoid semicolons. Prefer shorter sentences or commas.
+- Don't join independent clauses with em dashes, semicolons, or hyphens. Write two sentences. Swapping one connector for another is not a fix.
 - Don't structure bullets as `- **path/to/file**: description`.
 - Use `####` headers instead of `**Label:**` for labeled subsections.
 - Headings name the topic in a couple of words. No verbs, no `Topic: clause`, no sentence-shaped headings. Move the explanation into the body.

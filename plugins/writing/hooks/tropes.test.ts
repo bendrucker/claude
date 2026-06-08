@@ -28,6 +28,11 @@ describe("scan", () => {
       expect(match[0]?.category).toBe("spaced em dash");
     });
 
+    it("steers toward splitting into two sentences", () => {
+      const match = scan("This is \u2014 a problem");
+      expect(match[0]?.message).toContain("two sentences");
+    });
+
     for (const allowed of ["This is\u2014fine", "2024 \u2013 2025"]) {
       it(`allows: "${allowed}"`, () => {
         expect(firstByTier(scan(allowed), "deny")).toBeUndefined();
@@ -178,32 +183,149 @@ describe("scan", () => {
     }
   });
 
-  describe("semicolon overuse", () => {
-    const text = "First point; second point; third point; fourth";
+  describe("connector density", () => {
+    const semicolons =
+      "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
+    const emDashes =
+      "The cache starts cold—the first request fills it. The retry logic backs off—later attempts succeed. The parser rejects malformed input—it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
+    const mixed =
+      "The cache starts cold; the first request fills it. The retry logic backs off—later attempts succeed. The parser rejects malformed input - it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
+    const hyphen =
+      "The cache starts cold - the first request fills it. The retry logic backs off - later attempts succeed. The parser rejects malformed input - it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
 
-    it("detects three semicolons in proximity", () => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("semicolon overuse");
+    for (const [name, text] of [
+      ["semicolons", semicolons],
+      ["unspaced em dashes", emDashes],
+      ["mixed connectors", mixed],
+      ["letter-flanked hyphens", hyphen],
+    ] as const) {
+      it(`flags ${name}`, () => {
+        expect(firstByTier(scan(text), "context")?.category).toBe("connector density");
+      });
+    }
+
+    it("fires at exactly 30% density (3 of 10)", () => {
+      const text =
+        "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely.";
+      expect(firstByTier(scan(text), "context")?.category).toBe("connector density");
+    });
+
+    it("does not fire below MIN_CONNECTOR_SENTENCES (2 of 10)", () => {
+      const text =
+        "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input and errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely.";
+      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+    });
+
+    it("does not fire below MIN_SENTENCES (4 all connectored)", () => {
+      const text =
+        "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates; it stops.";
+      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+    });
+
+    it("does not fire below density threshold (3 of 11, 27%)", () => {
+      const text =
+        "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely. The cron schedules the task.";
+      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+    });
+
+    it("does not fire on one semicolon list among clean sentences", () => {
+      const text =
+        "The build depends on three steps; compile; link; package. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely. The cron schedules the task. The cache warms slowly.";
+      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+    });
+
+    it("does not fire on a numeric range", () => {
+      const text =
+        "The project ran from 2024 - 2025 without issues. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day.";
+      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+    });
+
+    it("does not fire on markdown table rows alone", () => {
+      const text = [
+        "| col a | col b | col c |",
+        "| --- | --- | --- |",
+        "| x; y | a; b | p; q |",
+        "| m; n | c; d | r; s |",
+        "| e; f | g; h | i; j |",
+        "| k; l | u; v | w; z |",
+      ].join("\n");
+      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+    });
+
+    it("does not fire on a two-sentence text", () => {
+      const text = "The cache starts cold; it fills later. The retry logic backs off; it succeeds.";
+      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+    });
+
+    it("does not fire on a definition bullet list", () => {
+      const text = [
+        "- **jxa** — JXA language guide for automation",
+        "- **jxa-run** — App-scoped JXA runner with validation",
+        "- **sandbox** — Detects Go binaries and disables the sandbox",
+        "- **shortcut** — Author shortcuts as plain text",
+        "- **xcall** — Send x-callback-url requests",
+        "- **tmux** — Layout awareness and pane management",
+      ].join("\n");
+      expect(
+        scan(text, "README.md").find((m) => m.category === "connector density"),
+      ).toBeUndefined();
+    });
+
+    it("does not fire on a numbered definition list", () => {
+      const text = [
+        "1. Flowchart — nodes and edges here",
+        "2. Sequence — participants and messages",
+        "3. State — states and transitions here",
+        "4. ER — entities and relationships here",
+        "5. Class — members and methods here",
+        "6. Gantt — tasks and milestones here",
+      ].join("\n");
+      expect(scan(text, "doc.md").find((m) => m.category === "connector density")).toBeUndefined();
+    });
+
+    it("does not fire on reference-link bullets with periods in the path", () => {
+      const text = [
+        "- [Flowchart](./references/flowchart.md) — Nodes, edges, subgraphs, direction",
+        "- [Sequence](./references/sequence.md) — Participants, messages, activations",
+        "- [State](./references/state.md) — States, transitions, composite states",
+        "- [ER](./references/er.md) — Entities, relationships, cardinality",
+        "- [Class](./references/class.md) — Classes, members, relationships",
+        "- [Gantt](./references/gantt.md) — Tasks, sections, milestones",
+      ].join("\n");
+      expect(
+        scan(text, "SKILL.md").find((m) => m.category === "connector density"),
+      ).toBeUndefined();
+    });
+
+    it("does not fire on headings with hyphen subtitles", () => {
+      const text = [
+        "## Flowchart - Basic",
+        "## Flowchart - Unclosed Bracket",
+        "## Sequence - Simple",
+        "## State - Composite",
+        "## ER - Cardinality",
+        "## Class - Inheritance",
+      ].join("\n");
+      expect(scan(text, "doc.md").find((m) => m.category === "connector density")).toBeUndefined();
     });
 
     it("detects in prose files", () => {
-      expect(firstByTier(scan(text, "doc.md"), "context")?.category).toBe("semicolon overuse");
+      expect(firstByTier(scan(semicolons, "doc.md"), "context")?.category).toBe(
+        "connector density",
+      );
     });
 
-    it("skips in code files", () => {
-      expect(
-        scan(text, "script.sh").find((m) => m.category === "semicolon overuse"),
-      ).toBeUndefined();
+    it("applies when no path is given", () => {
+      expect(firstByTier(scan(semicolons, undefined), "context")?.category).toBe(
+        "connector density",
+      );
     });
 
-    it("skips in CSS files", () => {
-      expect(
-        scan(text, "style.css").find((m) => m.category === "semicolon overuse"),
-      ).toBeUndefined();
-    });
-
-    for (const allowed of ["First clause; second clause.", "First; second; third."]) {
-      it(`allows: "${allowed}"`, () => {
-        expect(scan(allowed).find((m) => m.category === "semicolon overuse")).toBeUndefined();
+    for (const path of ["script.sh", "index.ts", "style.css"]) {
+      it(`skips in ${path}`, () => {
+        expect(
+          scan(semicolons, path).find((m) => m.category === "connector density"),
+        ).toBeUndefined();
       });
     }
   });

@@ -70,6 +70,36 @@ function testResultHits(text: string): Hits {
 const CROSS_SENTENCE_NOT =
   /\b(it|this|that|he|she|they|we|you)\s+(?:is|are|was|were)(?:n't|\s+not)\s+[^.!?]{1,80}[.!?]\s+\1\s+(?:is|are|was|were)\b/gi;
 
+const CLAUSE_CONNECTOR = /;|—|[A-Za-z] [-–] [A-Za-z]/;
+const HEADING = /^#{1,6}\s/;
+const LIST_ITEM = /^(?:[-*+]|\d+[.)])\s/;
+const MIN_SENTENCES = 5;
+const MIN_CONNECTOR_SENTENCES = 3;
+const CONNECTOR_DENSITY = 0.3;
+
+// In a list item a dash usually separates a label from its gloss (`- **term** — gloss`)
+// rather than joining two clauses, so only a semicolon counts as a connector there.
+function isConnectorSentence(sentence: string): boolean {
+  if (LIST_ITEM.test(sentence)) return sentence.includes(";");
+  return CLAUSE_CONNECTOR.test(sentence);
+}
+
+function connectorDensityHits(text: string): Hits {
+  const sentences = text
+    .split(/(?<!\d)[.!?]+(?=\s|$)|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => !s.startsWith("|"))
+    .filter((s) => !HEADING.test(s))
+    .filter((s) => s.split(/\s+/).length >= 4);
+  if (sentences.length < MIN_SENTENCES) return { count: 0, sample: "" };
+  const connected = sentences.filter(isConnectorSentence);
+  if (connected.length < MIN_CONNECTOR_SENTENCES) return { count: 0, sample: "" };
+  if (connected.length / sentences.length < CONNECTOR_DENSITY) return { count: 0, sample: "" };
+  const first = connected[0] as string;
+  const i = CLAUSE_CONNECTOR.exec(first)?.index ?? 0;
+  return { count: connected.length, sample: first.slice(Math.max(0, i - 20), i + 24).trim() };
+}
+
 export const PATTERNS: PatternDef[] = [
   {
     tier: "deny",
@@ -77,7 +107,7 @@ export const PATTERNS: PatternDef[] = [
     structural: true,
     test: / — /g,
     message: () =>
-      "Spaced em dashes ( — ) are an AI writing tell. Use unspaced em dashes (—), commas, colons, or parentheses instead.",
+      "Spaced em dashes ( — ) are an AI writing tell. Split the clauses into two sentences. Do not substitute a semicolon or unspaced em dash: the run-on structure is the problem, not the mark.",
   },
   {
     tier: "deny",
@@ -131,6 +161,14 @@ export const PATTERNS: PatternDef[] = [
   },
   {
     tier: "context",
+    category: "connector density",
+    test: connectorDensityHits,
+    fileOnly: true,
+    message: (matched) =>
+      `Many sentences here fuse independent clauses with semicolons or dashes (e.g. "${matched}"). This is run-on structure. Split each into two sentences. Swapping one connector for another is not a fix.`,
+  },
+  {
+    tier: "context",
     category: "test result reporting",
     test: testResultHits,
     message: () =>
@@ -164,14 +202,6 @@ export const PATTERNS: PatternDef[] = [
     test: CROSS_SENTENCE_NOT,
     message: () =>
       'Cross-sentence "It isn\'t X. It is Y." patterns are an AI tell. Combine into one sentence or drop the negation.',
-  },
-  {
-    tier: "context",
-    category: "semicolon overuse",
-    test: /;[^;]*;[^;]*;/g,
-    fileOnly: true,
-    message: () =>
-      "Multiple semicolons in close proximity. AI tends to overuse semicolons. Prefer shorter sentences or commas.",
   },
   {
     tier: "context",

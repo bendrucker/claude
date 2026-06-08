@@ -144,23 +144,24 @@ describe("wordlist files", () => {
   });
 });
 
-describe("semicolon file scoping", () => {
-  const semicolonText = "First point; second point; third point; fourth";
+describe("connector density file scoping", () => {
+  const denseText =
+    "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
 
-  it("flags semicolons in markdown files", async () => {
-    const input = mockWrite(semicolonText);
+  it("flags connector density in markdown files", async () => {
+    const input = mockWrite(denseText);
     const result = await processInput(input);
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
-  it("skips semicolons in shell scripts", async () => {
-    const input = mockWrite(semicolonText);
+  it("skips connector density in shell scripts", async () => {
+    const input = mockWrite(denseText);
     (input.tool_input as Record<string, unknown>).file_path = "deploy.sh";
     expect(await processInput(input)).toBeNull();
   });
 
-  it("skips semicolons in TypeScript files", async () => {
-    const input = mockWrite(semicolonText);
+  it("skips connector density in TypeScript files", async () => {
+    const input = mockWrite(denseText);
     (input.tool_input as Record<string, unknown>).file_path = "index.ts";
     expect(await processInput(input)).toBeNull();
   });
@@ -443,7 +444,7 @@ describe("Bash/MCP processInput", () => {
   });
 
   it("ignores flagged content in nested old_str fields", async () => {
-    const flagged = "text with; semicolons; everywhere; really; lots of them";
+    const flagged = "We should delve into the codebase to understand it.";
     const result = await processInput(
       mockMcp("mcp__example_tool", {
         command: "update_content",

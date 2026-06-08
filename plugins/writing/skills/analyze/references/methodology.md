@@ -109,7 +109,7 @@ Skill injections and hook feedback are excluded earlier by `is_meta=true` in the
 
 `structural.ts` imports the hook's `PATTERNS` directly from `hooks/tropes.ts` rather than re-declaring them, so the audit cannot drift from what the hook enforces. It keeps only the regex patterns whose source is not a wordlist (the FTS pass covers stemmed vocabulary, weighted verbs, and `WORDLISTS.openers`) and normalizes each to the global flag for counting. Function-based tests (e.g. test-result reporting) are excluded because a single regex match cannot count them.
 
-The patterns run against all assistant text (not just deliverables). Each reports total hits, rows containing hits, and session spread, labeled by hook scope (all, file-only, side-effect-only). This catches structural tropes (semicolons, passive voice, hedging, parallelism) that the n-gram pipeline cannot detect.
+The patterns run against all assistant text (not just deliverables). Each reports total hits, rows containing hits, and session spread, labeled by hook scope (all, file-only, side-effect-only). This catches structural tropes (passive voice, hedging, parallelism) that the n-gram pipeline cannot detect.
 
 ## Rule health table
 

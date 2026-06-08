@@ -26,9 +26,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   }
   const defaultState = getDefaultState(assignee);
 
-  // updatedInput is honored with permissionDecision "allow" or "ask".
-  // "ask" would prompt on every matched create even when the tool is
-  // otherwise allowlisted, so auto-allow at the cost of the prompt.
+  // updatedInput is applied only when permissionDecision is "allow"; the
+  // harness ignores it otherwise. "allow" also bypasses the permission
+  // prompt for the call, a cost we accept to inject the default state.
   // updatedInput replaces the entire input object, so echo back every
   // original field alongside the injected state.
   return {

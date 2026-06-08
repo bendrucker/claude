@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import { loadPlugins } from "@bendrucker/claude-marketplace";
 import { Glob } from "bun";
+import { loadPlugins } from "../packages/marketplace/index";
 
 async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
   const deps = new Set<string>();

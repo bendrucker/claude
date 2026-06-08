@@ -17,10 +17,10 @@ import {
 } from "./dump";
 import { escapeRegex, frustrationRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
-import { processTagCorpus, processTagRows, type TagSignatureRow } from "./tag-ngram";
 import { findQuote } from "./quote-context";
 import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
 import { auditStructuralPatterns } from "./structural";
+import { processTagCorpus, processTagRows, type TagSignatureRow } from "./tag-ngram";
 import { loadProfile, phraseProfileStat } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 import { loadWordlists } from "./wordlists";
@@ -63,8 +63,7 @@ const argv = cli({
     },
     tagMinLift: {
       type: Number,
-      description:
-        "Minimum lift threshold for structural (part-of-speech tag sequence) signatures",
+      description: "Minimum lift threshold for structural (part-of-speech tag sequence) signatures",
       default: 2.0,
     },
     tagTop: {
@@ -213,7 +212,8 @@ async function main(): Promise<void> {
       deliverableRows,
       ngramSizes,
     );
-    const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
+    const userText = serializeCorpus(userRows);
+    const userCorpus = processCorpus(userText, ngramSizes);
     const candidateSessions = new Set(deliverableRows.map((r) => r.session_id)).size;
     const minSessions = Math.max(3, Math.round(candidateSessions * 0.05));
     console.error(
@@ -248,7 +248,7 @@ async function main(): Promise<void> {
 
     console.error("Computing structural signatures (part-of-speech tag sequences)");
     const tagAssistant = processTagRows(deliverableRows);
-    const tagUser = processTagCorpus(serializeCorpus(userRows));
+    const tagUser = processTagCorpus(userText);
     // Tag sequences draw from an alphabet of ~17 tags, so they are far
     // denser than word n-grams; the floors are higher to compensate.
     const tagLifts = computeLift({

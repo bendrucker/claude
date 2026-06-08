@@ -1,9 +1,9 @@
 import { type DeliverableAudit, isDeliverableSurface } from "./deliverable-audit";
 import type { CorrectionRow, CorrectiveRow, ModelSummaryRow } from "./dump";
 import type { LiftRow } from "./ngram";
-import type { TagSignatureRow } from "./tag-ngram";
 import type { QuoteContext } from "./quote-context";
 import type { StructuralAuditRow } from "./structural";
+import type { TagSignatureRow } from "./tag-ngram";
 import type { VoiceProfile } from "./voice-profile";
 import { phraseProfileStatStemmed } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";

@@ -37,6 +37,7 @@ export type Event =
   | { type: "api-error"; consecutive: number }
   | { type: "rate-limited"; retry_after: string }
   | { type: "pr-closed" }
+  | { type: "merged" }
   | { type: "max-time-reached"; minutes: number };
 
 // `has_conflicts` is GitLab's authoritative conflict flag; `detailed_merge_status`
@@ -109,7 +110,7 @@ export function deriveEvents(
       });
       next = { ...next, lastSha: probe.sha, lastState: "success" };
     }
-    events.push({ type: "pr-closed" });
+    events.push(probe.mrState === "merged" ? { type: "merged" } : { type: "pr-closed" });
     return { events, state: next };
   }
 
@@ -610,6 +611,7 @@ function isTerminal(events: Event[], mode: RunTarget["mode"]): boolean {
   return events.some(
     (e) =>
       e.type === "pr-closed" ||
+      e.type === "merged" ||
       (e.type === "status" && e.state === "success") ||
       (mode === "pipeline-id" && e.type === "status" && e.state === "failing"),
   );

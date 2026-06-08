@@ -399,43 +399,58 @@ describe("resolveMergeable", () => {
   });
 });
 
-describe("pr-closed", () => {
-  it("emits pr-closed for MERGED state", () => {
+describe("merged", () => {
+  it("emits merged (not pr-closed) for MERGED state", () => {
     const { events } = advance([{ probe: baseProbe({ prState: "MERGED" }) }]);
-    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
+    expect(events.find((e) => e.type === "merged")).toBeDefined();
+    expect(events.find((e) => e.type === "pr-closed")).toBeUndefined();
   });
 
-  it("emits pr-closed for CLOSED state", () => {
-    const { events } = advance([{ probe: baseProbe({ prState: "CLOSED" }) }]);
-    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
-  });
-
-  it("emits status:success before pr-closed when merged with success checks and lastState not success", () => {
+  it("emits status:success before merged when merged with success checks and lastState not success", () => {
     const { events } = advance([
       { probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) },
+    ]);
+    const statusIdx = events.findIndex((e) => e.type === "status");
+    const mergedIdx = events.findIndex((e) => e.type === "merged");
+    expect(statusIdx).toBeGreaterThanOrEqual(0);
+    expect(events[statusIdx]).toMatchObject({ type: "status", state: "success", sha: "s1" });
+    expect(mergedIdx).toBeGreaterThan(statusIdx);
+  });
+
+  it("emits only merged when merged with success checks and lastState already success", () => {
+    const initial: WatcherState = { ...initialState(), lastState: "success", lastSha: "s1" };
+    const { events } = advance(
+      [{ probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) }],
+      { initial },
+    );
+    expect(events).toEqual([{ type: "merged" }]);
+  });
+
+  it("emits only merged when merged with failing checks (no false success)", () => {
+    const { events } = advance([
+      { probe: baseProbe({ prState: "MERGED", state: "failing", sha: "s1" }) },
+    ]);
+    expect(events.find((e) => e.type === "status")).toBeUndefined();
+    expect(events.find((e) => e.type === "merged")).toBeDefined();
+  });
+});
+
+describe("pr-closed", () => {
+  it("emits pr-closed (not merged) for CLOSED state", () => {
+    const { events } = advance([{ probe: baseProbe({ prState: "CLOSED" }) }]);
+    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
+    expect(events.find((e) => e.type === "merged")).toBeUndefined();
+  });
+
+  it("emits status:success before pr-closed when closed with success checks and lastState not success", () => {
+    const { events } = advance([
+      { probe: baseProbe({ prState: "CLOSED", state: "success", sha: "s1" }) },
     ]);
     const statusIdx = events.findIndex((e) => e.type === "status");
     const closedIdx = events.findIndex((e) => e.type === "pr-closed");
     expect(statusIdx).toBeGreaterThanOrEqual(0);
     expect(events[statusIdx]).toMatchObject({ type: "status", state: "success", sha: "s1" });
     expect(closedIdx).toBeGreaterThan(statusIdx);
-  });
-
-  it("emits only pr-closed when merged with success checks and lastState already success", () => {
-    const initial: WatcherState = { ...initialState(), lastState: "success", lastSha: "s1" };
-    const { events } = advance(
-      [{ probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) }],
-      { initial },
-    );
-    expect(events).toEqual([{ type: "pr-closed" }]);
-  });
-
-  it("emits only pr-closed when merged with failing checks (no false success)", () => {
-    const { events } = advance([
-      { probe: baseProbe({ prState: "MERGED", state: "failing", sha: "s1" }) },
-    ]);
-    expect(events.find((e) => e.type === "status")).toBeUndefined();
-    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
   });
 });
 

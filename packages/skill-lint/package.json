@@ -5,9 +5,6 @@
   "bin": {
     "skill-lint": "./cli.ts"
   },
-  "exports": {
-    ".": "./index.ts"
-  },
   "scripts": {
     "test": "bun test"
   }

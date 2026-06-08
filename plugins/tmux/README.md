@@ -6,7 +6,7 @@ Tmux session, window, and pane awareness for Claude Code.
 
 - **Skill: tmux** — Layout awareness, pane interaction, and notification monitoring
 - **Hook: context** — SessionStart hook that injects tmux env vars
-- **Hook: resume-command**, a SessionStart hook that records the session's resume command in a pane-scoped tmux option for plugins like tmux-resurrect to use when resuming a pane
+- **Hook: resume-command**, a SessionStart hook that records the session's resume command in a pane-scoped tmux option for plugins like [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) to use when resuming a pane
 - **Hook: notification** — Bell and status bar notifications for permission prompts
 
 ## How It Works

@@ -1,7 +1,6 @@
 ---
 name: pull-request:babysit
-description: |
-  Monitor a PR's CI, fix trivial failures (lint, types, formatting), and self-cancel when green. Use after pushing for hands-off CI monitoring. With --merge, drive the PR to merged (handling merge-train/queue kickouts, rebase issues, and re-runs); with --reviews, hand off to AI-review triage after the first green.
+description: Monitor a PR's CI, fix trivial failures, and self-cancel when green; --merge drives to merged, --reviews hands off to AI-review triage.
 argument-hint: "[--merge] [--reviews]"
 allowed-tools:
   - Monitor
@@ -37,6 +36,10 @@ Parse `$ARGUMENTS` for two optional flags, both off by default so plain babysit 
 
 - `--reviews`: after the first green, triage AI-reviewer threads. See [Reviews Hand-off](#reviews-hand-off).
 - `--merge`: don't stop at green; drive the PR to merged. See [Merge Mode](#merge-mode).
+
+## Bounds
+
+One babysit invocation owns at most one watcher generation. The watcher enforces the wall clock (`--max-minutes`, default 60), poll interval, and dedup, so pass `--max-minutes` through when the user supplies one. After `max-time-reached` the watcher has exited: report and stop, never re-arm a fresh watcher. If babysit runs under `/loop`, the loop owns repetition, not babysit.
 
 ## Event Handlers
 
@@ -113,7 +116,7 @@ Report and stop. The watcher has already exited.
 
 #### max-time-reached
 
-Report the event (include `minutes`) and stop. The watcher has already exited.
+Report the event (include `minutes`) and the work done since the start SHA, then stop. The watcher has already exited; do not re-arm (see [Bounds](#bounds)).
 
 ## Reviews Hand-off
 
@@ -135,7 +138,7 @@ Submit by the most automated path the repo allows (merge queue/train, else auto-
 - **GitHub**: `gh pr merge <pr-url> --auto --squash` enables auto-merge or queues the PR. If `--auto` is rejected, merge directly: `gh pr merge <pr-url> --squash`. Prefer squash → merge → rebase per `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
 - **GitLab**: delegate to the `gitlab:merge-request` skill.
 
-Then poll until it merges or is kicked out. On a kickout, diagnose and re-submit: a rebase/merge conflict routes through the [conflicts](#conflicts) handler, a CI failure through [status: failing](#status-failing) (each produces a new SHA). Stop on: merged (success); 3 submit attempts (re-submits included, an oscillation guard); an unrecoverable block (missing human approval, non-trivial CI failure, non-lockfile conflict, permissions); or PR closed.
+Then poll until it merges or is kicked out. This is babysit's only self-driven loop, so poll no faster than 60s and honor the 60-minute wall clock. On a kickout, diagnose and re-submit: a rebase/merge conflict routes through the [conflicts](#conflicts) handler, a CI failure through [status: failing](#status-failing) (each produces a new SHA). Stop on: merged (success); 3 submit attempts (re-submits included, an oscillation guard); the 60-minute wall clock; an unrecoverable block (missing human approval, non-trivial CI failure, non-lockfile conflict, permissions); or PR closed.
 
 ## Gotchas
 

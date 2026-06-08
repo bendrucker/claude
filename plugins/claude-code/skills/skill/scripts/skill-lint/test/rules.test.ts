@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import * as path from "node:path";
 import { lintSkill } from "../index";
 import { parseSkill } from "../parse";
+import { bangExecutionMatcher } from "../rules/bang-execution";
 import {
   allowedToolsFormat,
   descriptionLength,
@@ -212,6 +213,53 @@ describe("frontmatter rules", () => {
       const result = single(allowedToolsFormat.check(content, ""));
       expect(result.passed).toBe(false);
     });
+  });
+});
+
+describe("bangExecutionMatcher", () => {
+  const root = ["$", "{CLAUDE_PLUGIN_ROOT}"].join("");
+  const skill = (allowedTools: string, body: string) =>
+    parseSkill(`---\nname: test\nallowed-tools:\n${allowedTools}\n---\n\n${body}\n`);
+
+  it("passes when the open-glob shape matches a bang command", () => {
+    const content = skill(
+      `  - "Bash(bun ${root}/scripts/*)"`,
+      `- Out: !\`bun ${root}/scripts/context.ts\``,
+    );
+    const result = single(bangExecutionMatcher.check(content, ""));
+    expect(result.passed).toBe(true);
+  });
+
+  it("warns when a :* glob matcher matches a bang command", () => {
+    const content = skill(
+      `  - "Bash(bun ${root}/scripts/*:*)"`,
+      `- Out: !\`bun ${root}/scripts/context.ts\``,
+    );
+    const result = single(bangExecutionMatcher.check(content, ""));
+    expect(result.passed).toBe(false);
+    expect(result.severity).toBe("warn");
+    expect(result.message).toContain(`Bash(bun ${root}/scripts/*:*)`);
+  });
+
+  it("passes when there is no bang execution", () => {
+    const content = skill(`  - "Bash(bun ${root}/scripts/*:*)"`, "Run the script when needed.");
+    const result = single(bangExecutionMatcher.check(content, ""));
+    expect(result.passed).toBe(true);
+  });
+
+  it("ignores a :* glob matcher that no bang command uses", () => {
+    const content = skill(
+      '  - "Bash(git show :*:*)"\n  - "Bash(jq:*)"',
+      "- List: !`hunk session list`",
+    );
+    const result = single(bangExecutionMatcher.check(content, ""));
+    expect(result.passed).toBe(true);
+  });
+
+  it("passes when a bang command is matched by a command-prefix matcher", () => {
+    const content = skill('  - "Bash(uname:*)"', "- OS: !`uname -s`");
+    const result = single(bangExecutionMatcher.check(content, ""));
+    expect(result.passed).toBe(true);
   });
 });
 

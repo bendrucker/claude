@@ -1,4 +1,5 @@
 import type { Rule } from "../types";
+import { bangExecutionRules } from "./bang-execution";
 import { bodyRules } from "./body";
 import { frontmatterRules } from "./frontmatter";
 import { namespaceRules } from "./namespace";
@@ -8,6 +9,7 @@ export const allRules: Rule[] = [
   ...frontmatterRules,
   ...namespaceRules,
   ...bodyRules,
+  ...bangExecutionRules,
   ...tokenRules,
 ];
 

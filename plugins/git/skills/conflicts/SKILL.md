@@ -19,7 +19,7 @@ allowed-tools:
   - Bash(git update-index:*)
   - Bash(git fetch:*)
   - Bash(git push:*)
-  - Bash(bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/*:*)
+  - Bash(bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/*)
 hooks:
   PreToolUse:
     - matcher: "Bash(git commit:*)|Bash(git rebase --continue:*)|Bash(git merge --continue:*)|Bash(git cherry-pick --continue:*)"

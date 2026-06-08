@@ -12,11 +12,7 @@ allowed-tools:
   - "Bash(git remote get-url:*)"
   - "Bash(gh pr:*)"
   - "Bash(glab mr:*)"
-  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*:*)"
-  # workaround: inline skill execution includes syntax markers in the permission
-  # check pattern, breaking allowed-tools matching.
-  # https://github.com/bendrucker/claude/issues/486
-  - "Bash(!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/*`:*)"
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*)"
 ---
 
 # Create Pull Request

@@ -50,7 +50,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processPostToolUse(input);
+  const output = await processPostToolUse(input);
   if (output) {
     writeStdoutJson(output);
   }

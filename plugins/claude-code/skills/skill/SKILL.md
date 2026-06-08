@@ -14,11 +14,11 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "bun ${CLAUDE_SKILL_DIR}/scripts/check-namespace.ts"
+          command: "bun ${CLAUDE_PLUGIN_ROOT}/skills/skill/scripts/check-namespace.ts"
         - type: command
-          command: "bun ${CLAUDE_SKILL_DIR}/scripts/check-structure.ts"
+          command: "bun ${CLAUDE_PLUGIN_ROOT}/skills/skill/scripts/check-structure.ts"
         - type: command
-          command: "bun ${CLAUDE_SKILL_DIR}/scripts/check-lint.ts"
+          command: "bun ${CLAUDE_PLUGIN_ROOT}/skills/skill/scripts/check-lint.ts"
 ---
 
 # Claude Code Skills Development
@@ -116,7 +116,9 @@ Skill-scoped hooks activate only when the skill is invoked and last for the sess
 | `$ARGUMENTS`           | All arguments passed when invoking the skill. Appended automatically if absent.  |
 | `$ARGUMENTS[N]` / `$N` | Access a specific argument by 0-based index.                                     |
 | `${CLAUDE_SESSION_ID}` | Current session ID.                                                              |
-| `${CLAUDE_SKILL_DIR}` | Absolute path to the skill's directory. Works in hooks and allowed-tools, but NOT in `!` context. |
+| `${CLAUDE_SKILL_DIR}` | Absolute path to the skill's directory. Substituted in skill content: the body, `!` injection commands, and `allowed-tools`. |
+
+These substitutions apply to skill content, not the frontmatter `hooks:` block. The hooks engine expands only `${CLAUDE_PROJECT_DIR}`, `${CLAUDE_PLUGIN_ROOT}`, and `${CLAUDE_PLUGIN_DATA}` ([hooks reference](https://code.claude.com/docs/en/hooks)); `${CLAUDE_SKILL_DIR}` there resolves to an empty string. In a hook command, reference a bundled script by plugin root instead: `${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/check.ts`.
 
 ### Dynamic Context Injection
 

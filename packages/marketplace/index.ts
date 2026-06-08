@@ -45,6 +45,36 @@ export interface Plugin {
   mcpServers: string[];
 }
 
+export interface HookCommandContext {
+  /** e.g. "plugins/linear/hooks/hooks.json" */
+  file: string;
+  /** The raw matcher entry, for access to `.matcher`. */
+  entry: MatcherEntry;
+  /** Individual command object. */
+  command: HookCommand;
+}
+
+export interface MatcherEntryContext {
+  file: string;
+  entry: MatcherEntry;
+}
+
+/** Yields every hook command across a plugin's hooks file, tagged with its source file. */
+export function* hookCommands(plugin: Plugin): Generator<HookCommandContext> {
+  if (!plugin.hooks) return;
+  const file = `plugins/${plugin.name}/hooks/hooks.json`;
+  for (const entries of Object.values(plugin.hooks.hooks))
+    for (const entry of entries) for (const command of entry.hooks) yield { file, entry, command };
+}
+
+/** Yields every matcher entry across a plugin's hooks file, tagged with its source file. */
+export function* matcherEntries(plugin: Plugin): Generator<MatcherEntryContext> {
+  if (!plugin.hooks) return;
+  const file = `plugins/${plugin.name}/hooks/hooks.json`;
+  for (const entries of Object.values(plugin.hooks.hooks))
+    for (const entry of entries) yield { file, entry };
+}
+
 export interface LoadOptions {
   /** Repository root. Defaults to the repo containing this package. */
   root?: string;

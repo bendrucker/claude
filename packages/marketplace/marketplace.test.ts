@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { enabledPluginNames, loadPlugins, type Plugin } from "./index";
+import {
+  enabledPluginNames,
+  hookCommands,
+  loadPlugins,
+  matcherEntries,
+  type Plugin,
+} from "./index";
 
 let root: string;
 
@@ -116,6 +122,37 @@ describe("loadPlugins", () => {
   test("settingsPath override is honored", async () => {
     const plugins = await loadPlugins({ root, settingsPath: join(root, "user", "settings.json") });
     expect(plugins.find((p) => p.name === "alpha")?.enabled).toBe(true);
+  });
+});
+
+describe("hookCommands", () => {
+  test("yields one item for alpha plugin", async () => {
+    const alpha = (await catalog()).get("alpha")!;
+    const items = [...hookCommands(alpha)];
+    expect(items).toHaveLength(1);
+    expect(items[0]?.file).toBe("plugins/alpha/hooks/hooks.json");
+    expect(items[0]?.entry.matcher).toBe("Bash");
+    expect(items[0]?.command.command).toBe("bun x.ts");
+  });
+
+  test("yields nothing for plugin without hooks", async () => {
+    const beta = (await catalog()).get("beta")!;
+    expect([...hookCommands(beta)]).toHaveLength(0);
+  });
+});
+
+describe("matcherEntries", () => {
+  test("yields one entry for alpha plugin", async () => {
+    const alpha = (await catalog()).get("alpha")!;
+    const items = [...matcherEntries(alpha)];
+    expect(items).toHaveLength(1);
+    expect(items[0]?.file).toBe("plugins/alpha/hooks/hooks.json");
+    expect(items[0]?.entry.matcher).toBe("Bash");
+  });
+
+  test("yields nothing for plugin without hooks", async () => {
+    const beta = (await catalog()).get("beta")!;
+    expect([...matcherEntries(beta)]).toHaveLength(0);
   });
 });
 

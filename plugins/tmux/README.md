@@ -7,7 +7,6 @@ Tmux session, window, and pane awareness for Claude Code.
 - **Skill: tmux** — Layout awareness, pane interaction, and notification monitoring
 - **Hook: context** — SessionStart hook that injects tmux env vars
 - **Hook: notification** — Bell and status bar notifications for permission prompts
-- **Hook: team-workaround** — Overrides `default-command` to fix [agent team pane startup race](https://github.com/anthropics/claude-code/issues/23513)
 
 ## How It Works
 

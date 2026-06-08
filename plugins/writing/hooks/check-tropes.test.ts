@@ -374,13 +374,60 @@ describe("Bash/MCP processInput", () => {
     expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
   });
 
-  it("denies Bash body-file with AI vocabulary", async () => {
+  it("denies a spaced em dash even on a non-prose tool", async () => {
+    const result = await processInput(
+      mockMcp("mcp__db__execute", {
+        statement: "Filter the rows \u2014 the pending ones \u2014 before the update runs",
+      }),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+  });
+
+  it("flags Bash body-file with AI vocabulary as context", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
     const file = join(dir, "body.md");
     await Bun.write(file, "We must delve into the issue");
     const result = await processInput(mockBash(`gh pr create --body-file ${file}`));
     await rm(dir, { recursive: true, force: true });
-    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+  });
+
+  it("does not deny Bash commands containing flagged tokens as literals", async () => {
+    const result = await processInput(mockBash('gh pr create --title "Rename underscore field"'));
+    if (result) {
+      expect(result.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+    }
+  });
+
+  it("flags AI vocabulary on a prose-bearing tool as context", async () => {
+    const result = await processInput(
+      mockMcp("mcp__linear__save_issue", {
+        title: "Login fails",
+        summary: "We delve into the intricacies of the auth flow here",
+      }),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
+  });
+
+  it("ignores AI vocabulary on a non-prose tool with a non-prose key", async () => {
+    const result = await processInput(
+      mockMcp("mcp__db__execute", {
+        statement: "We delve into the rows and underscore the totals here",
+      }),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("flags AI vocabulary on a non-prose tool with a prose key", async () => {
+    const result = await processInput(
+      mockMcp("mcp__db__execute", {
+        description: "We delve into the rows and underscore the totals here",
+      }),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
   });
 
   it("returns null for clean MCP input", async () => {
@@ -423,6 +470,7 @@ describe("Bash/MCP processInput", () => {
         payload: { body: "We delve into the system for a while longer" },
       }),
     );
-    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
   });
 });

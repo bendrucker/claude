@@ -1,8 +1,14 @@
 #!/usr/bin/env bun
 
 import { dirname, join, relative, resolve } from "node:path";
-import { loadPlugins } from "@bendrucker/claude-marketplace";
 import { Glob } from "bun";
+import { loadPlugins } from "../packages/marketplace/index";
+
+// Exit codes: 0 clean, VIOLATION_EXIT when cross-plugin imports are found.
+// Anything else (bun exits 1 on uncaught errors) means the checker itself
+// failed to run. The Stop hook in .claude/hooks/plugin-imports relies on this
+// distinction to avoid reporting a crash as a violation.
+export const VIOLATION_EXIT = 2;
 
 const rootDir = join(import.meta.dirname, "..");
 const pluginsDir = join(rootDir, "plugins");
@@ -51,14 +57,20 @@ async function checkPlugin(pluginDir: string): Promise<string[]> {
   return violations;
 }
 
-const pluginDirs = await getPluginDirs();
-const results = await Promise.all(pluginDirs.map(checkPlugin));
-const violations = results.flat();
+async function main(): Promise<void> {
+  const pluginDirs = await getPluginDirs();
+  const results = await Promise.all(pluginDirs.map(checkPlugin));
+  const violations = results.flat();
 
-for (const v of violations) {
-  console.error(v);
+  for (const v of violations) {
+    console.error(v);
+  }
+
+  if (violations.length > 0) {
+    process.exit(VIOLATION_EXIT);
+  }
 }
 
-if (violations.length > 0) {
-  process.exit(1);
+if (import.meta.main) {
+  await main();
 }

@@ -63,13 +63,15 @@ The script emits one JSON object per line on stdout:
 
 - `{"type":"status","state":"running|failing|success","sha":"...","run_id":"..."}`
 - `{"type":"conflicts","sha":"..."}` (PR mode only)
+- `{"type":"mergeable-unknown","sha":"..."}` (PR mode only)
 - `{"type":"queued-timeout","minutes":N}`
 - `{"type":"api-error","consecutive":N}`
 - `{"type":"rate-limited","retry_after":"..."}`
 - `{"type":"pr-closed"}` (PR mode only)
+- `{"type":"merged"}` (PR mode only)
 - `{"type":"max-time-reached","minutes":60}`
 
-`conflicts` and `pr-closed` fire only in PR mode; run-id and branch mode never emit them. The script exits on `status:success`, `pr-closed`, and `max-time-reached`. In run-id mode it also exits on `status:failing`, since a specific run reaches a terminal conclusion and there is no "next run" to wait for. In PR and branch mode, `failing` is not terminal (the user may push a fix or start another run).
+`conflicts`, `mergeable-unknown`, `pr-closed`, and `merged` fire only in PR mode; run-id and branch mode never emit them. `merged` and `pr-closed` are distinct terminal events: `merged` means the PR landed, `pr-closed` means it closed without merging. The script exits on `status:success`, `pr-closed`, `merged`, and `max-time-reached`. In run-id mode it also exits on `status:failing`, since a specific run reaches a terminal conclusion and there is no "next run" to wait for. In PR and branch mode, `failing` is not terminal (the user may push a fix or start another run).
 
 #### React to status:failing
 
@@ -88,10 +90,12 @@ Use the agent's JSON response to report failures to the user. The agent persists
 #### React to other events
 
 - `conflicts` (PR mode): note the conflicting SHA; the caller (e.g. `pull-request:babysit`) decides whether to resolve.
+- `mergeable-unknown` (PR mode): GitHub could not settle mergeability after bounded re-polling. Note the SHA; the caller decides whether to run an authoritative local check.
 - `queued-timeout`: surface to the user that a run has been queued past the threshold.
 - `api-error`: surface repeated CLI failures so the user can intervene.
 - `rate-limited`: back off or stop; retry once the window passes.
-- `pr-closed` (PR mode): the PR was merged, closed, or the branch was deleted. The script exits on its own.
+- `merged` (PR mode): the PR landed. The script exits on its own.
+- `pr-closed` (PR mode): the PR closed without merging, or the branch was deleted. The script exits on its own.
 - `max-time-reached`: the wall-clock cap fired. The script exits on its own.
 
 #### Initial-green case
@@ -100,7 +104,7 @@ No separate path. If the target is already green at startup, the script emits a 
 
 #### Stopping
 
-The monitor exits naturally on `status:success`, `pr-closed` (PR mode), `status:failing` (run-id mode only), or `max-time-reached`. To stop early, call `TaskStop` on the monitor task.
+The monitor exits naturally on `status:success`, `merged` or `pr-closed` (PR mode), `status:failing` (run-id mode only), or `max-time-reached`. To stop early, call `TaskStop` on the monitor task.
 
 ## References
 

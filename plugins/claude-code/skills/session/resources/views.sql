@@ -24,6 +24,31 @@ LEFT JOIN (
 ) s USING (host, session_id)
 WHERE r.type IN ('user', 'assistant');
 
+-- Per-message usage, deduped. Claude Code writes one JSONL row per content block, and
+-- every row repeats the parent message's cumulative usage, so summing token columns
+-- per-row inflates totals 2-3.5x. One row per assistant message (keyed by the API
+-- message id, falling back to the record uuid), taking MAX of each usage column.
+-- `content_rows` preserves the raw row count for queries that need it.
+CREATE OR REPLACE VIEW message_usage AS
+SELECT
+  host,
+  session_id,
+  COALESCE((data->>'$.message.id'), (data->>'$.uuid')) AS message_id,
+  ANY_VALUE(project_path) AS project_path,
+  MIN(timestamp)          AS timestamp,
+  ANY_VALUE(model)        AS model,
+  ANY_VALUE(attribution_skill)  AS attribution_skill,
+  ANY_VALUE(attribution_plugin) AS attribution_plugin,
+  ANY_VALUE(attribution_agent)  AS attribution_agent,
+  MAX(input_tokens)           AS input_tokens,
+  MAX(output_tokens)          AS output_tokens,
+  MAX(cache_read_tokens)      AS cache_read_tokens,
+  MAX(cache_creation_tokens)  AS cache_creation_tokens,
+  COUNT(*)                    AS content_rows
+FROM messages
+WHERE type = 'assistant'
+GROUP BY host, session_id, message_id;
+
 CREATE OR REPLACE TABLE content_items AS
 WITH src AS (
   SELECT

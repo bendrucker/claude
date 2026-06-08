@@ -263,7 +263,6 @@
     "pull-request@bendrucker": true,
     "interview@bendrucker": true,
     "github@claude-plugins-official": true,
-    "astral@astral-sh": true,
     "personal-review@bendrucker": true,
     "x-callback-url@bendrucker": true,
     "calendar@bendrucker": true,
@@ -330,7 +329,7 @@
       "source": {
         "source": "github",
         "repo": "vercel-labs/agent-browser",
-        "ref": "v0.27.0"
+        "ref": "v0.27.1"
       }
     }
   },
@@ -341,14 +340,14 @@
       "allowLocalBinding": true,
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
-        "~/.tmux"
+        "~/.tmux",
+        "/tmp/claude"
       ]
     },
     "filesystem": {
       "allowWrite": [
         "/tmp",
         "~/.tmux",
-        ".claude/worktrees",
         "~/.terraform.d/plugin-cache",
         "~/.cache",
         "~/Library/Caches/go-build",

@@ -16,8 +16,11 @@ import {
   probePr,
   probeRunId,
   registerApiError,
+  resolveMergeable,
   type WatcherState,
 } from "./watch";
+
+const noopSleep = (): Promise<void> => Promise.resolve();
 
 // Stub `exec` for probe* tests. Each entry maps a substring matcher (anything
 // the gh command line should contain) to a canned result. Tests assert that
@@ -58,6 +61,7 @@ function baseProbe(overrides: Partial<Probe> = {}): Probe {
     state: "running",
     runId: "run-1",
     mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
     prState: "OPEN",
     ...overrides,
   };
@@ -318,45 +322,135 @@ describe("conflicts", () => {
     const conflicts = events.filter((e) => e.type === "conflicts");
     expect(conflicts).toHaveLength(2);
   });
+
+  it("emits conflicts when mergeStateStatus is DIRTY even if mergeable lags UNKNOWN", () => {
+    const { events } = advance([
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "DIRTY" }) },
+    ]);
+    const conflicts = events.filter((e) => e.type === "conflicts");
+    expect(conflicts).toHaveLength(1);
+    expect(events.some((e) => e.type === "mergeable-unknown")).toBe(false);
+  });
+
+  it("emits both status:success and conflicts in one cycle on a green conflicting probe", () => {
+    const { events } = advance([
+      { probe: baseProbe({ sha: "s1", state: "success", mergeable: "CONFLICTING" }) },
+    ]);
+    expect(events.some((e) => e.type === "status" && e.state === "success")).toBe(true);
+    expect(events.some((e) => e.type === "conflicts" && e.sha === "s1")).toBe(true);
+  });
+});
+
+describe("mergeable-unknown", () => {
+  it("emits mergeable-unknown once per SHA when undetermined", () => {
+    const sequence = [
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+    ];
+    const { events } = advance(sequence);
+    const unknowns = events.filter((e) => e.type === "mergeable-unknown");
+    expect(unknowns).toHaveLength(1);
+    expect(unknowns[0]).toMatchObject({ sha: "s1" });
+    expect(events.some((e) => e.type === "conflicts")).toBe(false);
+  });
+
+  it("re-emits mergeable-unknown when the SHA changes", () => {
+    const sequence = [
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+      { probe: baseProbe({ sha: "s2", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+    ];
+    const { events } = advance(sequence);
+    expect(events.filter((e) => e.type === "mergeable-unknown")).toHaveLength(2);
+  });
+
+  it("does not emit mergeable-unknown once mergeability resolves to a definite value", () => {
+    const sequence = [
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+      { probe: baseProbe({ sha: "s1", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" }) },
+    ];
+    const { events } = advance(sequence);
+    expect(events.filter((e) => e.type === "mergeable-unknown")).toHaveLength(1);
+  });
+});
+
+describe("resolveMergeable", () => {
+  const mergeJson = (mergeable: string, mergeStateStatus: string): string =>
+    JSON.stringify({ mergeable, mergeStateStatus });
+
+  it("resolves to CONFLICTING once a re-poll returns a definite value", async () => {
+    const { exec, remaining } = makeExec([
+      { match: "gh pr view 42", result: ok(mergeJson("UNKNOWN", "UNKNOWN")) },
+      { match: "gh pr view 42", result: ok(mergeJson("CONFLICTING", "DIRTY")) },
+    ]);
+    const resolved = await resolveMergeable(42, exec, noopSleep);
+    expect(resolved).toEqual({ mergeable: "CONFLICTING", mergeStateStatus: "DIRTY" });
+    expect(remaining()).toEqual([]);
+  });
+
+  it("returns undetermined after exhausting the retry budget", async () => {
+    const scripted = Array.from({ length: 4 }, () => ({
+      match: "gh pr view 42",
+      result: ok(mergeJson("UNKNOWN", "UNKNOWN")),
+    }));
+    const { exec, remaining } = makeExec(scripted);
+    const resolved = await resolveMergeable(42, exec, noopSleep);
+    expect(resolved).toEqual({ mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" });
+    expect(remaining()).toEqual([]);
+  });
+});
+
+describe("merged", () => {
+  it("emits merged (not pr-closed) for MERGED state", () => {
+    const { events } = advance([{ probe: baseProbe({ prState: "MERGED" }) }]);
+    expect(events.find((e) => e.type === "merged")).toBeDefined();
+    expect(events.find((e) => e.type === "pr-closed")).toBeUndefined();
+  });
+
+  it("emits status:success before merged when merged with success checks and lastState not success", () => {
+    const { events } = advance([
+      { probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) },
+    ]);
+    const statusIdx = events.findIndex((e) => e.type === "status");
+    const mergedIdx = events.findIndex((e) => e.type === "merged");
+    expect(statusIdx).toBeGreaterThanOrEqual(0);
+    expect(events[statusIdx]).toMatchObject({ type: "status", state: "success", sha: "s1" });
+    expect(mergedIdx).toBeGreaterThan(statusIdx);
+  });
+
+  it("emits only merged when merged with success checks and lastState already success", () => {
+    const initial: WatcherState = { ...initialState(), lastState: "success", lastSha: "s1" };
+    const { events } = advance(
+      [{ probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) }],
+      { initial },
+    );
+    expect(events).toEqual([{ type: "merged" }]);
+  });
+
+  it("emits only merged when merged with failing checks (no false success)", () => {
+    const { events } = advance([
+      { probe: baseProbe({ prState: "MERGED", state: "failing", sha: "s1" }) },
+    ]);
+    expect(events.find((e) => e.type === "status")).toBeUndefined();
+    expect(events.find((e) => e.type === "merged")).toBeDefined();
+  });
 });
 
 describe("pr-closed", () => {
-  it("emits pr-closed for MERGED state", () => {
-    const { events } = advance([{ probe: baseProbe({ prState: "MERGED" }) }]);
-    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
-  });
-
-  it("emits pr-closed for CLOSED state", () => {
+  it("emits pr-closed (not merged) for CLOSED state", () => {
     const { events } = advance([{ probe: baseProbe({ prState: "CLOSED" }) }]);
     expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
+    expect(events.find((e) => e.type === "merged")).toBeUndefined();
   });
 
-  it("emits status:success before pr-closed when merged with success checks and lastState not success", () => {
+  it("emits status:success before pr-closed when closed with success checks and lastState not success", () => {
     const { events } = advance([
-      { probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) },
+      { probe: baseProbe({ prState: "CLOSED", state: "success", sha: "s1" }) },
     ]);
     const statusIdx = events.findIndex((e) => e.type === "status");
     const closedIdx = events.findIndex((e) => e.type === "pr-closed");
     expect(statusIdx).toBeGreaterThanOrEqual(0);
     expect(events[statusIdx]).toMatchObject({ type: "status", state: "success", sha: "s1" });
     expect(closedIdx).toBeGreaterThan(statusIdx);
-  });
-
-  it("emits only pr-closed when merged with success checks and lastState already success", () => {
-    const initial: WatcherState = { ...initialState(), lastState: "success", lastSha: "s1" };
-    const { events } = advance(
-      [{ probe: baseProbe({ prState: "MERGED", state: "success", sha: "s1" }) }],
-      { initial },
-    );
-    expect(events).toEqual([{ type: "pr-closed" }]);
-  });
-
-  it("emits only pr-closed when merged with failing checks (no false success)", () => {
-    const { events } = advance([
-      { probe: baseProbe({ prState: "MERGED", state: "failing", sha: "s1" }) },
-    ]);
-    expect(events.find((e) => e.type === "status")).toBeUndefined();
-    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
   });
 });
 

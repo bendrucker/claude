@@ -9,7 +9,7 @@ hooks:
     - matcher: "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/render.ts:*)|Bash(bun ${CLAUDE_SKILL_DIR}/scripts/render-html.ts:*)"
       hooks:
         - type: command
-          command: "bun ${CLAUDE_SKILL_DIR}/scripts/setup.ts"
+          command: "bun ${CLAUDE_PLUGIN_ROOT}/skills/wireframe/scripts/setup.ts"
           once: true
         - type: command
           command: |
@@ -18,7 +18,7 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "bun ${CLAUDE_SKILL_DIR}/scripts/validate-hook.ts"
+          command: "bun ${CLAUDE_PLUGIN_ROOT}/skills/wireframe/scripts/validate-hook.ts"
 ---
 
 # Wireframe

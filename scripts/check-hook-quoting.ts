@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { loadPlugins } from "@bendrucker/claude-marketplace";
+import { loadPlugins } from "../packages/marketplace/index";
 
 // Matches an unquoted ${CLAUDE_PLUGIN_ROOT}/... path segment in a command string.
 // The path is unquoted if it is NOT preceded by a double quote.

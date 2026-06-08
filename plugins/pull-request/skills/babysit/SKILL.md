@@ -1,7 +1,7 @@
 ---
 name: pull-request:babysit
 description: |
-  Monitor a PR's CI, fix trivial failures (lint, types, formatting), and self-cancel when green. Use after pushing when you want hands-off CI monitoring with automatic fixes. With --merge, drive the PR all the way to merged (handling merge-train/queue kickouts, rebase issues, and re-runs); with --reviews, hand off to AI-review triage after the first green.
+  Monitor a PR's CI, fix trivial failures (lint, types, formatting), and self-cancel when green. Use after pushing for hands-off CI monitoring. With --merge, drive the PR to merged (handling merge-train/queue kickouts, rebase issues, and re-runs); with --reviews, hand off to AI-review triage after the first green.
 argument-hint: "[--merge] [--reviews]"
 allowed-tools:
   - Monitor

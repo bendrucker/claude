@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: hands off to Launch Services (open) for Things URL schemes
 
-import { $ } from "bun";
+import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
-import { buildUrl } from "./url";
+import { dispatch } from "./url";
 
 const INTERMEDIATE_LIST: Record<string, string> = {
   today: "anytime",
@@ -11,11 +11,20 @@ const INTERMEDIATE_LIST: Record<string, string> = {
   someday: "anytime",
 };
 
-async function openJsonUrl(data: object[]): Promise<void> {
+async function updateWhen(ids: string[], when: string): Promise<void> {
   const params = new Map<string, string>();
-  params.set("data", JSON.stringify(data));
-  const url = await buildUrl("json", params);
-  await $`open -g ${url}`;
+  params.set(
+    "data",
+    JSON.stringify(
+      ids.map((id) => ({
+        type: "to-do",
+        operation: "update",
+        id,
+        attributes: { when },
+      })),
+    ),
+  );
+  await dispatch("json", params);
 }
 
 async function reorder(targetList: string, ids: string[]): Promise<void> {
@@ -30,30 +39,13 @@ async function reorder(targetList: string, ids: string[]): Promise<void> {
     process.exit(1);
   }
 
-  await openJsonUrl(
-    ids.map((id) => ({
-      type: "to-do",
-      operation: "update",
-      id,
-      attributes: { when: intermediate },
-    })),
-  );
-
-  await openJsonUrl(
-    ids.map((id) => ({
-      type: "to-do",
-      operation: "update",
-      id,
-      attributes: { when: targetList },
-    })),
-  );
+  await updateWhen(ids, intermediate);
+  await updateWhen(ids, targetList);
 
   console.log(JSON.stringify({ success: true, list: targetList, reordered: ids.length }));
 }
 
 if (import.meta.main) {
-  const { cli } = await import("cleye");
-
   const argv = cli({
     name: "reorder",
     parameters: ["[ids...]"],

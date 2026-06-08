@@ -4,6 +4,7 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { $ } from "bun";
+import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
 
 const AUTH_REQUIRED_COMMANDS = ["update", "update-project", "json"] as const;
@@ -29,7 +30,7 @@ function requiresAuth(command: string): boolean {
   return (AUTH_REQUIRED_COMMANDS as readonly string[]).includes(command);
 }
 
-export async function getAuthToken(): Promise<string> {
+async function getAuthToken(): Promise<string> {
   try {
     const result =
       await $`security find-generic-password -a "$USER" -s "things-auth-token" -w`.text();
@@ -41,11 +42,11 @@ export async function getAuthToken(): Promise<string> {
   }
 }
 
-export interface OpenUrlOptions {
+interface OpenUrlOptions {
   background?: boolean;
 }
 
-export async function buildUrl(command: string, params: Map<string, string>): Promise<string> {
+async function buildUrl(command: string, params: Map<string, string>): Promise<string> {
   if (!isValidCommand(command)) {
     throw new Error(`Invalid command: ${command}`);
   }
@@ -75,7 +76,7 @@ export function isSandboxBlockedHandoff(stderr: string): boolean {
   );
 }
 
-export async function openUrl(
+async function openUrl(
   command: string,
   params: Map<string, string>,
   options?: OpenUrlOptions,
@@ -102,7 +103,7 @@ export async function openUrl(
   }
 }
 
-export async function findXcallRunner(): Promise<string | null> {
+async function findXcallRunner(): Promise<string | null> {
   const pluginRoot = join(import.meta.dirname, "..");
 
   // Dev layout: sibling plugin directory
@@ -172,11 +173,7 @@ export function buildJsonPayload(ids: string[], attributes: Record<string, strin
   return JSON.stringify(data);
 }
 
-export async function xcall(url: string): Promise<string> {
-  const runner = await findXcallRunner();
-  if (!runner) {
-    throw new Error("xcall not found — x-callback-url plugin not installed");
-  }
+async function xcall(runner: string, url: string): Promise<string> {
   const proc = Bun.spawn([runner, url], { stdout: "pipe", timeout: 10_000 });
   const text = await new Response(proc.stdout).text();
   const code = await proc.exited;
@@ -184,10 +181,59 @@ export async function xcall(url: string): Promise<string> {
   return text.trim();
 }
 
+function parseThingsId(xcallOutput: string): string | null {
+  const match = xcallOutput.match(/x-things-id=([^&\s]+)/);
+  return match?.[1] ?? null;
+}
+
+export interface DispatchResult {
+  /** The created/updated todo id, when xcall returned one. */
+  id: string | null;
+  /** Raw xcall stdout, or null when the call fell back to Launch Services open. */
+  output: string | null;
+  /** Whether the call ran via xcall (true) or fell back to Launch Services open (false). */
+  viaXcall: boolean;
+}
+
+/**
+ * Runner and open hooks for {@link dispatch}, injectable for tests.
+ * Mirrors the MergeActions pattern in plugins/gitlab/scripts/merge.ts.
+ */
+export interface DispatchActions {
+  findXcallRunner(): Promise<string | null>;
+  xcall(runner: string, url: string): Promise<string>;
+  openUrl(command: string, params: Map<string, string>, options?: OpenUrlOptions): Promise<void>;
+}
+
+const defaultActions: DispatchActions = { findXcallRunner, xcall, openUrl };
+
+/**
+ * Builds the Things URL for an action, runs it through xcall when the
+ * x-callback-url runner is available, and falls back to a Launch Services open
+ * on any xcall failure. Returns the parsed todo id when xcall surfaced one.
+ */
+export async function dispatch(
+  command: string,
+  params: Map<string, string>,
+  actions: DispatchActions = defaultActions,
+): Promise<DispatchResult> {
+  const runner = await actions.findXcallRunner();
+  if (runner) {
+    const url = await buildUrl(command, params);
+    try {
+      const result = await actions.xcall(runner, url);
+      return { id: parseThingsId(result), output: result, viaXcall: true };
+    } catch {
+      // fall through to Launch Services
+    }
+  }
+
+  await actions.openUrl(command, params);
+  return { id: null, output: null, viaXcall: false };
+}
+
 if (import.meta.main) {
   await ensureThingsRunning();
-
-  const { cli } = await import("cleye");
 
   const argv = cli({
     name: "url",
@@ -218,6 +264,10 @@ if (import.meta.main) {
 
   const useBulkJson = command === "update" && ids.length > 1;
 
+  const callbackActions: DispatchActions = argv.flags.callback
+    ? defaultActions
+    : { ...defaultActions, findXcallRunner: async () => null };
+
   if (useBulkJson) {
     const attributes: Record<string, string> = {};
     for (const [key, value] of params) {
@@ -226,34 +276,18 @@ if (import.meta.main) {
     const payload = buildJsonPayload(ids, attributes);
     const jsonParams = new Map<string, string>();
     jsonParams.set("data", payload);
-    if (argv.flags.callback && (await findXcallRunner())) {
-      const url = await buildUrl("json", jsonParams);
-      try {
-        const result = await xcall(url);
-        console.log(result);
-      } catch (error) {
-        console.error("xcall failed, falling back to open", error);
-        await openUrl("json", jsonParams);
-      }
-    } else {
-      await openUrl("json", jsonParams);
+    const result = await dispatch("json", jsonParams, callbackActions);
+    if (result.output !== null) {
+      console.log(result.output);
     }
   } else {
     const singleId = ids[0];
     if (singleId) {
       params.set("id", singleId);
     }
-    if (argv.flags.callback && (await findXcallRunner())) {
-      const url = await buildUrl(command, params);
-      try {
-        const result = await xcall(url);
-        console.log(result);
-      } catch (error) {
-        console.error("xcall failed, falling back to open", error);
-        await openUrl(command, params);
-      }
-    } else {
-      await openUrl(command, params);
+    const result = await dispatch(command, params, callbackActions);
+    if (result.output !== null) {
+      console.log(result.output);
     }
   }
 }

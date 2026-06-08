@@ -39,7 +39,7 @@ Parse `$ARGUMENTS` for two optional flags, both off by default so plain babysit 
 
 ## Bounds
 
-One babysit invocation owns at most one watcher generation. The watcher enforces the wall clock (`--max-minutes`, default 60), poll interval, and dedup, so pass `--max-minutes` through when the user supplies one. After `max-time-reached` the watcher has exited: report and stop, never re-arm a fresh watcher. If babysit runs under `/loop`, the loop owns repetition, not babysit.
+Every wait babysit performs runs through a watcher, including the post-submit merge wait ([Merge Mode](#merge-mode)); babysit has no poll loop of its own. The watcher enforces the wall clock (`--max-minutes`, default 60), poll interval, and dedup, so pass `--max-minutes` through when the user supplies one. After a watcher emits `max-time-reached` it has exited: report and stop, never re-arm a fresh watcher. If babysit runs under `/loop`, the loop owns repetition, not babysit.
 
 ## Event Handlers
 
@@ -112,7 +112,11 @@ Report `retry_after` and wait. The watcher resumes polling once the window elaps
 
 #### pr-closed
 
-Report and stop. The watcher has already exited.
+The PR closed without merging, or its source branch no longer exists. Report and stop. The watcher has already exited.
+
+#### merged
+
+The PR landed. In [Merge Mode](#merge-mode) this is the success terminal: report the merge and the work done since the start SHA, then stop. The watcher has already exited.
 
 #### max-time-reached
 
@@ -138,7 +142,15 @@ Submit by the most automated path the repo allows (merge queue/train, else auto-
 - **GitHub**: `gh pr merge <pr-url> --auto --squash` enables auto-merge or queues the PR. If `--auto` is rejected, merge directly: `gh pr merge <pr-url> --squash`. Prefer squash → merge → rebase per `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
 - **GitLab**: delegate to the `gitlab:merge-request` skill.
 
-Then poll until it merges or is kicked out. This is babysit's only self-driven loop, so poll no faster than 60s and honor the 60-minute wall clock. On a kickout, diagnose and re-submit: a rebase/merge conflict routes through the [conflicts](#conflicts) handler, a CI failure through [status: failing](#status-failing) (each produces a new SHA). Stop on: merged (success); 3 submit attempts (re-submits included, an oscillation guard); the 60-minute wall clock; an unrecoverable block (missing human approval, non-trivial CI failure, non-lockfile conflict, permissions); or PR closed.
+Then watch the merge through the monitor rather than polling by hand: invoke the provider's monitor skill again on the PR and react to its events. The watcher enforces the interval and the wall clock, so this phase stays bounded like the CI wait (see [Bounds](#bounds)) and babysit owns no loop here. React to:
+
+- `merged`: the PR landed. Report success and `TaskStop`.
+- `conflicts`: route through the [conflicts](#conflicts) handler, then re-submit. Counts as a submit attempt.
+- `status: failing`: route through the [status: failing](#status-failing) handler; the pushed fix produces a new SHA, then re-submit. Counts as a submit attempt.
+- `pr-closed`: the PR closed without merging. Report and `TaskStop`.
+- `max-time-reached`: report and `TaskStop`; do not re-arm.
+
+Stop re-submitting after 3 attempts (re-submits included, an oscillation guard) or an unrecoverable block (missing human approval, non-trivial CI failure, non-lockfile conflict, permissions).
 
 ## Gotchas
 

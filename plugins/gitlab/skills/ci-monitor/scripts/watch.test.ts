@@ -382,12 +382,12 @@ describe("deriveEvents", () => {
     expect(next.events).toContainEqual({ type: "mergeable-unknown", sha: "sha2" });
   });
 
-  it("emits pr-closed when the MR is closed", () => {
+  it("emits pr-closed (not merged) when the MR is closed", () => {
     const { events } = deriveEvents(makeProbe({ mrState: "closed" }), initialState(), 0, 15);
     expect(events).toEqual([{ type: "pr-closed" }]);
   });
 
-  it("emits pr-closed when the MR is merged (lastState already success)", () => {
+  it("emits merged (not pr-closed) when the MR is merged (lastState already success)", () => {
     const initial = { ...initialState(), lastState: "success" as const, lastSha: "sha1" };
     const { events } = deriveEvents(
       makeProbe({ mrState: "merged", state: "success" }),
@@ -395,10 +395,10 @@ describe("deriveEvents", () => {
       0,
       15,
     );
-    expect(events).toEqual([{ type: "pr-closed" }]);
+    expect(events).toEqual([{ type: "merged" }]);
   });
 
-  it("emits status:success before pr-closed when merged and lastState not success", () => {
+  it("emits status:success before merged when merged and lastState not success", () => {
     const { events } = deriveEvents(
       makeProbe({ mrState: "merged", state: "success", sha: "sha1", runId: "100" }),
       initialState(),
@@ -406,7 +406,7 @@ describe("deriveEvents", () => {
       15,
     );
     const statusIdx = events.findIndex((e) => e.type === "status");
-    const closedIdx = events.findIndex((e) => e.type === "pr-closed");
+    const mergedIdx = events.findIndex((e) => e.type === "merged");
     expect(statusIdx).toBeGreaterThanOrEqual(0);
     expect(events[statusIdx]).toEqual({
       type: "status",
@@ -414,10 +414,10 @@ describe("deriveEvents", () => {
       sha: "sha1",
       run_id: "100",
     });
-    expect(closedIdx).toBeGreaterThan(statusIdx);
+    expect(mergedIdx).toBeGreaterThan(statusIdx);
   });
 
-  it("emits only pr-closed when merged with failing checks (no false success)", () => {
+  it("emits only merged when merged with failing checks (no false success)", () => {
     const { events } = deriveEvents(
       makeProbe({ mrState: "merged", state: "failing" }),
       initialState(),
@@ -425,7 +425,7 @@ describe("deriveEvents", () => {
       15,
     );
     expect(events.find((e) => e.type === "status")).toBeUndefined();
-    expect(events.find((e) => e.type === "pr-closed")).toBeDefined();
+    expect(events.find((e) => e.type === "merged")).toBeDefined();
   });
 });
 

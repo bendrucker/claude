@@ -54,10 +54,11 @@ Each line is one of:
 - `{"type":"queued-timeout","minutes":N}`: pipeline has been queued longer than the threshold.
 - `{"type":"api-error","consecutive":N}`: consecutive `glab` failures crossed the threshold.
 - `{"type":"rate-limited","retry_after":"..."}`: emitted only when `glab` surfaces structured rate-limit data.
-- `{"type":"pr-closed"}`: MR was merged, closed, or the source branch was deleted. MR mode only. The script exits after emitting.
+- `{"type":"pr-closed"}`: MR closed without merging, or the source branch was deleted. MR mode only. The script exits after emitting.
+- `{"type":"merged"}`: MR merged. MR mode only. The script exits after emitting.
 - `{"type":"max-time-reached","minutes":60}`: wall-clock cap hit. The script exits after emitting.
 
-In branch and pipeline-id modes, `conflicts`, `mergeable-unknown`, and `pr-closed` are never emitted (there is no MR metadata to derive them from).
+In branch and pipeline-id modes, `conflicts`, `mergeable-unknown`, `pr-closed`, and `merged` are never emitted (there is no MR metadata to derive them from). `merged` and `pr-closed` are distinct terminal events: `merged` means the MR landed, `pr-closed` means it closed without merging.
 
 The script exits on `status: success` in every mode. In pipeline-id mode it also exits on `status: failing` (the pipeline is terminal).
 
@@ -81,11 +82,11 @@ On `mergeable-unknown`, report the SHA; the caller decides whether to run an aut
 
 On `queued-timeout`, `api-error`, or `rate-limited`, surface the event once and keep the monitor running. Consecutive rate-limit or api-error events indicate the monitor should be stopped manually.
 
-On `pr-closed` or `max-time-reached`, the monitor has already exited. Report and finish.
+On `merged`, `pr-closed`, or `max-time-reached`, the monitor has already exited. Report and finish.
 
 #### Stopping
 
-The monitor exits on its own for `status: success`, `pr-closed`, and `max-time-reached`. In pipeline-id mode it also exits on `status: failing`. To stop earlier (for example after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
+The monitor exits on its own for `status: success`, `merged`, `pr-closed`, and `max-time-reached`. In pipeline-id mode it also exits on `status: failing`. To stop earlier (for example after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
 
 ## Reference
 

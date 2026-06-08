@@ -45,6 +45,7 @@ export type Event =
   | { type: "api-error"; consecutive: number }
   | { type: "rate-limited"; retry_after: string }
   | { type: "pr-closed" }
+  | { type: "merged" }
   | { type: "max-time-reached"; minutes: number };
 
 // A conflict is definite when either signal says so; mergeability is
@@ -106,7 +107,7 @@ export function deriveEvents(
       });
       next = { ...next, lastSha: probe.sha, lastState: "success" };
     }
-    events.push({ type: "pr-closed" });
+    events.push(probe.prState === "MERGED" ? { type: "merged" } : { type: "pr-closed" });
     return { events, state: next };
   }
 
@@ -689,6 +690,7 @@ async function run(options: RunOptions): Promise<void> {
       const terminal = outcome.events.find(
         (e) =>
           e.type === "pr-closed" ||
+          e.type === "merged" ||
           (e.type === "status" && e.state === "success") ||
           (options.mode === "run-id" && e.type === "status" && e.state === "failing"),
       );

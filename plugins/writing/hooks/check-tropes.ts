@@ -34,7 +34,7 @@ function isProse(value: string): boolean {
   return /\s/.test(value);
 }
 
-type ProseEntry = { key?: string; value: string };
+type ProseEntry = { key: string | undefined; value: string };
 
 function extractProseEntries(value: unknown, key?: string): ProseEntry[] {
   if (shouldSkipKey(key)) return [];

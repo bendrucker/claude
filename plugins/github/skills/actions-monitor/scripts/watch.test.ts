@@ -16,8 +16,11 @@ import {
   probePr,
   probeRunId,
   registerApiError,
+  resolveMergeable,
   type WatcherState,
 } from "./watch";
+
+const noopSleep = (): Promise<void> => Promise.resolve();
 
 // Stub `exec` for probe* tests. Each entry maps a substring matcher (anything
 // the gh command line should contain) to a canned result. Tests assert that
@@ -58,6 +61,7 @@ function baseProbe(overrides: Partial<Probe> = {}): Probe {
     state: "running",
     runId: "run-1",
     mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
     prState: "OPEN",
     ...overrides,
   };
@@ -317,6 +321,81 @@ describe("conflicts", () => {
     const { events } = advance(sequence);
     const conflicts = events.filter((e) => e.type === "conflicts");
     expect(conflicts).toHaveLength(2);
+  });
+
+  it("emits conflicts when mergeStateStatus is DIRTY even if mergeable lags UNKNOWN", () => {
+    const { events } = advance([
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "DIRTY" }) },
+    ]);
+    const conflicts = events.filter((e) => e.type === "conflicts");
+    expect(conflicts).toHaveLength(1);
+    expect(events.some((e) => e.type === "mergeable-unknown")).toBe(false);
+  });
+
+  it("emits both status:success and conflicts in one cycle on a green conflicting probe", () => {
+    const { events } = advance([
+      { probe: baseProbe({ sha: "s1", state: "success", mergeable: "CONFLICTING" }) },
+    ]);
+    expect(events.some((e) => e.type === "status" && e.state === "success")).toBe(true);
+    expect(events.some((e) => e.type === "conflicts" && e.sha === "s1")).toBe(true);
+  });
+});
+
+describe("mergeable-unknown", () => {
+  it("emits mergeable-unknown once per SHA when undetermined", () => {
+    const sequence = [
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+    ];
+    const { events } = advance(sequence);
+    const unknowns = events.filter((e) => e.type === "mergeable-unknown");
+    expect(unknowns).toHaveLength(1);
+    expect(unknowns[0]).toMatchObject({ sha: "s1" });
+    expect(events.some((e) => e.type === "conflicts")).toBe(false);
+  });
+
+  it("re-emits mergeable-unknown when the SHA changes", () => {
+    const sequence = [
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+      { probe: baseProbe({ sha: "s2", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+    ];
+    const { events } = advance(sequence);
+    expect(events.filter((e) => e.type === "mergeable-unknown")).toHaveLength(2);
+  });
+
+  it("does not emit mergeable-unknown once mergeability resolves to a definite value", () => {
+    const sequence = [
+      { probe: baseProbe({ sha: "s1", mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" }) },
+      { probe: baseProbe({ sha: "s1", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" }) },
+    ];
+    const { events } = advance(sequence);
+    expect(events.filter((e) => e.type === "mergeable-unknown")).toHaveLength(1);
+  });
+});
+
+describe("resolveMergeable", () => {
+  const mergeJson = (mergeable: string, mergeStateStatus: string): string =>
+    JSON.stringify({ mergeable, mergeStateStatus });
+
+  it("resolves to CONFLICTING once a re-poll returns a definite value", async () => {
+    const { exec, remaining } = makeExec([
+      { match: "gh pr view 42", result: ok(mergeJson("UNKNOWN", "UNKNOWN")) },
+      { match: "gh pr view 42", result: ok(mergeJson("CONFLICTING", "DIRTY")) },
+    ]);
+    const resolved = await resolveMergeable(42, exec, noopSleep);
+    expect(resolved).toEqual({ mergeable: "CONFLICTING", mergeStateStatus: "DIRTY" });
+    expect(remaining()).toEqual([]);
+  });
+
+  it("returns undetermined after exhausting the retry budget", async () => {
+    const scripted = Array.from({ length: 4 }, () => ({
+      match: "gh pr view 42",
+      result: ok(mergeJson("UNKNOWN", "UNKNOWN")),
+    }));
+    const { exec, remaining } = makeExec(scripted);
+    const resolved = await resolveMergeable(42, exec, noopSleep);
+    expect(resolved).toEqual({ mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" });
+    expect(remaining()).toEqual([]);
   });
 });
 

@@ -50,13 +50,14 @@ Each line is one of:
 
 - `{"type":"status","state":"running|failing|success","sha":"...","run_id":"..."}`: `run_id` is the GitLab pipeline ID.
 - `{"type":"conflicts","sha":"..."}`: MR reports merge conflicts against the target branch. MR mode only.
+- `{"type":"mergeable-unknown","sha":"..."}`: GitLab could not settle merge status after bounded re-polling. MR mode only.
 - `{"type":"queued-timeout","minutes":N}`: pipeline has been queued longer than the threshold.
 - `{"type":"api-error","consecutive":N}`: consecutive `glab` failures crossed the threshold.
 - `{"type":"rate-limited","retry_after":"..."}`: emitted only when `glab` surfaces structured rate-limit data.
 - `{"type":"pr-closed"}`: MR was merged, closed, or the source branch was deleted. MR mode only. The script exits after emitting.
 - `{"type":"max-time-reached","minutes":60}`: wall-clock cap hit. The script exits after emitting.
 
-In branch and pipeline-id modes, `conflicts` and `pr-closed` are never emitted (there is no MR metadata to derive them from).
+In branch and pipeline-id modes, `conflicts`, `mergeable-unknown`, and `pr-closed` are never emitted (there is no MR metadata to derive them from).
 
 The script exits on `status: success` in every mode. In pipeline-id mode it also exits on `status: failing` (the pipeline is terminal).
 
@@ -75,6 +76,8 @@ Agent(
 Surface the summary to the parent conversation. Do not attempt fixes; `pull-request:babysit` owns that decision.
 
 On `conflicts`, report the SHA with conflicts and stop watching; conflict resolution belongs to the caller.
+
+On `mergeable-unknown`, report the SHA; the caller decides whether to run an authoritative local check.
 
 On `queued-timeout`, `api-error`, or `rate-limited`, surface the event once and keep the monitor running. Consecutive rate-limit or api-error events indicate the monitor should be stopped manually.
 

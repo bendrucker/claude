@@ -10,14 +10,7 @@
  */
 import { compromiseTagger } from "../../../linguistics/compromise";
 import type { Tagger } from "../../../linguistics/tagger";
-import { type CorpusStats, type LiftRow, processCorpus, processRows } from "./ngram";
-
-export interface TagProcessedRows {
-  stats: CorpusStats;
-  sessionSpread: Map<string, number>;
-  /** Shortest corpus sentence seen for each tag sequence. */
-  examples: Map<string, string>;
-}
+import type { LiftRow } from "./ngram";
 
 export interface TagSignatureRow extends LiftRow {
   example: string | null;
@@ -35,30 +28,4 @@ export function tagSequence(sentence: string, tagger: Tagger = compromiseTagger)
     .flatMap((tagged) => tagged.tokens)
     .filter((token) => token.tag !== "PUNCT" && token.tag !== "X")
     .map((token) => token.tag);
-}
-
-/** Tag-sequence corpus stats plus session spread and shortest examples. */
-export function processTagRows(
-  rows: Array<{ session_id: string; text?: string }>,
-  sizes: number[] = [3, 4, 5],
-  tagger: Tagger = compromiseTagger,
-): TagProcessedRows {
-  const examples = new Map<string, string>();
-  const { stats, sessionSpread } = processRows(rows, sizes, {
-    tokenize: (sentence) => tagSequence(sentence, tagger),
-    examples,
-  });
-  return { stats, sessionSpread, examples };
-}
-
-/**
- * Tag-sequence corpus stats only, for the baseline corpus where session
- * spread and examples are not needed (mirrors `processCorpus` for words).
- */
-export function processTagCorpus(
-  text: string,
-  sizes: number[] = [3, 4, 5],
-  tagger: Tagger = compromiseTagger,
-): CorpusStats {
-  return processCorpus(text, sizes, (sentence) => tagSequence(sentence, tagger));
 }

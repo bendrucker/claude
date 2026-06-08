@@ -20,7 +20,7 @@ import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram
 import { findQuote } from "./quote-context";
 import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
 import { auditStructuralPatterns } from "./structural";
-import { processTagCorpus, processTagRows, type TagSignatureRow } from "./tag-ngram";
+import { type TagSignatureRow, tagSequence } from "./tag-ngram";
 import { loadProfile, phraseProfileStat } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 import { loadWordlists } from "./wordlists";
@@ -247,8 +247,13 @@ async function main(): Promise<void> {
     const deliverableAudit = auditDeliverableCorpus(wordlistEntries, deliverableRows);
 
     console.error("Computing structural signatures (part-of-speech tag sequences)");
-    const tagAssistant = processTagRows(deliverableRows);
-    const tagUser = processTagCorpus(userText);
+    const tagSizes = [3, 4, 5];
+    const tagExamples = new Map<string, string>();
+    const tagAssistant = processRows(deliverableRows, tagSizes, {
+      tokenize: (s) => tagSequence(s),
+      examples: tagExamples,
+    });
+    const tagUser = processCorpus(userText, tagSizes, (s) => tagSequence(s));
     // Tag sequences draw from an alphabet of ~17 tags, so they are far
     // denser than word n-grams; the floors are higher to compensate.
     const tagLifts = computeLift({
@@ -263,7 +268,7 @@ async function main(): Promise<void> {
       .map((r) => ({
         ...r,
         sessions: tagAssistant.sessionSpread.get(r.phrase) ?? 0,
-        example: tagAssistant.examples.get(r.phrase) ?? null,
+        example: tagExamples.get(r.phrase) ?? null,
       }));
 
     console.error("Fetching correction candidates");

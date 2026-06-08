@@ -3,8 +3,8 @@ import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
-import { isMemoryPath, isPlanPath, isProseFile } from "../../../hooks/markdown";
-import { type ScanResult, scanAll } from "../../../hooks/scan";
+import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
+import { type ScanResult, scanAll } from "../../../detection/scan";
 
 const SKIP_SEGMENTS = ["node_modules", ".git"];
 const WORDLIST_PATH = /(?:^|\/)wordlists\/[^/]+\.txt$/;

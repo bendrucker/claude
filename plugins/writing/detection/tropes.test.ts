@@ -1,5 +1,20 @@
 import { describe, expect, it } from "bun:test";
-import { firstByTier, type PatternMatch, scan, stripCode } from "./tropes";
+import { firstByTier, type PatternMatch, regexCatalog, scan, stripCode } from "./tropes";
+
+describe("regexCatalog", () => {
+  it("returns globalized regex patterns for counting", () => {
+    for (const entry of regexCatalog()) {
+      expect(entry.pattern.global).toBe(true);
+    }
+  });
+
+  it("includes a known structural pattern and excludes wordlist-backed ones", () => {
+    const categories = regexCatalog().map((entry) => entry.category);
+    expect(categories).toContain("spaced em dash");
+    expect(categories).not.toContain("sycophantic opener");
+    expect(categories).not.toContain("AI vocabulary");
+  });
+});
 
 describe("stripCode", () => {
   it("replaces fenced code blocks with their newline count", () => {

@@ -24,7 +24,7 @@ Used for openers and let-me-verbs where the match depends on position context (l
 
 `<word> <weight>` per line. Uses the same Porter stemmer as vocabulary. The hook accumulates the weighted total of hits and reminds when the total clears a threshold.
 
-The loader lives in [`hooks/wordlists.ts`](hooks/wordlists.ts). Compiled patterns are exposed via the `WORDLISTS` constant and consumed by `tropes.ts`.
+The loader lives in [`detection/wordlists.ts`](detection/wordlists.ts). Compiled patterns are exposed via the `WORDLISTS` constant and consumed by `tropes.ts`.
 
 ## Hook Commands
 

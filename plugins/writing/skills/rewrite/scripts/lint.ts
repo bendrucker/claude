@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { scanAll } from "../../../hooks/scan";
+import { scanAll } from "../../../detection/scan";
 
 async function readInput(arg: string | undefined): Promise<{ text: string; filePath?: string }> {
   if (arg && (await Bun.file(arg).exists())) {

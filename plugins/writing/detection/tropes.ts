@@ -1,4 +1,4 @@
-import { isProseFile } from "./markdown";
+import { isProseFile } from "./paths";
 import {
   type Hits,
   type StemmedWeight,
@@ -306,6 +306,36 @@ function countNewlines(text: string): number {
     if (char === "\n") count++;
   }
   return count;
+}
+
+export type RegexCatalogEntry = {
+  category: string;
+  pattern: RegExp;
+  fileOnly?: boolean;
+  sideEffectOnly?: boolean;
+};
+
+function globalize(pattern: RegExp): RegExp {
+  return new RegExp(
+    pattern.source,
+    pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`,
+  );
+}
+
+// The regex-backed structural patterns, normalized to the global flag for
+// counting. Wordlist-backed patterns (stemmed vocabulary, weighted verbs, and
+// the compiled openers regex) and function-based tests are excluded: a single
+// regex match cannot count those, and the corpus FTS pass covers the wordlists.
+export function regexCatalog(): RegexCatalogEntry[] {
+  return PATTERNS.filter(
+    (def): def is PatternDef & { test: RegExp } =>
+      def.test instanceof RegExp && def.test !== WORDLISTS.openers,
+  ).map((def) => ({
+    category: def.category,
+    pattern: globalize(def.test),
+    fileOnly: def.fileOnly ?? false,
+    sideEffectOnly: def.sideEffectOnly ?? false,
+  }));
 }
 
 // Replace code with whitespace that preserves both line and column offsets, so a

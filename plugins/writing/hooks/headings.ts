@@ -6,16 +6,9 @@ import { apStyleTitleCase } from "ap-style-title-case";
 import type { Heading, Paragraph, Strong, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
+import { getExtension, isMarkdownFile, isMemoryPath } from "../detection/paths";
 import { classifyHeadingBaseline } from "../linguistics/heading";
-import {
-  type EditInput,
-  formatContext,
-  getExtension,
-  isMarkdownFile,
-  isMemoryPath,
-  type SyncHookJSONOutput,
-  type WriteInput,
-} from "./markdown";
+import { type EditInput, formatContext, type SyncHookJSONOutput, type WriteInput } from "./io";
 
 const PLACEHOLDER = "\0";
 

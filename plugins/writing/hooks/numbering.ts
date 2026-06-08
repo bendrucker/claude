@@ -11,16 +11,8 @@ import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runn
 import type { Heading, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import {
-  type EditInput,
-  formatDecision,
-  getExtension,
-  isMarkdownFile,
-  isMemoryPath,
-  isPlanPath,
-  type SyncHookJSONOutput,
-  type WriteInput,
-} from "./markdown";
+import { getExtension, isMarkdownFile, isMemoryPath, isPlanPath } from "../detection/paths";
+import { type EditInput, formatDecision, type SyncHookJSONOutput, type WriteInput } from "./io";
 
 type Mode = "write" | "edit";
 

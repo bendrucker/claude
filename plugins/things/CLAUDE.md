@@ -25,9 +25,11 @@ JXA runs on JavaScriptCore (ES5). Scripts must:
 
 Biome linting is disabled for `scripts/jxa/` files via the root `biome.json` override.
 
-## Reorder Script
+## URL Dispatch
 
-`scripts/reorder.ts` is a bun TypeScript script that reuses `url.ts` exports (`getAuthToken`, `buildUrl`). It opens Things URLs via `open -g` to reorder items. Unlike the JXA scripts, it does not use `osascript`. Sandbox bypass comes from the `mac` plugin's marker hook, which detects the `claude:dangerouslyDisableSandbox` comment in the script head.
+`scripts/url.ts` owns the URL handoff. `dispatch(command, params)` builds the Things URL, runs it through the x-callback-url runner when available, and falls back to a Launch Services `open` on any xcall failure, returning the parsed todo id when xcall surfaces one. `inbox.ts`, `reorder.ts`, and `url.ts`'s own CLI call `dispatch` rather than re-implementing the runner-selection and fallback. `buildUrl`, `openUrl`, `xcall`, and `findXcallRunner` are internal to `url.ts`. Inject a `DispatchActions` to test runner selection and fallback without real Launch Services or keychain access, mirroring `plugins/gitlab/scripts/merge.ts`.
+
+`reorder.ts` and `inbox.ts` are bun TypeScript scripts (not `osascript`). Sandbox bypass comes from the `mac` plugin's marker hook, which detects the `claude:dangerouslyDisableSandbox` comment in the script head.
 
 ## What NOT to Do
 

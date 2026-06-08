@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { buildJsonPayload, coerceAttributes, isSandboxBlockedHandoff } from "./url";
+import {
+  buildJsonPayload,
+  coerceAttributes,
+  type DispatchActions,
+  dispatch,
+  isSandboxBlockedHandoff,
+} from "./url";
 
 describe("buildJsonPayload", () => {
   test("single ID produces correct structure", () => {
@@ -150,5 +156,86 @@ describe("isSandboxBlockedHandoff", () => {
   test("does not match -10673 embedded in a larger number", () => {
     expect(isSandboxBlockedHandoff("some unrelated number 999-106730 here")).toBe(false);
     expect(isSandboxBlockedHandoff("error -106731 something else")).toBe(false);
+  });
+});
+
+describe("dispatch", () => {
+  function trackingActions(overrides: Partial<DispatchActions>): {
+    actions: DispatchActions;
+    calls: { xcall: string[]; open: string[] };
+  } {
+    const calls = { xcall: [] as string[], open: [] as string[] };
+    const actions: DispatchActions = {
+      findXcallRunner: async () => "/runner",
+      xcall: async (_runner, url) => {
+        calls.xcall.push(url);
+        return "";
+      },
+      openUrl: async (command) => {
+        calls.open.push(command);
+      },
+      ...overrides,
+    };
+    return { actions, calls };
+  }
+
+  test("runs via xcall and parses the returned id", async () => {
+    const { actions, calls } = trackingActions({
+      xcall: async (_runner, url) => {
+        calls.xcall.push(url);
+        return "things:///x-callback-url/add?x-things-id=ABC123&x-source=Things";
+      },
+    });
+
+    const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
+
+    expect(result).toEqual({ id: "ABC123", output: expect.any(String), viaXcall: true });
+    expect(calls.open).toEqual([]);
+    expect(calls.xcall[0]).toContain("things:///add?");
+  });
+
+  test("returns a null id when xcall surfaces no id", async () => {
+    const { actions } = trackingActions({ xcall: async () => "" });
+
+    const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
+
+    expect(result.id).toBeNull();
+    expect(result.viaXcall).toBe(true);
+  });
+
+  test("falls back to openUrl when no runner is available", async () => {
+    const { actions, calls } = trackingActions({ findXcallRunner: async () => null });
+
+    const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
+
+    expect(result).toEqual({ id: null, output: null, viaXcall: false });
+    expect(calls.xcall).toEqual([]);
+    expect(calls.open).toEqual(["add"]);
+  });
+
+  test("falls back to openUrl when xcall throws", async () => {
+    const { actions, calls } = trackingActions({
+      xcall: async () => {
+        throw new Error("xcall failed (exit 1)");
+      },
+    });
+
+    const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
+
+    expect(result.viaXcall).toBe(false);
+    expect(calls.open).toEqual(["add"]);
+  });
+
+  test("propagates openUrl errors", async () => {
+    const { actions } = trackingActions({
+      findXcallRunner: async () => null,
+      openUrl: async () => {
+        throw new Error("open blocked");
+      },
+    });
+
+    await expect(dispatch("add", new Map([["title", "Buy milk"]]), actions)).rejects.toThrow(
+      "open blocked",
+    );
   });
 });

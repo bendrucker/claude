@@ -4,18 +4,13 @@
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
 import { mergeTags, parseTags } from "./tags";
-import { buildUrl, findXcallRunner, openUrl, xcall } from "./url";
+import { dispatch } from "./url";
 
 const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-items"]);
 
 function buildAttribution(sessionId: string): string {
   const dir = process.cwd();
   return `---\n\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\ncd ${dir} && claude --resume ${sessionId}\n\`\`\``;
-}
-
-function parseThingsId(xcallOutput: string): string | null {
-  const match = xcallOutput.match(/x-things-id=([^&\s]+)/);
-  return match?.[1] ?? null;
 }
 
 export function printCaptured(params: Map<string, string>): void {
@@ -33,16 +28,6 @@ export function printCaptured(params: Map<string, string>): void {
     return;
   }
   console.log("captured: (untitled)");
-}
-
-async function captureViaOpen(params: Map<string, string>): Promise<void> {
-  try {
-    await openUrl("add", params);
-    printCaptured(params);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
 }
 
 if (import.meta.main) {
@@ -88,20 +73,15 @@ if (import.meta.main) {
 
   await ensureThingsRunning();
 
-  if (await findXcallRunner()) {
-    const url = await buildUrl("add", params);
-    try {
-      const result = await xcall(url);
-      const id = parseThingsId(result);
-      if (id) {
-        console.log(`https://things.bendrucker.me/show?id=${id}`);
-      } else {
-        printCaptured(params);
-      }
-    } catch {
-      await captureViaOpen(params);
+  try {
+    const result = await dispatch("add", params);
+    if (result.id) {
+      console.log(`https://things.bendrucker.me/show?id=${result.id}`);
+    } else {
+      printCaptured(params);
     }
-  } else {
-    await captureViaOpen(params);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
   }
 }

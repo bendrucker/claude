@@ -1,6 +1,6 @@
 # Linguistic Tooling
 
-Evaluation record for replacing hand-rolled heading and trope detectors with POS-tagger-backed rules (issue #745). This file holds the tagger comparison, the promotion criteria for swapping a tagger-backed classifier into the hook, and the earn/retire rules for each dependency.
+Evaluation record for replacing hand-rolled heading and trope detectors with part-of-speech-tagger-backed rules (issue #745). This file holds the tagger comparison, the promotion criteria for swapping a tagger-backed classifier into the hook, and the earn/retire rules for each dependency.
 
 All numbers are aggregates over private session corpora. Example headings in this file are invented, never quoted from sessions.
 
@@ -9,8 +9,8 @@ All numbers are aggregates over private session corpora. Example headings in thi
 `plugins/writing/linguistics/` is importable by both `hooks/` and `skills/analyze/scripts/`:
 
 - `tags.ts`, `preprocess.ts`, `grammar.ts`, `heading.ts`: pure, no tagger imports, safe for hooks. `heading.ts` exports `classifyHeadingBaseline`, the extracted heading heuristic the hook runs today.
-- `tagger.ts` plus `compromise.ts`, `wink.ts`, `natural.ts`: adapters mapping each tagger into one coarse tag space (`CoarseTag`), so grammar rules are tagger-neutral and the eval isolates tagging quality.
-- `classifiers.ts`: eval-only. It imports the tagger adapters, which are devDependencies.
+- `tagger.ts` plus `compromise.ts` and `natural.ts`: adapters mapping each tagger into one coarse tag space (`CoarseTag`), so grammar rules are tagger-neutral and the eval isolates tagging quality.
+- `classifiers.ts`: eval-only. It imports the tagger adapters, including `natural`, a devDependency the plugin cache omits.
 
 Hooks must never import tagger adapters. Distributed plugins run from the plugin cache where `bun` auto-install skips devDependencies, so a hook importing one works locally and breaks for every marketplace install.
 
@@ -144,8 +144,8 @@ Where each existing detector class lands:
 
 | package | role | earns its place by | retired when |
 |---|---|---|---|
-| `compromise` | primary tagger | powering the heading eval and the POS-sequence structural signatures in analyze | structural signatures stop producing actionable rules and no classifier is promoted |
-| `wink-pos-tagger` | eval comparator | the tagger comparison above | removed once the comparison is recorded here (PR 2) |
-| `natural` | eval comparator | the tagger comparison above | removed once the comparison is recorded here (PR 2) |
+| `compromise` | primary tagger | powering the heading eval and the part-of-speech-sequence structural signatures in analyze | structural signatures stop producing actionable rules and no classifier is promoted |
+| `wink-pos-tagger` | eval comparator | the tagger comparison above | removed after the comparison was recorded (numbers above); it was dominated by `natural` on both precision and recall |
+| `natural` | promotion candidate (devDependency) | `hybrid:natural` leads the labeled eval | removed if a larger labeled pass rejects it or promotion lands on another tagger |
 
-All three enter as devDependencies (zero session cost, not distributed). `compromise` moves to `dependencies` only when analyze scripts need it at runtime from the plugin cache.
+`compromise` lives in `dependencies`: the analyze scripts import it at runtime, and distributed plugins run from the plugin cache where `bun` auto-install skips devDependencies. `natural` stays a devDependency (zero session and distribution cost) while the promotion question is open.

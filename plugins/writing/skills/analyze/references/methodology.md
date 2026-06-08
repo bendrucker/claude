@@ -111,7 +111,17 @@ Skill injections and hook feedback are excluded earlier by `is_meta=true` in the
 
 The patterns run against all assistant text (not just deliverables). Each reports total hits, rows containing hits, and session spread, labeled by hook scope (all, file-only, side-effect-only). This catches structural tropes (passive voice, hedging, parallelism) that the n-gram pipeline cannot detect.
 
-## Rule health table
+## Structural Signatures
+
+`tag-ngram.ts` is the word-independent analogue of the n-gram candidate miner. Each sentence in the deliverable corpus and the human user corpus is tagged with the `compromise` adapter from `plugins/writing/linguistics/`, mapped to coarse part-of-speech tags, and the tag sequences (3- to 5-grams like `COPULA PARTICIPLE ADP`) run through the same lift math as word n-grams. Punctuation is dropped, so these are part-of-speech sequences (word types only), not syntax.
+
+The motivation: vocabulary tells drift with model releases, so wordlists need constant re-curation. The structural shape of a habit (passive voice, "not X but Y" parallelism, negated appositives, participial openers) persists across that drift. A high-lift tag sequence is a candidate for a structural rule that no vocabulary change invalidates.
+
+Tag sequences draw from an alphabet of ~17 tags, so they are far denser than word n-grams: the per-size count floors are higher (3-grams: 30, 4-grams: 15, 5-grams: 8), the lift threshold is lower (`--tag-min-lift`, default 2.0, vs 5.0 for words), and most grammar is shared between the corpora so lift hovers near 1.0 for ordinary shapes.
+
+Each surfaced shape carries its shortest corpus example sentence. Examples are verbatim corpus text: the report is local-only, and any shape quoted elsewhere needs an invented example.
+
+## Rule Health Table
 
 Each rule is labeled in the **type** column by how the hook enforces it:
 

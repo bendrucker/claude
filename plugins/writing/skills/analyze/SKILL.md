@@ -64,6 +64,7 @@ Run with `--help` for all flags. `--data-dir` overrides where the voice baseline
 - Proposed additions (high-lift n-grams not already covered), each with its voice-baseline rate and a spot-checkable quote
 - Rule health table (every entry with type, audit surface, and `keep` / `remove (reason)`), plus deliverable quotes for the deliverable-surface tells
 - Structural pattern audit (the hook's regex patterns, hit counts across sessions)
+- Structural signatures (part-of-speech tag sequences distinctive to the model's deliverable prose; word-independent, so they survive vocabulary drift between model releases)
 - Corrective feedback (short human messages naming a writing problem, with the preceding model output)
 - Correction candidates (long-assistant, short-user pairs suggesting prose pushback)
 
@@ -88,4 +89,4 @@ Review the report. Edit `plugins/writing/wordlists/*.txt` by hand, then re-run t
 
 See [references/methodology.md](references/methodology.md) for query details, known gaps, and tuning guidance.
 
-See [references/linguistics.md](references/linguistics.md) for the POS tagger evaluation behind `scripts/headings-eval.ts`: classifier comparison, synthetic corpus generation, promotion criteria, and dependency earn/retire rules.
+See [references/linguistics.md](references/linguistics.md) for the part-of-speech tagger evaluation behind `scripts/headings-eval.ts`: classifier comparison, synthetic corpus generation, promotion criteria, and dependency earn/retire rules.

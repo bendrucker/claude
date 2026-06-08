@@ -20,6 +20,7 @@ import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram
 import { findQuote } from "./quote-context";
 import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
 import { auditStructuralPatterns } from "./structural";
+import { processTagCorpus, processTagRows, type TagSignatureRow } from "./tag-ngram";
 import { loadProfile, phraseProfileStat } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 import { loadWordlists } from "./wordlists";
@@ -59,6 +60,16 @@ const argv = cli({
       type: Number,
       description: "Top N candidate phrases to surface",
       default: 30,
+    },
+    tagMinLift: {
+      type: Number,
+      description: "Minimum lift threshold for structural (part-of-speech tag sequence) signatures",
+      default: 2.0,
+    },
+    tagTop: {
+      type: Number,
+      description: "Top N structural signatures to surface",
+      default: 20,
     },
     out: {
       type: String,
@@ -201,7 +212,8 @@ async function main(): Promise<void> {
       deliverableRows,
       ngramSizes,
     );
-    const userCorpus = processCorpus(serializeCorpus(userRows), ngramSizes);
+    const userText = serializeCorpus(userRows);
+    const userCorpus = processCorpus(userText, ngramSizes);
     const candidateSessions = new Set(deliverableRows.map((r) => r.session_id)).size;
     const minSessions = Math.max(3, Math.round(candidateSessions * 0.05));
     console.error(
@@ -233,6 +245,26 @@ async function main(): Promise<void> {
 
     console.error("Auditing deliverable corpus for wordlist rules");
     const deliverableAudit = auditDeliverableCorpus(wordlistEntries, deliverableRows);
+
+    console.error("Computing structural signatures (part-of-speech tag sequences)");
+    const tagAssistant = processTagRows(deliverableRows);
+    const tagUser = processTagCorpus(userText);
+    // Tag sequences draw from an alphabet of ~17 tags, so they are far
+    // denser than word n-grams; the floors are higher to compensate.
+    const tagLifts = computeLift({
+      assistant: tagAssistant.stats,
+      user: tagUser,
+      minAssistantCount: { 3: 30, 4: 15, 5: 8 },
+    });
+    const structuralSignatures: TagSignatureRow[] = tagLifts
+      .filter((r) => r.lift >= argv.flags.tagMinLift)
+      .filter((r) => (tagAssistant.sessionSpread.get(r.phrase) ?? 0) >= minSessions)
+      .slice(0, argv.flags.tagTop)
+      .map((r) => ({
+        ...r,
+        sessions: tagAssistant.sessionSpread.get(r.phrase) ?? 0,
+        example: tagAssistant.examples.get(r.phrase) ?? null,
+      }));
 
     console.error("Fetching correction candidates");
     const corrections = await db.runQuery<CorrectionRow>("correction-candidates", baseParams);
@@ -274,6 +306,7 @@ async function main(): Promise<void> {
       voiceProfile,
       ruleHealth,
       structuralAudit,
+      structuralSignatures,
       candidatePhrases,
       corrections,
       corrective,

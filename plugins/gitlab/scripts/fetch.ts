@@ -17,44 +17,42 @@ type Route = {
   suggestion: (params: Record<string, string>) => string;
 };
 
-const SUFFIX = "Run /gitlab:glab for more patterns.";
-
 // GitLab uses /-/ prefix for resource paths
 const routes: Route[] = [
   {
     pattern: new UrlPattern("-/issues/:number"),
     type: "issue",
-    suggestion: ({ number }) => `Use: glab issue view ${number}. ${SUFFIX}`,
+    suggestion: ({ number }) => `Use: glab issue view ${number}.`,
   },
   {
     pattern: new UrlPattern("-/merge_requests/:number"),
     type: "mr",
-    suggestion: ({ number }) => `Use: glab mr view ${number}. ${SUFFIX}`,
+    suggestion: ({ number }) => `Use: glab mr view ${number}.`,
   },
   {
     pattern: new UrlPattern("-/pipelines/:id"),
     type: "pipeline",
-    suggestion: ({ id }) => `Use: glab ci view ${id}. ${SUFFIX}`,
+    suggestion: ({ id }) => `Use: glab ci view ${id}.`,
   },
   {
     pattern: new UrlPattern("-/jobs/:id"),
     type: "job",
-    suggestion: ({ id }) => `Use: glab ci trace ${id}. ${SUFFIX}`,
+    suggestion: ({ id }) => `Use: glab ci trace ${id}.`,
   },
   {
     pattern: new UrlPattern("-/blob/:ref/*"),
     type: "file",
-    suggestion: () => `Use: glab api to fetch file contents. ${SUFFIX}`,
+    suggestion: () => `Use: glab api to fetch file contents.`,
   },
   {
     pattern: new UrlPattern("-/tree/:ref"),
     type: "tree",
-    suggestion: () => `Use: glab api to fetch file contents. ${SUFFIX}`,
+    suggestion: () => `Use: glab api to fetch file contents.`,
   },
   {
     pattern: new UrlPattern("-/tree/:ref/*"),
     type: "tree",
-    suggestion: () => `Use: glab api to fetch file contents. ${SUFFIX}`,
+    suggestion: () => `Use: glab api to fetch file contents.`,
   },
 ];
 
@@ -99,7 +97,7 @@ export function parseGitLabUrl(url: string): { type: string; suggestion: string 
   if (pathWithoutSlash.includes("/") && !pathWithoutSlash.includes("?")) {
     return {
       type: "repo",
-      suggestion: `Use: glab repo view [<project>]. ${SUFFIX}`,
+      suggestion: `Use: glab repo view [<project>].`,
     };
   }
 
@@ -131,7 +129,7 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
     return formatOutput("deny", parsed.suggestion);
   }
 
-  return formatOutput("ask", `Unknown GitLab URL pattern. ${SUFFIX}`);
+  return formatOutput("ask", `Unknown GitLab URL pattern.`);
 }
 
 async function main(): Promise<void> {

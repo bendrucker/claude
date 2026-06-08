@@ -49,14 +49,18 @@ export interface CorpusStats {
   ngrams: Map<number, NGramCounts>;
 }
 
-export function processCorpus(text: string, sizes: number[] = [2, 3, 4]): CorpusStats {
+export function processCorpus(
+  text: string,
+  sizes: number[] = [2, 3, 4],
+  tokenize: (sentence: string) => string[] = tokenizeSentence,
+): CorpusStats {
   const cleaned = cleanText(text);
   const stats: CorpusStats = {
     tokens: 0,
     ngrams: new Map(sizes.map((n) => [n, new Map<string, number>()])),
   };
   for (const sent of splitSentences(cleaned)) {
-    const tokens = tokenizeSentence(sent);
+    const tokens = tokenize(sent);
     if (tokens.length === 0) continue;
     stats.tokens += tokens.length;
     for (const n of sizes) {
@@ -120,10 +124,23 @@ export interface ProcessedRows {
   sessionSpread: Map<string, number>;
 }
 
+export interface ProcessRowsOptions {
+  /** Tokenizer for each sentence; defaults to the word tokenizer. */
+  tokenize?: (sentence: string) => string[];
+  /**
+   * When provided, records the shortest sentence seen for each n-gram key.
+   * Mutated in place so callers that need examples can read them after.
+   */
+  examples?: Map<string, string>;
+}
+
 export function processRows(
   rows: Array<{ session_id: string; text?: string }>,
   sizes: number[] = [2, 3, 4],
+  options: ProcessRowsOptions = {},
 ): ProcessedRows {
+  const tokenize = options.tokenize ?? tokenizeSentence;
+  const { examples } = options;
   const stats: CorpusStats = {
     tokens: 0,
     ngrams: new Map(sizes.map((n) => [n, new Map<string, number>()])),
@@ -132,7 +149,7 @@ export function processRows(
   for (const row of rows) {
     if (!row.text) continue;
     for (const sent of splitSentences(cleanText(row.text))) {
-      const tokens = tokenizeSentence(sent);
+      const tokens = tokenize(sent);
       if (tokens.length === 0) continue;
       stats.tokens += tokens.length;
       for (const n of sizes) {
@@ -147,6 +164,10 @@ export function processRows(
             phraseSessions.set(key, sessions);
           }
           sessions.add(row.session_id);
+          if (examples) {
+            const existing = examples.get(key);
+            if (!existing || sent.length < existing.length) examples.set(key, sent);
+          }
         }
       }
     }

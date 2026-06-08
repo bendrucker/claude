@@ -121,6 +121,8 @@ Tag sequences draw from an alphabet of ~17 tags, so they are far denser than wor
 
 Each surfaced shape carries its shortest corpus example sentence. Examples are verbatim corpus text: the report is local-only, and any shape quoted elsewhere needs an invented example.
 
+## Rule Health Table
+
 Each rule is labeled in the **type** column by how the hook enforces it:
 
 - **vocabulary**: stemmed word match, fires on all prose (file writes, Bash args, MCP inputs)

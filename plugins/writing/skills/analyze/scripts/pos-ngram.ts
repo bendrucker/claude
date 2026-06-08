@@ -8,7 +8,7 @@
  */
 import { compromiseTagger } from "../../../linguistics/compromise";
 import type { Tagger } from "../../../linguistics/tagger";
-import { addNgrams, type CorpusStats, cleanText, type LiftRow, splitSentences } from "./ngram";
+import { type CorpusStats, type LiftRow, processCorpus, processRows } from "./ngram";
 
 export interface PosProcessedRows {
   stats: CorpusStats;
@@ -22,9 +22,10 @@ export interface PosSignatureRow extends LiftRow {
 }
 
 /**
- * Tag a sentence and return its coarse tag sequence. Punctuation and
- * unknown tokens are dropped, matching the word tokenizer, so tag
- * sequences and word n-grams describe the same token stream.
+ * Tag a sentence and return its coarse tag sequence, dropping punctuation
+ * and unknown tokens. This is the POS analogue of `tokenizeSentence`: it
+ * plugs into the same `processRows`/`processCorpus` pipeline as the word
+ * tokenizer, so the lift math is shared.
  */
 export function tagSequence(sentence: string, tagger: Tagger = compromiseTagger): string[] {
   return tagger
@@ -34,48 +35,28 @@ export function tagSequence(sentence: string, tagger: Tagger = compromiseTagger)
     .map((token) => token.tag);
 }
 
+/** Tag-sequence corpus stats plus session spread and shortest examples. */
 export function processPosRows(
   rows: Array<{ session_id: string; text?: string }>,
   sizes: number[] = [3, 4, 5],
   tagger: Tagger = compromiseTagger,
 ): PosProcessedRows {
-  const stats: CorpusStats = {
-    tokens: 0,
-    ngrams: new Map(sizes.map((n) => [n, new Map<string, number>()])),
-  };
-  const keySessions = new Map<string, Set<string>>();
   const examples = new Map<string, string>();
-
-  for (const row of rows) {
-    if (!row.text) continue;
-    for (const sentence of splitSentences(cleanText(row.text))) {
-      const tags = tagSequence(sentence, tagger);
-      if (tags.length === 0) continue;
-      stats.tokens += tags.length;
-      for (const n of sizes) {
-        const counts = stats.ngrams.get(n);
-        if (!counts) continue;
-        addNgrams(counts, tags, n);
-        for (let i = 0; i <= tags.length - n; i++) {
-          const key = tags.slice(i, i + n).join(" ");
-          let sessions = keySessions.get(key);
-          if (!sessions) {
-            sessions = new Set();
-            keySessions.set(key, sessions);
-          }
-          sessions.add(row.session_id);
-          const existing = examples.get(key);
-          if (!existing || sentence.length < existing.length) {
-            examples.set(key, sentence);
-          }
-        }
-      }
-    }
-  }
-
-  const sessionSpread = new Map<string, number>();
-  for (const [key, sessions] of keySessions) {
-    sessionSpread.set(key, sessions.size);
-  }
+  const { stats, sessionSpread } = processRows(rows, sizes, {
+    tokenize: (sentence) => tagSequence(sentence, tagger),
+    examples,
+  });
   return { stats, sessionSpread, examples };
+}
+
+/**
+ * Tag-sequence corpus stats only, for the baseline corpus where session
+ * spread and examples are not needed (mirrors `processCorpus` for words).
+ */
+export function processPosCorpus(
+  text: string,
+  sizes: number[] = [3, 4, 5],
+  tagger: Tagger = compromiseTagger,
+): CorpusStats {
+  return processCorpus(text, sizes, (sentence) => tagSequence(sentence, tagger));
 }

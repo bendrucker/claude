@@ -17,7 +17,7 @@ import {
 } from "./dump";
 import { escapeRegex, frustrationRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
-import { type PosSignatureRow, processPosRows } from "./pos-ngram";
+import { type PosSignatureRow, processPosCorpus, processPosRows } from "./pos-ngram";
 import { findQuote } from "./quote-context";
 import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
 import { auditStructuralPatterns } from "./structural";
@@ -247,23 +247,23 @@ async function main(): Promise<void> {
 
     console.error("Computing structural signatures (POS tag sequences)");
     const posAssistant = processPosRows(deliverableRows);
-    const posUser = processPosRows(userRows);
+    const posUser = processPosCorpus(serializeCorpus(userRows));
     // Tag sequences draw from an alphabet of ~17 tags, so they are far
     // denser than word n-grams; the floors are higher to compensate.
     const posLifts = computeLift({
       assistant: posAssistant.stats,
-      user: posUser.stats,
+      user: posUser,
       minAssistantCount: { 3: 30, 4: 15, 5: 8 },
     });
     const structuralSignatures: PosSignatureRow[] = posLifts
       .filter((r) => r.lift >= argv.flags.posMinLift)
       .filter((r) => (posAssistant.sessionSpread.get(r.phrase) ?? 0) >= minSessions)
+      .slice(0, argv.flags.posTop)
       .map((r) => ({
         ...r,
         sessions: posAssistant.sessionSpread.get(r.phrase) ?? 0,
         example: posAssistant.examples.get(r.phrase) ?? null,
-      }))
-      .slice(0, argv.flags.posTop);
+      }));
 
     console.error("Fetching correction candidates");
     const corrections = await db.runQuery<CorrectionRow>("correction-candidates", baseParams);

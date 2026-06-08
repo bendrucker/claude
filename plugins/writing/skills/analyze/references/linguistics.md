@@ -10,7 +10,7 @@ All numbers are aggregates over private session corpora. Example headings in thi
 
 - `tags.ts`, `preprocess.ts`, `grammar.ts`, `heading.ts`: pure, no tagger imports, safe for hooks. `heading.ts` exports `classifyHeadingBaseline`, the extracted heading heuristic the hook runs today.
 - `tagger.ts` plus `compromise.ts` and `natural.ts`: adapters mapping each tagger into one coarse tag space (`CoarseTag`), so grammar rules are tagger-neutral and the eval isolates tagging quality.
-- `classifiers.ts`: eval-only. It imports the tagger adapters, which are devDependencies.
+- `classifiers.ts`: eval-only. It imports the tagger adapters, including `natural`, a devDependency the plugin cache omits.
 
 Hooks must never import tagger adapters. Distributed plugins run from the plugin cache where `bun` auto-install skips devDependencies, so a hook importing one works locally and breaks for every marketplace install.
 

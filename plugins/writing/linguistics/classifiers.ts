@@ -1,7 +1,7 @@
 /**
  * Candidate heading classifiers for the corpus evaluation. This module
- * imports the tagger adapters (devDependencies), so only eval tooling
- * may import it, never hooks.
+ * imports the tagger adapters, including `natural` (a devDependency the
+ * plugin cache omits), so only eval tooling may import it, never hooks.
  */
 import { compromiseTagger } from "./compromise";
 import { finiteVerbWithSubject, isNounPhrase } from "./grammar";

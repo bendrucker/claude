@@ -58,6 +58,8 @@ For non-trivial failures (logic bugs, design issues, flaky tests, environment-de
 
 #### status: success
 
+Green on a conflicting PR is stale: if a `conflicts` or unresolved `mergeable-unknown` event arrived for the current SHA, address it (per [conflicts](#conflicts) or [mergeable-unknown](#mergeable-unknown)) before treating green as done.
+
 Summarize the session: run `git log ${start-sha}..HEAD --oneline` for the commits pushed while babysitting.
 
 Then branch on the flags parsed from `$ARGUMENTS`:
@@ -79,6 +81,19 @@ git merge --abort
 If the conflicting paths are only lockfiles (`bun.lock`, etc.) or generated files, regenerate per project convention (e.g. `rm bun.lock && bun install`), commit the result, and push. The watcher picks up the new SHA.
 
 Otherwise, report the conflicting file list and call `TaskStop`. Do not invoke `gh` or `glab` here; git alone is enough.
+
+#### mergeable-unknown
+
+The platform could not determine mergeability after its own bounded re-polling, so run the authoritative local check with the same dry-run as [conflicts](#conflicts):
+
+```
+git fetch origin <base>
+git merge origin/<base> --no-commit --no-ff
+git diff --name-only --diff-filter=U
+git merge --abort
+```
+
+If the dry-run surfaces conflicting paths, route them through the [conflicts](#conflicts) logic (lockfiles or generated files → regenerate, commit, push; source → report and `TaskStop`). If the merge is clean, report that the PR is mergeable and keep watching.
 
 #### queued-timeout
 

@@ -18,7 +18,8 @@ import {
 import { escapeRegex, frustrationRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
 import { findQuote } from "./quote-context";
-import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
+import { type CandidatePhrase, renderReport } from "./report";
+import { buildRuleHealth, type FtsAuditRow } from "./rule-health";
 import { auditStructuralPatterns } from "./structural";
 import { processTagCorpus, processTagRows, type TagSignatureRow } from "./tag-ngram";
 import { loadProfile, phraseProfileStat } from "./voice-profile";

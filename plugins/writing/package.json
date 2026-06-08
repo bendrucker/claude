@@ -14,6 +14,9 @@
     "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
-    "@types/mdast": "^4.0.4"
+    "@types/mdast": "^4.0.4",
+    "compromise": "^14.15.1",
+    "natural": "^8.1.1",
+    "wink-pos-tagger": "^2.2.2"
   }
 }

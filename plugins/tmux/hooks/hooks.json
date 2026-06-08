@@ -11,16 +11,6 @@
         ]
       },
       {
-        "matcher": "startup",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -n \"$TMUX_PANE\" ] && tmux set-option -p -t \"$TMUX_PANE\" @agent_resume_command \"claude --resume $CLAUDE_CODE_SESSION_ID\" || true"
-          }
-        ]
-      },
-      {
-        "matcher": "resume",
         "hooks": [
           {
             "type": "command",

@@ -3,6 +3,7 @@
 import { join } from "node:path";
 import { Glob } from "bun";
 import { loadPlugins } from "../packages/marketplace/index";
+import { runCheck } from "./check";
 
 async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
   const deps = new Set<string>();
@@ -54,22 +55,23 @@ async function getImportedPackages(pluginDir: string): Promise<Set<string>> {
   return packages;
 }
 
-let failed = false;
+async function checkDeps(): Promise<string[]> {
+  const violations: string[] = [];
 
-for (const plugin of await loadPlugins()) {
-  if (!plugin.dir) continue;
+  for (const plugin of await loadPlugins()) {
+    if (!plugin.dir) continue;
 
-  const declared = await getPluginDeps(plugin.dir);
-  const imported = await getImportedPackages(plugin.dir);
+    const declared = await getPluginDeps(plugin.dir);
+    const imported = await getImportedPackages(plugin.dir);
 
-  for (const pkg of imported) {
-    if (!declared.has(pkg) && !declared.has(`@types/${pkg}`)) {
-      console.error(`${plugin.name}: missing dependency "${pkg}"`);
-      failed = true;
+    for (const pkg of imported) {
+      if (!declared.has(pkg) && !declared.has(`@types/${pkg}`)) {
+        violations.push(`${plugin.name}: missing dependency "${pkg}"`);
+      }
     }
   }
+
+  return violations;
 }
 
-if (failed) {
-  process.exit(1);
-}
+await runCheck(checkDeps, { stream: "stderr", indent: false });

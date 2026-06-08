@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { enabledPluginNames, loadPlugins, matcherEntries } from "../packages/marketplace/index";
+import { runCheck } from "./check";
 
 const MCP_PATTERN = /^mcp__(?!plugin_)(?!claude_ai_)(\w+)__(.+)$/;
 
@@ -66,13 +67,10 @@ async function checkMatchers(): Promise<string[]> {
   return errors;
 }
 
-const errors = await checkMatchers();
-if (errors.length > 0) {
-  console.log("MCP hook matchers missing plugin variants:");
-  for (const err of errors) {
-    console.log(`  ${err}`);
-  }
-  process.exit(1);
-}
-
-console.log("All MCP hook matchers include plugin and Claude AI variants");
+await runCheck(
+  async () => ({
+    header: "MCP hook matchers missing plugin variants:",
+    violations: await checkMatchers(),
+  }),
+  { success: "All MCP hook matchers include plugin and Claude AI variants" },
+);

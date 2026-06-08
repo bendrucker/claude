@@ -3,6 +3,7 @@
 import { dirname, join, relative, resolve } from "node:path";
 import { Glob } from "bun";
 import { loadPlugins } from "../packages/marketplace/index";
+import { runCheck } from "./check";
 
 // Exit codes: 0 clean, VIOLATION_EXIT when cross-plugin imports are found.
 // Anything else (bun exits 1 on uncaught errors) means the checker itself
@@ -57,20 +58,16 @@ async function checkPlugin(pluginDir: string): Promise<string[]> {
   return violations;
 }
 
-async function main(): Promise<void> {
+async function findViolations(): Promise<string[]> {
   const pluginDirs = await getPluginDirs();
   const results = await Promise.all(pluginDirs.map(checkPlugin));
-  const violations = results.flat();
-
-  for (const v of violations) {
-    console.error(v);
-  }
-
-  if (violations.length > 0) {
-    process.exit(VIOLATION_EXIT);
-  }
+  return results.flat();
 }
 
 if (import.meta.main) {
-  await main();
+  await runCheck(findViolations, {
+    stream: "stderr",
+    indent: false,
+    failureExit: VIOLATION_EXIT,
+  });
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { enabledPluginNames, loadPlugins } from "../packages/marketplace/index";
+import { enabledPluginNames, loadPlugins, matcherEntries } from "../packages/marketplace/index";
 
 const MCP_PATTERN = /^mcp__(?!plugin_)(?!claude_ai_)(\w+)__(.+)$/;
 
@@ -27,43 +27,36 @@ async function checkMatchers(): Promise<string[]> {
   const errors: string[] = [];
 
   for (const plugin of plugins) {
-    if (!plugin.hooks) continue;
-    const file = `plugins/${plugin.name}/hooks/hooks.json`;
+    for (const { file, entry } of matcherEntries(plugin)) {
+      if (typeof entry.matcher !== "string") continue;
+      const patterns = entry.matcher.split("|");
 
-    for (const entries of Object.values(plugin.hooks.hooks)) {
-      for (const entry of entries) {
-        if (typeof entry.matcher !== "string") continue;
-        const patterns = entry.matcher.split("|");
+      for (const pattern of patterns) {
+        const match = MCP_PATTERN.exec(pattern);
+        if (!match) continue;
 
-        for (const pattern of patterns) {
-          const match = MCP_PATTERN.exec(pattern);
-          if (!match) continue;
+        const server = match[1];
+        const tool = match[2];
+        if (!server || !tool) continue;
 
-          const server = match[1];
-          const tool = match[2];
-          if (!server || !tool) continue;
+        // Determine plugin name: use known mapping, or fall back to
+        // enabled plugin names that match the server name
+        const pluginName = knownServers.get(server) ?? (enabledNames.has(server) ? server : null);
+        if (!pluginName) continue;
 
-          // Determine plugin name: use known mapping, or fall back to
-          // enabled plugin names that match the server name
-          const pluginName = knownServers.get(server) ?? (enabledNames.has(server) ? server : null);
-          if (!pluginName) continue;
+        const pluginVariant = `mcp__plugin_${pluginName}_${server}__${tool}`;
+        if (!patterns.includes(pluginVariant)) {
+          errors.push(`${file}: matcher "${pattern}" is missing plugin variant "${pluginVariant}"`);
+        }
 
-          const pluginVariant = `mcp__plugin_${pluginName}_${server}__${tool}`;
-          if (!patterns.includes(pluginVariant)) {
+        const claudeAi = CLAUDE_AI_MAPPINGS[server];
+        if (claudeAi) {
+          const mappedTool = claudeAi.tools[tool] ?? tool;
+          const claudeAiVariant = `mcp__claude_ai_${claudeAi.displayName}__${mappedTool}`;
+          if (!patterns.includes(claudeAiVariant)) {
             errors.push(
-              `${file}: matcher "${pattern}" is missing plugin variant "${pluginVariant}"`,
+              `${file}: matcher "${pattern}" is missing Claude AI variant "${claudeAiVariant}"`,
             );
-          }
-
-          const claudeAi = CLAUDE_AI_MAPPINGS[server];
-          if (claudeAi) {
-            const mappedTool = claudeAi.tools[tool] ?? tool;
-            const claudeAiVariant = `mcp__claude_ai_${claudeAi.displayName}__${mappedTool}`;
-            if (!patterns.includes(claudeAiVariant)) {
-              errors.push(
-                `${file}: matcher "${pattern}" is missing Claude AI variant "${claudeAiVariant}"`,
-              );
-            }
           }
         }
       }

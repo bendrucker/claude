@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { loadPlugins } from "../packages/marketplace/index";
+import { hookCommands, loadPlugins } from "../packages/marketplace/index";
 
 // Matches an unquoted ${CLAUDE_PLUGIN_ROOT}/... path segment in a command string.
 // The path is unquoted if it is NOT preceded by a double quote.
@@ -10,19 +10,12 @@ const plugins = await loadPlugins();
 const violations: string[] = [];
 
 for (const plugin of plugins) {
-  if (!plugin.hooks) continue;
-  const file = `plugins/${plugin.name}/hooks/hooks.json`;
+  for (const { file, command: hook } of hookCommands(plugin)) {
+    if (!hook.command?.includes("${CLAUDE_PLUGIN_ROOT}")) continue;
 
-  for (const entries of Object.values(plugin.hooks.hooks)) {
-    for (const entry of entries) {
-      for (const hook of entry.hooks) {
-        if (!hook.command?.includes("${CLAUDE_PLUGIN_ROOT}")) continue;
-
-        for (const _match of hook.command.matchAll(UNQUOTED_PATH)) {
-          violations.push(`${file}: ${hook.command}`);
-          break;
-        }
-      }
+    for (const _match of hook.command.matchAll(UNQUOTED_PATH)) {
+      violations.push(`${file}: ${hook.command}`);
+      break;
     }
   }
 }

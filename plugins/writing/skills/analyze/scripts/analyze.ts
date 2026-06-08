@@ -17,7 +17,7 @@ import {
 } from "./dump";
 import { escapeRegex, frustrationRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
-import { type PosSignatureRow, processPosCorpus, processPosRows } from "./pos-ngram";
+import { processTagCorpus, processTagRows, type TagSignatureRow } from "./tag-ngram";
 import { findQuote } from "./quote-context";
 import { buildRuleHealth, type CandidatePhrase, type FtsAuditRow, renderReport } from "./report";
 import { auditStructuralPatterns } from "./structural";
@@ -61,12 +61,13 @@ const argv = cli({
       description: "Top N candidate phrases to surface",
       default: 30,
     },
-    posMinLift: {
+    tagMinLift: {
       type: Number,
-      description: "Minimum lift threshold for structural (POS tag sequence) signatures",
+      description:
+        "Minimum lift threshold for structural (part-of-speech tag sequence) signatures",
       default: 2.0,
     },
-    posTop: {
+    tagTop: {
       type: Number,
       description: "Top N structural signatures to surface",
       default: 20,
@@ -245,24 +246,24 @@ async function main(): Promise<void> {
     console.error("Auditing deliverable corpus for wordlist rules");
     const deliverableAudit = auditDeliverableCorpus(wordlistEntries, deliverableRows);
 
-    console.error("Computing structural signatures (POS tag sequences)");
-    const posAssistant = processPosRows(deliverableRows);
-    const posUser = processPosCorpus(serializeCorpus(userRows));
+    console.error("Computing structural signatures (part-of-speech tag sequences)");
+    const tagAssistant = processTagRows(deliverableRows);
+    const tagUser = processTagCorpus(serializeCorpus(userRows));
     // Tag sequences draw from an alphabet of ~17 tags, so they are far
     // denser than word n-grams; the floors are higher to compensate.
-    const posLifts = computeLift({
-      assistant: posAssistant.stats,
-      user: posUser,
+    const tagLifts = computeLift({
+      assistant: tagAssistant.stats,
+      user: tagUser,
       minAssistantCount: { 3: 30, 4: 15, 5: 8 },
     });
-    const structuralSignatures: PosSignatureRow[] = posLifts
-      .filter((r) => r.lift >= argv.flags.posMinLift)
-      .filter((r) => (posAssistant.sessionSpread.get(r.phrase) ?? 0) >= minSessions)
-      .slice(0, argv.flags.posTop)
+    const structuralSignatures: TagSignatureRow[] = tagLifts
+      .filter((r) => r.lift >= argv.flags.tagMinLift)
+      .filter((r) => (tagAssistant.sessionSpread.get(r.phrase) ?? 0) >= minSessions)
+      .slice(0, argv.flags.tagTop)
       .map((r) => ({
         ...r,
-        sessions: posAssistant.sessionSpread.get(r.phrase) ?? 0,
-        example: posAssistant.examples.get(r.phrase) ?? null,
+        sessions: tagAssistant.sessionSpread.get(r.phrase) ?? 0,
+        example: tagAssistant.examples.get(r.phrase) ?? null,
       }));
 
     console.error("Fetching correction candidates");

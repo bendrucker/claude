@@ -1,7 +1,7 @@
 import { type DeliverableAudit, isDeliverableSurface } from "./deliverable-audit";
 import type { CorrectionRow, CorrectiveRow, ModelSummaryRow } from "./dump";
 import type { LiftRow } from "./ngram";
-import type { PosSignatureRow } from "./pos-ngram";
+import type { TagSignatureRow } from "./tag-ngram";
 import type { QuoteContext } from "./quote-context";
 import type { StructuralAuditRow } from "./structural";
 import type { VoiceProfile } from "./voice-profile";
@@ -51,7 +51,7 @@ export interface ReportInput {
   voiceProfile: VoiceProfile | null;
   ruleHealth: CurrentRuleHealth[];
   structuralAudit: StructuralAuditRow[];
-  structuralSignatures: PosSignatureRow[];
+  structuralSignatures: TagSignatureRow[];
   candidatePhrases: CandidatePhrase[];
   corrections: CorrectionRow[];
   corrective: CorrectiveRow[];
@@ -263,7 +263,7 @@ function renderStructuralSignatures(input: ReportInput): string {
   const lines = [
     "## Structural Signatures",
     "",
-    "Coarse POS tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.",
+    "Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.",
     "",
   ];
   if (input.structuralSignatures.length === 0) {

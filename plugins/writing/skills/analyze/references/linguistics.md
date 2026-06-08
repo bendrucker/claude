@@ -1,6 +1,6 @@
 # Linguistic Tooling
 
-Evaluation record for replacing hand-rolled heading and trope detectors with POS-tagger-backed rules (issue #745). This file holds the tagger comparison, the promotion criteria for swapping a tagger-backed classifier into the hook, and the earn/retire rules for each dependency.
+Evaluation record for replacing hand-rolled heading and trope detectors with part-of-speech-tagger-backed rules (issue #745). This file holds the tagger comparison, the promotion criteria for swapping a tagger-backed classifier into the hook, and the earn/retire rules for each dependency.
 
 All numbers are aggregates over private session corpora. Example headings in this file are invented, never quoted from sessions.
 
@@ -144,7 +144,7 @@ Where each existing detector class lands:
 
 | package | role | earns its place by | retired when |
 |---|---|---|---|
-| `compromise` | primary tagger | powering the heading eval and the POS-sequence structural signatures in analyze | structural signatures stop producing actionable rules and no classifier is promoted |
+| `compromise` | primary tagger | powering the heading eval and the part-of-speech-sequence structural signatures in analyze | structural signatures stop producing actionable rules and no classifier is promoted |
 | `wink-pos-tagger` | eval comparator | the tagger comparison above | removed after the comparison was recorded (numbers above); it was dominated by `natural` on both precision and recall |
 | `natural` | promotion candidate (devDependency) | `hybrid:natural` leads the labeled eval | removed if a larger labeled pass rejects it or promotion lands on another tagger |
 

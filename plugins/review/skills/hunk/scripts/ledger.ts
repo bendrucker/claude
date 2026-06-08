@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
-import { type AnchorSide, deriveAnchor, type HunkNote } from "./note";
+import { type AnchorSide, decodeNotes, deriveAnchor, type HunkNote } from "./note";
 
 export type { AnchorSide, HunkNote, NoteSource } from "./note";
 
@@ -184,11 +184,6 @@ function resolveLedger(flags: {
   return Ledger.open({ dir, repo, branch });
 }
 
-function parseNotes(raw: string): HunkNote[] {
-  const data = JSON.parse(raw) as { comments: HunkNote[] } | HunkNote[];
-  return Array.isArray(data) ? data : data.comments;
-}
-
 function printRecords(records: LedgerRecord[], asJson: boolean): void {
   if (asJson) {
     console.log(JSON.stringify(records, null, 2));
@@ -245,7 +240,7 @@ const upsertCmd = command(
   },
   async (parsed) => {
     const ledger = await resolveLedger(parsed.flags);
-    const notes = parseNotes(await Bun.stdin.text());
+    const notes = decodeNotes(await Bun.stdin.text());
     for (const note of notes) {
       await ledger.upsert(note);
     }
@@ -282,7 +277,7 @@ const reconcileCmd = command(
     const raw = (await Bun.stdin.text()).trim();
     let noteIds: string[];
     if (raw.startsWith("[") || raw.startsWith("{")) {
-      noteIds = parseNotes(raw).map((n) => n.noteId);
+      noteIds = decodeNotes(raw).map((n) => n.noteId);
     } else {
       noteIds = raw
         .split("\n")

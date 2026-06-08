@@ -31,3 +31,9 @@ export function deriveAnchor(note: HunkNote): Anchor {
   }
   throw new Error("note has no anchor");
 }
+
+/** Decode a notes JSON payload, accepting either `{ comments: [...] }` or a bare array. */
+export function decodeNotes(raw: string): HunkNote[] {
+  const data = JSON.parse(raw) as { comments: HunkNote[] } | HunkNote[];
+  return Array.isArray(data) ? data : data.comments;
+}

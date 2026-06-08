@@ -95,7 +95,7 @@ Without this filtering, roughly half the user corpus by character count is machi
 
 The patterns run against all assistant text (not just deliverables). Each reports total hits, number of rows containing hits, and session spread. Patterns are labeled by their hook scope (all, file-only, side-effect-only).
 
-This catches structural tropes (semicolons, passive voice, hedging, parallelism) that the n-gram pipeline cannot detect.
+This catches structural tropes (passive voice, hedging, parallelism) that the n-gram pipeline cannot detect.
 
 ## Rule health table
 

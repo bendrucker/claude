@@ -35,22 +35,29 @@ describe("scanAll", () => {
     expect(categories.has("spaced em dash")).toBe(true);
   });
 
+  const dense =
+    "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
+
   it("applies fileOnly patterns for prose files", () => {
-    const text = "First clause; second clause; third clause; fourth.";
-    const categories = scanAll(text, "notes.md").map((r) => r.category);
-    expect(categories).toContain("semicolon overuse");
+    const categories = scanAll(dense, "notes.md").map((r) => r.category);
+    expect(categories).toContain("connector density");
   });
 
   it("skips fileOnly patterns for non-prose files", () => {
-    const text = "First clause; second clause; third clause; fourth.";
-    const categories = scanAll(text, "script.ts").map((r) => r.category);
-    expect(categories).not.toContain("semicolon overuse");
+    const categories = scanAll(dense, "script.ts").map((r) => r.category);
+    expect(categories).not.toContain("connector density");
   });
 
   it("applies fileOnly patterns when no path is given", () => {
-    const text = "First clause; second clause; third clause; fourth.";
-    const categories = scanAll(text).map((r) => r.category);
-    expect(categories).toContain("semicolon overuse");
+    const categories = scanAll(dense).map((r) => r.category);
+    expect(categories).toContain("connector density");
+  });
+
+  it("reports the position of the connector density sample", () => {
+    const match = scanAll(dense, "notes.md").find((r) => r.category === "connector density");
+    expect(match).toBeDefined();
+    expect(match?.line).toBe(1);
+    expect(match?.col).toBe(2);
   });
 
   it("does not report sideEffectOnly patterns", () => {

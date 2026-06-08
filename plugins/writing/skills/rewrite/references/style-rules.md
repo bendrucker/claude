@@ -9,9 +9,9 @@ Structural rules for rewriting text. Vocabulary and pattern violations are caugh
 - Specific verbs over vague ones. "Generates a report" not "handles report generation."
 - Every sentence teaches the reader something new. Cut sentences that restate what came before.
 
-## Semicolons
+## Clause Connectors
 
-Limit to one per paragraph at most. Prefer splitting into separate sentences.
+Don't join independent clauses with a semicolon or em dash. Split them into two sentences. At most one connector-joined sentence per paragraph, and only when the clauses can't stand alone.
 
 ## Filler
 

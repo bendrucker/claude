@@ -20,6 +20,8 @@ The plugin name forms a namespace for its contents (e.g., `gitlab:ci-monitor`). 
 
 Anti-stuttering applies to the part after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right. Run `bun run skill-lint` to catch namespace mismatches and stuttering.
 
+A plugin's primary skill MAY share the plugin name (`plugin:plugin`, e.g. `writing:writing`, `tmux:tmux`, `git:git`). This is the intentional entry-skill pattern: the namespace's default skill, named to leave room for siblings (`writing:analyze`, `writing:review`). The platform registers and accepts both the qualified and unqualified forms. The stutter to avoid is the redundant-suffix form (`plugin:plugin-foo`, e.g. `writing:writing-analyze`), which `skill-lint` flags. Exact `plugin:plugin` is permitted by design.
+
 ## MCP Tool Naming
 
 MCP tools appear with three naming patterns depending on how the server is connected:

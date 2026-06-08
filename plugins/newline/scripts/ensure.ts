@@ -15,12 +15,12 @@ export async function ensureTrailingNewline(filePath: string): Promise<string | 
   }
 
   if (file.size === 0) {
-    return "File is empty, skipping";
+    return null;
   }
 
   const content = await file.text();
   if (content.endsWith("\n")) {
-    return "File already has trailing newline";
+    return null;
   }
 
   await Bun.write(filePath, `${content}\n`);

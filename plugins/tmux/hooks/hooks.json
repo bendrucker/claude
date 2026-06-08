@@ -1,5 +1,5 @@
 {
-  "description": "Inject tmux context and ring terminal bell for notifications",
+  "description": "Inject tmux context, persist the agent resume command for tmux-resurrect, and ring terminal bell for notifications",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,24 @@
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/context.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$TMUX_PANE\" ] && tmux set-option -p -t \"$TMUX_PANE\" @agent_resume_command \"claude --resume $CLAUDE_CODE_SESSION_ID\" || true"
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$TMUX_PANE\" ] && tmux set-option -p -t \"$TMUX_PANE\" @agent_resume_command \"claude --resume $CLAUDE_CODE_SESSION_ID\" || true"
           }
         ]
       }

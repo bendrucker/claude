@@ -6,11 +6,14 @@ Tmux session, window, and pane awareness for Claude Code.
 
 - **Skill: tmux** — Layout awareness, pane interaction, and notification monitoring
 - **Hook: context** — SessionStart hook that injects tmux env vars
+- **Hook: agent-resume-command**, a SessionStart hook that records the session's resume command in a pane-scoped tmux option for plugins like tmux-resurrect to use when resuming a pane
 - **Hook: notification** — Bell and status bar notifications for permission prompts
 
 ## How It Works
 
 A SessionStart hook detects whether Claude is running inside tmux and writes session/window/pane identifiers to `CLAUDE_ENV_FILE`. These env vars are available in all subsequent Bash calls.
+
+Another SessionStart hook records the command that resumes the current session (`claude --resume <id>`) in the pane-scoped tmux option `@agent_resume_command`, refreshed on both `startup` and `resume`. Plugins like tmux-resurrect can read it back with `tmux show-options -p -t <pane> -qv @agent_resume_command` to resume the session when restoring a pane. Outside tmux the hook is a no-op.
 
 The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only, navigation, layout). The safe command list is maintained in [`safe-commands.json`](skills/tmux/resources/safe-commands.json).
 

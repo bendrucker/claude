@@ -330,9 +330,11 @@ describe("scan", () => {
     }
   });
 
-  it("returns at most one match per tier", () => {
+  it("returns all matches per tier", () => {
     const denyMatches = scan("This delve serves as a testament").filter((m) => m.tier === "deny");
-    expect(denyMatches).toHaveLength(1);
+    const categories = denyMatches.map((m) => m.category);
+    expect(categories).toContain("AI vocabulary");
+    expect(categories).toContain("copula avoidance");
   });
 
   it("returns empty for empty string", () => {
@@ -430,6 +432,38 @@ describe("scan", () => {
         scan("It isn't broken.").find((m) => m.category === "cross-sentence not-X"),
       ).toBeUndefined();
     });
+  });
+
+  describe("contrast not", () => {
+    const flag = [
+      "This is a tool, not a framework.",
+      "The goal is clarity, not perfection.",
+      "We want specificity, not abstraction.",
+      "It's a refactor, not a rewrite.",
+      "Focus on outcomes, not process.",
+      "Return an error, not an exception.",
+      "a command-line tool, not a library",
+    ];
+    const allow = [
+      "It is not the case that X.",
+      "not only X, but Y",
+      "a, not b",
+      "Not a framework, but a tool",
+      "Inline code: `foo, not bar`",
+      "```\nif err != nil, not ok\n```",
+    ];
+
+    for (const text of flag) {
+      it(`flags: "${text}"`, () => {
+        expect(firstByTier(scan(text), "context")?.category).toBe("contrast not");
+      });
+    }
+
+    for (const text of allow) {
+      it(`allows: ${JSON.stringify(text)}`, () => {
+        expect(scan(text).find((m) => m.category === "contrast not")).toBeUndefined();
+      });
+    }
   });
 
   describe("passive PR summary", () => {

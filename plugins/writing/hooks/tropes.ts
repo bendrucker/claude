@@ -205,6 +205,13 @@ export const PATTERNS: PatternDef[] = [
   },
   {
     tier: "context",
+    category: "contrast not",
+    test: /\b\w[\w\s]{2,40},\s+not\s+\w[\w\s]{2,30}(?=[.!?,\n]|$)/gi,
+    message: (matched) =>
+      `"${matched}" is a rhetorical "X, not Y" contrast. State the positive directly.`,
+  },
+  {
+    tier: "context",
     category: "passive PR summary",
     test: /\b(?:is|was|are|were)\s+(?:added|updated|removed|refactored|introduced|created|deleted|modified|improved)\b/gi,
     fileOnly: true,
@@ -331,10 +338,8 @@ export function scanIntroduced(
   const newStripped = stripCode(newText);
   const oldStripped = stripCode(oldText);
   const matches: PatternMatch[] = [];
-  const seenTiers = new Set<PatternTier>();
 
   for (const def of PATTERNS) {
-    if (seenTiers.has(def.tier)) continue;
     if (def.fileOnly && filePath && !isProseFile(filePath)) continue;
     if (def.sideEffectOnly && context === "file") continue;
 
@@ -350,11 +355,9 @@ export function scanIntroduced(
       message: def.message(newHits.sample),
       structural: def.structural ?? false,
     });
-    seenTiers.add(def.tier);
   }
 
   for (const group of WEIGHTED_PATTERNS) {
-    if (seenTiers.has(group.tier)) continue;
     if (group.fileOnly && filePath && !isProseFile(filePath)) continue;
 
     const newWeighted = weightedStemHits(newStripped, group.entries);
@@ -369,7 +372,6 @@ export function scanIntroduced(
       message: group.message(newWeighted.samples, newWeighted.totalWeight),
       structural: false,
     });
-    seenTiers.add(group.tier);
   }
 
   return matches;

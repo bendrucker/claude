@@ -134,7 +134,7 @@ The hybrid family leads as #744 predicted, keeping the heuristic's structure and
 Where each existing detector class lands:
 
 - Lexical wordlists (`wordlists/*.txt`): stay as word lists. They are cheap, the analyze skill audits their health each run, and tagger machinery adds nothing to an exact vocabulary match.
-- Structural regexes in `hooks/tropes.ts`: migration candidates, one follow-up issue each, gated by the same corpus-eval discipline as headings:
+- Structural regexes in `detection/tropes.ts`: migration candidates, one follow-up issue each, gated by the same corpus-eval discipline as headings:
   - passive voice (`COPULA PARTICIPLE` tag sequence vs. the current participle regex)
   - "not X but Y" parallelism (tag-sequence shape vs. literal `not ... but` matching)
   - cross-sentence negation ("It isn't X. It is Y.")

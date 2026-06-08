@@ -4,7 +4,7 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { formatDecision } from "./markdown";
+import { formatDecision } from "./io";
 import { checkCode, checkMarkdown, processInput } from "./numbering";
 
 function hasSg(): boolean {

@@ -1,4 +1,4 @@
-import { isProseFile } from "./markdown";
+import { isProseFile } from "./paths";
 import {
   PATTERNS,
   type PatternDef,

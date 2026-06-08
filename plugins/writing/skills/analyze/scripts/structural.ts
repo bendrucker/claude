@@ -1,34 +1,12 @@
-import { PATTERNS, stripCode } from "../../../hooks/tropes";
-import { WORDLISTS } from "../../../hooks/wordlists";
+import { type RegexCatalogEntry, regexCatalog, stripCode } from "../../../detection/tropes";
 
-export interface StructuralPattern {
-  category: string;
-  pattern: RegExp;
-  fileOnly?: boolean;
-  sideEffectOnly?: boolean;
-}
+export type StructuralPattern = RegexCatalogEntry;
 
-function globalize(pattern: RegExp): RegExp {
-  return new RegExp(
-    pattern.source,
-    pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`,
-  );
-}
-
-// Derived from the hook's regex patterns so the audit cannot drift from what
-// the hook enforces. Wordlist-backed and function tests are excluded: stemmed
-// vocabulary and weighted verbs are covered by the FTS pass, openers compile to
-// WORDLISTS.openers (also FTS-covered), and function tests cannot be counted by
-// a single regex match.
-export const STRUCTURAL_PATTERNS: StructuralPattern[] = PATTERNS.filter(
-  (def): def is typeof def & { test: RegExp } =>
-    def.test instanceof RegExp && def.test !== WORDLISTS.openers,
-).map((def) => ({
-  category: def.category,
-  pattern: globalize(def.test),
-  fileOnly: def.fileOnly ?? false,
-  sideEffectOnly: def.sideEffectOnly ?? false,
-}));
+// The audit reuses the engine's regex catalog so it cannot drift from what the
+// hook enforces. The catalog already excludes wordlist-backed and function
+// tests (covered by the FTS pass) and normalizes each pattern to the global
+// flag for counting.
+export const STRUCTURAL_PATTERNS: StructuralPattern[] = regexCatalog();
 
 function countHits(text: string, pattern: RegExp): number {
   pattern.lastIndex = 0;

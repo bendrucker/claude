@@ -2,14 +2,9 @@
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import {
-  formatContext,
-  formatDecision,
-  isMemoryPath,
-  isPlanPath,
-  type SyncHookJSONOutput,
-} from "./markdown";
-import { firstByTier, type PatternMatch, type ScanContext, scan, scanIntroduced } from "./tropes";
+import { isMemoryPath, isPlanPath } from "../detection/paths";
+import { firstByTier, type PatternMatch, scan, scanIntroduced } from "../detection/tropes";
+import { formatContext, formatDecision, type SyncHookJSONOutput } from "./io";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 

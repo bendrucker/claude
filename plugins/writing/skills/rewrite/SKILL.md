@@ -34,16 +34,16 @@ If `$ARGUMENTS` is empty, ask for the text to rewrite. You may offer to read it 
 
 ## Lint
 
-Before and after rewriting, run the lint script to find violations:
+Before and after rewriting, run the scan script in single-input mode to find violations:
 
 ```bash
-echo "<text>" | bun ${CLAUDE_SKILL_DIR}/scripts/lint.ts
+echo "<text>" | bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input
 ```
 
 Or pass a file path directly:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/lint.ts path/to/file.md
+bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input path/to/file.md
 ```
 
 The script outputs one finding per line (`line:col: category: message`).

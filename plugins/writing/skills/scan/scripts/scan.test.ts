@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectFiles, scanFiles, shouldSkip, toGlob } from "./scan";
+import { collectFiles, readInput, scanFiles, shouldSkip, toGlob } from "./scan";
 
 describe("shouldSkip", () => {
   it("skips node_modules", () => {
@@ -88,5 +88,29 @@ describe("collectFiles and scanFiles", () => {
       expect(v.line).toBeGreaterThanOrEqual(1);
       expect(v.col).toBeGreaterThanOrEqual(1);
     }
+  });
+});
+
+describe("readInput", () => {
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "writing-scan-input-"));
+    await Bun.write(join(dir, "doc.md"), "The function reads input.\n");
+  });
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("reads an existing file and reports its path", async () => {
+    const path = join(dir, "doc.md");
+    expect(await readInput(path)).toEqual({ text: "The function reads input.\n", filePath: path });
+  });
+
+  it("treats a non-existent argument as inline text", async () => {
+    expect(await readInput("The function reads input.")).toEqual({
+      text: "The function reads input.",
+    });
   });
 });

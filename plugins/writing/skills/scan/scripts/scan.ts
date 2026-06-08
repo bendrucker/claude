@@ -40,6 +40,32 @@ export async function collectFiles(input: string): Promise<string[]> {
   return files.sort();
 }
 
+export async function readInput(
+  arg: string | undefined,
+): Promise<{ text: string; filePath?: string }> {
+  if (arg && (await Bun.file(arg).exists())) {
+    return { text: await Bun.file(arg).text(), filePath: arg };
+  }
+  if (arg) {
+    return { text: arg };
+  }
+  return { text: await new Response(Bun.stdin.stream()).text() };
+}
+
+function scanInput(text: string, filePath: string | undefined): number {
+  const violations = scanAll(text, filePath);
+
+  if (violations.length === 0) {
+    console.log("No violations found.");
+    return 0;
+  }
+
+  for (const v of violations) {
+    console.log(`${v.line}:${v.col}: ${v.category}: ${v.message}`);
+  }
+  return 1;
+}
+
 export type FileViolations = { path: string; violations: ScanResult[] };
 
 export async function scanFiles(files: string[]): Promise<FileViolations[]> {
@@ -94,12 +120,18 @@ function printSummary(results: FileViolations[]): void {
 async function main(): Promise<void> {
   const argv = cli({
     name: "scan",
-    parameters: ["<path>"],
+    parameters: ["[path]"],
     help: {
       description:
-        "Scan existing repository prose for AI writing tropes. Pass a directory or a glob; reports every match per file with a summary.",
+        "Scan existing repository prose for AI writing tropes. Pass a directory or a glob; reports every match per file with a summary. With --input, scan a single file, inline text, or stdin and report matches as line:col without a path prefix.",
     },
     flags: {
+      input: {
+        type: Boolean,
+        description:
+          "Scan a single input (file path, inline text, or stdin) instead of walking a directory",
+        default: false,
+      },
       noSummary: {
         type: Boolean,
         description: "Suppress the trailing summary table",
@@ -107,6 +139,16 @@ async function main(): Promise<void> {
       },
     },
   });
+
+  if (argv.flags.input) {
+    const { text, filePath } = await readInput(argv._.path);
+    process.exit(scanInput(text, filePath));
+  }
+
+  if (!argv._.path) {
+    argv.showHelp();
+    process.exit(1);
+  }
 
   const results = await scanFiles(await collectFiles(argv._.path));
   printViolations(results);

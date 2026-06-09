@@ -162,6 +162,26 @@ ORDER BY h.session_id, h.timestamp
 
 Sample sessions first, then rows within them. Without the session pool step, high-volume sessions dominate the sample and quieter sessions go unexamined.
 
+## Detector Labeling Protocol
+
+`headings-eval.ts` measures a candidate classifier's precision over its positive (flagged) labels with a Wilson interval. The interval width is governed by the positive count, not the corpus size, so an underpowered sample cannot separate two candidates. The heading pilot had ~24 positives in the random subset and a ±~19pp interval, too wide to promote any tagger. The protocol below sizes the labeling work once and is reusable per trope.
+
+#### Size the labels with the power calc
+
+`power.ts` solves the normal-approximation half-width `z * sqrt(p(1-p)/n)` for `n` at a target detectable lift. `--power <targetLiftPP>` prints the positive labels needed to detect that lift at 95%, the uniform-random rows that yield them at the current flag rate, and the multiple over the current sample. Worst-case precision (0.5) is the default; pass a measured precision to size at an operating point. The interval is widest at 0.5, so the default is conservative. A target lift near the current interval width lands around 3-5x the current positives; a tighter target costs more (10pp detectable at 0.5 needs ~385 positives).
+
+#### Concentrate labels where they move the decision
+
+Spend new labels on the candidates' disagreements with the baseline and on the leader classifier's flags. These are the items that change a promotion verdict. `--sample` writes a labeling file biased toward disagreements (capped by `--disagreement-cap`) plus a uniform-random remainder.
+
+#### Keep a uniform-random anchor
+
+Active labeling on disagreements inflates the apparent flag rate, so it cannot estimate precision honestly. The random subset (`source = random`, drawn from headings excluded from the disagreement set) gives the unbiased precision. Score it separately: `--labels` reports both the full labeled set and the random-only subset. Size the power calc against the random subset's positives, not the full labeled count.
+
+#### Freeze a test set separate from the dev set
+
+Tuning a classifier and measuring it on the same labels inflates the result. Hold out a frozen test set for the promotion estimate and tune thresholds on a separate dev set. The freeze is what makes a promotion number trustworthy across re-tuning.
+
 ## Tuning
 
 Raise `--min-lift` (default 5.0) if the candidate list is too noisy. Lower it if too quiet. Raise `--min-count` (default 5) to be stricter about what counts as a live rule (more removals tagged dead); lower it to keep rarer rules. N-grams larger than 4 tokens are not currently considered.

@@ -4,7 +4,9 @@ import {
   dedupeHeadings,
   evaluateClassifiers,
   extractHeadings,
+  formatPowerReport,
   parseLabelsFile,
+  sampleForLabeling,
   scoreAgainstLabels,
   wilson,
 } from "./headings-eval";
@@ -115,6 +117,57 @@ describe("parseLabelsFile", () => {
 
   it("rejects unknown labels", () => {
     expect(() => parseLabelsFile("Heading\tbogus\trandom\n")).toThrow("Unknown label");
+  });
+});
+
+describe("sampleForLabeling", () => {
+  const headings = Array.from({ length: 10 }, (_, i) => ({
+    heading: `H${i}`,
+    occurrences: 1,
+    sessions: 1,
+  }));
+  const disagreements = ["H0", "H1", "H2", "H3"];
+
+  it("caps disagreements and keeps them out of the random pool", () => {
+    // The reproducibility leak (#769): uncapped disagreements polluting the
+    // unbiased random subset. The cap bounds the disagreement rows, and the
+    // random pool excludes every capped disagreement so the unbiased subset
+    // stays unbiased.
+    const sample = sampleForLabeling(headings, disagreements, 5, 2);
+    const byHeading = new Map(sample.map((row) => [row.heading, row.source]));
+
+    const disagreementRows = sample.filter((row) => row.source === "disagreement");
+    expect(disagreementRows.map((row) => row.heading).sort()).toEqual(["H0", "H1"]);
+
+    const randomRows = sample.filter((row) => row.source === "random");
+    for (const row of randomRows) {
+      expect(["H0", "H1"]).not.toContain(row.heading);
+    }
+    // A capped-out disagreement may still appear, but only as a random draw.
+    for (const capped of ["H2", "H3"]) {
+      if (byHeading.has(capped)) expect(byHeading.get(capped)).toBe("random");
+    }
+  });
+
+  it("never draws the same heading as both disagreement and random", () => {
+    const sample = sampleForLabeling(headings, disagreements, 10, 4);
+    const headingsSeen = sample.map((row) => row.heading);
+    expect(new Set(headingsSeen).size).toBe(headingsSeen.length);
+  });
+});
+
+describe("formatPowerReport", () => {
+  it("reports the positives needed to detect a target lift", () => {
+    const report = formatPowerReport(
+      { positives: 24, total: 499, label: "labeled random subset" },
+      20,
+    );
+    expect(report).toContain("20pp detectable lift");
+    expect(report).toContain("labeled random subset");
+    expect(report).toContain("positive labels");
+    // 20pp at worst-case 0.5 needs 97 positives, ~4x the current 24.
+    expect(report).toContain("97");
+    expect(report).toContain("4.0x");
   });
 });
 

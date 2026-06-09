@@ -25,6 +25,7 @@ import { table } from "table";
 import { visit } from "unist-util-visit";
 import { CLASSIFIERS } from "../../../linguistics/classifiers";
 import type { HeadingClassifier, HeadingKind } from "../../../linguistics/heading";
+import { powerFromCurrentSample } from "../../../linguistics/power";
 import { openSessionDb } from "./db";
 import type { DeliverableRow } from "./dump";
 
@@ -230,7 +231,7 @@ export function parseLabelsFile(content: string): LabeledHeading[] {
   return labeled;
 }
 
-function sampleForLabeling(
+export function sampleForLabeling(
   headings: HeadingRecord[],
   disagreements: string[],
   sampleSize: number,
@@ -255,6 +256,39 @@ function sampleForLabeling(
 
 function percent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
+}
+
+/**
+ * Render the labeling-power report for a target detectable lift. The current
+ * sample sizes the flag rate and positive count: with hand labels, positives
+ * are the random subset's true positives; without, the leader classifier's
+ * flag count over the corpus. The table reports the positives needed to detect
+ * the lift, how that compares to the current count, and the uniform-random
+ * pass that would yield them.
+ */
+export function formatPowerReport(
+  current: { positives: number; total: number; label: string },
+  targetLiftPP: number,
+): string {
+  const power = powerFromCurrentSample(current, targetLiftPP);
+  return [
+    `Power, ${targetLiftPP}pp detectable lift at 95% (sized on ${current.label}):`,
+    table([
+      ["metric", "current", "required", "multiple"],
+      [
+        "positive labels",
+        String(current.positives),
+        String(power.requiredPositives),
+        `${power.positiveMultiple.toFixed(1)}x`,
+      ],
+      [
+        "uniform-random rows",
+        String(current.total),
+        String(power.requiredSamples),
+        `${(power.requiredSamples / current.total).toFixed(1)}x`,
+      ],
+    ]),
+  ].join("\n");
 }
 
 async function corpusFromDocs(dir: string): Promise<Array<{ session_id: string; text: string }>> {
@@ -323,6 +357,11 @@ async function main(): Promise<void> {
       labels: {
         type: String,
         description: "Labeled TSV (heading<TAB>label<TAB>source) to score against",
+      },
+      power: {
+        type: Number,
+        description:
+          "Target detectable lift in pp; print the labeled positives needed to act on it",
       },
       out: {
         type: String,
@@ -404,8 +443,9 @@ async function main(): Promise<void> {
     );
   }
 
+  let labeled: LabeledHeading[] | undefined;
   if (argv.flags.labels) {
-    const labeled = parseLabelsFile(await Bun.file(argv.flags.labels).text());
+    labeled = parseLabelsFile(await Bun.file(argv.flags.labels).text());
     const randomOnly = labeled.filter((row) => row.source === "random");
     console.log(`Labeled: ${labeled.length} rows (${randomOnly.length} random)`);
     for (const [title, subset] of [
@@ -431,6 +471,31 @@ async function main(): Promise<void> {
       );
     }
   }
+
+  if (argv.flags.power !== undefined) {
+    const current = currentSampleForPower(headings.length, evaluation, labeled);
+    console.log(formatPowerReport(current, argv.flags.power));
+  }
+}
+
+/**
+ * The current sample the power calc sizes against. Hand labels give the
+ * honest positive count (the random subset's true positives over the random
+ * total). Without labels, fall back to the leader classifier's flag count over
+ * the corpus, the upper-bound positive count active labeling would target.
+ */
+function currentSampleForPower(
+  corpusSize: number,
+  evaluation: Evaluation,
+  labeled: LabeledHeading[] | undefined,
+): { positives: number; total: number; label: string } {
+  if (labeled) {
+    const randomOnly = labeled.filter((row) => row.source === "random");
+    const positives = randomOnly.filter((row) => SHOULD_FLAG.has(row.label)).length;
+    return { positives, total: randomOnly.length, label: "labeled random subset" };
+  }
+  const leader = evaluation.stats.reduce((best, row) => (row.flags > best.flags ? row : best));
+  return { positives: leader.flags, total: corpusSize, label: `${leader.name} flags` };
 }
 
 function daysAgo(days: number): string {

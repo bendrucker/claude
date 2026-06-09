@@ -1,8 +1,35 @@
 # Linguistic Tooling
 
-Evaluation record for replacing hand-rolled heading and trope detectors with part-of-speech-tagger-backed rules (issue #745). This file holds the tagger comparison, the promotion criteria for swapping a tagger-backed classifier into the hook, and the earn/retire rules for each dependency.
+The framework for deciding whether a linguistic detector is worth shipping, and the record of applying it to headings (issues #745, #769). It defines four detector layers, the surface-specific bars a detector must clear, and the earn/retire rules for each dependency. The heading classifier comparison is the first detector run through it.
 
 All numbers are aggregates over private session corpora. Example headings in this file are invented, never quoted from sessions.
+
+## Detector Layers
+
+Writing checks sort by the signal they need, and that sorting drives the architecture more than "tagger vs heuristic" does. Each candidate belongs to one layer, and the layer decides the right tool before any code is written:
+
+- **Lexical** (`delve`, `boasts`, "it's worth noting"): a wordlist is optimal. Linguistics adds nothing. The eval is corpus frequency and lift, which the analyze skill already measures.
+- **Morphosyntactic** (sentence-shaped headings, passive `COPULA PARTICIPLE`, "not X but Y", correlatives): patterns over part-of-speech sequences that do not reduce to a word list and break as brittle regexes. This is the only layer the tagger stack is the right tool for.
+- **Discourse / cross-sentence** (negation flip "It isn't X. It is Y.", escalating triads, question-then-answer cadence): structure above the sentence. Part-of-speech tagging alone does not reach it.
+- **Semantic / pragmatic** (reads like marketing, hedging density): no grammar captures it. LLM-judge territory.
+
+The failure mode to avoid is making the tagger the hammer for all four. Before a trope is built as a grammar rule it gets a wordlist-vs-regex-vs-grammar-vs-judge comparison; the migration candidates in the Trope Pattern Inventory each earn the grammar layer or stay where they are. A cheap LLM-judge run is the upper reference: if a judge ties the tagger stack on a trope at acceptable latency, that trope does not belong in the grammar layer.
+
+## Two Surfaces, Two Promotion Bars
+
+The same grammar engine serves two surfaces with opposite tolerances, so promotion is two bars, not one. The eval scores every candidate against both and reports which surface, if any, it clears.
+
+The hook is a PreToolUse nudge on every edit. A false positive is a cheap, ignorable nudge, but frequent ones train the user to dismiss the hook, so it is precision-critical and recall-tolerant. A candidate replaces a hook detector only when, on a labeled session sample with an interval tight enough to act on:
+
+- precision ≥ baseline precision
+- recall strictly greater than baseline recall
+- zero regressions on the committed seed (`linguistics/heading.test.ts`)
+
+The analyze and review skills are batch and human-in-the-loop. A reviewer triages flags, so precision can be far lower in exchange for recall. A classifier too noisy for the hook can be valuable here. The bar is recall above baseline at a precision a reviewer tolerates, with the false-positive rate reported rather than gated.
+
+The near-term win is shipping the grammar layer into analyze/review at the recall-leaning bar while the hook stays on the tuned heuristic. That needs no promotion-grade interval. The hook swap waits for a labeled pass with enough power.
+
+Interval width, not point estimates, decides hook promotion. Twenty-four positive flags in a random subset put roughly ±20pp on every metric, which promotes nothing. A power calculation sizes the labeling work to the interval the decision needs (rough target: 3-5x the current positive count). The labeling protocol concentrates new labels where they move the decision (baseline-candidate disagreements and the leader's flags) while keeping a uniform-random anchor for an honest precision estimate.
 
 ## Modules
 
@@ -119,28 +146,33 @@ Vary the document type (design doc, postmortem, evaluation, rollout plan, capaci
 bun skills/analyze/scripts/headings-eval.ts --docs tmp/synthetic-corpus --out tmp/synthetic
 ```
 
-## Promotion Criterion
+## Heading Verdict
 
-A tagger-backed classifier replaces `classifyHeadingBaseline` in the hook only when, on the labeled session sample:
+Applying the two bars to the heading classifiers:
 
-- precision ≥ baseline precision
-- recall strictly greater than baseline recall
-- zero regressions on the committed seed (`linguistics/heading.test.ts`)
+- No candidate clears the hook bar. `hybrid:natural` leads on point estimates (precision at or above baseline, roughly double the recall), but the intervals overlap heavily at 24 random-subset flags, so this is direction, not a verdict. The hook keeps `classifyHeadingBaseline`.
+- The grammar layer clears the analyze/review bar: `hybrid:natural`'s recall gain is worth its precision cost where a reviewer triages. This is the near-term ship.
+- `natural` stays a devDependency while the hook question is open. The next step is a labeled pass sized by the power calculation, concentrated on `natural`'s flags, before any hook swap.
 
-The hybrid family leads as #744 predicted, keeping the heuristic's structure and replacing only the word sets, but with `natural` doing the tagging rather than the expected `compromise` (see Labeled Sample Results). Until a candidate clears the bar with a tight enough interval, the hook keeps the heuristic and the linguistics layer surfaces through the analyze and review skills.
+The hybrid family leads as #744 predicted, keeping the heuristic's structure and replacing only the word sets, but with `natural` doing the tagging rather than the expected `compromise` (see Labeled Sample Results).
 
 ## Trope Pattern Inventory
 
-Where each existing detector class lands:
+Where each existing detector lands in the layer model, and what moving it would take:
 
-- Lexical wordlists (`wordlists/*.txt`): stay as word lists. They are cheap, the analyze skill audits their health each run, and tagger machinery adds nothing to an exact vocabulary match.
-- Structural regexes in `detection/tropes.ts`: migration candidates, one follow-up issue each, gated by the same corpus-eval discipline as headings:
+- **Lexical** (`wordlists/*.txt`): stay as word lists. Cheap, the analyze skill audits their health each run, and tagger machinery adds nothing to an exact vocabulary match.
+- **Morphosyntactic** (structural regexes in `detection/tropes.ts`): migration candidates, one follow-up issue each, each gated by a wordlist-vs-regex-vs-grammar-vs-judge comparison and the two-surface bars before it is built:
   - passive voice (`COPULA PARTICIPLE` tag sequence vs. the current participle regex)
   - "not X but Y" parallelism (tag-sequence shape vs. literal `not ... but` matching)
-  - cross-sentence negation ("It isn't X. It is Y.")
   - test-result reporting (function-based test, currently uncountable by the structural audit)
+- **Discourse** (cross-sentence negation, escalating triads): structure above the sentence, which part-of-speech tagging alone does not reach. Held until the layer has tooling.
+- **Semantic** (marketing tone, hedging density): LLM-judge territory, not grammar.
+
+Per-trope migrations hold until the two-surface bars and the power calculation exist, or each repeats the underpowered-eval mistake. In the meantime the `tropes.ts` regexes ship as hook nudges and stay as-is.
 
 ## Dependencies
+
+The tagger fork is now two-way. `wink-pos-tagger` is retired (dominated by `natural`), leaving `compromise` (primary, runtime) and `natural` (devDependency, promotion candidate). The framework resolves the rest: promote `natural` if a powered labeling pass clears it at the hook bar, otherwise collapse to `compromise` only. The analyze/review ship does not force this choice, since the grammar layer surfaces there regardless of which tagger backs it.
 
 | package | role | earns its place by | retired when |
 |---|---|---|---|

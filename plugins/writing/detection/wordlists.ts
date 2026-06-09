@@ -13,6 +13,12 @@ export type PlainWordlistOptions = {
 const COMMENT_OR_BLANK = /^\s*(?:#|$)/;
 const WORD_TOKEN = /[a-zA-Z]+/g;
 
+// Count word tokens the same way the wordlist matchers tokenize, so a per-token
+// density measured against this count lines up with what the matchers see.
+export function countWords(text: string): number {
+  return text.match(WORD_TOKEN)?.length ?? 0;
+}
+
 function parseLines(content: string): string[] {
   const lines: string[] = [];
   for (const raw of content.split(/\r?\n/)) {

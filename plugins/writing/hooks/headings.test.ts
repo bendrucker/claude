@@ -46,6 +46,21 @@ const titleCaseCases: { description: string; content: string; match: boolean }[]
   { description: "uncapitalized first word (stop word)", content: "# the Guide", match: true },
   { description: "stop words mid-heading", content: "# The Guide to Everything", match: false },
   { description: "heading inside code block", content: "```\n# introduction\n```", match: false },
+  {
+    description: "lowercase as (AP stop word) mid-heading",
+    content: "## The Tagger Comparison as an Eval Device, Not the Architecture",
+    match: false,
+  },
+  {
+    description: "lowercase vs. (AP stop word) mid-heading",
+    content: "## Relationship to Other Issues, and What to Hold vs. Do Ad Hoc",
+    match: false,
+  },
+  {
+    description: "capitalized As (incorrect AP case)",
+    content: "## Treat It As a Device",
+    match: true,
+  },
 ];
 
 describe("checkTitleCase", () => {

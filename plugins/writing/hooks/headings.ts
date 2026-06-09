@@ -12,6 +12,33 @@ import { type EditInput, formatContext, type SyncHookJSONOutput, type WriteInput
 
 const PLACEHOLDER = "\0";
 
+// ap-style-title-case ships a stopword list missing two words AP lowercases:
+// `as` (a short conjunction/preposition) and `vs`/`vs.` (versus). Without
+// them the checker flags correct headings like "X as Y" and "A vs. B". The
+// library splits on commas and colons but not periods, so `vs.` is one token.
+const AP_STOPWORDS = [
+  "a",
+  "an",
+  "and",
+  "as",
+  "at",
+  "but",
+  "by",
+  "for",
+  "in",
+  "nor",
+  "of",
+  "on",
+  "or",
+  "so",
+  "the",
+  "to",
+  "up",
+  "vs",
+  "vs.",
+  "yet",
+];
+
 export function checkTitleCase(content: string): string | null {
   const ast = fromMarkdown(content);
   let result: string | null = null;
@@ -32,7 +59,7 @@ export function checkTitleCase(content: string): string | null {
     }
 
     const combined = parts.join("");
-    const titleCased = apStyleTitleCase(combined);
+    const titleCased = apStyleTitleCase(combined, { stopwords: AP_STOPWORDS });
 
     const originalParts = combined.split(PLACEHOLDER);
     const titleParts = titleCased.split(PLACEHOLDER);

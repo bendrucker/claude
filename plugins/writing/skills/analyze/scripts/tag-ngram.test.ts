@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { processTagRows, tagSequence } from "./tag-ngram";
+import { processRows } from "./ngram";
+import { tagSequence } from "./tag-ngram";
 
 // Invented sentences exercising the structural shapes the signature
 // miner exists to catch: passive voice, participial openers, "not X
@@ -30,32 +31,34 @@ describe("tagSequence", () => {
   });
 });
 
-describe("processTagRows", () => {
+describe("tag sequences through processRows", () => {
   const passive = "The flag was removed after the rollout";
   const rows = [
     { session_id: "a", text: `${passive}. The flag was removed by the cleanup job.` },
     { session_id: "b", text: "The cache was invalidated by a background sweep." },
     { session_id: "c" },
   ];
+  const tokenize = (sentence: string) => tagSequence(sentence);
 
   it("counts tag trigrams across rows", () => {
-    const { stats } = processTagRows(rows, [3]);
+    const { stats } = processRows(rows, [3], { tokenize });
     const counts = stats.ngrams.get(3);
     expect(counts?.get("NOUN COPULA PARTICIPLE")).toBe(3);
   });
 
   it("tracks session spread per sequence", () => {
-    const { sessionSpread } = processTagRows(rows, [3]);
+    const { sessionSpread } = processRows(rows, [3], { tokenize });
     expect(sessionSpread.get("NOUN COPULA PARTICIPLE")).toBe(2);
   });
 
   it("keeps the shortest example sentence per sequence", () => {
-    const { examples } = processTagRows(rows, [3]);
+    const examples = new Map<string, string>();
+    processRows(rows, [3], { tokenize, examples });
     expect(examples.get("NOUN COPULA PARTICIPLE")).toBe(passive);
   });
 
   it("skips rows without text", () => {
-    const { stats } = processTagRows([{ session_id: "c" }], [3]);
+    const { stats } = processRows([{ session_id: "c" }], [3], { tokenize });
     expect(stats.tokens).toBe(0);
   });
 });

@@ -37,4 +37,4 @@ Pass `--no-summary` to suppress the table when piping the per-line output elsewh
 
 The scan is report-only. To fix a flagged file, open it and run `writing:rewrite` on the offending passages, or edit directly using the reported positions. Bulk auto-fixing is not part of this skill.
 
-The detection engine is shared with the `tropes` hook and the `writing:rewrite` lint script (`detection/scan.ts` over `detection/tropes.ts`), so a clean scan matches what the hook would allow on new edits.
+The detection engine is shared with the `tropes` hook and the `writing:rewrite` skill, which runs this script in `--input` mode for a single file, inline text, or stdin (`detection/scan.ts` over `detection/tropes.ts`), so a clean scan matches what the hook would allow on new edits.

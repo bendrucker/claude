@@ -143,6 +143,14 @@ describe("template_presence", () => {
   test("returns 0 when a section is missing", () => {
     expect(compute("## Changes\n\nStuff only.")).toBe(0);
   });
+
+  test("requires a word boundary after the section name", () => {
+    expect(compute("## Changeset\n\nStuff.\n\n## Testing\n\nMore.")).toBe(0);
+  });
+
+  test("ignores headings inside fenced code blocks", () => {
+    expect(compute("Prose.\n\n```md\n## Changes\n## Testing\n```")).toBe(0);
+  });
 });
 
 describe("unique_heading_variety", () => {
@@ -159,12 +167,28 @@ describe("heading_rate", () => {
     expect(compute("## Anything\n\nbody")).toBe(1);
     expect(compute("Plain prose with no headings.")).toBe(0);
   });
+
+  test("does not count shell comments in fenced code as headings", () => {
+    expect(compute("Run the script.\n\n```sh\n# this is a comment\nrun.sh\n```")).toBe(0);
+  });
 });
 
 describe("action_verb_opener_rate", () => {
+  const compute = feature("action_verb_opener_rate").compute;
+
   test("returns the fraction of lines opening with a present-tense verb", () => {
     const text = "Adds the cache layer.\nThe loader was slow.\nRemoves the old path.\n";
-    expect(feature("action_verb_opener_rate").compute(text)).toBeCloseTo(2 / 3, 5);
+    expect(compute(text)).toBeCloseTo(2 / 3, 5);
+  });
+
+  test("counts bullet lines, where the pattern stacks", () => {
+    const text = "- Adds the cache layer\n- Removes the old path\n";
+    expect(compute(text)).toBe(1);
+  });
+
+  test("excludes fenced code lines from the denominator", () => {
+    const text = "Adds the cache layer.\n\n```\nx = 1\ny = 2\nz = 3\n```\n";
+    expect(compute(text)).toBe(1);
   });
 });
 

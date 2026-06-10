@@ -53,6 +53,15 @@ function nonEmptyLines(text: string): string[] {
   return text.split("\n").filter((l) => l.trim().length > 0);
 }
 
+// Remove fenced code blocks while preserving line structure. Line- and
+// heading-based features use this so a `# comment` inside a shell snippet does
+// not register as a markdown heading and code lines do not inflate line
+// denominators. stripCode flattens whitespace, which would destroy line-based
+// rates.
+function stripFencedBlocks(text: string): string {
+  return text.replace(/```[\s\S]*?```/g, "");
+}
+
 // Strip fenced and inline code blocks before rate counting.
 function stripCode(text: string): string {
   return text
@@ -191,8 +200,9 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
       'SKILL.md Body: "Use `##` sections for larger changes". Aggregate template rate is an analyze trend only',
     // Returns 1 if both template sections are present, 0 otherwise.
     compute: (text) => {
-      const hasChanges = /^##\s+(Changes|What Changed)/im.test(text);
-      const hasTesting = /^##\s+Testing/im.test(text);
+      const prose = stripFencedBlocks(text);
+      const hasChanges = /^##\s+(Changes|What Changed)\b/im.test(prose);
+      const hasTesting = /^##\s+Testing\b/im.test(prose);
       return hasChanges && hasTesting ? 1 : 0;
     },
     isFraction: true,
@@ -206,7 +216,7 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
       "sections.md fixes the section vocabulary (Issue/Changes/Testing/References). Aggregate uniformity metric only, never per-document",
     // Returns the count of unique heading texts (lowercased) in this document.
     compute: (text) => {
-      const headings = [...text.matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) =>
+      const headings = [...stripFencedBlocks(text).matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) =>
         (m[1] ?? "").toLowerCase().trim(),
       );
       return new Set(headings).size;
@@ -219,7 +229,7 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     provenance: "skill-prescribed",
     source: 'Same "larger changes" clause as template presence. Report as a trend',
     // Returns 1 if the document contains any markdown heading, 0 otherwise.
-    compute: (text) => (/^#{1,6}\s+/m.test(text) ? 1 : 0),
+    compute: (text) => (/^#{1,6}\s+/m.test(stripFencedBlocks(text)) ? 1 : 0),
     isFraction: true,
     format: (rate) => `${(rate * 100).toFixed(0)}%`,
   },
@@ -230,11 +240,12 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     source:
       'SKILL.md Voice: "Open with a bare present-tense verb". Skill prescribes only the opening summary line; stacking across lines is the drift signal',
     compute: (text) => {
-      const lines = nonEmptyLines(text);
+      const lines = nonEmptyLines(stripFencedBlocks(text));
       if (lines.length === 0) return 0;
-      // Match lines opening with a common present-tense verb (capitalized).
+      // Match lines (including bullets, where the pattern stacks) opening with
+      // a common present-tense verb (capitalized).
       const verbOpener =
-        /^\s*(?:Add|Remove|Extract|Fix|Update|Refactor|Move|Rename|Delete|Enable|Disable|Replace|Expose|Allow|Prevent|Extend|Create|Set|Run|Use|Make|Build|Change|Skip|Drop|Emit|Load|Save|Return|Push|Pull|Pass|Wrap|Bump|Pin|Guard|Gate|Handle|Limit|Filter|Sort|Map|Merge|Split|Read|Write|Mark|Track|Log|Check|Test|Wire|Inject|Import|Export|Bind|Align|Trim|Convert|Compute|Parse|Validate|Normalize)[a-z]*(?:\s|$)/;
+        /^\s*(?:[-*]\s+)?(?:Add|Remove|Extract|Fix|Update|Refactor|Move|Rename|Delete|Enable|Disable|Replace|Expose|Allow|Prevent|Extend|Create|Set|Run|Use|Make|Build|Change|Skip|Drop|Emit|Load|Save|Return|Push|Pull|Pass|Wrap|Bump|Pin|Guard|Gate|Handle|Limit|Filter|Sort|Map|Merge|Split|Read|Write|Mark|Track|Log|Check|Test|Wire|Inject|Import|Export|Bind|Align|Trim|Convert|Compute|Parse|Validate|Normalize)[a-z]*(?:\s|$)/;
       const openers = lines.filter((l) => verbOpener.test(l)).length;
       return openers / lines.length;
     },
@@ -260,9 +271,10 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     source:
       'sections.md bans the bold form ("Never structure bullets as **path**: description"). The backtick variant evades the letter of the rule',
     compute: (text) => {
-      const bullets = bulletLines(text);
+      const prose = stripFencedBlocks(text);
+      const bullets = bulletLines(prose);
       if (bullets.length === 0) return 0;
-      return countBacktickManifestBullets(text) / bullets.length;
+      return countBacktickManifestBullets(prose) / bullets.length;
     },
     isFraction: true,
     format: (rate) => `${(rate * 100).toFixed(1)}%`,

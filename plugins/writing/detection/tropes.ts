@@ -551,7 +551,7 @@ export const PATTERNS: PatternDef[] = [
     fileOnly: true,
     skillOnly: true,
     message: (matched) =>
-      `"${matched}" chains clauses with ", so". Split into two sentences; state the cause and effect separately.`,
+      `"${matched}" chains clauses with ", so". Split into two sentences. State the cause and effect separately.`,
     positives: [
       "The cache fills up, so the old entries get evicted.",
       "The worker finishes, so the queue clears.",

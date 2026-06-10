@@ -1,4 +1,5 @@
 import { stemmer } from "stemmer";
+import { countSubsequence } from "../../../detection/wordlists";
 import { cleanText } from "./ngram";
 import type { WordlistEntry } from "./wordlists";
 
@@ -33,27 +34,6 @@ export function stemPhrase(phrase: string): string[] {
   return (phrase.toLowerCase().match(WORD_TOKEN) ?? []).map((w) => stemmer(w));
 }
 
-// Count non-overlapping occurrences of a stemmed token subsequence, matching
-// how the hook's stemmedPhraseHits / compileStemmedWordlist scan deliverable
-// text. Single-word entries reduce to a token-membership count.
-export function countSubsequence(haystack: string[], needle: string[]): number {
-  if (needle.length === 0) return 0;
-  let count = 0;
-  for (let i = 0; i + needle.length <= haystack.length; i++) {
-    let matched = true;
-    for (let j = 0; j < needle.length; j++) {
-      if (haystack[i + j] !== needle[j]) {
-        matched = false;
-        break;
-      }
-    }
-    if (matched) {
-      count++;
-      i += needle.length - 1;
-    }
-  }
-  return count;
-}
 
 export interface DeliverableAuditRow {
   count: number;

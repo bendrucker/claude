@@ -212,22 +212,38 @@ function renderStructuralAudit(input: ReportInput): string {
     "## Structural Pattern Audit",
     "",
     "Regex-based patterns from the writing hook, run against all model-generated text.",
+    "Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook",
+    "without a promotion record appear here as misplacement signals.",
     "",
   ];
   if (input.structuralAudit.length === 0) {
     lines.push("_No structural patterns defined._");
     return lines.join("\n");
   }
-  lines.push("| pattern | scope | assistant hits | user hits | rows | sessions |");
-  lines.push("| --- | --- | --- | --- | --- | --- |");
-  const sorted = [...input.structuralAudit].sort((a, b) => b.assistantHits - a.assistantHits);
-  for (const r of sorted) {
-    const scope = r.sideEffectOnly ? "side-effect" : r.fileOnly ? "file-only" : "all";
-    lines.push(
-      `| ${r.category} | ${scope} | ${r.assistantHits} | ${r.userHits} | ${r.assistantRows} | ${r.assistantSessions} |`,
-    );
+  const layerOrder = ["vocabulary", "grammar", "cross-sentence", "meaning"] as const;
+  const byLayer = new Map<string, typeof input.structuralAudit>();
+  for (const r of input.structuralAudit) {
+    const group = byLayer.get(r.layer) ?? [];
+    group.push(r);
+    byLayer.set(r.layer, group);
   }
-  return lines.join("\n");
+  for (const layer of layerOrder) {
+    const rows = byLayer.get(layer);
+    if (!rows || rows.length === 0) continue;
+    lines.push(`### ${layer}`);
+    lines.push("");
+    lines.push("| pattern | scope | assistant hits | user hits | rows | sessions | retire when |");
+    lines.push("| --- | --- | --- | --- | --- | --- | --- |");
+    const sorted = [...rows].sort((a, b) => b.assistantHits - a.assistantHits);
+    for (const r of sorted) {
+      const scope = r.sideEffectOnly ? "side-effect" : r.fileOnly ? "file-only" : "all";
+      lines.push(
+        `| ${r.category} | ${scope} | ${r.assistantHits} | ${r.userHits} | ${r.assistantRows} | ${r.assistantSessions} | ${esc(r.retire)} |`,
+      );
+    }
+    lines.push("");
+  }
+  return lines.join("\n").trimEnd();
 }
 
 function renderStructuralSignatures(input: ReportInput): string {

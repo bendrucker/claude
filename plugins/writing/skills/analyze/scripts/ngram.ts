@@ -16,6 +16,16 @@ const STRIP_PATTERNS: RegExp[] = [
 const WORD_RE = /[a-z][a-z'-]*/g;
 const SENTENCE_BREAK = /[.!?\n]+/;
 
+// cleanText: aggressively strip non-prose tokens before n-gram mining.
+//
+// Contract: removes fenced code blocks, inline code, URLs, blockquotes, HTML
+// tags, table lines, headers, file paths, CLI flags, function calls,
+// snake_case, and CamelCase identifiers. Position accuracy is not preserved.
+// Use for corpus mining where noise suppression matters more than fidelity.
+//
+// Compare stripCode (detection/tropes.ts): a minimal pipeline that only removes
+// fenced blocks and inline code while preserving line and column offsets for
+// position-accurate source mapping. Use that for the hook and scan paths.
 export function cleanText(text: string): string {
   let result = text;
   for (const pattern of STRIP_PATTERNS) {

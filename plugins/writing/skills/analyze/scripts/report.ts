@@ -1,6 +1,7 @@
 import type { CorrectionRow, CorrectiveRow, ModelSummaryRow } from "./dump";
 import type { LiftRow } from "./ngram";
 import type { QuoteContext } from "./quote-context";
+import type { CorpusRateTrends } from "./rate-detectors";
 import type { CurrentRuleHealth, RemoveReason } from "./rule-health";
 import type { StructuralAuditRow } from "./structural";
 import type { TagSignatureRow } from "./tag-ngram";
@@ -23,6 +24,8 @@ export interface ReportInput {
   ruleHealth: CurrentRuleHealth[];
   structuralAudit: StructuralAuditRow[];
   structuralSignatures: TagSignatureRow[];
+  /** Corpus-level rate trends (action-verb opener density, backtick ref density, template rates). */
+  rateTrends: CorpusRateTrends;
   candidatePhrases: CandidatePhrase[];
   corrections: CorrectionRow[];
   corrective: CorrectiveRow[];
@@ -44,6 +47,7 @@ export function renderReport(input: ReportInput): string {
     renderRuleHealthTable(input),
     renderStructuralAudit(input),
     renderStructuralSignatures(input),
+    renderStructuralTrends(input),
     renderCorrectiveFeedback(input),
     renderCorrections(input),
   ];
@@ -269,6 +273,46 @@ function renderStructuralSignatures(input: ReportInput): string {
   return lines.join("\n");
 }
 
+function renderStructuralTrends(input: ReportInput): string {
+  const t = input.rateTrends;
+  const lines = [
+    "## Structural Trends",
+    "",
+    "Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.",
+    "",
+  ];
+  if (t.documentCount === 0) {
+    lines.push("_No deliverable documents analyzed._");
+    return lines.join("\n");
+  }
+  lines.push(`Documents analyzed: ${fmtNum(t.documentCount)}`);
+  lines.push("");
+  lines.push("| metric | value | note |");
+  lines.push("| --- | --- | --- |");
+  lines.push(
+    `| action-verb opener rate | ${fmtPct(t.meanActionVerbOpenerRate)} | mean fraction of non-first lines opening with a bare verb; 16.6% AI-era vs 2.4% baseline (2026-06) |`,
+  );
+  lines.push(
+    `| backtick ref density | ${t.meanBacktickRefDensity.toFixed(1)}/1k words | mean inline code spans per 1k words; ~60/1k marks over-reliance on identifiers as structure (2026-06) |`,
+  );
+  lines.push(
+    `| template document rate | ${fmtPct(t.templateDocumentRate)} | fraction of documents with at least one ## section heading |`,
+  );
+  lines.push(
+    `| template on small document | ${t.templateOnSmallDocumentCount} docs | full ## Changes + ## Testing on body under 150 words; pull-request:create scopes sections to larger changes |`,
+  );
+  lines.push("");
+  lines.push("Section count distribution (## Changes / ## Testing / ## Issue / ## References):");
+  lines.push("");
+  lines.push("| sections present | documents |");
+  lines.push("| --- | --- |");
+  for (let i = 0; i <= 4; i++) {
+    const count = t.sectionCountDistribution[i] ?? 0;
+    lines.push(`| ${i} | ${count} |`);
+  }
+  return lines.join("\n");
+}
+
 function renderCorrections(input: ReportInput): string {
   const lines = [
     "## Correction Candidates",
@@ -325,6 +369,10 @@ function reasonRank(reason: RemoveReason | null): number {
   if (reason === "dead") return 0;
   if (reason === "not distinctive") return 1;
   return 2;
+}
+
+function fmtPct(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function fmtNum(value: number | null): string {

@@ -30,6 +30,11 @@ export type PatternDef = {
   fileOnly?: boolean;
   sideEffectOnly?: boolean;
   structural?: boolean;
+  /**
+   * When true, this pattern ships in the batch analyze/review/score surfaces
+   * only. The hook never runs it. Hook promotion is an explicit user checkpoint.
+   */
+  skillOnly?: boolean;
   /** Invented examples that must match this pattern. Never quoted from sessions. */
   positives: string[];
   /** Invented examples that must not match this pattern. Never quoted from sessions. */
@@ -499,6 +504,73 @@ export const PATTERNS: PatternDef[] = [
     retire:
       "Remove when corrective-feedback moments stop citing sycophantic preambles, or if the pattern stops appearing in assistant side-effect outputs.",
   },
+  {
+    tier: "context",
+    layer: "grammar",
+    category: "backtick path bullet",
+    test: /^\s*-\s*`[^`\n]+`\s*:\s*/m,
+    fileOnly: true,
+    skillOnly: true,
+    message: () =>
+      "`` - `path`: description `` bullets read as file manifests. Describe the conceptual change in prose.",
+    positives: ["- `src/foo.ts`: refactors the helper", "- `index.ts`: adds the middleware"],
+    negatives: ["- Added retry logic to the HTTP client", "- **src/foo.ts**: refactors the helper"],
+    evidence:
+      "2026-06 corpus comparison: backtick path-bullet form appears in ~30% of AI-era bullets vs ~4% of the hand-written baseline. Hook promotion requires cross-project validation before shipping at hook frequency.",
+    retire:
+      "Promote to hook (remove skillOnly) after a cross-project labeling pass confirms precision at the hook bar. Retire when the pattern drops below baseline rate in the deliverable corpus.",
+  },
+  {
+    tier: "context",
+    layer: "cross-sentence",
+    category: "template on small document",
+    test: (text: string): Hits => {
+      const wordCount = text.split(/\s+/).filter(Boolean).length;
+      if (wordCount >= 150) return { count: 0, sample: "" };
+      const hasChanges = /^##\s+Changes\b/m.test(text);
+      const hasTesting = /^##\s+Testing\b/m.test(text);
+      if (hasChanges && hasTesting) {
+        return { count: 1, sample: "## Changes / ## Testing on small document" };
+      }
+      return { count: 0, sample: "" };
+    },
+    fileOnly: true,
+    skillOnly: true,
+    message: () =>
+      "pull-request:create scopes ## Changes and ## Testing sections to larger changes. Length tracks substance. A short body with the full section template is over-structured. Use prose instead.",
+    positives: [
+      "## Changes\n\n- Adds retry logic\n\n## Testing\n\nRan the suite.\n\nFixes #1",
+      "## Summary\n\nAdds a flag.\n\n## Changes\n\n- Adds `--verbose`\n\n## Testing\n\nManual.",
+    ],
+    negatives: [
+      `Adds a cache layer. ${Array(20).fill("The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL.").join(" ")}\n\n## Changes\n\n- Adds the LRU cache\n\n## Testing\n\nAdded tests for cache expiry and eviction.`,
+      "## Changes\n\nAdds retry logic to the HTTP client.",
+      "Fixes the race condition in the cache layer by adding a mutex.",
+    ],
+    evidence:
+      "pull-request:create (SKILL.md) states: 'Use ## sections for larger changes. Length tracks substance.' A full section template on a body under ~150 words violates the skill's own rule. Threshold from corpus review of 209 hand-written PRs.",
+    retire:
+      "Remove or widen the word-count threshold if the corpus shows most short PRs include sections naturally, or if pull-request:create updates its conditionality guidance.",
+  },
+  {
+    tier: "context",
+    layer: "cross-sentence",
+    category: "consequence chain",
+    test: /,\s*so\s+(?:the|it|they|this|that|a)\b/gi,
+    fileOnly: true,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" chains clauses with ", so". Split into two sentences. State the cause and effect separately.`,
+    positives: [
+      "The cache fills up, so the old entries get evicted.",
+      "The worker finishes, so the queue clears.",
+    ],
+    negatives: ["So the next step is to fix the test.", "This happens because the cache is full."],
+    evidence:
+      "2026-06 corpus comparison: consequence-chain rate ~3/1k words in AI-era deliverables. Per-document rate detector. Hook promotion requires cross-project validation.",
+    retire:
+      "Promote to hook after a cross-project labeling pass at the hook bar. Retire when the consequence-chain rate in deliverables falls below 1/1k words or matches the hand-written baseline.",
+  },
 ];
 
 const MARKETING_VERB_THRESHOLD = 3.0;
@@ -548,6 +620,7 @@ export type RegexCatalogEntry = {
   pattern: RegExp;
   fileOnly?: boolean;
   sideEffectOnly?: boolean;
+  skillOnly?: boolean;
   retire: string;
 };
 
@@ -562,6 +635,10 @@ function globalize(pattern: RegExp): RegExp {
 // counting. Wordlist-backed patterns (stemmed vocabulary, weighted verbs, and
 // the compiled openers regex) and function-based tests are excluded: a single
 // regex match cannot count those, and the corpus FTS pass covers the wordlists.
+//
+// skillOnly patterns are included here so the batch analyze surface can audit
+// them. The hook never calls this catalog; it calls scan() directly, which
+// already skips skillOnly patterns.
 export function regexCatalog(): RegexCatalogEntry[] {
   return PATTERNS.filter(
     (def): def is PatternDef & { test: RegExp } =>
@@ -572,6 +649,7 @@ export function regexCatalog(): RegexCatalogEntry[] {
     pattern: globalize(def.test),
     fileOnly: def.fileOnly ?? false,
     sideEffectOnly: def.sideEffectOnly ?? false,
+    skillOnly: def.skillOnly ?? false,
     retire: def.retire,
   }));
 }
@@ -618,6 +696,7 @@ export function scanIntroduced(
   const matches: PatternMatch[] = [];
 
   for (const def of PATTERNS) {
+    if (def.skillOnly) continue;
     if (def.fileOnly && filePath && !isProseFile(filePath)) continue;
     if (def.sideEffectOnly && context === "file") continue;
 

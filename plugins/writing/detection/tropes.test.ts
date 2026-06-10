@@ -360,7 +360,9 @@ describe("scan", () => {
 
   describe("sycophantic opener", () => {
     it("does not fire when openers.txt is empty", () => {
-      expect(scan("Excellent. That works.").find((m) => m.category === "sycophantic opener")).toBeUndefined();
+      expect(
+        scan("Excellent. That works.").find((m) => m.category === "sycophantic opener"),
+      ).toBeUndefined();
     });
   });
 

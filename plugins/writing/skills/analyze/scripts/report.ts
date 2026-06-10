@@ -160,7 +160,9 @@ function renderProposedAdditions(input: ReportInput): string {
   }
   lines.push("", "```diff");
   for (const r of input.candidatePhrases) {
-    lines.push(`+ ${r.phrase}  # lift=${fmtLiftAgainstRate(r.lift, r.userPerM)}, n=${r.n}, baseline=${r.baselineCount}`);
+    lines.push(
+      `+ ${r.phrase}  # lift=${fmtLiftAgainstRate(r.lift, r.userPerM)}, n=${r.n}, baseline=${r.baselineCount}`,
+    );
   }
   lines.push("```");
   return lines.join("\n");

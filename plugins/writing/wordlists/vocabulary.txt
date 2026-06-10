@@ -5,5 +5,4 @@ tapestry
 meticulous
 leverage
 robust
-comprehensive
 nuance

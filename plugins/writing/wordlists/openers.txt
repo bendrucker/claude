@@ -5,4 +5,3 @@
 # Curated against session history by writing:analyze. Entries the user uses as
 # much as the model (Great, Absolutely, Perfect) or that the model has stopped
 # producing (Wonderful, Fantastic, Amazing, Awesome, Brilliant) were removed.
-Excellent

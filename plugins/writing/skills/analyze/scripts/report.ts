@@ -123,7 +123,7 @@ function renderProposedRemovals(input: ReportInput): string {
   lines.push("| --- | --- | --- | --- | --- | --- | --- |");
   for (const r of removable) {
     lines.push(
-      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${r.surface} | ${r.removeReason} | ${fmtPerM(r.modelPerM)} | ${fmtPerM(r.baselinePerM)} | ${fmtLift(r.lift)} |`,
+      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${r.surface} | ${r.removeReason} | ${fmtPerM(r.modelPerM)} | ${fmtPerM(r.baselinePerM)} | ${fmtLiftAgainstRate(r.lift, r.baselinePerM)} |`,
     );
   }
   lines.push("", "```diff");
@@ -151,7 +151,7 @@ function renderProposedAdditions(input: ReportInput): string {
   lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const r of input.candidatePhrases) {
     lines.push(
-      `| \`${esc(r.phrase)}\` | ${r.n} | ${r.assistantCount} | ${r.userCount} | ${r.sessions ?? "-"} | ${r.baselineCount} | ${fmtPerM(r.baselinePerM)} | ${r.lift.toFixed(1)} |`,
+      `| \`${esc(r.phrase)}\` | ${r.n} | ${r.assistantCount} | ${r.userCount} | ${r.sessions ?? "-"} | ${r.baselineCount} | ${fmtPerM(r.baselinePerM)} | ${fmtLiftAgainstRate(r.lift, r.userPerM)} |`,
     );
   }
   lines.push("", "Context for each candidate (spot-check before adding):", "");
@@ -160,7 +160,9 @@ function renderProposedAdditions(input: ReportInput): string {
   }
   lines.push("", "```diff");
   for (const r of input.candidatePhrases) {
-    lines.push(`+ ${r.phrase}  # lift=${r.lift.toFixed(1)}, n=${r.n}, baseline=${r.baselineCount}`);
+    lines.push(
+      `+ ${r.phrase}  # lift=${fmtLiftAgainstRate(r.lift, r.userPerM)}, n=${r.n}, baseline=${r.baselineCount}`,
+    );
   }
   lines.push("```");
   return lines.join("\n");
@@ -194,7 +196,7 @@ function renderRuleHealthTable(input: ReportInput): string {
         : `remove (${r.removeReason})`;
     const ruleType = ruleTypeLabel(r.entry.source);
     lines.push(
-      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${ruleType} | ${r.surface} | ${fmtPerM(r.modelPerM)} | ${fmtPerM(r.baselinePerM)} | ${fmtLift(r.lift)} | ${status} |`,
+      `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${ruleType} | ${r.surface} | ${fmtPerM(r.modelPerM)} | ${fmtPerM(r.baselinePerM)} | ${fmtLiftAgainstRate(r.lift, r.baselinePerM)} | ${status} |`,
     );
   }
   const withQuotes = input.ruleHealth.filter((r) => r.quote);
@@ -261,7 +263,7 @@ function renderStructuralSignatures(input: ReportInput): string {
   lines.push("| --- | --- | --- | --- | --- | --- | --- |");
   for (const r of input.structuralSignatures) {
     lines.push(
-      `| \`${r.phrase}\` | ${r.n} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${r.sessions ?? "-"} | ${r.lift.toFixed(1)} | ${r.example ? esc(truncate(r.example, 100)) : "-"} |`,
+      `| \`${r.phrase}\` | ${r.n} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${r.sessions ?? "-"} | ${fmtLiftAgainstRate(r.lift, r.userPerM)} | ${r.example ? esc(truncate(r.example, 100)) : "-"} |`,
     );
   }
   return lines.join("\n");
@@ -278,8 +280,14 @@ function renderCorrections(input: ReportInput): string {
     lines.push("_No correction candidates in window._");
     return lines.join("\n");
   }
+  const proseCount = input.corrections.filter((c) => c.prose_signal).length;
+  lines.push(
+    `Signal-to-noise: ${proseCount}/${input.corrections.length} candidates carry a prose signal. If this ratio stays low across runs, the surface is mostly task pivots and should be retired.`,
+    "",
+  );
   for (const c of input.corrections) {
-    lines.push(`### ${c.assistant_timestamp} (${c.project ?? "unknown"})`);
+    const signal = c.prose_signal ? "prose" : "non-prose";
+    lines.push(`### ${c.assistant_timestamp} (${c.project ?? "unknown"}) [${signal}]`);
     lines.push("");
     lines.push(`Assistant (${c.assistant_chars} chars):`);
     lines.push("", "```", c.assistant_snippet, "```", "");
@@ -332,6 +340,14 @@ function fmtPerM(value: number | null): string {
 function fmtLift(value: number | null): string {
   if (value === null) return "-";
   return `${value.toFixed(1)}x`;
+}
+
+// A lift computed against a zero user rate reflects the Laplace smoothing
+// floor: the phrase is absent from the comparison text. Label the absence
+// instead of printing a misleading multiplier.
+function fmtLiftAgainstRate(lift: number | null, userRate: number | null): string {
+  if (lift !== null && userRate === 0) return "absent from user text";
+  return fmtLift(lift);
 }
 
 function ruleTypeLabel(source: string): string {

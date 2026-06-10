@@ -42,11 +42,19 @@ candidates AS (
     source_file      AS assistant_source_file,
     source_line      AS assistant_source_line,
     next_source_file AS user_source_file,
-    next_source_line AS user_source_line
+    next_source_line AS user_source_line,
+    -- Prose signal: true for written prose responses. Heuristic: at least two
+    -- sentence-ending marks and the text starts outside a code fence.
+    (
+      length(message_text) - length(replace(message_text, '.', ''))
+        + length(message_text) - length(replace(message_text, '!', ''))
+        + length(message_text) - length(replace(message_text, '?', ''))
+    ) >= 2
+    AND NOT starts_with(ltrim(message_text), '```') AS prose_signal
   FROM paired
   WHERE role = 'assistant'
     AND next_role = 'user'
-    AND chars >= COALESCE(getvariable('min_assistant_chars')::BIGINT, 300)
+    AND chars >= COALESCE(getvariable('min_assistant_chars')::BIGINT, 800)
     AND next_chars <= COALESCE(getvariable('max_user_chars')::BIGINT, 250)
 )
 SELECT * FROM candidates

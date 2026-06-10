@@ -15,7 +15,7 @@ import {
   type TextRow,
   totalChars,
 } from "./dump";
-import { escapeRegex, frustrationRegex } from "./frustration";
+import { escapeRegex, frustrationRegex, gatedRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
 import { findQuote } from "./quote-context";
 import { type CandidatePhrase, type ReportInput, renderReport } from "./report";
@@ -236,7 +236,10 @@ export async function runAnalysis(db: Database, config: AnalysisConfig): Promise
   });
 
   console.error("Dumping deliverable-prose corpus (Write/Edit/Bash tool inputs)");
-  const deliverableRows = await db.runQuery<DeliverableRow>("deliverable-prose", baseParams);
+  const deliverableRows = await db.runQuery<DeliverableRow>("deliverable-prose", {
+    ...baseParams,
+    model: config.modelFilter,
+  });
 
   console.error("Dumping user corpus (human input only)");
   const userRows = await db.runQuery<TextRow>("text-export", {
@@ -325,12 +328,18 @@ export async function runAnalysis(db: Database, config: AnalysisConfig): Promise
   const corrections = await db.runQuery<CorrectionRow>("correction-candidates", baseParams);
 
   console.error("Fetching corrective feedback (frustration lexicon)");
-  const corrective = await db.runQuery<CorrectiveRow>("corrective-feedback", {
+  const primaryPattern = frustrationRegex();
+  const primaryRe = new RegExp(primaryPattern, "i");
+  const combinedLexicon = `(?:${primaryPattern})|(?:${gatedRegex()})`;
+  const rawCorrective = await db.runQuery<CorrectiveRow>("corrective-feedback", {
     ...baseParams,
-    lexicon: frustrationRegex(),
+    lexicon: combinedLexicon,
     max_user_chars: "400",
     limit: String(config.correctiveLimit),
   });
+  // Gated terms (e.g. "sounds like") only count when a primary frustration
+  // term also appears in the same message.
+  const corrective = rawCorrective.filter((row) => primaryRe.test(row.user_text));
 
   console.error("Auditing structural patterns against all model-generated text");
   const structuralAudit = auditStructuralPatterns(allModelText, userRows);

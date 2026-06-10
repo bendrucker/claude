@@ -258,7 +258,7 @@ describe("diff-aware filtering", () => {
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
-  it("skips sycophantic opener in file Edit (sideEffectOnly)", async () => {
+  it("skips text with no active tropes in file Edit", async () => {
     const input = mockEdit("Excellent. Let me proceed.\nNext line.", "Next line.");
     expect(await processInput(input)).toBeNull();
   });

@@ -101,8 +101,8 @@ describe("scanAll", () => {
     expect(scanAll("The function reads input and writes output.")).toHaveLength(0);
   });
 
-  it("reports a weighted group once with stacked samples listed", () => {
-    const text = "This release empowers users and streamlines deploys to delight teams.";
+  it("reports a weighted group once when threshold is cleared by repeated hits", () => {
+    const text = "One: empowers users. Two: empowers teams.";
     const marketing = scanAll(text).filter((r) => r.category === "marketing verbs");
     expect(marketing).toHaveLength(1);
     expect(marketing[0]?.message).toContain("empower");

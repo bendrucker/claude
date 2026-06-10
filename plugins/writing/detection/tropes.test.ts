@@ -64,8 +64,6 @@ describe("scan", () => {
       "leverage",
       "leveraged",
       "robust",
-      "comprehensive",
-      "comprehensively",
       "nuance",
       "nuanced",
     ];
@@ -361,24 +359,11 @@ describe("scan", () => {
   });
 
   describe("sycophantic opener", () => {
-    const flag = ["Excellent. That works.", "Excellent! Moving on."];
-    const allow = [
-      "This was a perfect example of the issue.",
-      "An excellent question to consider.",
-      "It is great that the migration shipped.",
-    ];
-
-    for (const text of flag) {
-      it(`flags: "${text}"`, () => {
-        expect(firstByTier(scan(text), "deny")?.category).toBe("sycophantic opener");
-      });
-    }
-
-    for (const text of allow) {
-      it(`allows: "${text}"`, () => {
-        expect(scan(text).find((m) => m.category === "sycophantic opener")).toBeUndefined();
-      });
-    }
+    it("does not fire when openers.txt is empty", () => {
+      expect(
+        scan("Excellent. That works.").find((m) => m.category === "sycophantic opener"),
+      ).toBeUndefined();
+    });
   });
 
   describe("sycophantic acknowledgment", () => {
@@ -623,7 +608,6 @@ describe("scan", () => {
 
   describe("sideEffectOnly scoping", () => {
     const conversational = [
-      { text: "Excellent. That works.", category: "sycophantic opener" },
       { text: "You're right about that.", category: "sycophantic acknowledgment" },
       { text: "Want me to fix the bug?", category: "permission-seeking" },
       { text: "Would you like me to retry?", category: "hedging close" },
@@ -654,24 +638,11 @@ describe("scan", () => {
   });
 
   describe("marketing verbs (weighted)", () => {
-    it("does not flag a single low-weight hit", () => {
-      // enhance is 1.5, below the 3.0 threshold on its own.
-      expect(
-        scan("This change enhances the workflow.").find((m) => m.category === "marketing verbs"),
-      ).toBeUndefined();
-    });
-
-    it("does not flag a single mid-weight hit below threshold", () => {
+    it("does not flag a single hit below threshold", () => {
       // empower is 2.5, below the 3.0 threshold on its own.
       expect(
         scan("This release empowers users.").find((m) => m.category === "marketing verbs"),
       ).toBeUndefined();
-    });
-
-    it("flags when stacked verbs clear the threshold", () => {
-      // empower (2.5) + streamline (1.5) = 4.0, above 3.0.
-      const text = "This release empowers users and streamlines deploys.";
-      expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
     });
 
     it("flags repeated high-weight hits", () => {

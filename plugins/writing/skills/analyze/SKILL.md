@@ -37,6 +37,8 @@ bun ${CLAUDE_SKILL_DIR}/scripts/ingest-voice.ts --source github --author <user> 
 bun ${CLAUDE_SKILL_DIR}/scripts/voice-profile.ts
 ```
 
+Both scripts write to the plugin data directory. That path is outside the default sandbox allowlist, so run them with `dangerouslyDisableSandbox: true` (or via a terminal outside Claude Code).
+
 If no profile exists, analyze still runs: deliverable-surface rules fall back to the chat audit and the report flags the baseline as not loaded.
 
 ## Run

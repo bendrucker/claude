@@ -33,6 +33,7 @@ export interface CorrectionRow {
   user_chars: number;
   assistant_snippet: string;
   user_snippet: string;
+  prose_signal: boolean;
 }
 
 export interface ModelSummaryRow {

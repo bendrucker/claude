@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { FRUSTRATION_TERMS, frustrationRegex } from "./frustration";
+import { FRUSTRATION_TERMS, frustrationRegex, GATED_TERMS, gatedRegex } from "./frustration";
 
 describe("frustrationRegex", () => {
   test("matches single-word and multi-word terms with boundaries", () => {
@@ -25,5 +25,25 @@ describe("frustrationRegex", () => {
     expect(FRUSTRATION_TERMS).toContain("flowery");
     expect(FRUSTRATION_TERMS).toContain("clanker");
     expect(FRUSTRATION_TERMS).toContain("reads like");
+    expect(FRUSTRATION_TERMS).toContain("jargon");
+    expect(FRUSTRATION_TERMS).toContain("marketing");
+  });
+
+  test("sounds like is not in the primary lexicon (gated)", () => {
+    expect(FRUSTRATION_TERMS).not.toContain("sounds like");
+    const re = new RegExp(frustrationRegex(), "i");
+    expect(re.test("sounds like a plan")).toBe(false);
+  });
+});
+
+describe("gatedRegex", () => {
+  test("sounds like is in the gated lexicon", () => {
+    expect(GATED_TERMS).toContain("sounds like");
+  });
+
+  test("matches sounds like with word boundaries", () => {
+    const re = new RegExp(gatedRegex(), "i");
+    expect(re.test("that sounds like marketing copy")).toBe(true);
+    expect(re.test("this is fine")).toBe(false);
   });
 });

@@ -6,6 +6,9 @@ import { scanAll } from "../../../detection/scan";
 import { stripCode } from "../../../detection/tropes";
 import { compileStemmedWordlist, countWords } from "../../../detection/wordlists";
 import { readInput } from "../../../scripts/io";
+import { profilePath, resolveDataDir } from "../../analyze/scripts/data-dir";
+import { checkRegister, VOICE_DELTA_FEATURES } from "../../analyze/scripts/voice-delta";
+import { loadProfile, type VoiceProfile } from "../../analyze/scripts/voice-profile";
 
 export type CategoryScore = { category: string; hits: number; density: number };
 
@@ -150,6 +153,56 @@ async function loadCustomMatch(
   return compileStemmedWordlist(content);
 }
 
+// Render voice-delta features for a single document. Accepts the loaded profile
+// (null when not available). Skips baseline comparison when the input is
+// out-of-register (too short or non-prose markdown fraction).
+export function renderVoiceDeltaTable(text: string, profile: VoiceProfile | null): string {
+  const register = checkRegister(text);
+  const baseline = profile?.voiceDelta ?? null;
+
+  const lines: string[] = ["Voice Delta Features"];
+
+  if (!register.inRegister) {
+    lines.push(`Register check: skipping baseline comparison (${register.reason}).`);
+    lines.push("");
+  } else if (baseline === null) {
+    lines.push("No baseline loaded. Run ingest-voice.ts then voice-profile.ts to build one.");
+    lines.push("");
+  }
+
+  const hasBaseline = baseline !== null && register.inRegister;
+
+  const headers = hasBaseline
+    ? ["Feature", "Provenance", "Rate", "Baseline", "Delta"]
+    : ["Feature", "Provenance", "Rate"];
+
+  const rows: string[][] = [];
+  for (const feature of VOICE_DELTA_FEATURES) {
+    const rate = feature.compute(text);
+    const fmt = feature.format ?? ((r: number) => r.toFixed(2));
+    const rateStr = fmt(rate);
+
+    if (hasBaseline) {
+      const baselineRate = baseline.rates[feature.id];
+      if (baselineRate === undefined) {
+        rows.push([feature.label, feature.provenance, rateStr, "(no stat)", "-"]);
+      } else {
+        const baselineStr = fmt(baselineRate);
+        const delta = rate - baselineRate;
+        const deltaStr = feature.isFraction
+          ? `${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(1)}pp`
+          : `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`;
+        rows.push([feature.label, feature.provenance, rateStr, baselineStr, deltaStr]);
+      }
+    } else {
+      rows.push([feature.label, feature.provenance, rateStr]);
+    }
+  }
+
+  lines.push(table([headers, ...rows]).trimEnd());
+  return lines.join("\n");
+}
+
 async function main(): Promise<void> {
   const argv = cli({
     name: "score",
@@ -178,6 +231,17 @@ async function main(): Promise<void> {
         type: String,
         description: "Score an extra stemmed vocabulary file as a 'custom vocabulary' category",
       },
+      voiceDelta: {
+        type: Boolean,
+        description:
+          "Report voice-delta rate features alongside the baseline from the local voice profile. Skips baseline comparison when the input is out-of-register.",
+        default: false,
+      },
+      dataDir: {
+        type: String,
+        description:
+          "Local data dir for the voice baseline (default: CLAUDE_PLUGIN_DATA or ~/.claude/plugins/data/writing-bendrucker). Only used with --voice-delta.",
+      },
     },
   });
 
@@ -194,6 +258,13 @@ async function main(): Promise<void> {
   } else {
     console.log(renderTable(report));
   }
+
+  if (argv.flags.voiceDelta) {
+    const dataDir = resolveDataDir(argv.flags.dataDir);
+    const profileData = await loadProfile(profilePath(dataDir));
+    console.log(`\n${renderVoiceDeltaTable(text, profileData)}`);
+  }
+
   process.exit(0);
 }
 

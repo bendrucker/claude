@@ -5,6 +5,7 @@ import { corpusPath, profilePath, resolveDataDir, voiceBaselineDir } from "./dat
 import { stemPhrase, stemTokens } from "./deliverable-audit";
 import { cleanText, splitSentences, tokenizeSentence } from "./ngram";
 import { parseCorpus, type VoiceDocument } from "./voice-corpus";
+import { computeCorpusRates, type VoiceDeltaBaseline } from "./voice-delta";
 
 // Word n-gram sizes the profile records. Unigrams cover single-word tells
 // (e.g. "cleanly"); bigrams and trigrams cover phrase tells (e.g. "source of
@@ -28,7 +29,13 @@ export interface VoiceProfile {
   totalStemmedTokens: number;
   generatedAt: string;
   sources: string[];
+  // Voice-delta aggregate stats from the baseline corpus. Optional: profiles
+  // built before this field was added will not have it. Callers should treat
+  // its absence as "no baseline for voice-delta features".
+  voiceDelta?: VoiceDeltaBaseline;
 }
+
+export type { VoiceDeltaBaseline };
 
 export function buildProfile(docs: VoiceDocument[], generatedAt: string): VoiceProfile {
   const ngrams = new Map<number, Map<string, number>>(PROFILE_SIZES.map((n) => [n, new Map()]));
@@ -52,6 +59,13 @@ export function buildProfile(docs: VoiceDocument[], generatedAt: string): VoiceP
     addNgramCounts(stemmedNgrams, stemmed);
   }
 
+  const corpusRates = computeCorpusRates(docs.map((d) => d.body));
+  const voiceDelta: VoiceDeltaBaseline = {
+    rates: Object.fromEntries([...corpusRates.entries()].map(([id, fr]) => [id, fr.rate])),
+    documentCount: docs.length,
+    computedAt: generatedAt,
+  };
+
   return {
     documentCount: docs.length,
     totalTokens,
@@ -60,6 +74,7 @@ export function buildProfile(docs: VoiceDocument[], generatedAt: string): VoiceP
     totalStemmedTokens,
     generatedAt,
     sources: Array.from(sources).sort(),
+    voiceDelta,
   };
 }
 

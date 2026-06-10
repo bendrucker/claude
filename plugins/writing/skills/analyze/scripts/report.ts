@@ -5,6 +5,7 @@ import type { CorpusRateTrends } from "./rate-detectors";
 import type { CurrentRuleHealth, RemoveReason } from "./rule-health";
 import type { StructuralAuditRow } from "./structural";
 import type { TagSignatureRow } from "./tag-ngram";
+import { type FeatureRate, VOICE_DELTA_FEATURES } from "./voice-delta";
 import type { VoiceProfile } from "./voice-profile";
 
 export interface ReportInput {
@@ -21,6 +22,9 @@ export interface ReportInput {
   deliverableTotalChars: number;
   userTotalChars: number;
   voiceProfile: VoiceProfile | null;
+  // Per-feature mean rates across the deliverable corpus for the analysis
+  // window. Compared against voiceProfile.voiceDelta baseline rates.
+  voiceDeltaRates: Map<string, FeatureRate>;
   ruleHealth: CurrentRuleHealth[];
   structuralAudit: StructuralAuditRow[];
   structuralSignatures: TagSignatureRow[];
@@ -42,6 +46,7 @@ export function renderReport(input: ReportInput): string {
   const sections = [
     renderHeader(input),
     renderSummary(input),
+    renderVoiceDelta(input),
     renderProposedRemovals(input),
     renderProposedAdditions(input),
     renderRuleHealthTable(input),
@@ -97,6 +102,57 @@ function renderSummary(input: ReportInput): string {
       );
     }
   }
+  return lines.join("\n");
+}
+
+function renderVoiceDelta(input: ReportInput): string {
+  const baseline = input.voiceProfile?.voiceDelta ?? null;
+  const hasBaseline = baseline !== null;
+
+  const lines = [
+    "## Voice Delta",
+    "",
+    hasBaseline
+      ? `Baseline: ${fmtNum(baseline.documentCount)} documents (computed ${baseline.computedAt}). Each rate is the mean across the deliverable corpus in this window vs the pre-AI baseline. Provenance labels: **skill-prescribed** = tune the skill if the aggregate drifts; **skill-encouraged** = under-application of the skill; **ungoverned** = genuine voice signal.`
+      : "No voice-delta baseline loaded. Run `ingest-voice.ts` then `voice-profile.ts` to build a baseline. Rates shown are corpus means only.",
+    "",
+  ];
+
+  if (hasBaseline) {
+    lines.push("| feature | provenance | corpus rate | baseline rate | delta |");
+    lines.push("| --- | --- | --- | --- | --- |");
+  } else {
+    lines.push("| feature | provenance | corpus rate |");
+    lines.push("| --- | --- | --- |");
+  }
+
+  for (const feature of VOICE_DELTA_FEATURES) {
+    const corpusEntry = input.voiceDeltaRates.get(feature.id);
+    const corpusRate = corpusEntry?.rate ?? 0;
+    const fmt = feature.format ?? ((r: number) => r.toFixed(2));
+    const corpusStr = fmt(corpusRate);
+
+    if (hasBaseline) {
+      const baselineRate = baseline.rates[feature.id];
+      if (baselineRate === undefined) {
+        lines.push(
+          `| ${feature.label} | ${feature.provenance} | ${corpusStr} | (no baseline stat) | - |`,
+        );
+      } else {
+        const baselineStr = fmt(baselineRate);
+        const delta = corpusRate - baselineRate;
+        const deltaStr = feature.isFraction
+          ? `${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(1)}pp`
+          : `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`;
+        lines.push(
+          `| ${feature.label} | ${feature.provenance} | ${corpusStr} | ${baselineStr} | ${deltaStr} |`,
+        );
+      }
+    } else {
+      lines.push(`| ${feature.label} | ${feature.provenance} | ${corpusStr} |`);
+    }
+  }
+
   return lines.join("\n");
 }
 

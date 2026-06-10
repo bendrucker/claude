@@ -62,6 +62,7 @@ Run with `--help` for all flags. `--data-dir` overrides where the voice baseline
 ## Output
 
 - Summary stats (corpus sizes, voice-baseline size, rule count, model breakdown)
+- Voice delta (per-feature corpus rates beside the local baseline rates, each labeled **skill-prescribed**, **skill-encouraged**, or **ungoverned** so drift points at the right fix: tune the skill or build a detector; aggregate trends only, never per-document flags)
 - Proposed removals, each tagged **dead** (model produced it fewer than `--min-count` times on the surface where the hook fires it) or **not distinctive** (baseline uses it at least as often as the model)
 - Proposed additions (high-lift n-grams not already covered), each with its voice-baseline rate and a spot-checkable quote
 - Rule health table (every entry with type, audit surface, and `keep` / `remove (reason)`), plus deliverable quotes for the deliverable-surface tells

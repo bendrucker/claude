@@ -23,6 +23,7 @@ import { type CandidatePhrase, type ReportInput, renderReport } from "./report";
 import { buildRuleHealth, type FtsAuditRow } from "./rule-health";
 import { auditStructuralPatterns } from "./structural";
 import { type TagSignatureRow, tagSequence } from "./tag-ngram";
+import { computeCorpusRates } from "./voice-delta";
 import { loadProfile, phraseProfileStat } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 import { loadWordlists } from "./wordlists";
@@ -363,6 +364,8 @@ export async function runAnalysis(db: Database, config: AnalysisConfig): Promise
       surface === "deliverable" ? findQuote(entry.phrase, deliverableRows) : null,
   });
 
+  const voiceDeltaRates = computeCorpusRates(deliverableRows.map((r) => r.text));
+
   return {
     generatedAt: config.generatedAt,
     since: config.since,
@@ -377,6 +380,7 @@ export async function runAnalysis(db: Database, config: AnalysisConfig): Promise
     deliverableTotalChars: totalChars(deliverableRows),
     userTotalChars: totalChars(userRows),
     voiceProfile,
+    voiceDeltaRates,
     ruleHealth,
     structuralAudit,
     structuralSignatures,

@@ -42,6 +42,10 @@ A table per group with category, hits, and density, sorted by density. The `--js
 
 For non-prose source files, single-line comments (`//`, `#`) are extracted and scored as a separate `comments` group, so prose-only patterns apply to them without an AST. This is on by default for source files and off for prose files (`.md` and friends, whose fenced code blocks are already stripped). Force it with `--comments` or suppress it with `--no-comments`.
 
+## Voice Delta
+
+`--voice-delta` appends a table of voice rate features (first-person rate, sentence length, backtick density, and friends) beside the rates from the local voice baseline (`--data-dir` overrides the location). Each feature carries a provenance label: **skill-prescribed** drift means tune the skill, **skill-encouraged** deficits mean the skill is under-applied, and **ungoverned** features are genuine voice signal. A register check skips the baseline comparison for inputs too short or too markdown-heavy to compare against the PR-body baseline. The table is informational and never gates.
+
 ## Custom Vocabulary
 
 `--wordlist <path>` compiles an extra stemmed vocabulary file (one term per line, `#` comments allowed) and scores it as a `custom vocabulary` category in every group. Use it to measure context-specific terms a general wordlist would not flag.

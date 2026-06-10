@@ -1,3 +1,4 @@
+import { TRICOLON_PATTERN } from "../linguistics/tricolon";
 import { isProseFile } from "./paths";
 import {
   PATTERNS,
@@ -7,6 +8,11 @@ import {
   type WeightedPatternGroup,
 } from "./tropes";
 import { weightedStemHits } from "./wordlists";
+
+// Patterns that import tagger adapters and therefore run only on the batch
+// surfaces (scan, score). Hooks import detection/tropes directly and must
+// never import this module: that is the wall that keeps them deterministic.
+export const BATCH_PATTERNS: PatternDef[] = [TRICOLON_PATTERN];
 
 export type ScanResult = {
   line: number;
@@ -95,7 +101,7 @@ export function scanAll(text: string, filePath?: string): ScanResult[] {
   const prose = filePath === undefined || isProseFile(filePath);
   const results: ScanResult[] = [];
 
-  for (const def of PATTERNS) {
+  for (const def of [...PATTERNS, ...BATCH_PATTERNS]) {
     if (def.sideEffectOnly) continue;
     if (def.fileOnly && !prose) continue;
     results.push(...regexResults(stripped, def));

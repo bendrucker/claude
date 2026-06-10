@@ -53,6 +53,24 @@ bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --project ben
 
 Run with `--help` for all flags. `--data-dir` overrides where the voice baseline is read from (default: `CLAUDE_PLUGIN_DATA` or `~/.claude/plugins/data/writing-bendrucker`). Writes a markdown report to `tmp/trope-analysis-<date>.md` (override with `--out`). The report may quote any host in the combined index, so keep it under `tmp/` and never paste host-specific content into committed work.
 
+## Meaning-Layer Judge
+
+`--judge` adds an LLM-judge pass over the deliverable corpus (six binary criteria, information-density first). It requires `ANTHROPIC_API_KEY`, prints a cost estimate before any call, and caps documents with `--judge-limit` (default 100, roughly cents per run on the default Haiku-class model):
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --judge
+```
+
+The judge prompt is a versioned artifact (`resources/judge/prompt.md`). The report records its hash, and numbers from different hashes are not comparable. Judge flag rates are uncalibrated until the #791 labeling passes run (a user checkpoint). The standalone runner covers ad-hoc files, the reproducibility gate, and the #769 heading baseline:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts files <paths...>
+bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts gate
+bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts headings tmp/heading-labels.tsv
+```
+
+See the "Meaning-Layer Judge" section of [references/methodology.md](references/methodology.md) for the rubric, prompt versioning, gate, and calibration protocol.
+
 ## Metrics
 
 **Lift**: how distinctive a phrase is to assistant output vs. user text. `lift = rate_assistant / rate_user_smoothed`, where rates are per-million-token frequencies. A lift of 10.0 means the assistant uses the phrase 10x more per token than the user. The `--min-lift` threshold (default 5.0) gates new candidate phrases only. Rule keep/remove uses a direct rate comparison plus `--min-count`, not lift (see methodology for why).
@@ -68,6 +86,7 @@ Run with `--help` for all flags. `--data-dir` overrides where the voice baseline
 - Rule health table (every entry with type, audit surface, and `keep` / `remove (reason)`), plus deliverable quotes for the deliverable-surface tells
 - Structural pattern audit (the hook's regex patterns, hit counts across sessions)
 - Structural signatures (part-of-speech tag sequences distinctive to the model's deliverable prose; word-independent, so they survive vocabulary drift between model releases)
+- Meaning-layer audit (per-criterion judge flag rates with sampled spans, only when `--judge` is passed)
 - Corrective feedback (short human messages naming a writing problem, with the preceding model output)
 - Correction candidates (long-assistant, short-user pairs suggesting prose pushback)
 

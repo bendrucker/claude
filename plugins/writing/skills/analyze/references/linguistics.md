@@ -11,7 +11,7 @@ A writing check belongs to one of four layers, and the layer decides the right t
 - **Vocabulary** (`delve`, `boasts`, "it's worth noting"): a wordlist. Linguistics adds nothing here. The analyze skill already measures word frequency and lift.
 - **Grammar** (sentence-shaped headings, passive voice, "not X but Y"): patterns over part-of-speech sequences that a wordlist cannot express and a plain regex gets wrong. This is the only layer a tagger helps with.
 - **Cross-sentence** (negation flips, escalating triads): structure spanning sentences, which a tagger alone cannot see.
-- **Meaning** (marketing tone, hedging density): no grammar captures it. This needs an LLM judge.
+- **Meaning** (vacuous specificity, motivation absence, marketing tone, hedging density): no grammar captures it. This is the LLM judge's layer (`skills/analyze/scripts/judge.ts`, batch-only). See the "Meaning-Layer Judge" section of `methodology.md`.
 
 Before building a grammar rule, check whether a wordlist, a regex, or an LLM judge does the job as well. The tagger is not the default.
 
@@ -124,6 +124,16 @@ Ten generated documents produced 114 headings, none of them real sentence headin
 - Trailing participles ("Lessons Learned"): the participle fails the noun-phrase parse.
 - Colon-prefixed noun phrases ("Testing Strategy: Payments Reconciliation Service").
 
+## Judge Reference Baseline
+
+The upper-reference run this eval calls for: the same LLM judge that scores the meaning layer, pointed at headings with one question ("is this heading sentence-shaped?", `resources/judge/headings-prompt.md`). If a cheap judge ties the tagger stack on a trope, that trope does not belong in the grammar layer.
+
+```bash
+bun skills/analyze/scripts/judge-run.ts headings tmp/heading-labels.tsv
+```
+
+The runner scores the judge against the existing labels with the same Wilson protocol and prints the full-set and random-subset aggregates. The comparison has not been run yet (it needs an API key and the labeled file, and sits behind the #791 calibration checkpoint). Record the resulting aggregate here, next to the classifier table, when it runs.
+
 ## Verdict
 
 - No candidate clears the hook bar. `hybrid:natural` leads, but the intervals are too wide to act on, so the hook keeps `classifyHeadingBaseline`.
@@ -137,7 +147,7 @@ Where each existing detector sits, and what moving it would take:
 - **Vocabulary** (`wordlists/*.txt`): stay as wordlists. The analyze skill audits them each run.
 - **Grammar** (regexes in `detection/tropes.ts`): candidates for a tagger rule, each only after the layer check confirms a tagger beats a regex. Passive voice, "not X but Y", and test-result reporting are the current candidates.
 - **Cross-sentence** (negation flips, burstiness, question cadence, discourse markers, tricolon): five batch-surface detectors in `detection/tropes.ts`, plus the tagger-backed tricolon in `linguistics/tricolon.ts` behind the hook wall. Thresholds are literature heuristics until the #769 labeling pass calibrates them.
-- **Meaning** (marketing tone, hedging): LLM-judge territory.
+- **Meaning** (vacuous specificity, motivation absence, marketing tone, hedging): the batch judge (`judge.ts`) covers this layer in analyze, pending calibration (#791). Hooks never run it.
 
 Until the bars and the power calculation are in place, the `tropes.ts` regexes stay as they are and ship as hook nudges.
 

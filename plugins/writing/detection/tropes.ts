@@ -716,7 +716,7 @@ export const PATTERNS: PatternDef[] = [
       "Go. The server starts up and begins processing the incoming queue of jobs that arrive throughout the day. Ok. The extremely long sentence that goes on and on with many clauses and sub-clauses describing the entire system architecture in exhaustive detail. Fine.",
     ],
     evidence:
-      "Literature heuristic. Session-corpus calibration pending. CV threshold 0.55 is a starting point derived from commercial detector documentation placing LLM output near CV 0.5 and human prose near CV 0.78. Gate: 8+ sentences. Batch-only; must not fire in the hook.",
+      "Literature heuristic. Session-corpus calibration pending. CV threshold 0.55 is a starting point derived from commercial detector documentation placing LLM output near CV 0.5 and human prose near CV 0.78. Gate: 8+ sentences. Batch-only. Must not fire in the hook.",
     retire:
       "Remove or recalibrate the threshold after session-corpus calibration. If the false-positive rate on technical prose is high, raise the threshold or narrow to prose-file context.",
   },
@@ -762,7 +762,7 @@ export const PATTERNS: PatternDef[] = [
       "However, the cache is cold. Nevertheless, the retry works.",
     ],
     evidence:
-      "Literature heuristic. Session-corpus calibration pending. PDTB-derived two-tier connective table. Tier 1 (unambiguous adversatives) counted anywhere; tier 2 (ambiguous) counted only at sentence start. 20% density threshold is a starting heuristic. Batch-only.",
+      "Literature heuristic. Session-corpus calibration pending. PDTB-derived two-tier connective table. Tier 1 (unambiguous adversatives) is counted anywhere. Tier 2 (ambiguous) is counted only at sentence start. 20% density threshold is a starting heuristic. Batch-only.",
     retire:
       "Remove or recalibrate after session-corpus calibration. If the false-positive rate on technical documentation is high, raise the threshold or restrict tier-2 markers.",
   },

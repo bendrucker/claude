@@ -1,6 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { compileStemmedWordlist } from "../../../detection/wordlists";
-import { buildReport, extractComments, renderTable, scoreComments, scoreText } from "./score";
+import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
+import {
+  buildReport,
+  extractComments,
+  renderTable,
+  renderVoiceDeltaTable,
+  scoreComments,
+  scoreText,
+} from "./score";
 
 function category(report: ReturnType<typeof buildReport>, group: string, name: string) {
   return report.groups.find((g) => g.group === group)?.categories.find((c) => c.category === name);
@@ -94,5 +102,55 @@ describe("renderTable", () => {
   it("reports no patterns for clean prose", () => {
     const report = buildReport("The function reads input.", "doc.md", { comments: false });
     expect(renderTable(report)).toContain("No patterns detected.");
+  });
+});
+
+// Invented fixture profile for voice-delta rendering. Rates are made-up
+// numbers; real baseline stats stay in the local data dir.
+const fixtureProfile: VoiceProfile = {
+  documentCount: 5,
+  totalTokens: 1200,
+  ngrams: {},
+  stemmedNgrams: {},
+  totalStemmedTokens: 1100,
+  generatedAt: "2026-01-01",
+  sources: ["github"],
+  voiceDelta: {
+    rates: { first_person_rate: 9.5 },
+    documentCount: 5,
+    computedAt: "2026-01-01",
+  },
+};
+
+const inRegisterText =
+  "This fixes the loader race. I noticed it while testing retries. The fix holds the lock across the read.";
+
+describe("renderVoiceDeltaTable", () => {
+  it("shows rate, baseline, and delta columns for in-register text", () => {
+    const out = renderVoiceDeltaTable(inRegisterText, fixtureProfile);
+    expect(out).toContain("Voice Delta Features");
+    expect(out).toContain("Baseline");
+    expect(out).toContain("Delta");
+    expect(out).toContain("skill-encouraged");
+    expect(out).toContain("9.50");
+  });
+
+  it("skips the baseline comparison for out-of-register input", () => {
+    const out = renderVoiceDeltaTable("Too short.", fixtureProfile);
+    expect(out).toContain("Register check: skipping baseline comparison");
+    expect(out).toContain("too short");
+    expect(out).not.toContain("Baseline");
+  });
+
+  it("reports a missing baseline and still renders rates", () => {
+    const out = renderVoiceDeltaTable(inRegisterText, null);
+    expect(out).toContain("No baseline loaded");
+    expect(out).toContain("Rate");
+    expect(out).not.toContain("Baseline");
+  });
+
+  it("marks features absent from the baseline stats", () => {
+    const out = renderVoiceDeltaTable(inRegisterText, fixtureProfile);
+    expect(out).toContain("(no stat)");
   });
 });

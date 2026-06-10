@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { CorrectionRow, CorrectiveRow, ModelSummaryRow } from "./dump";
 import { type CandidatePhrase, renderReport } from "./report";
+import type { FeatureRate } from "./voice-delta";
+import type { VoiceProfile } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 
 const baseInput = {
@@ -196,5 +198,100 @@ describe("renderReport", () => {
     expect(removalIdx).toBeGreaterThan(summaryIdx);
     expect(additionIdx).toBeGreaterThan(removalIdx);
     expect(healthIdx).toBeGreaterThan(additionIdx);
+  });
+});
+
+// Invented fixture profile. Rates are made-up numbers, never real baseline
+// content, which stays in the local data dir.
+const fixtureProfile: VoiceProfile = {
+  documentCount: 5,
+  totalTokens: 1200,
+  ngrams: {},
+  stemmedNgrams: {},
+  totalStemmedTokens: 1100,
+  generatedAt: "2026-01-01",
+  sources: ["github"],
+  voiceDelta: {
+    rates: { first_person_rate: 9.5, template_presence: 0.1 },
+    documentCount: 5,
+    computedAt: "2026-01-01",
+  },
+};
+
+function rateEntry(featureId: string, rate: number): [string, FeatureRate] {
+  return [featureId, { featureId, rate, documentCount: 4 }];
+}
+
+describe("renderReport voice delta", () => {
+  test("renders rates-only table with a hint when no baseline is loaded", () => {
+    const output = renderReport({
+      ...baseInput,
+      voiceDeltaRates: new Map([rateEntry("first_person_rate", 3.2)]),
+    });
+    expect(output).toContain("No voice-delta baseline loaded");
+    expect(output).toContain("| feature | provenance | corpus rate |");
+    expect(output).toContain("| First-person voice (I/we per 1k) | skill-encouraged | 3.20 |");
+  });
+
+  test("treats a profile without voiceDelta stats as no baseline", () => {
+    const { voiceDelta: _omitted, ...legacyProfile } = fixtureProfile;
+    const output = renderReport({
+      ...baseInput,
+      voiceProfile: legacyProfile,
+    });
+    expect(output).toContain("No voice-delta baseline loaded");
+  });
+
+  test("renders corpus rate, baseline rate, and delta per feature", () => {
+    const output = renderReport({
+      ...baseInput,
+      voiceProfile: fixtureProfile,
+      voiceDeltaRates: new Map([rateEntry("first_person_rate", 3.2)]),
+    });
+    expect(output).toContain("Baseline: 5 documents (computed 2026-01-01)");
+    expect(output).toContain("| feature | provenance | corpus rate | baseline rate | delta |");
+    expect(output).toContain(
+      "| First-person voice (I/we per 1k) | skill-encouraged | 3.20 | 9.50 | -6.30 |",
+    );
+  });
+
+  test("formats fraction features as percentages with pp deltas", () => {
+    const output = renderReport({
+      ...baseInput,
+      voiceProfile: fixtureProfile,
+      voiceDeltaRates: new Map([rateEntry("template_presence", 0.6)]),
+    });
+    expect(output).toContain(
+      "| Template presence (## Changes + ## Testing) | skill-prescribed | 60% | 10% | +50.0pp |",
+    );
+  });
+
+  test("marks features missing from the baseline stats", () => {
+    const output = renderReport({
+      ...baseInput,
+      voiceProfile: fixtureProfile,
+      voiceDeltaRates: new Map([rateEntry("url_rate", 2.5)]),
+    });
+    expect(output).toContain(
+      "| URL cross-references (per 1k words) | ungoverned | 2.50 | (no baseline stat) | - |",
+    );
+  });
+
+  test("labels every feature row with its provenance", () => {
+    const output = renderReport({
+      ...baseInput,
+      voiceProfile: fixtureProfile,
+    });
+    const section = output.slice(
+      output.indexOf("## Voice Delta"),
+      output.indexOf("## Proposed Wordlist Removals"),
+    );
+    const rows = section
+      .split("\n")
+      .filter((l) => l.startsWith("| ") && !l.includes("--- ") && !l.startsWith("| feature"));
+    expect(rows.length).toBe(14);
+    for (const row of rows) {
+      expect(row).toMatch(/\| (skill-prescribed|skill-encouraged|ungoverned) \|/);
+    }
   });
 });

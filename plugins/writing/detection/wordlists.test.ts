@@ -175,10 +175,8 @@ describe("loaded WORDLISTS", () => {
     expect(WORDLISTS.vocabulary("a nuanced take").count).toBeGreaterThan(0);
   });
 
-  it("loads openers", () => {
-    expect("Excellent.".match(WORDLISTS.openers)).not.toBeNull();
-    expect("Excellent! Moving on.".match(WORDLISTS.openers)).not.toBeNull();
-    expect("an excellent example here".match(WORDLISTS.openers)).toBeNull();
+  it("loads openers (null when file is empty)", () => {
+    expect(WORDLISTS.openers).toBeNull();
   });
 
   it("loads marketing verbs as weighted stems", () => {

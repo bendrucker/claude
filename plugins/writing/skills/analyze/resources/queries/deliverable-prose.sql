@@ -6,6 +6,18 @@ WITH hook_excluded AS (
   ]) AS pattern
 ),
 
+-- Sessions that contain at least one assistant message matching the model
+-- filter. Filters at session level because content_items (tool calls) carry
+-- no model column; a per-item filter would silently include tool calls from
+-- sidechain models (e.g. Haiku) in sessions that are primarily Opus.
+model_sessions AS (
+  SELECT DISTINCT tc.host, tc.session_id
+  FROM text_content tc
+  WHERE tc.role = 'assistant'
+    AND (getvariable('model') IS NULL OR (tc.model IS NOT NULL AND tc.model GLOB getvariable('model')::VARCHAR))
+    AND date_filter(tc.timestamp, getvariable('after_date'), getvariable('before_date'))
+),
+
 write_prose AS (
   SELECT
     ci.session_id,
@@ -15,6 +27,7 @@ write_prose AS (
     (ci.data->>'$.input.content') AS text
   FROM content_items ci
   JOIN sessions s USING (host, session_id)
+  JOIN model_sessions ms USING (host, session_id)
   WHERE ci.type = 'tool_use'
     AND ci.name = 'Write'
     AND regexp_matches((ci.data->>'$.input.file_path'), '\.(md|txt|rst|adoc)$')
@@ -35,6 +48,7 @@ edit_prose AS (
     (ci.data->>'$.input.new_string') AS text
   FROM content_items ci
   JOIN sessions s USING (host, session_id)
+  JOIN model_sessions ms USING (host, session_id)
   WHERE ci.type = 'tool_use'
     AND ci.name = 'Edit'
     AND regexp_matches((ci.data->>'$.input.file_path'), '\.(md|txt|rst|adoc)$')
@@ -59,6 +73,7 @@ bash_prose AS (
     ) AS text
   FROM content_items ci
   JOIN sessions s USING (host, session_id)
+  JOIN model_sessions ms USING (host, session_id)
   WHERE ci.type = 'tool_use'
     AND ci.name = 'Bash'
     AND regexp_matches(

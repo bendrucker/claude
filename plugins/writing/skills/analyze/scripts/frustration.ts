@@ -19,8 +19,12 @@ export const FRUSTRATION_TERMS = [
   "dramatic",
   "clanker",
   "reads like",
-  "sounds like",
 ];
+
+// Terms that only count when a writing-complaint word from FRUSTRATION_TERMS
+// also appears in the same message. "sounds like" is common in non-writing
+// contexts ("sounds like a plan"), so require co-occurrence to filter noise.
+export const GATED_TERMS = ["sounds like"];
 
 export function escapeRegex(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -31,6 +35,12 @@ export function escapeRegex(literal: string): string {
 // "stopped" is acceptable here (we want the standalone gripe), and "ugh" will
 // not fire on "tough".
 export function frustrationRegex(terms: string[] = FRUSTRATION_TERMS): string {
+  const fragments = terms.map(escapeRegex).join("|");
+  return `\\b(?:${fragments})\\b`;
+}
+
+// Regex matching gated terms that require co-occurrence with a primary term.
+export function gatedRegex(terms: string[] = GATED_TERMS): string {
   const fragments = terms.map(escapeRegex).join("|");
   return `\\b(?:${fragments})\\b`;
 }

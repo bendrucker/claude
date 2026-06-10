@@ -163,7 +163,7 @@ async function readWordlist(name: string): Promise<string> {
 
 export type LoadedWordlists = {
   vocabulary: (text: string) => Hits;
-  openers: RegExp;
+  openers: RegExp | null;
   marketingVerbs: StemmedWeight[];
   softPhrasing: StemmedWeight[];
   floweryPhrases: StemmedPhrase[];
@@ -185,7 +185,6 @@ async function load(): Promise<LoadedWordlists> {
     suffix: "(?=[.!,])",
     flags: "gm",
   });
-  if (!openers) throw new Error("openers.txt produced no entries");
 
   const marketingVerbs = compileWeightedStems(marketingSrc);
   const softPhrasing = compileWeightedStems(softSrc);

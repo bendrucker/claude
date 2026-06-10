@@ -114,6 +114,29 @@ function connectorDensityHits(text: string): Hits {
   return { count: connected.length, sample: first.slice(Math.max(0, i - 20), i + 24).trim() };
 }
 
+const openerPatterns: PatternDef[] = WORDLISTS.openers
+  ? [
+      {
+        tier: "deny",
+        layer: "vocabulary",
+        category: "sycophantic opener",
+        test: WORDLISTS.openers,
+        sideEffectOnly: true,
+        message: (matched: string) =>
+          `"${matched.trim()}" reads as a sycophantic opener. Open with the substance.`,
+        positives: ["Excellent! Moving on.", "Excellent. That settles it."],
+        negatives: [
+          "An excellent question to consider.",
+          "It is great that the migration shipped.",
+        ],
+        evidence:
+          "Openers list curated from corpus. Entries are plain-word matches at line start, reviewed for false-positive rate against normal prose.",
+        retire:
+          "Remove individual openers when they no longer appear in assistant side-effect outputs or when corrective-feedback moments stop citing them.",
+      },
+    ]
+  : [];
+
 export const PATTERNS: PatternDef[] = [
   {
     tier: "deny",
@@ -160,21 +183,7 @@ export const PATTERNS: PatternDef[] = [
     retire:
       "Remove if corrective-feedback moments stop referencing copula avoidance or if the pattern begins flagging legitimate usage in corpus spot-checks.",
   },
-  {
-    tier: "deny",
-    layer: "vocabulary",
-    category: "sycophantic opener",
-    test: WORDLISTS.openers,
-    sideEffectOnly: true,
-    message: (matched) =>
-      `"${matched.trim()}" reads as a sycophantic opener. Open with the substance.`,
-    positives: ["Excellent! Moving on.", "Excellent. That settles it."],
-    negatives: ["An excellent question to consider.", "It is great that the migration shipped."],
-    evidence:
-      "Openers list curated from corpus. Entries are plain-word matches at line start, reviewed for false-positive rate against normal prose.",
-    retire:
-      "Remove individual openers when they no longer appear in assistant side-effect outputs or when corrective-feedback moments stop citing them.",
-  },
+  ...openerPatterns,
   {
     tier: "deny",
     layer: "vocabulary",

@@ -93,7 +93,6 @@ export function scoreComments(
   return { ...scoreText(comments, undefined, customMatch), group: "comments" };
 }
 
-
 // Whether to extract and score code comments as a separate group. Prose files
 // (including `.md`, whose fenced code blocks stripCode already removes) are
 // scored whole; non-prose source files get their comments pulled out. Explicit

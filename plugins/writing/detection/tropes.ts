@@ -127,10 +127,7 @@ export const PATTERNS: PatternDef[] = [
       "The cache warms slowly — then it saturates.",
       "The worker finishes — the queue clears.",
     ],
-    negatives: [
-      "This is—fine without spaces.",
-      "The range spans 2024–2025.",
-    ],
+    negatives: ["This is—fine without spaces.", "The range spans 2024–2025."],
     evidence:
       "Corpus audit and direct model-output observation. Spaced em dashes appear at high lift in assistant deliverables and are absent from the 209-PR hand-written baseline.",
     retire:
@@ -172,10 +169,7 @@ export const PATTERNS: PatternDef[] = [
     message: (matched) =>
       `"${matched.trim()}" reads as a sycophantic opener. Open with the substance.`,
     positives: ["Excellent! Moving on.", "Excellent. That settles it."],
-    negatives: [
-      "An excellent question to consider.",
-      "It is great that the migration shipped.",
-    ],
+    negatives: ["An excellent question to consider.", "It is great that the migration shipped."],
     evidence:
       "Openers list curated from corpus. Entries are plain-word matches at line start, reviewed for false-positive rate against normal prose.",
     retire:
@@ -269,10 +263,7 @@ export const PATTERNS: PatternDef[] = [
     test: testResultHits,
     message: () =>
       "Do not report test results, counts, or CI status. Describe what is covered instead.",
-    positives: [
-      "All 8 tests pass. Now let me check the linter.",
-      "3/3 passing on Sonnet 4.6.",
-    ],
+    positives: ["All 8 tests pass. Now let me check the linter.", "3/3 passing on Sonnet 4.6."],
     negatives: [
       "The tests fail because processInput is now async.",
       "Write a test for this function.",
@@ -289,7 +280,10 @@ export const PATTERNS: PatternDef[] = [
     test: /\b(boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b/gi,
     message: (matched) =>
       `"${matched}" reads as promotional AI language. Consider a more neutral word.`,
-    positives: ["The library boasts excellent performance.", "A groundbreaking approach to caching."],
+    positives: [
+      "The library boasts excellent performance.",
+      "A groundbreaking approach to caching.",
+    ],
     negatives: ["The server handles concurrent requests.", "A well-tested approach to retries."],
     evidence:
       "Pre-dates the curation principle; no corpus evidence recorded. Each word in this list was identified as promotional AI vocabulary, but none has a per-entry corpus audit. Candidates for migration to vocabulary.txt once audited.",
@@ -304,14 +298,8 @@ export const PATTERNS: PatternDef[] = [
     fileOnly: true,
     message: (matched) =>
       `"${matched}" is stock phrasing the model reaches for. State the mechanism plainly.`,
-    positives: [
-      "This keeps a single source of truth.",
-      "Added an escape hatch for power users.",
-    ],
-    negatives: [
-      "The truth about the data source is unclear.",
-      "A hatch you can escape through.",
-    ],
+    positives: ["This keeps a single source of truth.", "Added an escape hatch for power users."],
+    negatives: ["The truth about the data source is unclear.", "A hatch you can escape through."],
     evidence:
       "flowery-phrases.txt entries are audited per the deliverable-surface rule-health check. Each phrase has been validated against the model's deliverable corpus and the user's voice baseline.",
     retire:
@@ -345,10 +333,7 @@ export const PATTERNS: PatternDef[] = [
       "It isn't broken. It is slow.",
       "This isn't a regression. This is a design decision.",
     ],
-    negatives: [
-      "It isn't broken.",
-      "The server is slow.",
-    ],
+    negatives: ["It isn't broken.", "The server is slow."],
     evidence:
       "Pre-dates the curation principle; no corpus evidence recorded. The cross-sentence structure is documented in linguistics.md (Trope Inventory) as a known AI tell with no tooling yet.",
     retire:
@@ -361,14 +346,8 @@ export const PATTERNS: PatternDef[] = [
     test: /\b\w[\w\s]{2,40},\s+not\s+\w[\w\s]{2,30}(?=[.!?,\n]|$)/gi,
     message: (matched) =>
       `"${matched}" is a rhetorical "X, not Y" contrast. State the positive directly.`,
-    positives: [
-      "This is a tool, not a framework.",
-      "The goal is clarity, not perfection.",
-    ],
-    negatives: [
-      "It is not the case that X.",
-      "Not a framework, but a tool.",
-    ],
+    positives: ["This is a tool, not a framework.", "The goal is clarity, not perfection."],
+    negatives: ["It is not the case that X.", "Not a framework, but a tool."],
     evidence:
       "Pre-dates the curation principle; no corpus evidence recorded. Retained because the rhetorical contrast form is a consistent AI-prose tell.",
     retire:
@@ -400,10 +379,7 @@ export const PATTERNS: PatternDef[] = [
     message: () =>
       '"Tests cover ..." elides the subject. Use "Added tests covering ..." or describe the change.',
     positives: ["Tests cover error handling for malformed JSON.", "Tests verify the retry logic."],
-    negatives: [
-      "Added tests covering error handling.",
-      "The suite validates the retry logic.",
-    ],
+    negatives: ["Added tests covering error handling.", "The suite validates the retry logic."],
     evidence:
       "Pre-dates the curation principle; no corpus evidence recorded. Retained as a low-false-positive opener pattern.",
     retire:
@@ -432,8 +408,14 @@ export const PATTERNS: PatternDef[] = [
     fileOnly: true,
     message: (matched) =>
       `"${matched.trim()}" dangles at sentence end as AI hedging. Drop it or rewrite the clause.`,
-    positives: ["The approach has tradeoffs regardless.\nNext sentence.", "The fix works anyway.\n"],
-    negatives: ["Regardless of the input, the parser rejects it.", "The fix works anyway you look at it."],
+    positives: [
+      "The approach has tradeoffs regardless.\nNext sentence.",
+      "The fix works anyway.\n",
+    ],
+    negatives: [
+      "Regardless of the input, the parser rejects it.",
+      "The fix works anyway you look at it.",
+    ],
     evidence:
       "Pre-dates the curation principle; no corpus evidence recorded. Retained because trailing hedge words at sentence boundaries are a consistent AI-prose tell.",
     retire:
@@ -487,10 +469,7 @@ export const PATTERNS: PatternDef[] = [
     category: "filler",
     test: /\b(?:it's worth noting that|importantly|interestingly|it should be noted|as mentioned|in terms of)\b/gi,
     message: (matched) => `"${matched}" is filler. Cut it.`,
-    positives: [
-      "It's worth noting that the cache is cold.",
-      "Importantly, the test was skipped.",
-    ],
+    positives: ["It's worth noting that the cache is cold.", "Importantly, the test was skipped."],
     negatives: ["The cache is cold.", "Note that the test was skipped."],
     evidence:
       "Pre-dates the curation principle; no corpus evidence recorded. Retained as a vocabulary-level filler gate covering common AI preamble phrases.",

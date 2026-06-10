@@ -5,7 +5,8 @@ import { cli } from "cleye";
 import { table } from "table";
 import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
 import { type ScanResult, scanAll } from "../../../detection/scan";
-export { readInput } from "../../io";
+
+import { readInput } from "../../io";
 
 const SKIP_SEGMENTS = ["node_modules", ".git"];
 const WORDLIST_PATH = /(?:^|\/)wordlists\/[^/]+\.txt$/;
@@ -40,7 +41,6 @@ export async function collectFiles(input: string): Promise<string[]> {
   }
   return files.sort();
 }
-
 
 function scanInput(text: string, filePath: string | undefined): number {
   const violations = scanAll(text, filePath);

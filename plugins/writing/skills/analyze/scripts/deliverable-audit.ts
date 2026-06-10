@@ -34,7 +34,6 @@ export function stemPhrase(phrase: string): string[] {
   return (phrase.toLowerCase().match(WORD_TOKEN) ?? []).map((w) => stemmer(w));
 }
 
-
 export interface DeliverableAuditRow {
   count: number;
   perMillion: number;

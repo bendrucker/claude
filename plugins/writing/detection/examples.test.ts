@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { type PatternDef, PATTERNS } from "./tropes";
+import { PATTERNS, type PatternDef } from "./tropes";
 
 // Regression gate for the examples embedded in every PatternDef. Each pattern
 // carries invented positives (must match) and negatives (must not match), so a

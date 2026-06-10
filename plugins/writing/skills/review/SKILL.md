@@ -31,7 +31,7 @@ Spawn all applicable agents in parallel. Each receives the document content, aud
 For `writing:style`, also inject these writing preferences (sub-agents cannot see skills):
 
 - Avoid AI-typical vocabulary: `meticulous`/`meticulously`, `pivotal`, `testament`, `underscore` (figurative), `interplay`, `intricacies`, `bolstered`, `garner`/`garnered`, `foster`/`fostering`
-  - These eight words are **review-only**. They do not appear in the hook wordlists because none has a corpus audit behind it. The review skill runs in batch mode where a human triages flags (recall matters more than precision), matching the analyze-and-review bar from linguistics.md. Promoting any of them to the hook wordlists requires a corpus audit confirming lift and distinctiveness versus the user's voice baseline.
+  - These words are **review-only**. They do not appear in the hook wordlists because none has a corpus audit behind it. The review skill runs in batch mode where a human triages flags (recall matters more than precision), matching the analyze-and-review bar from linguistics.md. Promoting any of them to the hook wordlists requires a corpus audit confirming lift and distinctiveness versus the user's voice baseline.
 - Avoid promotional language: `boasts`, `vibrant`, `showcasing`, `nestled`, `groundbreaking`, `renowned`, `diverse array`
 - Avoid copula avoidance ("X is Y" not fancy alternatives)
 - Split connector-joined clauses (semicolons, dashes) into separate sentences

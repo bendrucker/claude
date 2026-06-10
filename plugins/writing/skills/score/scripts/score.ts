@@ -5,7 +5,7 @@ import { isProseFile } from "../../../detection/paths";
 import { scanAll } from "../../../detection/scan";
 import { stripCode } from "../../../detection/tropes";
 import { compileStemmedWordlist, countWords } from "../../../detection/wordlists";
-import { readInput } from "../../io";
+import { readInput } from "../../../scripts/io";
 
 export type CategoryScore = { category: string; hits: number; density: number };
 

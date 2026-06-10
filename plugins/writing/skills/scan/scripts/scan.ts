@@ -6,7 +6,7 @@ import { table } from "table";
 import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
 import { type ScanResult, scanAll } from "../../../detection/scan";
 
-import { readInput } from "../../io";
+import { readInput } from "../../../scripts/io";
 
 const SKIP_SEGMENTS = ["node_modules", ".git"];
 const WORDLIST_PATH = /(?:^|\/)wordlists\/[^/]+\.txt$/;

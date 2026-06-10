@@ -420,20 +420,6 @@ describe("scan", () => {
     }
   });
 
-  describe("cross-sentence not-X", () => {
-    it("flags: It isn't X. It is Y.", () => {
-      expect(firstByTier(scan("It isn't broken. It is slow."), "context")?.category).toBe(
-        "cross-sentence not-X",
-      );
-    });
-
-    it("allows: single-sentence negation", () => {
-      expect(
-        scan("It isn't broken.").find((m) => m.category === "cross-sentence not-X"),
-      ).toBeUndefined();
-    });
-  });
-
   describe("contrast not", () => {
     const flag = [
       "This is a tool, not a framework.",

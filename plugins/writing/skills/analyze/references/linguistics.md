@@ -136,7 +136,7 @@ Where each existing detector sits, and what moving it would take:
 
 - **Vocabulary** (`wordlists/*.txt`): stay as wordlists. The analyze skill audits them each run.
 - **Grammar** (regexes in `detection/tropes.ts`): candidates for a tagger rule, each only after the layer check confirms a tagger beats a regex. Passive voice, "not X but Y", and test-result reporting are the current candidates.
-- **Cross-sentence** (negation flips): no tooling yet.
+- **Cross-sentence** (negation flips, burstiness, question cadence, discourse markers, tricolon): five batch-surface detectors in `detection/tropes.ts`, plus the tagger-backed tricolon in `linguistics/tricolon.ts` behind the hook wall. Thresholds are literature heuristics until the #769 labeling pass calibrates them.
 - **Meaning** (marketing tone, hedging): LLM-judge territory.
 
 Until the bars and the power calculation are in place, the `tropes.ts` regexes stay as they are and ship as hook nudges.

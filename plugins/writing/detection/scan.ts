@@ -1,3 +1,4 @@
+import { TRICOLON_PATTERN } from "../linguistics/tricolon";
 import { isProseFile } from "./paths";
 import {
   PATTERNS,
@@ -7,6 +8,11 @@ import {
   type WeightedPatternGroup,
 } from "./tropes";
 import { weightedStemHits } from "./wordlists";
+
+// Patterns that import tagger adapters and therefore run only on the batch
+// surfaces (scan, score). Hooks import detection/tropes directly and must
+// never import this module: that is the wall that keeps them deterministic.
+export const BATCH_PATTERNS: PatternDef[] = [TRICOLON_PATTERN];
 
 export type ScanResult = {
   line: number;
@@ -30,10 +36,14 @@ function positionAt(text: string, index: number): Position {
   return { line, col: index - lastNewline };
 }
 
-// Best-effort position for a sample string the matcher reported without an index.
+// Best-effort position for a sample string the matcher reported without an
+// index. Cross-sentence detectors join sentence excerpts with " / ", so when
+// the joined sample is absent from the text, fall back to its first segment.
 function positionOfSample(text: string, sample: string): Position {
-  if (sample) {
-    const index = text.toLowerCase().indexOf(sample.toLowerCase());
+  const lower = text.toLowerCase();
+  for (const candidate of [sample, sample.split(" / ")[0] ?? ""]) {
+    if (candidate.length === 0) continue;
+    const index = lower.indexOf(candidate.toLowerCase());
     if (index >= 0) return positionAt(text, index);
   }
   return { line: 1, col: 1 };
@@ -95,7 +105,7 @@ export function scanAll(text: string, filePath?: string): ScanResult[] {
   const prose = filePath === undefined || isProseFile(filePath);
   const results: ScanResult[] = [];
 
-  for (const def of PATTERNS) {
+  for (const def of [...PATTERNS, ...BATCH_PATTERNS]) {
     if (def.sideEffectOnly) continue;
     if (def.fileOnly && !prose) continue;
     results.push(...regexResults(stripped, def));

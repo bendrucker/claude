@@ -141,6 +141,7 @@ describe("renderReport", () => {
           user_chars: 50,
           assistant_snippet: "long assistant response here",
           user_snippet: "no, do it differently",
+          prose_signal: true,
         },
       ],
     });

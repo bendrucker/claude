@@ -179,6 +179,36 @@ ORDER BY h.session_id, h.timestamp
 
 Sample sessions first, then rows within them. Without the session pool step, high-volume sessions dominate the sample and quieter sessions go unexamined.
 
+## Meaning-Layer Judge
+
+The meaning layer (vacuous specificity, motivation absence, marketing tone, hedging density, sycophancy, press-release structure) is judge territory per `linguistics.md`. No wordlist, regex, or tagger captures it. `judge.ts` implements the batch LLM judge from issue #791. It runs only in batch surfaces a person triages, behind the `BatchDetectors` seam in `runAnalysis` (the `structural.ts` template: rows in, typed findings out, rendered via `ReportInput`). The hook path never imports it. `judge.test.ts` asserts no module under `hooks/`, `detection/`, or `linguistics/` references the judge or the API client.
+
+#### Rubric
+
+Six binary criteria in ranked order: information-density first (per the #791 priority comment, vacuous specificity outranks marketing tone on the PR surface), then motivation-presence, marketing-phrasing, hedging-density, sycophancy, and press-release-structure last (structure is partly skill-governed). Each flag requires a verbatim quoted span. The deterministic layer keeps the cheap precursors (the test-result-reporting detector, the pull-request skill's section bans). The judge covers the unbounded remainder and does not duplicate the precursors as criteria checks in code.
+
+Each criterion in `JUDGE_CRITERIA` carries its layer label (`meaning`), the rubric question, and evidence/retire lifecycle metadata, mirroring the curation principle for wordlist entries.
+
+#### Prompt Versioning
+
+`resources/judge/prompt.md` is the rule, committed and hashed. Every audit records its sha256, and a report with a different hash is not comparable to prior numbers. `judge-fixtures.ts` pins the hash. Editing the prompt fails `judge-fixtures.test.ts` until the reproducibility tuples are re-validated and re-pinned. Bias instructions live in the prompt: do not reward length, quote the offending span, and state that the text is AI-written and the job is detecting AI-typical patterns (counters self-preference, since a Claude judge scores Claude output).
+
+#### Execution and Cost
+
+One call per document at temperature 0 with structured JSON output on a Haiku-class model, prompt sent as a cacheable system prefix. Documents over 1,500 words are chunked at paragraph boundaries and aggregated by per-criterion maxima. The runner prints an estimated cost before any call and accepts a document limit (default 100). A 200-document run of 1k-word bodies stays well under a dollar.
+
+#### Reproducibility Gate
+
+`judge-fixtures.ts` commits (prompt hash, input hash, expected flags) tuples over synthetic negatives and invented positives. The hash halves run in CI with no API key. The live half (`judge-run.ts gate`, or `judge.integration.ts` locally) replays the tuples against the real judge and fails on drift. The gate is deliberately not wired into default CI: CI has no API key, and the gate's job is drift detection at measurement time, not per-commit blocking.
+
+#### Calibration (Pending)
+
+Judge criteria are unstable until anchored against real examples, so calibration follows the labeling protocol below. Size dev and test splits with `linguistics/power.ts` first, run two criteria-refinement rounds on the dev split, then freeze the prompt and measure once on the held-out test split with the Wilson protocol. Promotion bar for analyze/review: precision at or above ~50% on the random subset with interval width at or under ±20pp, plus a human spot-check of flagged examples. The labeling passes are a user checkpoint and have not run. Until they do, treat judge flag rates as uncalibrated and the committed fixture expectations as design targets.
+
+#### Privacy
+
+The judged corpus is session text and never leaves the machine beyond the API call itself. Sampled spans appear only in the local report under `tmp/`. Committed content (prompt examples, fixtures) is invented, never quoted from sessions.
+
 ## Detector Labeling Protocol
 
 `headings-eval.ts` measures a candidate classifier's precision over its positive (flagged) labels with a Wilson interval. The interval width is governed by the positive count, not the corpus size, so an underpowered sample cannot separate two candidates. The heading pilot had ~24 positives in the random subset and a ±~19pp interval, too wide to promote any tagger. The protocol below sizes the labeling work once and is reusable per trope.

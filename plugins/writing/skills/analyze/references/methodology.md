@@ -105,11 +105,28 @@ User-role messages in Claude Code contain a mix of human input and machine-gener
 
 Skill injections and hook feedback are excluded earlier by `is_meta=true` in the WHERE clause. Without this filtering, roughly half the user corpus by character count is machine-generated, inflating the baseline and suppressing real lift signals.
 
+## Text Cleaning Pipelines
+
+Two cleaning pipelines serve different jobs. Use the right one for the right context.
+
+`stripCode` (`detection/tropes.ts`) removes only fenced code blocks and inline code, replacing them with whitespace that preserves line and column offsets. Use it in any path where position accuracy matters: the hook, `scan.ts`, `structural.ts`. Never use it for corpus mining.
+
+`cleanText` (`skills/analyze/scripts/ngram.ts`) aggressively removes URLs, table lines, headers, file paths, CLI flags, function calls, snake_case, and CamelCase in addition to code blocks. Position accuracy is not preserved. Use it for n-gram mining and voice-profile building where noise suppression matters more than fidelity.
+
+These pipelines are intentionally different. Do not converge them.
+
 ## Structural pattern audit
 
 `structural.ts` consumes the detection engine's `regexCatalog()` (from `detection/tropes.ts`) rather than re-declaring patterns, so the audit cannot drift from what the hook enforces. The catalog keeps only the regex patterns whose source is not a wordlist (the FTS pass covers stemmed vocabulary, weighted verbs, and the compiled openers regex) and normalizes each to the global flag for counting. Function-based tests (e.g. test-result reporting) are excluded because a single regex match cannot count them.
 
-The patterns run against all assistant text (not just deliverables). Each reports total hits, rows containing hits, and session spread, labeled by hook scope (all, file-only, side-effect-only). This catches structural tropes (passive voice, hedging, parallelism) that the n-gram pipeline cannot detect.
+The patterns run against all assistant text (not just deliverables). Each reports total hits, rows containing hits, and session spread, labeled by hook scope (all, file-only, side-effect-only) and detector layer. Patterns are grouped by layer in the report:
+
+- **vocabulary**: wordlist or simple keyword matches.
+- **grammar**: regex patterns over syntactic forms (passive voice, parallelism, em dashes).
+- **cross-sentence**: patterns that span sentence boundaries (connector density, negation flips).
+- **meaning**: LLM-judge territory; no hook implementation yet.
+
+Cross-sentence patterns shipping in the hook without a promotion record appear as misplacement signals in the grouped audit. The retirement condition for each pattern is printed alongside its hit counts, so a future analyze run can check whether the condition has been met.
 
 ## Structural Signatures
 

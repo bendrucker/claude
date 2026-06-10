@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectFiles, readInput, scanFiles, shouldSkip, toGlob } from "./scan";
+import { readInput } from "../../../scripts/io";
+import { collectFiles, scanFiles, shouldSkip, toGlob } from "./scan";
 
 describe("shouldSkip", () => {
   it("skips node_modules", () => {

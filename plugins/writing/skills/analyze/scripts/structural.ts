@@ -1,4 +1,9 @@
-import { type RegexCatalogEntry, regexCatalog, stripCode } from "../../../detection/tropes";
+import {
+  type DetectorLayer,
+  type RegexCatalogEntry,
+  regexCatalog,
+  stripCode,
+} from "../../../detection/tropes";
 
 export type StructuralPattern = RegexCatalogEntry;
 
@@ -18,6 +23,7 @@ function countHits(text: string, pattern: RegExp): number {
 
 export interface StructuralAuditRow {
   category: string;
+  layer: DetectorLayer;
   assistantHits: number;
   userHits: number;
   assistantRows: number;
@@ -25,6 +31,7 @@ export interface StructuralAuditRow {
   assistantSessions: number;
   fileOnly: boolean;
   sideEffectOnly: boolean;
+  retire: string;
 }
 
 export function auditStructuralPatterns(
@@ -61,6 +68,7 @@ export function auditStructuralPatterns(
 
     return {
       category: sp.category,
+      layer: sp.layer,
       assistantHits,
       userHits,
       assistantRows: assistantRowCount,
@@ -68,6 +76,25 @@ export function auditStructuralPatterns(
       assistantSessions: sessions.size,
       fileOnly: sp.fileOnly ?? false,
       sideEffectOnly: sp.sideEffectOnly ?? false,
+      retire: sp.retire,
     };
   });
+}
+
+// DetectorModule is the seam for batch detector modules (analyze-script tier).
+// A module receives corpus rows and returns typed findings for the report.
+// structural.ts (regexCatalog + auditStructuralPatterns) is the template.
+//
+// To add a new detector module (e.g. an LLM judge for the meaning layer):
+//   1. Create a module that implements this interface.
+//   2. Call it from runAnalysis alongside auditStructuralPatterns.
+//   3. Extend ReportInput with the findings type.
+//   4. Render findings in report.ts under the appropriate section.
+//
+// The meaning layer is the first expected user of this seam (#791). Grammar
+// and cross-sentence detectors may follow as they graduate from the hook.
+export interface DetectorModule<TFinding> {
+  layer: DetectorLayer;
+  /** Run the detector over corpus rows and return per-row findings. */
+  detect(rows: Array<{ session_id: string; text?: string }>): Promise<TFinding[]>;
 }

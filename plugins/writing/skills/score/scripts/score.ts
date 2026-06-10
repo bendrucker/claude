@@ -5,6 +5,7 @@ import { isProseFile } from "../../../detection/paths";
 import { scanAll } from "../../../detection/scan";
 import { stripCode } from "../../../detection/tropes";
 import { compileStemmedWordlist, countWords } from "../../../detection/wordlists";
+import { readInput } from "../../../scripts/io";
 
 export type CategoryScore = { category: string; hits: number; density: number };
 
@@ -90,18 +91,6 @@ export function scoreComments(
   if (comments.trim().length === 0) return undefined;
   // Score comments as prose so prose-only patterns apply to them.
   return { ...scoreText(comments, undefined, customMatch), group: "comments" };
-}
-
-export async function readInput(
-  arg: string | undefined,
-): Promise<{ text: string; filePath?: string }> {
-  if (arg && (await Bun.file(arg).exists())) {
-    return { text: await Bun.file(arg).text(), filePath: arg };
-  }
-  if (arg) {
-    return { text: arg };
-  }
-  return { text: await new Response(Bun.stdin.stream()).text() };
 }
 
 // Whether to extract and score code comments as a separate group. Prose files

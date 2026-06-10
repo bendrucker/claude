@@ -104,7 +104,7 @@ export function compileStemmedPhrases(content: string): StemmedPhrase[] {
 }
 
 // Count contiguous occurrences of `needle` within `haystack` (non-overlapping).
-function countSubsequence(haystack: string[], needle: string[]): number {
+export function countSubsequence(haystack: string[], needle: string[]): number {
   if (needle.length === 0) return 0;
   let count = 0;
   for (let i = 0; i + needle.length <= haystack.length; i++) {

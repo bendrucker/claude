@@ -6,6 +6,8 @@ import { table } from "table";
 import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
 import { type ScanResult, scanAll } from "../../../detection/scan";
 
+import { readInput } from "../../../scripts/io";
+
 const SKIP_SEGMENTS = ["node_modules", ".git"];
 const WORDLIST_PATH = /(?:^|\/)wordlists\/[^/]+\.txt$/;
 
@@ -38,18 +40,6 @@ export async function collectFiles(input: string): Promise<string[]> {
     files.push(path);
   }
   return files.sort();
-}
-
-export async function readInput(
-  arg: string | undefined,
-): Promise<{ text: string; filePath?: string }> {
-  if (arg && (await Bun.file(arg).exists())) {
-    return { text: await Bun.file(arg).text(), filePath: arg };
-  }
-  if (arg) {
-    return { text: arg };
-  }
-  return { text: await new Response(Bun.stdin.stream()).text() };
 }
 
 function scanInput(text: string, filePath: string | undefined): number {

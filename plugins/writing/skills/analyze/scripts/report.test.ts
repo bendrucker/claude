@@ -17,6 +17,7 @@ const baseInput = {
   deliverableTotalChars: 0,
   userTotalChars: 0,
   voiceProfile: null,
+  voiceDeltaRates: new Map(),
   ruleHealth: [],
   structuralAudit: [],
   structuralSignatures: [],
@@ -30,6 +31,7 @@ describe("renderReport", () => {
     const output = renderReport(baseInput);
     expect(output).toContain("# Writing trope analysis");
     expect(output).toContain("## Summary");
+    expect(output).toContain("## Voice Delta");
     expect(output).toContain("## Proposed Wordlist Removals");
     expect(output).toContain("## Proposed Wordlist Additions");
     expect(output).toContain("## Current Rule Health");

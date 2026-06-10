@@ -296,10 +296,52 @@ const PRICING_PER_MTOK: Record<string, ModelPricing> = {
   "claude-sonnet-4-6": { input: 3, output: 15 },
 };
 
-/** Rough tokens-per-word multiplier for cost estimation. */
+/** Rough tokens-per-word multiplier for the offline fallback estimate. */
 const TOKENS_PER_WORD = 1.35;
 /** Structured verdict with spans lands well under this output budget. */
 const OUTPUT_TOKENS_PER_CALL = 300;
+/** count_tokens is free but rate-limited, so counting calls run in a small pool. */
+const COUNT_CONCURRENCY = 8;
+
+/** Counts the input tokens of one judge call (system prompt plus user content). */
+export type InputTokenCounter = (userContent: string) => Promise<number>;
+
+/**
+ * Exact input-token counter over the count_tokens endpoint. The endpoint is
+ * free, so every real judge run uses this instead of the word heuristic. The
+ * count omits the json_schema output config, a constant few tokens per call.
+ */
+export function anthropicTokenCounter(options: AnthropicJudgeOptions): InputTokenCounter {
+  const client = new Anthropic();
+  const model = options.model ?? JUDGE_MODEL;
+  return async (userContent: string) => {
+    const response = await client.messages.countTokens({
+      model,
+      system: [{ type: "text", text: options.prompt }],
+      messages: [{ role: "user", content: userContent }],
+    });
+    return response.input_tokens;
+  };
+}
+
+/** Word-count heuristic for contexts without API credentials (tests, dry runs). */
+function heuristicTokenCounter(promptText: string): InputTokenCounter {
+  const promptTokens = Math.ceil(countWords(promptText) * TOKENS_PER_WORD);
+  return async (userContent: string) =>
+    promptTokens + Math.ceil(countWords(userContent) * TOKENS_PER_WORD);
+}
+
+async function mapPooled<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  const queue = items.map((item, index) => ({ item, index }));
+  const workers = Array.from({ length: Math.min(COUNT_CONCURRENCY, items.length) }, async () => {
+    for (let entry = queue.shift(); entry; entry = queue.shift()) {
+      results[entry.index] = await fn(entry.item);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 export interface CostEstimate {
   calls: number;
@@ -318,25 +360,24 @@ function modelPricing(model: string): ModelPricing {
 }
 
 /**
- * Pre-run cost estimate, printed before any API call. The prompt prefix is
- * counted once per call at the cache-read rate's upper bound (full price), so
- * the estimate is conservative.
+ * Pre-run cost estimate, printed before any paid API call. Input tokens are
+ * exact when a counter is supplied (every real run passes the count_tokens
+ * counter); without one, the word heuristic stands in. The prompt prefix is
+ * priced per call at the cache-write rate's upper bound (full price), and
+ * output tokens are a fixed per-call budget, so the estimate stays
+ * conservative either way.
  */
-export function estimateCost(
+export async function estimateCost(
   texts: string[],
-  options: { promptText: string; model?: string },
-): CostEstimate {
+  options: { promptText: string; model?: string; countTokens?: InputTokenCounter },
+): Promise<CostEstimate> {
   const model = options.model ?? JUDGE_MODEL;
   const pricing = modelPricing(model);
-  const promptTokens = Math.ceil(countWords(options.promptText) * TOKENS_PER_WORD);
-  let calls = 0;
-  let inputTokens = 0;
-  for (const text of texts) {
-    for (const chunk of chunkDocument(text)) {
-      calls++;
-      inputTokens += promptTokens + Math.ceil(countWords(chunk) * TOKENS_PER_WORD);
-    }
-  }
+  const count = options.countTokens ?? heuristicTokenCounter(options.promptText);
+  const chunks = texts.flatMap((text) => chunkDocument(text));
+  const perCall = await mapPooled(chunks, count);
+  const calls = chunks.length;
+  const inputTokens = perCall.reduce((sum, n) => sum + n, 0);
   const outputTokens = calls * OUTPUT_TOKENS_PER_CALL;
   const usd = (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
   return { calls, inputTokens, outputTokens, usd };
@@ -344,21 +385,23 @@ export function estimateCost(
 
 /**
  * Cost estimate for the batched heading baseline: headings share a call per
- * `HEADING_BATCH_SIZE` group, so the prompt prefix is counted per batch, not
- * per heading.
+ * `HEADING_BATCH_SIZE` group, so each counted request carries one batch in the
+ * same tab-indexed shape the heading judge sends.
  */
-export function estimateHeadingCost(
+export async function estimateHeadingCost(
   headings: string[],
-  options: { promptText: string; model?: string },
-): CostEstimate {
+  options: { promptText: string; model?: string; countTokens?: InputTokenCounter },
+): Promise<CostEstimate> {
   const model = options.model ?? JUDGE_MODEL;
   const pricing = modelPricing(model);
-  const promptTokens = Math.ceil(countWords(options.promptText) * TOKENS_PER_WORD);
-  const calls = Math.ceil(headings.length / HEADING_BATCH_SIZE);
-  const headingTokens = Math.ceil(
-    headings.reduce((sum, h) => sum + countWords(h), 0) * TOKENS_PER_WORD,
-  );
-  const inputTokens = calls * promptTokens + headingTokens;
+  const count = options.countTokens ?? heuristicTokenCounter(options.promptText);
+  const batches: string[] = [];
+  for (let i = 0; i < headings.length; i += HEADING_BATCH_SIZE) {
+    batches.push(formatHeadingBatch(headings.slice(i, i + HEADING_BATCH_SIZE)));
+  }
+  const perCall = await mapPooled(batches, count);
+  const calls = batches.length;
+  const inputTokens = perCall.reduce((sum, n) => sum + n, 0);
   const outputTokens = calls * OUTPUT_TOKENS_PER_CALL;
   const usd = (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
   return { calls, inputTokens, outputTokens, usd };
@@ -448,7 +491,11 @@ export function meaningDetector(options: MeaningDetectorOptions = {}): MeaningDe
       .map((r) => r.text)
       .filter((t) => countWords(t) >= minWords)
       .slice(0, limit);
-    const cost = estimateCost(texts, { promptText: prompt.text, model });
+    const cost = await estimateCost(texts, {
+      promptText: prompt.text,
+      model,
+      countTokens: anthropicTokenCounter({ prompt: prompt.text, model }),
+    });
     console.error(
       `Meaning judge: ${texts.length} documents (limit ${limit}), ${cost.calls} calls, est. $${cost.usd.toFixed(4)} on ${model} (prompt ${prompt.sha256.slice(0, 12)})`,
     );
@@ -523,11 +570,16 @@ export const HEADING_BATCH_SIZE = 25;
 
 export type HeadingJudge = (headings: string[]) => Promise<boolean[]>;
 
+/** Tab-indexed batch shape shared by the heading judge and its cost estimate. */
+export function formatHeadingBatch(headings: string[]): string {
+  return headings.map((heading, index) => `${index}\t${heading}`).join("\n");
+}
+
 export function anthropicHeadingJudge(options: AnthropicJudgeOptions): HeadingJudge {
   const client = new Anthropic();
   const model = options.model ?? JUDGE_MODEL;
   return async (headings: string[]) => {
-    const input = headings.map((heading, index) => `${index}\t${heading}`).join("\n");
+    const input = formatHeadingBatch(headings);
     const response = await client.messages.create({
       model,
       max_tokens: 2048,

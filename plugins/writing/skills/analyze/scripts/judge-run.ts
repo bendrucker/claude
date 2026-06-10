@@ -4,6 +4,7 @@ import { type LabeledHeading, parseLabelsFile, SHOULD_FLAG, wilson } from "./hea
 import {
   anthropicChunkJudge,
   anthropicHeadingJudge,
+  anthropicTokenCounter,
   type ChunkJudge,
   estimateCost,
   estimateHeadingCost,
@@ -162,7 +163,11 @@ async function filesMain(paths: string[], model: string, limit: number): Promise
   for (const p of paths.slice(0, limit)) {
     texts.push(await Bun.file(p).text());
   }
-  const cost = estimateCost(texts, { promptText: prompt.text, model });
+  const cost = await estimateCost(texts, {
+    promptText: prompt.text,
+    model,
+    countTokens: anthropicTokenCounter({ prompt: prompt.text, model }),
+  });
   console.error(
     `Judging ${texts.length} documents: ${cost.calls} calls, est. $${cost.usd.toFixed(4)} on ${model}`,
   );
@@ -179,7 +184,11 @@ async function gateMain(model: string): Promise<void> {
   requireApiKey();
   const prompt = await loadPrompt();
   const texts = JUDGE_FIXTURES.map((f) => f.text);
-  const cost = estimateCost(texts, { promptText: prompt.text, model });
+  const cost = await estimateCost(texts, {
+    promptText: prompt.text,
+    model,
+    countTokens: anthropicTokenCounter({ prompt: prompt.text, model }),
+  });
   console.error(
     `Gating ${JUDGE_FIXTURES.length} fixtures: ${cost.calls} calls, est. $${cost.usd.toFixed(4)} on ${model}`,
   );
@@ -213,9 +222,13 @@ async function headingsMain(labelsPath: string, model: string, limit: number): P
     console.error(`No labeled headings found in ${labelsPath}`);
     process.exit(1);
   }
-  const cost = estimateHeadingCost(
+  const cost = await estimateHeadingCost(
     labeled.map((l) => l.heading),
-    { promptText: prompt.text, model },
+    {
+      promptText: prompt.text,
+      model,
+      countTokens: anthropicTokenCounter({ prompt: prompt.text, model }),
+    },
   );
   console.error(
     `Judging ${labeled.length} headings in ${cost.calls} batched calls, est. $${cost.usd.toFixed(4)} on ${model}`,

@@ -200,25 +200,47 @@ describe("judgeDocument", () => {
 });
 
 describe("estimateCost", () => {
-  test("counts one call per chunk and prices by model", () => {
+  test("counts one call per chunk and prices by model", async () => {
     const longDoc = Array(3).fill(Array(1200).fill("word").join(" ")).join("\n\n");
     const docs = ["short doc one", longDoc];
-    const estimate = estimateCost(docs, { promptText: "prompt words here" });
+    const estimate = await estimateCost(docs, { promptText: "prompt words here" });
     expect(estimate.calls).toBe(4);
     expect(estimate.usd).toBeGreaterThan(0);
     expect(estimate.inputTokens).toBeGreaterThan(estimate.outputTokens);
   });
 
-  test("heading estimate counts one call per batch, not per heading", () => {
+  test("an injected counter replaces the word heuristic", async () => {
+    const counted: string[] = [];
+    const estimate = await estimateCost(["doc one", "doc two"], {
+      promptText: "prompt words here",
+      countTokens: async (userContent) => {
+        counted.push(userContent);
+        return 1000;
+      },
+    });
+    expect(counted).toEqual(["doc one", "doc two"]);
+    expect(estimate.inputTokens).toBe(2000);
+  });
+
+  test("heading estimate counts one call per batch, not per heading", async () => {
     const headings = Array(HEADING_BATCH_SIZE * 2 + 1).fill("Deployment Topology");
-    const estimate = estimateHeadingCost(headings, { promptText: "prompt words here" });
+    const batches: string[] = [];
+    const estimate = await estimateHeadingCost(headings, {
+      promptText: "prompt words here",
+      countTokens: async (userContent) => {
+        batches.push(userContent);
+        return 500;
+      },
+    });
     expect(estimate.calls).toBe(3);
+    expect(batches[0]).toContain("0\tDeployment Topology");
+    expect(batches[2]).toBe("0\tDeployment Topology");
   });
 
   test("a 200-document run of 1k-word PR bodies stays under a dollar on haiku", async () => {
     const prompt = await loadPrompt();
     const docs = Array(200).fill(Array(1000).fill("word").join(" "));
-    const estimate = estimateCost(docs, { promptText: prompt.text });
+    const estimate = await estimateCost(docs, { promptText: prompt.text });
     expect(estimate.usd).toBeLessThan(1);
   });
 });

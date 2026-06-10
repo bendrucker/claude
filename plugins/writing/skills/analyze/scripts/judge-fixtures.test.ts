@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-  HEADINGS_PROMPT_SHA256,
-  JUDGE_FIXTURES,
-  JUDGE_PROMPT_SHA256,
-} from "./judge-fixtures";
 import { HEADING_PROMPT_PATH, JUDGE_CRITERIA, loadPrompt, sha256 } from "./judge";
+import { HEADINGS_PROMPT_SHA256, JUDGE_FIXTURES, JUDGE_PROMPT_SHA256 } from "./judge-fixtures";
 
 // The reproducibility tuples are (prompt hash, input hash, expected flags).
 // This suite keeps the committed hashes in sync without an API key; the live

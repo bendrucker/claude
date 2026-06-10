@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
   aggregateVerdicts,
   CHUNK_WORD_LIMIT,
+  type CriterionKey,
   chunkDocument,
   countWords,
-  type CriterionKey,
   estimateCost,
   HEADING_BATCH_SIZE,
   HEADING_PROMPT_PATH,
@@ -14,9 +14,9 @@ import {
   judgeDocument,
   judgeHeadings,
   loadPrompt,
+  PROMPT_PATH,
   parseHeadingVerdicts,
   parseVerdict,
-  PROMPT_PATH,
   sha256,
   verdictSchema,
 } from "./judge";
@@ -115,7 +115,9 @@ describe("parseVerdict", () => {
   test("rejects a missing criterion", () => {
     const partial: Record<string, unknown> = JSON.parse(JSON.stringify(verdict()));
     delete partial.hedging_density;
-    expect(() => parseVerdict(JSON.stringify(partial))).toThrow('missing criterion "hedging_density"');
+    expect(() => parseVerdict(JSON.stringify(partial))).toThrow(
+      'missing criterion "hedging_density"',
+    );
   });
 
   test("rejects non-boolean flagged and non-string span", () => {
@@ -123,10 +125,11 @@ describe("parseVerdict", () => {
       string,
       { flagged: unknown; span: unknown }
     >;
-    bad.sycophancy.flagged = "yes";
+    const sycophancy = bad.sycophancy as { flagged: unknown; span: unknown };
+    sycophancy.flagged = "yes";
     expect(() => parseVerdict(JSON.stringify(bad))).toThrow("must be a boolean");
-    bad.sycophancy.flagged = true;
-    bad.sycophancy.span = 7;
+    sycophancy.flagged = true;
+    sycophancy.span = 7;
     expect(() => parseVerdict(JSON.stringify(bad))).toThrow("must be a string or null");
   });
 });
@@ -197,9 +200,7 @@ describe("judgeDocument", () => {
 
 describe("estimateCost", () => {
   test("counts one call per chunk and prices by model", () => {
-    const longDoc = Array(3)
-      .fill(Array(1200).fill("word").join(" "))
-      .join("\n\n");
+    const longDoc = Array(3).fill(Array(1200).fill("word").join(" ")).join("\n\n");
     const docs = ["short doc one", longDoc];
     const estimate = estimateCost(docs, { promptText: "prompt words here" });
     expect(estimate.calls).toBe(4);

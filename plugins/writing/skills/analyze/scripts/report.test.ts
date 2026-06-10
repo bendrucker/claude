@@ -31,6 +31,7 @@ const baseInput = {
     sectionCountDistribution: {},
     templateOnSmallDocumentCount: 0,
   },
+  meaningAudit: null,
   candidatePhrases: [] as CandidatePhrase[],
   corrections: [] as CorrectionRow[],
   corrective: [] as CorrectiveRow[],
@@ -90,6 +91,46 @@ describe("renderReport", () => {
     });
     expect(output).toContain("`COPULA PART DET NOUN`");
     expect(output).toContain("This is not a cache, it is a ledger");
+  });
+
+  test("explains how to enable the meaning audit when the judge did not run", () => {
+    const output = renderReport(baseInput);
+    expect(output).toContain("## Meaning-Layer Audit (LLM Judge)");
+    expect(output).toContain("Judge not run");
+  });
+
+  test("renders meaning-audit flag rates, prompt hash, and sampled spans", () => {
+    const output = renderReport({
+      ...baseInput,
+      meaningAudit: {
+        promptSha256: "abc123def456",
+        model: "claude-haiku-4-5",
+        documents: 40,
+        estimatedCostUsd: 0.1234,
+        criteria: [
+          {
+            id: "information-density",
+            question: "Does this text tell the reviewer anything new?",
+            flagged: 12,
+            total: 40,
+            spans: ["These changes ensure correct behavior."],
+          },
+          {
+            id: "sycophancy",
+            question: "Does the text flatter the reader?",
+            flagged: 0,
+            total: 40,
+            spans: [],
+          },
+        ],
+      },
+    });
+    expect(output).toContain("Prompt: `abc123def456`");
+    expect(output).toContain("| information-density |");
+    expect(output).toContain("| 12/40 | 30% |");
+    expect(output).toContain('information-density: "These changes ensure correct behavior."');
+    expect(output).toContain("| sycophancy |");
+    expect(output).not.toContain('sycophancy: "');
   });
 
   test("renders proposed-removals diff block when entries collapse", () => {

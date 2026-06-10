@@ -16,6 +16,7 @@ import {
   totalChars,
 } from "./dump";
 import { escapeRegex, frustrationRegex, gatedRegex } from "./frustration";
+import { DEFAULT_JUDGE_LIMIT, JUDGE_MODEL, type MeaningDetector, meaningDetector } from "./judge";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
 import { findQuote } from "./quote-context";
 import { aggregateTrends, analyzeDocument } from "./rate-detectors";
@@ -47,6 +48,16 @@ export interface AnalysisConfig {
   pasteMaxChars: number;
   selfName: string;
   correctiveLimit: number;
+}
+
+/**
+ * Optional batch detector modules, following the structural.ts seam: rows in,
+ * typed findings out, wired here, rendered via ReportInput. LLM judges live
+ * behind this seam only; the hook path never sees them. `detect` is async
+ * because judge modules call the API.
+ */
+export interface BatchDetectors {
+  meaning?: MeaningDetector;
 }
 
 if (import.meta.main) {
@@ -135,6 +146,22 @@ function parseFlags() {
         description: "Max corrective-feedback moments to surface",
         default: 25,
       },
+      judge: {
+        type: Boolean,
+        description:
+          "Run the meaning-layer LLM judge over the deliverable corpus (requires ANTHROPIC_API_KEY; prints a cost estimate before calling)",
+        default: false,
+      },
+      judgeModel: {
+        type: String,
+        description: "Judge model (Haiku-class recommended)",
+        default: JUDGE_MODEL,
+      },
+      judgeLimit: {
+        type: Number,
+        description: "Max deliverable documents the judge scores per run (cost guardrail)",
+        default: DEFAULT_JUDGE_LIMIT,
+      },
     },
   });
 }
@@ -163,6 +190,18 @@ async function main(): Promise<void> {
   const dbPath = path.resolve(argv.flags.sessionDb ?? "");
   const outPath = argv.flags.out ?? path.join("tmp", `trope-analysis-${today}.md`);
 
+  const detectors: BatchDetectors = {};
+  if (argv.flags.judge) {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error("--judge requires ANTHROPIC_API_KEY. Run without --judge or set the key.");
+      process.exit(1);
+    }
+    detectors.meaning = meaningDetector({
+      model: argv.flags.judgeModel,
+      limit: argv.flags.judgeLimit,
+    });
+  }
+
   const sessionId = process.env.CLAUDE_SESSION_ID ?? "anonymous";
   const isolatedPath = path.join(
     process.env.TMPDIR || "/tmp",
@@ -173,7 +212,7 @@ async function main(): Promise<void> {
 
   const db = await openSessionDb(isolatedPath);
   try {
-    const report = renderReport(await runAnalysis(db, config));
+    const report = renderReport(await runAnalysis(db, config, detectors));
     mkdirSync(path.dirname(outPath), { recursive: true });
     await Bun.write(outPath, report);
     console.error(`Wrote report to ${outPath}`);
@@ -187,7 +226,11 @@ async function main(): Promise<void> {
 // Orchestrates the tested modules over an opened session DB into a ReportInput.
 // All inputs come from db + config; no flag parsing, clock reads, or report
 // rendering happen here, so a fixture DB can drive the whole composition.
-export async function runAnalysis(db: Database, config: AnalysisConfig): Promise<ReportInput> {
+export async function runAnalysis(
+  db: Database,
+  config: AnalysisConfig,
+  detectors: BatchDetectors = {},
+): Promise<ReportInput> {
   const baseParams: Record<string, string | null> = {
     after_date: config.since,
     before_date: config.until,
@@ -354,6 +397,12 @@ export async function runAnalysis(db: Database, config: AnalysisConfig): Promise
     .map((r) => analyzeDocument(r.session_id, r.text as string));
   const rateTrends = aggregateTrends(rateDocumentRows);
 
+  let meaningAudit: ReportInput["meaningAudit"] = null;
+  if (detectors.meaning) {
+    console.error("Running meaning-layer judge over the deliverable corpus");
+    meaningAudit = await detectors.meaning(deliverableRows);
+  }
+
   const ruleHealth = buildRuleHealth({
     entries: wordlistEntries,
     chatAudit: auditByTerm,
@@ -385,6 +434,7 @@ export async function runAnalysis(db: Database, config: AnalysisConfig): Promise
     structuralAudit,
     structuralSignatures,
     rateTrends,
+    meaningAudit,
     candidatePhrases,
     corrections,
     corrective,

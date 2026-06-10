@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LabeledHeading } from "./headings-eval";
-import { JUDGE_CRITERIA, type CriterionKey, type JudgeVerdict } from "./judge";
+import { type CriterionKey, JUDGE_CRITERIA, type JudgeVerdict } from "./judge";
 import { JUDGE_PROMPT_SHA256 } from "./judge-fixtures";
 import { runGate, scoreHeadingBaseline } from "./judge-run";
 

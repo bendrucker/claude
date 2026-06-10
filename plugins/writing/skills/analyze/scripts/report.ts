@@ -1,4 +1,5 @@
 import type { CorrectionRow, CorrectiveRow, ModelSummaryRow } from "./dump";
+import type { MeaningAudit } from "./judge";
 import type { LiftRow } from "./ngram";
 import type { QuoteContext } from "./quote-context";
 import type { CorpusRateTrends } from "./rate-detectors";
@@ -30,6 +31,7 @@ export interface ReportInput {
   structuralSignatures: TagSignatureRow[];
   /** Corpus-level rate trends (action-verb opener density, backtick ref density, template rates). */
   rateTrends: CorpusRateTrends;
+  meaningAudit: MeaningAudit | null;
   candidatePhrases: CandidatePhrase[];
   corrections: CorrectionRow[];
   corrective: CorrectiveRow[];
@@ -53,6 +55,7 @@ export function renderReport(input: ReportInput): string {
     renderStructuralAudit(input),
     renderStructuralSignatures(input),
     renderStructuralTrends(input),
+    renderMeaningAudit(input),
     renderCorrectiveFeedback(input),
     renderCorrections(input),
   ];
@@ -365,6 +368,40 @@ function renderStructuralTrends(input: ReportInput): string {
   for (let i = 0; i <= 4; i++) {
     const count = t.sectionCountDistribution[i] ?? 0;
     lines.push(`| ${i} | ${count} |`);
+  }
+  return lines.join("\n");
+}
+
+function renderMeaningAudit(input: ReportInput): string {
+  const lines = [
+    "## Meaning-Layer Audit (LLM Judge)",
+    "",
+    "Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.",
+    "",
+  ];
+  const audit = input.meaningAudit;
+  if (!audit) {
+    lines.push("_Judge not run. Pass `--judge` (requires `ANTHROPIC_API_KEY`) to enable._");
+    return lines.join("\n");
+  }
+  lines.push(
+    `Prompt: \`${audit.promptSha256}\` | Model: \`${audit.model}\` | Documents: ${fmtNum(audit.documents)} | Est. cost: $${audit.estimatedCostUsd.toFixed(4)}`,
+    "",
+    "| criterion | question | flagged | rate |",
+    "| --- | --- | --- | --- |",
+  );
+  for (const stat of audit.criteria) {
+    const rate = stat.total > 0 ? `${((stat.flagged / stat.total) * 100).toFixed(0)}%` : "-";
+    lines.push(`| ${stat.id} | ${esc(stat.question)} | ${stat.flagged}/${stat.total} | ${rate} |`);
+  }
+  const withSpans = audit.criteria.filter((c) => c.spans.length > 0);
+  if (withSpans.length > 0) {
+    lines.push("", "Sampled spans (local-only; spot-check before acting):", "");
+    for (const stat of withSpans) {
+      for (const span of stat.spans) {
+        lines.push(`- ${stat.id}: "${esc(truncate(span, 160))}"`);
+      }
+    }
   }
   return lines.join("\n");
 }

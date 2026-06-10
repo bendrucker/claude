@@ -1,11 +1,6 @@
 #!/usr/bin/env bun
 import { cli, command } from "cleye";
-import {
-  type LabeledHeading,
-  parseLabelsFile,
-  SHOULD_FLAG,
-  wilson,
-} from "./headings-eval";
+import { type LabeledHeading, parseLabelsFile, SHOULD_FLAG, wilson } from "./headings-eval";
 import {
   anthropicChunkJudge,
   anthropicHeadingJudge,
@@ -201,7 +196,9 @@ async function gateMain(model: string): Promise<void> {
       );
     }
   }
-  console.log(`\n${results.length - failed}/${results.length} tuples hold (prompt ${prompt.sha256.slice(0, 12)})`);
+  console.log(
+    `\n${results.length - failed}/${results.length} tuples hold (prompt ${prompt.sha256.slice(0, 12)})`,
+  );
   if (failed > 0) process.exit(1);
 }
 
@@ -300,7 +297,9 @@ if (import.meta.main) {
   cli(
     {
       name: "judge-run",
-      help: { description: "Run the meaning-layer LLM judge (batch-only, needs ANTHROPIC_API_KEY)" },
+      help: {
+        description: "Run the meaning-layer LLM judge (batch-only, needs ANTHROPIC_API_KEY)",
+      },
       commands: [filesCmd, gateCmd, headingsCmd],
     },
     (parsed) => {

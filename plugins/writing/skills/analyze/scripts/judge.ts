@@ -19,13 +19,7 @@ export const JUDGE_MODEL = "claude-haiku-4-5";
 export const CHUNK_WORD_LIMIT = 1500;
 export const MAX_SAMPLE_SPANS = 5;
 
-export const PROMPT_PATH = path.join(
-  import.meta.dirname,
-  "..",
-  "resources",
-  "judge",
-  "prompt.md",
-);
+export const PROMPT_PATH = path.join(import.meta.dirname, "..", "resources", "judge", "prompt.md");
 export const HEADING_PROMPT_PATH = path.join(
   import.meta.dirname,
   "..",
@@ -267,9 +261,7 @@ export function anthropicChunkJudge(options: AnthropicJudgeOptions): ChunkJudge 
       model,
       max_tokens: 2048,
       temperature: 0,
-      system: [
-        { type: "text", text: options.prompt, cache_control: { type: "ephemeral" } },
-      ],
+      system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
       output_config: { format: { type: "json_schema", schema: verdictSchema() } },
       messages: [{ role: "user", content: chunkText }],
     });
@@ -290,8 +282,15 @@ export async function judgeDocument(judge: ChunkJudge, text: string): Promise<Ju
   return aggregateVerdicts(verdicts);
 }
 
-const PRICING_PER_MTOK: Record<string, { input: number; output: number }> = {
-  "claude-haiku-4-5": { input: 1, output: 5 },
+interface ModelPricing {
+  input: number;
+  output: number;
+}
+
+const HAIKU_PRICING: ModelPricing = { input: 1, output: 5 };
+
+const PRICING_PER_MTOK: Record<string, ModelPricing> = {
+  "claude-haiku-4-5": HAIKU_PRICING,
   "claude-sonnet-4-6": { input: 3, output: 15 },
 };
 
@@ -317,7 +316,7 @@ export function estimateCost(
   options: { promptText: string; model?: string },
 ): CostEstimate {
   const model = options.model ?? JUDGE_MODEL;
-  const pricing = PRICING_PER_MTOK[model] ?? PRICING_PER_MTOK[JUDGE_MODEL];
+  const pricing = PRICING_PER_MTOK[model] ?? HAIKU_PRICING;
   const promptTokens = Math.ceil(countWords(options.promptText) * TOKENS_PER_WORD);
   let calls = 0;
   let inputTokens = 0;
@@ -501,9 +500,7 @@ export function anthropicHeadingJudge(options: AnthropicJudgeOptions): HeadingJu
       model,
       max_tokens: 2048,
       temperature: 0,
-      system: [
-        { type: "text", text: options.prompt, cache_control: { type: "ephemeral" } },
-      ],
+      system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
       output_config: {
         format: { type: "json_schema", schema: headingBatchSchema(headings.length) },
       },

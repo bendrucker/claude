@@ -3,10 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type {
-  PreToolUseHookInput,
-  PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { collectText, processInput } from "./check-tropes";
 
 function mockWrite(content: string): PreToolUseHookInput {
@@ -74,14 +71,6 @@ function mockMcp(toolName: string, toolInput: Record<string, unknown>): PreToolU
     tool_input: toolInput,
     tool_use_id: "test",
   };
-}
-
-async function getDecision(
-  input: PreToolUseHookInput,
-): Promise<PreToolUseHookSpecificOutput | null> {
-  const result = await processInput(input);
-  if (!result) return null;
-  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
 
 describe("plan files", () => {

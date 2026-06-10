@@ -134,7 +134,7 @@ const openerPatterns: PatternDef[] = WORDLISTS.openers
     ]
   : [];
 
-// Adversative negation-flip: sentence N contains a negation cue; sentence N+1
+// Adversative negation-flip: sentence N contains a negation cue and sentence N+1
 // opens with an adversative conjunction. This signals the cross-sentence
 // contrast structure. Pure regex, two-sentence sliding window.
 const NEGATION_CUE = /\b(?:not|never)\b|\bno\s|n't\b/i;
@@ -153,11 +153,11 @@ function adversativeNegationFlipHits(text: string): Hits {
 }
 
 // Burstiness: coefficient of variation (CV) of sentence word counts.
-// Literature: LLM output clusters near CV ~0.5; human prose near CV ~0.78.
-// Gate: 8+ sentences required; gated DEFAULT-OFF (batch-only, uncalibrated).
+// Literature: LLM output clusters near CV ~0.5, human prose near CV ~0.78.
+// Gate: 8+ sentences required. Gated DEFAULT-OFF (batch-only, uncalibrated).
 const BURSTINESS_MIN_SENTENCES = 8;
 // CV threshold: flag when CV < 0.55 (suspiciously uniform).
-// Literature heuristic; session-corpus calibration pending.
+// Literature heuristic. Session-corpus calibration pending.
 const BURSTINESS_CV_THRESHOLD = 0.55;
 
 function sentenceWordCount(sentence: string): number {
@@ -188,7 +188,7 @@ function burstinessHits(text: string): Hits {
 }
 
 // Question-then-answer cadence: 2 of 4+ paragraphs open with a question.
-// Pure regex; lower precision; near-zero cost.
+// Pure regex. Lower precision, near-zero cost.
 const MIN_PARAGRAPHS_FOR_QA = 4;
 const QA_QUESTION_THRESHOLD = 2;
 // Matches question-opening sentences after splitSentences strips the trailing '?'.
@@ -215,7 +215,7 @@ function questionAnswerCadenceHits(text: string): Hits {
 // they unambiguously signal a discourse move rather than a local modifier.
 //
 // Threshold: > 20% of sentences carry a tier-1 or tier-2 cue.
-// Literature heuristic; session-corpus calibration pending.
+// Literature heuristic. Session-corpus calibration pending.
 const DISCOURSE_MIN_SENTENCES = 5;
 const DISCOURSE_DENSITY_THRESHOLD = 0.2;
 
@@ -716,7 +716,7 @@ export const PATTERNS: PatternDef[] = [
       "Go. The server starts up and begins processing the incoming queue of jobs that arrive throughout the day. Ok. The extremely long sentence that goes on and on with many clauses and sub-clauses describing the entire system architecture in exhaustive detail. Fine.",
     ],
     evidence:
-      "Literature heuristic; session-corpus calibration pending. CV threshold 0.55 is a starting point derived from commercial detector documentation placing LLM output near CV 0.5 and human prose near CV 0.78. Gate: 8+ sentences. Batch-only; must not fire in the hook.",
+      "Literature heuristic. Session-corpus calibration pending. CV threshold 0.55 is a starting point derived from commercial detector documentation placing LLM output near CV 0.5 and human prose near CV 0.78. Gate: 8+ sentences. Batch-only; must not fire in the hook.",
     retire:
       "Remove or recalibrate the threshold after session-corpus calibration. If the false-positive rate on technical prose is high, raise the threshold or narrow to prose-file context.",
   },
@@ -739,7 +739,7 @@ export const PATTERNS: PatternDef[] = [
       "What does this do?\nIt processes jobs.\n\nThe retry logic changed.\n\nUnit tests were added.\n\nThe error rate dropped.",
     ],
     evidence:
-      "Literature heuristic; session-corpus calibration pending. Question-opener cadence is a known AI structuring pattern in explanatory prose. Threshold: 2 of 4+ paragraphs. Batch-only.",
+      "Literature heuristic. Session-corpus calibration pending. Question-opener cadence is a known AI structuring pattern in explanatory prose. Threshold: 2 of 4+ paragraphs. Batch-only.",
     retire:
       "Remove when session-corpus calibration shows the pattern does not distinguish assistant from user text, or when precision on a labeled sample is below the hook bar.",
   },
@@ -762,7 +762,7 @@ export const PATTERNS: PatternDef[] = [
       "However, the cache is cold. Nevertheless, the retry works.",
     ],
     evidence:
-      "Literature heuristic; session-corpus calibration pending. PDTB-derived two-tier connective table. Tier 1 (unambiguous adversatives) counted anywhere; tier 2 (ambiguous) counted only at sentence start. 20% density threshold is a starting heuristic. Batch-only.",
+      "Literature heuristic. Session-corpus calibration pending. PDTB-derived two-tier connective table. Tier 1 (unambiguous adversatives) counted anywhere; tier 2 (ambiguous) counted only at sentence start. 20% density threshold is a starting heuristic. Batch-only.",
     retire:
       "Remove or recalibrate after session-corpus calibration. If the false-positive rate on technical documentation is high, raise the threshold or restrict tier-2 markers.",
   },

@@ -16,7 +16,7 @@ import type { CoarseTag } from "./tags";
 // shorter sentences converge on the same shapes by chance.
 const TRICOLON_MIN_TOKENS = 6;
 // Normalized edit distance at or below this counts as parallel.
-// Literature heuristic; session-corpus calibration pending per #769.
+// Literature heuristic. Session-corpus calibration pending per #769.
 const TRICOLON_DISTANCE_THRESHOLD = 0.35;
 
 // Determiners, punctuation, and numbers carry no parallelism signal:
@@ -103,7 +103,7 @@ export const TRICOLON_PATTERN: PatternDef = {
     "The cache begins cold on the first request of the day. Entries accumulate as traffic arrives, and reads accelerate once the working set stabilizes. Nobody should tune anything before measuring real production load.",
   ],
   evidence:
-    "Literature heuristic; session-corpus calibration pending per the #769 labeling protocol. Normalized edit distance over coarse POS shapes (DET/PUNCT/NUM filtered), threshold 0.35, 6+ tokens per sentence. Batch-only: this module imports the compromise tagger, so hooks never load it.",
+    "Literature heuristic. Session-corpus calibration pending per the #769 labeling protocol. Normalized edit distance over coarse POS shapes (DET/PUNCT/NUM filtered), threshold 0.35, 6+ tokens per sentence. Batch-only: this module imports the compromise tagger, so hooks never load it.",
   retire:
     "Remove if the labeled eval pass shows precision below the batch bar, or recalibrate the threshold if the session corpus places parallel triads elsewhere. Remove outright if assistant deliverables stop producing tricolons.",
 };

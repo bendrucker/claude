@@ -97,6 +97,24 @@ describe("scanAll", () => {
     expect(match?.col).toBe(1);
   });
 
+  it("locates a multi-sentence sample by its first segment", () => {
+    // Cross-sentence samples join sentence excerpts with " / ", which never
+    // appears verbatim in the source, so position falls back to segment one.
+    const text =
+      "Intro line.\nThe parser validates the incoming request payload quickly. The router dispatches the matching handler function cleanly. The logger records the final response status faithfully.";
+    const match = scanAll(text, "doc.md").find((r) => r.category === "tricolon");
+    expect(match).toBeDefined();
+    expect(match?.line).toBe(2);
+    expect(match?.col).toBe(1);
+  });
+
+  it("reports the batch-only tricolon pattern", () => {
+    const text =
+      "It reads the config file from disk at startup. It opens the network socket to the broker at boot. It starts the worker pool for the queue at launch.";
+    const categories = scanAll(text, "doc.md").map((r) => r.category);
+    expect(categories).toContain("tricolon");
+  });
+
   it("returns empty for clean prose", () => {
     expect(scanAll("The function reads input and writes output.")).toHaveLength(0);
   });

@@ -137,7 +137,7 @@ const openerPatterns: PatternDef[] = WORDLISTS.openers
 // Adversative negation-flip: sentence N contains a negation cue; sentence N+1
 // opens with an adversative conjunction. This signals the cross-sentence
 // contrast structure. Pure regex, two-sentence sliding window.
-const NEGATION_CUE = /\b(?:not|never|no\s)|n't\b/i;
+const NEGATION_CUE = /\b(?:not|never)\b|\bno\s|n't\b/i;
 const ADVERSATIVE_OPENER = /^\s*(?:However|But|Yet|Nevertheless|Nonetheless|Still|That said),?\s/i;
 
 function adversativeNegationFlipHits(text: string): Hits {
@@ -175,7 +175,7 @@ function coefficientOfVariation(values: number[]): number {
   return Math.sqrt(variance) / mean;
 }
 
-function burstinenssHits(text: string): Hits {
+function burstinessHits(text: string): Hits {
   const sentences = splitSentences(text).filter((s) => s.split(/\s+/).length >= 2);
   if (sentences.length < BURSTINESS_MIN_SENTENCES) return { count: 0, sample: "" };
   const wordCounts = sentences.map(sentenceWordCount);
@@ -670,9 +670,10 @@ export const PATTERNS: PatternDef[] = [
     negatives: [
       "The cache fills on first request. However, it can evict under pressure.",
       "The server starts. The queue drains.",
+      "The notable design held up under load. However, the rollout was slow.",
     ],
     evidence:
-      "The CROSS_SENTENCE_NOT regex (8 hits in 2 sessions over 30 days) confirmed the contrast family fires rarely. This detector subsumes that narrow pronoun-repeat pattern and broadens coverage to any negation cue followed by an adversative opener. Session-corpus calibration pending before hook promotion.",
+      "The CROSS_SENTENCE_NOT regex (8 hits in 2 sessions over 30 days) confirmed the contrast family fires rarely, so it was retired. This detector replaces it with a different shape: any negation cue followed by an adversative opener. Session-corpus calibration pending before hook promotion.",
     retire:
       "Remove when corpus analysis shows the pattern fires at comparable rates on user text (not distinctive), or when session-corpus calibration shows precision below the hook bar.",
   },
@@ -700,7 +701,7 @@ export const PATTERNS: PatternDef[] = [
     layer: "cross-sentence",
     category: "sentence burstiness",
     fileOnly: true,
-    test: burstinenssHits,
+    test: burstinessHits,
     message: (matched) =>
       `Low sentence-length variation (${matched}). Uniform sentence length is an AI prose tell. Vary sentence rhythm.`,
     positives: [

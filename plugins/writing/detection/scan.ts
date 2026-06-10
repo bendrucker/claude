@@ -36,10 +36,14 @@ function positionAt(text: string, index: number): Position {
   return { line, col: index - lastNewline };
 }
 
-// Best-effort position for a sample string the matcher reported without an index.
+// Best-effort position for a sample string the matcher reported without an
+// index. Cross-sentence detectors join sentence excerpts with " / ", so when
+// the joined sample is absent from the text, fall back to its first segment.
 function positionOfSample(text: string, sample: string): Position {
-  if (sample) {
-    const index = text.toLowerCase().indexOf(sample.toLowerCase());
+  const lower = text.toLowerCase();
+  for (const candidate of [sample, sample.split(" / ")[0] ?? ""]) {
+    if (candidate.length === 0) continue;
+    const index = lower.indexOf(candidate.toLowerCase());
     if (index >= 0) return positionAt(text, index);
   }
   return { line: 1, col: 1 };

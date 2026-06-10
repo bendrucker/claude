@@ -20,6 +20,14 @@ const baseInput = {
   ruleHealth: [],
   structuralAudit: [],
   structuralSignatures: [],
+  rateTrends: {
+    documentCount: 0,
+    meanActionVerbOpenerRate: 0,
+    meanBacktickRefDensity: 0,
+    templateDocumentRate: 0,
+    sectionCountDistribution: {},
+    templateOnSmallDocumentCount: 0,
+  },
   candidatePhrases: [] as CandidatePhrase[],
   corrections: [] as CorrectionRow[],
   corrective: [] as CorrectiveRow[],
@@ -34,7 +42,29 @@ describe("renderReport", () => {
     expect(output).toContain("## Proposed Wordlist Additions");
     expect(output).toContain("## Current Rule Health");
     expect(output).toContain("## Structural Signatures");
+    expect(output).toContain("## Structural Trends");
     expect(output).toContain("## Correction Candidates");
+  });
+
+  test("renders structural trends table when documents are present", () => {
+    const output = renderReport({
+      ...baseInput,
+      rateTrends: {
+        documentCount: 42,
+        meanActionVerbOpenerRate: 0.166,
+        meanBacktickRefDensity: 58.3,
+        templateDocumentRate: 0.73,
+        sectionCountDistribution: { 0: 11, 1: 5, 2: 26 },
+        templateOnSmallDocumentCount: 7,
+      },
+    });
+    expect(output).toContain("## Structural Trends");
+    expect(output).toContain("42");
+    expect(output).toContain("action-verb opener rate");
+    expect(output).toContain("backtick ref density");
+    expect(output).toContain("template document rate");
+    expect(output).toContain("template on small document");
+    expect(output).toContain("7 docs");
   });
 
   test("renders structural signature rows with example sentences", () => {

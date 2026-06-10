@@ -133,6 +133,10 @@ describe("runAnalysis", () => {
     expect(result.corrective.length).toBeGreaterThan(0);
     expect(result.corrective[0]?.matched_term.length).toBeGreaterThan(0);
 
+    // Rate trends are present with a non-negative document count.
+    expect(typeof result.rateTrends).toBe("object");
+    expect(result.rateTrends.documentCount).toBeGreaterThanOrEqual(0);
+
     // The remaining sections are present and typed as arrays.
     expect(Array.isArray(result.candidatePhrases)).toBe(true);
     expect(Array.isArray(result.structuralSignatures)).toBe(true);

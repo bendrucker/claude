@@ -18,6 +18,7 @@ import {
 import { escapeRegex, frustrationRegex } from "./frustration";
 import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram";
 import { findQuote } from "./quote-context";
+import { aggregateTrends, analyzeDocument } from "./rate-detectors";
 import { type CandidatePhrase, type ReportInput, renderReport } from "./report";
 import { buildRuleHealth, type FtsAuditRow } from "./rule-health";
 import { auditStructuralPatterns } from "./structural";
@@ -335,6 +336,14 @@ export async function runAnalysis(db: Database, config: AnalysisConfig): Promise
   console.error("Auditing structural patterns against all model-generated text");
   const structuralAudit = auditStructuralPatterns(allModelText, userRows);
 
+  console.error(
+    "Computing corpus-level rate trends (action-verb opener, backtick density, template rates)",
+  );
+  const rateDocumentRows = deliverableRows
+    .filter((r) => r.text)
+    .map((r) => analyzeDocument(r.session_id, r.text as string));
+  const rateTrends = aggregateTrends(rateDocumentRows);
+
   const ruleHealth = buildRuleHealth({
     entries: wordlistEntries,
     chatAudit: auditByTerm,
@@ -362,6 +371,7 @@ export async function runAnalysis(db: Database, config: AnalysisConfig): Promise
     ruleHealth,
     structuralAudit,
     structuralSignatures,
+    rateTrends,
     candidatePhrases,
     corrections,
     corrective,

@@ -149,7 +149,9 @@ export function verdictSchema(): Record<string, unknown> {
     type: "object",
     properties: {
       flagged: { type: "boolean" },
-      span: { type: ["string", "null"] },
+      // anyOf rather than type: ["string", "null"]: the structured-outputs
+      // schema subset documents anyOf support; type arrays are not listed.
+      span: { anyOf: [{ type: "string" }, { type: "null" }] },
     },
     required: ["flagged", "span"],
     additionalProperties: false,
@@ -306,6 +308,15 @@ export interface CostEstimate {
   usd: number;
 }
 
+function modelPricing(model: string): ModelPricing {
+  const pricing = PRICING_PER_MTOK[model];
+  if (pricing) return pricing;
+  console.error(
+    `No pricing table entry for model "${model}"; cost estimate assumes Haiku-class rates and may understate the real cost.`,
+  );
+  return HAIKU_PRICING;
+}
+
 /**
  * Pre-run cost estimate, printed before any API call. The prompt prefix is
  * counted once per call at the cache-read rate's upper bound (full price), so
@@ -316,7 +327,7 @@ export function estimateCost(
   options: { promptText: string; model?: string },
 ): CostEstimate {
   const model = options.model ?? JUDGE_MODEL;
-  const pricing = PRICING_PER_MTOK[model] ?? HAIKU_PRICING;
+  const pricing = modelPricing(model);
   const promptTokens = Math.ceil(countWords(options.promptText) * TOKENS_PER_WORD);
   let calls = 0;
   let inputTokens = 0;
@@ -326,6 +337,28 @@ export function estimateCost(
       inputTokens += promptTokens + Math.ceil(countWords(chunk) * TOKENS_PER_WORD);
     }
   }
+  const outputTokens = calls * OUTPUT_TOKENS_PER_CALL;
+  const usd = (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
+  return { calls, inputTokens, outputTokens, usd };
+}
+
+/**
+ * Cost estimate for the batched heading baseline: headings share a call per
+ * `HEADING_BATCH_SIZE` group, so the prompt prefix is counted per batch, not
+ * per heading.
+ */
+export function estimateHeadingCost(
+  headings: string[],
+  options: { promptText: string; model?: string },
+): CostEstimate {
+  const model = options.model ?? JUDGE_MODEL;
+  const pricing = modelPricing(model);
+  const promptTokens = Math.ceil(countWords(options.promptText) * TOKENS_PER_WORD);
+  const calls = Math.ceil(headings.length / HEADING_BATCH_SIZE);
+  const headingTokens = Math.ceil(
+    headings.reduce((sum, h) => sum + countWords(h), 0) * TOKENS_PER_WORD,
+  );
+  const inputTokens = calls * promptTokens + headingTokens;
   const outputTokens = calls * OUTPUT_TOKENS_PER_CALL;
   const usd = (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
   return { calls, inputTokens, outputTokens, usd };
@@ -433,7 +466,7 @@ export function meaningDetector(options: MeaningDetectorOptions = {}): MeaningDe
  * "is this heading sentence-shaped?". Headings are batched per call; the
  * verdict is one boolean per heading, by index.
  */
-export function headingBatchSchema(count: number): Record<string, unknown> {
+export function headingBatchSchema(): Record<string, unknown> {
   return {
     type: "object",
     properties: {
@@ -449,7 +482,6 @@ export function headingBatchSchema(count: number): Record<string, unknown> {
           additionalProperties: false,
         },
       },
-      count: { type: "integer", const: count },
     },
     required: ["headings"],
     additionalProperties: false,
@@ -502,7 +534,7 @@ export function anthropicHeadingJudge(options: AnthropicJudgeOptions): HeadingJu
       temperature: 0,
       system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
       output_config: {
-        format: { type: "json_schema", schema: headingBatchSchema(headings.length) },
+        format: { type: "json_schema", schema: headingBatchSchema() },
       },
       messages: [{ role: "user", content: input }],
     });

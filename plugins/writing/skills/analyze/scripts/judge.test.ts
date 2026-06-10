@@ -6,6 +6,7 @@ import {
   chunkDocument,
   countWords,
   estimateCost,
+  estimateHeadingCost,
   HEADING_BATCH_SIZE,
   HEADING_PROMPT_PATH,
   JUDGE_CRITERIA,
@@ -206,6 +207,12 @@ describe("estimateCost", () => {
     expect(estimate.calls).toBe(4);
     expect(estimate.usd).toBeGreaterThan(0);
     expect(estimate.inputTokens).toBeGreaterThan(estimate.outputTokens);
+  });
+
+  test("heading estimate counts one call per batch, not per heading", () => {
+    const headings = Array(HEADING_BATCH_SIZE * 2 + 1).fill("Deployment Topology");
+    const estimate = estimateHeadingCost(headings, { promptText: "prompt words here" });
+    expect(estimate.calls).toBe(3);
   });
 
   test("a 200-document run of 1k-word PR bodies stays under a dollar on haiku", async () => {

@@ -399,7 +399,10 @@ function renderMeaningAudit(input: ReportInput): string {
     lines.push("", "Sampled spans (local-only; spot-check before acting):", "");
     for (const stat of withSpans) {
       for (const span of stat.spans) {
-        lines.push(`- ${stat.id}: "${esc(truncate(span, 160))}"`);
+        // Spans are verbatim quotes and may contain newlines, which would
+        // break the list item; collapse all whitespace runs to single spaces.
+        const flat = span.replace(/\s+/g, " ").trim();
+        lines.push(`- ${stat.id}: "${esc(truncate(flat, 160))}"`);
       }
     }
   }

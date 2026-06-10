@@ -113,7 +113,7 @@ describe("renderReport", () => {
             question: "Does this text tell the reviewer anything new?",
             flagged: 12,
             total: 40,
-            spans: ["These changes ensure correct behavior."],
+            spans: ["These changes ensure\ncorrect behavior."],
           },
           {
             id: "sycophancy",
@@ -128,6 +128,7 @@ describe("renderReport", () => {
     expect(output).toContain("Prompt: `abc123def456`");
     expect(output).toContain("| information-density |");
     expect(output).toContain("| 12/40 | 30% |");
+    // Multi-line spans are flattened so they cannot break the list item.
     expect(output).toContain('information-density: "These changes ensure correct behavior."');
     expect(output).toContain("| sycophancy |");
     expect(output).not.toContain('sycophancy: "');

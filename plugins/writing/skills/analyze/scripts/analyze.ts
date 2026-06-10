@@ -192,8 +192,10 @@ async function main(): Promise<void> {
 
   const detectors: BatchDetectors = {};
   if (argv.flags.judge) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.error("--judge requires ANTHROPIC_API_KEY. Run without --judge or set the key.");
+    if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
+      console.error(
+        "--judge requires API credentials (ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN). Run without --judge or set one.",
+      );
       process.exit(1);
     }
     detectors.meaning = meaningDetector({

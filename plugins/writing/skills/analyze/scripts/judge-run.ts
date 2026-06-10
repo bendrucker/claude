@@ -6,6 +6,7 @@ import {
   anthropicHeadingJudge,
   type ChunkJudge,
   estimateCost,
+  estimateHeadingCost,
   HEADING_PROMPT_PATH,
   type HeadingJudge,
   JUDGE_CRITERIA,
@@ -125,8 +126,10 @@ export function scoreHeadingBaseline(
 }
 
 function requireApiKey(): void {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error("ANTHROPIC_API_KEY is not set. The judge runs only with a live API key.");
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
+    console.error(
+      "Neither ANTHROPIC_API_KEY nor ANTHROPIC_AUTH_TOKEN is set. The judge runs only with live API credentials.",
+    );
     process.exit(1);
   }
 }
@@ -210,12 +213,12 @@ async function headingsMain(labelsPath: string, model: string, limit: number): P
     console.error(`No labeled headings found in ${labelsPath}`);
     process.exit(1);
   }
-  const cost = estimateCost(
+  const cost = estimateHeadingCost(
     labeled.map((l) => l.heading),
     { promptText: prompt.text, model },
   );
   console.error(
-    `Judging ${labeled.length} headings (batched), est. $${cost.usd.toFixed(4)} on ${model}`,
+    `Judging ${labeled.length} headings in ${cost.calls} batched calls, est. $${cost.usd.toFixed(4)} on ${model}`,
   );
   const judge: HeadingJudge = anthropicHeadingJudge({ prompt: prompt.text, model });
   const verdicts = await judgeHeadings(

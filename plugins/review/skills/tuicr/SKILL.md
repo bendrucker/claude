@@ -1,5 +1,6 @@
 ---
 name: review:tuicr
+argument-hint: "[-w | -r <range> | pr <N> | mr <N>]"
 disable-model-invocation: true
 description: >
   Drive tuicr, the terminal code-review TUI, as a live local review surface in tmux. Use when
@@ -45,7 +46,8 @@ tmux split-window -h -d -c "<repo>" "cd '<repo>' && tuicr -w"
 
 - `tuicr -w` reviews the working tree (uncommitted changes), skipping the target selector.
 - Swap the inner command for other targets: `tuicr -r main..HEAD` (commit range),
-  `tuicr pr <N>` (GitHub PR), `tuicr mr <N>` (GitLab MR).
+  `tuicr pr <N>` (GitHub PR), `tuicr mr <N>` (GitLab MR). On a direct `/review:tuicr` invocation the
+  target comes from `$ARGUMENTS` (default `-w`); `review:self` and `review:peer` pass their own.
 - tuicr reloads the diff as the working tree changes, which drives the inbound loop.
 
 After ~3s, `tuicr review list --repo <repo>` confirms the session `slug`, and
@@ -94,7 +96,7 @@ natively on the platform.
 To act on comments as they arrive instead of in a batch, pass this as a `Monitor` command:
 
 ```bash
-bash ${CLAUDE_SKILL_DIR}/scripts/watch.sh <slug> --repo <repo>
+bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts <slug> --repo <repo>
 ```
 
 It polls `tuicr review comments` (tuicr has no push stream), emits one event per new comment
@@ -105,7 +107,7 @@ responses and gate the apply or post on the user's go.
 
 Run each with `--help` for flags.
 
-- `scripts/watch.sh <slug> [--repo <path>] [poll-seconds]`: per-comment events for `Monitor`.
+- `scripts/watch.ts <slug> [--repo <path>] [poll-seconds]`: per-comment events for `Monitor`.
 - `scripts/mapping.ts map`: comments to GitHub/GitLab payloads with an in-diff pre-check,
   dropping off-diff anchors GitHub would reject with 422.
 - `scripts/ledger.ts`: resolution ledger keyed by tuicr comment `id`; repo and branch default to

@@ -2,6 +2,7 @@
 name: review:self
 description: |
   Self-review your own changes in a live tuicr session before committing or opening a PR. You annotate changed lines in the terminal and your comments come back to Claude as edits to apply. Replaces the difit web UI. Use for "review my changes", "self review", "let me look at the diff before committing".
+argument-hint: "[staged | <commit-range> | HEAD]"
 disable-model-invocation: true
 allowed-tools:
   - Skill(review:tuicr)

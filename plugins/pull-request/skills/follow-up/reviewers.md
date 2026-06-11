@@ -11,7 +11,7 @@ Third-party reviewers converge on one shape: each leaves a single summary commen
 
 A reviewer is done when its latest summary on the current HEAD reports nothing actionable and no unresolved bot threads remain. A stale signal from an earlier SHA does not count. Each vendor phrases "none left" differently; use the string as a fast path, fall back to the thread count:
 
-- **CodeRabbit** (GitHub `coderabbitai`, GitLab `group_<id>_bot`): `Actionable comments posted: 0`. Nitpick and LGTM notes are noise unless obviously correct.
+- **CodeRabbit** (GitHub `coderabbitai`, GitLab `group_<id>_bot_<hash>`): `Actionable comments posted: 0`. Nitpick and LGTM notes are noise unless obviously correct.
 - **Greptile** (GitHub `greptile-apps[bot]` / `greptileai`): top confidence score (e.g. `5/5`); actionable items live in its "fix all with AI" section.
 
 > Verify these strings against recent PR history when a reviewer's wording drifts. The reliable cross-cutting signal is **zero new actionable bot threads on the current HEAD after a re-review**.
@@ -32,7 +32,7 @@ This @-mention is the only place a bot is named. Thread replies never name or th
 
 ## Adding a Reviewer
 
-Common reviewers need no maintenance: GitHub reports `__typename: "Bot"` for App and bot accounts, and GitLab service accounts follow the `*-bot` / `*_bot` convention (`group_<id>_bot` for CodeRabbit). Whatever those signals catch is handled automatically.
+Common reviewers need no maintenance: GitHub reports `__typename: "Bot"` for App and bot accounts, and GitLab service accounts follow the `*-bot` / `*_bot` convention or the token service-account form `group_<id>_bot_<hash>` / `project_<id>_bot_<hash>` (CodeRabbit posts under a group token account). Whatever those signals catch is handled automatically.
 
 For an account they miss (a GitLab bot with an off-convention username) or a human reviewer you want the loop to triage, add one username per line to `reviewers.txt` in that plugin's data directory (`$CLAUDE_PLUGIN_DATA`, e.g. `~/.claude/plugins/data/github-bendrucker/reviewers.txt`). Blank lines and `#` comments are ignored, and the list only ever adds to the structural detection.
 

@@ -250,7 +250,7 @@ describe("bangExecutionMatcher", () => {
   it("ignores a :* glob matcher that no bang command uses", () => {
     const content = skill(
       '  - "Bash(git show :*:*)"\n  - "Bash(jq:*)"',
-      "- List: !`hunk session list`",
+      "- List: !`tuicr review list`",
     );
     const result = single(bangExecutionMatcher.check(content, ""));
     expect(result.passed).toBe(true);

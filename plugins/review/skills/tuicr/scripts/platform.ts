@@ -1,15 +1,15 @@
+import { deriveAnchor, type TuicrComment } from "./comment";
 import type { ParsedDiff } from "./diff";
-import { deriveAnchor, type HunkNote } from "./note";
 
 export type ValidationResult = { ok: true } | { ok: false; reason: string };
 
 /**
- * Pre-check that a note's anchor lands on a line the platform will accept.
- * Hunk allows anchoring on unchanged context lines outside the diff, which
+ * Pre-check that a comment's anchor lands on a line the platform will accept.
+ * tuicr allows anchoring on unchanged context lines outside the diff, which
  * GitHub rejects with 422 "Line could not be resolved".
  */
-export function validateInDiff(note: HunkNote, parsed: ParsedDiff): ValidationResult {
-  const anchor = deriveAnchor(note);
+export function validateInDiff(comment: TuicrComment, parsed: ParsedDiff): ValidationResult {
+  const anchor = deriveAnchor(comment);
   const fileDiff = parsed.get(anchor.path);
   if (!fileDiff) {
     return { ok: false, reason: `File ${anchor.path} is not in the diff` };
@@ -34,15 +34,15 @@ export type GitHubComment = {
   body: string;
 };
 
-/** Map a note to a GitHub review-comment payload. new-side -> RIGHT, old-side -> LEFT. */
-export function toGitHubComment(note: HunkNote, opts: { commitId: string }): GitHubComment {
-  const anchor = deriveAnchor(note);
+/** Map a comment to a GitHub review-comment payload. new-side -> RIGHT, old-side -> LEFT. */
+export function toGitHubComment(comment: TuicrComment, opts: { commitId: string }): GitHubComment {
+  const anchor = deriveAnchor(comment);
   return {
     path: anchor.path,
     line: anchor.line,
     side: anchor.side === "new" ? "RIGHT" : "LEFT",
     commit_id: opts.commitId,
-    body: note.body,
+    body: comment.content,
   };
 }
 
@@ -64,16 +64,16 @@ export type GitLabPosition = {
 };
 
 /**
- * Map a note to a GitLab discussion `position`. Sets `new_line` for new-side
+ * Map a comment to a GitLab discussion `position`. Sets `new_line` for new-side
  * anchors and `old_line` for old-side. `old_path` defaults to `new_path` when
  * the file is not a rename.
  */
 export function toGitLabPosition(
-  note: HunkNote,
+  comment: TuicrComment,
   refs: GitLabRefs,
   opts: { newPath: string; oldPath?: string },
 ): GitLabPosition {
-  const anchor = deriveAnchor(note);
+  const anchor = deriveAnchor(comment);
   const position: GitLabPosition = {
     position_type: "text",
     base_sha: refs.base_sha,

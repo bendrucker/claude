@@ -9,7 +9,7 @@ allowed-tools:
   - mcp__github
   - WebFetch
   - Skill(code-review)
-  - Skill(review:hunk)
+  - Skill(review:tuicr)
 ---
 
 # Peer Review
@@ -38,10 +38,11 @@ If not on the branch, first run `gh pr checkout` to switch.
    - **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations
    - **max**: rare — incident hotfix or change with extreme blast radius
 5. **Think** - Evaluate against priorities (see [priorities.md](priorities.md)), incorporating `/code-review` findings
-6. **Stage** - Open the PR diff in Hunk via `review:hunk` and seed proposed comments as agent notes. Capture the PR head SHA (and base/start SHAs for GitLab, from the MR `diff_refs`) for mapping. Skip staging entirely when approving with no comments.
-7. **Revise** - I curate in the Hunk pane: delete notes I reject, reword, and add my own at any line. The surviving set is what gets posted.
-8. **Map** - Read back the final set (`hunk session comment list --type all --json`) and map each note to a platform position with `review:hunk`'s mapping CLI (`mapping.ts map --platform <github|gitlab> --notes ... --diff ... --commit <sha>`). It runs the in-diff pre-check and returns `{ payloads, dropped }`; off-diff anchors land in `dropped` (GitHub rejects them with `422 "Line could not be resolved"`), so surface those to me rather than silently losing them.
-9. **Submit** - Show me the mapped set, then on my go post as one batch and choose Approve / Comment / Request Changes based on severity. GitHub: a pending review submitted as a batch. GitLab: draft notes published together.
+6. **Stage** - Open the PR diff in tuicr via `review:tuicr` (`tuicr pr <N>` for GitHub, `tuicr mr <N>` for GitLab) and seed proposed comments with `tuicr review add` (pass `--username` so they read as agent comments). Capture the PR head SHA (and base/start SHAs for GitLab, from the MR `diff_refs`) for mapping. Skip staging entirely when approving with no comments.
+7. **Revise** - I curate in the tuicr pane: delete comments I reject, reword, and add my own at any line. The surviving set is what gets posted.
+8. **Submit a GitHub PR yourself from the TUI** - For a GitHub PR you curated in the tuicr pane, the fastest path is tuicr's own `:submit` (Comment / Approve / Request changes / Draft), which posts a real PR review via `gh`. When that fits, skip the map-and-post steps below entirely. Claude maps and posts only for GitLab (tuicr cannot post to GitLab at all) or when the review runs headless with no TUI.
+9. **Map** - When Claude posts, read back the final set (`tuicr review comments --repo <repo> --session <slug>`) and map each comment to a platform position with `review:tuicr`'s mapping CLI (`mapping.ts map --platform <github|gitlab> --comments ... --diff ... --commit <sha>`). It runs the in-diff pre-check and returns `{ payloads, dropped }`. Off-diff anchors land in `dropped` (GitHub rejects them with `422 "Line could not be resolved"`), so surface those to me rather than silently losing them.
+10. **Post** - Show me the mapped set, then on my go post as one batch and choose Approve / Comment / Request Changes based on severity. GitHub: a pending review submitted as a batch. GitLab: draft notes published together.
 
 See [tone.md](tone.md) for comment style guidelines.
 
@@ -49,4 +50,4 @@ See [tone.md](tone.md) for comment style guidelines.
 
 This skill assumes GitHub. For GitLab merge requests, load `gitlab:merge-request` for the submission workflow; use `draft-note.ts submit` to publish draft notes with an optional summary and review decision.
 
-When Hunk is not running or I prefer to skip it, fall back to posting directly via `mcp__github` / `gh` / `glab`. On follow-up, resolution is native: resolve addressed threads on the platform (`review-threads.ts` for GitHub, the resolve flow in `gitlab:merge-request` for GitLab), not in Hunk.
+tuicr's own `:submit` is interactive and GitHub-only. When I curate a GitHub PR live in the pane, I submit it there and Claude posts nothing. Claude's programmatic path (`mcp__github` / `gh` / `glab`) covers the two cases tuicr can't: a GitLab MR (tuicr never posts to GitLab) and a headless GitHub run with no TUI. When tuicr is not running or I prefer to skip it, stage nothing and post directly the same way. On follow-up, resolution is native: resolve addressed threads on the platform (`review-threads.ts` for GitHub, the resolve flow in `gitlab:merge-request` for GitLab), not in tuicr.

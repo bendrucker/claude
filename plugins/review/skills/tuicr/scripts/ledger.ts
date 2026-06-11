@@ -3,15 +3,15 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
-import { type AnchorSide, decodeNotes, deriveAnchor, type HunkNote } from "./note";
+import { type CommentSide, decodeComments, deriveAnchor, type TuicrComment } from "./comment";
 
-export type { AnchorSide, HunkNote, NoteSource } from "./note";
+export type { CommentSide, TuicrComment } from "./comment";
 
 export interface LedgerRecord {
-  noteId: string;
-  filePath: string;
-  anchor: { side: AnchorSide; line: number };
-  body: string;
+  id: string;
+  path: string;
+  anchor: { side: CommentSide; line: number };
+  content: string;
   resolved: boolean;
   action?: string;
   ref?: string;
@@ -30,7 +30,7 @@ export interface ReconcileResult {
 }
 
 export function defaultLedgerDir(): string {
-  return join(homedir(), ".claude", "plugins", "data", "claude-review", "hunk-ledger");
+  return join(homedir(), ".claude", "plugins", "data", "claude-review", "tuicr-ledger");
 }
 
 function sanitize(value: string): string {
@@ -76,7 +76,7 @@ export class Ledger {
       return new Map();
     }
     const data = JSON.parse(await file.text()) as LedgerFile;
-    return new Map(data.records.map((record) => [record.noteId, record]));
+    return new Map(data.records.map((record) => [record.id, record]));
   }
 
   private async persist(): Promise<void> {
@@ -89,14 +89,14 @@ export class Ledger {
     await Bun.write(this.path, `${JSON.stringify(data, null, 2)}\n`);
   }
 
-  async upsert(note: HunkNote): Promise<LedgerRecord> {
-    const existing = this.records.get(note.noteId);
-    const anchor = deriveAnchor(note);
+  async upsert(comment: TuicrComment): Promise<LedgerRecord> {
+    const existing = this.records.get(comment.id);
+    const anchor = deriveAnchor(comment);
     const record: LedgerRecord = {
-      noteId: note.noteId,
-      filePath: note.filePath,
+      id: comment.id,
+      path: anchor.path,
       anchor: { side: anchor.side, line: anchor.line },
-      body: note.body,
+      content: comment.content,
       resolved: existing?.resolved ?? false,
       updatedAt: this.now(),
     };
@@ -106,18 +106,15 @@ export class Ledger {
     if (existing?.ref !== undefined) {
       record.ref = existing.ref;
     }
-    this.records.set(note.noteId, record);
+    this.records.set(comment.id, record);
     await this.persist();
     return record;
   }
 
-  async markResolved(
-    noteId: string,
-    info?: { action?: string; ref?: string },
-  ): Promise<LedgerRecord> {
-    const record = this.records.get(noteId);
+  async markResolved(id: string, info?: { action?: string; ref?: string }): Promise<LedgerRecord> {
+    const record = this.records.get(id);
     if (!record) {
-      throw new Error(`No ledger record for note ${noteId}`);
+      throw new Error(`No ledger record for comment ${id}`);
     }
     record.resolved = true;
     if (info?.action !== undefined) {
@@ -131,12 +128,12 @@ export class Ledger {
     return record;
   }
 
-  isResolved(noteId: string): boolean {
-    return this.records.get(noteId)?.resolved ?? false;
+  isResolved(id: string): boolean {
+    return this.records.get(id)?.resolved ?? false;
   }
 
-  get(noteId: string): LedgerRecord | undefined {
-    return this.records.get(noteId);
+  get(id: string): LedgerRecord | undefined {
+    return this.records.get(id);
   }
 
   all(): LedgerRecord[] {
@@ -151,9 +148,9 @@ export class Ledger {
     return this.all().filter((record) => record.resolved);
   }
 
-  reconcile(currentNoteIds: string[]): ReconcileResult {
-    const present = new Set(currentNoteIds);
-    const orphaned = this.all().filter((record) => !present.has(record.noteId));
+  reconcile(currentIds: string[]): ReconcileResult {
+    const present = new Set(currentIds);
+    const orphaned = this.all().filter((record) => !present.has(record.id));
     return { orphaned };
   }
 }
@@ -194,10 +191,10 @@ function printRecords(records: LedgerRecord[], asJson: boolean): void {
     return;
   }
   const rows = [
-    ["noteId", "file", "anchor", "status", "action", "ref"],
+    ["id", "file", "anchor", "status", "action", "ref"],
     ...records.map((r) => [
-      r.noteId,
-      r.filePath,
+      r.id,
+      r.path,
       `${r.anchor.side}:${r.anchor.line}`,
       r.resolved ? "resolved" : "open",
       r.action ?? "",
@@ -216,7 +213,7 @@ const storageFlags = {
 const resolveCmd = command(
   {
     name: "resolve",
-    parameters: ["<noteId>"],
+    parameters: ["<id>"],
     flags: {
       ...storageFlags,
       action: { type: String, description: "Action taken (e.g. applied)" },
@@ -228,8 +225,8 @@ const resolveCmd = command(
     const info: { action?: string; ref?: string } = {};
     if (parsed.flags.action !== undefined) info.action = parsed.flags.action;
     if (parsed.flags.ref !== undefined) info.ref = parsed.flags.ref;
-    const record = await ledger.markResolved(parsed._.noteId, info);
-    console.error(`Resolved ${record.noteId}`);
+    const record = await ledger.markResolved(parsed._.id, info);
+    console.error(`Resolved ${record.id}`);
   },
 );
 
@@ -240,11 +237,11 @@ const upsertCmd = command(
   },
   async (parsed) => {
     const ledger = await resolveLedger(parsed.flags);
-    const notes = decodeNotes(await Bun.stdin.text());
-    for (const note of notes) {
-      await ledger.upsert(note);
+    const comments = decodeComments(await Bun.stdin.text());
+    for (const comment of comments) {
+      await ledger.upsert(comment);
     }
-    console.error(`Upserted ${notes.length} note(s)`);
+    console.error(`Upserted ${comments.length} comment(s)`);
   },
 );
 
@@ -275,16 +272,16 @@ const reconcileCmd = command(
   async (parsed) => {
     const ledger = await resolveLedger(parsed.flags);
     const raw = (await Bun.stdin.text()).trim();
-    let noteIds: string[];
+    let ids: string[];
     if (raw.startsWith("[") || raw.startsWith("{")) {
-      noteIds = decodeNotes(raw).map((n) => n.noteId);
+      ids = decodeComments(raw).map((c) => c.id);
     } else {
-      noteIds = raw
+      ids = raw
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line !== "");
     }
-    const { orphaned } = ledger.reconcile(noteIds);
+    const { orphaned } = ledger.reconcile(ids);
     console.log(JSON.stringify(orphaned, null, 2));
   },
 );

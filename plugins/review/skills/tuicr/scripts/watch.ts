@@ -29,15 +29,7 @@ export function newComments(seen: Set<string>, comments: TuicrComment[]): TuicrC
  * longer resolve the slug) is the signal to stop, distinct from a readable session with no comments.
  */
 export function readComments(repo: string, slug: string): TuicrComment[] | null {
-  const result = Bun.spawnSync([
-    "tuicr",
-    "review",
-    "comments",
-    "--repo",
-    repo,
-    "--session",
-    slug,
-  ]);
+  const result = Bun.spawnSync(["tuicr", "review", "comments", "--repo", repo, "--session", slug]);
   if (!result.success) return null;
   try {
     return decodeComments(result.stdout.toString());

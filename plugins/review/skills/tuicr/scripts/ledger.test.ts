@@ -3,16 +3,19 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defaultLedgerDir, type HunkNote, Ledger } from "./ledger";
+import { defaultLedgerDir, Ledger, type TuicrComment } from "./ledger";
 
-function makeNote(overrides: Partial<HunkNote> = {}): HunkNote {
+function makeComment(overrides: Partial<TuicrComment> = {}): TuicrComment {
   return {
-    noteId: "user:1",
-    source: "user",
-    filePath: "src/index.ts",
-    newRange: [10, 12],
-    oldRange: null,
-    body: "needs a guard clause",
+    id: "c1",
+    location: "src/index.ts:10-12",
+    path: "src/index.ts",
+    start_line: 10,
+    end_line: 12,
+    side: "new",
+    comment_type: "issue",
+    lifecycle_state: "local_draft",
+    content: "needs a guard clause",
     ...overrides,
   };
 }
@@ -35,15 +38,15 @@ describe("Ledger", () => {
 
   test("round-trips records through persistence", async () => {
     const writer = await ledger();
-    await writer.upsert(makeNote());
+    await writer.upsert(makeComment());
 
     const reader = await ledger();
-    const record = reader.get("user:1");
+    const record = reader.get("c1");
     expect(record).toEqual({
-      noteId: "user:1",
-      filePath: "src/index.ts",
+      id: "c1",
+      path: "src/index.ts",
       anchor: { side: "new", line: 10 },
-      body: "needs a guard clause",
+      content: "needs a guard clause",
       resolved: false,
       updatedAt: "2026-06-01T00:00:00.000Z",
     });
@@ -51,86 +54,86 @@ describe("Ledger", () => {
 
   test("upsert, markResolved, isResolved", async () => {
     const led = await ledger();
-    await led.upsert(makeNote());
-    expect(led.isResolved("user:1")).toBe(false);
+    await led.upsert(makeComment());
+    expect(led.isResolved("c1")).toBe(false);
 
-    await led.markResolved("user:1", { action: "applied", ref: "abc123" });
-    expect(led.isResolved("user:1")).toBe(true);
+    await led.markResolved("c1", { action: "applied", ref: "abc123" });
+    expect(led.isResolved("c1")).toBe(true);
 
-    const record = led.get("user:1");
+    const record = led.get("c1");
     expect(record?.action).toBe("applied");
     expect(record?.ref).toBe("abc123");
   });
 
-  test("upsert does not un-resolve an already-resolved note", async () => {
+  test("upsert does not un-resolve an already-resolved comment", async () => {
     const led = await ledger();
-    await led.upsert(makeNote());
-    await led.markResolved("user:1");
-    expect(led.isResolved("user:1")).toBe(true);
+    await led.upsert(makeComment());
+    await led.markResolved("c1");
+    expect(led.isResolved("c1")).toBe(true);
 
-    await led.upsert(makeNote({ body: "edited body" }));
-    expect(led.isResolved("user:1")).toBe(true);
-    expect(led.get("user:1")?.body).toBe("edited body");
+    await led.upsert(makeComment({ content: "edited content" }));
+    expect(led.isResolved("c1")).toBe(true);
+    expect(led.get("c1")?.content).toBe("edited content");
   });
 
   test("first sight defaults resolved=false", async () => {
     const led = await ledger();
-    await led.upsert(makeNote());
+    await led.upsert(makeComment());
     expect(led.open()).toHaveLength(1);
     expect(led.resolved()).toHaveLength(0);
   });
 
   test("open and resolved partition records", async () => {
     const led = await ledger();
-    await led.upsert(makeNote({ noteId: "user:1" }));
-    await led.upsert(makeNote({ noteId: "user:2" }));
-    await led.markResolved("user:2");
+    await led.upsert(makeComment({ id: "c1" }));
+    await led.upsert(makeComment({ id: "c2" }));
+    await led.markResolved("c2");
 
-    expect(led.open().map((r) => r.noteId)).toEqual(["user:1"]);
-    expect(led.resolved().map((r) => r.noteId)).toEqual(["user:2"]);
+    expect(led.open().map((r) => r.id)).toEqual(["c1"]);
+    expect(led.resolved().map((r) => r.id)).toEqual(["c2"]);
   });
 
   test("reconcile detects an orphaned entry", async () => {
     const led = await ledger();
-    await led.upsert(makeNote({ noteId: "user:1" }));
-    await led.upsert(makeNote({ noteId: "user:2" }));
+    await led.upsert(makeComment({ id: "c1" }));
+    await led.upsert(makeComment({ id: "c2" }));
 
-    const { orphaned } = led.reconcile(["user:1"]);
-    expect(orphaned.map((r) => r.noteId)).toEqual(["user:2"]);
+    const { orphaned } = led.reconcile(["c1"]);
+    expect(orphaned.map((r) => r.id)).toEqual(["c2"]);
   });
 
-  test("reconcile reports nothing when all notes are present", async () => {
+  test("reconcile reports nothing when all comments are present", async () => {
     const led = await ledger();
-    await led.upsert(makeNote({ noteId: "user:1" }));
-    expect(led.reconcile(["user:1", "user:99"]).orphaned).toEqual([]);
+    await led.upsert(makeComment({ id: "c1" }));
+    expect(led.reconcile(["c1", "c99"]).orphaned).toEqual([]);
   });
 
   test("different branches use different files", async () => {
     const a = await ledger("feature-a");
     const b = await ledger("feature-b");
-    await a.upsert(makeNote({ noteId: "user:1" }));
+    await a.upsert(makeComment({ id: "c1" }));
 
     expect(a.filePath).not.toBe(b.filePath);
-    expect(b.get("user:1")).toBeUndefined();
+    expect(b.get("c1")).toBeUndefined();
     expect(b.all()).toHaveLength(0);
   });
 
-  test("anchors to old side when newRange is null", async () => {
+  test("anchors to old side when tuicr stamps it", async () => {
     const led = await ledger();
-    await led.upsert(makeNote({ noteId: "user:1", newRange: null, oldRange: [5, 8] }));
-    expect(led.get("user:1")?.anchor).toEqual({ side: "old", line: 5 });
+    await led.upsert(makeComment({ id: "c1", start_line: 5, end_line: 8, side: "old" }));
+    expect(led.get("c1")?.anchor).toEqual({ side: "old", line: 5 });
   });
 
-  test("upsert throws when note has neither range", async () => {
+  test("upsert throws when comment has no line anchor", async () => {
     const led = await ledger();
-    expect(led.upsert(makeNote({ newRange: null, oldRange: null }))).rejects.toThrow(
-      "note has no anchor",
+    expect(led.upsert(makeComment({ path: null, start_line: null }))).rejects.toThrow(
+      "comment has no anchor",
     );
   });
 
-  test("markResolved throws for unknown note", async () => {
+  test("markResolved throws for unknown comment", async () => {
     const led = await ledger();
-    expect(led.markResolved("user:404")).rejects.toThrow("No ledger record");
+    expect(led.markResolved("c404")).rejects.toThrow("No ledger record");
   });
 
   test("loads tolerantly when file is missing", async () => {
@@ -145,14 +148,14 @@ describe("Ledger", () => {
       branch: "feature/foo bar",
       now,
     });
-    await led.upsert(makeNote());
+    await led.upsert(makeComment());
     const name = led.filePath.slice(dir.length + 1);
     expect(name).toBe("owner-repo__feature-foo-bar.json");
   });
 
   test("persists pretty-printed JSON with trailing newline", async () => {
     const led = await ledger();
-    await led.upsert(makeNote());
+    await led.upsert(makeComment());
     const raw = await Bun.file(led.filePath).text();
     expect(raw.endsWith("\n")).toBe(true);
     expect(raw).toContain('  "records"');
@@ -160,7 +163,7 @@ describe("Ledger", () => {
 
   test("defaultLedgerDir points under the plugin data dir", () => {
     expect(defaultLedgerDir()).toContain(
-      join(".claude", "plugins", "data", "claude-review", "hunk-ledger"),
+      join(".claude", "plugins", "data", "claude-review", "tuicr-ledger"),
     );
   });
 });

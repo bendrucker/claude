@@ -1,6 +1,6 @@
 import { cli, command } from "cleye";
+import { decodeComments, type TuicrComment } from "./comment";
 import { parseDiff } from "./diff";
-import { decodeNotes, type HunkNote } from "./note";
 import { toGitHubComment, toGitLabPosition, validateInDiff } from "./platform";
 
 const mapCmd = command(
@@ -8,7 +8,7 @@ const mapCmd = command(
     name: "map",
     flags: {
       platform: { type: String, description: "Target platform: github or gitlab" },
-      notes: { type: String, description: "Path to notes JSON ({comments:[...]} or [...])" },
+      comments: { type: String, description: "Path to comments JSON ({comments:[...]} or [...])" },
       diff: { type: String, description: "Path to unified diff text" },
       commit: { type: String, description: "Head commit SHA" },
       base: { type: String, description: "Base SHA (gitlab)" },
@@ -16,14 +16,14 @@ const mapCmd = command(
     },
   },
   async (parsed) => {
-    const { platform, notes, diff, commit, base, start } = parsed.flags;
+    const { platform, comments, diff, commit, base, start } = parsed.flags;
 
     if (platform !== "github" && platform !== "gitlab") {
       console.error("--platform must be github or gitlab");
       return process.exit(1);
     }
-    if (notes === undefined || diff === undefined || commit === undefined) {
-      console.error("--notes, --diff, and --commit are required");
+    if (comments === undefined || diff === undefined || commit === undefined) {
+      console.error("--comments, --diff, and --commit are required");
       return process.exit(1);
     }
     if (platform === "gitlab" && (base === undefined || start === undefined)) {
@@ -31,10 +31,10 @@ const mapCmd = command(
       return process.exit(1);
     }
 
-    let noteList: HunkNote[];
+    let commentList: TuicrComment[];
     let diffText: string;
     try {
-      noteList = decodeNotes(await Bun.file(notes).text());
+      commentList = decodeComments(await Bun.file(comments).text());
       diffText = await Bun.file(diff).text();
     } catch (error) {
       console.error((error as Error).message);
@@ -43,26 +43,26 @@ const mapCmd = command(
 
     const parsedDiff = parseDiff(diffText);
     const payloads: unknown[] = [];
-    const dropped: { noteId: string; reason: string }[] = [];
+    const dropped: { id: string; reason: string }[] = [];
 
-    for (const note of noteList) {
-      const result = validateInDiff(note, parsedDiff);
+    for (const comment of commentList) {
+      const result = validateInDiff(comment, parsedDiff);
       if (!result.ok) {
-        dropped.push({ noteId: note.noteId, reason: result.reason });
+        dropped.push({ id: comment.id, reason: result.reason });
         continue;
       }
       if (platform === "github") {
-        payloads.push(toGitHubComment(note, { commitId: commit }));
-      } else if (base !== undefined && start !== undefined) {
-        const fileDiff = parsedDiff.get(note.filePath);
-        const opts: { newPath: string; oldPath?: string } = { newPath: note.filePath };
+        payloads.push(toGitHubComment(comment, { commitId: commit }));
+      } else if (base !== undefined && start !== undefined && comment.path !== null) {
+        const fileDiff = parsedDiff.get(comment.path);
+        const opts: { newPath: string; oldPath?: string } = { newPath: comment.path };
         if (fileDiff?.oldPath !== undefined) opts.oldPath = fileDiff.oldPath;
         const position = toGitLabPosition(
-          note,
+          comment,
           { base_sha: base, head_sha: commit, start_sha: start },
           opts,
         );
-        payloads.push({ body: note.body, position });
+        payloads.push({ body: comment.content, position });
       }
     }
 

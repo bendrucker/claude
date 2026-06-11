@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { TuicrComment } from "./comment";
 import { parseDiff } from "./diff";
-import type { HunkNote } from "./note";
 import { toGitHubComment, toGitLabPosition, validateInDiff } from "./platform";
 
 const SETTINGS_DIFF = `diff --git a/user/settings.json b/user/settings.json
@@ -27,49 +27,59 @@ index 1111111..2222222 100644
  keep two
  keep three`;
 
-function note(overrides: Partial<HunkNote>): HunkNote {
+function comment(overrides: Partial<TuicrComment>): TuicrComment {
   return {
-    noteId: "user:1",
-    source: "user",
-    filePath: "user/settings.json",
-    hunkIndex: 0,
-    newRange: null,
-    oldRange: null,
-    body: "comment",
+    id: "c1",
+    location: "user/settings.json:150",
+    path: "user/settings.json",
+    start_line: null,
+    end_line: null,
+    side: "new",
+    comment_type: "issue",
+    lifecycle_state: "local_draft",
+    content: "comment",
     ...overrides,
   };
 }
 
 describe("validateInDiff", () => {
-  test("accepts a note on a changed new-side line", () => {
+  test("accepts a comment on a changed new-side line", () => {
     const parsed = parseDiff(SETTINGS_DIFF);
-    expect(validateInDiff(note({ newRange: [150, 150] }), parsed)).toEqual({ ok: true });
+    expect(
+      validateInDiff(comment({ start_line: 150, end_line: 150, side: "new" }), parsed),
+    ).toEqual({ ok: true });
   });
 
   test("rejects an off-diff anchor", () => {
     const parsed = parseDiff(SETTINGS_DIFF);
-    const result = validateInDiff(note({ newRange: [1, 1] }), parsed);
+    const result = validateInDiff(comment({ start_line: 1, end_line: 1, side: "new" }), parsed);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toContain("line 1");
   });
 
   test("accepts an old-side deletion anchor", () => {
     const parsed = parseDiff(DELETION_DIFF);
-    expect(validateInDiff(note({ filePath: "old.txt", oldRange: [11, 11] }), parsed)).toEqual({
-      ok: true,
-    });
+    expect(
+      validateInDiff(
+        comment({ path: "old.txt", start_line: 11, end_line: 11, side: "old" }),
+        parsed,
+      ),
+    ).toEqual({ ok: true });
   });
 
   test("rejects a file not present in the diff", () => {
     const parsed = parseDiff(SETTINGS_DIFF);
-    const result = validateInDiff(note({ filePath: "missing.ts", newRange: [5, 5] }), parsed);
+    const result = validateInDiff(
+      comment({ path: "missing.ts", start_line: 5, end_line: 5, side: "new" }),
+      parsed,
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toContain("not in the diff");
   });
 
   test("rejects an anchor one line past a newline-terminated hunk", () => {
     const parsed = parseDiff(`${SETTINGS_DIFF}\n`);
-    const result = validateInDiff(note({ newRange: [154, 154] }), parsed);
+    const result = validateInDiff(comment({ start_line: 154, end_line: 154, side: "new" }), parsed);
     expect(result.ok).toBe(false);
   });
 
@@ -84,9 +94,9 @@ index 1111111..2222222 100644
  trailing
 `;
     const parsed = parseDiff(diff);
-    expect(validateInDiff(note({ filePath: "a.txt", newRange: [2, 2] }), parsed)).toEqual({
-      ok: true,
-    });
+    expect(
+      validateInDiff(comment({ path: "a.txt", start_line: 2, end_line: 2, side: "new" }), parsed),
+    ).toEqual({ ok: true });
   });
 
   test("accepts a deleted line whose text starts with ---", () => {
@@ -100,15 +110,19 @@ index 1111111..2222222 100644
  trailing
 `;
     const parsed = parseDiff(diff);
-    expect(validateInDiff(note({ filePath: "b.txt", oldRange: [2, 2] }), parsed)).toEqual({
-      ok: true,
-    });
+    expect(
+      validateInDiff(comment({ path: "b.txt", start_line: 2, end_line: 2, side: "old" }), parsed),
+    ).toEqual({ ok: true });
   });
 });
 
 describe("toGitHubComment", () => {
-  test("maps a new-side note to RIGHT", () => {
-    expect(toGitHubComment(note({ newRange: [150, 150] }), { commitId: "abc123" })).toEqual({
+  test("maps a new-side comment to RIGHT", () => {
+    expect(
+      toGitHubComment(comment({ start_line: 150, end_line: 150, side: "new" }), {
+        commitId: "abc123",
+      }),
+    ).toEqual({
       path: "user/settings.json",
       line: 150,
       side: "RIGHT",
@@ -119,7 +133,9 @@ describe("toGitHubComment", () => {
 
   test("maps an old-side deletion to LEFT", () => {
     expect(
-      toGitHubComment(note({ filePath: "old.txt", oldRange: [11, 11] }), { commitId: "abc123" }),
+      toGitHubComment(comment({ path: "old.txt", start_line: 11, end_line: 11, side: "old" }), {
+        commitId: "abc123",
+      }),
     ).toEqual({
       path: "old.txt",
       line: 11,
@@ -133,9 +149,11 @@ describe("toGitHubComment", () => {
 describe("toGitLabPosition", () => {
   const refs = { base_sha: "base", head_sha: "head", start_sha: "start" };
 
-  test("sets new_line for a new-side note and defaults old_path to new_path", () => {
+  test("sets new_line for a new-side comment and defaults old_path to new_path", () => {
     expect(
-      toGitLabPosition(note({ newRange: [150, 150] }), refs, { newPath: "user/settings.json" }),
+      toGitLabPosition(comment({ start_line: 150, end_line: 150, side: "new" }), refs, {
+        newPath: "user/settings.json",
+      }),
     ).toEqual({
       position_type: "text",
       base_sha: "base",
@@ -149,9 +167,13 @@ describe("toGitLabPosition", () => {
 
   test("sets old_line for an old-side deletion", () => {
     expect(
-      toGitLabPosition(note({ filePath: "old.txt", oldRange: [11, 11] }), refs, {
-        newPath: "old.txt",
-      }),
+      toGitLabPosition(
+        comment({ path: "old.txt", start_line: 11, end_line: 11, side: "old" }),
+        refs,
+        {
+          newPath: "old.txt",
+        },
+      ),
     ).toEqual({
       position_type: "text",
       base_sha: "base",
@@ -165,10 +187,14 @@ describe("toGitLabPosition", () => {
 
   test("carries distinct old_path for a rename", () => {
     expect(
-      toGitLabPosition(note({ filePath: "src/new-name.ts", newRange: [7, 7] }), refs, {
-        newPath: "src/new-name.ts",
-        oldPath: "src/old-name.ts",
-      }),
+      toGitLabPosition(
+        comment({ path: "src/new-name.ts", start_line: 7, end_line: 7, side: "new" }),
+        refs,
+        {
+          newPath: "src/new-name.ts",
+          oldPath: "src/old-name.ts",
+        },
+      ),
     ).toEqual({
       position_type: "text",
       base_sha: "base",

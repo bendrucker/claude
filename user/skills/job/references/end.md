@@ -16,8 +16,9 @@ Dispatch parallel read-only sub-agents:
 Everything pushed today should leave tonight with:
 
 - A reviewer assigned. Assigning one is safe; respect any reviewer conventions in the config notes.
-- A self-review pass before anything new goes out for review. Delegate to an installed code-review skill.
 - A body that matches the current diff. When commits have outrun the description, delegate to an installed PR-update skill.
+
+A PR/MR sitting without a reviewer is usually deliberate: doubt about the approach, a blocker, a dependency. Surface it with the likely reason and ask for the next step rather than defaulting to another review pass. Offer a self-review via an installed code-review skill only when the user wants one before sending.
 
 Flag items that need collaboration lead time (a reviewer in another timezone, a long CI run) so they go out tonight rather than tomorrow morning.
 
@@ -31,6 +32,8 @@ Review debt is inbound requests you did not reach today plus unanswered threads 
 Never silently drop an item.
 
 ## Unpushed Work Sweep
+
+The configured roots may span many repositories, so keep this phase cheap: one sub-agent, local git commands only, no platform API calls. This is the lowest-priority phase. Skip it when the focus hint points elsewhere or the rest of the brief already needs the time.
 
 Enumerate worktrees via the configured worktree tool. Fall back to `git worktree list` run across the configured roots. For each worktree, report:
 

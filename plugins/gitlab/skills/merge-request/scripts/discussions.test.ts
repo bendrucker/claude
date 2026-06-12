@@ -66,7 +66,9 @@ describe("filterDiscussions", () => {
 
   it("keeps structural bots and listed reviewers with bots", () => {
     const discussions = [
-      makeDiscussion("1", { author: { username: "group_123_bot" } }),
+      makeDiscussion("1", {
+        author: { username: "group_108656794_bot_52b7e4c7a732080fa3b51efe36863e09" },
+      }),
       makeDiscussion("2", { author: { username: "coderabbitai" } }),
       makeDiscussion("3", { author: { username: "alice" } }),
     ];

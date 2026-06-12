@@ -28,6 +28,10 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 
 Three output formats are supported: `json` (default), `digest`, and `table`.
 
+To filter `--author` to yourself, resolve your username with `glab api user 2>/dev/null | jq -r .username`. The `glab api user --jq .username` form returns empty on glab 1.102.0.
+
+The script resolves the project from the current directory's git remote. Run it from a checkout of the MR's repo; from an unrelated directory it returns `[]`.
+
 #### JSON output schema
 
 The default (`--format json`) is a flat array of summary objects, one per discussion (the first note of each thread). It is not the raw GitLab `{ notes: [...] }` shape, so query the top-level fields directly.
@@ -44,6 +48,14 @@ The default (`--format json`) is a flat array of summary objects, one per discus
 | `lineRange` | `{ start, end }` or `null` | `null` for single-line and non-positioned comments |
 
 `file` and `line` are omitted entirely for general (non-inline) discussions, so handle them as optional. `lineRange` is always present but is `null` unless the comment spans multiple lines.
+
+The summary flattens each thread to its **first note only**. To see the author's replies or the full thread, fetch the raw payload, which keeps every note:
+
+```bash
+glab api "projects/:id/merge_requests/<iid>/discussions?per_page=100" 2>/dev/null
+```
+
+A GitLab "reply" that is a `changed line in version N` system note (`notes[].system == true`) is not a substantive response. Filter those out before treating a thread as answered.
 
 #### Compact triage
 

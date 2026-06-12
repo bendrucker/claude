@@ -5,7 +5,7 @@ import { join } from "node:path";
 type StateStore = Record<string, string>;
 
 function getStateFilePath(): string {
-  return join(tmpdir(), "claude-newline-state.json");
+  return process.env.CLAUDE_NEWLINE_STATE_FILE ?? join(tmpdir(), "claude-newline-state.json");
 }
 
 async function readStore(): Promise<StateStore> {

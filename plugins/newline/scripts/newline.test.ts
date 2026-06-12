@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +13,11 @@ import { processInput as ensureInput, ensureTrailingNewline } from "./ensure";
 import { processInput as preserveInput, preserveNewlineState } from "./preserve";
 import { clearAllState, clearState, getState, setState } from "./state";
 
-const testDir = join(tmpdir(), "newline-test");
+// Isolate fixtures and state per test process so concurrent suites (prek runs many
+// at once) don't collide on shared /tmp paths.
+const testRoot = mkdtempSync(join(tmpdir(), "newline-test-"));
+const testDir = join(testRoot, "fixtures");
+process.env.CLAUDE_NEWLINE_STATE_FILE = join(testRoot, "state.json");
 
 function mockPreToolInput(filePath: string): PreToolUseHookInput {
   return {

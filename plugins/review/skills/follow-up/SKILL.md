@@ -21,10 +21,9 @@ Follow up on my review of: $ARGUMENTS
 empty, resolve the target from the current branch's open PR/MR before anything else (see [Resolve
 Target](#resolve-target)). Only ask me to paste a URL when that resolution genuinely fails.
 
-A `--on-behalf-of <reviewer>` flag may appear with or without a URL. It selects the unattended
-monitoring loop that re-approves in `<reviewer>`'s name (see [Trust Gate](#trust-gate-on-behalf-of-mode)).
-Strip the flag, resolve the URL from whatever remains (URL or branch), and gate before arming. Without
-the flag, follow-up is interactive and the gate never runs.
+A `--on-behalf-of <reviewer>` flag selects a trust-gated, unattended loop that auto-re-approves in
+`<reviewer>`'s name as fixes land. See [references/on-behalf-of.md](references/on-behalf-of.md) for
+the procedure. Without the flag, follow-up is interactive.
 
 You are the reviewer. The question is not "did the author reply?" but "did the fix actually grasp
 each concern, or just go through the motions?" Status is a signal. The code is the verdict.
@@ -187,65 +186,6 @@ A graded call:
 Name the minor-nit lane explicitly: approving while requesting trivial follow-ups is a real option,
 not a forced choice between approve and block.
 
-### Trust Gate (on-behalf-of mode)
-
-This gate exists only for `--on-behalf-of <reviewer>`: a monitoring loop that watches for new
-commits and auto-re-approves in another reviewer's name, without a human in the loop on each pass.
-Normal interactive follow-up, where I review my own threads and decide each call, is unaffected and
-never touches this gate.
-
-The gate must clear before the loop arms, so it runs ahead of [Execute Actions](#execute-actions).
-Any approval the loop fires depends on it.
-
-#### Why the gate exists
-
-The threat is approval forgery via commit-matching. The loop approves when a new commit addresses the
-remaining open threads. On a public repo, anyone able to push a matching commit (a fork
-PR author, an outside contributor) could trigger an approval recorded in the named reviewer's
-identity. The reviewer never saw the code. Restricting the loop to private and internal repos
-collapses the population that can push a triggering commit down to vetted members of the org, so a
-commit that fires the loop came from someone already trusted.
-
-#### Detecting visibility
-
-Use the same idiom as `review:peer` (see its [corporate](../peer/references/corporate.md) context):
-
-- GitHub: `gh api repos/OWNER/REPO --jq .visibility`
-- GitLab: `glab api projects/ENCODED_PATH | jq -r .visibility`
-
-Trust `private` and `internal`. Treat `public` as untrusted.
-
-#### Refusal
-
-If visibility is `public`, do not arm the loop, do not approve, and do not post the monitoring
-footer. Explain that auto-re-approval in someone else's name is unsafe on a public repo (see [Why the
-gate exists](#why-the-gate-exists)), and offer a gated single-shot review instead: run the normal
-follow-up assessment once and hand me the graded call to act on myself.
-
-Fail closed. If the API call can't determine visibility for any reason, refuse the same way. Never
-assume private.
-
-### Behalf-of Monitoring Loop
-
-This is the sanctioned exception to the "don't approve automatically" guardrail, and the [Trust
-Gate](#trust-gate-on-behalf-of-mode) is what bounds it.
-
-Gate once, at arm time. Run the [Trust Gate](#trust-gate-on-behalf-of-mode) before the first watch.
-If it refuses, stop here. If it clears, arm the loop and don't re-gate on every commit (visibility
-doesn't change mid-session).
-
-Drive iteration with the `Monitor` tool watching the author's commits, the same session-scoped
-watcher model `pull-request:babysit` uses. On each new commit, reuse the existing pipeline unchanged:
-[Classify Threads](#classify-threads), then [Assess Fixes](#assess-fixes), ending in the graded call.
-When a commit addresses the remaining open threads, run [Execute Actions](#execute-actions) to approve
-in the reviewer's name.
-
-Like babysit, the watcher is session-scoped: when the session ends, the watcher process ends with it.
-Re-invoke the skill from a new session to resume monitoring.
-
-The approval footer must name the trust basis, for example: "Monitoring on <reviewer>'s behalf;
-private repo, vetted pushers."
-
 ### Execute Actions
 
 After I decide on next steps, use platform-appropriate commands:
@@ -269,6 +209,4 @@ Approve, resolve or unresolve threads, and comment via the `gitlab:merge-request
 - **Sync before judging**: never assess stale local state. Fetch and diff against origin first.
 - **Status is a signal, the code is the verdict**: a mismatch between the two is a finding, not noise.
 - **Intent over words**: distinguish a fix that meets the concern from one that mechanically satisfies its literal wording.
-- **Behalf-of approval is private/internal only**: auto-re-approval on another reviewer's behalf is allowed only on `private` or `internal` repos. Never approve in someone else's name on a public repo. This loop is the one sanctioned exception to "don't approve automatically", and the [Trust Gate](#trust-gate-on-behalf-of-mode) is the bound that earns it.
-- **Public repo means refuse**: on a public repo, refuse the behalf-of loop and fall back to a gated single-shot review.
-- **Undeterminable visibility fails closed**: if the platform won't yield a visibility, refuse. Never assume private.
+- **Behalf-of approval is private/internal only**: auto-re-approval on another reviewer's behalf ([references/on-behalf-of.md](references/on-behalf-of.md)) is allowed only on `private` or `internal` repos, never in someone else's name on a public repo. Fail closed if visibility is undeterminable.

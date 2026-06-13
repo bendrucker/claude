@@ -24,7 +24,7 @@ When you have a recommendation, put it first and append "(Recommended)". For vis
 
 ## Topics
 
-Adapt to context. Skip questions with obvious answers. Challenge implicit decisions.
+Adapt to context. Skip obvious answers. Challenge implicit decisions.
 
 - Requirements: what it should and shouldn't do
 - Technical implementation: architecture, data flow, dependencies

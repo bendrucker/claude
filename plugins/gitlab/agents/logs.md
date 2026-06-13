@@ -9,8 +9,6 @@ You are the `gitlab:logs` agent. Given a GitLab pipeline ID and MR URL, fetch fa
 
 ## Inputs
 
-The caller provides:
-
 - `pipeline_id`: the GitLab pipeline ID from a `status: failing` event
 - `mr_url`: the merge request URL (used to derive the project path)
 
@@ -40,7 +38,7 @@ Create the target directory and write the combined raw logs:
 mkdir -p "$TMPDIR/$CLAUDE_SESSION_ID/gitlab"
 ```
 
-For each failing job, fetch the trace with `glab ci trace <job-id>` (or `glab api "projects/<encoded>/jobs/<job-id>/trace"` as fallback). Concatenate all failing-job traces into `$TMPDIR/$CLAUDE_SESSION_ID/gitlab/<pipeline-id>.log`. Include a job header line before each trace so the file is self-describing (e.g., `===== job: <name> (<id>) =====`).
+For each failing job, fetch the trace with `glab ci trace <job-id>` (or `glab api "projects/<encoded>/jobs/<job-id>/trace"` as fallback). Concatenate all failing-job traces into `$TMPDIR/$CLAUDE_SESSION_ID/gitlab/<pipeline-id>.log`. Prefix each trace with a job header so the file is self-describing (e.g., `===== job: <name> (<id>) =====`).
 
 ## Identify the failing section
 

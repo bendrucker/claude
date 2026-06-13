@@ -60,7 +60,7 @@ glab api groups/<group>/merge_requests --paginate -f state=opened -f author_id=<
 
 ### Triage
 
-For each MR, use `AskUserQuestion` to determine next steps (e.g., follow up on review, rebase, close).
+For each MR, use `AskUserQuestion` for next steps (e.g., follow up on review, rebase, close).
 
 ## Evening Variant
 

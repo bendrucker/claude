@@ -27,7 +27,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --reply-to <discussio
 bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> --resolve --body-file tmp/note.md
 ```
 
-Positioned comments are validated against the MR diff before posting. If a line is not within a diff hunk, the command exits with an error showing valid line ranges.
+Positioned comments are validated against the MR diff before posting. If a line is not within a diff hunk, the command exits with an error showing the valid line ranges.
 
 ### Batch Review
 
@@ -60,7 +60,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts list <iid>
 
 ### Submit Review
 
-Publish all draft notes and optionally set a review decision. GitLab's REST API has no atomic "submit review" endpoint, so this runs up to three sequential calls: bulk publish, summary comment, and decision.
+Publish all draft notes and optionally set a review decision. GitLab's REST API has no atomic "submit review" endpoint, so this runs up to three sequential calls: bulk publish, summary comment, decision.
 
 ```bash
 # Publish only (equivalent to "Comment" in web UI)
@@ -108,12 +108,12 @@ third line
 ## API Pitfalls
 
 - **Content-Type required**: `glab api --input <file>` requires `-H "Content-Type: application/json"`. Without it, GitLab returns HTTP 415.
-- **No nested `-f` fields**: `glab api -f "position[base_sha]=..."` silently fails. Nested objects must be sent as JSON via `--input`.
+- **No nested `-f` fields**: `glab api -f "position[base_sha]=..."` silently fails. Send nested objects as JSON via `--input`.
 - **Reply field**: Use `in_reply_to_discussion_id`, not `discussion_id`.
 - **Don't update positioned notes**: PUT to update a draft note strips the position. Delete and recreate instead.
 - **No atomic review submit**: The REST API's `bulk_publish` only publishes drafts (no summary comment or review decision). The web UI uses an internal controller that combines all three, but it's session-authenticated only. The `submit` command above sequences the calls separately.
 - **Review state is GraphQL-only**: See [review-state.md](review-state.md) for mutations (`mergeRequestRequestChanges`, `mergeRequestDestroyRequestedChanges`) and querying review state. Key: `projectPath` is `ID!` not `String!`, caller must be assigned as reviewer, requires Premium/Ultimate.
-- **Range comments need `new_line`**: `line_range` alone is rejected ("position is incomplete"). Always set `new_line` to the range end line. The comment anchors at this line in the UI.
+- **Range comments need `new_line`**: `line_range` alone is rejected ("position is incomplete"). Set `new_line` to the range end line; the comment anchors there in the UI.
 
 ## Discussions
 

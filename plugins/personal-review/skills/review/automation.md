@@ -4,7 +4,7 @@ Future automation for common patterns.
 
 ## Auto-Handle Candidates
 
-Patterns that could be handled without user input:
+Patterns handleable without user input:
 
 ### GitHub
 
@@ -43,8 +43,8 @@ To enable automation, log decisions:
 }
 ```
 
-Pattern detection from logged decisions enables smart defaults.
+Pattern detection from logged decisions enables defaults.
 
 ## Not Yet Implemented
 
-This file documents extension points. No automation is active yet. All items require user decision.
+No automation is active yet. All items require user decision.

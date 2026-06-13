@@ -46,7 +46,7 @@ if (archiveBox) {
 
 ## Batch Archiving
 
-Process in reverse index order to avoid index shifting:
+Process in reverse index order to avoid index shifting.
 
 ```javascript
 for (var i = toArchive.length - 1; i >= 0; i--) {
@@ -56,5 +56,5 @@ for (var i = toArchive.length - 1; i >= 0; i--) {
 
 ## Gmail Notes
 
-- "All Mail" may appear as `[Gmail]/All Mail` or just `All Mail` depending on IMAP config
-- Test with a single message first before batch operations
+- "All Mail" may appear as `[Gmail]/All Mail` or `All Mail` depending on IMAP config
+- Test with a single message before batch operations

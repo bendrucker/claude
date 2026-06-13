@@ -10,7 +10,7 @@ Load the `github:notifications` skill. Query active notifications (not done).
 
 Before presenting notifications for triage, auto-handle these patterns and report counts.
 
-**Read mentions:** Filter notifications where `reason == "MENTION"` and `isUnread == false`. Bulk mark done:
+**Read mentions:** Filter where `reason == "MENTION"` and `isUnread == false`. Bulk mark done:
 
 ```bash
 ... --jq '[... | select(.reason == "MENTION" and .isUnread == false)] | .[].summaryId' | \
@@ -29,7 +29,7 @@ If count > 0, auto-mark the notification done. Report: "Auto-marked N already-re
 
 ## Group by Reason
 
-Present groups in priority order — action needed first, then engagement, then informational.
+Present in priority order — action needed first, then engagement, then informational.
 
 | Priority | Reason | Typical Actions |
 |----------|--------|-----------------|

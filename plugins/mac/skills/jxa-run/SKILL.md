@@ -15,7 +15,7 @@ hooks:
 
 # Run JXA
 
-Run the JXA expression or script file provided in the arguments. `$0` is the app name, remaining arguments are passed to the runner.
+Run the JXA expression or script file from the arguments. `$0` is the app name; remaining arguments pass to the runner.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts $ARGUMENTS

@@ -67,7 +67,7 @@ What the feature does and a concrete explanation of why this user should care.
 * **things:** Store tag mappings in the plugin data directory so they persist across plugin updates, eliminating the need to re-configure after each update.
 ```
 
-**Bug Fixes, Performance, Quality of Life**: Summarize each category in 2-3 sentences highlighting the most impactful changes. Don't list every entry. The goal is to extract what's useful, not mirror the changelog. If the user asks about a specific area, then go deeper on that area.
+**Bug Fixes, Performance, Quality of Life**: Summarize each category in 2-3 sentences highlighting the most impactful changes. Don't list every entry. Extract what's useful, not mirror the changelog. If the user asks about a specific area, go deeper there.
 
 ## Gotchas
 

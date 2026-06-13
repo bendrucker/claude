@@ -32,7 +32,7 @@ hooks:
 
 # PR Review Comments
 
-Fetch unresolved review threads from a GitHub pull request, filtered for context efficiency. Avoids flooding the context with resolved threads. Outdated threads are included but marked.
+Fetch unresolved review threads from a GitHub pull request, filtered for context efficiency: resolved threads are excluded, outdated threads included but marked.
 
 ## Usage
 
@@ -49,13 +49,13 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts <pr-url> [--role author|reviewe
 
 ## Role
 
-- **author** (default when authenticated user is the PR author): shows all unresolved threads, the feedback that needs addressing.
-- **reviewer** (default when authenticated user is not the PR author): shows only unresolved threads started by the authenticated user, to check whether comments have been resolved.
+- **author** (default when authenticated user is the PR author): all unresolved threads, the feedback that needs addressing.
+- **reviewer** (default when authenticated user is not the PR author): only unresolved threads started by the authenticated user, to check whether comments have been resolved.
 
 ## Since
 
-- `last-review`: Scopes to threads with activity since the last relevant review.
-  - As author: since the most recent review by a human other than you (bot reviews are excluded)
+- `last-review`: threads with activity since the last relevant review.
+  - As author: since the most recent review by a human other than you (bot reviews excluded)
   - As reviewer: since your most recent submitted review
 - ISO date: explicit cutoff (e.g., `2025-01-15`)
 
@@ -65,7 +65,7 @@ Compact markdown grouped by file with line numbers and full comment bodies, enou
 
 ## Replying and Resolving
 
-Reply to and resolve threads through the `addPullRequestReviewThreadReply` and `resolveReviewThread` mutations, addressing a thread by the `id` from the fetch output.
+Reply to and resolve threads via the `addPullRequestReviewThreadReply` and `resolveReviewThread` mutations, addressing a thread by the `id` from the fetch output.
 
 ```bash
 # Reply, or reply and resolve in one call

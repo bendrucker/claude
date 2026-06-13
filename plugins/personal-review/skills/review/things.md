@@ -29,7 +29,7 @@ For each batch, use `AskUserQuestion`:
 Load the `things:url` skill for mutations:
 - Use `update` to set `when`, `list-id`, or `tags`
 - Use `add` to create follow-ups if breaking down tasks
-- For quick-do items, mark complete or just tell user to do it now
+- For quick-do items, mark complete or tell user to do it now
 
 ## Goal
 

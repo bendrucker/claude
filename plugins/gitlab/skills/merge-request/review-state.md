@@ -123,7 +123,7 @@ The REST queue (`scope=reviews_for_me`) reports every reviewer as `active`, so i
 }
 ```
 
-Keep nodes where the reviewer whose `username` equals `currentUser.username` has `reviewState === "UNREVIEWED"`. That is the canonical "awaiting my first review" bucket, the analog of GitHub's `gh search prs --review-requested=@me`. [`scripts/review-queue.ts`](scripts/review-queue.ts) runs the query and applies the filter, emitting `[{ url, reference, title }]` as JSON:
+Keep nodes where the reviewer whose `username` equals `currentUser.username` has `reviewState === "UNREVIEWED"`. That is the canonical "awaiting my first review" bucket, the analog of GitHub's `gh search prs --review-requested=@me`. [`scripts/review-queue.ts`](scripts/review-queue.ts) runs the query and filter, emitting `[{ url, reference, title }]` as JSON:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
@@ -142,4 +142,4 @@ The cross-project queue above filters to `UNREVIEWED`. To triage everything you 
 
 The API never returns `REVIEWED`; the web UI's "Reviewed" label maps to `REVIEW_STARTED` or `REQUESTED_CHANGES`.
 
-A re-request ([`mergeRequestReviewerRereview`](#re-request-review)) resets your entry to `UNREVIEWED` and re-surfaces the MR. Triage off `reviewState` rather than the GitLab todos inbox: a dismissed todo does not mean the review is handled, and re-requests do not reliably regenerate one.
+A re-request ([`mergeRequestReviewerRereview`](#re-request-review)) resets your entry to `UNREVIEWED` and re-surfaces the MR. Triage off `reviewState`, not the GitLab todos inbox: a dismissed todo does not mean the review is handled, and re-requests do not reliably regenerate one.

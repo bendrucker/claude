@@ -16,7 +16,7 @@ Each sub-agent uses the delegated skill or CLI for its source and returns struct
 
 Order items blocking others first, then oldest.
 
-Separate fresh requests from re-reviews where the author responded to your earlier feedback. For re-reviews, delegate the addressed-or-not analysis to an installed review-follow-up skill if one exists. Otherwise compare the threads against your prior comments yourself.
+Separate fresh requests from re-reviews where the author responded to your earlier feedback. For re-reviews, delegate the addressed-or-not analysis to an installed review-follow-up skill if one exists. Otherwise compare the threads against your prior comments.
 
 Recommended actions per item:
 

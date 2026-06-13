@@ -21,7 +21,7 @@ Use `glab ci --help` and `glab ci <command> --help` for full options.
 
 ## Debugging Failures
 
-- `glab ci view` - Interactive view of pipeline jobs (can also trace/retry from here)
+- `glab ci view` - Interactive view of pipeline jobs (trace/retry from here too)
 - `glab ci trace <job-id>` - Stream job logs in real-time
 - `glab ci retry <job-id>` - Retry a failed job
 

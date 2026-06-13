@@ -30,7 +30,7 @@ Import from the versioned semconv package (e.g., `go.opentelemetry.io/otel/semco
 
 ## Status
 
-Only set status on errors: `span.SetStatus(codes.Error, err.Error())`. Never set `Ok` — unset is the success state. Call `RecordError` alongside `SetStatus` (it only adds a span event, doesn't change status).
+Only set status on errors: `span.SetStatus(codes.Error, err.Error())`. Never set `Ok` — unset is the success state. Call `RecordError` alongside `SetStatus`; it only adds a span event, doesn't change status.
 
 For HTTP: 4xx is `Error` on client spans, `Unset` on server spans. 5xx is always `Error`.
 

@@ -4,10 +4,10 @@
 
 ## Conflict Resolution
 
-Regenerate from scratch:
+Regenerate:
 
 ```bash
 rm bun.lock && bun install
 ```
 
-Do **not** use `git checkout origin/main -- bun.lock && bun install`. This produces empty integrity hashes for platform-specific packages (e.g., `@img/sharp-libvips-linux-x64`), breaking CI on other platforms.
+Do **not** use `git checkout origin/main -- bun.lock && bun install` — it produces empty integrity hashes for platform-specific packages (e.g., `@img/sharp-libvips-linux-x64`), breaking CI on other platforms.

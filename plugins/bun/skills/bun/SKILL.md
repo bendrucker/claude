@@ -7,13 +7,13 @@ description: Bun runtime patterns. Use when running bun commands, working with p
 
 ## bunx
 
-Use `--bun` before the executable name to force the Bun runtime over Node shebangs. Use `-p`/`--package` when the binary name differs from the package name (e.g., `bunx -p @angular/cli ng`).
+Put `--bun` before the executable name to force the Bun runtime over Node shebangs. Use `-p`/`--package` when the binary name differs from the package name (e.g., `bunx -p @angular/cli ng`).
 
 See [references/bunx.md](references/bunx.md)
 
 ## Lockfile
 
-`bun.lock` is a text-based lockfile. Resolve merge conflicts by deleting it and running `bun install` to regenerate from scratch — never attempt to merge lockfile contents.
+`bun.lock` is a text-based lockfile. Resolve merge conflicts by deleting it and running `bun install` to regenerate — never merge it.
 
 See [references/lockfile.md](references/lockfile.md)
 
@@ -25,13 +25,13 @@ See [references/resolution.md](references/resolution.md)
 
 ## Shell
 
-`Bun.$` is a tagged template for shell execution. Use response methods (`.text()`, `.json()`, `.lines()`) to extract output, `.nothrow()` to handle failures without exceptions, and pipe/redirect syntax for composing commands.
+`Bun.$` is a tagged template for shell execution. Use response methods (`.text()`, `.json()`, `.lines()`) to extract output, `.nothrow()` to handle failures without exceptions, and pipe/redirect syntax to compose commands.
 
 See [references/shell.md](references/shell.md)
 
 ## Subprocess
 
-`Bun.spawn` spawns subprocesses with streaming I/O. Use `Bun.spawnSync` for synchronous execution. Configure stdin/stdout/stderr, environment variables, and working directory. Check `exitCode` for error handling.
+`Bun.spawn` spawns subprocesses with streaming I/O; `Bun.spawnSync` runs synchronously. Configure stdin/stdout/stderr, environment variables, and working directory. Check `exitCode` for errors.
 
 See [references/spawn.md](references/spawn.md)
 

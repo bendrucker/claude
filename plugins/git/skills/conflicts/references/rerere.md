@@ -12,7 +12,7 @@ git config --global rerere.enabled true
 
 1. Resolve a conflict manually
 2. Git records the resolution
-3. Same conflict later: git auto-applies the recorded resolution
+3. Same conflict later: git auto-applies it
 4. Verify with `git diff` before committing
 
 ## Commands

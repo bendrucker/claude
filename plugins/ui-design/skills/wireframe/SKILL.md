@@ -25,7 +25,7 @@ hooks:
 
 Create wireframes for UI mockups with two approaches.
 
-Wireframes are skeletal, black-and-white representations of UI layout. They focus on structure, content priority, and function—not visual design. No colors, no styling, minimal fidelity.
+Wireframes are skeletal, black-and-white representations of UI layout, focused on structure, content priority, and function—not visual design. No colors, no styling, minimal fidelity.
 
 ## Choose Your Approach
 
@@ -34,7 +34,7 @@ Wireframes are skeletal, black-and-white representations of UI layout. They focu
 | **SVG** | Precise positioning, overlapping elements, custom shapes, artistic layouts | `render.ts` |
 | **HTML/Tailwind** | Standard UI patterns (forms, grids, navigation, modals), flexbox layouts | `render-html.ts` |
 
-**Before creating any wireframe**: Read the reference file for your chosen approach. The references contain required patterns, component examples, and the exact rendering workflow.
+**Before creating any wireframe**: Read the reference file for your chosen approach. The references contain required patterns, component examples, and the rendering workflow.
 
 ## References
 

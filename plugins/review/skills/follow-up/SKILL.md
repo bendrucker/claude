@@ -4,7 +4,7 @@ description: >
   Follow up on a PR/MR you reviewed: assess whether the author's fixes actually grasped each
   concern, find silently resolved or mechanically-fixed threads, and get a graded re-review call.
   Use after leaving review feedback to see if the author acted on it.
-argument-hint: <pr-url>
+argument-hint: "[pr-url]"
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)
@@ -16,6 +16,10 @@ allowed-tools:
 
 Follow up on my review of: $ARGUMENTS
 
+`$ARGUMENTS` is optional. When it carries a PR/MR URL or identifier, follow up on that. When it's
+empty, resolve the target from the current branch's open PR/MR before anything else (see [Resolve
+Target](#resolve-target)). Only ask me to paste a URL when that resolution genuinely fails.
+
 You are the reviewer. The question is not "did the author reply?" but "did the fix actually grasp
 each concern, or just go through the motions?" Status is a signal. The code is the verdict.
 
@@ -23,6 +27,42 @@ All diff and file reading happens in Explore sub-agents. Your main session holds
 verdicts they return, never raw diffs. This keeps my development context free.
 
 ## Workflow
+
+### Resolve Target
+
+Settle on a PR/MR URL before any other step. Everything downstream (platform detection, sync, fetch)
+keys off that URL.
+
+- If `$ARGUMENTS` carries a PR/MR URL or identifier, use it. This is the prior behavior, unchanged.
+- If `$ARGUMENTS` is empty, resolve the current branch's open PR/MR:
+  - Pick the platform from the remote: `git remote get-url origin`. A host containing `github.com`
+    means GitHub; any other host is the GitLab instance the remote points at (`glab` reads the
+    instance from the same remote, so no extra configuration is needed).
+  - GitHub: `gh pr view --json url,state --jq '.url'`. With no positional argument, `gh pr view`
+    resolves the PR for the current branch.
+  - GitLab: `glab mr view --output json | jq -r '.web_url'`. With no argument it resolves the MR for
+    the current branch.
+
+Feed the resolved URL into [Detect Platform](#detect-platform) and the rest of the workflow
+unchanged.
+
+#### When Resolution Fails
+
+Don't silently bail. Ask me for a URL only after auto-detection genuinely comes up empty, and report
+what you tried first: the branch name (`git branch --show-current`) and the `origin` remote you
+resolved the platform from. The edge cases below shape that fallback.
+
+When the branch has no open PR/MR, `gh pr view` or `glab mr view` find nothing. Report the branch and
+remote, then ask for a URL.
+
+On a detached HEAD, `git symbolic-ref --quiet HEAD` fails, so there's no branch to resolve from. Skip
+detection and ask for a URL.
+
+With multiple remotes, resolve from `origin`. If that's not the right remote, I can pass a URL.
+
+A closed or merged target still resolves: `gh pr view --json state` (or the MR equivalent) may return
+a PR/MR whose `state` is not open. Surface the `state` so I can confirm it's the one I meant before
+you proceed.
 
 ### Detect Platform
 

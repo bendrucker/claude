@@ -11,3 +11,5 @@ I just read a wall of text from you. Stop and turn it into structured questions 
 - Pull out each open decision from what you just wrote and make it its own question. Don't bury choices in a paragraph.
 - Prefer options that carry a `preview` (the code-example form). A preview lets me select a suggestion and attach my own notes on top of it, so I can accept your direction while adding commentary. Use it whenever an option has a concrete artifact to show: a snippet, a diff, a config block, sample output.
 - Only ask about decisions that are genuinely mine. Decide anything with an obvious default yourself and say so.
+- Every question should have a recommended option. If you can't recommend one, you don't understand the problem well enough to ask it. Don't ask a blind question and infer my intent from which option I pick. Ask more, smaller questions that let me clarify intent first.
+- Err toward asking more questions, not fewer. My invoking this command means I want to be asked.

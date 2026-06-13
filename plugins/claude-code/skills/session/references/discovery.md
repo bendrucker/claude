@@ -24,6 +24,7 @@ Each dimension maps to the named queries that answer it (Tier-1 listed in `SKILL
 | Tokens | `repeat-read-waste`, `top-sessions-by-output` | `stats`, `model-summary`, `skill-activity` |
 | Turns and compaction | `stop-hook-noop-detector` | `activity` (compactions, API errors) |
 | Skill economy | `skill-auto-vs-explicit` | `skills`, `skill-activity` |
+| Planning | `plans` | `plan_sessions`, `plan_calls` |
 
 Use `records`, `fields`, `schema`, and `keys` whenever a dimension needs a path that isn't pinned: `SELECT kind, COUNT(*) FROM records GROUP BY kind` is the full taxonomy, and `fields` infers the JSON keys under any path.
 

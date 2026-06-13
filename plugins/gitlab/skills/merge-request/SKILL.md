@@ -80,6 +80,10 @@ See [review-state.md](review-state.md) for the underlying GraphQL query and filt
 
 To group all your review-requested MRs by next actor (not just the `UNREVIEWED` slice), see [Review Inbox (Next-Actor Triage)](review-state.md#review-inbox-next-actor-triage) in review-state.md.
 
+## Re-request reviewers
+
+Re-trigger a review after a push reset approvals. The `mergeRequestReviewerRereview` mutation flips the target's `reviewState` back to `UNREVIEWED` and re-surfaces the MR. The reviewer must already be assigned. See [Re-Request Review](review-state.md#re-request-review) for the user-ID lookup and the exact mutation.
+
 ## Discussions
 
 Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md](discussions.md) for the discussions script, resolution workflow, and pagination pitfalls.

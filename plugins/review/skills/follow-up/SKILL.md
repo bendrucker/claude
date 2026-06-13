@@ -30,39 +30,24 @@ verdicts they return, never raw diffs. This keeps my development context free.
 
 ### Resolve Target
 
-Settle on a PR/MR URL before any other step. Everything downstream (platform detection, sync, fetch)
-keys off that URL.
+Settle on a PR/MR URL before any other step; everything downstream keys off it.
 
-- If `$ARGUMENTS` carries a PR/MR URL or identifier, use it. This is the prior behavior, unchanged.
-- If `$ARGUMENTS` is empty, resolve the current branch's open PR/MR:
-  - Pick the platform from the remote: `git remote get-url origin`. A host containing `github.com`
-    means GitHub; any other host is the GitLab instance the remote points at (`glab` reads the
-    instance from the same remote, so no extra configuration is needed).
-  - GitHub: `gh pr view --json url,state --jq '.url'`. With no positional argument, `gh pr view`
-    resolves the PR for the current branch.
-  - GitLab: `glab mr view --output json | jq -r '.web_url'`. With no argument it resolves the MR for
-    the current branch.
+If `$ARGUMENTS` carries a URL or identifier, use it. If it's empty, detect the current branch's open
+PR/MR. Pick the platform from `git remote get-url origin` (host contains `github.com` => GitHub,
+else the GitLab instance that remote points at), then:
 
-Feed the resolved URL into [Detect Platform](#detect-platform) and the rest of the workflow
-unchanged.
+- GitHub: `gh pr view --json url,state --jq '.url'`
+- GitLab: `glab mr view --output json | jq -r '.web_url'`
 
-#### When Resolution Fails
+Both resolve the current branch with no positional argument. Feed the URL into [Detect
+Platform](#detect-platform) unchanged.
 
-Don't silently bail. Ask me for a URL only after auto-detection genuinely comes up empty, and report
-what you tried first: the branch name (`git branch --show-current`) and the `origin` remote you
-resolved the platform from. The edge cases below shape that fallback.
+Ask me for a URL only after detection genuinely comes up empty, and report what you tried: the branch
+(`git branch --show-current`) and the `origin` you resolved from. Edge cases:
 
-When the branch has no open PR/MR, `gh pr view` or `glab mr view` find nothing. Report the branch and
-remote, then ask for a URL.
-
-On a detached HEAD, `git symbolic-ref --quiet HEAD` fails, so there's no branch to resolve from. Skip
-detection and ask for a URL.
-
-With multiple remotes, resolve from `origin`. If that's not the right remote, I can pass a URL.
-
-A closed or merged target still resolves: `gh pr view --json state` (or the MR equivalent) may return
-a PR/MR whose `state` is not open. Surface the `state` so I can confirm it's the one I meant before
-you proceed.
+- Detached HEAD (no branch) => skip detection, ask.
+- Multiple remotes => use `origin`; I can pass a URL if that's wrong.
+- Closed or merged => still resolves; surface the `state` so I can confirm before proceeding.
 
 ### Detect Platform
 

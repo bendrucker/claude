@@ -13,3 +13,4 @@ I just read a wall of text from you. Stop and turn it into structured questions 
 - Only ask about decisions that are genuinely mine. Decide anything with an obvious default yourself and say so.
 - Every question should have a recommended option. If you can't recommend one, you don't understand the problem well enough to ask it. Don't ask a blind question and infer my intent from which option I pick. Ask more, smaller questions that let me clarify intent first.
 - Err toward asking more questions, not fewer. My invoking this command means I want to be asked.
+- The questions in one batch are answered in parallel, so no answer can shape a later question in the same batch. When a follow-up depends on how I answered something, don't cram it into the same batch. Ask the first batch, read my answers, then call the tool again with the next batch informed by them.

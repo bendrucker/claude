@@ -52,8 +52,8 @@ Then run each round:
 1. Apply batched fixes, commit, push **once** (one new SHA to re-review).
 2. Reply-and-resolve the noise threads (`github:pr-comments` or `gitlab:merge-request` do both in one call).
 3. Escalate the unsure threads and pause **that subset only**; actionable pushes proceed.
-4. Hand CI back to `pull-request:babysit` (it owns CI, stops at green).
-5. Re-fetch bot threads to poll for the re-review. If none lands within ~5 min of green, post one top-level `@<bot>` re-trigger and reset the timer.
+4. Hand CI back to `pull-request:babysit` (it owns CI, stops at green). babysit's Monitor watcher re-invokes you on CI events, so don't wrap that wait in `ScheduleWakeup`. The harness already wakes you.
+5. Wait for the bot to re-review the green SHA. No Monitor watcher tracks this, so self-pace with `ScheduleWakeup`: arm a tick (`prompt` set to this same `/pull-request:follow-up` invocation so the wake re-enters the loop) at ~270s for an idle wait before re-triggering, or 180-240s when a fast re-review is expected. Never 300s (the cache-expiry boundary). On wake, re-fetch bot threads and evaluate the loop-exit conditions below: if the reviewer is satisfied or another exit fires, stop; otherwise, if no re-review landed, post one top-level `@<bot>` re-trigger, then re-arm the next tick.
 
 Loop until: the reviewer's satisfaction signal hits on HEAD ([reviewers.md](reviewers.md)); no new bot threads for two rounds after a green push; max 4 rounds (oscillation guard); the idle timeout outlasts the re-trigger; or the PR closes/merges.
 

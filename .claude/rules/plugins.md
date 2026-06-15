@@ -49,7 +49,7 @@ Each plugin should have a `README.md` with consistent sections:
 - **Contents**: List what the plugin provides (skills, hooks, agents, commands)
 - **Testing**: How to run tests (if the plugin has tests)
 
-Do not include installation instructions or skill activation details, the README is an index, not documentation. Users can read the skill files directly for activation patterns.
+Do not include installation instructions or skill activation details, the README is an index, not documentation.
 
 ## Plugin Metadata
 

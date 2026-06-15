@@ -18,7 +18,7 @@ Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` cod
 When writing scripts (hooks, skill CLIs, etc.) that accept arguments:
 
 - **Argument parsing**: Use [cleye](https://github.com/privatenumber/cleye) for type-safe argument parsing with automatic `--help` generation. Load the `cleye` skill for usage patterns (parameters, flags, subcommands) instead of reading existing scripts.
-- **Table output**: Use the `table` package for formatted terminal table output. Do not use `markdown-table` or similar GFM-oriented packages, script output is displayed in a terminal, not rendered as markdown.
+- **Table output**: Use the `table` package for terminal table output. Do not use `markdown-table` or similar GFM-oriented packages, script output is displayed in a terminal, not rendered as markdown.
 - **Ancestor paths**: Use `join(import.meta.dirname, "..")` to resolve parent directories. Avoid chaining `dirname()` calls; explicit `".."` is clearer.
 
 # Terminal Colors

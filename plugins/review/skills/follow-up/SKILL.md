@@ -4,7 +4,7 @@ description: >
   Follow up on a PR/MR you reviewed: assess whether the author's fixes actually grasped each
   concern, find silently resolved or mechanically-fixed threads, and get a graded re-review call.
   Use after leaving review feedback to see if the author acted on it.
-argument-hint: <pr-url>
+argument-hint: "[pr-url]"
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)
@@ -16,6 +16,10 @@ allowed-tools:
 
 Follow up on my review of: $ARGUMENTS
 
+`$ARGUMENTS` is optional. When it carries a PR/MR URL or identifier, follow up on that. When it's
+empty, resolve the target from the current branch's open PR/MR before anything else (see [Resolve
+Target](#resolve-target)). Only ask me to paste a URL when that resolution genuinely fails.
+
 You are the reviewer. The question is not "did the author reply?" but "did the fix actually grasp
 each concern, or just go through the motions?" Status is a signal. The code is the verdict.
 
@@ -23,6 +27,27 @@ All diff and file reading happens in Explore sub-agents. Your main session holds
 verdicts they return, never raw diffs. This keeps my development context free.
 
 ## Workflow
+
+### Resolve Target
+
+Settle on a PR/MR URL before any other step; everything downstream keys off it.
+
+If `$ARGUMENTS` carries a URL or identifier, use it. If it's empty, detect the current branch's open
+PR/MR. Pick the platform from `git remote get-url origin` (host contains `github.com` => GitHub,
+else the GitLab instance that remote points at), then:
+
+- GitHub: `gh pr view --json url,state --jq '.url'`
+- GitLab: `glab mr view --output json | jq -r '.web_url'`
+
+Both resolve the current branch with no positional argument. Feed the URL into [Detect
+Platform](#detect-platform) unchanged.
+
+Ask me for a URL only after detection genuinely comes up empty, and report what you tried: the branch
+(`git branch --show-current`) and the `origin` you resolved from. Edge cases:
+
+- Detached HEAD (no branch) => skip detection, ask.
+- Multiple remotes => use `origin`; I can pass a URL if that's wrong.
+- Closed or merged => still resolves; surface the `state` so I can confirm before proceeding.
 
 ### Detect Platform
 

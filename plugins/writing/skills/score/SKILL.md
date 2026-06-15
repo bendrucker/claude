@@ -14,7 +14,7 @@ allowed-tools:
 
 # Score
 
-Measure AI writing patterns in one input and report density per category. This quantifies trope load so you can compare drafts or track a file over time. To list every match with positions, use `writing:scan`. To rewrite an input, use `writing:rewrite`.
+Measure AI writing patterns in one input and report density per category. Quantifies trope load so you can compare drafts or track a file over time. To list every match with positions, use `writing:scan`. To rewrite an input, use `writing:rewrite`.
 
 ## Input
 
@@ -36,11 +36,11 @@ Hits are threshold-crossing counts from the shared detection engine (`detection/
 
 ## Output
 
-A table per group with category, hits, and density, sorted by density. The `--json` flag emits the structured report for diffing two runs. The command is informational: every run returns a success status, so it never gates anything.
+A table per group with category, hits, and density, sorted by density. The `--json` flag emits the structured report for diffing two runs. The command is informational: every run returns success, so it never gates anything.
 
 ## Comments
 
-For non-prose source files, single-line comments (`//`, `#`) are extracted and scored as a separate `comments` group, so prose-only patterns apply to them without an AST. This is on by default for source files and off for prose files (`.md` and friends, whose fenced code blocks are already stripped). Force it with `--comments` or suppress it with `--no-comments`.
+For non-prose source files, single-line comments (`//`, `#`) are extracted and scored as a separate `comments` group, so prose-only patterns apply to them without an AST. On by default for source files, off for prose files (`.md` and friends, whose fenced code blocks are already stripped). Force it with `--comments` or suppress it with `--no-comments`.
 
 ## Voice Delta
 

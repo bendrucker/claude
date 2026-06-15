@@ -61,7 +61,7 @@ Clear the lint findings as described above, then apply the structural rules from
 - Cutting sentences that restate previous ones
 - Removing filler phrases and hedging
 
-Do not add, remove, or restructure the content's meaning. The output should convey the same information in fewer, clearer words.
+Do not add, remove, or restructure the content's meaning. Convey the same information in fewer, clearer words.
 
 ## Output
 

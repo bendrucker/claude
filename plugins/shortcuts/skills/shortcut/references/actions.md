@@ -1,6 +1,6 @@
 # Shortcut Actions Reference
 
-This file covers programming constructs and a selection of commonly-used built-in actions. It is not exhaustive — built-in actions change with each OS release and there are hundreds of them.
+Programming constructs and a selection of common built-in actions. Not exhaustive — built-in actions change with each OS release and there are hundreds of them.
 
 **On macOS**, use `discover.swift` to read `WFActions.plist` for the full, current list. See [discovery.md](discovery.md).
 
@@ -25,7 +25,7 @@ Built-in actions use the `is.workflow.actions.*` prefix. Third-party apps use th
 
 ## Control Flow
 
-These are the core programming constructs. All use `GroupingIdentifier` (a UUID shared across the start/middle/end actions) and `WFControlFlowMode` (0 = start, 1 = middle, 2 = end).
+Core programming constructs. All use `GroupingIdentifier` (a UUID shared across the start/middle/end actions) and `WFControlFlowMode` (0 = start, 1 = middle, 2 = end).
 
 | Action | Identifier | Key Parameters |
 |--------|-----------|----------------|
@@ -92,7 +92,7 @@ To capture action output, add `UUID` and `CustomOutputName` to the source action
 
 ## Default App Example: Calendar
 
-These actions interact with the built-in Calendar app. Included as an example of how default app actions are structured — other default apps (Reminders, Contacts, Maps, Music, etc.) follow similar patterns.
+These actions interact with the built-in Calendar app — an example of how default app actions are structured. Other default apps (Reminders, Contacts, Maps, Music, etc.) follow similar patterns.
 
 | Action | Identifier | Key Parameters |
 |--------|-----------|----------------|
@@ -103,7 +103,7 @@ These actions interact with the built-in Calendar app. Included as an example of
 
 ## Discovering More Actions
 
-This reference cannot be exhaustive. To find actions not listed here:
+To find actions not listed here:
 
 1. **macOS discovery**: Use `discover.swift` to parse `WFActions.plist` (see [discovery.md](discovery.md))
 2. **Export and inspect**: Create a shortcut in the GUI, export with `shortcuts export`, convert with `plutil -convert xml1`

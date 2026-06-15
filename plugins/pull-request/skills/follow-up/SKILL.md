@@ -19,27 +19,27 @@ allowed-tools:
 
 Follow up on review feedback for: $ARGUMENTS
 
-Parse the URL and flags from `$ARGUMENTS`. GitHub URLs contain `github.com`; GitLab URLs contain the instance hostname. GitHub is primary: work through `gh`, `mcp__github`, and `github:*` skills directly. Delegate all GitLab behavior to `gitlab:merge-request` (no `glab` calls here).
+Parse the URL and flags from `$ARGUMENTS`. GitHub URLs contain `github.com`; GitLab URLs contain the instance hostname. GitHub is primary: work through `gh`, `mcp__github`, and `github:*` skills directly. Delegate all GitLab behavior to `gitlab:merge-request` (no `glab` calls).
 
 - `--auto`: autonomously triage **bot** threads, looping until the reviewer is satisfied (see [The Autonomous Loop](#the-autonomous-loop)).
 - `--include-human-nits`: under `--auto`, also act on **human** threads, but only trivial high-confidence changes (typos, renames, one-liners). Off by default.
 
 ## Default Workflow (Gated)
 
-Without `--auto`, stay read-only: fetch, classify, draft, and **check with me before posting or resolving**.
+Without `--auto`, stay read-only: fetch, classify, draft, **check with me before posting or resolving**.
 
-Fetch all resolvable threads (resolved and unresolved) via `github:pr-comments` (`--role author`) or `gitlab:merge-request`, then classify each:
+Fetch all resolvable threads (resolved and unresolved) via `github:pr-comments` (`--role author`) or `gitlab:merge-request`, then classify:
 
 - **Unresolved / no reply**
 - **Unresolved / replied**
 - **Resolved / with reply**
 - **Resolved / silent**: resolved with no author reply; flag these, they hide context
 
-For unresolved threads, diff the comment's creation date against HEAD to see whether later commits already addressed the feedback. Draft replies per [replies.md](replies.md).
+For unresolved threads, diff the comment's creation date against HEAD to see whether later commits addressed the feedback. Draft replies per [replies.md](replies.md).
 
 ## The Autonomous Loop
 
-With `--auto`, drive bot threads to closure without asking. Partition threads with each provider's `--bots` filter (`github:pr-comments`, `gitlab:merge-request`): fetch once filtered for the bot set, once unfiltered to see the human threads you're leaving alone. Add new reviewers per [reviewers.md](reviewers.md).
+With `--auto`, drive bot threads to closure without asking. Partition threads with each provider's `--bots` filter (`github:pr-comments`, `gitlab:merge-request`): fetch once filtered for the bot set, once unfiltered to see the human threads you're leaving alone. Add reviewers per [reviewers.md](reviewers.md).
 
 Triage each bot thread:
 
@@ -52,7 +52,7 @@ Then run each round:
 1. Apply batched fixes, commit, push **once** (one new SHA to re-review).
 2. Reply-and-resolve the noise threads (`github:pr-comments` or `gitlab:merge-request` do both in one call).
 3. Escalate the unsure threads and pause **that subset only**; actionable pushes proceed.
-4. Hand CI back to `pull-request:babysit` (it owns CI, stops at green). babysit's Monitor watcher re-invokes you on CI events, so don't wrap that wait in `ScheduleWakeup`. The harness already wakes you.
+4. Hand CI back to `pull-request:babysit` (it owns CI, stops at green). babysit's Monitor watcher re-invokes you on CI events, so don't wrap that wait in `ScheduleWakeup`; the harness wakes you.
 5. Wait for the bot to re-review the green SHA. No Monitor watcher tracks this, so self-pace with `ScheduleWakeup`: arm a tick (`prompt` set to this same `/pull-request:follow-up` invocation so the wake re-enters the loop) at ~270s for an idle wait before re-triggering, or 180-240s when a fast re-review is expected. Never 300s (the cache-expiry boundary). On wake, re-fetch bot threads and evaluate the loop-exit conditions below: if the reviewer is satisfied or another exit fires, stop; otherwise, if no re-review landed, post one top-level `@<bot>` re-trigger, then re-arm the next tick.
 
 Loop until: the reviewer's satisfaction signal hits on HEAD ([reviewers.md](reviewers.md)); no new bot threads for two rounds after a green push; max 4 rounds (oscillation guard); the idle timeout outlasts the re-trigger; or the PR closes/merges.

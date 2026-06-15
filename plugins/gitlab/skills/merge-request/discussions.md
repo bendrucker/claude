@@ -26,7 +26,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 ```
 
-Three output formats are supported: `json` (default), `digest`, and `table`.
+Three output formats: `json` (default), `digest`, and `table`.
 
 To filter `--author` to yourself, resolve your username with `glab api user 2>/dev/null | jq -r .username`. The `glab api user --jq .username` form returns empty on glab 1.102.0.
 
@@ -34,7 +34,7 @@ The script resolves the project from the current directory's git remote. Run it 
 
 #### JSON output schema
 
-The default (`--format json`) is a flat array of summary objects, one per discussion (the first note of each thread). It is not the raw GitLab `{ notes: [...] }` shape, so query the top-level fields directly.
+The default (`--format json`) is a flat array of summary objects, one per discussion (the first note of each thread). Not the raw GitLab `{ notes: [...] }` shape, so query the top-level fields directly.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -47,7 +47,7 @@ The default (`--format json`) is a flat array of summary objects, one per discus
 | `line` | number (optional) | Present only for positioned (inline) comments |
 | `lineRange` | `{ start, end }` or `null` | `null` for single-line and non-positioned comments |
 
-`file` and `line` are omitted entirely for general (non-inline) discussions, so handle them as optional. `lineRange` is always present but is `null` unless the comment spans multiple lines.
+`file` and `line` are omitted entirely for general (non-inline) discussions, so handle them as optional. `lineRange` is always present but `null` unless the comment spans multiple lines.
 
 The summary flattens each thread to its **first note only**. To see the author's replies or the full thread, fetch the raw payload, which keeps every note:
 
@@ -59,7 +59,7 @@ A GitLab "reply" that is a `changed line in version N` system note (`notes[].sys
 
 #### Compact triage
 
-For triage, prefer a compact format over the full JSON. Both truncate each body to `--truncate` characters (default 80); raise it when bodies are clipped too aggressively.
+For triage, prefer a compact format over the full JSON. Both truncate each body to `--truncate` characters (default 80); raise it when bodies are clipped too much.
 
 `--format digest` prints one line per discussion: id, location (`file:line`, `file:start-end` for ranges, or `-` when not positioned), resolution state, and a truncated body.
 
@@ -117,7 +117,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --old-line 10 --body-file tmp/note.md
 ```
 
-Diff refs are fetched automatically. Positioned comments are validated against diff hunks before posting. If a line is not in the diff, the command exits with valid line ranges.
+Diff refs are fetched automatically. Positioned comments are validated against diff hunks before posting. If a line is not in the diff, the command exits with the valid line ranges.
 
 ### Suggestions
 
@@ -147,7 +147,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --
 
 ## Pitfalls
 
-**Pagination concatenation**: `glab api --paginate` concatenates JSON arrays as `][` across pages, producing invalid JSON. The script handles this automatically with `parseGlabPaginated`, which replaces `][` with `,`.
+**Pagination concatenation**: `glab api --paginate` concatenates JSON arrays as `][` across pages, producing invalid JSON. The script handles this with `parseGlabPaginated`, which replaces `][` with `,`.
 
 **Resolution status location**: Check `notes[0].resolved`, not the top-level discussion `resolved` field. The top-level field may not reflect the current state accurately.
 

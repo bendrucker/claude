@@ -25,7 +25,7 @@ You launch and drive it in a sibling pane; the TUI is the user's. `review:self` 
 ## Session Discovery
 
 tuicr persists each review as a session with a `slug`. The CLI is the agent's interface; the TUI
-is the user's. List sessions and pick the active one by `slug`:
+is the user's. List sessions and pick the active one by `slug`.
 
 ```bash
 tuicr review list --repo <repo>   # checkout path or owner/repo: local + PR sessions
@@ -48,7 +48,7 @@ tmux split-window -h -d -c "<repo>" "cd '<repo>' && tuicr -w"
 - Swap the inner command for other targets: `tuicr -r main..HEAD` (commit range),
   `tuicr pr <N>` (GitHub PR), `tuicr mr <N>` (GitLab MR). On a direct `/review:tuicr` invocation the
   target comes from `$ARGUMENTS` (default `-w`); `review:self` and `review:peer` pass their own.
-- tuicr reloads the diff as the working tree changes, which drives the inbound loop.
+- tuicr reloads the diff as the working tree changes, driving the inbound loop.
 
 After ~3s, `tuicr review list --repo <repo>` confirms the session `slug`, and
 `git rev-parse HEAD` captures the head SHA for outbound mapping. A single active session
@@ -66,9 +66,9 @@ tuicr review add --repo <repo> --session <slug> --input - < "$TMPDIR/comments.js
 ```
 
 `--input` also accepts literal JSON or `@file.json`. Pass `--username` (e.g. the agent's name)
-so seeded comments are visually distinct from the user's. The flag form
+so seeded comments are distinct from the user's. The flag form
 (`--target-file --line --end-line --side --type --username`) adds a single comment; `--input`
-batches structured JSON. Supported target types are `review`, `file`, `line`, and `line_range`;
+batches structured JSON. Target types are `review`, `file`, `line`, and `line_range`;
 `--type` is `issue`, `suggestion`, `note`, or `praise`.
 
 #### Reading Back

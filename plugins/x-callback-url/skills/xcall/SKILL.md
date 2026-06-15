@@ -13,7 +13,7 @@ Send [x-callback-url](https://x-callback-url.com/) requests from the command lin
 
 ## How It Works
 
-`xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source into `${CLAUDE_PLUGIN_DATA}/xcall.app` and registers the callback scheme (`xcall-claude://`) with Launch Services. Installing into the plugin's data directory (instead of the plugin source/cache tree) keeps the registered path stable across plugin updates: the marketplace cache is content-addressed, so building xcall.app inside it would orphan the Launch Services registration on the next update.
+`xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source into `${CLAUDE_PLUGIN_DATA}/xcall.app` and registers the callback scheme (`xcall-claude://`) with Launch Services. Installing into the plugin's data directory (not the plugin source/cache tree) keeps the registered path stable across plugin updates: the marketplace cache is content-addressed, so building xcall.app inside it would orphan the Launch Services registration on the next update.
 
 ## Usage
 
@@ -53,13 +53,13 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "bear://x-callback-url/create?title=Meeting
 
 ## x-callback-url Protocol
 
-The [x-callback-url](https://x-callback-url.com/specification/) protocol defines three callback parameters:
+The [x-callback-url](https://x-callback-url.com/specification/) protocol defines three callback parameters.
 
 - **x-success** — called on success, with app-specific result parameters
 - **x-error** — called on failure, with `errorCode` and `errorMessage`
 - **x-cancel** — called when the user cancels
 
-`xcall` appends these automatically using its registered `xcall-claude://` scheme.
+`xcall` appends these using its registered `xcall-claude://` scheme.
 
 ## Supported Apps
 
@@ -80,5 +80,5 @@ Apps with their own CLI (e.g., Shortcuts via `shortcuts run`) don't need xcall �
 - Callback scheme: `xcall-claude://`
 - `Info.plist`: `CFBundleTypeRole=Editor`, `LSUIElement=true`. `LSBackgroundOnly` is intentionally not set: combining it with `LSUIElement` causes macOS to refuse to route URL scheme callbacks to the app, surfacing as a "no application set" dialog.
 - After building, `build.sh` calls `lsregister -f` and verifies the scheme handler is the freshly built bundle. If verification fails it exits non-zero.
-- Build is cached — only recompiles if `main.swift` is newer than the binary
+- Build is cached — recompiles only if `main.swift` is newer than the binary
 - Timeout: 10 seconds

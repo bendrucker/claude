@@ -18,7 +18,7 @@ Outputs a JSON array of all built-in Shortcuts actions with identifier, name, de
 swift @scripts/discover.swift actions
 ```
 
-**Cache on first use.** The output is stable within a session. Write it to a temp file and query from there:
+**Cache on first use.** The output is stable within a session. Write it to a temp file and query from there.
 
 ```bash
 swift @scripts/discover.swift actions > /tmp/shortcut-actions.json
@@ -57,7 +57,7 @@ swift @scripts/discover.swift apps | jq '.[] | select(.name | test("Things"; "i"
 
 ## Third-Party App Actions
 
-The `apps` command finds which apps have Shortcuts support but cannot enumerate their individual actions. To discover a third-party app's actions, create a shortcut using that app in the GUI, then inspect it:
+The `apps` command finds which apps have Shortcuts support but cannot enumerate their individual actions. To discover a third-party app's actions, create a shortcut using that app in the GUI, then inspect it.
 
 ```bash
 # Open a shortcut in the editor to examine its structure
@@ -66,4 +66,4 @@ shortcuts view "My Shortcut"
 
 ## Data Source
 
-The CLI uses the WorkflowKit framework's runtime API (`WFActionRegistry`) to enumerate actions. This reflects the current system's available actions regardless of macOS version.
+The CLI uses the WorkflowKit framework's runtime API (`WFActionRegistry`) to enumerate actions, reflecting the current system's available actions regardless of macOS version.

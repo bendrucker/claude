@@ -73,7 +73,7 @@ hooks:                                    # Optional: skill-scoped hooks
 
 #### Description Is a Trigger
 
-The description field is not a summary. It's what Claude scans to decide whether to activate the skill. Write it for the model: include trigger terms, use cases, and "Use when..." phrasing. Make it slightly pushy to combat under-triggering.
+The description field is not a summary. It's what Claude scans to decide whether to activate the skill. Write it for the model: trigger terms, use cases, and "Use when..." phrasing. Make it slightly pushy to combat under-triggering.
 
 #### Skip the Obvious
 
@@ -85,7 +85,7 @@ The highest-signal content in any skill is a `## Gotchas` section documenting fa
 
 #### Progressive Disclosure
 
-A skill is a folder, not just a markdown file. Keep `SKILL.md` concise (~30 lines for the hub) and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. It will load them at appropriate times.
+A skill is a folder, not just a markdown file. Keep `SKILL.md` concise (~30 lines for the hub) and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them; it loads them at the right times.
 
 #### Don't Railroad Claude
 
@@ -122,7 +122,7 @@ These substitutions apply to skill content, not the frontmatter `hooks:` block. 
 
 ### Dynamic Context Injection
 
-The bang-backtick syntax runs shell commands **before** the skill content is sent to Claude. The command output replaces the placeholder — Claude only sees the final result, not the command. This is preprocessing, not something Claude executes. Use this to inject live data (git state, CLI output, file contents) so the application harness extracts and runs the commands without waiting on the model.
+The bang-backtick syntax runs shell commands **before** the skill content is sent to Claude. The output replaces the placeholder — Claude sees only the result, not the command. This is preprocessing, not something Claude executes. Use it to inject live data (git state, CLI output, file contents) so the harness extracts and runs the commands without waiting on the model.
 
 See [references/patterns.md](references/patterns.md) for syntax, examples, and gotchas.
 

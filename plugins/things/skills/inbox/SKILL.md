@@ -14,7 +14,7 @@ Add todos to the Things 3 inbox.
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
 ```
 
-The script handles URL encoding, session attribution, and the `Claude` tag automatically. Extra tags can be added via the `--tag` flag (repeatable). For example, `--tag claude-code` adds the `claude-code` tag to all captured todos. Multiple tags: `--tag foo --tag bar`.
+The script handles URL encoding, session attribution, and the `Claude` tag. Add extra tags via the `--tag` flag (repeatable): `--tag claude-code` adds the `claude-code` tag to all captured todos. Multiple tags: `--tag foo --tag bar`.
 
 The script always prints a confirmation to stdout on success. When the `x-callback-url` plugin is installed, xcall returns the todo ID and the script outputs `https://things.bendrucker.me/show?id=...`. Present this URL to the user so they can click to open the todo. Without xcall (or when xcall succeeds but returns no ID), the script prints `captured: <title>`. No stdout output means the call failed; read stderr and surface the cause to the user rather than retrying.
 
@@ -60,8 +60,8 @@ Things supports [Markdown in notes](https://culturedcode.com/things/support/arti
 
 #### Never retry on silent output
 
-The script always prints to stdout on success. If you see no output, the call failed. Read stderr, surface the cause to the user, and only retry once the root cause is understood. Silent retries have historically created duplicate todos.
+The script always prints to stdout on success. If you see no output, the call failed. Read stderr, surface the cause to the user, and only retry once the root cause is understood. Silent retries have created duplicate todos.
 
 #### Sandbox-blocked URL handoff
 
-If stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the macOS sandbox blocked the URL handoff to Things. The plugin's PreToolUse hook should disable the sandbox for `bun ${CLAUDE_PLUGIN_ROOT}/scripts/...` invocations. If this still happens, the hook is not firing for the invocation form being used. Investigate the invocation rather than disabling the sandbox manually.
+If stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the macOS sandbox blocked the URL handoff to Things. The plugin's PreToolUse hook should disable the sandbox for `bun ${CLAUDE_PLUGIN_ROOT}/scripts/...` invocations. If this still happens, the hook is not firing for the invocation form used. Investigate the invocation rather than disabling the sandbox manually.

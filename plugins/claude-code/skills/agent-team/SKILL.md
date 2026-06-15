@@ -45,7 +45,7 @@ Teams are stored locally:
 
 The config contains a `members` array with each teammate's name, agent ID, and type. Teammates read this file to discover each other.
 
-Teammates inherit the lead's permission settings at spawn. Each teammate loads project context (CLAUDE.md, MCP servers, skills) plus the spawn prompt — the lead's conversation history does not carry over.
+Teammates inherit the lead's permission settings at spawn. Each loads project context (CLAUDE.md, MCP servers, skills) plus the spawn prompt — the lead's conversation history does not carry over.
 
 ## Limitations
 

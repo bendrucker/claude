@@ -11,7 +11,7 @@ Create SVG wireframes for UI mockups with layout validation and PNG rendering.
 
 ## Guidelines
 
-Wireframes use only black strokes on white background:
+Wireframes use only black strokes on a white background:
 
 - **Containers**: `<rect>` with black stroke, dashed for sections (`stroke-dasharray="4"`)
 - **Buttons/inputs**: `<rect>` with solid black stroke, no fill
@@ -36,10 +36,10 @@ Wireframes use only black strokes on white background:
 
 ## Layout Rules
 
-These rules are enforced by validation:
+Enforced by validation:
 
 1. **Child bounds**: Children must fit within parent containers
-2. **No overlap**: Sibling elements should not overlap
+2. **No overlap**: Sibling elements must not overlap
 3. **Text fit**: Text must fit within its container
 
 ## Coordinate System
@@ -116,7 +116,7 @@ Checks layout constraints and reports violations. Exit code 0 if valid.
 bun {SKILL_DIR}/scripts/render.ts [--scale N] <svg-file> [output.png]
 ```
 
-Renders SVG to PNG using sharp. Output path defaults to same name with `.png` extension.
+Renders SVG to PNG using sharp. Output path defaults to the same name with `.png` extension.
 
 **Scale options:**
 - `--scale 1` (default): 1x resolution for quick verification during iteration

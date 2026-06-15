@@ -20,7 +20,7 @@ High-level system design:
 
 ### Implementation
 
-Scaffolding for the technical work. Subsections vary by project. Common categories:
+Scaffolding for the technical work. Subsections vary by project. Common:
 
 | Section | When to Include |
 |---------|-----------------|
@@ -31,7 +31,7 @@ Scaffolding for the technical work. Subsections vary by project. Common categori
 | Services | Background jobs, integrations, external APIs |
 | Security | Auth, permissions, data protection |
 
-Adapt based on what's relevant. Add sections as needed during exploration.
+Adapt to what's relevant. Add sections as needed during exploration.
 
 For each subsection:
 - Code snippets only when they clarify the change

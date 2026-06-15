@@ -13,18 +13,18 @@ disable-model-invocation: true
 
 ### Reading Before Planning
 
-Before proposing any changes:
+Before proposing changes:
 
 1. Read the files you intend to modify
-2. Understand the existing patterns and conventions
+2. Understand existing patterns and conventions
 3. Identify related code that might be affected
-4. Check for existing tests that cover the area
+4. Check for existing tests covering the area
 
 ### Plan Structure
 
 A good plan includes:
 
-- **Context**: What problem are we solving? What's the current state?
+- **Context**: What problem are we solving? Current state?
 - **Changes**: Specific files and modifications, with line references
 - **Dependencies**: What must happen in order? What can be parallelized?
 - **Verification**: How do we confirm success? What tests to run?
@@ -34,14 +34,14 @@ A good plan includes:
 
 Plans should match the request exactly:
 
-- If asked to fix a bug, don't refactor surrounding code
-- If asked to add a feature, don't add "nice to have" extras
-- If asked to refactor, don't fix unrelated issues you notice
+- Asked to fix a bug: don't refactor surrounding code
+- Asked to add a feature: don't add "nice to have" extras
+- Asked to refactor: don't fix unrelated issues you notice
 - Document out-of-scope observations separately if important
 
 ### When Plans Get Rejected
 
-Common reasons for plan rejection:
+Common reasons:
 
 - Too vague (no specific file/line references)
 - Too broad (scope creep beyond the request)

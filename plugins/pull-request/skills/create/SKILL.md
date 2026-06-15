@@ -83,17 +83,36 @@ When an issue is referenced:
 - **ONLY reference the issue** in the PR body (e.g., `Closes #123`, `Fixes #456`)
 - **NEVER modify the issue directly** - no comments, labels, milestones, or assignees
 
+## Reviewers
+
+Suggest reviewers; never assign them. The user always chooses from the suggestions.
+
+Run the script to rank candidates from the git history of the changed files. It excludes you and needs no arguments:
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-reviewers.ts
+```
+
+- **Blame owners**: people who wrote the lines you're changing. Suggest the top one or two.
+- **Sole-author fallback**: when the output reports you're the sole author of the area, use the recent in-area PR/MR refs it prints—look up who you requested review from on those and suggest the recurring names.
+
+Resolve names to platform usernames only after the user accepts, then pass them when creating the PR/MR:
+
+- **GitHub**: `gh pr create --reviewer <user>` (resolve emails to logins with `mcp__github` if needed)
+- **GitLab**: load `gitlab:merge-request` for username resolution before `--reviewer`
+
 ## Workflow
 
 1. **Branch validation**: If the context above shows you're on a default branch (main/master), stop and ask the user to switch to a feature branch first.
 1. Stage changes if not already staged: `git add .`
 1. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
 1. Push the branch to remote: `git push -u origin HEAD`
+1. Suggest reviewers (see [Reviewers](#reviewers)). Present the candidates and include only the ones the user accepts via `--reviewer` below.
 1. Create the PR/MR:
    - Write the body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
    - Include the branch name in the filename to avoid conflicts with concurrent agents
-   - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
-   - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
+   - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md [--reviewer u1,u2]`
+   - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)" [--reviewer u1,u2]`
 
 ## GitLab Notes
 

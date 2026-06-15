@@ -41,7 +41,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Writing
 
-1. Rewrite the PR body following the same title and body rules as the create skill, including its plain-voice guidance. Load the `writing` skill for the full set of tropes to avoid. If a PR template is provided in context, preserve its structure. See [`sections.md`](../create/sections.md) for section guidance.
+1. Rewrite the PR body following the same rules as the create skill. Lead with intent and the decisions a reviewer can't read off the diff, default to prose, and add `##` sections only when length earns them. Load the `writing` skill for the full set of tropes to avoid. If a PR template is provided in context, preserve its structure. See [`sections.md`](../create/sections.md) for the body guidance.
 2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply:
    - **GitHub**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr update --description "$(cat tmp/pr-body-<branch>.md)"`

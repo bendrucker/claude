@@ -1,60 +1,63 @@
-# Pull Request Sections
+# Pull Request Body
 
-Detailed guidance for optional PR body sections.
+What goes in the body, and what to leave out. The create and update skills both use this.
 
-Stick to active voice. Don't use passive ("X was added"). Rewrite so something is doing the verb.
+The body conveys what the diff cannot. The reviewer reads the code for what changed. Use the body for why it changed, the decisions you made, and how you know it works. If a sentence only restates what the diff shows, cut it.
 
-- Self-evident description of what the PR does: PR-as-subject is fine ("Adds retry logic") or subject-elided in bullets ("Added retry logic", "Extracted the helper")
-- Design decisions and judgment calls: use "I" so it's clear you made the call ("I chose X over Y because…")
+Write in active voice and first person for your own calls. "I chose X over Y because…", "I traced this to…". Don't write passively ("X was added", "the bug was caused by…"). Keep the prose plain. Technical terms are fine. Marketing and model flourishes (`source of truth`, `fail loudly`, `escape hatch`, `cleanly`, `wires up`) are not. Load the `writing` skill for the full set of tropes.
 
-Keep the prose plain. Technical terms are fine. Marketing phrasing and model flourishes (`source of truth`, `fail loudly`, `escape hatch`, `cleanly`) are not. Load the `writing` skill for the full set of tropes to avoid.
+## Shape
 
-## Issue
+Default to prose, not a scaffold.
 
-Use for bug fixes, which should include a related issue.
+- Open with what changed (a bare verb: "Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when the change needs justifying. Don't restate the title. Don't open with "This PR introduces".
+- Length tracks substance, not diff size. A subtle one-line fix may need paragraphs of root-cause reasoning. A large mechanical change may need two sentences.
+- Use `##` sections only when the body is long enough to need them. A small PR is a tight paragraph with no headers.
 
-- Describe the root cause as the author ("I traced this to…", "I found that…"). Avoid passive writeups ("the bug was caused by…")
-- Link existing issues with `Closes #123` or `Fixes #456`
+## Mine the Conversation
 
-## Changes
+The most valuable content is the substance that lived in the session but never reached the code. Review the conversation that produced the change and surface what applies. This belongs in the PR body, not in code comments where Claude tends to leak it.
 
-Organize by concept, not by file. Each bullet should describe a single conceptual shift, even when it spans multiple files. The reviewer reads this to understand *what's different and why*, not to get a tour of modified files.
+- Decisions and the alternatives you rejected. Name what you chose against and why you didn't take it.
+- Deviations from the issue or plan. Where the implementation departed from what was specified, and the scope you added or dropped (an extra `allowed-tools` entry, files touched beyond the plan, a feature cut).
+- Overturned theories. A root cause you diagnosed then disproved, an approach you built then abandoned. The diff shows the destination. The reviewer benefits from the wrong turn you already ruled out.
+- What you observed testing locally. The actual result, surprise, or failure mode, not just "verified". Benchmark or cost numbers. What you couldn't test and the concrete reason ("brew install failed locally", not "needs a real machine").
+- Limitations you ruled out. A workaround you considered and rejected as too fragile, a feature deferred as structural. This explains non-changes a reviewer might otherwise question.
+- Naming or interface settled by hand. A name the user chose during the work, surfaced as the decision it was rather than presented as obvious.
+- Deferred follow-ups, named concretely ("follow-up in #N to…"), not a vague TODO.
 
-- Lead with the conceptual change, not the file location. Subject-elided phrasing works for plain description ("Extracted the helper", "Replaced X with Y"); use "I" when a bullet explains a judgment call. Don't use passive ("X was added")
-- Omit cleanup that follows naturally from the main change (e.g. removing dead imports). The diff shows this
-- Never structure bullets as `**path**: description`
-- Reference code identifiers only when they add information beyond what the diff shows. Use the shortest unambiguous name (module, filename, or component, not full paths)
-- When referring to a set of things changed, write naturally: enumerate short lists inline (e.g. "hook command variants (command, model, prompt)"), use "all" or "each" for large sets. Never pair a count with the enumeration ("all three X (a, b, c)"). Either enumerate or summarize, not both
+Not every PR has all of these. Include only what a reviewer would act on. True but inert detail is padding. Aim for the substance that changes how someone reviews or uses the change. When the work ran through sub-agents, the substance is in their returned summaries. Pull it forward before it gets smoothed away.
 
-## Testing
+### By Change Type
 
-Only include if tests were added/modified or manual testing was performed. Omit entirely if no testing discussion is relevant.
+- Visual or GUI work: screenshots or a recording of the result. Rejected layouts. Bugs only live rendering surfaced.
+- Backend or API work: an example request and response. The mechanism proof for a fix (what breaks without it). Performance numbers.
+- Config, tooling, or prose: scope deviations, what you deliberately did not build, and the evidence that grounds the design.
 
-**NEVER mention test counts** - phrases like "Added N tests" or "13 unit tests" provide no value. The number of tests doesn't indicate coverage quality, and readers can count tests themselves if they care.
+## Ground Claims in Evidence
 
-Focus on **what** is covered and **why** it matters:
+Prefer showing to asserting. Link a permalink to the exact lines instead of paraphrasing code. Blockquote the doc or spec you reason from. Paste the real error, stack trace, or test output in a fence rather than describing it. "Reverting the fix makes `TestX` fail with `exit 2`" beats "added a test for the fix".
 
-**Good examples:**
-- "Added tests covering error handling for malformed JSON responses"
-- "Added integration tests for the full request/response cycle"
-- "Extended the auth tests to cover the new OAuth flow"
-- "Verified edge cases: empty input, null values, and Unicode handling"
+## Optional Sections
 
-**Coverage gaps**: Note anything that merited testing but was difficult to automate:
-- "Left rate-limiting behavior for manual verification against the live API"
-- "Verified visual layout changes in the browser but didn't add snapshot coverage"
+Use these only when the body is long enough to earn them. A small PR stays a paragraph.
 
-**Manual verification**: Include any testing done outside of automated tests—running commands, checking output, verifying behavior in a browser or tool. This counts whether performed by the user or by Claude during the session.
+### Changes
 
-**Patterns to avoid:**
-- "Added N tests" or "N unit tests" (counts are noise)
-- "All tests passed" (CI shows this)
-- "Tests work correctly" (too vague)
-- Listing test file names without explaining coverage
+Organize by concept, not by file. Each bullet is one conceptual shift, even when it spans files. Never write `**path**: description`. Reference an identifier only when it adds something the diff doesn't. Don't pair a count with an enumeration ("all three X (a, b, c)"). Enumerate or summarize, not both. Omit cleanup that follows from the main change (dead imports). The diff shows it.
 
-## References
+### Testing
 
-Only include if there are relevant links or related issues.
+Only if you added tests or tested by hand. State what the test proves, not that it exists. The falsification ("reverting the fix makes `TestX` fail"), the edge cases covered, what you verified manually and what you couldn't. Never test counts ("added 5 tests"). They measure nothing. Never "all tests pass". CI shows that. Paste real output over claiming success.
 
-- Bulleted list of links, related issues, code reviews
-- Use `Closes #<issue>` if the change closes an issue
+### References
+
+Related links, issues, or reviews that aren't the motivating issue. Use `Closes #N` for what this resolves and `Relates to #N` for context, keeping the two distinct.
+
+## Slop to Cut
+
+- The reflexive `## Changes` plus `## Testing` scaffold on every PR. Small PRs don't need it.
+- Bullets that narrate which file changed. If a bullet only says what the diff shows, delete it.
+- Test counts, "all tests pass", coverage inventories.
+- Count-padding ("six detectors, three and three"). The number is rarely the point.
+- The consequence chain (`, so the…`) used as a filler connective, and the antithesis (`not just X but Y`, `X instead of Y`) used as framing. Both read as tics when habitual.

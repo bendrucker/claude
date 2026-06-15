@@ -94,6 +94,29 @@ describe("plan files", () => {
   });
 });
 
+describe("plan mode", () => {
+  it("skips Write in plan mode with spaced em dash", async () => {
+    const input: PreToolUseHookInput = {
+      ...mockWrite("This \u2014 is bad"),
+      permission_mode: "plan",
+    };
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("skips Edit in plan mode with trope", async () => {
+    const input: PreToolUseHookInput = {
+      ...mockEdit("This \u2014 is bad"),
+      permission_mode: "plan",
+    };
+    expect(await processInput(input)).toBeNull();
+  });
+
+  it("still flags trope in normal mode outside plan path", async () => {
+    const result = await processInput(mockWrite("This \u2014 is bad"));
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+});
+
 describe("memory files", () => {
   const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
 

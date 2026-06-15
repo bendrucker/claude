@@ -12,7 +12,13 @@ import type { Heading, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { getExtension, isMarkdownFile, isMemoryPath, isPlanPath } from "../detection/paths";
-import { type EditInput, formatDecision, type SyncHookJSONOutput, type WriteInput } from "./io";
+import {
+  type EditInput,
+  formatDecision,
+  isPlanMode,
+  type SyncHookJSONOutput,
+  type WriteInput,
+} from "./io";
 
 type Mode = "write" | "edit";
 
@@ -27,10 +33,6 @@ type AstGrepMatch = {
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-function isPlanMode(input: PreToolUseHookInput): boolean {
-  return input.permission_mode === "plan";
-}
 
 export function checkMarkdown(content: string): string | null {
   const ast = fromMarkdown(content);

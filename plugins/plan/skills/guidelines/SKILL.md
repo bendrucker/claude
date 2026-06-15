@@ -11,24 +11,19 @@ disable-model-invocation: true
 
 ## Plan Shape
 
-Grounding comes first, then the substance. A plan usually carries:
-
-- Context with grounding: the problem and current state, callers cited by `file:line`, the explicit constraints quoted, and for a fix the evidence it was confirmed against.
-- New terms: any coined or borrowed term defined on first use, marked by where it comes from.
-- Changes: the specific edits, ordered by dependency.
-- Verification: at least one criterion that fails when the change is wrong while the suite still passes.
+Lead with grounding, then order the substance: Context, New Terms, Changes (by dependency), Verification. The sections above define each.
 
 ## Rejection Diagnosis
 
-When a plan is rejected, the cause is usually one skipped guideline. Match the redirect to the section that prevents it:
+When a plan is rejected, the cause is usually one skipped guideline. Match the redirect to its section:
 
-- Redirect points at a file or caller you did not read: Grounding. Read every consumer before proposing the interface.
-- Redirect restores a constraint you dropped (a stop instruction, a "not acceptable", a required order): Grounding. The request is a constraint set.
-- Redirect says the fix targets the wrong thing or rests on an unconfirmed premise: Grounding. Confirm the failure against a repro, telemetry, or the actual source.
-- Redirect shrinks the work: Minimal-First Scope. Lead with the smallest responsive change.
-- Redirect rejects the whole approach: Direction Before Detail. Validate the approach before specifying mechanism.
-- Redirect questions a coined name or an undefined term: New Terms. Define it and say where it comes from. Cut undefinable coinage.
-- Redirect says a check proves nothing: Verification. Name a signal that fails when the change is wrong.
+- Redirect points at a file or caller you did not read: Grounding.
+- Redirect restores a constraint you dropped (a stop instruction, a "not acceptable", a required order): Grounding.
+- Redirect says the fix targets the wrong thing or rests on an unconfirmed premise: Grounding.
+- Redirect shrinks the work: Minimal-First Scope.
+- Redirect rejects the whole approach: Direction Before Detail.
+- Redirect questions a coined name or an undefined term: New Terms.
+- Redirect says a check proves nothing: Verification.
 - Redirect cites a naming or layout convention: Naming and Conventions.
 
-Fix only the line the redirect targeted, then re-present. Leave unaffected sections alone.
+Fix only the line the redirect targeted, then re-present.

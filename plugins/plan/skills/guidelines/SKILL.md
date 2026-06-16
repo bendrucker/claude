@@ -9,42 +9,21 @@ disable-model-invocation: true
 
 @references/guidelines.md
 
-## Extended Guidance
+## Plan Shape
 
-### Reading Before Planning
+Lead with grounding, then order the substance: Context, New Terms, Changes (by dependency), Verification. The sections above define each.
 
-Before proposing changes:
+## Rejection Diagnosis
 
-1. Read the files you intend to modify
-2. Understand existing patterns and conventions
-3. Identify related code that might be affected
-4. Check for existing tests covering the area
+When a plan is rejected, the cause is usually one skipped guideline. Match the redirect to its section:
 
-### Plan Structure
+- Redirect points at a file or caller you did not read: Grounding.
+- Redirect restores a constraint you dropped (a stop instruction, a "not acceptable", a required order): Grounding.
+- Redirect says the fix targets the wrong thing or rests on an unconfirmed premise: Grounding.
+- Redirect shrinks the work: Minimal-First Scope.
+- Redirect rejects the whole approach: Direction Before Detail.
+- Redirect questions a coined name or an undefined term: New Terms.
+- Redirect says a check proves nothing: Verification.
+- Redirect cites a naming or layout convention: Naming and Conventions.
 
-A good plan includes:
-
-- **Context**: What problem are we solving? Current state?
-- **Changes**: Specific files and modifications, with line references
-- **Dependencies**: What must happen in order? What can be parallelized?
-- **Verification**: How do we confirm success? What tests to run?
-- **Risks**: What could go wrong? How do we recover?
-
-### Scope Management
-
-Plans should match the request exactly:
-
-- Asked to fix a bug: don't refactor surrounding code
-- Asked to add a feature: don't add "nice to have" extras
-- Asked to refactor: don't fix unrelated issues you notice
-- Document out-of-scope observations separately if important
-
-### When Plans Get Rejected
-
-Common reasons:
-
-- Too vague (no specific file/line references)
-- Too broad (scope creep beyond the request)
-- Missing verification steps
-- Ignoring existing patterns in the codebase
-- Proposing changes to unread code
+Fix only the line the redirect targeted, then re-present.

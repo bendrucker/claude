@@ -722,6 +722,61 @@ export const PATTERNS: PatternDef[] = [
   },
   {
     tier: "context",
+    layer: "vocabulary",
+    category: "rides on",
+    test: /\brid(?:e|es|ing)\s+(?:on|atop|alongside)\b/gi,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" is figurative dependency language. State the relationship plainly: "X depends on Y", "X reuses Y", or "X piggybacks on Y".`,
+    positives: [
+      "The teardown rides on the normal end of a team.",
+      "The new reader rides atop the existing httpfs layer.",
+      "The sync loop rides alongside the existing poll cycle.",
+    ],
+    negatives: ["The cyclists ride for charity.", "She takes the early train to work."],
+    evidence:
+      "User-flagged 2026-06 as a recurring figurative construction for dependency or coupling ('X rides on Y'). It appears mostly in conversational reasoning, which neither the hook nor the additions miner reads, so it ships skillOnly pending a chat-voice calibration decision.",
+    retire:
+      "Remove if a chat-voice corpus pass shows the construction is not distinctive versus the user baseline. Promote to hook (drop skillOnly) only after a deliverable-corpus pass clears it at the hook precision bar.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "can bite",
+    test: /\b(?:can|could|will|may|might)\s+bite\b/gi,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" is figurative risk language for a latent bug. Name the failure: what breaks, and under what condition.`,
+    positives: [
+      "A stale cache entry can bite at runtime.",
+      "That assumption could bite once the schema changes.",
+    ],
+    negatives: ["The dog will bark at strangers.", "This could break under load."],
+    evidence:
+      "User-flagged 2026-06 as a recurring figurative construction for latent-bug risk ('this can bite later'). It lives almost entirely in conversational reasoning, so it ships skillOnly pending a chat-voice calibration decision.",
+    retire:
+      "Remove if a chat-voice corpus pass shows the construction is not distinctive versus the user baseline. Promote to hook only after a deliverable-corpus pass clears it at the hook precision bar.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "surface as verb",
+    test: /\bsurfac(?:e|es|ed|ing)\s+(?:the|a|an|that|this|these|those|any|all|each|its|their|every)\b/gi,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" uses "surface" as a verb meaning reveal or report. Say "show", "report", or "expose".`,
+    positives: [
+      "The hook should surface the conflict to the user.",
+      "The report surfaces these gaps automatically.",
+    ],
+    negatives: ["The attack surface is large.", "Reduce the API surface area."],
+    evidence:
+      "User-flagged 2026-06 as the highest-frequency tell, but 'surface' is polysemous: it is a load-bearing domain noun in this plugin ('chat surface', 'deliverable surface') and a word the user writes legitimately ('surface area'). The determiner lookahead targets the verb-with-object sense and spares the noun sense. Ships skillOnly because the verb sense itself appears in the user's own writing, so distinctiveness is unverified.",
+    retire:
+      "Remove if a sense-aware corpus pass shows the verb usage is not distinctive versus the user baseline. Do not promote to hook or add 'surface' to vocabulary.txt: a stem match cannot separate the verb from the domain noun.",
+  },
+  {
+    tier: "context",
     layer: "grammar",
     category: "hedging observation",
     test: /\b(?:looks|appears|seems)\s+(?:like|to)\b/gi,

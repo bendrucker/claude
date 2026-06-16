@@ -874,3 +874,66 @@ describe("attribution and skill-activity query", () => {
     expect(Number(writing?.assistant_turns)).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe("plan_calls view and plans query", () => {
+  it("classifies a redirected plan as outcome=redirected with plan_seq=1", async () => {
+    const rows = await db.query<{
+      session_id: string;
+      outcome: string;
+      plan_seq: bigint;
+      plan_chars: bigint;
+      plan_file: string;
+    }>(
+      "SELECT session_id, outcome, plan_seq, plan_chars, plan_file FROM plan_calls WHERE session_id = 'plan-session' ORDER BY plan_seq",
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.outcome).toBe("redirected");
+    expect(Number(rows[0]?.plan_seq)).toBe(1);
+    expect(Number(rows[0]?.plan_chars)).toBeGreaterThan(0);
+    expect(rows[0]?.plan_file).toContain("plan-session");
+  });
+
+  it("classifies the second plan (after approval) as outcome=approved with plan_seq=2", async () => {
+    const rows = await db.query<{ outcome: string; plan_seq: bigint }>(
+      "SELECT outcome, plan_seq FROM plan_calls WHERE session_id = 'plan-session' ORDER BY plan_seq",
+    );
+    expect(rows[1]?.outcome).toBe("approved");
+    expect(Number(rows[1]?.plan_seq)).toBe(2);
+  });
+
+  it("aggregates plan_sessions with correct counts and replan tier", async () => {
+    const [row] = await db.query<{
+      plan_count: bigint;
+      redirect_count: bigint;
+      approved_count: bigint;
+    }>(
+      "SELECT plan_count, redirect_count, approved_count FROM plan_sessions WHERE session_id = 'plan-session'",
+    );
+    expect(Number(row?.plan_count)).toBe(2);
+    expect(Number(row?.redirect_count)).toBe(1);
+    expect(Number(row?.approved_count)).toBe(1);
+  });
+
+  it("reports the session via the plans query with replan_tier=replan", async () => {
+    const rows = await runQuery<{ session_id: string; replan_tier: string; plan_count: bigint }>(
+      db,
+      "plans",
+      { after_date: null, before_date: null, project: null, host: null, min_plans: null },
+    );
+    const row = rows.find((r) => r.session_id === "plan-session");
+    expect(row).toBeDefined();
+    expect(row?.replan_tier).toBe("replan");
+    expect(Number(row?.plan_count)).toBe(2);
+  });
+
+  it("excludes sessions below min_plans threshold", async () => {
+    const rows = await runQuery<{ session_id: string }>(db, "plans", {
+      after_date: null,
+      before_date: null,
+      project: null,
+      host: null,
+      min_plans: "3",
+    });
+    expect(rows.find((r) => r.session_id === "plan-session")).toBeUndefined();
+  });
+});

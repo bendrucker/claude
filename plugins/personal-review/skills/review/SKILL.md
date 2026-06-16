@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Daily Review
 
-Multi-phase workflow with checkpoints between phases. Each phase ends with a summary before proceeding.
+Multi-phase workflow with checkpoints. Each phase ends with a summary before proceeding.
 
 ## Variants
 
@@ -21,9 +21,9 @@ Ask which variant if not specified.
 
 Dispatch a read-only sub-agent (Task tool) to scan today's events. See [calendar.md](calendar.md).
 
-If the sub-agent reports calendar access denied (the `"reason": "no-app-bundle"` error), skip silently. Do not prompt to fix permissions. Note "Calendar: skipped (access denied)" and proceed to the next phase.
+If the sub-agent reports calendar access denied (`"reason": "no-app-bundle"`), skip silently. Do not prompt to fix permissions. Note "Calendar: skipped (access denied)" and proceed to the next phase.
 
-Otherwise, present time budget (available hours, focus windows, meetings needing prep). Ask user to proceed.
+Otherwise, present time budget (available hours, focus windows, meetings needing prep). Ask the user to proceed.
 
 ## Phase: Things Inbox
 
@@ -37,11 +37,11 @@ Batch items by pattern, ask user for each batch:
 
 Goal: inbox count = 0.
 
-After inbox processing, re-query calendar (see Re-Check in [calendar.md](calendar.md)). If calendar was skipped due to access denied in the initial phase, skip the re-check too. Otherwise, present any new events and updated time budget. Ask user to proceed.
+After inbox processing, re-query calendar (see Re-Check in [calendar.md](calendar.md)). If calendar was skipped due to access denied in the initial phase, skip the re-check too. Otherwise, present new events and updated time budget. Ask the user to proceed.
 
 ## Phase: Notifications
 
-Dispatch read-only sub-agents in parallel (Task tool) for GitHub, GitLab, and Linear. Then triage each interactively.
+Dispatch read-only sub-agents in parallel (Task tool) for GitHub, GitLab, and Linear, then triage each interactively.
 
 ### GitHub Notifications
 
@@ -78,7 +78,7 @@ Review unread notifications:
 - **Mentions** — read, respond, archive
 - **Status changes** — acknowledge, archive
 
-After all notification inboxes are processed, ask user to proceed.
+After all notification inboxes are processed, ask the user to proceed.
 
 ## Phase: Today Triage
 

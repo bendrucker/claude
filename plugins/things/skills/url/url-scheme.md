@@ -1,6 +1,6 @@
 # Things 3 URL Scheme Reference
 
-Complete documentation for Things 3 automation via URL schemes.
+Things 3 automation via URL schemes.
 
 **Source**: [Things URL Scheme](https://culturedcode.com/things/support/articles/2803573/)
 
@@ -20,7 +20,7 @@ All commands follow the pattern: `things:///commandName?param1=value1&param2=val
 
 ### add - Create To-dos
 
-Creates new to-do items in Things.
+Creates new to-do items.
 
 **Parameters:**
 - `title` (string) - Todo title
@@ -48,7 +48,7 @@ open -g "things:///add?title=Buy%20milk&notes=Low%20fat&when=evening&tags=Errand
 
 ### add-project - Create Projects
 
-Creates new projects with optional to-dos and areas.
+Creates projects with optional to-dos and areas.
 
 **Parameters:**
 - `title` (string) - Project title
@@ -69,7 +69,7 @@ open -g "things:///add-project?title=Build%20treehouse&when=today&area=Home"
 
 ### update - Modify To-dos
 
-Updates existing to-do properties. **Requires `auth-token` and `id`.**
+Updates to-do properties. **Requires `auth-token` and `id`.**
 
 **Parameters:**
 - `id` (string, required) - Todo ID
@@ -103,14 +103,14 @@ open -g "things:///update?id=4BE64FEA-8FEF-4F4F-B8B2-4E74605D5FA5&auth-token=YOU
 
 ### update-project - Modify Projects
 
-Updates existing project properties. **Requires `auth-token` and `id`.**
+Updates project properties. **Requires `auth-token` and `id`.**
 
 Supports same parameters as `update` plus:
 - `area` or `area-id` - Move to different area
 
 ### show - Navigate & Display
 
-Navigates to specific items or built-in lists.
+Navigates to items or built-in lists.
 
 **Parameters:**
 - `id` (string) - Item ID or built-in list name
@@ -138,7 +138,7 @@ open -g "things:///show?query=Weekly%20Review&filter=Work,Planning"
 
 ### search - Open Search
 
-Invokes the search interface.
+Opens the search interface.
 
 **Parameters:**
 - `query` (string, optional) - Pre-filled search text
@@ -186,7 +186,7 @@ open -g "things:///version"
 
 ## JSON Command Format
 
-The `json` command enables creating complex structures with projects, to-dos, headings, and checklist items.
+The `json` command creates complex structures with projects, to-dos, headings, and checklist items.
 
 **Basic Usage:**
 ```bash
@@ -311,7 +311,7 @@ open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 
 ### URL Encoding
 
-All URL parameters must be properly encoded:
+All URL parameters must be encoded:
 - Space → `%20`
 - Newline → `%0a`
 - Comma → `%2C` (if not used as separator)
@@ -371,5 +371,5 @@ Controls when a to-do appears:
 - **Auth token required**: All `update`, `update-project` operations and `json` updates require auth token from Things > Settings > General
 
 ### Data Constraints
-- JSON payload size limited by URL length constraints
+- JSON payload size limited by URL length
 - Complex structures should use `json` command instead of individual `add` commands

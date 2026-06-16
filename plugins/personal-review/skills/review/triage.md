@@ -10,7 +10,7 @@ Load the `things:jxa` skill. Query all Today items as JSON from `TMTodayListSour
 
 Apply the midnight heuristic: a task is a repeating instance if `creationDate` ends with `T00:00:00` (midnight local time in ISO). Manually created tasks have non-zero hours/minutes/seconds.
 
-Overdue repeating tasks (where `dueDate` or `activationDate` is before today) should be batched for a single "Defer all overdue repeating tasks to tomorrow?" prompt. Load the `things:url` skill for batch defer.
+Batch overdue repeating tasks (where `dueDate` or `activationDate` is before today) into a single "Defer all overdue repeating tasks to tomorrow?" prompt. Load the `things:url` skill for batch defer.
 
 ## Grouping
 

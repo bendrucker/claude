@@ -24,7 +24,7 @@ Use `glab mr --help` and `glab mr <command> --help` for full options.
 
 ## Merging
 
-Always use `merge.ts` to merge. It handles merge trains, auto-merge, and squash automatically, falling back to `glab mr merge` internally when appropriate.
+Always use `merge.ts` to merge. It handles merge trains, auto-merge, and squash, falling back to `glab mr merge` internally when appropriate.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts
@@ -45,7 +45,7 @@ git push -u origin feature-branch && glab mr create --fill
 
 **Body from file:** No `--body-file` flag; use `--description "$(cat file.md)"`.
 
-**Username resolution:** Flags like `--reviewer` and `--assignee` require exact usernames. Invalid names are silently ignored. Look up users first:
+**Username resolution:** Flags like `--reviewer` and `--assignee` require exact usernames; invalid names are silently ignored. Look up users first:
 
 ```bash
 glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<name>"; "i")) | {name, username}'
@@ -53,7 +53,7 @@ glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<n
 
 ## Blocking
 
-Prevent an MR from merging until another MR merges first. Uses the REST API directly since `glab mr` has no blocking subcommand.
+Prevent an MR from merging until another MR merges first. Uses the REST API since `glab mr` has no blocking subcommand.
 
 ```bash
 # Block MR !10 until MR !5 merges
@@ -70,7 +70,7 @@ glab api projects/:id/merge_requests/10/blocks/<block-id> -X DELETE
 
 Submit review feedback as draft notes that accumulate before publishing. See [review.md](review.md) for the draft notes workflow, code suggestions, and approvals.
 
-Fetch the MRs awaiting your first review across all projects (the `UNREVIEWED` bucket; REST's `scope=reviews_for_me` cannot filter by review state). Emits `[{ url, reference, title }]` as JSON:
+Fetch MRs awaiting your first review across all projects (the `UNREVIEWED` bucket; REST's `scope=reviews_for_me` cannot filter by review state). Emits `[{ url, reference, title }]` as JSON:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
@@ -80,13 +80,17 @@ See [review-state.md](review-state.md) for the underlying GraphQL query and filt
 
 To group all your review-requested MRs by next actor (not just the `UNREVIEWED` slice), see [Review Inbox (Next-Actor Triage)](review-state.md#review-inbox-next-actor-triage) in review-state.md.
 
+## Re-request reviewers
+
+Re-trigger a review after a push reset approvals. The `mergeRequestReviewerRereview` mutation flips the target's `reviewState` back to `UNREVIEWED` and re-surfaces the MR. The reviewer must already be assigned. See [Re-Request Review](review-state.md#re-request-review) for the user-ID lookup and exact mutation.
+
 ## Discussions
 
 Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md](discussions.md) for the discussions script, resolution workflow, and pagination pitfalls.
 
 ## Stacking
 
-`glab stack` manages stacked diffs—small changes that build on each other. See [stack.md](stack.md).
+`glab stack` manages stacked diffs — small changes that build on each other. See [stack.md](stack.md).
 
 ## Reference Files
 

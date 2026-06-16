@@ -6,9 +6,15 @@ import { apStyleTitleCase } from "ap-style-title-case";
 import type { Heading, Paragraph, Strong, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import { getExtension, isMarkdownFile, isMemoryPath } from "../detection/paths";
+import { getExtension, isMarkdownFile, isMemoryPath, isPlanPath } from "../detection/paths";
 import { classifyHeadingBaseline } from "../linguistics/heading";
-import { type EditInput, formatContext, type SyncHookJSONOutput, type WriteInput } from "./io";
+import {
+  type EditInput,
+  formatContext,
+  isPlanMode,
+  type SyncHookJSONOutput,
+  type WriteInput,
+} from "./io";
 
 const PLACEHOLDER = "\0";
 
@@ -147,6 +153,8 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   }
 
   if (isMemoryPath(filePath)) return null;
+  if (isPlanPath(filePath)) return null;
+  if (isPlanMode(input)) return null;
 
   const ext = getExtension(filePath);
   if (!isMarkdownFile(ext)) return null;

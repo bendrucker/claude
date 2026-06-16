@@ -24,7 +24,7 @@ Expand brief issue descriptions into structured issues for developers and AI age
 
 ## Output Structure
 
-Every issue opens with Summary and closes with Context. Type guides offer a menu of middle sections. Include only those that earn their place.
+Lead with what's wrong or what's needed. For a substantial issue, open with Summary and close with Context, drawing middle sections from the type guide's menu. Include only those that earn their place. A trivial issue can be a tight paragraph or a single sentence. Don't wrap it in a Summary and Context skeleton it doesn't need.
 
 ```markdown
 ## Summary
@@ -48,15 +48,13 @@ Links to related issues, prior attempts, upstream work.
 
 Every section must tell the reader something they couldn't have guessed. Cut sections whose content is tautological ("tests must pass"), template residue ("no behavior change"), or obvious given the issue's size.
 
-Minimum: Summary plus one type section plus Context. Grow only when content demands.
+For a substantial issue, Summary plus one type section plus Context is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough.
 
 ## Style
 
-- **Direct** - Facts, not hedging
-- **Specific** - Name the function, file, behavior
-- **Concise** - Every sentence adds information
-- **Earn the heading** - A section present only to match the template is filler
-- **Link to code** - Permalinks for GitHub (`https://github.com/{owner}/{repo}/blob/{sha}/path#L10-L20`), file paths elsewhere (`path/to/file:10-20`)
+State facts, not hedging. Name the function, file, or behavior rather than describing it vaguely. Every sentence should add information. A section present only to match the template is filler, so earn each heading.
+
+Link to code. Use permalinks for GitHub (`https://github.com/{owner}/{repo}/blob/{sha}/path#L10-L20`) and file paths elsewhere (`path/to/file:10-20`).
 
 ## Issue Trackers
 

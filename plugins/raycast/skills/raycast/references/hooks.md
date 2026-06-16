@@ -4,7 +4,7 @@ All hooks from `@raycast/utils`. Install with `npm install @raycast/utils`.
 
 ## useFetch
 
-Fetch data from a URL with automatic JSON parsing:
+Fetch data from a URL with automatic JSON parsing.
 
 ```tsx
 import { List } from "@raycast/api";
@@ -54,7 +54,7 @@ Key options: `keepPreviousData`, `initialData`, `execute`, `mapResult`, `parseRe
 
 ## usePromise
 
-Wrap any async function:
+Wrap any async function.
 
 ```tsx
 import { usePromise } from "@raycast/utils";
@@ -91,7 +91,7 @@ Cached data must be JSON-serializable. Returns cached data immediately, then rev
 
 ## useForm
 
-Form state management with validation:
+Form state management with validation.
 
 ```tsx
 import { useForm, FormValidation } from "@raycast/utils";
@@ -112,7 +112,7 @@ Spread `itemProps.<field>` onto form items. `handleSubmit` only fires `onSubmit`
 
 ## useLocalStorage
 
-Persistent key-value storage:
+Persistent key-value storage.
 
 ```tsx
 import { useLocalStorage } from "@raycast/utils";
@@ -134,7 +134,7 @@ Returns `value`, `setValue`, `removeValue`, and `isLoading`.
 
 ## useExec
 
-Execute shell commands with stale-while-revalidate caching:
+Execute shell commands with stale-while-revalidate caching.
 
 ```tsx
 import { useExec } from "@raycast/utils";

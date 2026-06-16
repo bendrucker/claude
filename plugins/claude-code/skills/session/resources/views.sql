@@ -495,3 +495,66 @@ SELECT
   (data->>'$.prUrl')                      AS url
 FROM raw
 WHERE type = 'pr-link';
+
+-- Plan-mode calls: one row per ExitPlanMode tool_use, joined with its tool_result to
+-- classify the outcome. `plan_seq` is 1-based within the session ordered by timestamp.
+-- Outcome classification: 'approved' when the result contains "approved your plan";
+-- 'redirected' when it contains "doesn't want to proceed" or "was rejected" (the user
+-- typed feedback instead of clicking approve); 'unknown' for anything else (cancelled,
+-- null, etc.). Full plan text is in `data->'$.input.plan'`; not materialized here
+-- because plans can be several KB each.
+CREATE OR REPLACE VIEW plan_calls AS
+WITH calls AS (
+  SELECT
+    ci.host,
+    ci.session_id,
+    ci.project_path,
+    ci.timestamp,
+    ci.id AS tool_use_id,
+    (ci.data->>'$.input.planFilePath') AS plan_file,
+    length(json_extract_string(ci.data, '$.input.plan')) AS plan_chars,
+    r.content AS result_content
+  FROM content_items ci
+  LEFT JOIN content_items r
+    ON r.tool_use_id = ci.id
+   AND r.host = ci.host
+   AND r.type = 'tool_result'
+  WHERE ci.type = 'tool_use'
+    AND ci.name = 'ExitPlanMode'
+)
+SELECT
+  host,
+  session_id,
+  project_path,
+  timestamp,
+  tool_use_id,
+  plan_file,
+  plan_chars,
+  CASE
+    WHEN (result_content) LIKE '%approved your plan%'              THEN 'approved'
+    WHEN (result_content) LIKE '%want to proceed%'
+      OR (result_content) LIKE '%was rejected%'                    THEN 'redirected'
+    ELSE 'unknown'
+  END AS outcome,
+  ROW_NUMBER() OVER (
+    PARTITION BY host, session_id
+    ORDER BY timestamp
+  ) AS plan_seq
+FROM calls;
+
+-- Session-level plan aggregates: one row per session that used plan mode, with counts
+-- broken down by outcome. Sessions with plan_count >= 2 are replan candidates; >= 3
+-- are off-rails candidates.
+CREATE OR REPLACE VIEW plan_sessions AS
+SELECT
+  host,
+  session_id,
+  ANY_VALUE(project_path)                                AS project_path,
+  COUNT(*)                                               AS plan_count,
+  COUNT(*) FILTER (WHERE outcome = 'redirected')         AS redirect_count,
+  COUNT(*) FILTER (WHERE outcome = 'approved')           AS approved_count,
+  COUNT(*) FILTER (WHERE outcome = 'unknown')            AS unknown_count,
+  MIN(timestamp)                                         AS first_plan_ts,
+  MAX(timestamp)                                         AS last_plan_ts
+FROM plan_calls
+GROUP BY host, session_id;

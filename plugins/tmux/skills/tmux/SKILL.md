@@ -35,13 +35,13 @@ Each pane line ends with its geometry as `@<left>,<top> <width>x<height>`, in ce
 
 ### Worktrees and Parallel Panes
 
-Panes in a git repo show their branch and whether the checkout is a linked `(worktree)` or the primary `(main)` one. When the user refers to work by branch or worktree ("the pane on the X branch", "the worktree for Y", "the other pane, which is ready"), match the reference to a pane's branch and dispatch to it with `send-keys` (or treat it as already running) rather than entering a worktree of your own. A pane already sitting in a worktree is set up for parallel work; hand off to it instead of duplicating the checkout.
+Panes in a git repo show their branch and whether the checkout is a linked `(worktree)` or the primary `(main)` one. When the user refers to work by branch or worktree ("the pane on the X branch", "the worktree for Y", "the other pane, which is ready"), match the reference to a pane's branch and dispatch to it with `send-keys` (or treat it as already running) rather than entering a worktree of your own. A pane already in a worktree is set up for parallel work; hand off to it instead of duplicating the checkout.
 
 ## Session
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/session.sh`
 
-The `TITLE` column shows the active pane's title in each window. Claude sessions advertise their current task there, which is usually enough to identify a window without capturing its content. Windows marked `here` are the current window; `bell` or `activity` flags mean the window needs attention (a process finished, errored, or produced output).
+The `TITLE` column shows the active pane's title in each window. Claude sessions advertise their current task there, usually enough to identify a window without capturing its content. Windows marked `here` are the current window; `bell` or `activity` flags mean the window needs attention (a process finished, errored, or produced output).
 
 ## Sessions
 
@@ -49,7 +49,7 @@ The `TITLE` column shows the active pane's title in each window. Claude sessions
 
 ### Drilling Into Other Targets
 
-Each script accepts an optional target argument so you can inspect any pane, window, or session — not just the current one:
+Each script accepts an optional target argument to inspect any pane, window, or session — not just the current one:
 
 ```bash
 bash ${CLAUDE_SKILL_DIR}/scripts/session.sh other-session
@@ -80,7 +80,7 @@ Use `split-window` with `-t $TMUX_PANE` so new panes open relative to Claude's p
 tmux split-window -h -d -t $TMUX_PANE 'tail -f logs/dev.log'
 ```
 
-The command string runs in the new pane's shell. When it exits, the pane closes. Use `$SHELL` or omit the command to open an interactive shell.
+The command runs in the new pane's shell. When it exits, the pane closes. Use `$SHELL` or omit the command to open an interactive shell.
 
 ### Starting Claude Sessions
 
@@ -94,7 +94,7 @@ Use `send-keys` only for follow-up messages to an already-running session.
 
 ## Collaborative File Viewing
 
-When collaborating on a file, open it in a sidebar pane so the user can see changes in real-time as you edit.
+When collaborating on a file, open it in a sidebar pane so the user sees changes in real-time as you edit.
 
 ```bash
 tmux split-window -h -d -l 40% -t $TMUX_PANE '<command> <file>'
@@ -127,11 +127,11 @@ Open with `$EDITOR` when set, otherwise fall back to read-only viewers:
 | bat | `bat --paging always file.ts` | Syntax-highlighted, read-only |
 | less | `less file.ts` | Plain text fallback |
 
-Use the first available option. If the pane exits immediately, the tool is missing, try the next.
+Use the first available option. If the pane exits immediately, the tool is missing; try the next.
 
 ## Capturing Pane Content
 
-Use `capture-pane -p` to print to stdout instead of a paste buffer:
+Use `capture-pane -p` to print to stdout instead of a paste buffer.
 
 ```bash
 tmux capture-pane -t $TARGET -p

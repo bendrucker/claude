@@ -56,7 +56,7 @@ Controls where the shortcut appears:
 
 ## WFWorkflowInputContentItemClasses
 
-Accepted input types when the shortcut receives input from the share sheet or another shortcut:
+Input types accepted when the shortcut receives input from the share sheet or another shortcut:
 
 - `WFAppStoreAppContentItem`
 - `WFArticleContentItem`

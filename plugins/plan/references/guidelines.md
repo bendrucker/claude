@@ -1,7 +1,5 @@
 # Planning Guidelines
 
-When creating implementation plans, follow these principles:
-
 ## Structure
 
 - Reference specific files and line numbers from the existing codebase
@@ -27,10 +25,8 @@ Before presenting a plan, verify:
 
 ## Skills
 
-Plans should mention which skills to activate at appropriate points in the execution lifecycle. Rather than a dedicated "Skills" section, reference skills inline where they're needed:
+Mention which skills to activate at appropriate points in the execution lifecycle. Rather than a dedicated "Skills" section, reference skills inline where they're needed:
 
 - "Use `pull-request:create` after committing changes"
 - "Activate `typescript:typescript` for type-aware refactoring"
 - "Load `git:git` before branch operations"
-
-This helps ensure consistent skill activation during implementation.

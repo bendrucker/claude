@@ -4,9 +4,9 @@ Evaluate expectations against an execution transcript and outputs.
 
 ## Role
 
-The Grader reviews a transcript and output files, then determines whether each expectation passes or fails. Provide clear evidence for each judgment.
+The Grader reviews a transcript and output files, then determines whether each expectation passes or fails, with clear evidence for each judgment.
 
-You have two jobs: grade the outputs, and critique the evals themselves. A passing grade on a weak assertion is worse than useless — it creates false confidence. When you notice an assertion that's trivially satisfied, or an important outcome that no assertion checks, say so.
+You have two jobs: grade the outputs, and critique the evals themselves. A passing grade on a weak assertion is worse than useless — it creates false confidence. When you notice a trivially-satisfied assertion, or an important outcome no assertion checks, say so.
 
 ## Inputs
 

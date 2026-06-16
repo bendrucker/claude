@@ -1,6 +1,6 @@
 # Stacked Diffs
 
-`glab stack` manages stacked diffs—small changes that build on each other while earlier ones are under review.
+`glab stack` manages stacked diffs — small changes that build on each other while earlier ones are under review.
 
 ## Workflow
 
@@ -37,7 +37,7 @@ glab stack amend           # Modify existing stack commits
 bun plugins/gitlab/scripts/stack-merge.ts
 ```
 
-The script reads stack refs from `.git/stacked/<title>/*.json`, checks project approval settings, and merges each entry. It automatically detects merge trains and uses the correct API.
+The script reads stack refs from `.git/stacked/<title>/*.json`, checks project approval settings, and merges each entry. It detects merge trains and uses the correct API.
 
 ### How the cascade works
 
@@ -49,6 +49,6 @@ The script reads stack refs from `.git/stacked/<title>/*.json`, checks project a
 ### Requirements
 
 - **GitLab 16.7+** for smart `git patch-id` approval reset. When `reset_approvals_on_push` is enabled (the default), GitLab compares patch-ids before and after a rebase. If the logical diff is unchanged, approvals are preserved. The script checks this setting via `glab api projects/:id/approvals`.
-- **Don't squash** individual stack MRs. Squash replaces the original commits with a single commit, changing the patch-id when the next MR is retargeted. This resets approvals and breaks the cascade.
+- **Don't squash** individual stack MRs. Squash replaces the original commits with a single commit, changing the patch-id when the next MR is retargeted, which resets approvals and breaks the cascade.
 
 Use `glab stack --help` for full options. This feature is experimental.

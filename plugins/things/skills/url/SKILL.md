@@ -14,7 +14,7 @@ Write operations for Things 3 via the `things:///` URL scheme.
 
 ## Quick Start
 
-Use `url.ts` for most operations — it handles auth tokens and URL encoding:
+Use `url.ts` for most operations — it handles auth tokens and URL encoding.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts <command> [key=value ...]
@@ -51,7 +51,7 @@ Items appear at the top of the list in the order specified. Default list is `tod
 
 ## Callback
 
-When the `x-callback-url` plugin is installed, `url.ts` automatically uses xcall to get a response from Things on stdout. Present the result to the user as clickable `https://things.bendrucker.me/show?id=<id>` links:
+When the `x-callback-url` plugin is installed, `url.ts` uses xcall to get a response from Things on stdout. Present the result as clickable `https://things.bendrucker.me/show?id=<id>` links:
 
 - **Single todo** (`add`, `update`): returns `x-things-id=<id>` — present one link
 - **Batch** (`json`): returns `x-things-ids=["id1","id2"]` — present a bulleted list with each todo's title and link

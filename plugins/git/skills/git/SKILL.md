@@ -7,14 +7,14 @@ description: >-
 
 # Git
 
-* **Never** `git push` to the default branch (usually `main` or `master`) unless I explicitly instruct you to do so.
-* **Always** use a topic branch with a few brief word hyphenated name
+* **Never** `git push` to the default branch (usually `main` or `master`) unless I explicitly instruct you.
+* **Always** use a topic branch with a few-word hyphenated name
 
 ## Commit Messages
 
 For multi-line commit messages:
 
-- **Simple (subject + body):** Use multiple `-m` flags. Each `-m` creates a separate paragraph:
+- **Simple (subject + body):** Use multiple `-m` flags; each creates a separate paragraph:
   ```bash
   git commit -m "Subject line" -m "Body paragraph here."
   ```

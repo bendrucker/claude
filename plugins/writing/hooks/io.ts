@@ -1,9 +1,13 @@
-import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 export type { SyncHookJSONOutput };
 
 export type WriteInput = { file_path: string; content: string };
 export type EditInput = { file_path: string; new_string: string };
+
+export function isPlanMode(input: PreToolUseHookInput): boolean {
+  return input.permission_mode === "plan";
+}
 
 export function formatDecision(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
   return {

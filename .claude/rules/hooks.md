@@ -6,9 +6,9 @@ paths:
 
 # Hooks
 
-See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. This repository includes a Biome PostToolUse hook (`.claude/hooks/biome/`) that runs after file edits to check for lint errors.
+See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. A Biome PostToolUse hook (`.claude/hooks/biome/`) runs after file edits to check lint errors.
 
-Raw `git worktree add` is denied in favor of the `worktrunk` skill, except when the target is under `tmp/`, which is allowed for disposable scripted verification checkouts.
+Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under `tmp/`, allowed for disposable scripted verification checkouts.
 
 Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Matcher fields are not shell commands and should not be quoted. Run `bun scripts/check-hook-quoting.ts` to validate.
 

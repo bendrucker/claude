@@ -22,6 +22,6 @@ After making changes to plugin scripts, run them directly to verify they work en
 
 Tests run per-plugin in the CI matrix for:
 - **Parallelization**: Integration tests can take seconds; running in parallel across plugins is faster
-- **Clear feedback**: Failed tests clearly indicate which plugin has the issue
+- **Clear feedback**: Failed tests indicate which plugin has the issue
 
 Root-level tests (e.g., `hooks/`) run in a dedicated job since they're not part of any plugin.

@@ -75,6 +75,13 @@ When an issue is referenced:
 
 ## Reviewers
 
+Reviewer suggestion is for corporate and internal work. On OSS the project author or maintainer triages incoming PRs, so suggesting reviewers there only adds noise. Gate this whole section on repository visibility:
+
+- **GitHub**: `gh repo view --json visibility -q .visibility`
+- **GitLab**: `glab api projects/:fullpath --jq .visibility`
+
+A public repository is OSS. Skip the rest of this section and let the maintainer triage. Any other visibility (private, internal) is corporate. Continue below.
+
 Suggest reviewers; never assign them. The user always chooses from the suggestions.
 
 Run the script to rank candidates from the git history of the changed files. It excludes you and needs no arguments:
@@ -103,7 +110,7 @@ If `--dry-run` (or `--body-only`) is set, follow the Dry Run section instead of 
 1. Stage changes if not already staged: `git add .`
 1. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
 1. Push the branch to remote: `git push -u origin HEAD`
-1. Suggest reviewers (see [Reviewers](#reviewers)). Present the candidates and include only the ones the user accepts via `--reviewer` below.
+1. Suggest reviewers on corporate repos (see [Reviewers](#reviewers)). Skip this step for OSS. When suggesting, present the candidates and include only the ones the user accepts via `--reviewer` below.
 1. Create the PR/MR:
    - Write the body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
    - Include the branch name in the filename to avoid conflicts with concurrent agents

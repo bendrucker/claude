@@ -329,7 +329,7 @@
       "source": {
         "source": "github",
         "repo": "vercel-labs/agent-browser",
-        "ref": "v0.27.1"
+        "ref": "v0.28.0"
       }
     }
   },

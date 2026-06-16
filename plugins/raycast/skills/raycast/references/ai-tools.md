@@ -25,7 +25,7 @@ The default export receives a typed `Input` object and returns a value. JSDoc co
 
 ## Confirmation
 
-Export a `confirmation` function for operations with side effects:
+Export a `confirmation` function for operations with side effects.
 
 ```ts
 // src/tools/delete-todo.ts

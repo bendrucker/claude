@@ -12,7 +12,7 @@ Teammates don't inherit the lead's conversation history. Include task-specific d
 |---|---|
 | Too small | Coordination overhead exceeds the benefit |
 | Too large | Teammates work too long without check-ins, risking wasted effort |
-| Right | Self-contained units producing a clear deliverable (a function, test file, or review) |
+| Right | Self-contained units producing a clear deliverable (function, test file, or review) |
 
 Aim for 5-6 tasks per teammate.
 

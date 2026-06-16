@@ -20,7 +20,7 @@ Ask via AskUserQuestion with detected candidates as options, relying on the buil
 - Issue tracker: platform, username and team, and how "current cycle" is expressed there, whether that is a cycle, sprint, iteration, or milestone, recording the exact term and how to query it.
 - Worktrees: the tool used, if any, plus every root directory the end-of-day sweep should walk when it checks for uncommitted changes and unpushed commits.
 - Working hours: optional, default 09:00 to 17:00, used only to suggest a mode when `/job` runs with no argument.
-- Notes: optional free-form text for reviewer conventions and team norms, the field where employer specifics belong rather than anywhere in the skill.
+- Notes: optional free-form text for reviewer conventions and team norms, where employer specifics belong rather than anywhere in the skill.
 
 ## Persist
 

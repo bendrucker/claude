@@ -2,7 +2,7 @@
 
 Comments should be concise and instructive. Help the author understand why a suggestion was made. Provide inline links to relevant sources.
 
-Write in a natural, conversational tone. Avoid stiff or over-punctuated prose. Read the reviewer's actual comment history to match their voice.
+Write in a natural, conversational tone. Avoid stiff or over-punctuated prose. Read the reviewer's comment history to match their voice.
 
 Don't address the author by name or with greetings ("Hey Alice,", "Hi @bob"). Comments are already targeted at the author, so open with the substance.
 
@@ -26,10 +26,10 @@ The keyword conveys severity without drawing attention to itself.
 
 Blocking comments should be matter-of-fact about the risk. State the problem and its impact directly without hedging.
 
-Non-blocking suggestions should be collaborative. Use phrasing like "what about...", "have you considered...", or "worth adding" to invite discussion rather than direct.
+Non-blocking suggestions should be collaborative. Use phrasing like "what about...", "have you considered...", or "worth adding" to invite discussion.
 
 ## Nitpicks
 
-Prefix unimportant comments with `Nit:` to indicate a nitpick.
+Prefix unimportant comments with `Nit:`.
 
 Any review with only nitpick comments should be approved.

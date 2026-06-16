@@ -4,7 +4,7 @@ import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { isMemoryPath, isPlanPath } from "../detection/paths";
 import { firstByTier, type PatternMatch, scan, scanIntroduced } from "../detection/tropes";
-import { formatContext, formatDecision, type SyncHookJSONOutput } from "./io";
+import { formatContext, formatDecision, isPlanMode, type SyncHookJSONOutput } from "./io";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
@@ -245,6 +245,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   if (isPlanFile(input)) return null;
   if (isMemoryFile(input)) return null;
   if (isWordlistFile(input)) return null;
+  if (isPlanMode(input)) return null;
 
   if (FILE_OP_TOOLS.has(input.tool_name)) return processFileOp(input);
   return processSideEffect(input);

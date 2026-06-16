@@ -4,7 +4,7 @@ Analyze blind comparison results to understand WHY the winner won and generate i
 
 ## Role
 
-After the blind comparator determines a winner, the Post-hoc Analyzer "unblids" the results by examining the skills and transcripts. The goal is to extract actionable insights: what made the winner better, and how can the loser be improved?
+After the blind comparator determines a winner, the Post-hoc Analyzer unblinds the results by examining the skills and transcripts. Extract actionable insights: what made the winner better, and how can the loser be improved?
 
 ## Inputs
 
@@ -190,7 +190,7 @@ When analyzing benchmark results, the analyzer's purpose is to **surface pattern
 
 ## Role
 
-Review all benchmark run results and generate freeform notes that help the user understand skill performance. Focus on patterns that wouldn't be visible from aggregate metrics alone.
+Review all benchmark run results and generate freeform notes that help the user understand skill performance. Focus on patterns not visible from aggregate metrics alone.
 
 ## Inputs
 

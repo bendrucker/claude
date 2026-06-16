@@ -46,7 +46,7 @@ Retrieves a named variable:
 
 ## Action Output UUIDs
 
-Any action can capture its output for later use. Add `UUID` and `CustomOutputName` to the action's parameters:
+Any action can capture its output for later use. Add `UUID` and `CustomOutputName` to the action's parameters.
 
 ```xml
 <dict>
@@ -66,7 +66,7 @@ Any action can capture its output for later use. Add `UUID` and `CustomOutputNam
 
 ## Referencing Action Output
 
-To use a captured output in a later action's parameters, use `WFTextTokenAttachment`:
+To use a captured output in a later action's parameters, use `WFTextTokenAttachment`.
 
 ```xml
 <dict>
@@ -118,4 +118,4 @@ For strings that contain inline variable references, use `WFTextTokenString`. Th
 - `{6, 1}` is `{offset, length}` — the character position of the replacement character
 - Each embedded variable needs its own entry in `attachmentsByRange`
 
-**Recommendation**: For simplicity, prefer `Set Variable` / `Get Variable` actions over inline token strings. Use `WFTextTokenString` only when you need variables embedded mid-string.
+**Recommendation**: Prefer `Set Variable` / `Get Variable` actions over inline token strings. Use `WFTextTokenString` only when you need variables embedded mid-string.

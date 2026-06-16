@@ -79,7 +79,7 @@ Wireframes use black borders on white background:
 
 ### Image Placeholder
 
-Use a bordered div with centered placeholder text (not X-pattern):
+Bordered div with centered placeholder text (not X-pattern):
 
 ```html
 <div class="border border-black h-48 flex items-center justify-center text-gray-400">

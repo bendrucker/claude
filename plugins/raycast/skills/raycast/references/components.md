@@ -1,6 +1,6 @@
 # Components
 
-All UI is built with React components from `@raycast/api`.
+UI is built with React components from `@raycast/api`.
 
 ## List
 
@@ -155,7 +155,7 @@ Form items: `TextField`, `TextArea`, `PasswordField`, `Checkbox`, `DatePicker`, 
 
 ## ActionPanel
 
-Actions are grouped in `ActionPanel`, optionally split into sections:
+Actions are grouped in `ActionPanel`, optionally split into sections.
 
 ```tsx
 <ActionPanel>
@@ -176,7 +176,7 @@ Custom actions accept `title`, `icon`, `shortcut`, and `onAction`.
 
 ## Toasts
 
-Show feedback with `showToast`:
+Show feedback with `showToast`.
 
 ```tsx
 import { showToast, Toast } from "@raycast/api";

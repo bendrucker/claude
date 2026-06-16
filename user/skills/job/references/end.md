@@ -33,7 +33,7 @@ Never silently drop an item.
 
 ## Unpushed Work Sweep
 
-The configured roots may span many repositories, so keep this phase cheap: one sub-agent, local git commands only, no platform API calls. This is the lowest-priority phase. Skip it when the focus hint points elsewhere or the rest of the brief already needs the time.
+The configured roots may span many repositories, so keep this phase cheap: one sub-agent, local git commands only, no platform API calls. This is the lowest-priority phase. Skip it when the focus hint points elsewhere or the rest of the brief needs the time.
 
 Enumerate worktrees via the configured worktree tool. Fall back to `git worktree list` run across the configured roots. For each worktree, report:
 

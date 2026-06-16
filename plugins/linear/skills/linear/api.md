@@ -1,6 +1,6 @@
 # Linear GraphQL API via CLI
 
-Run GraphQL queries and mutations against Linear using the `linear api` CLI subcommand.
+Run GraphQL queries and mutations against Linear with the `linear api` CLI subcommand.
 
 ## Authentication
 
@@ -24,7 +24,7 @@ Or pipe from stdin:
 echo '{ viewer { id } }' | linear api
 ```
 
-Output is JSON on stdout. Pipe through `jq` for formatting or field extraction:
+Output is JSON on stdout. Pipe through `jq` for formatting or field extraction.
 
 ```bash
 linear api 'query { viewer { id name email } }' | jq '.data.viewer'
@@ -47,7 +47,7 @@ linear api 'mutation($input: IssueCreateInput!) { issueCreate(input: $input) { s
 
 ## Pagination
 
-Use `--paginate` to automatically fetch all pages:
+Use `--paginate` to fetch all pages:
 
 ```bash
 linear api 'query { issues(first: 50) { nodes { id title } pageInfo { hasNextPage endCursor } } }' --paginate
@@ -110,8 +110,8 @@ linear api 'mutation($id: String!, $input: IssueUpdateInput!) {
 - **Team IDs**: Required for most operations involving issues and projects
 - **State IDs**: Issues default to the team's first Backlog state unless specified
 - **Archived Resources**: Hidden by default; use `includeArchived: true` to retrieve
-- **Error Handling**: Always check the `errors` array in responses before assuming success
-- **Rate Limiting**: Monitor HTTP status codes and handle rate limits appropriately
+- **Error Handling**: Check the `errors` array in responses before assuming success
+- **Rate Limiting**: Monitor HTTP status codes and handle limits
 
 ## Schema Introspection
 

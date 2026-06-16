@@ -26,11 +26,11 @@ Use MCP tools to find and inspect runs:
 2. `list_runs` with the workspace ID to see recent runs
 3. `get_run_details` with the run ID for status, relationships, and timestamps
 
-The run details include `relationships.plan.data.id` and `relationships.apply.data.id` — use these to fetch logs.
+Run details include `relationships.plan.data.id` and `relationships.apply.data.id` — use these to fetch logs.
 
 ## Fetching Plan/Apply Logs
 
-The MCP server does not expose log retrieval. Use the TFC API directly:
+The MCP server does not expose log retrieval; use the TFC API directly.
 
 ```bash
 # Get the apply details (includes log-read-url)
@@ -48,7 +48,7 @@ curl -s "$(archivist_url)"
 
 The same pattern works for plans via `/api/v2/plans/{plan-id}`.
 
-See [references/api.md](references/api.md) for full API details.
+See [references/api.md](references/api.md).
 
 ## Authentication
 
@@ -60,4 +60,4 @@ The MCP server reads `TFE_TOKEN` from the environment. For curl calls, use it as
 
 ## Registry
 
-Provider and module searches are available via MCP tools (`search_providers`, `search_modules`, `provider_details`, `module_details`). No curl needed for registry operations.
+Provider and module searches use MCP tools (`search_providers`, `search_modules`, `provider_details`, `module_details`). No curl needed.

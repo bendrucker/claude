@@ -4,7 +4,13 @@ import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { extractBodyFilePath, processInput, validateBody } from "./validate-body";
+import {
+  extractBodyFilePath,
+  hasFileTourBullets,
+  hasReflexiveScaffold,
+  processInput,
+  validateBody,
+} from "./validate-body";
 
 function getPermissionDecision(result: Awaited<ReturnType<typeof validateBody>>) {
   const output = result?.hookSpecificOutput;
@@ -13,6 +19,20 @@ function getPermissionDecision(result: Awaited<ReturnType<typeof validateBody>>)
   }
   return undefined;
 }
+
+function getAdditionalContext(result: Awaited<ReturnType<typeof validateBody>>) {
+  const output = result?.hookSpecificOutput;
+  if (output && "additionalContext" in output) {
+    return output.additionalContext;
+  }
+  return undefined;
+}
+
+const LONG_PROSE = Array(40)
+  .fill(
+    "The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL.",
+  )
+  .join(" ");
 
 describe("extractBodyFilePath", () => {
   it("returns null when command has no --body-file", () => {
@@ -73,6 +93,90 @@ describe("validateBody", () => {
     const result = validateBody("## Test plan\nadded 10 tests");
     expect(result).not.toBeNull();
     expect(getPermissionDecision(result)).toBe("deny");
+  });
+
+  it("warns (does not deny) on a reflexive scaffold in a small body", () => {
+    const result = validateBody(
+      "## Changes\n\n- Adds a flag\n\n## Testing\n\nRan the suite.\n\nFixes #1",
+    );
+    expect(result).not.toBeNull();
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("scaffold");
+  });
+
+  it("warns on file-tour bullets", () => {
+    const result = validateBody(
+      "## Changes\n\n- **src/cache.ts**: adds an LRU cache\n- **src/index.ts**: wires it up",
+    );
+    expect(result).not.toBeNull();
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("file tour");
+  });
+
+  it("combines both structural warnings into one message", () => {
+    const result = validateBody(
+      "## Changes\n\n- **src/cache.ts**: adds a cache\n\n## Testing\n\nManual.",
+    );
+    expect(getPermissionDecision(result)).toBeUndefined();
+    const context = getAdditionalContext(result);
+    expect(context).toContain("scaffold");
+    expect(context).toContain("file tour");
+  });
+
+  it("lets a test-count deny take precedence over structural warnings", () => {
+    const result = validateBody(
+      "## Changes\n\n- **src/cache.ts**: adds a cache\n\n## Testing\n\nAdded 5 tests",
+    );
+    expect(getPermissionDecision(result)).toBe("deny");
+  });
+
+  it("does not warn on a large PR with earned sections", () => {
+    const body = `${LONG_PROSE}\n\n## Changes\n\n- Adds the LRU cache\n\n## Testing\n\nManual exercise of expiry and eviction.`;
+    expect(validateBody(body)).toBeNull();
+  });
+
+  it("does not warn on concept-labeled bold bullets", () => {
+    const result = validateBody(
+      "## Changes\n\n- **Caching**: stores records in memory\n- **Eviction**: drops the oldest entry",
+    );
+    expect(result).toBeNull();
+  });
+});
+
+describe("hasReflexiveScaffold", () => {
+  it("flags a small body with both Changes and Testing headings", () => {
+    expect(hasReflexiveScaffold("## Changes\n\n- x\n\n## Testing\n\ny")).toBe(true);
+  });
+
+  it("does not flag when only one heading is present", () => {
+    expect(hasReflexiveScaffold("## Changes\n\n- x")).toBe(false);
+  });
+
+  it("does not flag a body at or over the word limit", () => {
+    const body = `${LONG_PROSE}\n\n## Changes\n\n- x\n\n## Testing\n\ny`;
+    expect(hasReflexiveScaffold(body)).toBe(false);
+  });
+});
+
+describe("hasFileTourBullets", () => {
+  it("flags a bold label with a path separator", () => {
+    expect(hasFileTourBullets("- **src/cache.ts**: adds a cache")).toBe(true);
+  });
+
+  it("flags a bold label that ends in a file extension", () => {
+    expect(hasFileTourBullets("* **cache.ts**: adds a cache")).toBe(true);
+  });
+
+  it("flags a bold label wrapped in backticks denoting a path", () => {
+    expect(hasFileTourBullets("- **`lib/foo.ts`**: refactors it")).toBe(true);
+  });
+
+  it("does not flag a plain concept label", () => {
+    expect(hasFileTourBullets("- **Caching**: stores records in memory")).toBe(false);
+  });
+
+  it("does not flag a multi-word concept label", () => {
+    expect(hasFileTourBullets("- **Retry logic**: backs off exponentially")).toBe(false);
   });
 });
 

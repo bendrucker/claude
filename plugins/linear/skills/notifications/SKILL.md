@@ -53,7 +53,7 @@ linear api 'mutation { notificationMarkAllAsRead(input: {}) { success } }'
 
 ## Filtering
 
-Add filters to the query:
+Add filters to the query.
 
 ```graphql
 notifications(first: 50, filter: { type: { eq: "IssueAssignedToYou" } })

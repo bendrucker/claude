@@ -90,6 +90,7 @@ Every query also takes an optional `host` param. Omit it to span every machine (
 - `repeat-read-waste`: repeat Reads (same file re-read within a session) decomposed by cause: paginated (`offset`/`limit` chunking), sidechain (subagent fan-out), after-own-edit, and true repeats (the actionable context tax), with char/token cost. Params: `after_date`, `before_date`, `project`, `host`.
 - `skill-auto-vs-explicit`: per skill, model-auto (empty args) vs explicit/slash invocations, the core `disable-model-invocation` lever. Params: `min_calls` (default 1), `after_date`, `before_date`, `project`, `host`.
 - `sandbox-bypass-effective-command`: top `dangerouslyDisableSandbox` commands normalized to their real verb after stripping a leading `cd <path>` wrapper (`excludedCommands` candidates). Params: `min_count` (default 5), `after_date`, `before_date`, `project`, `host`.
+- `plans`: sessions that used plan mode (ExitPlanMode), with per-session plan count, redirect/approved breakdown, and a `replan_tier` label (`single` / `replan` / `off-rails` for plan_count >= 3). Sorted by plan_count descending. Params: `min_plans` (default 1), `after_date`, `before_date`, `project`, `host`.
 
 ## Cross-Machine History
 
@@ -164,6 +165,8 @@ Every table and view carries a `host` column (`local` for this machine, the labe
 - `permission_requests`: tool calls the user rejected.
 - `sandbox_bypasses`: Bash calls that used `dangerouslyDisableSandbox=true`, with back-links to retried failures.
 - `skill_calls`: one row per `Skill` tool invocation.
+- `plan_calls`: one row per `ExitPlanMode` tool use. Columns: `tool_use_id`, `plan_file`, `plan_chars` (length of plan text; fetch the full text via `json_extract_string(data, '$.input.plan')` from `content_items` when needed), `outcome` (`approved` / `redirected` / `unknown`), `plan_seq` (1-based ordinal within the session).
+- `plan_sessions`: one row per session that used plan mode. Columns: `plan_count`, `redirect_count`, `approved_count`, `unknown_count`, `first_plan_ts`, `last_plan_ts`.
 
 ## Macros
 

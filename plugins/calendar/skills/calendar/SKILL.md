@@ -23,13 +23,13 @@ hooks:
 
 Interact with Calendar.app using a Swift CLI that wraps EventKit.
 
-The CLI lives at `@skills/calendar/scripts/cal.swift` and is invoked via `swift <path> <command> [options]`. It uses EventKit's native date range predicates for efficient queries and returns JSON.
+The CLI lives at `@skills/calendar/scripts/cal.swift`, invoked via `swift <path> <command> [options]`. It uses EventKit's native date range predicates for efficient queries and returns JSON.
 
 ## Setup
 
 Calendar access must be granted to the terminal app (Ghostty, Terminal.app, etc.) in **System Settings → Privacy & Security → Calendars**.
 
-EventKit requires TCC permissions tied to an app bundle. Over SSH, in tmux, or in any context where the responsible process has no app bundle, EventKit access is unavailable. Use a local terminal session launched directly from an app (not through a multiplexer).
+EventKit requires TCC permissions tied to an app bundle. Over SSH, in tmux, or any context where the responsible process has no app bundle, EventKit access is unavailable. Use a local terminal session launched directly from an app, not through a multiplexer.
 
 ## Read Operations
 
@@ -38,7 +38,7 @@ EventKit requires TCC permissions tied to an app bundle. Over SSH, in tmux, or i
 timeout 5 swift @scripts/cal.swift calendars
 ```
 
-Returns `id`, `name`, `writable`, and `source` (Google, iCloud, etc.) for each calendar. Use `id` or `name` to filter in other commands.
+Returns `id`, `name`, `writable`, and `source` (Google, iCloud, etc.) per calendar. Use `id` or `name` to filter in other commands.
 
 **List events in a date range:**
 ```bash
@@ -118,13 +118,13 @@ When creating events with `--calendar`, the CLI tries:
 1. Exact calendar ID match
 2. Calendar name match (first writable match if duplicates exist)
 
-For calendars with duplicate names (e.g., "Personal" on both Google and iCloud), use the calendar ID from the `calendars` command.
+For duplicate names (e.g., "Personal" on both Google and iCloud), use the calendar ID from the `calendars` command.
 
 ## Troubleshooting
 
 **"Calendar access denied"**: Grant access in System Settings → Privacy & Security → Calendars for your terminal app.
 
-**"Calendar access denied" with `"reason": "no-app-bundle"`**: The responsible process has no app bundle context. This occurs in tmux, SSH, or similar environments where macOS cannot identify a bundled app to associate TCC permissions with. Switch to a direct terminal session (e.g., Ghostty or Terminal.app, not inside tmux).
+**"Calendar access denied" with `"reason": "no-app-bundle"`**: The responsible process has no app bundle context. Occurs in tmux, SSH, or similar environments where macOS cannot identify a bundled app to associate TCC permissions with. Switch to a direct terminal session (e.g., Ghostty or Terminal.app, not tmux).
 
 **"Event not found"**: Event IDs are EventKit identifiers returned by `list` and `create`. IDs from other tools (icalBuddy, JXA) are incompatible.
 

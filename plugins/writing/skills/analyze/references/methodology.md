@@ -14,7 +14,7 @@ Run the session skill's `refresh.ts --refresh` before analyze. It rescans `~/.cl
 
 #### Lift
 
-How distinctive a phrase is to assistant output versus the user's voice, borrowed from association rule mining:
+How distinctive a phrase is to assistant output versus the user's voice, from association rule mining:
 
 ```
 lift = rate_assistant / rate_user_smoothed
@@ -36,23 +36,23 @@ Installs DuckDB's FTS extension and materializes per-role corpus tables (`fts_as
 
 `fts-phrase-audit.sql` batch-audits wordlist entries: it Porter-stems each entry, looks up term frequencies in both FTS indexes, and returns per-term assistant/user counts, per-million rates, and lift.
 
-A rule is **kept** when the model uses it strictly more per token than the comparison baseline (`model_per_m > baseline_per_m`) and it appears at least `--min-count` times (default 5) on its firing surface. Otherwise the report proposes removal with one of two reasons:
+A rule is **kept** when the model uses it strictly more per token than the baseline (`model_per_m > baseline_per_m`) and it appears at least `--min-count` times (default 5) on its firing surface. Otherwise the report proposes removal with one of two reasons:
 
 - **dead**: fewer than `--min-count` model occurrences on the firing surface. The rule rarely fires regardless of distinctiveness.
 - **not distinctive**: the baseline uses it at least as often per token. The rule would flag the user's own voice.
 
-Removal does **not** use lift. The user baseline is small (often tens of thousands of tokens, even with cross-machine history merged in), so the Laplace smoothing floor (`1/user_total`) dominates: any word the user never types needs a high per-million rate in assistant text just to reach a lift of 5.0. That gate is nearly unreachable for single words, so a pure lift threshold would flag the model's strongest surviving tells (`delve`, `comprehensive`, `robust`) for removal. The direct rate comparison is smoothing-free and keeps them.
+Removal does **not** use lift. The user baseline is small (often tens of thousands of tokens, even with cross-machine history merged in), so the Laplace smoothing floor (`1/user_total`) dominates: any word the user never types needs a high per-million rate in assistant text to reach a lift of 5.0. That gate is nearly unreachable for single words, so a pure lift threshold would flag the model's strongest surviving tells (`delve`, `comprehensive`, `robust`) for removal. The direct rate comparison is smoothing-free and keeps them.
 
 #### Per-surface auditing
 
-Each rule is judged on the surface where the hook fires it, so the audit measures the rule against the corpus it actually polices.
+Each rule is judged on the surface where the hook fires it, so the audit measures it against the corpus it polices.
 
 - **Chat-surface rules** (`openers.txt`, the conversational vocabulary, the sycophantic patterns) compare the model's chat assistant text against the user's chat text in `text_content`, via the FTS pass. The model's chat usage of these terms tracks its overall habit. A consequence: a term both the model and the user say conversationally (`Perfect` as an acknowledgment) reads as not distinctive and is dropped even if it might still open a deliverable.
 - **Deliverable-surface rules** (`flowery-phrases.txt` and `soft-phrasing.txt`, both `fileOnly` in the hook) compare the model's deliverable-prose rate against the user's voice-baseline rate. Each entry is stem-matched against the deliverable corpus (the same Porter-stemmed subsequence scan the hook uses) and looked up in the voice profile (`voice-profile.ts`). A phrase frequent in the model's PR bodies and absent from the user's hand-written baseline reads as **keep**, which is the correct verdict: `source of truth`, `escape hatch`, `self-sufficient`, and `fail loudly` each occur dozens of times in deliverable prose and zero times across the 209 pre-AI baseline PRs.
 
 `marketing-verbs.txt` stays on the chat audit even though it reads as deliverable phrasing: its hook group is not `fileOnly`, so it fires on Bash side-effect inputs too, and auditing it against deliverables alone undercounts it (the few deliverable hits are often the user's own meta-discussion of the wordlist file). See `deliverable-audit.ts` for the surface assignment.
 
-When no voice profile is loaded, deliverable-surface rules are still measured on the deliverable corpus, not the chat audit. The chat audit cannot score them: it stems each entry and joins against single-word FTS tokens, so a multi-word phrase never matches and would read as a false `dead`. Without a baseline the distinctiveness check is skipped, so an alive rule is reported `keep (no baseline)` rather than proposed for removal. Build the baseline with `ingest-voice.ts` then `voice-profile.ts` (see "Voice baseline") for the full deliverable-aware verdicts.
+When no voice profile is loaded, deliverable-surface rules are still measured on the deliverable corpus, not the chat audit. The chat audit cannot score them: it stems each entry and joins against single-word FTS tokens, so a multi-word phrase never matches and reads as a false `dead`. Without a baseline the distinctiveness check is skipped, so an alive rule is reported `keep (no baseline)` rather than proposed for removal. Build the baseline with `ingest-voice.ts` then `voice-profile.ts` (see "Voice baseline") for the full deliverable-aware verdicts.
 
 Because removed single words are no longer in the wordlist, a later audit cannot resurface them (the additions pipeline only mines multi-word n-grams). If the model regresses to a removed word, add it back by hand.
 
@@ -98,7 +98,7 @@ Pulls two corpora:
 
 #### User text filtering
 
-User-role messages in Claude Code contain a mix of human input and machine-generated content. The `text_content` view classifies these with two boolean columns:
+User-role messages in Claude Code mix human input and machine-generated content. The `text_content` view classifies these with two boolean columns:
 
 - `is_subagent`: `source_file` contains `/subagents/` (subagent prompts, task dispatches)
 - `is_system`: prefix-based heuristics covering XML-tagged injections (`<task-notification>`, `<command-name>`, `<system-reminder>`), context compaction summaries (`This session is being continued from a previous conversation`), plan injections (`Implement the following plan:`), interruption markers (`[Request interrupted by user]`), ultraplan/ultrareview UI (`◇ `, `◆ `, `Ultraplan `), and goal injections (`Goal set:`)
@@ -111,13 +111,13 @@ Two cleaning pipelines serve different jobs. Use the right one for the right con
 
 `stripCode` (`detection/tropes.ts`) removes only fenced code blocks and inline code, replacing them with whitespace that preserves line and column offsets. Use it in any path where position accuracy matters: the hook, `scan.ts`, `structural.ts`. Never use it for corpus mining.
 
-`cleanText` (`skills/analyze/scripts/ngram.ts`) aggressively removes URLs, table lines, headers, file paths, CLI flags, function calls, snake_case, and CamelCase in addition to code blocks. Position accuracy is not preserved. Use it for n-gram mining and voice-profile building where noise suppression matters more than fidelity.
+`cleanText` (`skills/analyze/scripts/ngram.ts`) removes URLs, table lines, headers, file paths, CLI flags, function calls, snake_case, and CamelCase in addition to code blocks. Position accuracy is not preserved. Use it for n-gram mining and voice-profile building where noise suppression matters more than fidelity.
 
 These pipelines are intentionally different. Do not converge them.
 
 ## Structural pattern audit
 
-`structural.ts` consumes the detection engine's `regexCatalog()` (from `detection/tropes.ts`) rather than re-declaring patterns, so the audit cannot drift from what the hook enforces. The catalog keeps only the regex patterns whose source is not a wordlist (the FTS pass covers stemmed vocabulary, weighted verbs, and the compiled openers regex) and normalizes each to the global flag for counting. Function-based tests (e.g. test-result reporting) are excluded because a single regex match cannot count them.
+`structural.ts` consumes the detection engine's `regexCatalog()` (from `detection/tropes.ts`) rather than re-declaring patterns, so the audit cannot drift from what the hook enforces. The catalog keeps only regex patterns whose source is not a wordlist (the FTS pass covers stemmed vocabulary, weighted verbs, and the compiled openers regex) and normalizes each to the global flag for counting. Function-based tests (e.g. test-result reporting) are excluded because a single regex match cannot count them.
 
 The patterns run against all assistant text (not just deliverables). Each reports total hits, rows containing hits, and session spread, labeled by hook scope (all, file-only, side-effect-only) and detector layer. Patterns are grouped by layer in the report:
 
@@ -132,7 +132,7 @@ Cross-sentence patterns shipping in the hook without a promotion record appear a
 
 `tag-ngram.ts` is the word-independent analogue of the n-gram candidate miner. Each sentence in the deliverable corpus and the human user corpus is tagged with the `compromise` adapter from `plugins/writing/linguistics/`, mapped to coarse part-of-speech tags, and the tag sequences (3- to 5-grams like `COPULA PARTICIPLE ADP`) run through the same lift math as word n-grams. Punctuation is dropped, so these are part-of-speech sequences (word types only), not syntax.
 
-The motivation: vocabulary tells drift with model releases, so wordlists need constant re-curation. The structural shape of a habit (passive voice, "not X but Y" parallelism, negated appositives, participial openers) persists across that drift. A high-lift tag sequence is a candidate for a structural rule that no vocabulary change invalidates.
+Motivation: vocabulary tells drift with model releases, so wordlists need constant re-curation. The structural shape of a habit (passive voice, "not X but Y" parallelism, negated appositives, participial openers) persists across that drift. A high-lift tag sequence is a candidate for a structural rule that no vocabulary change invalidates.
 
 Tag sequences draw from an alphabet of ~17 tags, so they are far denser than word n-grams: the per-size count floors are higher (3-grams: 30, 4-grams: 15, 5-grams: 8), the lift threshold is lower (`--tag-min-lift`, default 2.0, vs 5.0 for words), and most grammar is shared between the corpora so lift hovers near 1.0 for ordinary shapes.
 
@@ -148,7 +148,7 @@ Each rule is labeled in the **type** column by how the hook enforces it:
 
 ## Surface corrections
 
-Runs `correction-candidates` with `min_assistant_chars=300`, `max_user_chars=250`, `limit=--corrections-limit`. It finds adjacent pairs where a long assistant message is followed by a short user reply, which often indicates a correction or pushback.
+Runs `correction-candidates` with `min_assistant_chars=300`, `max_user_chars=250`, `limit=--corrections-limit`. It finds adjacent pairs where a long assistant message is followed by a short user reply, often a correction or pushback.
 
 ## Spot-checking with DuckDB samples
 
@@ -195,7 +195,7 @@ Each criterion in `JUDGE_CRITERIA` carries its layer label (`meaning`), the rubr
 
 #### Execution and Cost
 
-One call per document at temperature 0 with structured JSON output on a Haiku-class model, prompt sent as a cacheable system prefix. Documents over 1,500 words are chunked at paragraph boundaries and aggregated by per-criterion maxima. The runner prints an estimated cost before any call and accepts a document limit (default 100). A 200-document run of 1k-word bodies stays well under a dollar.
+One call per document at temperature 0 with structured JSON output on a Haiku-class model, prompt sent as a cacheable system prefix. Documents over 1,500 words are chunked at paragraph boundaries and aggregated by per-criterion maxima. The runner prints an estimated cost before any call and accepts a document limit (default 100). A 200-document run of 1k-word bodies stays under a dollar.
 
 #### Reproducibility Gate
 
@@ -203,7 +203,7 @@ One call per document at temperature 0 with structured JSON output on a Haiku-cl
 
 #### Calibration (Pending)
 
-Judge criteria are unstable until anchored against real examples, so calibration follows the labeling protocol below. Size dev and test splits with `linguistics/power.ts` first, run two criteria-refinement rounds on the dev split, then freeze the prompt and measure once on the held-out test split with the Wilson protocol. Promotion bar for analyze/review: precision at or above ~50% on the random subset with interval width at or under ±20pp, plus a human spot-check of flagged examples. The labeling passes are a user checkpoint and have not run. Until they do, treat judge flag rates as uncalibrated and the committed fixture expectations as design targets.
+Judge criteria are unstable until anchored against real examples, so calibration follows the labeling protocol below. Size dev and test splits with `linguistics/power.ts` first, run two criteria-refinement rounds on the dev split, then freeze the prompt and measure once on the held-out test split with the Wilson protocol. Promotion bar for analyze/review: precision at or above ~50% on the random subset with interval width at or under ±20pp, plus a human spot-check of flagged examples. The labeling passes are a user checkpoint and have not run. Until then, treat judge flag rates as uncalibrated and the committed fixture expectations as design targets.
 
 #### Privacy
 
@@ -227,7 +227,7 @@ Active labeling on disagreements inflates the apparent flag rate, so it cannot e
 
 #### Freeze a test set separate from the dev set
 
-Tuning a classifier and measuring it on the same labels inflates the result. Hold out a frozen test set for the promotion estimate and tune thresholds on a separate dev set. The freeze is what makes a promotion number trustworthy across re-tuning.
+Tuning a classifier and measuring it on the same labels inflates the result. Hold out a frozen test set for the promotion estimate and tune thresholds on a separate dev set. The freeze makes a promotion number trustworthy across re-tuning.
 
 ## Tuning
 

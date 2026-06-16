@@ -76,4 +76,4 @@ The `WFSerializationType` key signals that a value uses a structured encoding:
 
 ## Variable-Containing Parameters
 
-When a parameter that normally takes a literal value needs to reference a variable instead, wrap it in the appropriate serialization type. See [variables.md](variables.md) for `WFTextTokenAttachment` and `WFTextTokenString` details.
+When a parameter that normally takes a literal value needs to reference a variable, wrap it in the appropriate serialization type. See [variables.md](variables.md) for `WFTextTokenAttachment` and `WFTextTokenString` details.

@@ -44,7 +44,7 @@ hooks:
 
 ## Three-Way Access
 
-Git stores three versions in staging slots during conflicts:
+Git stores three versions in staging slots during a conflict:
 
 | Slot | Version | Command |
 |------|---------|---------|

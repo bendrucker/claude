@@ -10,15 +10,15 @@ Writing style enforcement and slop detection for prose output (PR descriptions, 
 
 ## Wordlists
 
-Trope patterns that take the form of a list of words live as line-delimited files under [`wordlists/`](wordlists/).
+Word-list trope patterns live as line-delimited files under [`wordlists/`](wordlists/).
 
 #### Stemmed Wordlists
 
-One word per line. Matching uses a Porter stemmer (`stemmer` npm package), so inflected forms are caught automatically from base entries. `#` comments and blank lines are ignored. Multi-word and hyphenated phrases are not supported in stemmed wordlists (the stemmer tokenizes on word boundaries). Use inline regex patterns in `tropes.ts` for phrase matching.
+One word per line. Matching uses a Porter stemmer (`stemmer` npm package), so inflected forms are caught from base entries. `#` comments and blank lines are ignored. Multi-word and hyphenated phrases are not supported (the stemmer tokenizes on word boundaries). Use inline regex patterns in `tropes.ts` for phrase matching.
 
 #### Plain Wordlists (Regex)
 
-Used for openers and let-me-verbs where the match depends on position context (line start, "let me" prefix). One entry per line, compiled to a regex alternation with configurable prefix/suffix.
+Used for openers and let-me-verbs where the match depends on position (line start, "let me" prefix). One entry per line, compiled to a regex alternation with configurable prefix/suffix.
 
 #### Weighted Wordlists
 
@@ -28,9 +28,9 @@ The loader lives in [`detection/wordlists.ts`](detection/wordlists.ts). Compiled
 
 ## Hook Commands
 
-Each existing hook command runs `bun install --cwd ${CLAUDE_PLUGIN_ROOT}` before the hook script. Installed plugins have no `node_modules` — bun auto-installs dependencies from its global cache, but packages like `unist-util-visit-parents` use self-referencing subpath exports that fail without a local `node_modules`. Running `bun install` ensures Node.js-style resolution works. With everything already installed, `bun install` completes in ~50ms.
+Each hook command runs `bun install --cwd ${CLAUDE_PLUGIN_ROOT}` before the hook script. Installed plugins have no `node_modules`. Bun auto-installs dependencies from its global cache, but packages like `unist-util-visit-parents` use self-referencing subpath exports that fail without a local `node_modules`. `bun install` restores Node.js-style resolution and completes in ~50ms once installed.
 
-The `check-tropes.ts` hook does not need `bun install` since it has no dependencies requiring local resolution.
+The `check-tropes.ts` hook skips `bun install`: it has no dependencies requiring local resolution.
 
 ## Testing
 

@@ -10,7 +10,7 @@ Group, prioritize, defer, and reorder the Things Today list.
 
 ## Query
 
-Load the `things:jxa` skill. Run the query to get all Today items as JSON:
+Load the `things:jxa` skill. Run the query to get all Today items as JSON.
 
 ```
 /mac:jxa-run Things3 ${CLAUDE_PLUGIN_ROOT}/scripts/jxa/query-list.js TMTodayListSource
@@ -24,11 +24,11 @@ Filter to open items.
 
 Apply the midnight heuristic: a task is a repeating instance if `creationDate` ends with `T00:00:00` (midnight local time in ISO). Manually created tasks have non-zero hours/minutes/seconds.
 
-Overdue repeating tasks (where `dueDate` or `activationDate` is before today) should be batched for a single "Defer all overdue repeating tasks to tomorrow?" prompt. Load the `things:url` skill for batch defer via URL scheme.
+Batch overdue repeating tasks (where `dueDate` or `activationDate` is before today) for a single "Defer all overdue repeating tasks to tomorrow?" prompt. Load the `things:url` skill for batch defer via URL scheme.
 
 ## Grouping
 
-Group remaining items by area (primary) and tag (secondary) for batch triage. This is a presentation strategy — read the JSON and form logical groups.
+Group remaining items by area (primary) and tag (secondary) for batch triage. Read the JSON and form logical groups.
 
 ## Triage Questions
 
@@ -50,7 +50,7 @@ Present proposed order for user confirmation.
 
 ## Reorder
 
-Load the `things:url` skill. Use the reorder script:
+Load the `things:url` skill. Use the reorder script.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3> ...

@@ -15,23 +15,25 @@ function strip(s: string): string {
 }
 
 describe("formatElapsed", () => {
-  test("minutes and seconds", () => {
-    expect(formatElapsed(0, 65_000)).toBe("1m 5s");
-    expect(formatElapsed(0, 0)).toBe("0m 0s");
-    expect(formatElapsed(10_000, 130_000)).toBe("2m 0s");
-    expect(formatElapsed(0, 3_661_000)).toBe("61m 1s");
+  test.each([
+    [0, 65_000, "1m 5s"],
+    [0, 0, "0m 0s"],
+    [10_000, 130_000, "2m 0s"],
+    [0, 3_661_000, "61m 1s"],
+  ])("formatElapsed(%i, %i) → %s", (start, now, want) => {
+    expect(formatElapsed(start, now)).toBe(want);
   });
 });
 
 describe("formatTokens", () => {
-  test("integer below 1000", () => {
-    expect(formatTokens(0)).toBe("0");
-    expect(formatTokens(999)).toBe("999");
-  });
-  test("thousands with one decimal", () => {
-    expect(formatTokens(1000)).toBe("1.0k");
-    expect(formatTokens(1500)).toBe("1.5k");
-    expect(formatTokens(12_340)).toBe("12.3k");
+  test.each([
+    [0, "0"],
+    [999, "999"],
+    [1000, "1.0k"],
+    [1500, "1.5k"],
+    [12_340, "12.3k"],
+  ])("formatTokens(%i) → %s", (n, want) => {
+    expect(formatTokens(n)).toBe(want);
   });
 });
 

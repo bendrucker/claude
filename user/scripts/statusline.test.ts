@@ -128,47 +128,60 @@ describe("rendered output", () => {
 });
 
 describe("dialColor", () => {
-  test("thresholds", () => {
-    expect(dialColor(0, false)).toBe("green");
-    expect(dialColor(39, false)).toBe("green");
-    expect(dialColor(40, false)).toBe("yellow");
-    expect(dialColor(64, false)).toBe("yellow");
-    expect(dialColor(65, false)).toBe("redBright");
-    expect(dialColor(79, false)).toBe("redBright");
-    expect(dialColor(80, false)).toBe("red");
-    expect(dialColor(100, false)).toBe("red");
-  });
+  const cases: Array<[number, boolean, ReturnType<typeof dialColor>]> = [
+    [0, false, "green"],
+    [39, false, "green"],
+    [40, false, "yellow"],
+    [64, false, "yellow"],
+    [65, false, "redBright"],
+    [79, false, "redBright"],
+    [80, false, "red"],
+    [100, false, "red"],
+    // exceeds_200k escalates one band, with the boundary at 45; redBright/red are unaffected.
+    [30, true, "yellow"],
+    [44, true, "yellow"],
+    [45, true, "red"],
+    [70, true, "redBright"],
+    [85, true, "red"],
+  ];
 
-  test("exceeds_200k escalation", () => {
-    expect(dialColor(30, true)).toBe("yellow"); // green -> yellow
-    expect(dialColor(44, true)).toBe("yellow"); // yellow stays (< 45)
-    expect(dialColor(45, true)).toBe("red"); // yellow -> red (>= 45)
-    expect(dialColor(70, true)).toBe("redBright"); // redBright unaffected
-    expect(dialColor(85, true)).toBe("red"); // red unaffected
+  test.each(cases)("dialColor(%i, exceeds=%p) → %s", (pct, exceeds, want) => {
+    expect(dialColor(pct, exceeds)).toBe(want);
   });
 });
 
 describe("exceeds200k", () => {
-  test("sums the live current_usage token breakdown", () => {
-    expect(exceeds200k({ context_window: { current_usage: { input_tokens: 250_000 } } })).toBe(
-      true,
-    );
-    expect(
-      exceeds200k({
-        context_window: {
-          current_usage: {
-            input_tokens: 100_000,
-            cache_read_input_tokens: 90_000,
-            output_tokens: 20_000,
+  const sumCases: Array<{ name: string; input: Parameters<typeof exceeds200k>[0]; want: boolean }> =
+    [
+      {
+        name: "single field over 200k",
+        input: { context_window: { current_usage: { input_tokens: 250_000 } } },
+        want: true,
+      },
+      {
+        name: "summed breakdown over 200k",
+        input: {
+          context_window: {
+            current_usage: {
+              input_tokens: 100_000,
+              cache_read_input_tokens: 90_000,
+              output_tokens: 20_000,
+            },
           },
         },
-      }),
-    ).toBe(true);
-    expect(exceeds200k({ context_window: { current_usage: { input_tokens: 150_000 } } })).toBe(
-      false,
-    );
-    expect(exceeds200k({ context_window: {} })).toBe(false);
-    expect(exceeds200k({})).toBe(false);
+        want: true,
+      },
+      {
+        name: "under 200k",
+        input: { context_window: { current_usage: { input_tokens: 150_000 } } },
+        want: false,
+      },
+      { name: "no current_usage", input: { context_window: {} }, want: false },
+      { name: "no context_window", input: {}, want: false },
+    ];
+
+  test.each(sumCases)("sums the live current_usage token breakdown: $name", ({ input, want }) => {
+    expect(exceeds200k(input)).toBe(want);
   });
 
   test("color de-escalates with position after compaction shrinks the context", () => {
@@ -188,12 +201,14 @@ describe("exceeds200k", () => {
 });
 
 describe("dialIndex", () => {
-  test("ramp and cap", () => {
-    expect(dialIndex(0)).toBe(0);
-    expect(dialIndex(39)).toBe(2);
-    expect(dialIndex(50)).toBe(3);
-    expect(dialIndex(100)).toBe(7);
-    expect(dialIndex(120)).toBe(7); // capped
+  test.each([
+    [0, 0],
+    [39, 2],
+    [50, 3],
+    [100, 7],
+    [120, 7], // capped
+  ])("dialIndex(%i) → %i", (pct, want) => {
+    expect(dialIndex(pct)).toBe(want);
   });
 });
 

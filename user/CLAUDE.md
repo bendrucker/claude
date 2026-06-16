@@ -36,6 +36,12 @@ Every customization costs tokens on every session. Before adding one, define how
 
 The Bash tool escapes `!` to `\!`, breaking `jq !=`, `awk !~`, and similar operators ([#2941](https://github.com/anthropics/claude-code/issues/2941), [#10335](https://github.com/anthropics/claude-code/issues/10335)). For `jq`, use `| not` instead of `!=`. For any script, pass it via heredoc to bypass inline escaping.
 
+## Git
+
+- Never `git push` to the default branch (usually `main` or `master`) unless I explicitly instruct you.
+- Always work on a topic branch with a short hyphenated name.
+- For commit messages, use multiple `-m` flags for a simple subject and body. Each `-m` is a separate paragraph. For complex messages, pass the message through a heredoc.
+
 ## Worktrees
 
 I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:

@@ -19,8 +19,6 @@
       "Skill(claude-code:skill-creator)",
       "Skill(code-review)",
       "Skill(git:conflicts)",
-      "Skill(git:fix-conflicts)",
-      "Skill(git:git)",
       "Skill(github:actions-monitor)",
       "Skill(github:notifications)",
       "Skill(github:pr-comments)",

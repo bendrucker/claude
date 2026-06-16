@@ -29,4 +29,4 @@ Mention which skills to activate at appropriate points in the execution lifecycl
 
 - "Use `pull-request:create` after committing changes"
 - "Activate `typescript:typescript` for type-aware refactoring"
-- "Load `git:git` before branch operations"
+- "Load `git:conflicts` when a rebase or merge hits conflicts"

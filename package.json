@@ -33,6 +33,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "check": "biome check",
+    "coverage": "bun scripts/coverage/index.ts",
     "format": "biome format --write",
     "format:check": "biome format",
     "lint": "biome lint",
@@ -51,6 +52,8 @@
     "gray-matter": "^4.0.3"
   },
   "dependencies": {
+    "cleye": "^2.2.1",
+    "table": "^6.9.0",
     "typescript": "^5.9.3",
     "url-pattern": "^1.0.3"
   },

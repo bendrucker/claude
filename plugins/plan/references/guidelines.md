@@ -64,5 +64,5 @@ A pause or bare interrupt in plan mode is a stop signal. Present and wait. Do no
 ## Carryovers
 
 - No time estimates.
-- Reference skills inline where they run ("use `pull-request:create` after committing", "load `git:git` before branch operations") rather than in a separate list.
+- Reference skills inline where they run ("use `pull-request:create` after committing", "load `git:conflicts` when a rebase or merge hits conflicts") rather than in a separate list.
 - Document out-of-scope observations separately. Keep them out of the change.

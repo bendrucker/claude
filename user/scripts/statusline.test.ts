@@ -122,11 +122,9 @@ const cases: RenderCase[] = [
 ];
 
 describe("rendered output", () => {
-  for (const c of cases) {
-    test(c.name, () => {
-      expect(buildStatusLine(c.stdin, c.columns, c.worktree)).toMatchSnapshot();
-    });
-  }
+  test.each(cases)("$name", (c) => {
+    expect(buildStatusLine(c.stdin, c.columns, c.worktree)).toMatchSnapshot();
+  });
 });
 
 describe("dialColor", () => {

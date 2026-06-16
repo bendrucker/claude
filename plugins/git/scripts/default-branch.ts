@@ -2,12 +2,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 
-export async function getDefaultBranch(cwd?: string): Promise<string | null> {
+export async function getDefaultBranch(cwd?: string, repoRoot?: string): Promise<string | null> {
   try {
     const dir = cwd ?? process.cwd();
 
-    const repoRoot = (await $`git rev-parse --show-toplevel`.cwd(dir).quiet()).text().trim();
-    const safePath = repoRoot.replace(/\//g, "_");
+    const root =
+      repoRoot ?? (await $`git rev-parse --show-toplevel`.cwd(dir).quiet()).text().trim();
+    const safePath = root.replace(/\//g, "_");
     const tmpDir = process.env.TMPDIR || tmpdir();
     const cacheFile = join(tmpDir, `claude-default-branch${safePath}`);
 

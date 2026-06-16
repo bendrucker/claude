@@ -217,9 +217,7 @@ describe("rendered content", () => {
     },
   ];
 
-  for (const c of cases) {
-    test(c.name, () => {
-      expect(renderTask(c.task, c.columns, now, c.agentType).content).toMatchSnapshot();
-    });
-  }
+  test.each(cases)("$name", (c) => {
+    expect(renderTask(c.task, c.columns, now, c.agentType).content).toMatchSnapshot();
+  });
 });

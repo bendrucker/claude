@@ -4,12 +4,13 @@ description: >
   Follow up on a PR/MR you reviewed: assess whether the author's fixes actually grasped each
   concern, find silently resolved or mechanically-fixed threads, and get a graded re-review call.
   Use after leaving review feedback to see if the author acted on it.
-argument-hint: "[pr-url]"
+argument-hint: "[pr-url] [--on-behalf-of <reviewer>]"
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)
   - Bash(git:*)
   - Task
+  - Monitor
 ---
 
 # Review Follow-Up
@@ -19,6 +20,11 @@ Follow up on my review of: $ARGUMENTS
 `$ARGUMENTS` is optional. When it carries a PR/MR URL or identifier, follow up on that. When it's
 empty, resolve the target from the current branch's open PR/MR before anything else (see [Resolve
 Target](#resolve-target)). Only ask me to paste a URL when that resolution genuinely fails.
+
+A `--on-behalf-of <reviewer>` flag selects a trust-gated, unattended loop that auto-re-approves in
+`<reviewer>`'s name as fixes land. See [references/on-behalf-of.md](references/on-behalf-of.md) for
+the procedure. Without the flag, follow-up is interactive.
+
 
 You are the reviewer. The question is not "did the author reply?" but "did the fix actually grasp
 each concern, or go through the motions?" Status is a signal. The code is the verdict.
@@ -203,3 +209,4 @@ Approve, resolve or unresolve threads, and comment via the `gitlab:merge-request
 - **Sync before judging**: never assess stale local state. Fetch and diff against origin first.
 - **Status is a signal, the code is the verdict**: a mismatch between the two is a finding, not noise.
 - **Intent over words**: distinguish a fix that meets the concern from one that mechanically satisfies its literal wording.
+- **Behalf-of approval is private/internal only**: auto-re-approval on another reviewer's behalf ([references/on-behalf-of.md](references/on-behalf-of.md)) is allowed only on `private` or `internal` repos, never in someone else's name on a public repo. Fail closed if visibility is undeterminable.

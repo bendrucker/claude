@@ -35,30 +35,14 @@ describe("terminalReport", () => {
 });
 
 describe("githubReport", () => {
-  const reports = [fileCoverage("a.ts", { 1: 1, 2: 0, 3: 0 })];
-
   test("builds a markdown summary table", () => {
-    const { summary } = githubReport(reports);
+    const summary = githubReport([fileCoverage("a.ts", { 1: 1, 2: 0, 3: 0 })]);
     expect(summary).toContain("## Coverage");
     expect(summary).toContain("| `a.ts` |");
+    expect(summary).toContain("33.3%");
   });
 
-  test("annotates every uncovered line without a changed-lines filter", () => {
-    const { annotations } = githubReport(reports);
-    expect(annotations).toEqual([
-      "::warning file=a.ts,line=2::Line not covered by tests",
-      "::warning file=a.ts,line=3::Line not covered by tests",
-    ]);
-  });
-
-  test("restricts annotations to changed lines", () => {
-    const changed = new Map([["a.ts", new Set([3])]]);
-    const { annotations } = githubReport(reports, changed);
-    expect(annotations).toEqual(["::warning file=a.ts,line=3::Line not covered by tests"]);
-  });
-
-  test("emits no annotations when no changed lines are uncovered", () => {
-    const changed = new Map([["a.ts", new Set([1])]]);
-    expect(githubReport(reports, changed).annotations).toEqual([]);
+  test("reports no data for an empty set", () => {
+    expect(githubReport([])).toBe("## Coverage\n\nNo coverage data.");
   });
 });

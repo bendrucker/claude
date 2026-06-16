@@ -47,31 +47,11 @@ function markdownTable(reports: FileCoverage[]): string {
   return [header, ...rows].join("\n");
 }
 
-export interface GithubReport {
-  summary: string;
-  /** Workflow command annotations, one per uncovered changed line. */
-  annotations: string[];
-}
-
-// `changedLines` maps a repo-relative file to the set of lines added/changed in
-// the PR. Annotations are restricted to those lines so they land in the diff
-// view rather than spamming untouched code.
-export function githubReport(
-  reports: FileCoverage[],
-  changedLines?: Map<string, Set<number>>,
-): GithubReport {
-  const summary = reports.length
+// Markdown summary for the GitHub Actions job summary. Reporting only: no
+// per-line annotations, which read as defect-grade warnings and hit GitHub's
+// ~10-per-level render cap. Per-line detail lives in the local hook and skill.
+export function githubReport(reports: FileCoverage[]): string {
+  return reports.length
     ? `## Coverage\n\n${markdownTable(reports)}`
     : "## Coverage\n\nNo coverage data.";
-
-  const annotations: string[] = [];
-  for (const fc of reports) {
-    const changed = changedLines?.get(fc.file);
-    for (const line of uncoveredLines(fc)) {
-      if (changedLines && !changed?.has(line)) continue;
-      annotations.push(`::warning file=${fc.file},line=${line}::Line not covered by tests`);
-    }
-  }
-
-  return { summary, annotations };
 }

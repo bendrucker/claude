@@ -25,31 +25,6 @@ function changedFiles(base: string): string[] {
     .filter((f) => f && isSourceFile(f));
 }
 
-// Map each changed file to the set of lines it added/modified, parsed from a
-// zero-context diff. lcov keys files by their repo-relative path, and so does
-// git diff, so the keys line up without rewriting.
-function changedLines(base: string): Map<string, Set<number>> {
-  const diff = git(["diff", "--unified=0", `${base}...HEAD`]);
-  const byFile = new Map<string, Set<number>>();
-  let current: Set<number> | null = null;
-
-  for (const line of diff.split("\n")) {
-    const fileMatch = line.match(/^\+\+\+ b\/(.+)$/);
-    if (fileMatch?.[1]) {
-      current = new Set();
-      byFile.set(fileMatch[1], current);
-      continue;
-    }
-    const hunk = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
-    if (hunk?.[1] && current) {
-      const start = Number(hunk[1]);
-      const count = hunk[2] === undefined ? 1 : Number(hunk[2]);
-      for (let n = start; n < start + count; n++) current.add(n);
-    }
-  }
-  return byFile;
-}
-
 function persistLcov(reports: Parameters<typeof formatLcov>[0]): void {
   const dir = join(repoRoot, "coverage");
   mkdirSync(dir, { recursive: true });
@@ -101,11 +76,7 @@ const targets = files.length
 const scoped = targets ? reports.filter((fc) => targets.has(fc.file)) : reports;
 
 if (argv.flags.report === "github") {
-  const { summary, annotations } = githubReport(
-    scoped,
-    argv.flags.changed ? changedLines(argv.flags.base) : undefined,
-  );
-  for (const annotation of annotations) console.log(annotation);
+  const summary = githubReport(scoped);
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (summaryPath) {
     await Bun.write(

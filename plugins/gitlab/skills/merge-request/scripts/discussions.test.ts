@@ -193,20 +193,12 @@ describe("formatDigest", () => {
       ],
       80,
     );
-    const lines = out.split("\n");
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toContain("111111111111");
-    expect(lines[0]).toContain("src/app.ts:42");
-    expect(lines[0]).toContain("[open]");
-    expect(lines[0]).toContain("Extract this");
-    expect(lines[1]).toContain("[resolved]");
-    expect(lines[1]).toContain("-");
+    expect(out.split("\n")).toHaveLength(2);
+    expect(out).toMatchSnapshot();
   });
 
   it("truncates bodies to the given width", () => {
-    const out = formatDigest([makeSummary({ body: "x".repeat(200) })], 20);
-    expect(out).toContain(`${"x".repeat(19)}…`);
-    expect(out).not.toContain("x".repeat(21));
+    expect(formatDigest([makeSummary({ body: "x".repeat(200) })], 20)).toMatchSnapshot();
   });
 
   it("returns an empty string with no discussions", () => {

@@ -1,0 +1,8 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`formatDigest emits one line per discussion with id, location, state, and body 1`] = `
+"111111111111  src/app.ts:42  [open]      Extract this
+222222222222  -              [resolved]  Nit: typo"
+`;
+
+exports[`formatDigest truncates bodies to the given width 1`] = `"abcdef012345  -  [open]  xxxxxxxxxxxxxxxxxxx…"`;

@@ -1,0 +1,1681 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renderReport empty scaffold 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport structural trends table 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+Documents analyzed: 42
+
+| metric | value | note |
+| --- | --- | --- |
+| action-verb opener rate | 16.6% | mean fraction of non-first lines opening with a bare verb; 16.6% AI-era vs 2.4% baseline (2026-06) |
+| backtick ref density | 58.3/1k words | mean inline code spans per 1k words; ~60/1k marks over-reliance on identifiers as structure (2026-06) |
+| template document rate | 73.0% | fraction of documents with at least one ## section heading |
+| template on small document | 7 docs | full ## Changes + ## Testing on body under 150 words; pull-request:create scopes sections to larger changes |
+
+Section count distribution (## Changes / ## Testing / ## Issue / ## References):
+
+| sections present | documents |
+| --- | --- |
+| 0 | 11 |
+| 1 | 5 |
+| 2 | 26 |
+| 3 | 0 |
+| 4 | 0 |
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport structural signature rows 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+| shape | n | assistant/M | user/M | sessions | lift | example |
+| --- | --- | --- | --- | --- | --- | --- |
+| \`COPULA PART DET NOUN\` | 4 | 120.0 | 10.0 | 6 | 8.4x | This is not a cache, it is a ledger |
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport meaning audit 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+Prompt: \`abc123def456\` | Model: \`claude-haiku-4-5\` | Documents: 40 | Est. cost: $0.1234
+
+| criterion | question | flagged | rate |
+| --- | --- | --- | --- |
+| information-density | Does this text tell the reviewer anything new? | 12/40 | 30% |
+| sycophancy | Does the text flatter the reader? | 0/40 | 0% |
+
+Sampled spans (local-only; spot-check before acting):
+
+- information-density: "These changes ensure correct behavior."
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport proposed removals diff block 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 1
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 1 (dead: 0, not distinctive: 1)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+| phrase | source | surface | reason | model/M | baseline/M | lift |
+| --- | --- | --- | --- | --- | --- | --- |
+| \`tapestry\` | vocabulary.txt | chat | not distinctive | 50.0 | 100.0 | 0.5x |
+
+\`\`\`diff
+- tapestry  # not distinctive, source=vocabulary.txt
+\`\`\`
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+| phrase | source | type | surface | model/M | baseline/M | lift | status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| \`tapestry\` | vocabulary.txt | vocabulary | chat | 50.0 | 100.0 | 0.5x | remove (not distinctive) |
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport proposed additions diff block 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 1
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+| phrase | n | assistant count | user count | sessions | baseline count | baseline/M | lift |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| \`reaching for\` | 2 | 20 | 1 | - | 0 | 0.0 | 16.0x |
+
+Context for each candidate (spot-check before adding):
+
+- \`reaching for\` (no deliverable occurrence found)
+
+\`\`\`diff
++ reaching for  # lift=16.0x, n=2, baseline=0
+\`\`\`
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport corrective feedback moments 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 1
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+### 2026-05-20T10:01:00Z (myproject): matched \`fluff\`
+
+Preceding model output (300 chars):
+
+\`\`\`
+the model wrote a flowery paragraph
+\`\`\`
+
+User feedback (40 chars):
+
+\`\`\`
+ugh this reads like marketing fluff
+\`\`\`
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport correction snippets 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 1
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+Signal-to-noise: 1/1 candidates carry a prose signal. If this ratio stays low across runs, the surface is mostly task pivots and should be retired.
+
+### 2026-05-20T10:00:00Z (myproject) [prose]
+
+Assistant (500 chars):
+
+\`\`\`
+long assistant response here
+\`\`\`
+
+User reply (50 chars):
+
+\`\`\`
+no, do it differently
+\`\`\`
+"
+`;
+
+exports[`renderReport rule health opener and vocabulary types 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 2
+- Rules kept (distinctive and alive): 2
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+| phrase | source | type | surface | model/M | baseline/M | lift | status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| \`Perfect\` | openers.txt | opener | chat | 100.0 | 20.0 | 5.0x | keep |
+| \`tapestry\` | vocabulary.txt | vocabulary | chat | 50.0 | 10.0 | 5.0x | keep |
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport voice delta rates only, no baseline 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 3.20 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport voice delta corpus, baseline, and delta 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: 5 documents, 1,200 tokens (sources: github)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the deliverable corpus in this window vs the pre-AI baseline. Provenance labels: **skill-prescribed** = tune the skill if the aggregate drifts; **skill-encouraged** = under-application of the skill; **ungoverned** = genuine voice signal.
+
+| feature | provenance | corpus rate | baseline rate | delta |
+| --- | --- | --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 3.20 | 9.50 | -6.30 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 | (no baseline stat) | - |
+| Body length (words) | skill-encouraged | 0 | (no baseline stat) | - |
+| URL cross-references (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
+| Sentence length median (words) | ungoverned | 0.0 | (no baseline stat) | - |
+| Sentence length p90 (words) | ungoverned | 0.0 | (no baseline stat) | - |
+| Question marks (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% | 10% | -10.0pp |
+| Unique heading texts (count) | skill-prescribed | 0 | (no baseline stat) | - |
+| Has any heading (fraction of documents) | skill-prescribed | 0% | (no baseline stat) | - |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% | (no baseline stat) | - |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 | (no baseline stat) | - |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% | (no baseline stat) | - |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 | (no baseline stat) | - |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport voice delta fraction features as percentages 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: 5 documents, 1,200 tokens (sources: github)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the deliverable corpus in this window vs the pre-AI baseline. Provenance labels: **skill-prescribed** = tune the skill if the aggregate drifts; **skill-encouraged** = under-application of the skill; **ungoverned** = genuine voice signal.
+
+| feature | provenance | corpus rate | baseline rate | delta |
+| --- | --- | --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 | 9.50 | -9.50 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 | (no baseline stat) | - |
+| Body length (words) | skill-encouraged | 0 | (no baseline stat) | - |
+| URL cross-references (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
+| Sentence length median (words) | ungoverned | 0.0 | (no baseline stat) | - |
+| Sentence length p90 (words) | ungoverned | 0.0 | (no baseline stat) | - |
+| Question marks (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 60% | 10% | +50.0pp |
+| Unique heading texts (count) | skill-prescribed | 0 | (no baseline stat) | - |
+| Has any heading (fraction of documents) | skill-prescribed | 0% | (no baseline stat) | - |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% | (no baseline stat) | - |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 | (no baseline stat) | - |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% | (no baseline stat) | - |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 | (no baseline stat) | - |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport voice delta feature missing from baseline 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: 5 documents, 1,200 tokens (sources: github)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the deliverable corpus in this window vs the pre-AI baseline. Provenance labels: **skill-prescribed** = tune the skill if the aggregate drifts; **skill-encouraged** = under-application of the skill; **ungoverned** = genuine voice signal.
+
+| feature | provenance | corpus rate | baseline rate | delta |
+| --- | --- | --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 | 9.50 | -9.50 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 | (no baseline stat) | - |
+| Body length (words) | skill-encouraged | 0 | (no baseline stat) | - |
+| URL cross-references (per 1k words) | ungoverned | 2.50 | (no baseline stat) | - |
+| Sentence length median (words) | ungoverned | 0.0 | (no baseline stat) | - |
+| Sentence length p90 (words) | ungoverned | 0.0 | (no baseline stat) | - |
+| Question marks (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% | 10% | -10.0pp |
+| Unique heading texts (count) | skill-prescribed | 0 | (no baseline stat) | - |
+| Has any heading (fraction of documents) | skill-prescribed | 0% | (no baseline stat) | - |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% | (no baseline stat) | - |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 | (no baseline stat) | - |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% | (no baseline stat) | - |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 | (no baseline stat) | - |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport voice delta full feature table 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: 5 documents, 1,200 tokens (sources: github)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the deliverable corpus in this window vs the pre-AI baseline. Provenance labels: **skill-prescribed** = tune the skill if the aggregate drifts; **skill-encouraged** = under-application of the skill; **ungoverned** = genuine voice signal.
+
+| feature | provenance | corpus rate | baseline rate | delta |
+| --- | --- | --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 | 9.50 | -9.50 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 | (no baseline stat) | - |
+| Body length (words) | skill-encouraged | 0 | (no baseline stat) | - |
+| URL cross-references (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
+| Sentence length median (words) | ungoverned | 0.0 | (no baseline stat) | - |
+| Sentence length p90 (words) | ungoverned | 0.0 | (no baseline stat) | - |
+| Question marks (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% | 10% | -10.0pp |
+| Unique heading texts (count) | skill-prescribed | 0 | (no baseline stat) | - |
+| Has any heading (fraction of documents) | skill-prescribed | 0% | (no baseline stat) | - |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% | (no baseline stat) | - |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 | (no baseline stat) | - |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% | (no baseline stat) | - |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 | (no baseline stat) | - |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;
+
+exports[`renderReport treats a profile without voiceDelta stats as no baseline 1`] = `
+"# Writing trope analysis (2026-05-24)
+
+Window: 2026-04-24 to 2026-05-24
+Model filter: \`*opus*\`
+Project filter: (none)
+Min lift threshold (additions): 5.0x
+Min occurrences to count as alive: 5
+Top N candidates: 10
+
+## Summary
+
+- All assistant text: 0 chars
+- Deliverable prose (Write/Edit/Bash): 0 chars
+- User text (human only): 0 chars
+- Voice baseline: 5 documents, 1,200 tokens (sources: github)
+- Current wordlist entries audited: 0
+- Rules kept (distinctive and alive): 0
+- Proposed removals: 0 (dead: 0, not distinctive: 0)
+- Proposed additions (new candidates above threshold): 0
+- Correction candidates surfaced: 0
+- Corrective-feedback moments surfaced: 0
+
+## Voice Delta
+
+No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
+
+| feature | provenance | corpus rate |
+| --- | --- | --- |
+| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
+| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
+| Body length (words) | skill-encouraged | 0 |
+| URL cross-references (per 1k words) | ungoverned | 0.00 |
+| Sentence length median (words) | ungoverned | 0.0 |
+| Sentence length p90 (words) | ungoverned | 0.0 |
+| Question marks (per 1k words) | ungoverned | 0.00 |
+| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
+| Unique heading texts (count) | skill-prescribed | 0 |
+| Has any heading (fraction of documents) | skill-prescribed | 0% |
+| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
+| Backtick density (per 1k words) | skill-prescribed | 0.00 |
+| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
+| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
+
+## Proposed Wordlist Removals
+
+Two reasons a rule earns removal:
+
+- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
+- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
+
+Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
+
+_No removals proposed._
+
+## Proposed Wordlist Additions
+
+Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
+
+_No additions proposed._
+
+## Current Rule Health
+
+Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
+
+_No wordlists found at \`plugins/writing/wordlists/\`._
+
+## Structural Pattern Audit
+
+Regex-based patterns from the writing hook, run against all model-generated text.
+Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
+without a promotion record appear here as misplacement signals.
+
+_No structural patterns defined._
+
+## Structural Signatures
+
+Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
+
+_No structural signatures above threshold._
+
+## Structural Trends
+
+Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
+
+_No deliverable documents analyzed._
+
+## Meaning-Layer Audit (LLM Judge)
+
+Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
+
+_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
+
+## Corrective Feedback
+
+Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
+
+_No corrective-feedback moments in window._
+
+## Correction Candidates
+
+Adjacent (long assistant, short user) pairs. Scan for prose corrections.
+
+_No correction candidates in window._
+"
+`;

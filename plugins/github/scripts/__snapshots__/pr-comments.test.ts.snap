@@ -1,0 +1,199 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`formatThreads empty result 1`] = `
+"# Add feature X
+
+0 unresolved of 10 total threads
+
+No unresolved threads found."
+`;
+
+exports[`formatThreads reviewer-opener header 1`] = `
+"# Add feature X
+
+0 unresolved of 10 total threads
+Showing threads started by @DouweM
+
+No unresolved threads found."
+`;
+
+exports[`formatThreads bot header 1`] = `
+"# Add feature X
+
+0 unresolved of 10 total threads
+Showing review-bot and opted-in reviewer threads
+
+No unresolved threads found."
+`;
+
+exports[`formatThreads grouped by file 1`] = `
+"# Add feature X
+
+3 unresolved of 10 total threads
+
+## src/a.ts
+
+### Line 10
+\`PRRT_test\`
+
+**@reviewer** (2025-01-15):
+> comment
+
+---
+
+### Line 30
+\`PRRT_test\`
+
+**@reviewer** (2025-01-15):
+> comment
+
+---
+
+## src/b.ts
+
+### Line 20
+\`PRRT_test\`
+
+**@reviewer** (2025-01-15):
+> comment
+
+---
+"
+`;
+
+exports[`formatThreads line range 1`] = `
+"# Add feature X
+
+1 unresolved of 1 total threads
+
+## src/index.ts
+
+### Lines 10–20
+\`PRRT_test\`
+
+**@reviewer** (2025-01-15):
+> comment
+
+---
+"
+`;
+
+exports[`formatThreads outdated thread 1`] = `
+"# Add feature X
+
+1 unresolved of 1 total threads
+
+## src/index.ts
+
+### Line 42 (outdated)
+\`PRRT_test\`
+
+**@reviewer** (2025-01-15):
+> comment
+
+---
+"
+`;
+
+exports[`formatThreads thread id 1`] = `
+"# Add feature X
+
+1 unresolved of 1 total threads
+
+## src/index.ts
+
+### Line 42
+\`PRRT_abc123\`
+
+**@reviewer** (2025-01-15):
+> comment
+
+---
+"
+`;
+
+exports[`formatThreads bot-opened thread 1`] = `
+"# Add feature X
+
+1 unresolved of 1 total threads
+
+## src/index.ts
+
+### Line 42 (bot)
+\`PRRT_test\`
+
+**@coderabbitai** (2025-01-15):
+> comment
+
+---
+"
+`;
+
+exports[`formatThreads multi-line blockquote body 1`] = `
+"# Add feature X
+
+1 unresolved of 1 total threads
+
+## src/index.ts
+
+### Line 42
+\`PRRT_test\`
+
+**@DouweM** (2025-01-15):
+> Fix this
+> and that
+
+---
+"
+`;
+
+exports[`formatThreads file-level thread 1`] = `
+"# Add feature X
+
+1 unresolved of 1 total threads
+
+## src/index.ts
+
+### File-level
+\`PRRT_test\`
+
+**@reviewer** (2025-01-15):
+> comment
+
+---
+"
+`;
+
+exports[`formatThreads ghost author 1`] = `
+"# Add feature X
+
+1 unresolved of 1 total threads
+
+## src/index.ts
+
+### Line 42
+\`PRRT_test\`
+
+**@ghost** (2025-01-15):
+> feedback
+
+---
+"
+`;
+
+exports[`formatThreads author and date 1`] = `
+"# Add feature X
+
+1 unresolved of 1 total threads
+
+## src/index.ts
+
+### Line 42
+\`PRRT_test\`
+
+**@DouweM** (2025-01-15):
+> looks good
+
+---
+"
+`;

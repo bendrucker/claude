@@ -5,6 +5,8 @@ import type { FeatureRate } from "./voice-delta";
 import type { VoiceProfile } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 
+type ReportInput = Parameters<typeof renderReport>[0];
+
 const baseInput = {
   generatedAt: "2026-05-24",
   since: "2026-04-24",
@@ -35,24 +37,62 @@ const baseInput = {
   candidatePhrases: [] as CandidatePhrase[],
   corrections: [] as CorrectionRow[],
   corrective: [] as CorrectiveRow[],
+} satisfies ReportInput;
+
+// Invented fixture profile. Rates are made-up numbers, never real baseline
+// content, which stays in the local data dir.
+const fixtureProfile: VoiceProfile = {
+  documentCount: 5,
+  totalTokens: 1200,
+  ngrams: {},
+  stemmedNgrams: {},
+  totalStemmedTokens: 1100,
+  generatedAt: "2026-01-01",
+  sources: ["github"],
+  voiceDelta: {
+    rates: { first_person_rate: 9.5, template_presence: 0.1 },
+    documentCount: 5,
+    computedAt: "2026-01-01",
+  },
 };
 
-describe("renderReport", () => {
-  test("includes header, summary, and section titles even when empty", () => {
-    const output = renderReport(baseInput);
-    expect(output).toContain("# Writing trope analysis");
-    expect(output).toContain("## Summary");
-    expect(output).toContain("## Voice Delta");
-    expect(output).toContain("## Proposed Wordlist Removals");
-    expect(output).toContain("## Proposed Wordlist Additions");
-    expect(output).toContain("## Current Rule Health");
-    expect(output).toContain("## Structural Signatures");
-    expect(output).toContain("## Structural Trends");
-    expect(output).toContain("## Correction Candidates");
-  });
+function rateEntry(featureId: string, rate: number): [string, FeatureRate] {
+  return [featureId, { featureId, rate, documentCount: 4 }];
+}
 
-  test("renders structural trends table when documents are present", () => {
-    const output = renderReport({
+const meaningAuditInput: ReportInput = {
+  ...baseInput,
+  meaningAudit: {
+    promptSha256: "abc123def456",
+    model: "claude-haiku-4-5",
+    documents: 40,
+    estimatedCostUsd: 0.1234,
+    criteria: [
+      {
+        id: "information-density",
+        question: "Does this text tell the reviewer anything new?",
+        flagged: 12,
+        total: 40,
+        spans: ["These changes ensure\ncorrect behavior."],
+      },
+      {
+        id: "sycophancy",
+        question: "Does the text flatter the reader?",
+        flagged: 0,
+        total: 40,
+        spans: [],
+      },
+    ],
+  },
+};
+
+const provenanceInput: ReportInput = { ...baseInput, voiceProfile: fixtureProfile };
+
+const cases: Array<{ name: string; input: ReportInput }> = [
+  { name: "empty scaffold", input: baseInput },
+  {
+    name: "structural trends table",
+    input: {
       ...baseInput,
       rateTrends: {
         documentCount: 42,
@@ -62,18 +102,11 @@ describe("renderReport", () => {
         sectionCountDistribution: { 0: 11, 1: 5, 2: 26 },
         templateOnSmallDocumentCount: 7,
       },
-    });
-    expect(output).toContain("## Structural Trends");
-    expect(output).toContain("42");
-    expect(output).toContain("action-verb opener rate");
-    expect(output).toContain("backtick ref density");
-    expect(output).toContain("template document rate");
-    expect(output).toContain("template on small document");
-    expect(output).toContain("7 docs");
-  });
-
-  test("renders structural signature rows with example sentences", () => {
-    const output = renderReport({
+    },
+  },
+  {
+    name: "structural signature rows",
+    input: {
       ...baseInput,
       structuralSignatures: [
         {
@@ -88,59 +121,16 @@ describe("renderReport", () => {
           example: "This is not a cache, it is a ledger",
         },
       ],
-    });
-    expect(output).toContain("`COPULA PART DET NOUN`");
-    expect(output).toContain("This is not a cache, it is a ledger");
-  });
-
-  test("explains how to enable the meaning audit when the judge did not run", () => {
-    const output = renderReport(baseInput);
-    expect(output).toContain("## Meaning-Layer Audit (LLM Judge)");
-    expect(output).toContain("Judge not run");
-  });
-
-  test("renders meaning-audit flag rates, prompt hash, and sampled spans", () => {
-    const output = renderReport({
-      ...baseInput,
-      meaningAudit: {
-        promptSha256: "abc123def456",
-        model: "claude-haiku-4-5",
-        documents: 40,
-        estimatedCostUsd: 0.1234,
-        criteria: [
-          {
-            id: "information-density",
-            question: "Does this text tell the reviewer anything new?",
-            flagged: 12,
-            total: 40,
-            spans: ["These changes ensure\ncorrect behavior."],
-          },
-          {
-            id: "sycophancy",
-            question: "Does the text flatter the reader?",
-            flagged: 0,
-            total: 40,
-            spans: [],
-          },
-        ],
-      },
-    });
-    expect(output).toContain("Prompt: `abc123def456`");
-    expect(output).toContain("| information-density |");
-    expect(output).toContain("| 12/40 | 30% |");
-    // Multi-line spans are flattened so they cannot break the list item.
-    expect(output).toContain('information-density: "These changes ensure correct behavior."');
-    expect(output).toContain("| sycophancy |");
-    expect(output).not.toContain('sycophancy: "');
-  });
-
-  test("renders proposed-removals diff block when entries collapse", () => {
-    const entry: WordlistEntry = { phrase: "tapestry", source: "vocabulary.txt" };
-    const output = renderReport({
+    },
+  },
+  { name: "meaning audit", input: meaningAuditInput },
+  {
+    name: "proposed removals diff block",
+    input: {
       ...baseInput,
       ruleHealth: [
         {
-          entry,
+          entry: { phrase: "tapestry", source: "vocabulary.txt" } satisfies WordlistEntry,
           surface: "chat",
           modelCount: 5,
           modelPerM: 50,
@@ -152,14 +142,11 @@ describe("renderReport", () => {
           quote: null,
         },
       ],
-    });
-    expect(output).toContain("- tapestry");
-    expect(output).toContain("vocabulary.txt");
-    expect(output).toContain("```diff");
-  });
-
-  test("renders proposed-additions diff block for high-lift phrases", () => {
-    const output = renderReport({
+    },
+  },
+  {
+    name: "proposed additions diff block",
+    input: {
       ...baseInput,
       candidatePhrases: [
         {
@@ -175,14 +162,11 @@ describe("renderReport", () => {
           quote: null,
         },
       ],
-    });
-    expect(output).toContain("+ reaching for");
-    expect(output).toContain("lift=16.0");
-    expect(output).toContain("baseline=0");
-  });
-
-  test("renders corrective-feedback moments with matched term", () => {
-    const output = renderReport({
+    },
+  },
+  {
+    name: "corrective feedback moments",
+    input: {
       ...baseInput,
       corrective: [
         {
@@ -198,14 +182,11 @@ describe("renderReport", () => {
           context_snippet: "the model wrote a flowery paragraph",
         },
       ],
-    });
-    expect(output).toContain("## Corrective Feedback");
-    expect(output).toContain("matched `fluff`");
-    expect(output).toContain("reads like marketing fluff");
-  });
-
-  test("renders correction snippets in their own subsections", () => {
-    const output = renderReport({
+    },
+  },
+  {
+    name: "correction snippets",
+    input: {
       ...baseInput,
       corrections: [
         {
@@ -220,13 +201,11 @@ describe("renderReport", () => {
           prose_signal: true,
         },
       ],
-    });
-    expect(output).toContain("### 2026-05-20T10:00:00Z (myproject)");
-    expect(output).toContain("no, do it differently");
-  });
-
-  test("labels openers and vocabulary rules with type column", () => {
-    const output = renderReport({
+    },
+  },
+  {
+    name: "rule health opener and vocabulary types",
+    input: {
       ...baseInput,
       ruleHealth: [
         {
@@ -254,10 +233,47 @@ describe("renderReport", () => {
           quote: null,
         },
       ],
-    });
-    expect(output).toContain("| type |");
-    expect(output).toMatch(/Perfect.*opener/);
-    expect(output).toMatch(/tapestry.*vocabulary/);
+    },
+  },
+  {
+    name: "voice delta rates only, no baseline",
+    input: { ...baseInput, voiceDeltaRates: new Map([rateEntry("first_person_rate", 3.2)]) },
+  },
+  {
+    name: "voice delta corpus, baseline, and delta",
+    input: {
+      ...baseInput,
+      voiceProfile: fixtureProfile,
+      voiceDeltaRates: new Map([rateEntry("first_person_rate", 3.2)]),
+    },
+  },
+  {
+    name: "voice delta fraction features as percentages",
+    input: {
+      ...baseInput,
+      voiceProfile: fixtureProfile,
+      voiceDeltaRates: new Map([rateEntry("template_presence", 0.6)]),
+    },
+  },
+  {
+    name: "voice delta feature missing from baseline",
+    input: {
+      ...baseInput,
+      voiceProfile: fixtureProfile,
+      voiceDeltaRates: new Map([rateEntry("url_rate", 2.5)]),
+    },
+  },
+  { name: "voice delta full feature table", input: provenanceInput },
+];
+
+describe("renderReport", () => {
+  test.each(cases)("$name", ({ input }) => {
+    expect(renderReport(input)).toMatchSnapshot();
+  });
+
+  test("treats a profile without voiceDelta stats as no baseline", () => {
+    const { voiceDelta: _omitted, ...legacyProfile } = fixtureProfile;
+    expect(renderReport({ ...baseInput, voiceProfile: legacyProfile })).toMatchSnapshot();
   });
 
   test("orders sections: summary, removals, additions, health", () => {
@@ -271,89 +287,17 @@ describe("renderReport", () => {
     expect(additionIdx).toBeGreaterThan(removalIdx);
     expect(healthIdx).toBeGreaterThan(additionIdx);
   });
-});
 
-// Invented fixture profile. Rates are made-up numbers, never real baseline
-// content, which stays in the local data dir.
-const fixtureProfile: VoiceProfile = {
-  documentCount: 5,
-  totalTokens: 1200,
-  ngrams: {},
-  stemmedNgrams: {},
-  totalStemmedTokens: 1100,
-  generatedAt: "2026-01-01",
-  sources: ["github"],
-  voiceDelta: {
-    rates: { first_person_rate: 9.5, template_presence: 0.1 },
-    documentCount: 5,
-    computedAt: "2026-01-01",
-  },
-};
-
-function rateEntry(featureId: string, rate: number): [string, FeatureRate] {
-  return [featureId, { featureId, rate, documentCount: 4 }];
-}
-
-describe("renderReport voice delta", () => {
-  test("renders rates-only table with a hint when no baseline is loaded", () => {
-    const output = renderReport({
-      ...baseInput,
-      voiceDeltaRates: new Map([rateEntry("first_person_rate", 3.2)]),
-    });
-    expect(output).toContain("No voice-delta baseline loaded");
-    expect(output).toContain("| feature | provenance | corpus rate |");
-    expect(output).toContain("| First-person voice (I/we per 1k) | skill-encouraged | 3.20 |");
+  test("flattens multi-line meaning-audit spans and omits unflagged criteria", () => {
+    const output = renderReport(meaningAuditInput);
+    // Multi-line spans are flattened so they cannot break the list item.
+    expect(output).toContain('information-density: "These changes ensure correct behavior."');
+    // Unflagged criteria contribute no sampled-span line.
+    expect(output).not.toContain('sycophancy: "');
   });
 
-  test("treats a profile without voiceDelta stats as no baseline", () => {
-    const { voiceDelta: _omitted, ...legacyProfile } = fixtureProfile;
-    const output = renderReport({
-      ...baseInput,
-      voiceProfile: legacyProfile,
-    });
-    expect(output).toContain("No voice-delta baseline loaded");
-  });
-
-  test("renders corpus rate, baseline rate, and delta per feature", () => {
-    const output = renderReport({
-      ...baseInput,
-      voiceProfile: fixtureProfile,
-      voiceDeltaRates: new Map([rateEntry("first_person_rate", 3.2)]),
-    });
-    expect(output).toContain("Baseline: 5 documents (computed 2026-01-01)");
-    expect(output).toContain("| feature | provenance | corpus rate | baseline rate | delta |");
-    expect(output).toContain(
-      "| First-person voice (I/we per 1k) | skill-encouraged | 3.20 | 9.50 | -6.30 |",
-    );
-  });
-
-  test("formats fraction features as percentages with pp deltas", () => {
-    const output = renderReport({
-      ...baseInput,
-      voiceProfile: fixtureProfile,
-      voiceDeltaRates: new Map([rateEntry("template_presence", 0.6)]),
-    });
-    expect(output).toContain(
-      "| Template presence (## Changes + ## Testing) | skill-prescribed | 60% | 10% | +50.0pp |",
-    );
-  });
-
-  test("marks features missing from the baseline stats", () => {
-    const output = renderReport({
-      ...baseInput,
-      voiceProfile: fixtureProfile,
-      voiceDeltaRates: new Map([rateEntry("url_rate", 2.5)]),
-    });
-    expect(output).toContain(
-      "| URL cross-references (per 1k words) | ungoverned | 2.50 | (no baseline stat) | - |",
-    );
-  });
-
-  test("labels every feature row with its provenance", () => {
-    const output = renderReport({
-      ...baseInput,
-      voiceProfile: fixtureProfile,
-    });
+  test("labels every voice-delta feature row with its provenance", () => {
+    const output = renderReport(provenanceInput);
     const section = output.slice(
       output.indexOf("## Voice Delta"),
       output.indexOf("## Proposed Wordlist Removals"),

@@ -21,18 +21,18 @@ export async function processInput(
 ): Promise<SyncHookJSONOutput | null> {
   const dir = cwd ?? process.cwd();
 
-  const gitDir = await $`git rev-parse --git-dir`.cwd(dir).quiet().nothrow();
-  if (gitDir.exitCode !== 0) {
+  // One rev-parse yields both the repo root (cache key) and current branch.
+  // A non-zero exit means we're outside a repo; "HEAD" means detached.
+  const rev = await $`git rev-parse --show-toplevel --abbrev-ref HEAD`.cwd(dir).quiet().nothrow();
+  if (rev.exitCode !== 0) {
+    return null;
+  }
+  const [repoRoot, currentBranch] = rev.text().trim().split("\n");
+  if (!repoRoot || !currentBranch || currentBranch === "HEAD") {
     return null;
   }
 
-  const branch = await $`git symbolic-ref --short HEAD`.cwd(dir).quiet().nothrow();
-  if (branch.exitCode !== 0) {
-    return null;
-  }
-  const currentBranch = branch.text().trim();
-
-  const defaultBranch = await getDefaultBranch(dir);
+  const defaultBranch = await getDefaultBranch(dir, repoRoot);
   if (!defaultBranch) {
     return null;
   }

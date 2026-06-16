@@ -533,16 +533,19 @@ describe("scan", () => {
   });
 
   describe("dig into", () => {
-    it("flags: 'dig into the codebase'", () => {
-      expect(firstByTier(scan("Let's dig into the codebase."), "context")?.category).toBe(
-        "dig into",
-      );
+    it.each([
+      "Let's dig into the codebase.",
+      "We'll dive into the data later.",
+      "I dug into the parser internals.",
+      "She dove into the schema migration.",
+      "We're digging into the root cause.",
+      "The audit dives into each subsystem.",
+    ])("flags: %j", (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("dig into");
     });
 
-    it("flags: 'dive into the data'", () => {
-      expect(firstByTier(scan("We'll dive into the data later."), "context")?.category).toBe(
-        "dig into",
-      );
+    it.each(["She dug a trench.", "Water drains into the basin."])("allows: %j", (text) => {
+      expect(scan(text).find((m) => m.category === "dig into")).toBeUndefined();
     });
   });
 

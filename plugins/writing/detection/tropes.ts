@@ -556,15 +556,20 @@ export const PATTERNS: PatternDef[] = [
     tier: "context",
     layer: "vocabulary",
     category: "dig into",
-    test: /\b(?:dig|dive|wade)\s+into\b/gi,
+    test: /\b(?:dig|digs|digging|dug|dive|dives|diving|dove|dived|wade|wades|wading|waded)\s+into\b/gi,
     message: (matched) =>
       `"${matched}" is exploration filler. Describe what you're actually looking at.`,
-    positives: ["Let's dig into the codebase.", "We'll dive into the data later."],
-    negatives: ["She dug a trench.", "The code dives into the network stack."],
+    positives: [
+      "Let's dig into the codebase.",
+      "I dug into the parser internals.",
+      "She dove into the schema migration.",
+      "We're digging into the root cause.",
+    ],
+    negatives: ["She dug a trench.", "Water drains into the basin."],
     evidence:
-      "Pre-dates the curation principle; no corpus evidence recorded. Retained as a vocabulary-level filler marker.",
+      "Corpus audit of assistant output found exploration-filler 'into' constructions in inflected forms the base-form regex missed, including the irregular past tenses 'dug into' and 'dove into'. Porter stemming cannot unify irregular verbs ('dug' stems to 'dug', not 'dig'), so each inflection is enumerated explicitly.",
     retire:
-      "Remove if corpus analysis shows the phrase is no longer distinctive, or migrate to vocabulary.txt after a per-entry audit.",
+      "Remove if corpus analysis shows the construction is no longer distinctive. Drop individual inflections that stop appearing in assistant output.",
   },
   {
     tier: "context",

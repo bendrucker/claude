@@ -93,10 +93,10 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-reviewers.ts
 - **Blame owners**: people who wrote the lines you're changing. Suggest the top one or two.
 - **Sole-author fallback**: when the output reports you're the sole author of the area, use the recent in-area PR/MR refs it prints—look up who you requested review from on those and suggest the recurring names.
 
-Resolve names to platform usernames only after the user accepts, then pass them when creating the PR/MR:
+This runs after you create the PR/MR, so it never delays creation. Resolve names to platform usernames only after the user accepts, then assign them to the existing PR/MR:
 
-- **GitHub**: `gh pr create --reviewer <user>` (resolve emails to logins with `mcp__github` if needed)
-- **GitLab**: load `gitlab:merge-request` for username resolution before `--reviewer`
+- **GitHub**: `gh pr edit --add-reviewer <user>` (resolve emails to logins with `mcp__github` if needed)
+- **GitLab**: load `gitlab:merge-request` for username resolution, then `glab mr update --reviewer <user>`
 
 ## Dry Run
 
@@ -110,12 +110,12 @@ If `--dry-run` (or `--body-only`) is set, follow the Dry Run section instead of 
 1. Stage changes if not already staged: `git add .`
 1. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
 1. Push the branch to remote: `git push -u origin HEAD`
-1. Suggest reviewers on corporate repos (see [Reviewers](#reviewers)). Skip this step for OSS. When suggesting, present the candidates and include only the ones the user accepts via `--reviewer` below.
 1. Create the PR/MR:
    - Write the body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
    - Include the branch name in the filename to avoid conflicts with concurrent agents
-   - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md [--reviewer u1,u2]`
-   - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)" [--reviewer u1,u2]`
+   - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
+   - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
+1. Suggest reviewers on corporate repos (see [Reviewers](#reviewers)). Skip this step for OSS. The PR/MR already exists, so reviewer ranking runs after creation and adds no latency to it.
 
 ## GitLab Notes
 

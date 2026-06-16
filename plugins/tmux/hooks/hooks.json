@@ -37,6 +37,15 @@
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/target.ts\""
           }
         ]
+      },
+      {
+        "matcher": "TeamCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$TMUX_PANE\" ] && tmux set-environment CLAUDE_PATH \"$PATH\" && tmux set-option default-command \"${CLAUDE_PLUGIN_ROOT}/hooks/shell-wrapper.sh\" && tmux set-option -w -t \"$TMUX_PANE\" @claude_fast_shell 1 || true"
+          }
+        ]
       }
     ],
     "Notification": [

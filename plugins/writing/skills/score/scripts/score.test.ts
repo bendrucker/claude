@@ -91,17 +91,13 @@ describe("buildReport", () => {
 });
 
 describe("renderTable", () => {
-  it("renders a header with word count and a category row", () => {
-    const report = buildReport("a — b", "doc.md", { comments: false });
-    const out = renderTable(report);
-    expect(out).toContain("prose (2 words)");
-    expect(out).toContain("spaced em dash");
-    expect(out).toContain("Density /1k");
-  });
+  const cases: Array<{ name: string; text: string }> = [
+    { name: "header with word count and category rows", text: "a — b" },
+    { name: "no patterns for clean prose", text: "The function reads input." },
+  ];
 
-  it("reports no patterns for clean prose", () => {
-    const report = buildReport("The function reads input.", "doc.md", { comments: false });
-    expect(renderTable(report)).toContain("No patterns detected.");
+  it.each(cases)("$name", ({ text }) => {
+    expect(renderTable(buildReport(text, "doc.md", { comments: false }))).toMatchSnapshot();
   });
 });
 
@@ -126,31 +122,26 @@ const inRegisterText =
   "This fixes the loader race. I noticed it while testing retries. The fix holds the lock across the read.";
 
 describe("renderVoiceDeltaTable", () => {
-  it("shows rate, baseline, and delta columns for in-register text", () => {
-    const out = renderVoiceDeltaTable(inRegisterText, fixtureProfile);
-    expect(out).toContain("Voice Delta Features");
-    expect(out).toContain("Baseline");
-    expect(out).toContain("Delta");
-    expect(out).toContain("skill-encouraged");
-    expect(out).toContain("9.50");
+  const cases: Array<{ name: string; text: string; profile: VoiceProfile | null }> = [
+    {
+      name: "rate, baseline, and delta columns for in-register text",
+      text: inRegisterText,
+      profile: fixtureProfile,
+    },
+    {
+      name: "skips the baseline comparison for out-of-register input",
+      text: "Too short.",
+      profile: fixtureProfile,
+    },
+    { name: "missing baseline still renders rates", text: inRegisterText, profile: null },
+  ];
+
+  it.each(cases)("$name", ({ text, profile }) => {
+    expect(renderVoiceDeltaTable(text, profile)).toMatchSnapshot();
   });
 
-  it("skips the baseline comparison for out-of-register input", () => {
-    const out = renderVoiceDeltaTable("Too short.", fixtureProfile);
-    expect(out).toContain("Register check: skipping baseline comparison");
-    expect(out).toContain("too short");
-    expect(out).not.toContain("Baseline");
-  });
-
-  it("reports a missing baseline and still renders rates", () => {
-    const out = renderVoiceDeltaTable(inRegisterText, null);
-    expect(out).toContain("No baseline loaded");
-    expect(out).toContain("Rate");
-    expect(out).not.toContain("Baseline");
-  });
-
-  it("marks features absent from the baseline stats", () => {
-    const out = renderVoiceDeltaTable(inRegisterText, fixtureProfile);
-    expect(out).toContain("(no stat)");
+  it("omits the baseline column when the comparison is skipped or unavailable", () => {
+    expect(renderVoiceDeltaTable("Too short.", fixtureProfile)).not.toContain("Baseline");
+    expect(renderVoiceDeltaTable(inRegisterText, null)).not.toContain("Baseline");
   });
 });

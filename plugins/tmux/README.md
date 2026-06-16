@@ -24,7 +24,7 @@ The tmux team backend spawns each teammate in a new pane and immediately sends t
 
 A PreToolUse hook on `TeamCreate` heads this off. It points tmux's `default-command` at [`shell-wrapper.sh`](hooks/shell-wrapper.sh) and pins `@claude_fast_shell` on the lead's window. New panes in that window exec a shell with rc loading skipped (`zsh --no-rcs`, `bash --norc`, `fish --no-config`), so the prompt is ready before `send-keys` fires. Every other window falls through to a normal login shell, so panes you open elsewhere behave as usual. One catch: a no-rc shell never rebuilds `PATH`, so the hook stashes the current value in the `CLAUDE_PATH` tmux environment variable and the wrapper restores it. Otherwise `claude` would not resolve.
 
-There is no teardown. The override lasts for the life of the tmux session and leaves the team window stuck with a no-rc shell. Kill the window to reset it. That tradeoff is deliberate. It keeps the hook off the `Stop` path, where an earlier teardown version burned a `bun` startup on every stop in every session for no benefit.
+A second hook on `TeamDelete` reverses all of this. It unsets `default-command`, clears the window's `@claude_fast_shell` pin, and removes `CLAUDE_PATH`. Teardown is optimistic. It rides on the normal end of a team and never touches the `Stop` path, where an earlier version burned a `bun` startup on every stop in every session. When a team is never deleted, its window keeps the no-rc shell until the tmux session ends. Kill the window to reset it sooner.
 
 ## Sandbox
 

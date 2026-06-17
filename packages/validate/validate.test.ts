@@ -96,13 +96,13 @@ describe("validateFile", () => {
       const file = join(tempDir, `${fixture.name.replace(/\s+/g, "-")}.json`);
       await Bun.write(file, JSON.stringify(fixture.data));
 
-      const result = await validateFile(
-        file,
-        schemaPath,
-        fixture.warnAdditional
-          ? { warnAdditional: true, allowAdditional: fixture.allowAdditional }
-          : undefined,
-      );
+      const options = fixture.warnAdditional
+        ? {
+            warnAdditional: true,
+            ...(fixture.allowAdditional && { allowAdditional: fixture.allowAdditional }),
+          }
+        : undefined;
+      const result = await validateFile(file, schemaPath, options);
 
       expect(result.errors).toHaveLength(fixture.errors.length);
       for (const [i, pattern] of fixture.errors.entries()) {

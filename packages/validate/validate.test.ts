@@ -32,6 +32,7 @@ describe("validateFile", () => {
     name: string;
     data: unknown;
     warnAdditional?: boolean;
+    allowAdditional?: string[];
     errors: string[];
     warnings: string[];
   }[] = [
@@ -80,6 +81,14 @@ describe("validateFile", () => {
       errors: ["must be string"],
       warnings: ['unknown property "extra"'],
     },
+    {
+      name: "allowAdditional suppresses listed properties",
+      data: { name: "test", allowed: true, unknown: "yes" },
+      warnAdditional: true,
+      allowAdditional: ["allowed"],
+      errors: [],
+      warnings: ['unknown property "unknown"'],
+    },
   ];
 
   for (const fixture of fixtures) {
@@ -90,7 +99,9 @@ describe("validateFile", () => {
       const result = await validateFile(
         file,
         schemaPath,
-        fixture.warnAdditional ? { warnAdditional: true } : undefined,
+        fixture.warnAdditional
+          ? { warnAdditional: true, allowAdditional: fixture.allowAdditional }
+          : undefined,
       );
 
       expect(result.errors).toHaveLength(fixture.errors.length);

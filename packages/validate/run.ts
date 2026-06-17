@@ -12,6 +12,7 @@ export interface ValidationTarget {
   files: string[];
   schema: string;
   warnAdditional?: boolean;
+  allowAdditional?: string[];
   extraSchemas?: { schema: string; key: string }[];
   successMessage?: string;
 }
@@ -25,9 +26,10 @@ export async function runValidation(target: ValidationTarget): Promise<void> {
     }
   }
 
-  const options: { ajv?: Ajv; warnAdditional?: boolean } = {};
+  const options: { ajv?: Ajv; warnAdditional?: boolean; allowAdditional?: string[] } = {};
   if (ajv) options.ajv = ajv;
   if (target.warnAdditional) options.warnAdditional = true;
+  if (target.allowAdditional) options.allowAdditional = target.allowAdditional;
 
   const result: ValidationResult = { errors: [], warnings: [] };
   for (const file of target.files) {

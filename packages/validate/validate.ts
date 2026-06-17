@@ -76,7 +76,7 @@ function patchHookSchema(schema: Record<string, unknown>): void {
 export async function validateFile(
   file: string,
   schemaPath: string,
-  options?: { ajv?: Ajv; warnAdditional?: boolean },
+  options?: { ajv?: Ajv; warnAdditional?: boolean; allowAdditional?: string[] },
 ): Promise<ValidationResult> {
   const instance = options?.ajv ?? createValidator();
 
@@ -98,8 +98,9 @@ export async function validateFile(
   const warnings: string[] = [];
   if (options?.warnAdditional && entry.schema.properties) {
     const known = new Set(Object.keys(entry.schema.properties as Record<string, unknown>));
+    const allowed = new Set(options.allowAdditional ?? []);
     for (const key of Object.keys(data as Record<string, unknown>)) {
-      if (key !== "$schema" && !known.has(key)) {
+      if (key !== "$schema" && !known.has(key) && !allowed.has(key)) {
         warnings.push(formatWarning(file, key));
       }
     }

@@ -183,10 +183,6 @@ jobs:
         if: steps.inspect.outputs.has_skills == 'true'
         run: bun run skill-lint "plugins/${{ matrix.plugin.name }}/skills/*"
 
-      - name: Setup Swift
-        if: steps.inspect.outputs.has_swift == 'true'
-        uses: swift-actions/setup-swift@v2
-
       - name: Validate Swift syntax
         if: steps.inspect.outputs.has_swift == 'true'
         run: find "plugins/${{ matrix.plugin.name }}" -name "*.swift" -exec swiftc -parse {} +

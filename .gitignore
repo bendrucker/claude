@@ -4,3 +4,11 @@
 node_modules/
 .DS_Store
 **/fixtures/
+
+# Generated coverage output (bun test --coverage)
+/coverage/
+# The coverage tooling lives in directories named `coverage`. Re-include them
+# against a global `coverage` ignore so the source stays tracked.
+!scripts/coverage/
+!.claude/hooks/coverage/
+!.claude/skills/coverage/

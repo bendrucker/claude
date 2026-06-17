@@ -16,7 +16,7 @@ A SessionStart hook detects whether Claude is running inside tmux and writes ses
 
 Another SessionStart hook records the command that resumes the current session (`claude --resume <id>`) in the pane-scoped tmux option `@resume-command`, refreshed on every session start. Plugins like tmux-resurrect can read it back with `tmux show-options -p -t <pane> -qv @resume-command` to resume the session when restoring a pane. Outside tmux the hook is a no-op.
 
-The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only, navigation, layout). The safe command list is maintained in [`safe-commands.json`](skills/tmux/resources/safe-commands.json).
+The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only and within-window layout). The safe command list is maintained in [`safe-commands.json`](skills/tmux/resources/safe-commands.json). Window-switching verbs (`select-window`, `switch-client`, `next`/`previous`/`last-window`) are deliberately excluded, so they fall through to a permission prompt. This keeps cross-window navigation an explicit choice rather than a silent one during autonomous work.
 
 ## Agent Team Shell Race
 

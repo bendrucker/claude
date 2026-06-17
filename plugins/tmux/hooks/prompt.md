@@ -14,6 +14,9 @@ through unchanged. Injection is best-effort: it does NOT fire when the
 command's argument contains shell metacharacters (`$(...)`, `;`,
 `&&`, etc.), so pass `-t "$TMUX_PANE"` explicitly in those cases.
 
-To target the user's currently active pane, resolve it first:
+Default to your own pane and window. Reaching into another window is the
+exception: the window-switching verbs (`select-window`, `switch-client`,
+`next`/`previous`/`last-window`) prompt for permission, so cross-window work
+should follow an explicit request. When it does, resolve the target first:
 
     target=$(tmux display-message -p '#{pane_id}') && tmux send-keys -t "$target" ...

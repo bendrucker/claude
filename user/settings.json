@@ -336,6 +336,7 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
+    "allowAppleEvents": true,
     "network": {
       "allowLocalBinding": true,
       "allowUnixSockets": [

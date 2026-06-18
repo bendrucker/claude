@@ -22,7 +22,7 @@ Short review comments get short replies. Detailed technical feedback gets a prop
 
 ## Replying to AI Reviewers
 
-When `--auto` replies to a bot thread, write the reply as a note for any reader, not a message to the bot:
+When replying to a bot thread (auto or gated), write the reply as a note for any reader, not a message to the bot:
 
 - **Don't name or address the reviewer.** No "@coderabbitai", no "thanks", no "good bot". The one place a bot is named is the `@<bot>` re-trigger, a top-level comment, not a thread reply.
 - **State the resolution, not the dialogue.** "Guarded with a null check" or "Intentional: this path only runs after validation" reads correctly whether a human or a bot raised it.

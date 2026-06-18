@@ -354,6 +354,7 @@
         "~/src/go/pkg/mod",
         "~/src/go/pkg/sumdb",
         "~/.bun/install",
+        "~/.npm",
         "~/.local/share/uv",
         "~/.local/share/graphite"
       ]

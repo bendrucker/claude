@@ -46,7 +46,7 @@
     "disable-model-invocation": {
       "type": "boolean",
       "default": false,
-      "description": "Block programmatic invocation via the Skill tool. Does not affect slash menu or auto-discovery."
+      "description": "Block model (Skill tool) invocation and drop the skill's name and description from the always-on catalog, so it costs no recurring context. The skill still appears in the slash menu and loads its body when invoked with /name."
     }
   },
   "required": ["name", "description"],

@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -n \"$TMUX_PANE\" ] && tmux set-environment CLAUDE_PATH \"$PATH\" && tmux set-option default-command \"${CLAUDE_PLUGIN_ROOT}/hooks/shell-wrapper.sh\" && tmux set-option -w -t \"$TMUX_PANE\" @claude_fast_shell 1 || true"
+            "command": "[ -n \"$TMUX_PANE\" ] && tmux set-environment CLAUDE_PATH \"$PATH\" && tmux set-option default-command \"${CLAUDE_PLUGIN_ROOT}/hooks/shell-wrapper.sh\" && tmux set-environment CLAUDE_FAST_SHELL_UNTIL \"$(($(date +%s) + 15))\" || true"
           }
         ]
       }
@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -n \"$TMUX_PANE\" ] && { tmux set-option -u default-command; tmux set-option -wu -t \"$TMUX_PANE\" @claude_fast_shell; tmux set-environment -u CLAUDE_PATH; } || true"
+            "command": "[ -n \"$TMUX_PANE\" ] && { tmux set-option -u default-command; tmux set-environment -u CLAUDE_PATH; tmux set-environment -u CLAUDE_FAST_SHELL_UNTIL; } || true"
           }
         ]
       }

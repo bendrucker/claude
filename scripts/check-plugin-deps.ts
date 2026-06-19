@@ -5,6 +5,12 @@ import { Glob } from "bun";
 import { loadPlugins } from "../packages/marketplace/index";
 import { runCheck } from "./check";
 
+// Exit codes: 0 clean, VIOLATION_EXIT when undeclared dependencies are found.
+// Anything else (bun exits 1 on uncaught errors) means the checker itself
+// failed to run. The Stop hook in .claude/hooks/plugin-deps relies on this
+// distinction to avoid reporting a crash as a violation.
+export const VIOLATION_EXIT = 2;
+
 async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
   const deps = new Set<string>();
   const glob = new Glob("**/package.json");
@@ -74,4 +80,10 @@ async function checkDeps(): Promise<string[]> {
   return violations;
 }
 
-await runCheck(checkDeps, { stream: "stderr", indent: false });
+if (import.meta.main) {
+  await runCheck(checkDeps, {
+    stream: "stderr",
+    indent: false,
+    failureExit: VIOLATION_EXIT,
+  });
+}

@@ -1,6 +1,7 @@
 ---
 name: claude-code:agent-team
 description: Orchestrating Claude Code agent teams. Use when creating teams, spawning teammates, assigning tasks, configuring teammate modes, or setting up team quality gate hooks.
+argument-hint: "[--plan-approval] [--delegate] [--shutdown]"
 allowed-tools:
   - Read
   - Write
@@ -12,6 +13,14 @@ allowed-tools:
 ---
 
 # Agent Teams
+
+## Arguments
+
+These select a team mode up front instead of toggling it interactively (see [Team Lifecycle](#team-lifecycle)):
+
+- `--delegate`: start the lead in delegate mode, coordination-only with no direct implementation. Default: the lead can implement.
+- `--plan-approval`: require teammates to plan before implementing, read-only until the lead approves. Default: off.
+- `--shutdown`: shut the current team down, teammates first and then the team, then stop. Default: create or operate a team.
 
 ## Team Lifecycle
 

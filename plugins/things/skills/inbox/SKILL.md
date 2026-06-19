@@ -1,12 +1,17 @@
 ---
 name: things:inbox
 description: Quick captures to the Things 3 inbox. Not for reads (things:jxa), scheduled tasks, updates, or projects (things:url).
+argument-hint: "<text>"
 allowed-tools: ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"]
 ---
 
 # Things Inbox
 
 Add todos to the Things 3 inbox.
+
+## Arguments
+
+`$ARGUMENTS` is the capture text, passed as `title`. Multiple lines become multiple todos via `titles`. See [Add a Todo](#add-a-todo).
 
 ## Add a Todo
 

@@ -1,6 +1,7 @@
 ---
 name: linear
 description: Interacting with Linear issues, projects, and teams. Use when creating issues, updating issues, querying issues, managing projects, working on tasks, discussing backlogs, or any interaction with Linear.
+argument-hint: "[create | update | list | view | comment] [issue ...]"
 allowed-tools:
   - mcp__linear
   - mcp__claude_ai_Linear
@@ -11,6 +12,18 @@ allowed-tools:
 # Linear
 
 Tools and workflows for managing issues, projects, and teams in Linear.
+
+## Arguments
+
+`$0` (optional verb) routes to an operation; pass the rest (issue id, title, filters) as its params. With no verb, infer the operation from the request.
+
+- `create`: create an issue. See [Creating vs Updating](#creating-vs-updating) and [Issue Status](#issue-status).
+- `update`: update an issue by id. See [Creating vs Updating](#creating-vs-updating).
+- `list`: query issues. See [Querying Issues](#querying-issues).
+- `view`: fetch a single issue; include its `url` for anything you may reference.
+- `comment`: comment on an issue, using full URLs per [Issue References](#issue-references).
+
+Pick MCP tools or the `linear api` CLI per [Tool Selection](#tool-selection).
 
 ## Tool Selection
 

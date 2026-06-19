@@ -5,6 +5,7 @@ description: >-
   session history and surfacing candidate phrases. Use when refreshing trope
   detection, reviewing wordlist health, or mining sessions for new AI-writing
   patterns to add or stale rules to remove.
+argument-hint: "[--since date] [--model glob] [--judge]"
 disable-model-invocation: true
 allowed-tools:
   - Bash
@@ -15,6 +16,14 @@ allowed-tools:
 # Writing Analyze
 
 Mine the session DuckDB index for assistant writing patterns, compare against the user's voice, and propose a diff to `plugins/writing/wordlists/*.txt`.
+
+## Arguments
+
+Forward these from `$ARGUMENTS` to `analyze.ts` (see [Run](#run)):
+
+- `--since <date>`: restrict the corpus to sessions on or after the date. Default: the full index.
+- `--model <glob>`: restrict to matching model IDs (e.g. `*opus*`). Default: all models.
+- `--judge`: add the LLM-judge pass over the deliverable corpus. See [Meaning-Layer Judge](#meaning-layer-judge). Default: off.
 
 ## Prerequisites
 

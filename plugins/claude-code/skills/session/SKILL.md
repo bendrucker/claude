@@ -1,6 +1,7 @@
 ---
 name: claude-code:session
 description: Query Claude Code session history via a DuckDB index over `~/.claude/projects/`. Use when asked about Claude Code activity ("how many tokens today?", "what did I work on this week?") or instead of reading, grepping, or jq-ing session transcripts. Not for codebase search, git log queries, or arbitrary databases.
+argument-hint: "[--refresh] [--host label] [--since date]"
 allowed-tools:
   - Bash
   - Read
@@ -11,6 +12,14 @@ allowed-tools:
 Search and analyze Claude Code conversation history via a DuckDB index over JSONL session files.
 
 **Current Session ID**: `${CLAUDE_SESSION_ID}`
+
+## Arguments
+
+Map any arguments to the mechanisms below:
+
+- `--refresh`: force a full rescan via `refresh.ts --refresh` before querying. Default: incremental refresh keyed on file mtime.
+- `--host <label>`: scope queries to one imported machine through the `host` param. Default: span every host, including `local`. See [Cross-Machine History](#cross-machine-history).
+- `--since <date>`: pass as the `after_date` param to scope queries from that date forward. Default: the full index.
 
 ## Database
 

@@ -1,6 +1,7 @@
 ---
 name: git:conflicts
 description: Resolving git merge conflicts during rebase, merge, or cherry-pick. Use when conflicts arise. Can also drive the operation to completion and push when asked (e.g. "fix conflicts and push").
+argument-hint: "[--push]"
 allowed-tools:
   - Read
   - Edit
@@ -65,7 +66,7 @@ For each conflicted file:
 
 ## Committing and Pushing
 
-This step runs only when you are asked to take the operation to completion (e.g. the user ran `/git:conflicts push` or said "fix conflicts and push"). On auto-activation, or when asked only to resolve, stop after `git add` and do not commit, continue, or push.
+This step runs only when you are asked to take the operation to completion: the `--push` argument (its alias `push`), or a request like "fix conflicts and push". By default, on auto-activation or when asked only to resolve, stop after `git add` and do not commit, continue, or push.
 
 When driving to completion:
 

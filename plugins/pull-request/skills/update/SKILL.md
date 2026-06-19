@@ -4,6 +4,7 @@ description: |
   Update a pull request or merge request body to reflect the current state of changes.
   Use when a PR/MR has evolved through additional commits and the body needs to reflect what will be merged.
 
+argument-hint: "[pr-url | mr-url]"
 allowed-tools:
   - mcp__github
   - "Bash(git remote get-url:*)"
@@ -15,6 +16,10 @@ allowed-tools:
 # Update Pull Request
 
 The PR body documents what will happen when merged, not the journey. Don't echo review feedback. Only mention changes if the ultimate result is user-facing.
+
+## Arguments
+
+`$0` (optional): the PR/MR to update, given as a URL, number, or branch name. The Workflow passes it to `gh pr view`/`glab mr view`. Default: with no argument, the tools resolve the PR/MR from the current branch.
 
 ## Context
 

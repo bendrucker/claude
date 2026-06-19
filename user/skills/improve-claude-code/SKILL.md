@@ -62,7 +62,7 @@ One todo per candidate, not one blob. Filing lands findings in the same backlog 
 
 #### Non-Interactive Run
 
-A scheduled local run (`claude -p "/improve-claude-code discover"`) cannot stop for the [File the Keepers](#file-the-keepers) prompt, so it ends one step short of filing. Everything upstream runs unchanged: refresh the index, fan out the dimensions, and run the mandatory grounding pass. The verifier split stays exactly as it is on-demand. Skipping it would file week-stale findings against a config nobody re-checked.
+A scheduled local run (a Claude Code Desktop scheduled task firing `/improve-claude-code discover`) has nobody at the keyboard for the [File the Keepers](#file-the-keepers) prompt, so it ends one step short of filing. Everything upstream runs unchanged: refresh the index, fan out the dimensions, and run the mandatory grounding pass. The verifier split stays exactly as it is on-demand. Skipping it would file week-stale findings against a config nobody re-checked.
 
 Write the digest to `tmp/claude-discovery-digest-<YYYY-Www>.md` as always. Then, in place of the prompt, file exactly one Things doorway item that summarizes the run and hands triage back to you on demand. The run still never auto-files keepers. The doorway hands the filing choice back to you.
 
@@ -79,7 +79,9 @@ Report how many todos landed. The existing triage, plan, implement, PR, CI, and 
 
 #### Cadence
 
-On-demand is primary: invoke this skill in Discover mode at your terminal and file keepers through the prompt. The weekly run is the [Non-Interactive Run](#non-interactive-run) above, and it must fire **locally**. The session DB and the `duckdb` CLI live on this Mac, so a cloud `/schedule` routine cannot reach them and the `agent-ideas` headless-then-teleport bridge does not apply (that works only because RSS is public). The local trigger is a launchd job that lives in the dotfiles repo, paired with this skill and configured there, not here.
+On-demand is primary: invoke this skill in Discover mode at your terminal and file keepers through the prompt. The weekly run is the [Non-Interactive Run](#non-interactive-run) above, and it must fire **locally**. The session DB and the `duckdb` CLI live on this Mac, so a cloud `/schedule` routine cannot reach them. Routines run in Anthropic's cloud from a fresh repo clone, with no local filesystem or CLI access. The `agent-ideas` headless-then-teleport bridge does not apply either (that works only because RSS is public).
+
+The trigger is a Claude Code Desktop scheduled task. It runs on this Mac with full filesystem and `duckdb` access and bills against the subscription, unlike headless `claude -p`, which now draws from a separate metered credit pool. It fires only while the Desktop app is open. A launchd-launched interactive session is the fallback. Either way the trigger lives in the dotfiles repo, configured there, not here.
 
 #### Fingerprint
 

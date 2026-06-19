@@ -1,6 +1,7 @@
 ---
 name: gitlab:merge-request
 description: Working with GitLab merge requests via glab. Use when creating, updating, reviewing, or merging MRs.
+argument-hint: "[create | merge | review | discussions | block] [--draft] [--auto] [--role author|reviewer]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/*:*)
   - Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts:*)
@@ -10,6 +11,18 @@ allowed-tools:
 # Merge Requests
 
 Working with GitLab merge requests via `glab mr`.
+
+## Arguments
+
+`$0` (optional verb) routes to a section below. With no verb, infer the operation from the request.
+
+- `create`: open an MR. See [Patterns](#patterns). `--draft` opens it as a draft (`glab mr create --draft`).
+- `merge`: merge the MR. See [Merging](#merging). `--auto` enables auto-merge (`merge.ts --auto-merge`).
+- `review`: review MRs. See [Reviews](#reviews). `--role reviewer` (default) fetches MRs awaiting your review; `--role author` triages threads on MRs you authored.
+- `discussions`: work MR discussion threads. See [Discussions](#discussions).
+- `block`: block an MR until another merges. See [Blocking](#blocking).
+
+Flag defaults: `--draft` off, `--auto` off, `--role reviewer`.
 
 ## Key Commands
 

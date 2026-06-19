@@ -73,6 +73,9 @@ jobs:
       - name: Test packages
         run: bun test packages/
 
+      - name: Check schema overlays
+        run: bun run schemas check
+
       - name: Validate settings
         run: bun packages/validate/settings.ts
 

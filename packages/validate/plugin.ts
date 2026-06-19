@@ -8,7 +8,7 @@ runEntry(() =>
         ".claude-plugin/plugin.json",
       ),
     ],
-    schema: "schemas/plugin.schema.json",
+    schema: { overlay: "plugin" },
     warnAdditional: true,
   }),
 );

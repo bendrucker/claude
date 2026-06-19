@@ -6,7 +6,7 @@ This repository contains my personal Claude Code configuration and a plugin mark
 
 - `plugins/`: Plugins providing language support, workflows, and integrations
 - `.claude-plugin/marketplace.json`: Marketplace definition listing all available plugins
-- `schemas/`: JSON Schema definitions for `plugin.schema.json` and `marketplace.schema.json`
+- `schemas/`: JSON Schemas for Claude Code config formats. Upstream-backed ones (`plugin`, `marketplace`, `settings`) keep only our edits as an RFC 6902 overlay in [`schemas/overlays/`](schemas/overlays/), merged with the live upstream base in memory at validation time; the rest are hand-authored
 - `user/`: User-level configuration, symlinked to `~/.claude`
 - `.claude/`: Project-level configuration for this repository
 
@@ -28,12 +28,14 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 - [`settings.md`](.claude/rules/settings.md) (`**/settings*.json`): permission paths, sandbox and `excludedCommands`
 - [`testing.md`](.claude/rules/testing.md) (test and workflow files): testing conventions, CI structure
 - [`lockfile.md`](.claude/rules/lockfile.md) (`bun.lock`, `**/package.json`): lockfile conflict resolution
+- [`schemas.md`](.claude/rules/schemas.md) (`schemas/**`): schema overlays, generated vs hand-authored artifacts
 
 `user/rules/` (note: under `user/`, not `.claude/`) holds rules that apply across all repos and get symlinked to `~/.claude/rules/`. Use those for language/file-type guidance Claude should always have. Use skills for workflow-specific knowledge that requires explicit activation.
 
 ## Verification
 
 - `bun scripts/check-marketplace.ts`: verifies all plugin directories are listed in `marketplace.json`. Runs in CI.
+- `bun run schemas check`: fetches current upstream and verifies the upstream-backed schema overlays still apply, flagging overlay edits that upstream has absorbed. Runs in CI.
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 
 ## Workflow

@@ -81,7 +81,7 @@ Report how many todos landed. The existing triage, plan, implement, PR, CI, and 
 
 On-demand is primary: invoke this skill in Discover mode at your terminal and file keepers through the prompt. The weekly run is the [Non-Interactive Run](#non-interactive-run) above, and it must fire **locally**. The session DB and the `duckdb` CLI live on this Mac, so a cloud `/schedule` routine cannot reach them. Routines run in Anthropic's cloud from a fresh repo clone, with no local filesystem or CLI access. The `agent-ideas` headless-then-teleport bridge does not apply either (that works only because RSS is public).
 
-The trigger is a Claude Code Desktop scheduled task. It runs on this Mac with full filesystem and `duckdb` access and bills against the subscription, unlike headless `claude -p`, which now draws from a separate metered credit pool. It fires only while the Desktop app is open. A launchd-launched interactive session is the fallback. Either way the trigger lives in the dotfiles repo, configured there, not here.
+The trigger is a Claude Code Desktop scheduled task: on the Routines page, add a routine that runs `/improve-claude-code discover` weekly in Local mode. It runs on this Mac with full filesystem and `duckdb` access. It fires only while the Desktop app is open and the machine is awake. The routine is configured in the Desktop app, so nothing in this repo or dotfiles carries it. If you need the run to fire with the app closed, the fallback is a launchd job running `claude -p "/improve-claude-code discover"`, and that plist belongs in the dotfiles repo.
 
 #### Fingerprint
 

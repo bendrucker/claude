@@ -47,7 +47,7 @@ describe("store", () => {
 
     test("reads and parses valid state file", async () => {
       const state: DashboardState = { reviews: [makeReview()] };
-      const dir = join(tmpDir, "review-dashboard");
+      const dir = join(tmpDir, "review-inbox");
       mkdirSync(dir, { recursive: true });
       await Bun.write(join(dir, "state.json"), JSON.stringify(state));
 
@@ -55,7 +55,7 @@ describe("store", () => {
     });
 
     test("throws on malformed JSON missing reviews array", async () => {
-      const dir = join(tmpDir, "review-dashboard");
+      const dir = join(tmpDir, "review-inbox");
       mkdirSync(dir, { recursive: true });
       await Bun.write(join(dir, "state.json"), JSON.stringify({ something: "else" }));
 
@@ -83,7 +83,7 @@ describe("store", () => {
 
   describe("writeState", () => {
     test("creates directory if it does not exist", async () => {
-      const dir = join(tmpDir, "review-dashboard");
+      const dir = join(tmpDir, "review-inbox");
       await expect(readdir(dir)).rejects.toThrow();
 
       await writeState({ reviews: [] }, tmpDir);

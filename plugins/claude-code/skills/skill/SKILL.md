@@ -1,6 +1,7 @@
 ---
 name: claude-code:skill
 description: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows. Use when creating new skills, converting memory files to skills, debugging skill activation, or understanding skill architecture and best practices.
+argument-hint: "[--validate] [--structure]"
 allowed-tools:
   - Read
   - Write
@@ -24,6 +25,15 @@ hooks:
 # Claude Code Skills Development
 
 Reference for developing effective skills. The context window is a public good - only include information Claude doesn't already possess.
+
+## Arguments
+
+Run a check against a skill path in `$ARGUMENTS`, defaulting to the skill you just edited:
+
+- `--validate`: run `skill-lint` (`bun run skill-lint <path>`) for frontmatter, naming, and reference-depth validation.
+- `--structure`: run the directory-structure check (`${CLAUDE_SKILL_DIR}/scripts/check-structure.ts`) for the SKILL.md, `scripts/`, `references/`, `assets/` layout.
+
+With neither flag, use the skill as an authoring reference. See [Validation](#validation).
 
 ## Core Principles
 

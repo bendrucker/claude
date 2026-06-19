@@ -54,8 +54,8 @@ describe("hasBypassMarker", () => {
     expect(await hasBypassMarker(gitlabWatchScript)).toBe(true);
   });
 
-  test("mac jxa.ts carries the marker", async () => {
-    expect(await hasBypassMarker(jxaScript)).toBe(true);
+  test("mac jxa.ts no longer carries the marker (Apple Events handled by sandbox.allowAppleEvents)", async () => {
+    expect(await hasBypassMarker(jxaScript)).toBe(false);
   });
 });
 
@@ -107,12 +107,8 @@ describe("processInput", () => {
     expect(result).not.toBeNull();
   });
 
-  test("disables sandbox for mac jxa.ts", async () => {
+  test("does not disable sandbox for mac jxa.ts (relies on sandbox.allowAppleEvents)", async () => {
     const result = await processInput(makeInput(`bun ${jxaScript} Finder 'app.name()'`), "darwin");
-    expect(result).not.toBeNull();
-    expect(result?.hookSpecificOutput).toMatchObject({
-      hookEventName: "PreToolUse",
-      updatedInput: { dangerouslyDisableSandbox: true },
-    });
+    expect(result).toBeNull();
   });
 });

@@ -54,6 +54,7 @@ export async function loadSchema(schemaPath: string): Promise<Record<string, unk
     schema = await Bun.file(schemaPath).json();
   }
   patchHookSchema(schema);
+  patchSandboxSchema(schema);
   return schema;
 }
 
@@ -71,6 +72,18 @@ function patchHookSchema(schema: Record<string, unknown>): void {
       };
     }
   }
+}
+
+function patchSandboxSchema(schema: Record<string, unknown>): void {
+  const props = schema.properties as Record<string, Record<string, unknown>> | undefined;
+  const sandbox = props?.sandbox;
+  const sandboxProps = sandbox?.properties as Record<string, unknown> | undefined;
+  if (!sandboxProps) return;
+
+  sandboxProps.allowAppleEvents = {
+    type: "boolean",
+    description: "Allow sandboxed commands to send macOS Apple Events (osascript, open)",
+  };
 }
 
 export async function validateFile(

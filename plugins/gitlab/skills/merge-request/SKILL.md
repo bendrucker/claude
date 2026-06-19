@@ -112,6 +112,16 @@ See [review-state.md](review-state.md) for the underlying GraphQL query and filt
 
 To group all your review-requested MRs by next actor (not just the `UNREVIEWED` slice), see [Review Inbox (Next-Actor Triage)](review-state.md#review-inbox-next-actor-triage) in review-state.md.
 
+## Authored Queue
+
+Fetch your open authored MRs as a needs-action feed for `pull-request:outbox`. Emits `[{ url, platform, ci, review, isDraft, updatedAt }]` JSON, mapping each MR's head pipeline to `ci` and its reviewers to `review`:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/authored-queue.ts
+```
+
+This keeps the authored-MR query inside the gitlab plugin so outbox never reaches across the plugin boundary. The emitted shape is the contract outbox ranks.
+
 ## Re-request reviewers
 
 Re-trigger a review after a push reset approvals. The `mergeRequestReviewerRereview` mutation flips the target's `reviewState` back to `UNREVIEWED` and re-surfaces the MR. The reviewer must already be assigned. See [Re-Request Review](review-state.md#re-request-review) for the user-ID lookup and exact mutation.

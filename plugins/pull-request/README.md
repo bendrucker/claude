@@ -8,6 +8,7 @@ Create and update pull requests (PRs), merge requests (MRs), and change requests
 - **Skill**: `pull-request:update` — Update a PR/MR body to reflect the current state of changes
 - **Skill**: `pull-request:follow-up` — Follow up on review feedback you received: check resolution state, find silent resolves, draft replies
 - **Skill**: `pull-request:babysit` — Monitor a PR's CI, fix trivial failures (lint, types, formatting), and self-cancel when green
+- **Skill**: `pull-request:outbox` — Ranked needs-action feed of your authored PRs/MRs across GitHub and GitLab, with per-item babysit dispatch
 - **Hook**: Validates PR body content before creation or edit
 
 ## Worktree Support

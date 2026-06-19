@@ -60,13 +60,26 @@ Present the actionable (new, grounded) candidates and ask the user which to file
 
 One todo per candidate, not one blob. Filing lands findings in the same backlog the implement loop drains.
 
+#### Non-Interactive Run
+
+A scheduled local run (`claude -p "/improve-claude-code discover"`) cannot stop for the [File the Keepers](#file-the-keepers) prompt, so it ends one step short of filing. Everything upstream runs unchanged: refresh the index, fan out the dimensions, and run the mandatory grounding pass. The verifier split stays exactly as it is on-demand. Skipping it would file week-stale findings against a config nobody re-checked.
+
+Write the digest to `tmp/claude-discovery-digest-<YYYY-Www>.md` as always. Then, in place of the prompt, file exactly one Things doorway item that summarizes the run and hands triage back to you on demand. The run still never auto-files keepers. The doorway hands the filing choice back to you.
+
+Create the item via `things:url`, left untagged so the digest does not land in the `claude-code` backlog as one blob:
+
+- **Title**: `[discovery] Weekly digest: N candidates (YYYY-Www)`
+- **Notes**: the top-line summary (actionable count and the high-confidence standouts), then the digest path on its own line, then a one-line prompt to run `improve-claude-code` in Discover mode to file the keepers.
+
+When you pick the item up, re-run the skill interactively and flow through [File the Keepers](#file-the-keepers) against the same digest. The doorway item is the run's only signal. If creating it fails, say so loudly in the run output rather than ending silently.
+
 #### Hand Off
 
 Report how many todos landed. The existing triage, plan, implement, PR, CI, and annotate phases run on them later, unchanged. Filing is the default terminal action of Discover mode; implementing is a separate, explicit choice (run the loop below when ready).
 
 #### Cadence
 
-On-demand is primary: invoke this skill in Discover mode at your terminal. A weekly run is optional and must run **locally** (a `/loop` or `/schedule` trigger on this machine). The session DB and the `duckdb` CLI live here, so the `agent-ideas` headless-then-teleport bridge does not apply (that works only because RSS is public). A documented option, not built infrastructure.
+On-demand is primary: invoke this skill in Discover mode at your terminal and file keepers through the prompt. The weekly run is the [Non-Interactive Run](#non-interactive-run) above, and it must fire **locally**. The session DB and the `duckdb` CLI live on this Mac, so a cloud `/schedule` routine cannot reach them and the `agent-ideas` headless-then-teleport bridge does not apply (that works only because RSS is public). The local trigger is a launchd job that lives in the dotfiles repo, paired with this skill and configured there, not here.
 
 #### Fingerprint
 

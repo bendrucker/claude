@@ -37,6 +37,7 @@ Reference for developing effective skills. The context window is a public good -
 ---
 name: plugin-name:skill-name
 description: Third-person capability description with trigger terms
+argument-hint: "[--flag] [<positional>]"  # Optional: arguments shown in slash menu
 allowed-tools: [Read, Grep, Glob]         # Optional: tool restrictions
 model: claude-sonnet-4-20250514           # Optional: override model
 context: fork                             # Optional: run in isolated subagent
@@ -57,6 +58,7 @@ hooks:                                    # Optional: skill-scoped hooks
 - `description`: Third-person, includes trigger terms and use cases (max 1024 chars).
 
 **Optional Fields**:
+- `argument-hint`: Arguments the skill accepts, shown in the slash menu after the skill name. See [Argument Hints](#argument-hints).
 - `allowed-tools`: Tools Claude can use without permission when skill is active
 - `model`: Override the conversation's model
 - `context`: Set to `fork` to run in isolated subagent context
@@ -119,6 +121,22 @@ Skill-scoped hooks activate only when the skill is invoked and last for the sess
 | `${CLAUDE_SKILL_DIR}` | Absolute path to the skill's directory. Substituted in skill content: the body, `!` injection commands, and `allowed-tools`. |
 
 These substitutions apply to skill content, not the frontmatter `hooks:` block. The hooks engine expands only `${CLAUDE_PROJECT_DIR}`, `${CLAUDE_PLUGIN_ROOT}`, and `${CLAUDE_PLUGIN_DATA}` ([hooks reference](https://code.claude.com/docs/en/hooks)); `${CLAUDE_SKILL_DIR}` there resolves to an empty string. In a hook command, reference a bundled script by plugin root instead: `${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/check.ts`.
+
+### Argument Hints
+
+`argument-hint` declares the arguments a skill accepts. It renders in the slash menu after the skill name and reminds the user which flags exist. Give every directable skill a hint, even when it usually runs with none. A skill that branches internally ("if the user wants X") should expose that branch as a flag.
+
+#### Notation
+
+- Required tokens use angle brackets, optional tokens use square brackets: `<doc-path> [--draft]`.
+- Mutually-exclusive alternatives are pipe-separated with surrounding spaces: `[staged | <range> | HEAD]`.
+- Boolean flags are `[--flag]`. Value flags are `[--flag value]`. Enumerated values pipe-join without inner spaces: `[--role author|reviewer]`.
+- Order tokens as required positionals, then optional positionals, then flags.
+- Keep the hint compact and push parsing heuristics into the body. The hint reminds the user which flags exist; the body documents them.
+
+#### Parsing
+
+A skill that declares an `argument-hint` must parse `$ARGUMENTS` (or `$0`/`$1` for positionals) and act on what it finds. Add an `## Arguments` section to the body mapping each token to its behavior and stating the default when the token is absent. Every flag needs a stated default so the no-argument invocation stays well-defined.
 
 ### Dynamic Context Injection
 

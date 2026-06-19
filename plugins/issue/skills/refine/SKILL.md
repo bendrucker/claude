@@ -1,11 +1,19 @@
 ---
 name: issue:refine
 description: Refining issues with technical context and structured details. Use when expanding a brief bug, feature, or refactor description into a detailed issue suitable for developers and AI agents.
+argument-hint: "[--type bug|feature|refactor] [--compact]"
 ---
 
 # Issue Refinement
 
 Expand brief issue descriptions into structured issues for developers and AI agents.
+
+## Arguments
+
+Parse `$ARGUMENTS`:
+
+- `--type bug|feature|refactor`: skip type identification and read that guide directly. Default: infer the type from the description per [Issue Types](#issue-types).
+- `--compact`: force the tight output, a sentence or two that names the problem and points at the code, with no Summary/Context frame. Default: size the output to the issue per [Section Selection](#section-selection).
 
 ## Issue Types
 
@@ -17,9 +25,9 @@ Expand brief issue descriptions into structured issues for developers and AI age
 
 ## Workflow
 
-1. Identify type and read the corresponding guide
+1. Identify type and read the corresponding guide. When `--type` is set, use it and skip identification.
 2. Gather context from code and related issues
-3. Draft refinement following the type-specific structure
+3. Draft refinement following the type-specific structure. Under `--compact`, produce the tight output described in [Section Selection](#section-selection).
 4. Output for user approval before updating the issue
 
 ## Output Structure
@@ -49,6 +57,8 @@ Links to related issues, prior attempts, upstream work.
 Every section must tell the reader something they couldn't have guessed. Cut sections whose content is tautological ("tests must pass"), template residue ("no behavior change"), or obvious given the issue's size.
 
 For a substantial issue, Summary plus one type section plus Context is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough.
+
+`--compact` forces that trivial output regardless of size: name the problem, point at the code, drop the Summary/Context frame.
 
 ## Style
 

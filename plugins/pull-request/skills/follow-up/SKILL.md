@@ -5,7 +5,7 @@ description: >
   responses, investigate how threads were resolved (including silent resolves), and draft
   replies. With --auto, autonomously triage AI-reviewer (bot) threads and loop until the
   reviewer is satisfied, clearing a bot review hands-off.
-argument-hint: "[pr-url] [--auto]"
+argument-hint: "[pr-url] [--auto] [--include-human-nits]"
 allowed-tools:
   - Bash(git:*)
   - Bash(gh:*)

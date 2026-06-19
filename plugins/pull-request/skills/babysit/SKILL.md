@@ -1,7 +1,7 @@
 ---
 name: pull-request:babysit
 description: Monitor a PR's CI, fix trivial failures, and self-cancel when green; --merge drives to merged, --reviews hands off to AI-review triage.
-argument-hint: "[--merge] [--reviews]"
+argument-hint: "[pr-url] [--merge] [--reviews]"
 allowed-tools:
   - Monitor
   - TaskStop
@@ -33,8 +33,9 @@ Inspect the remote URL. For a `github.com` remote, invoke the `github:actions-mo
 
 Babysit consumes that event stream and reacts with the handlers below. The watcher handles polling, deduping by `(sha, state)`, rate limits, timeouts, and session-scoped lifecycle. Babysit handles fixes, pushes, and reporting. Remember the start SHA above so the success handler can summarize work done in the session.
 
-Parse `$ARGUMENTS` for two optional flags, both off by default so plain babysit stays CI-only:
+Parse `$ARGUMENTS` for an optional PR positional and two optional flags, both flags off by default so plain babysit stays CI-only:
 
+- `$0` (pr-url): the PR to babysit, given as a URL or number. Pass it through to `follow-up` and the merge commands below. Default: resolve the PR from the branch in Context.
 - `--reviews`: after the first green, triage AI-reviewer threads. See [Reviews Hand-off](#reviews-hand-off).
 - `--merge`: don't stop at green; drive the PR to merged. See [Merge Mode](#merge-mode).
 

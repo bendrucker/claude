@@ -62,7 +62,7 @@ hooks:                                    # Optional: skill-scoped hooks
 - `context`: Set to `fork` to run in isolated subagent context
 - `agent`: Agent type when `context: fork` (`Explore`, `Plan`, `general-purpose`, or custom)
 - `user-invocable`: Hide from slash menu when `false` (default: `true`)
-- `disable-model-invocation`: Block programmatic invocation via Skill tool
+- `disable-model-invocation`: Block model (Skill-tool) invocation and drop the skill's name and description from the always-on catalog (zero recurring context cost); still slash-invocable. Opposite of `user-invocable: false`, which hides the slash menu but keeps the description loaded for the model.
 - `hooks`: Skill-scoped hooks (`PreToolUse`, `PostToolUse`, `Stop`)
 
 **Naming**: Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab:ci`, `things:inbox`). The part after the colon should not repeat the plugin name. For standalone skills, use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`. Avoid vague names like `helper`, `utils`.

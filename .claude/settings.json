@@ -24,7 +24,7 @@
       "Skill(pull-request:create)",
       "Skill(pull-request:follow-up)",
       "Skill(pull-request:update)",
-      "Skill(review:dashboard)",
+      "Skill(review:inbox)",
       "Skill(review:follow-up)",
       "Skill(review:peer)",
       "Skill(review:self)",

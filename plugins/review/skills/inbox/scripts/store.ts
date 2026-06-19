@@ -43,7 +43,7 @@ function resolveDataDir(dataDir?: string): string {
 }
 
 function stateDir(dataDir?: string): string {
-  return join(resolveDataDir(dataDir), "review-dashboard");
+  return join(resolveDataDir(dataDir), "review-inbox");
 }
 
 function statePath(dataDir?: string): string {

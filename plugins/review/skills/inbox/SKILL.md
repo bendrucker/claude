@@ -1,8 +1,8 @@
 ---
-name: review:dashboard
+name: review:inbox
 description: >
-  Live tmux dashboard for reviewing inbound pull requests across GitHub and GitLab.
-  Use when reviewing multiple PRs, checking review queue, batch reviews, or managing a review dashboard.
+  Live tmux inbox for reviewing inbound pull requests across GitHub and GitLab.
+  Use when reviewing multiple PRs, checking the review queue, batch reviews, or managing your review inbox.
 disable-model-invocation: true
 allowed-tools:
   - Monitor
@@ -28,7 +28,7 @@ hooks:
             cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
 ---
 
-# Review Dashboard
+# Review Inbox
 
 Orchestrate live PR/MR reviews in tmux. You are the sidebar orchestrator: fetch pending reviews, spawn review sessions, and monitor their progress.
 
@@ -46,7 +46,7 @@ gh search prs --review-requested=@me --state=open --json number,title,url,reposi
 
 #### GitLab
 
-Load `gitlab:merge-request` and run its `review-queue` command for the UNREVIEWED MRs across all projects. It emits `[{ url, reference, title }]` as JSON. The query and its review-state filter are documented and owned by the gitlab plugin; the dashboard only delegates to it.
+Load `gitlab:merge-request` and run its `review-queue` command for the UNREVIEWED MRs across all projects. It emits `[{ url, reference, title }]` as JSON. The query and its review-state filter are documented and owned by the gitlab plugin; the inbox only delegates to it.
 
 ### Present Results
 
@@ -90,7 +90,7 @@ Detect exited panes, mark them completed, and prune their worktrees:
 bun ${CLAUDE_SKILL_DIR}/scripts/state.ts sync --data-dir ${CLAUDE_PLUGIN_DATA}
 ```
 
-When a review transitions `active → completed`, `sync` reclaims its worktree through Worktrunk: `spawn.ts` created the worktree as `wt switch --create <paneName>`, so `sync` removes it by that same stored branch (`wt remove <paneName> --force`) with no lookup. `wt remove` deletes the worktree (including untracked files), fires your `pre-remove` hooks, and drops the branch when it has no unmerged commits. `sync` prints `N completed, M worktrees removed` and surfaces any removal failures on stderr. A `pre-remove` hook that needs approval fails the removal (it surfaces in the failure list) rather than removing unattended; pre-approve with `wt config approvals add` to let the dashboard reclaim those worktrees on its own.
+When a review transitions `active → completed`, `sync` reclaims its worktree through Worktrunk: `spawn.ts` created the worktree as `wt switch --create <paneName>`, so `sync` removes it by that same stored branch (`wt remove <paneName> --force`) with no lookup. `wt remove` deletes the worktree (including untracked files), fires your `pre-remove` hooks, and drops the branch when it has no unmerged commits. `sync` prints `N completed, M worktrees removed` and surfaces any removal failures on stderr. A `pre-remove` hook that needs approval fails the removal (it surfaces in the failure list) rather than removing unattended; pre-approve with `wt config approvals add` to let the inbox reclaim those worktrees on its own.
 
 #### Quick Glance
 
@@ -123,15 +123,15 @@ The `Monitor` command does the polling and emits one line per newly-arrived revi
 `poll.ts` knows no platforms. Each `--queue` is a command that emits an UNREVIEWED queue as `[{ url }]` JSON. Pass one per platform you want polled, and omit the rest:
 
 - GitHub: `gh search prs --review-requested=@me --state=open --json url`.
-- GitLab: load `gitlab:merge-request` and pass `bun <ABS>`, where `<ABS>` is the absolute path the gitlab docs resolve to for `scripts/review-queue.ts` (for example `/Users/you/.claude/plugins/cache/.../gitlab/skills/merge-request/scripts/review-queue.ts`). Write the resolved path out in full. Do not reuse `${CLAUDE_SKILL_DIR}` from the examples below: it points at this dashboard skill, not gitlab, so it resolves to the wrong directory.
+- GitLab: load `gitlab:merge-request` and pass `bun <ABS>`, where `<ABS>` is the absolute path the gitlab docs resolve to for `scripts/review-queue.ts` (for example `/Users/you/.claude/plugins/cache/.../gitlab/skills/merge-request/scripts/review-queue.ts`). Write the resolved path out in full. Do not reuse `${CLAUDE_SKILL_DIR}` from the examples below: it points at this inbox skill, not gitlab, so it resolves to the wrong directory.
 
-A platform plugin that owns its queue keeps the query; the dashboard only runs the command it hands back.
+A platform plugin that owns its queue keeps the query; the inbox only runs the command it hands back.
 
 #### Arm the Monitor
 
 Pass this command to `Monitor` with `persistent: true` and a descriptive label. `watch.ts` runs a single long-lived bun process: each iteration syncs completed reviews, fetches all `--queue` sources, and prints one URL per line per newly-arrived review. Each printed URL is one event.
 
-`${CLAUDE_SKILL_DIR}` below is the dashboard's own directory (where `watch.ts` lives). The GitLab `--queue` uses a full absolute path instead, since it points into a different skill:
+`${CLAUDE_SKILL_DIR}` below is the inbox's own directory (where `watch.ts` lives). The GitLab `--queue` uses a full absolute path instead, since it points into a different skill:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts \

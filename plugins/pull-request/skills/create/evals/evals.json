@@ -37,6 +37,18 @@
         "Benchmark or observed numbers from the session appear in the body",
         "No test counts, no 'all tests pass', no listing of test file names without coverage detail"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Open a PR for this multi-part change. It refactors the auth callback handler, narrows the 401/403 error matching, and persists the DCR client ID. I deferred the token-refresh rework and left the existing retry behavior unchanged.",
+      "expected_output": "A sectioned body whose headings are Title-Cased noun phrases naming each topic, with deferred and unchanged work named as topics rather than as meta-headings.",
+      "files": [],
+      "expectations": [
+        "Section headings are Title-Cased noun phrases, not sentences, fragments, or questions",
+        "No heading carries a qualifying tail, a trailing clause, or a parenthetical that belongs in the body",
+        "Deferred and unchanged work is named by topic (e.g. Deferred Work, Unchanged Behavior), not as a What Changed or What I Didn't Do meta-heading",
+        "No Why/What/How question headings and no sentence-case headings"
+      ]
     }
   ]
 }

@@ -4,9 +4,11 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR—including after committing changes.
 
-argument-hint: "[--draft] [--auto] [--dry-run]"
+argument-hint: "[--draft] [--auto] [--watch] [--dry-run]"
 allowed-tools:
   - mcp__github
+  - Agent
+  - Skill(pull-request:babysit)
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
   - "Bash(git push:*)"
@@ -105,6 +107,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a normal PR/MR that is rea
 
 - `--draft`: open the PR/MR as a draft. Default: ready for review.
 - `--auto`: after creating, enable auto-merge so it merges once checks pass and required approvals land. Default: off.
+- `--watch`: after creating, spawn `pull-request:babysit` to actively shepherd the PR/MR (fix trivial red CI, drive the merge). Distinct from `--auto`, which only flips on the platform's passive auto-merge. Default: off.
 - `--dry-run` (alias `--body-only`): produce the body without creating anything. See [Dry Run](#dry-run). Default: off.
 
 ## Dry Run
@@ -128,6 +131,7 @@ If `--dry-run` (or `--body-only`) is set, follow the Dry Run section instead of 
    - **GitHub**: `gh pr merge --auto` (add `--squash` or `--rebase` to match the repo's merge method when known)
    - **GitLab**: load `gitlab:merge-request` and run its `merge.ts --auto-merge`, which handles merge trains and falls back to `glab mr merge` as needed
 1. Suggest reviewers on corporate repos (see [Reviewers](#reviewers)). Skip this step for OSS. The PR/MR already exists, so reviewer ranking runs after creation and adds no latency to it.
+1. Watch the PR/MR when `--watch` is set. Spawn a background `Agent` that invokes the `pull-request:babysit <url> --merge` skill on the PR/MR url created earlier. Babysit is session-scoped and owns its own `Monitor` watcher, so running it inside a backgrounded Agent gives it a session to live in: the create session returns immediately while the watch persists in the background. This mirrors the babysit -> follow-up handoff, where babysit delegates the review loop to another skill that owns its own watchers.
 
 ## GitLab Notes
 

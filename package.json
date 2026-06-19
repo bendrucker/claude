@@ -21,7 +21,6 @@
     "plugins/issue",
     "plugins/ui-design",
     "plugins/gitlab",
-    "plugins/vscode",
     "packages/validate",
     "packages/marketplace",
     "plugins/tmux",

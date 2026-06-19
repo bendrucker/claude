@@ -84,11 +84,6 @@
       "source": "./plugins/bun"
     },
     {
-      "name": "calendar",
-      "description": "Reading and managing macOS Calendar events",
-      "source": "./plugins/calendar"
-    },
-    {
       "name": "research",
       "description": "Research existing solutions when exploring a new problem space",
       "source": "./plugins/research"
@@ -112,11 +107,6 @@
       }
     },
     {
-      "name": "personal-review",
-      "description": "Cross-tool daily review workflow",
-      "source": "./plugins/personal-review"
-    },
-    {
       "name": "x-callback-url",
       "description": "Call x-callback-url schemes from the CLI and receive responses",
       "source": "./plugins/x-callback-url"
@@ -135,11 +125,6 @@
       "name": "tech-spec",
       "description": "Create and review technical specifications",
       "source": "./plugins/tech-spec"
-    },
-    {
-      "name": "vscode",
-      "description": "VS Code editor integration for interactive content editing",
-      "source": "./plugins/vscode"
     },
     {
       "name": "plan",

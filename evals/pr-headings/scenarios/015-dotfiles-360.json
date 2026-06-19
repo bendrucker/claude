@@ -1,0 +1,12 @@
+{
+  "id": "015-dotfiles-360",
+  "url": "https://github.com/bendrucker/dotfiles/pull/360",
+  "title": "worktrunk: add wts alias and wtp prune function",
+  "repo": "bendrucker/dotfiles",
+  "diff": "diff --git a/worktrunk/aliases.zsh b/worktrunk/aliases.zsh\nnew file mode 100644\nindex 00000000..1bd11a4f\n--- /dev/null\n+++ b/worktrunk/aliases.zsh\n@@ -0,0 +1,29 @@\n+#!/usr/bin/env zsh\n+\n+alias wts='wt switch'\n+\n+wtp () {\n+  wt step prune \"$@\"\n+\n+  local branches\n+  branches=$(wt list --format=json | jq -r '.[] | select(.is_main | not) | .branch')\n+  [[ -z \"$branches\" ]] && return\n+\n+  local remote_host\n+  remote_host=$(git remote get-url origin 2>/dev/null | sed -E 's|^[^@]*@||; s|^https?://||; s|[:/].*||')\n+\n+  local -a merged_branches\n+  if [[ \"$remote_host\" == *gitlab* ]]; then\n+    merged_branches=(\"${(@f)$(glab mr list --state merged --output json 2>/dev/null | jq -r '.[].source_branch')}\")\n+  else\n+    merged_branches=(\"${(@f)$(gh pr list --state merged --json headRefName --jq '.[].headRefName' 2>/dev/null)}\")\n+  fi\n+\n+  local branch\n+  for branch in ${(f)branches}; do\n+    if (( ${merged_branches[(Ie)$branch]} )); then\n+      echo \"Removing $branch (PR merged)\"\n+      wt remove --force --force-delete \"$branch\"\n+    fi\n+  done\n+}\n",
+  "contextNote": "Adds a wts shell alias for wt switch and a wtp function that prunes clean worktrees then force-removes worktrees whose GitHub PRs are already merged.",
+  "originalBody": "Adds `wts` as a shortcut for `wt switch` and a `wtp` function that extends `wt step prune` to handle dirty/stashed worktrees whose PRs have been merged on GitHub.\n\n`wt step prune` skips worktrees with local modifications. `wtp` runs it first for clean worktrees, then checks remaining branches against GitHub PR state via `gh pr view` and force-removes any whose PR is merged.",
+  "originalHeadings": [],
+  "expectSections": false,
+  "category": "small"
+}

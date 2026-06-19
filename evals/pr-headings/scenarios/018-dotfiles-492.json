@@ -1,0 +1,12 @@
+{
+  "id": "018-dotfiles-492",
+  "url": "https://github.com/bendrucker/dotfiles/pull/492",
+  "title": "terminal: replace markless with glow and leaf",
+  "repo": "bendrucker/dotfiles",
+  "diff": "diff --git a/terminal/Brewfile b/terminal/Brewfile\nindex 9062c02b..ed8423f0 100644\n--- a/terminal/Brewfile\n+++ b/terminal/Brewfile\n@@ -2,6 +2,7 @@ tap 'rjyo/moshi'\n \n cask 'iterm2'\n cask 'font-monaspice-nerd-font'\n+brew 'glow'\n brew 'rjyo/moshi/moshi-hook', restart_service: :changed\n brew 'shellspec'\n brew 'yazi'\ndiff --git a/terminal/mise.toml b/terminal/mise.toml\nindex 5e6d1ce6..9f0d8aa8 100644\n--- a/terminal/mise.toml\n+++ b/terminal/mise.toml\n@@ -1,2 +1,2 @@\n [tools]\n-\"github:jvanderberg/markless\" = \"0.9.29\"\n+\"github:RivoLink/leaf\" = \"1.24.2\"\n",
+  "contextNote": "Replaces the markless markdown viewer in the terminal dotfiles topic with glow for reading and leaf for live editing, since markless rendered images and diagrams poorly and glow lacks a file-watch mode.",
+  "originalBody": "Switches the terminal topic's markdown viewer from `markless` to two tools: `glow` for reading, `leaf` for live editing.\n\n`markless` is feature-rich, but it rendered inline images and Mermaid diagrams poorly enough that the breadth was not paying off. `glow` (Homebrew) takes over as the default reader. It brings mature `glamour` rendering, stdin/URL/remote-repo input, and a recursive file-browser TUI.\n\nThe catch: `glow` has no file-watch mode. Auto-reload-on-save with preserved scroll position was the one `markless` feature worth keeping, and no Homebrew-installable markdown tool offers it. `leaf` does. It takes the `mise` `github:` slot `markless` held. `leaf -w` reloads on save without losing scroll position, and `Ctrl+E` opens an external editor then reloads on return. Like `markless`, it installs as a global `mise` shim.\n\nVerified locally. `glow` installs from Homebrew (`2.1.2`). `leaf` installs from the `mise` `github:` backend (`1.24.2`), runs, and exposes `--watch`, with its shim landing on `PATH` exactly as the old `markless` shim did.",
+  "originalHeadings": [],
+  "expectSections": false,
+  "category": "borderline"
+}

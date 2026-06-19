@@ -1,0 +1,12 @@
+{
+  "id": "013-claude-688",
+  "url": "https://github.com/bendrucker/claude/pull/688",
+  "title": "user: prefer wt-switch-create skill for worktree creation",
+  "repo": "bendrucker/claude",
+  "diff": "diff --git a/user/CLAUDE.md b/user/CLAUDE.md\nindex 9cb5aab8..deb5ee62 100644\n--- a/user/CLAUDE.md\n+++ b/user/CLAUDE.md\n@@ -54,6 +54,13 @@ I use git-town for stacked branch workflows:\n \n Ship branches oldest-first. After a stack branch merges, `git town sync` rebases remaining branches.\n \n+## Worktrees\n+\n+I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:\n+\n+- For creating or entering a worktree, use the `worktrunk:wt-switch-create` skill. It re-roots the session into a new worktree (optionally in another repo), runs an optional task, and acts as a targeted command for the common case. Prefer it over the generic skill whenever the task is worktree creation, including anywhere you would otherwise delegate worktree creation to Worktrunk.\n+- For everything else (pruning, listing, removing, running hooks, editing config, and general `wt` questions), use the generic `worktrunk:worktrunk` skill.\n+\n ## Personal Details\n \n - Standard username: `@bendrucker`. Refer to any actions performed by this user as \"you.\"\n",
+  "contextNote": "Adds a Worktrees section to the user-level CLAUDE.md directing worktree creation to the wt-switch-create skill and other worktree operations to the generic worktrunk skill.",
+  "originalBody": "Adds a Worktrees section to my user-level `CLAUDE.md` directing worktree work to the two Worktrunk skills. The `worktrunk:wt-switch-create` skill is a targeted command for the common case (create or enter a worktree, optionally in another repo, then run a task), so I route worktree creation there. Everything else (pruning, listing, removing, hooks, config) goes to the generic `worktrunk:worktrunk` skill.\n\nThe preference is explicit: prefer `worktrunk:wt-switch-create` over the generic skill anywhere the task is worktree creation.",
+  "originalHeadings": [],
+  "expectSections": false,
+  "category": "small"
+}

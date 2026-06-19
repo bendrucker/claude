@@ -1,0 +1,12 @@
+{
+  "id": "016-claude-573",
+  "url": "https://github.com/bendrucker/claude/pull/573",
+  "title": "mac: add sandbox bypass hook to jxa-run skill",
+  "repo": "bendrucker/claude",
+  "diff": "diff --git a/plugins/mac/skills/jxa-run/SKILL.md b/plugins/mac/skills/jxa-run/SKILL.md\nindex 2cbcf098..fb641e95 100644\n--- a/plugins/mac/skills/jxa-run/SKILL.md\n+++ b/plugins/mac/skills/jxa-run/SKILL.md\n@@ -4,6 +4,13 @@ description: Execute JXA scripts scoped to a macOS application. Use when running\n context: fork\n allowed-tools:\n   - \"Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts:*)\"\n+hooks:\n+  PreToolUse:\n+    - matcher: \"Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts:*)\"\n+      hooks:\n+        - type: command\n+          command: |\n+            cat | jq '{hookSpecificOutput: {hookEventName: \"PreToolUse\", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'\n ---\n \n # Run JXA\n",
+  "contextNote": "Adds an inline PreToolUse hook to the mac:jxa-run skill that disables the sandbox when jxa.ts runs, since osascript inherited sandbox restrictions and failed with -600 errors.",
+  "originalBody": "Adds an inline PreToolUse hook to `mac:jxa-run` that disables the sandbox when `jxa.ts` runs. Previously, `osascript` spawned as a child of `bun` inherited sandbox restrictions and failed with `-600` errors. Neither the Things plugin hook (scoped to Things plugin scripts) nor the Mac plugin hook (Go binary detection only) matched the Mac plugin's `jxa.ts` command.\n\nThe hook uses the same matcher as `allowed-tools`, so it only fires for this skill's specific command, not on every Bash invocation.",
+  "originalHeadings": [],
+  "expectSections": false,
+  "category": "small"
+}

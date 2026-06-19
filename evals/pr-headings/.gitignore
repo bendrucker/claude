@@ -1,0 +1,10 @@
+# Regenerable artifacts. Rebuild with the pipeline in README.md.
+bodies/
+gen-outputs/
+gen-system-baseline.md
+gen-system-treatment.md
+gen-graded.json
+label.html
+node_modules/
+bun.lock
+.env.key

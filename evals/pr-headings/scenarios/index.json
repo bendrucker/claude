@@ -1,0 +1,128 @@
+[
+  {
+    "id": "001-claude-638",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 16
+  },
+  {
+    "id": "002-claude-680",
+    "url": "https://github.com/bendrucker/claude/pull/680",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 5
+  },
+  {
+    "id": "003-honeycomb-cli-229",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/229",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 6
+  },
+  {
+    "id": "004-honeycomb-cli-234",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/234",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 4
+  },
+  {
+    "id": "005-dotfiles-477",
+    "url": "https://github.com/bendrucker/dotfiles/pull/477",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 4
+  },
+  {
+    "id": "006-dotfiles-397",
+    "url": "https://github.com/bendrucker/dotfiles/pull/397",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 6
+  },
+  {
+    "id": "007-worktrunk-3105",
+    "url": "https://github.com/max-sixty/worktrunk/pull/3105",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 5
+  },
+  {
+    "id": "008-bendrucker.me-473",
+    "url": "https://github.com/bendrucker/bendrucker.me/pull/473",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 3
+  },
+  {
+    "id": "009-duckdb_webbed-83",
+    "url": "https://github.com/teaguesterling/duckdb_webbed/pull/83",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 4
+  },
+  {
+    "id": "010-tflint-2556",
+    "url": "https://github.com/terraform-linters/tflint/pull/2556",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 2
+  },
+  {
+    "id": "011-route-agent-34",
+    "url": "https://github.com/bendrucker/route-agent/pull/34",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 3
+  },
+  {
+    "id": "012-azure-blob-to-s3-79",
+    "url": "https://github.com/bendrucker/azure-blob-to-s3/pull/79",
+    "category": "multi-section",
+    "expectSections": true,
+    "originalHeadingCount": 3
+  },
+  {
+    "id": "013-claude-688",
+    "url": "https://github.com/bendrucker/claude/pull/688",
+    "category": "small",
+    "expectSections": false,
+    "originalHeadingCount": 0
+  },
+  {
+    "id": "014-claude-677",
+    "url": "https://github.com/bendrucker/claude/pull/677",
+    "category": "small",
+    "expectSections": false,
+    "originalHeadingCount": 0
+  },
+  {
+    "id": "015-dotfiles-360",
+    "url": "https://github.com/bendrucker/dotfiles/pull/360",
+    "category": "small",
+    "expectSections": false,
+    "originalHeadingCount": 0
+  },
+  {
+    "id": "016-claude-573",
+    "url": "https://github.com/bendrucker/claude/pull/573",
+    "category": "small",
+    "expectSections": false,
+    "originalHeadingCount": 0
+  },
+  {
+    "id": "017-claude-840",
+    "url": "https://github.com/bendrucker/claude/pull/840",
+    "category": "borderline",
+    "expectSections": false,
+    "originalHeadingCount": 0
+  },
+  {
+    "id": "018-dotfiles-492",
+    "url": "https://github.com/bendrucker/dotfiles/pull/492",
+    "category": "borderline",
+    "expectSections": false,
+    "originalHeadingCount": 0
+  }
+]

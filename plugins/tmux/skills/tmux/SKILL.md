@@ -1,6 +1,7 @@
 ---
 name: tmux
 description: Tmux session, window, and pane management. Use when capturing output, sending keys, opening processes in panes, or checking notifications.
+argument-hint: "[capture | send | split | notify | list] [target ...]"
 allowed-tools:
   - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/pane.sh:*)"
   - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/window.sh:*)"
@@ -20,6 +21,16 @@ hooks:
 ---
 
 # tmux
+
+## Arguments
+
+`$0` (optional verb) routes to a section; pass the target pane, window, or session as the rest. With no verb, infer the operation from the request.
+
+- `capture`: print pane content. See [Capturing Pane Content](#capturing-pane-content).
+- `send`: send keys to a running pane. See [Starting Claude Sessions](#starting-claude-sessions).
+- `split`: open a pane. See [Opening Panes](#opening-panes).
+- `notify`: check which windows need attention (`bell`/`activity`). See [Session](#session).
+- `list`: inventory panes, windows, and sessions. See [Drilling Into Other Targets](#drilling-into-other-targets).
 
 ## Pane
 

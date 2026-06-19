@@ -1,6 +1,7 @@
 ---
 name: things:url
 description: Create, update, and manage Things 3 tasks and projects. Not for reads — use things:jxa to query data. For simple inbox captures, use things:inbox.
+argument-hint: "<add | update | show | search | json> [key=value ...]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
@@ -11,6 +12,10 @@ allowed-tools:
 # Things URL Scheme
 
 Write operations for Things 3 via the `things:///` URL scheme.
+
+## Arguments
+
+`$0` is the command (`add`, `add-project`, `update`, `update-project`, `show`, `search`, `json`); the rest are its `key=value` params. Pass both straight to `url.ts` (see [Commands](#commands) and [Quick Start](#quick-start)). A command is required; with none, infer the operation from the request.
 
 ## Quick Start
 

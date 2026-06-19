@@ -4,6 +4,7 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR—including after committing changes.
 
+argument-hint: "[--draft] [--auto] [--dry-run]"
 allowed-tools:
   - mcp__github
   - "Bash(git add:*)"
@@ -98,6 +99,14 @@ This runs after you create the PR/MR, so it never delays creation. Resolve names
 - **GitHub**: `gh pr edit --add-reviewer <user>` (resolve emails to logins with `mcp__github` if needed)
 - **GitLab**: load `gitlab:merge-request` for username resolution, then `glab mr update --reviewer <user>`
 
+## Arguments
+
+Parse `$ARGUMENTS` for these flags. With none, create a normal PR/MR that is ready for review and does not auto-merge.
+
+- `--draft`: open the PR/MR as a draft. Default: ready for review.
+- `--auto`: after creating, enable auto-merge so it merges once checks pass and required approvals land. Default: off.
+- `--dry-run` (alias `--body-only`): produce the body without creating anything. See [Dry Run](#dry-run). Default: off.
+
 ## Dry Run
 
 If the arguments include `--dry-run` (alias `--body-only`), produce the body without creating anything. Determine the title and body from the context above as usual, write the body to `tmp/pr-body-<branch>.md`, then print the title and body to the user and stop. Do not stage, commit, push, or run `gh pr create` / `glab mr create`. Use this to preview or evaluate the body in isolation.
@@ -110,11 +119,14 @@ If `--dry-run` (or `--body-only`) is set, follow the Dry Run section instead of 
 1. Stage changes if not already staged: `git add .`
 1. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
 1. Push the branch to remote: `git push -u origin HEAD`
-1. Create the PR/MR:
+1. Create the PR/MR. Append `--draft` to the create command when `--draft` is set:
    - Write the body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
    - Include the branch name in the filename to avoid conflicts with concurrent agents
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
+1. Enable auto-merge when `--auto` is set, after the PR/MR exists:
+   - **GitHub**: `gh pr merge --auto` (add `--squash` or `--rebase` to match the repo's merge method when known)
+   - **GitLab**: load `gitlab:merge-request` and run its `merge.ts --auto-merge`, which handles merge trains and falls back to `glab mr merge` as needed
 1. Suggest reviewers on corporate repos (see [Reviewers](#reviewers)). Skip this step for OSS. The PR/MR already exists, so reviewer ranking runs after creation and adds no latency to it.
 
 ## GitLab Notes

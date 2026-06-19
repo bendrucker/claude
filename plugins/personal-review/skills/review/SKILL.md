@@ -1,6 +1,7 @@
 ---
 name: personal-review:review
 description: Interactive daily review workflow across Calendar, Things, GitHub, and Linear. Use when the user asks for a daily review, morning review, evening review, or weekly review.
+argument-hint: "[morning | evening | weekly]"
 disable-model-invocation: true
 ---
 
@@ -15,7 +16,7 @@ Multi-phase workflow with checkpoints. Each phase ends with a summary before pro
 | Morning | Full scan + prep | Full processing | Full triage | Full triage | Full review | Full triage |
 | Evening | Tomorrow preview | Quick triage | Mark read, defer | Defer reviews | Skip | Skip |
 
-Ask which variant if not specified.
+`$0` selects the variant: `morning`, `evening`, or `weekly` (a fuller pass over the same phases). Ask which variant when none is given.
 
 ## Phase: Calendar
 

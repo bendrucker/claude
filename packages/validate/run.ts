@@ -4,13 +4,14 @@ import {
   createValidator,
   loadSchema,
   reportAndExit,
+  type SchemaRef,
   type ValidationResult,
   validateFile,
 } from "./validate";
 
 export interface ValidationTarget {
   files: string[];
-  schema: string;
+  schema: SchemaRef;
   warnAdditional?: boolean;
   extraSchemas?: { schema: string; key: string }[];
   successMessage?: string;

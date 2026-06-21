@@ -1,0 +1,20 @@
+{
+  "$comment": "Registry of upstream-backed schemas. Each entry names an upstream SchemaStore URL and an RFC 6902 overlay holding only our not-yet-upstream edits. The base is fetched live and merged with the overlay in memory at validation time — nothing is vendored or generated to disk. Run `bun run schemas check` (CI) to verify overlays still apply against current upstream and flag ops upstream has absorbed. The `patch` path is relative to schemas/.",
+  "schemas": [
+    {
+      "name": "plugin",
+      "url": "https://www.schemastore.org/claude-code-plugin-manifest.json",
+      "patch": "overlays/plugin.patch.json"
+    },
+    {
+      "name": "marketplace",
+      "url": "https://www.schemastore.org/claude-code-marketplace.json",
+      "patch": "overlays/marketplace.patch.json"
+    },
+    {
+      "name": "settings",
+      "url": "https://www.schemastore.org/claude-code-settings.json",
+      "patch": "overlays/settings.patch.json"
+    }
+  ]
+}

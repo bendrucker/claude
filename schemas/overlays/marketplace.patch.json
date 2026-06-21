@@ -1,0 +1,22 @@
+[
+  {
+    "op": "add",
+    "path": "/properties/name/pattern",
+    "value": "^[a-z0-9]+(-[a-z0-9]+)*$"
+  },
+  {
+    "op": "add",
+    "path": "/properties/name/not",
+    "value": {
+      "enum": [
+        "claude-code-marketplace",
+        "claude-code-plugins",
+        "claude-plugins-official",
+        "anthropic-marketplace",
+        "anthropic-plugins",
+        "agent-skills",
+        "life-sciences"
+      ]
+    }
+  }
+]

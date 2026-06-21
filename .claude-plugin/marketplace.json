@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/marketplace.schema.json",
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
   "name": "bendrucker",
   "version": "1.0.0",
   "description": "Claude Code plugins for language support, workflows, and integrations",

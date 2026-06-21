@@ -37,6 +37,7 @@
     "format:check": "biome format",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
+    "schemas": "bun scripts/schemas/index.ts",
     "skill-lint": "bun ./packages/skill-lint/cli.ts",
     "test": "bun test",
     "test:unit": "bun test"

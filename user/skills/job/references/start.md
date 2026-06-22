@@ -24,9 +24,10 @@ Before recommending an action, give each item a one-line summary of what it chan
 
 Recommended actions per item:
 
-- Review now: start immediately after the brief, via the installed review skill for the configured platform.
-- Queue for a time today: record it in the today plan with the chosen slot.
+- Review today: slot it into the day's order. The review runs through the installed review skill once triage is approved.
 - Decline or reassign: ask-first, since it hands work back.
+
+Triage covers the whole queue before any review begins. Reviews are session-length work, so they kick off at the end of the run, after the order is locked.
 
 ## Outbox
 

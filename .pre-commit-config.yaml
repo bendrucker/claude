@@ -37,7 +37,7 @@ repos:
         language: system
         files: ^(\.claude/settings\.json|user/settings\.json)$
         pass_filenames: false
-        entry: bun .claude/hooks/settings/cli.ts
+        entry: bun packages/validate/settings.ts
 
       - id: no-double-assertion
         name: No double type assertions

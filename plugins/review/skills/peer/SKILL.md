@@ -1,8 +1,8 @@
 ---
 name: review:peer
 description: |
-  Review a pull request when requested by a peer. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes. Supports GitHub and GitLab.
-argument-hint: <pr-url-or-number>
+  Review a pull request when requested by a peer. Use when reviewing PRs, providing code review feedback, or analyzing proposed changes. Supports GitHub and GitLab. Pass --triage to summarize a PR and estimate its review effort without reviewing it.
+argument-hint: "<pr-url-or-number> [--triage]"
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)
@@ -15,6 +15,19 @@ allowed-tools:
 # Peer Review
 
 Assist me in reviewing this PR: $ARGUMENTS
+
+## Arguments
+
+- `--triage`: assess the PR for sequencing instead of reviewing it. Produce a one-line summary of what it changes and an estimated review effort, then stop. Default: off, which runs the full review workflow below.
+
+## Triage Mode
+
+When `--triage` is set, stay read-only and assess the PR for sequencing. Gather just enough to judge scope: the PR body, the diff stat, and the files touched. Then report two things and stop.
+
+- What the PR changes, in one line.
+- The estimated review effort on the same scale step 4 uses for `/code-review` (low, medium, high, xhigh, max), with one-line reasoning.
+
+Skip the checkout, `/code-review`, tuicr staging, and every later step. Nothing is posted. A caller such as the `job` skill's start brief uses the estimate to order a review queue before any review begins.
 
 If not on the branch, first run `gh pr checkout` to switch.
 

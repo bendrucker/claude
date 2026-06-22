@@ -22,6 +22,11 @@ const argv = cli({
       type: String,
       description: "Additional context to pass as the initial prompt to the spawned session",
     },
+    session: {
+      type: String,
+      description:
+        "Target tmux session for review panes (defaults to splitting the current pane as a sidebar)",
+    },
   },
 });
 
@@ -38,7 +43,11 @@ const sessionId = crypto.randomUUID();
 const paneName = derivePaneName(url);
 const state = await readState(dataDir);
 const activeReviews = state.reviews.filter((r) => r.status === "active");
-const splitArgs = layoutArgs(activeReviews.length, activeReviews.at(-1)?.paneId);
+const splitArgs = layoutArgs(
+  activeReviews.length,
+  activeReviews.at(-1)?.paneId,
+  argv.flags.session,
+);
 
 const prompt = argv.flags.context
   ? `${argv.flags.context}\n\n/review:peer ${url}`

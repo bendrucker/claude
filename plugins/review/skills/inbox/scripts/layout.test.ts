@@ -39,4 +39,17 @@ describe("layoutArgs", () => {
       "TMUX_PANE is not set (not running inside tmux)",
     );
   });
+
+  test("first pane with target session: split that session, no sidebar carve-out", () => {
+    expect(layoutArgs(0, undefined, "reviews")).toEqual(["-h", "-d", "-t", "reviews"]);
+  });
+
+  test("target session does not require TMUX_PANE for the first pane", () => {
+    delete process.env.TMUX_PANE;
+    expect(layoutArgs(0, undefined, "reviews")).toEqual(["-h", "-d", "-t", "reviews"]);
+  });
+
+  test("subsequent panes chain off the last pane even with a target session", () => {
+    expect(layoutArgs(1, "%1", "reviews")).toEqual(["-v", "-d", "-t", "%1"]);
+  });
 });

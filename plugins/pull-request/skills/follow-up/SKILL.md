@@ -43,8 +43,8 @@ With `--auto`, drive bot threads to closure without asking. Partition threads wi
 
 Triage each bot thread:
 
-- **Actionable** → fix in the working tree, batching across threads
-- **Noise / false positive** → reply with a one-line reason and resolve
+- **Actionable** → fix in the working tree, batching across threads. For a straightforward fix (test coverage, a rename, an obvious guard), acknowledge with a thumbs up reaction rather than a fleshed-out reply (see `github:pr-comments`, Reacting Instead of Replying)
+- **Noise / false positive** → reply with a one-line reason and resolve, or thumbs down a clearly wrong bot comment
 - **Unsure** → collect to escalate; don't guess
 
 Then run each round:
@@ -65,6 +65,7 @@ On stop, report fixes, replies/resolves, and escalations. If the reviewer is sat
 
 The gated default requires checking before any post or resolve. `--auto` lifts this for **bot threads only**; human threads stay gated unless `--include-human-nits`. Always:
 
-- Resolve only after replying; silent resolves hide context.
-- Never name or thank the bot in a reply; write it as a note for any reader. The `@<bot>` re-trigger is the one exception.
+- Resolve only after replying or reacting; silent resolves hide context.
+- Never name or thank the bot in a reply; write it as a note for any reader. The `@<bot>` re-trigger is the one exception. A thumbs up is the lighter-weight acknowledgement, preferred over a reply for straightforward changes.
+- Thumbs down is bot-only feedback. Never thumbs down a human thread, autonomously or otherwise.
 - Match my writing style; you're replying as me.

@@ -78,10 +78,22 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts resolve <thread-id>
 
 Pass the reply text with `--body`, `--bodyFile <path>`, or stdin. Don't resolve without a reply: a silent resolve hides why the thread closed.
 
+## Reacting Instead of Replying
+
+A reply is not always warranted. When the fix is straightforward and a reply would only acknowledge it (test coverage, a rename, an obvious guard), react with a thumbs up instead of writing a reply. A fleshed-out reply with code references to a bot is mechanical noise. The goal is fewer comments, not a new acknowledgement on every thread, so prefer a reaction only where you would otherwise have written a low-value reply, and stay silent where you would have stayed silent.
+
+```bash
+# Thumbs up, optionally resolving in the same call
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts react <thread-id> --resolve
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts react <thread-id> --down --resolve
+```
+
+The reaction lands on the thread's first comment. Thumbs down (`--down`) is feedback to a bot reviewer whose comment was wrong or unhelpful. Never thumbs down a human, and never in an autonomous run.
+
 #### Bot Reviewer Threads
 
 A bot reviewer is any account the `--bots` filter catches: accounts the API types as `Bot` (Copilot, CodeRabbit, Greptile) plus logins in `$CLAUDE_PLUGIN_DATA/reviewers.txt`. Use that filter to detect them rather than hardcoding logins.
 
-Do not write human-voiced replies to these threads. No thanks, no "addressed in the latest revision", no conversation with the bot. Push the fix and resolve the thread, or just resolve it.
+Do not write human-voiced replies to these threads. No thanks, no "addressed in the latest revision", no conversation with the bot. Push the fix and resolve the thread, or just resolve it. For a straightforward change, a thumbs up reaction (see [Reacting Instead of Replying](#reacting-instead-of-replying)) acknowledges the bot without a reply.
 
 If a reply is genuinely needed, state the resolution as a terse note for a human reader ("Guarded with a null check"), not a message to the bot.

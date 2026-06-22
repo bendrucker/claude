@@ -19,6 +19,24 @@ mutation($threadId: ID!) {
 }
 `;
 
+export const THREAD_COMMENT_QUERY = `
+query($threadId: ID!) {
+  node(id: $threadId) {
+    ... on PullRequestReviewThread {
+      comments(first: 1) { nodes { id } }
+    }
+  }
+}
+`;
+
+export const REACT_MUTATION = `
+mutation($subjectId: ID!, $content: ReactionContent!) {
+  addReaction(input: { subjectId: $subjectId, content: $content }) {
+    reaction { content }
+  }
+}
+`;
+
 async function ghGraphQL(query: string, variables: Record<string, string>): Promise<unknown> {
   const args = ["gh", "api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(variables)) {
@@ -88,11 +106,56 @@ const resolveCmd = command(
   },
 );
 
+interface ThreadCommentResponse {
+  data: { node: { comments: { nodes: { id: string }[] } } | null };
+}
+
+async function firstCommentId(threadId: string): Promise<string> {
+  const result = (await ghGraphQL(THREAD_COMMENT_QUERY, { threadId })) as ThreadCommentResponse;
+  const id = result.data.node?.comments.nodes[0]?.id;
+  if (!id) {
+    throw new Error(`No comment found for thread ${threadId}`);
+  }
+  return id;
+}
+
+const reactCmd = command(
+  {
+    name: "react",
+    parameters: ["<thread-id>"],
+    flags: {
+      down: {
+        type: Boolean,
+        description: "React with thumbs down instead of thumbs up",
+        default: false,
+      },
+      resolve: {
+        type: Boolean,
+        description: "Resolve the thread after reacting",
+        default: false,
+      },
+    },
+  },
+  async (parsed) => {
+    const threadId = parsed._.threadId;
+    const content = parsed.flags.down ? "THUMBS_DOWN" : "THUMBS_UP";
+    const subjectId = await firstCommentId(threadId);
+
+    await ghGraphQL(REACT_MUTATION, { subjectId, content });
+    if (parsed.flags.resolve) {
+      await ghGraphQL(RESOLVE_MUTATION, { threadId });
+    }
+    console.error(
+      `Reacted ${parsed.flags.down ? "👎" : "👍"} to ${threadId}${parsed.flags.resolve ? " and resolved" : ""}`,
+    );
+  },
+);
+
 if (import.meta.main) {
   cli(
     {
       name: "review-threads",
-      commands: [replyCmd, resolveCmd],
+      commands: [replyCmd, resolveCmd, reactCmd],
     },
     (parsed) => {
       parsed.showHelp();

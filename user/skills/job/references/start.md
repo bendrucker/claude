@@ -20,6 +20,8 @@ Order items blocking others first, then oldest.
 
 Separate fresh requests from re-reviews where the author responded to your earlier feedback. For re-reviews, delegate the addressed-or-not analysis to an installed review-follow-up skill if one exists. Otherwise compare the threads against your prior comments.
 
+Before recommending an action, give each item a one-line summary of what it changes and an estimated review effort. Delegate both to the installed review skill's summary pass when it offers one, so the estimate uses the same effort scale the eventual review would, and the brief never starts the review itself. The estimate is what makes the queue schedulable: it shows the morning's total review load and lets a run of small reviews clear ahead of one deep one.
+
 Recommended actions per item:
 
 - Review now: start immediately after the brief, via the installed review skill for the configured platform.

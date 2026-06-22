@@ -38,6 +38,26 @@ describe("settings validation", () => {
     expect(errors.size).toBeGreaterThan(0);
   });
 
+  it("allows allowAppleEvents on sandbox even when the schema omits it", async () => {
+    const sandboxSchema = {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        sandbox: {
+          type: "object",
+          additionalProperties: false,
+          properties: { enabled: { type: "boolean" } },
+        },
+      },
+    };
+    await Bun.write(
+      join(tempDir, ".claude/settings.json"),
+      JSON.stringify({ sandbox: { enabled: true, allowAppleEvents: true } }),
+    );
+    const errors = await validate(tempDir, sandboxSchema);
+    expect(errors.size).toBe(0);
+  });
+
   it("skips missing files", async () => {
     await rm(join(tempDir, ".claude/settings.json"), { force: true });
     await rm(join(tempDir, "user/settings.json"), { force: true });

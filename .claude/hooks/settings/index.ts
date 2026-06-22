@@ -36,6 +36,11 @@ interface SchemaObject {
 }
 
 function patchSchema(schema: SchemaObject): void {
+  patchHookIfField(schema);
+  patchSandboxAppleEvents(schema);
+}
+
+function patchHookIfField(schema: SchemaObject): void {
   const hookCommand = schema.$defs?.hookCommand;
   if (!hookCommand?.anyOf) return;
 
@@ -49,6 +54,16 @@ function patchSchema(schema: SchemaObject): void {
       variant.properties.if = ifProperty;
     }
   }
+}
+
+function patchSandboxAppleEvents(schema: SchemaObject): void {
+  const sandbox = schema.properties?.sandbox;
+  if (!sandbox?.properties) return;
+
+  sandbox.properties.allowAppleEvents = {
+    type: "boolean",
+    description: "Allow sandboxed processes to send Apple Events (macOS automation).",
+  };
 }
 
 export async function validate(

@@ -1,6 +1,6 @@
 # End
 
-The day ends with decisions. Nothing leaves it unsent, unanswered, or unpushed without one.
+The day ends with decisions. Nothing leaves it unsent, unanswered, unfiled, or unpushed without one.
 
 ## Gather
 
@@ -8,8 +8,10 @@ Dispatch parallel read-only sub-agents:
 
 - Outbox: your own PRs/MRs created or pushed today, with reviewer assignment, CI state, draft state, and whether the body still matches the diff.
 - Inbound: review requests still open against you, and threads on others' PRs/MRs awaiting your reply.
+- Messaging (when configured): direct messages, mentions, and tracker notifications awaiting your reply, with sender and link.
+- Email (when configured): unhandled mail awaiting your reply or filing, with sender and link.
 - Worktrees: every worktree's uncommitted and unpushed state (details under the sweep below).
-- Tracker: your in-flight issues and their current states.
+- Tracker: your in-flight issues, their current states, and their projects.
 
 ## Outbox Clearing
 
@@ -24,7 +26,7 @@ Flag items that need collaboration lead time (a reviewer in another timezone, a 
 
 ## Review Debt
 
-Review debt is inbound requests you did not reach today plus unanswered threads on others' PRs/MRs. Choose one path per item:
+Review debt is inbound requests you did not reach today, unanswered threads on others' PRs/MRs, and any message, notification, or email still awaiting your reply or filing. Choose one path per item:
 
 - Reply now: draft the reply and include it in the brief. Posting a draft the user approved is safe.
 - Carry to tomorrow: record it explicitly so it appears in tomorrow's start brief.
@@ -49,4 +51,4 @@ Offer per worktree: commit and push as WIP (safe on your own branch), or record 
 
 ## Brief and Act
 
-Assemble the brief in the phase order above and execute per the shared contract in `SKILL.md`.
+Assemble the brief grouped by project per the contract in `SKILL.md` and execute per that shared contract.

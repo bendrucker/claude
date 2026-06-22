@@ -27,7 +27,7 @@ Recommended actions per item:
 - Review today: slot it into the day's order. The review runs through the installed review skill once triage is approved.
 - Decline or reassign: ask-first, since it hands work back.
 
-Triage covers the whole queue before any review begins. Reviews are session-length work, so they kick off at the end of the run, after the order is locked.
+Triage covers the whole queue before any review begins. Reviews are session-length work, so they kick off at the end of the run, after the order is locked. If a skill that runs a review queue is installed, hand it the locked queue so it opens each review in order, with the triage summary as context. Otherwise run the reviews inline through the review skill.
 
 ## Outbox
 

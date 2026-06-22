@@ -36,7 +36,7 @@ Arguments beyond the mode are a focus hint ($ARGUMENTS). Weight the brief toward
 
 This skill never names platforms. The config declares which version-control platform, issue tracker, worktree tool, messaging platform, and email account the user works with. For each task:
 
-1. Find the installed skill covering the configured tool's task (the skill for the configured platform's merge requests, the skill for the configured tracker's issues, the skill or MCP for the configured messaging and email inboxes) and load it for mechanics.
+1. Find the installed skill covering the configured tool's task (the skill for the configured platform's merge requests, the skill for the configured tracker's issues, the skill or MCP for the configured messaging and email inboxes, the skill that runs a review queue) and load it for mechanics.
 2. If no installed skill matches, use the configured CLI or MCP directly. Stay read-only until the user confirms actions.
 
 Platforms, hostnames, and usernames come only from the config or the user, never from this skill.

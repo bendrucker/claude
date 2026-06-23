@@ -27,8 +27,6 @@ When `--triage` is set, stay read-only and assess the PR for sequencing. Gather 
 - What the PR changes, in one line.
 - The estimated review effort on the same scale step 4 uses for `/code-review` (low, medium, high, xhigh, max), with one-line reasoning.
 
-Skip the checkout, `/code-review`, tuicr staging, and every later step. Nothing is posted. A caller such as the `job` skill's start brief uses the estimate to order a review queue before any review begins.
-
 If not on the branch, first run `gh pr checkout` to switch.
 
 ## Guardrails

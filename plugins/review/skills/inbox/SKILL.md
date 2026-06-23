@@ -79,7 +79,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/spawn.ts <pr-url> --repo-path <local-path> --dat
 
 `spawn.ts` handles `--worktree` for branch isolation, tmux layout computation, and state tracking. Pass `--context` with PR metadata (title, author, description summary) so the spawned review session has immediate context. Panes cycle in groups of 3: one horizontal split (new column at 70% width for the first, equal width after), then two vertical splits stacking in the column.
 
-Pass `--session <name>` to open reviews in a tmux session other than the one you orchestrate from. Without it, `spawn.ts` splits the orchestrator's own pane. That fits running the inbox as a sidebar inside the review session itself. With it, a remote orchestrator dispatches elsewhere: a `job` start run in your work session hands the queue here, and the reviews open in your dedicated review session. The first pane splits that session's active pane rather than carving a sidebar from the orchestrator.
+Pass `--session <name>` to open reviews in a tmux session other than the one you orchestrate from. Without it, `spawn.ts` splits the orchestrator's own pane.
 
 Resize the orchestrator to a sidebar before spawning the first pane, but only when the panes share your window. Skip the resize under `--session`, since the orchestrator does not share the panes' window.
 

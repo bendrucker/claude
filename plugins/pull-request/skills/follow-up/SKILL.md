@@ -43,7 +43,7 @@ With `--auto`, drive bot threads to closure without asking. Partition threads wi
 
 Triage each bot thread:
 
-- **Actionable** → fix in the working tree, batching across threads. For a straightforward fix (test coverage, a rename, an obvious guard), acknowledge with a thumbs up reaction rather than a fleshed-out reply (see `github:pr-comments`, Reacting Instead of Replying)
+- **Actionable** → fix in the working tree, batching across threads. For a straightforward fix (test coverage, a rename, an obvious guard), acknowledge with a thumbs up reaction rather than a fleshed-out reply (see `github:pr-comments`, Reactions)
 - **Noise / false positive** → reply with a one-line reason and resolve, or thumbs down a clearly wrong bot comment
 - **Unsure** → collect to escalate; don't guess
 

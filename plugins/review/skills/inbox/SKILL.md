@@ -3,7 +3,8 @@ name: review:inbox
 description: >
   Live tmux inbox for reviewing inbound pull requests across GitHub and GitLab.
   Use when reviewing multiple PRs, checking the review queue, batch reviews, or managing your review inbox.
-disable-model-invocation: true
+  Pass --queue to spawn an already-ordered queue.
+argument-hint: "[--queue]"
 allowed-tools:
   - Monitor
   - TaskStop
@@ -31,6 +32,16 @@ hooks:
 # Review Inbox
 
 Orchestrate live PR/MR reviews in tmux. You are the sidebar orchestrator: fetch pending reviews, spawn review sessions, and monitor their progress.
+
+## Arguments
+
+- `--queue`: spawn an already-triaged, ordered queue handed in by a caller, rather than fetching your own. Default: off, the interactive flow that fetches and presents the queue below.
+
+## Curated Queue
+
+When `--queue` is set, another skill has already gathered, triaged, and ordered the reviews.
+
+Skip [Fetch Pending Reviews](#fetch-pending-reviews) and [Present Results](#present-results). Take the queue from the invoking context as given: spawn each review in the order received, passing its triage summary as the `spawn.ts` `--context` so the session opens with the caller's framing. Everything from [Spawn Review Sessions](#spawn-review-sessions) onward, the sidebar resize, layout, monitoring, and worktree reclamation, is unchanged.
 
 ## Fetch Pending Reviews
 

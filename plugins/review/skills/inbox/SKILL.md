@@ -3,8 +3,8 @@ name: review:inbox
 description: >
   Live tmux inbox for reviewing inbound pull requests across GitHub and GitLab.
   Use when reviewing multiple PRs, checking the review queue, batch reviews, or managing your review inbox.
-  Pass --curated to spawn an already-ordered queue handed in by another skill, such as the job skill, instead of fetching one.
-argument-hint: "[--curated]"
+  Pass --queue to spawn an already-ordered queue.
+argument-hint: "[--queue]"
 allowed-tools:
   - Monitor
   - TaskStop
@@ -35,11 +35,11 @@ Orchestrate live PR/MR reviews in tmux. You are the sidebar orchestrator: fetch 
 
 ## Arguments
 
-- `--curated`: spawn an already-triaged, ordered queue handed in by a caller, rather than fetching your own. Default: off, the interactive flow that fetches and presents the queue below.
+- `--queue`: spawn an already-triaged, ordered queue handed in by a caller, rather than fetching your own. Default: off, the interactive flow that fetches and presents the queue below.
 
 ## Curated Queue
 
-When `--curated` is set, another skill has already gathered, triaged, and ordered the reviews. The `job` skill does this: its start brief sequences the queue and estimates each review's effort before any review begins, then hands the approved order here.
+When `--queue` is set, another skill has already gathered, triaged, and ordered the reviews.
 
 Skip [Fetch Pending Reviews](#fetch-pending-reviews) and [Present Results](#present-results). Take the queue from the invoking context as given: spawn each review in the order received, passing its triage summary as the `spawn.ts` `--context` so the session opens with the caller's framing. Everything from [Spawn Review Sessions](#spawn-review-sessions) onward, the sidebar resize, layout, monitoring, and worktree reclamation, is unchanged.
 

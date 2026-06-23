@@ -55,7 +55,7 @@ One prioritized brief, grouped by project. Resolve each item to its project thro
 
 Within a group, order blocking items first, then oldest. Each item gets an identifier with a link, a one-line state, and a recommended action. The mode's phases set what to surface and label each item's role within its project.
 
-Close with the mode's cross-project synthesis (the day's sequence, or the night's open decisions) and confirm it with the user. Omit empty groups and never pad. An empty queue is a two-line brief.
+Close with the mode's cross-project synthesis: the day's sequence, or the night's open decisions. This is the triage gate. The brief covers everything gathered, and nothing executes until the user approves the order. Omit empty groups and never pad. An empty queue is a two-line brief.
 
 ### Act
 
@@ -67,3 +67,5 @@ Split recommended actions into two groups:
 Drive inbound to zero. Every review request, message, notification, and email leaves the run with a terminal disposition: handled, deferred to a tracked task or issue, or archived. Nothing stays in an ambiguous unread state.
 
 Present safe actions via AskUserQuestion (execute all, pick a subset, or none). Execute through the delegated skills, then give a short summary of what changed.
+
+Run the quick safe actions and tracker corrections first. Session-length work like a review starts only at the end of the run, after the rest is cleared, and never before the approved order from triage.

@@ -6,6 +6,17 @@ argument-hint: <pr-url-or-number>
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)
+  - Bash(git log:*)
+  - Bash(git diff:*)
+  - Bash(git show:*)
+  - Bash(git branch:*)
+  - Bash(git fetch:*)
+  - Bash(git checkout:*)
+  - Bash(git remote:*)
+  - Bash(git rev-parse:*)
+  - Bash(git cat-file:*)
+  - Bash(git status:*)
+  - Bash(jq:*)
   - mcp__github
   - WebFetch
   - Skill(code-review)

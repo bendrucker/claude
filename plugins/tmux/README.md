@@ -8,7 +8,6 @@ Tmux session, window, and pane awareness for Claude Code.
 - **Hook: context** — SessionStart hook that injects tmux env vars
 - **Hook: resume-command**, a SessionStart hook that records the session's resume command in a pane-scoped tmux option for plugins like [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) to use when resuming a pane
 - **Hook: notification** — Bell and status bar notifications for permission prompts
-- A PreToolUse hook on `Agent` that fixes the [agent team pane startup race](https://github.com/anthropics/claude-code/issues/25315) for tmux-backed teammates
 
 ## How It Works
 
@@ -17,16 +16,6 @@ A SessionStart hook detects whether Claude is running inside tmux and writes ses
 Another SessionStart hook records the command that resumes the current session (`claude --resume <id>`) in the pane-scoped tmux option `@resume-command`, refreshed on every session start. Plugins like tmux-resurrect can read it back with `tmux show-options -p -t <pane> -qv @resume-command` to resume the session when restoring a pane. Outside tmux the hook is a no-op.
 
 The skill provides a PreToolUse hook that auto-allows safe tmux commands (read-only and within-window layout). The safe command list is maintained in [`safe-commands.json`](skills/tmux/resources/safe-commands.json). Window-switching verbs (`select-window`, `switch-client`, `next`/`previous`/`last-window`) are deliberately excluded, so they fall through to a permission prompt. This keeps cross-window navigation an explicit choice rather than a silent one during autonomous work.
-
-## Agent Team Shell Race
-
-The tmux team backend spawns each teammate in a new pane and immediately sends the `claude` command with `send-keys`. A slow rc file breaks this. The keystrokes land before the login shell finishes sourcing it, get swallowed, and the teammate never starts.
-
-A PreToolUse hook on `Agent` heads this off. `Agent` is the tool that spawns teammates, and there is no longer a discrete team-creation event to hook: Claude Code removed the `TeamCreate` and `TeamDelete` tools in v2.1.178, and a team now forms implicitly on the first teammate spawn. The hook points tmux's `default-command` at [`shell-wrapper.sh`](hooks/shell-wrapper.sh) and arms a 15-second window by stamping a `CLAUDE_FAST_SHELL_UNTIL` expiry into the tmux environment. A pane that starts before that expiry execs a shell with rc loading skipped (`zsh --no-rcs`, `bash --norc`, `fish --no-config`), so the prompt is ready before `send-keys` fires. The teammate pane spawns within a second of the `Agent` call, well inside the window. Any pane you open later, including a split in the lead's own window, falls through to a normal login shell with your full dotfiles. The hook fires on every `Agent` call, including in-process subagents that never open a pane. Re-stamping the expiry is cheap. One catch: a no-rc shell never rebuilds `PATH`, so the hook stashes the current value in the `CLAUDE_PATH` tmux environment variable and the wrapper restores it. Otherwise `claude` would not resolve.
-
-Arming a time window rather than pinning a window option is deliberate. `default-command` is the only lever for a not-yet-created pane and it is server-scoped, so the wrapper runs for every new pane and cannot tell a teammate pane apart from your manual split. The one fact the setup controls is timing. The hook fires immediately before the spawn, so keying off that moment scopes the fast shell to Claude's panes alone. The tradeoff: a manual split in the ~15 seconds right after an agent team starts also gets a no-rc shell. That window is short and self-correcting.
-
-A `SessionEnd` hook reverses all of this. It unsets `default-command`, `CLAUDE_PATH`, and `CLAUDE_FAST_SHELL_UNTIL`. Teardown rides on the end of the lead session, not the per-turn `Stop` path, where an earlier version burned a `bun` startup on every stop in every session. Because the window self-expires, a missed teardown is harmless. Once the 15 seconds pass, every new pane gets a login shell again, even though `default-command` still points at the wrapper.
 
 ## Sandbox
 

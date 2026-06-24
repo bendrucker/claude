@@ -1,0 +1,12 @@
+{
+  "id": "agent-message-rendered-part-enum",
+  "path": "components/chat/AgentMessage.tsx",
+  "language": "tsx",
+  "kind": "block",
+  "comment": "/** Part types that AgentMessage actually renders as visible content\n * (drives the \"interrupted\" vs \"aborted\" copy below). Excludes invisible\n * parts like step-start. MUST stay in sync with the render switch in the\n * component body: a renderable part added there but not here makes an aborted\n * message with visible output wrongly read \"Query aborted\". */",
+  "context": "162: /** Part types that AgentMessage actually renders as visible content\n163:  * (drives the \"interrupted\" vs \"aborted\" copy below). Excludes invisible\n164:  * parts like step-start. MUST stay in sync with the render switch in the\n165:  * component body: a renderable part added there but not here makes an aborted\n166:  * message with visible output wrongly read \"Query aborted\". */\n167: function isRenderedPart(part: TypedUIMessage[\"parts\"][number]): boolean {\n168:   if (part.type === \"text\") return part.text.trim().length > 0;\n169:   if (part.type === \"reasoning\") return true;\n170:   if (isToolUIPart(part)) return true;\n171:   return (\n172:     part.type === \"data-task\" ||\n173:     part.type === \"data-task-created\" ||\n174:     part.type === \"data-task-updated\" ||\n175:     part.type === \"data-document\"\n176:   );\n177: }",
+  "label": "ok",
+  "category": null,
+  "source": "jacob/!223 AgentMessage.tsx:162",
+  "note": "Must-pass. The enumeration restates the function body, but it scaffolds a real invariant: this set must match the render switch in another file, and drift makes an aborted message with visible output misread \"Query aborted\". The restatement and the why are one thought below line granularity, so keeping the block whole is correct. Flagging it argues for a refactor (derive both lists from one source), not a comment fix."
+}

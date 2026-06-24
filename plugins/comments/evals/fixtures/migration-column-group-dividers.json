@@ -1,0 +1,13 @@
+{
+  "id": "migration-column-group-dividers",
+  "path": "migrations/versions/b67beab2a3fa_add_message_parts_table_for_ai_sdk_.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# Text parts",
+  "context": "39:         sa.Column(\"type\", sa.String(), nullable=False),\n40:         # Text parts\n41:         sa.Column(\"text_text\", sa.Text(), nullable=True),\n42:         # Reasoning parts\n43:         sa.Column(\"reasoning_text\", sa.Text(), nullable=True),\n44:         sa.Column(\"reasoning_provider_metadata\", sa.JSON(), nullable=True),\n45:         # File parts\n46:         sa.Column(\"file_media_type\", sa.String(), nullable=True),\n47:         sa.Column(\"file_filename\", sa.String(), nullable=True),\n48:         sa.Column(\"file_url\", sa.String(), nullable=True),\n49:         # Tool parts (generic for all tools - scales without schema changes)\n50:         sa.Column(\"tool_call_id\", sa.String(), nullable=True),\n51:         sa.Column(\"tool_name\", sa.String(), nullable=True),",
+  "label": "slop",
+  "category": "section-divider",
+  "trimToLines": null,
+  "source": "main migrations/b67beab2a3fa:40",
+  "note": "Section-divider labels (# Text parts, # Reasoning parts, # File parts) restating the column-name prefix immediately below each one. text_text is self-evidently a text part. The labels group columns the names already group."
+}

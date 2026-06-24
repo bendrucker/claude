@@ -1,0 +1,12 @@
+{
+  "id": "get-records-name-column-docstring",
+  "path": "src/agents/whirl/integrations/salesforce/duckdb/get_records.py",
+  "language": "python",
+  "kind": "docstring",
+  "comment": "\"\"\"Return the table's name-like text column for the near-match scan, or None.\n\n    Prefers the field flagged ``IsNameField`` in meta.fields (authoritative:\n    Username, Subject, CaseNumber, which a hardcoded list would miss), then the\n    Name/Label/DeveloperName fallbacks. The column must be text: the near-match\n    scan matches it with LOWER/ILIKE, so a non-text name field is skipped.\n    \"\"\"",
+  "context": "1110: async def _name_column(\n1111:     ctx: DuckDBNamedQueryContext,\n1112:     database: str,\n1113:     resolved: _Resolved,\n1114:     colmap: dict[str, tuple[str, str]],\n1115: ) -> str | None:\n1116:     \"\"\"Return the table's name-like text column for the near-match scan, or None.\n1117: \n1118:     Prefers the field flagged ``IsNameField`` in meta.fields (authoritative:\n1119:     Username, Subject, CaseNumber, which a hardcoded list would miss), then the\n1120:     Name/Label/DeveloperName fallbacks. The column must be text: the near-match\n1121:     scan matches it with LOWER/ILIKE, so a non-text name field is skipped.\n1122:     \"\"\"\n1123:     name_field = await _meta_name_field(ctx, database, resolved.table)\n1124:     candidate_names = list(_FALLBACK_NAME_COLUMNS)\n1125:     if name_field is not None and name_field not in candidate_names:\n1126:         candidate_names.insert(0, name_field)\n1127:     for name in candidate_names:\n1128:         entry = colmap.get(name.lower())\n1129:         if entry is None:\n1130:             continue\n1131:         declared, data_type = entry\n1132:         if _is_text_type(data_type):\n1133:             return declared\n1134:     return None",
+  "label": "ok",
+  "category": null,
+  "source": "jacob/!680 get_records.py:1116",
+  "note": "Must-pass. The candidate-order sentence restates the loop, but it carries a why mid-clause (the IsNameField flag catches Username/Subject/CaseNumber a hardcoded list would miss), and the rest of the block is the return contract plus a genuine why (the near-match runs LOWER/ILIKE, so the column must be text). Slop and why interleave below line granularity, so keeping the block is correct."
+}

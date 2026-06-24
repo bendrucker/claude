@@ -1,0 +1,13 @@
+{
+  "id": "get-records-meta-name-field-canonical",
+  "path": "src/agents/whirl/integrations/salesforce/duckdb/get_records.py",
+  "language": "python",
+  "kind": "docstring",
+  "comment": "\"\"\"Return the field meta.fields flags as the object's name (IsNameField).\"\"\"",
+  "context": "1137: async def _meta_name_field(\n1138:     ctx: DuckDBNamedQueryContext, database: str, table: str\n1139: ) -> str | None:\n1140:     \"\"\"Return the field meta.fields flags as the object's name (IsNameField).\"\"\"\n1141:     if ctx.catalog.get_dataset(database, _META_SCHEMA, _FIELDS_TABLE) is None:\n1142:         return None\n1143:     await ctx.loader.ensure(database, _META_SCHEMA, _FIELDS_TABLE)\n1144:     fields_columns = await fetch_dicts(\n1145:         ctx.conn,\n1146:         \"SELECT column_name FROM duckdb_columns() \"\n1147:         \"WHERE database_name = $1 AND schema_name = $2 AND table_name = $3\",\n1148:         [database, _META_SCHEMA, _FIELDS_TABLE],\n1149:     )",
+  "label": "ok",
+  "category": null,
+  "trimToLines": null,
+  "source": "main get_records.py:1140 (substitute for the Aembit OAuth/PKCE canonical-name case)",
+  "note": "Must-pass. A one-line docstring that largely restates the function name, yet earns its place by surfacing the canonical Salesforce metadata flag IsNameField that the identifier abbreviates. Name-restatement passes when it introduces a searchable proper noun. Stands in for the Aembit OAuth 2.0 + PKCE docstring, which is not reachable from the two pinned repos (blob search disabled, no aembit path in app/api)."
+}

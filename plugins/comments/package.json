@@ -1,0 +1,14 @@
+{
+  "name": "@bendrucker/claude-comments",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
+    "cleye": "^2.2.1",
+    "table": "^6.9.0",
+    "web-tree-sitter": "0.24.7"
+  },
+  "devDependencies": {
+    "tree-sitter-wasms": "^0.1.13"
+  }
+}

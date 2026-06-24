@@ -1,0 +1,13 @@
+{
+  "id": "migration-drop-unique-constraint",
+  "path": "migrations/versions/afc536d09102_add_unique_constraint_to_message_parts_.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# Drop unique constraint",
+  "context": "31: def downgrade() -> None:\n32:     \"\"\"Downgrade schema.\"\"\"\n33:     # Drop unique constraint\n34:     op.drop_constraint(\"uq_message_parts_order\", \"message_parts\", type_=\"unique\")\n35: \n36:     # Recreate the non-unique index\n37:     op.create_index(\"idx_parts_message_order\", \"message_parts\", [\"message_id\", \"order\"])",
+  "label": "slop",
+  "category": "restate-the-what",
+  "trimToLines": null,
+  "source": "main migrations/afc536d09102:33",
+  "note": "\"# Drop unique constraint\" above op.drop_constraint(..., type_=\"unique\") and \"# Recreate the non-unique index\" above op.create_index both paraphrase the call on the next line. The type_=\"unique\" argument already says it."
+}

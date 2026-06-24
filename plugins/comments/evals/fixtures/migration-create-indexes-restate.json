@@ -1,0 +1,13 @@
+{
+  "id": "migration-create-indexes-restate",
+  "path": "migrations/versions/b67beab2a3fa_add_message_parts_table_for_ai_sdk_.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# Create indexes for performance",
+  "context": "84:     )\n85: \n86:     # Create indexes for performance\n87:     op.create_index(\n88:         \"idx_parts_message_order\",\n89:         \"message_parts\",\n90:         [\"message_id\", \"order\"],\n91:         unique=False,\n92:     )\n93: \n94:     # Index for querying by tool name (partial index for efficiency)\n95:     op.create_index(\n96:         \"idx_parts_tool_name\",\n97:         \"message_parts\",\n98:         [\"tool_name\"],\n99:         unique=False,",
+  "label": "slop",
+  "category": "restate-the-what",
+  "trimToLines": null,
+  "source": "main migrations/b67beab2a3fa:86",
+  "note": "\"Create indexes for performance\" restates op.create_index. Indexes exist for performance by definition; the comment adds nothing. The adjacent \"# Index for querying by tool name\" likewise restates the index name and column."
+}

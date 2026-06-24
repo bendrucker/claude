@@ -1,0 +1,13 @@
+{
+  "id": "search-test-section-banner",
+  "path": "src/agents/whirl/integrations/salesforce/duckdb/search_test.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# ---------------------------------------------------------------------------\n# Schema setup helpers (token-row helper mirrors describe_test / references_test)\n# ---------------------------------------------------------------------------",
+  "context": "41: # ---------------------------------------------------------------------------\n42: # Schema setup helpers (token-row helper mirrors describe_test / references_test)\n43: # ---------------------------------------------------------------------------\n44: \n45: \n46: _TextReferenceRow = tuple[object, ...]\n47: \n48: \n49: def _setup_text_references(\n50:     raw: duckdb.DuckDBPyConnection,\n51:     rows: Sequence[_TextReferenceRow],\n52: ) -> None:",
+  "label": "slop",
+  "category": "section-divider",
+  "trimToLines": null,
+  "source": "main search_test.py:41",
+  "note": "Rule-bar section banner labeling a group of helpers in a test file. Lowest-confidence advisory tier: it organizes by visual divider where the functions and their names already do. The mirror-of-other-test-modules aside is the only non-divider content."
+}

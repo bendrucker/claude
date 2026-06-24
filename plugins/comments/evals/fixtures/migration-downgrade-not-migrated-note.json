@@ -1,0 +1,13 @@
+{
+  "id": "migration-downgrade-not-migrated-note",
+  "path": "migrations/versions/9f1891b12937_refactor_message_parts_to_use_pydantic_.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# Note: Downgrade does not migrate type values back from tool_call/tool_return to tool-{name}\n    # This would require data migration which is not supported in downgrade",
+  "context": "120:     )\n121: \n122:     # Restore original constraints\n123:     op.drop_constraint(\"tool_fields_required\", \"message_parts\", type_=\"check\")\n124:     op.create_check_constraint(\n125:         \"tool_fields_required\",\n126:         \"message_parts\",\n127:         \"CASE WHEN type LIKE 'tool-%' THEN tool_call_id IS NOT NULL AND tool_state IS NOT NULL ELSE TRUE END\",\n128:     )\n129: \n130:     # Note: Downgrade does not migrate type values back from tool_call/tool_return to tool-{name}\n131:     # This would require data migration which is not supported in downgrade",
+  "label": "slop",
+  "category": "narration",
+  "trimToLines": null,
+  "source": "main migrations/9f1891b12937:130",
+  "note": "Narrates the absence of work the code does not do (\"does not migrate ... back\"), then justifies the gap with a generic claim (\"not supported in downgrade\", which is untrue: op.execute is available right above). Decision-log prose about a non-action rather than a fact the reader needs."
+}

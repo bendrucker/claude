@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import Parser from "web-tree-sitter";
+import { extractSqlComments } from "./sql";
 import type { Comment, CommentKind, Language } from "./types";
 
 type TSNode = Parser.SyntaxNode;
@@ -74,6 +75,7 @@ function collect(node: TSNode, language: Language, comments: Comment[]): void {
 }
 
 export async function extractComments(source: string, language: Language): Promise<Comment[]> {
+  if (language === "sql") return extractSqlComments(source);
   await init();
   const lang = await loadLanguage(language);
   const parser = new Parser();
@@ -98,6 +100,7 @@ const extensions: Record<string, Language> = {
   rs: "rust",
   sh: "bash",
   bash: "bash",
+  sql: "sql",
 };
 
 export function languageForPath(path: string): Language | null {

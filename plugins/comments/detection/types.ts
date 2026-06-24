@@ -5,8 +5,19 @@
  * human-facing `path:line` output.
  */
 
-/** Languages with a vendored grammar in `grammars/`. SQL is a deferred open item. */
-export type Language = "python" | "typescript" | "tsx" | "javascript" | "go" | "rust" | "bash";
+/**
+ * Most languages have a vendored tree-sitter grammar in `grammars/`. SQL has no
+ * compatible grammar wasm, so it uses a string-aware scanner (`sql.ts`) instead.
+ */
+export type Language =
+  | "python"
+  | "typescript"
+  | "tsx"
+  | "javascript"
+  | "go"
+  | "rust"
+  | "bash"
+  | "sql";
 
 /**
  * `line` is a single-line comment (`#`, `//`). `block` is a delimited comment

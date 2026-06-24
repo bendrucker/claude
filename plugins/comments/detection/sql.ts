@@ -7,7 +7,8 @@ import type { Comment } from "./types";
  * `/*` inside one is never mistaken for a comment, which is the only thing a naive
  * regex gets wrong.
  *
- * Block comments do not nest, matching standard SQL and DuckDB.
+ * Block comments nest, matching DuckDB and PostgreSQL: a `/*` inside a block
+ * comment opens a level that must be closed before the comment ends.
  */
 
 const DOLLAR_TAG = /\$([A-Za-z_][A-Za-z0-9_]*)?\$/y;
@@ -85,10 +86,19 @@ export function extractSqlComments(source: string): Comment[] {
       const start = index;
       advance();
       advance();
-      while (index < length && !(source[index] === "*" && source[index + 1] === "/")) advance();
-      if (index < length) {
-        advance();
-        advance();
+      let depth = 1;
+      while (index < length && depth > 0) {
+        if (source[index] === "/" && source[index + 1] === "*") {
+          advance();
+          advance();
+          depth++;
+        } else if (source[index] === "*" && source[index + 1] === "/") {
+          advance();
+          advance();
+          depth--;
+        } else {
+          advance();
+        }
       }
       comments.push({
         kind: "block",

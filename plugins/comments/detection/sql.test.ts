@@ -10,6 +10,16 @@ describe("extractSqlComments", () => {
     ["line comment to end of line", "-- head\nSELECT 1;", ["-- head"]],
     ["block comment", "SELECT /* inline */ 1;", ["/* inline */"]],
     ["multiple comments", "-- a\nSELECT 1; -- b\n/* c */", ["-- a", "-- b", "/* c */"]],
+    [
+      "nested block comment closes at the matching delimiter",
+      "/* outer /* inner */ still outer */ -- real",
+      ["/* outer /* inner */ still outer */", "-- real"],
+    ],
+    [
+      "commenting out a block that contains a block comment",
+      "/* SELECT 1; /* note */ SELECT 2; */ -- real",
+      ["/* SELECT 1; /* note */ SELECT 2; */", "-- real"],
+    ],
     ["dash inside string", "SELECT '-- not a comment';", []],
     ["slash-star inside string", "SELECT '/* not a comment */';", []],
     ["doubled quote escapes the close", "SELECT 'it''s -- fine'; -- real", ["-- real"]],

@@ -25,7 +25,7 @@ The sandbox is egress control, not filesystem lockdown. Credentials stay outside
 
 ### Hosts (`WebFetch(domain:...)` Permissions)
 
-- Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`.
+- Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `community-extensions.duckdb.org` (DuckDB community extensions `markdown`/`yaml`, fetched on first `INSTALL ... FROM community`).
 - Docs and source: `docs.anthropic.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`.
 - Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`. Trusted only because each secret lives outside the sandbox.
 

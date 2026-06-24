@@ -12,7 +12,14 @@ Search and analyze Claude Code conversation history using a DuckDB index over JS
 - `scripts/db.ts` - DuckDB index, schema, host enumeration, and query logic
 - `resources/schema/` - Table and view definitions (ordered, run on startup)
 - `resources/queries/` - Parameterized SQL for built-in queries
+- `resources/extensions.sql` - Community extension setup (`markdown`, `yaml`), pulled into a query process via `-init`
 - `resources/import.sql` - JSONL parsing and flattening
+
+## Community Extensions
+
+The `plan-sections` and `frontmatter` queries read markdown and YAML from disk through DuckDB's `markdown` and `yaml` community extensions. Run them with `duckdb -readonly -init resources/extensions.sql`, which loads both before the piped query. The index/refresh path needs no extensions.
+
+DuckDB fetches these from `community-extensions.duckdb.org` on first `INSTALL ... FROM community`, then caches them per host under `~/.duckdb/extensions/`. The sandbox blocks network by default, so that host is allowlisted in `user/settings.json` (`WebFetch(domain:community-extensions.duckdb.org)`). Without it, the first install fails with a download error until the extension is cached.
 
 ## Testing
 

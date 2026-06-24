@@ -101,6 +101,32 @@ Every query also takes an optional `host` param. Omit it to span every machine (
 - `sandbox-bypass-effective-command`: top `dangerouslyDisableSandbox` commands normalized to their real verb after stripping a leading `cd <path>` wrapper (`excludedCommands` candidates). Params: `min_count` (default 5), `after_date`, `before_date`, `project`, `host`.
 - `plans`: sessions that used plan mode (ExitPlanMode), with per-session plan count, redirect/approved breakdown, and a `replan_tier` label (`single` / `replan` / `off-rails` for plan_count >= 3). Sorted by plan_count descending. Params: `min_plans` (default 1), `after_date`, `before_date`, `project`, `host`.
 
+### Markdown and YAML on Disk
+
+Two queries read files on disk through community extensions instead of the index. They need `markdown`/`yaml` loaded, so run them with `-init resources/extensions.sql`, which loads both in the same process before the piped query and runs under `-readonly`. The common-path queries above omit `-init` and pay nothing.
+
+```bash
+duckdb -readonly -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql "$DB" \
+  < ${CLAUDE_SKILL_DIR}/resources/queries/plan-sections.sql
+```
+
+- `plan-sections`: one row per markdown section across plan files on disk, joined to the session that produced each plan (outcome, replan sequence). The glob self-defaults to `~/.claude/plans/*.md` and takes an optional `plans_glob` override. Reads plan structure rather than re-parsing headings by hand, e.g. "which plans have no Verification section":
+
+  ```sql
+  -- prepend SET VARIABLE plans_glob = '...'; to scope
+  WITH s AS (
+    SELECT file_path, bool_or(title = 'Verification') AS has_verification
+    FROM read_markdown_sections('~/.claude/plans/*.md', filename=true)
+    GROUP BY file_path
+  )
+  SELECT file_path FROM s WHERE NOT has_verification;
+  ```
+
+  Local-host caveat: plans are read from the local disk, so a `plan_calls.plan_file` from an imported host (or a deleted plan) has no file to read. The `LEFT JOIN` simply omits its sections, so session-side data is unaffected. Embedded `$.input.plan` (via `plan_calls.plan_chars` / `content_items`) stays the source for cross-host and point-in-time needs.
+- `frontmatter`: one row per markdown file with YAML frontmatter, returning typed `name`/`description` and `content_chars`. The glob self-defaults to the memory corpus (`~/.claude/projects/*/memory/*.md`), where the nested `metadata` frontmatter auto-expands into a typed struct. Override with `frontmatter_glob` for skills, which live under `~/.claude/plugins` (not `~/.claude/skills`) and are duplicated across cache version-hashes, so pin one copy: `plugins/*/skills/*/SKILL.md` for repo skills.
+
+The reusable pattern for markdown/YAML on disk: a self-defaulting glob (`~` expands to home, override via `SET VARIABLE`) feeding a table function over files (`read_markdown_sections` for body structure, `read_yaml_frontmatter` for frontmatter), never materializing file bodies into a column, with extension setup centralized in `resources/extensions.sql` and pulled in via `-init`. Follow it for new markdown-on-disk needs rather than reinventing regex parsing.
+
 ## Cross-Machine History
 
 Session history copied from another machine is queryable alongside this machine's. Each machine is a `host`: this one is always `local`, and every imported machine gets a label you choose. With nothing imported, the index behaves exactly as the single-machine case.

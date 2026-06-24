@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { styleText } from "node:util";
 import { genericGlyph, purposeGlyphs } from "./glyphs";
 import {
+  extractActivity,
   formatDescription,
   formatElapsed,
   formatTokens,
+  humanizeTool,
   renderTask,
   type Task,
 } from "./subagent-statusline";
@@ -57,8 +59,98 @@ describe("formatDescription", () => {
   });
 });
 
+describe("humanizeTool", () => {
+  const cases: Array<[string, Record<string, unknown>, string]> = [
+    ["Read", { file_path: "/a/b/extract.ts" }, "Reading extract.ts"],
+    ["Edit", { file_path: "/a/b/diff.ts" }, "Editing diff.ts"],
+    ["MultiEdit", { file_path: "/a/b/diff.ts" }, "Editing diff.ts"],
+    ["Write", { file_path: "/a/b/prompt.md" }, "Writing prompt.md"],
+    ["Bash", { command: "ssh -o ControlPath=x host 'grep foo'" }, "Running ssh"],
+    ["Bash", { command: "  grep -A 3 bar baz" }, "Running grep"],
+    ["Grep", { pattern: "needle" }, "Searching needle"],
+    ["Glob", { pattern: "**/*.ts" }, "Globbing **/*.ts"],
+    ["ToolSearch", {}, "Searching tools"],
+    ["WebFetch", { url: "https://example.com/docs/page" }, "Fetching page"],
+    ["SendMessage", { to: "a77b", summary: "Redirect lake agent" }, "→ Redirect lake agent"],
+    ["SendMessage", {}, "→ message"],
+    ["Task", { description: "design the api" }, "Spawning design the api"],
+    ["TodoWrite", {}, "Updating todos"],
+    ["Skill", { skill: "writing:writing" }, "Running /writing:writing"],
+    ["MysteryTool", {}, "MysteryTool"],
+  ];
+
+  test.each(cases)("%s %o -> %s", (name, input, expected) => {
+    expect(humanizeTool(name, input)).toBe(expected);
+  });
+});
+
+describe("extractActivity", () => {
+  const assistant = (...content: object[]) => ({ message: { role: "assistant", content } });
+
+  test("returns the latest tool call when the last assistant turn ends mid-call", () => {
+    const entries = [
+      assistant({ type: "text", text: "Let me check" }),
+      assistant(
+        { type: "text", text: "Now run it" },
+        { type: "tool_use", name: "Bash", input: { command: "bun test" } },
+      ),
+      { message: { role: "user", content: [{ type: "tool_result" }] } },
+    ];
+    expect(extractActivity(entries)).toBe("Running bun");
+  });
+
+  test("returns the latest assistant line when the teammate is narrating", () => {
+    const entries = [
+      assistant({ type: "tool_use", name: "Read", input: { file_path: "/x/y.ts" } }),
+      { message: { role: "user", content: [{ type: "tool_result" }] } },
+      assistant({ type: "text", text: "14 fixtures delivered\nspanning 6 categories" }),
+    ];
+    expect(extractActivity(entries)).toBe("14 fixtures delivered spanning 6 categories");
+  });
+
+  test("skips empty text and non-assistant entries", () => {
+    const entries = [
+      assistant({ type: "tool_use", name: "ToolSearch", input: {} }),
+      assistant({ type: "text", text: "   " }),
+    ];
+    expect(extractActivity(entries)).toBe("Searching tools");
+  });
+
+  test("returns null when there is no tool or text event", () => {
+    expect(extractActivity([])).toBeNull();
+    expect(
+      extractActivity([{ message: { role: "assistant", content: [{ type: "thinking" }] } }]),
+    ).toBeNull();
+  });
+});
+
 describe("renderTask", () => {
   const now = 65_000;
+
+  test("activity wins over the description and is not sentence-cased", () => {
+    const out = renderTask(
+      { id: "a", description: "you are implementing the parser" },
+      null,
+      now,
+      null,
+      "→ lead",
+    );
+    expect(strip(out.content)).toContain("→ lead");
+    expect(strip(out.content)).not.toContain("implementing");
+  });
+
+  test("clean description overrides the raw stdin description as the fallback", () => {
+    const out = renderTask(
+      { id: "a", description: "you are implementing the parser" },
+      null,
+      now,
+      null,
+      null,
+      "build the parser",
+    );
+    expect(strip(out.content)).toContain("Build the parser");
+    expect(strip(out.content)).not.toContain("implementing");
+  });
 
   test("dims the in-progress gray glyph; finished green/red stay vivid", () => {
     expect(renderTask({ id: "a", status: "running" }, null, now, null).content).toContain(

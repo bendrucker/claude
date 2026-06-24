@@ -1,6 +1,20 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "theme": "auto",
+  "fallbackModel": ["sonnet"],
+  "cleanupPeriodDays": 90,
+  "autoMode": {
+    "hard_deny": [
+      "$defaults",
+      "Never git push to the default branch (main or master).",
+      "Never force-push to a shared branch or any branch you do not own; only your own stacked-PR branches may be force-pushed."
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Pause before destructive filesystem operations such as rm -rf or overwriting existing files outside tmp/ and .worktrees/.",
+      "Do not create a pull request or merge request on a third-party repository (one I do not own or maintain) unless I explicitly asked for one; offer it for confirmation first."
+    ]
+  },
   "attribution": {
     "commit": "",
     "pr": ""

@@ -147,6 +147,14 @@
         "@constellos/claude-code-kit": "^0.4.0",
       },
     },
+    "plugins/plan": {
+      "name": "@bendrucker/claude-plan",
+      "dependencies": {
+        "cleye": "^2.2.1",
+        "gray-matter": "^4.0.3",
+        "table": "^6.9.0",
+      },
+    },
     "plugins/pull-request": {
       "name": "pull-request",
       "dependencies": {
@@ -283,6 +291,8 @@
     "@babel/runtime": ["@babel/runtime@7.29.7", "", {}, "sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw=="],
 
     "@bendrucker/claude-marketplace": ["@bendrucker/claude-marketplace@workspace:packages/marketplace"],
+
+    "@bendrucker/claude-plan": ["@bendrucker/claude-plan@workspace:plugins/plan"],
 
     "@bendrucker/claude-review": ["@bendrucker/claude-review@workspace:plugins/review"],
 

@@ -13,6 +13,7 @@
     "plugins/linear",
     "plugins/mermaid/skills/diagram",
     "plugins/newline",
+    "plugins/plan",
     "plugins/pull-request",
     "plugins/shortcuts",
     "plugins/writing",

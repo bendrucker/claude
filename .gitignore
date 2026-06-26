@@ -4,6 +4,9 @@
 node_modules/
 .DS_Store
 **/fixtures/
+# The plan eval fixtures are authored input the harness reads by default, not
+# generated artifacts. Re-include them so the A/B works on a fresh clone.
+!plugins/plan/evals/fixtures/
 
 # Generated coverage output (bun test --coverage)
 /coverage/

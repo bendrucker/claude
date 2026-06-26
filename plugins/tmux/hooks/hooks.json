@@ -1,5 +1,5 @@
 {
-  "description": "Inject tmux context, persist the session's resume command for tmux-resurrect, and ring terminal bell for notifications",
+  "description": "Inject tmux context, persist the session's resume command for tmux-resurrect, ring terminal bell for notifications, and surface inter-pane relay messages",
   "hooks": {
     "SessionStart": [
       {
@@ -15,6 +15,16 @@
           {
             "type": "command",
             "command": "[ -n \"$TMUX_PANE\" ] && tmux set-option -p -t \"$TMUX_PANE\" @resume-command \"claude --resume $CLAUDE_CODE_SESSION_ID\" || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/relay.ts\""
           }
         ]
       }

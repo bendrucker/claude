@@ -3,17 +3,6 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-MAX_TITLE=48
-
-trunc() {
-  local max=$1 str=$2
-  if [ ${#str} -gt "$max" ]; then
-    printf '%s…' "${str:0:$((max-1))}"
-  else
-    printf '%s' "$str"
-  fi
-}
-
 # Print "<branch> (worktree|main)" for a pane's path, or nothing outside a repo.
 git_segment() {
   local path=$1 branch gdir cdir kind
@@ -42,7 +31,7 @@ tmux list-panes -t "$target" -F "$fmt" 2>/dev/null | while IFS=$'\t' read -r id 
   line="${id}${tag} ${cmd}"
 
   if [ -n "$title" ]; then
-    line="${line} $(trunc $MAX_TITLE "$title")"
+    line="${line} $(trunc "$title")"
   fi
 
   if [ "$path" != "$PWD" ]; then

@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/default-state.ts\"",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/save-issue.ts\"",
             "timeout": 10
           }
         ]

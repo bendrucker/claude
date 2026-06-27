@@ -1,126 +1,38 @@
 # Linear GraphQL API via CLI
 
-Run GraphQL queries and mutations against Linear with the `linear api` CLI subcommand.
+Raw GraphQL through the `linear api` subcommand is the fallback for operations the Claude.ai connector and MCP tools do not cover. Use it only after [Tool Selection](SKILL.md#tool-selection) rules out those paths.
 
-## Authentication
-
-Authenticate interactively (persists credentials):
+The `linear-cli:linear-cli` skill is the canonical reference for the full CLI surface and GraphQL mechanics (`--description-file`, schema introspection to a temp file, pagination). It is the recommended companion for non-trivial GraphQL work. The `linear` binary installs via Homebrew:
 
 ```bash
-linear auth login
+brew install schpet/tap/linear
 ```
+
+Authenticate once with `linear auth login` (persists credentials).
 
 ## Usage
 
-Pass a query as an argument:
-
-```bash
-linear api 'query { viewer { id name } }'
-```
-
-Or pipe from stdin:
-
-```bash
-echo '{ viewer { id } }' | linear api
-```
-
-Output is JSON on stdout. Pipe through `jq` for formatting or field extraction.
+Pass a query as the argument. Output is JSON on stdout; pipe through `jq` to extract fields.
 
 ```bash
 linear api 'query { viewer { id name email } }' | jq '.data.viewer'
 ```
 
-## Variables
+## Non-null markers and the `!` escaping bug
 
-Simple key-value variables:
-
-```bash
-linear api 'query($id: String!) { issue(id: $id) { title } }' --variable id=ISSUE_ID
-```
-
-JSON variables for complex inputs:
+GraphQL non-null markers (`String!`) contain `!`, which the Bash tool escapes and corrupts inline. Pass any query containing `!` through a quoted heredoc on stdin so the marker survives verbatim:
 
 ```bash
-linear api 'mutation($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { identifier } } }' \
-  --variables-json '{"input": {"teamId": "TEAM_ID", "title": "Issue title"}}'
+linear api --variable id=ISSUE_ID <<'GRAPHQL'
+query($id: String!) {
+  issue(id: $id) { title url state { name } }
+}
+GRAPHQL
 ```
 
-## Pagination
-
-Use `--paginate` to fetch all pages:
-
-```bash
-linear api 'query { issues(first: 50) { nodes { id title } pageInfo { hasNextPage endCursor } } }' --paginate
-```
-
-## Example Queries
-
-**Get authenticated user:**
-
-```bash
-linear api 'query { viewer { id name email } }'
-```
-
-**Get team issues:**
-
-```bash
-linear api 'query($teamId: String!) { team(id: $teamId) { issues { nodes { id title url state { name } assignee { name } } } } }' \
-  --variable teamId=TEAM_ID
-```
-
-**Get user's assigned issues:**
-
-```bash
-linear api 'query { viewer { assignedIssues { nodes { id title url state { name } team { key } } } } }'
-```
-
-## Example Mutations
-
-**Create issue:**
-
-```bash
-linear api 'mutation($input: IssueCreateInput!) {
-  issueCreate(input: $input) {
-    success
-    issue { id identifier title }
-  }
-}' --variables-json '{
-  "input": {
-    "teamId": "TEAM_ID",
-    "title": "Issue title",
-    "description": "Issue description",
-    "stateId": "STATE_ID"
-  }
-}'
-```
-
-**Update issue:**
-
-```bash
-linear api 'mutation($id: String!, $input: IssueUpdateInput!) {
-  issueUpdate(id: $id, input: $input) {
-    success
-    issue { id title state { name } }
-  }
-}' --variable id=ISSUE_ID --variables-json '{"input": {"stateId": "STATE_ID"}}'
-```
-
-## Key Concepts
-
-- **Team IDs**: Required for most operations involving issues and projects
-- **State IDs**: Issues default to the team's first Backlog state unless specified
-- **Archived Resources**: Hidden by default; use `includeArchived: true` to retrieve
-- **Error Handling**: Check the `errors` array in responses before assuming success
-- **Rate Limiting**: Monitor HTTP status codes and handle limits
-
-## Schema Introspection
-
-Discover the API schema:
-
-```bash
-linear api '{ __schema { types { name description } } }' | jq '.data.__schema.types[:10]'
-```
+The quoted delimiter (`<<'GRAPHQL'`) also stops the shell from expanding `$id` before `linear api` sees it.
 
 ## Reference
 
 - [Linear GraphQL Documentation](https://linear.app/developers/graphql)
+- `linear-cli:linear-cli` skill for the full CLI and GraphQL reference

@@ -4,7 +4,15 @@ set -euo pipefail
 extract_dirs() {
   local depth=$1
   shift
-  printf '%s\n' "$@" | cut -d/ -f1-"$depth" | sort -u
+  local path dir
+  for path in "$@"; do
+    case "$path" in
+      /* | ../* | */../*) continue ;;
+    esac
+    dir=$(printf '%s\n' "$path" | cut -d/ -f1-"$depth")
+    [ -d "$dir" ] || continue
+    printf '%s\n' "$dir"
+  done | sort -u
 }
 
 case "${1:-}" in

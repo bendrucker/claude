@@ -314,7 +314,7 @@
     "ast-grep-marketplace": {
       "source": {
         "source": "github",
-        "repo": "ast-grep/claude-skill",
+        "repo": "ast-grep/agent-skill",
         "ref": "577f4d4507678f2c8cee150fae25e6ce309f70b1"
       }
     },

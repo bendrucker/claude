@@ -346,6 +346,7 @@
     "allowAppleEvents": true,
     "network": {
       "allowLocalBinding": true,
+      "allowMachLookup": ["com.apple.trustd.agent"],
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
         "~/.tmux",

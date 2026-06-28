@@ -76,21 +76,21 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
     };
   }
 
+  // Preserve the original default-state behavior: inject a default only when
+  // creating and state is absent. Never override an explicitly set state.
+  const needsDefaultState = isCreate && !state;
+
+  // Nothing to fix and no state to inject: pass the call through untouched.
+  if (!mutated && !needsDefaultState) {
+    return null;
+  }
+
   // updatedInput replaces the entire input object and only applies under an
   // "allow" decision, which also bypasses the permission prompt. Echo back every
   // normalized field alongside any injected default state.
   const updatedInput: Record<string, unknown> = { ...normalized };
-  let changed = mutated;
-
-  // Preserve the original default-state behavior: inject a default only when
-  // creating and state is absent. Never override an explicitly set state.
-  if (isCreate && !state) {
+  if (needsDefaultState) {
     updatedInput.state = getDefaultState(assignee);
-    changed = true;
-  }
-
-  if (!changed) {
-    return null;
   }
 
   return {

@@ -1,9 +1,4 @@
-export const PERMISSION_MODES = [
-  "default",
-  "acceptEdits",
-  "plan",
-  "bypassPermissions",
-] as const;
+export const PERMISSION_MODES = ["default", "acceptEdits", "plan", "bypassPermissions"] as const;
 
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 

@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { buildWtArgs, type PermissionMode, PERMISSION_MODES, parsePermissionMode } from "./args";
+import { buildWtArgs, PERMISSION_MODES, type PermissionMode, parsePermissionMode } from "./args";
 
 const modeRows: [PermissionMode][] = PERMISSION_MODES.map((mode) => [mode]);
 
 describe("buildWtArgs", () => {
   test("omitted permissionMode matches the historical hardcoded array", () => {
-    expect(buildWtArgs({ paneName: "review-o-r-1", sessionId: "sid", prompt: "/review:peer u" })).toEqual([
+    expect(
+      buildWtArgs({ paneName: "review-o-r-1", sessionId: "sid", prompt: "/review:peer u" }),
+    ).toEqual([
       "wt",
       "switch",
       "--create",

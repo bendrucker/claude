@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { buildWtArgs, type PermissionMode, PERMISSION_MODES } from "./args";
+import { buildWtArgs, PERMISSION_MODES, type PermissionMode } from "./args";
 import { layoutArgs } from "./layout";
 import { derivePaneName } from "./parse";
 import { addReview, createReview, readState, writeState } from "./store";

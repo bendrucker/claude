@@ -24,6 +24,6 @@
     "@jxa/sdef-to-dts": "^1.4.0",
     "@types/node": "^25.1.0",
     "esbuild": "^0.28.1",
-    "typescript": "^5.7.3"
+    "typescript": "^6.0.0"
   }
 }

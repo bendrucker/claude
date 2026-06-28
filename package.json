@@ -54,7 +54,7 @@
   "dependencies": {
     "cleye": "^2.2.1",
     "table": "^6.9.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.0",
     "url-pattern": "^1.0.3"
   },
   "overrides": {

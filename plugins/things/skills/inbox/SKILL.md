@@ -69,4 +69,4 @@ The script always prints to stdout on success. If you see no output, the call fa
 
 #### Sandbox-blocked URL handoff
 
-If stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the macOS sandbox blocked the URL handoff to Things. The plugin's PreToolUse hook should disable the sandbox for `bun ${CLAUDE_PLUGIN_ROOT}/scripts/...` invocations. If this still happens, the hook is not firing for the invocation form used. Investigate the invocation rather than disabling the sandbox manually.
+If stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the macOS sandbox blocked the URL handoff to Things. Launch Services handoff is covered by `sandbox.allowAppleEvents` in `user/settings.json`. If this still happens, verify that key is set rather than disabling the sandbox manually.

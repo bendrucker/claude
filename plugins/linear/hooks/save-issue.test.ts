@@ -53,9 +53,18 @@ describe("processInput", () => {
     ["create with empty assignee injects Backlog", { title: "x", team: "ENG", assignee: "" }],
     ["create preserves extra fields", { title: "x", team: "ENG", labels: ["bug"], priority: 2 }],
     ["create with no title is denied", { team: "ENG" }],
-    ["create with explicit state passes through unchanged", { title: "x", team: "ENG", state: "In Progress" }],
-    ["nested issue wrapper create is unwrapped and allowed", { issue: { title: "x", team: "ENG" } }],
-    ["issueId-only is aliased to id and treated as an allowed update", { issueId: "abc-123", title: "Renamed" }],
+    [
+      "create with explicit state passes through unchanged",
+      { title: "x", team: "ENG", state: "In Progress" },
+    ],
+    [
+      "nested issue wrapper create is unwrapped and allowed",
+      { issue: { title: "x", team: "ENG" } },
+    ],
+    [
+      "issueId-only is aliased to id and treated as an allowed update",
+      { issueId: "abc-123", title: "Renamed" },
+    ],
     ["update with id and no state is not modified", { id: "abc-123" }],
     ["update with explicit state is not modified", { id: "abc-123", state: "Done" }],
     ["update with issueId is normalized and allowed", { issueId: "abc-123", state: "Done" }],
@@ -64,12 +73,16 @@ describe("processInput", () => {
   });
 
   it("works with the local MCP create_issue tool name", () => {
-    expect(processInput(mockInput({ title: "x", team: "ENG" }, "mcp__linear__create_issue"))).toMatchSnapshot();
+    expect(
+      processInput(mockInput({ title: "x", team: "ENG" }, "mcp__linear__create_issue")),
+    ).toMatchSnapshot();
   });
 
   it("works with the plugin MCP create_issue tool name", () => {
     expect(
-      processInput(mockInput({ title: "x", team: "ENG" }, "mcp__plugin_linear_linear__create_issue")),
+      processInput(
+        mockInput({ title: "x", team: "ENG" }, "mcp__plugin_linear_linear__create_issue"),
+      ),
     ).toMatchSnapshot();
   });
 });

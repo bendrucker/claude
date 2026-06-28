@@ -149,7 +149,7 @@ exports[`processInput create with no title is denied 1`] = `
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "deny",
-    "permissionDecisionReason": "\`save_issue\` creates when \`id\` is absent and requires \`title\`. To update an existing issue, pass its \`id\` from \`get_issue\`.",
+    "permissionDecisionReason": "Creating an issue requires \`title\`. To update an existing issue instead, pass its \`id\`.",
   },
 }
 `;

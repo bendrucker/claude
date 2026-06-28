@@ -52,21 +52,25 @@ export function normalizeInput(toolInput: Record<string, unknown>): NormalizeRes
 }
 
 export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { input: normalized, mutated } = normalizeInput(input.tool_input as Record<string, unknown>);
+  const { input: normalized, mutated } = normalizeInput(
+    input.tool_input as Record<string, unknown>,
+  );
   const { id, title, state, assignee } = normalized;
 
-  // claude.ai save_issue creates when id is absent and updates when present.
+  // An absent id means create (the connector's save_issue and the local
+  // create_issue tool); present id means update.
   const isCreate = !id;
 
   // Unrecoverable: a create with no title cannot proceed. Deny with a message
-  // covering both modes so the model can recover by supplying title or id.
+  // that names neither tool, since this hook fires for both save_issue and
+  // create_issue, so the model can recover by supplying title or id.
   if (isCreate && !title) {
     return {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
         permissionDecisionReason:
-          "`save_issue` creates when `id` is absent and requires `title`. To update an existing issue, pass its `id` from `get_issue`.",
+          "Creating an issue requires `title`. To update an existing issue instead, pass its `id`.",
       },
     };
   }

@@ -37,8 +37,9 @@ export function normalizeInput(toolInput: Record<string, unknown>): NormalizeRes
   let input: Record<string, unknown> = toolInput;
 
   const keys = Object.keys(input);
-  if (keys.length === 1 && WRAPPER_KEYS.includes(keys[0]) && isFieldObject(input[keys[0]])) {
-    input = input[keys[0]] as Record<string, unknown>;
+  const wrapperKey = keys.length === 1 ? keys[0] : undefined;
+  if (wrapperKey && WRAPPER_KEYS.includes(wrapperKey) && isFieldObject(input[wrapperKey])) {
+    input = input[wrapperKey] as Record<string, unknown>;
     mutated = true;
   }
 

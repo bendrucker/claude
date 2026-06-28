@@ -91,22 +91,13 @@ describe("extractComments: typescript", () => {
   });
 });
 
-describe("extractComments: sql routes through the dedicated scanner", () => {
+describe("extractComments: sql", () => {
   test("extracts -- and /* */ comments", async () => {
     const source = ["-- line", "SELECT 1; /* block", " more */"].join("\n");
     expect(await summarize(source, "sql")).toEqual([
       { kind: "line", text: "-- line" },
       { kind: "block", text: "/* block\n more */" },
     ]);
-  });
-
-  test("a dollar-quoted body containing -- yields no comment", async () => {
-    const source = [
-      "CREATE FUNCTION f() RETURNS int AS $$",
-      "  SELECT 1; -- inside the body",
-      "$$ LANGUAGE sql;",
-    ].join("\n");
-    expect(await extractComments(source, "sql")).toEqual([]);
   });
 });
 

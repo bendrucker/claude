@@ -15,8 +15,7 @@ against a two-type model of when a comment earns its place.
   base, an explicit ref, and a GitLab merge request. Flag-only by default. `--fix`
   adds suggestions.
 - **`detection/`**: deterministic comment extraction over Shiki's TextMate
-  grammars, with broad language coverage loaded from `node_modules` on demand. SQL
-  uses a dedicated `sql.ts` scanner for dollar-quote and nested-block fidelity.
+  grammars, with broad language coverage loaded from `node_modules` on demand.
   Also unified-diff parsing and base resolution, diff-scoping, and advisory tells.
 - **`judge/`**: the Anthropic judge harness and its versioned `prompt.md`.
 - **`evals/`**: the labeled fixture corpus and the precision/recall eval with a

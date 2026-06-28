@@ -5,7 +5,6 @@ import {
   type Highlighter,
   type ThemedToken,
 } from "shiki";
-import { extractSqlComments } from "./sql";
 import type { Comment, CommentKind, Language } from "./types";
 
 /**
@@ -163,7 +162,6 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
 }
 
 export async function extractComments(source: string, language: Language): Promise<Comment[]> {
-  if (language === "sql") return extractSqlComments(source);
   const bundled = bundledLanguage(language);
   if (bundled == null) return [];
   const highlighter = await getHighlighter();

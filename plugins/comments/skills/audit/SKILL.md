@@ -17,9 +17,8 @@ allowed-tools:
 
 Find low-value comments that a change introduced, scoped to added and modified
 lines so pre-existing comments are never flagged. A deterministic Shiki pass
-extracts comments over TextMate grammars (SQL uses a dedicated string-aware
-scanner), the diff scopes them, and an LLM judge calibrated to the owner's
-comment model decides which are slop.
+extracts comments over TextMate grammars, the diff scopes them, and an LLM judge
+calibrated to the owner's comment model decides which are slop.
 
 The judge only flags a comment when it fails the bar: a comment earns its place
 when it adds information not readily available in the adjacent code. See

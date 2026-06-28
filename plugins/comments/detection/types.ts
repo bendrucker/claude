@@ -6,10 +6,9 @@
  */
 
 /**
- * A Shiki language id, mapped from a file extension by `languageForPath`. Most
- * languages route through Shiki's TextMate grammars (loaded from `node_modules`
- * on demand). SQL is the exception: it uses a string-aware scanner (`sql.ts`)
- * that understands dollar-quoted bodies, which no Shiki grammar handles.
+ * A Shiki language id, mapped from a file extension by `languageForPath`. Every
+ * language routes through Shiki's TextMate grammars, loaded from `node_modules`
+ * on demand.
  */
 export type Language = string;
 

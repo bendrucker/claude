@@ -243,7 +243,7 @@
     },
   },
   "overrides": {
-    "@apidevtools/json-schema-ref-parser": "^11.2.0",
+    "@apidevtools/json-schema-ref-parser": "^15.0.0",
   },
   "packages": {
     "@acemir/cssom": ["@acemir/cssom@0.9.31", "", {}, "sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA=="],

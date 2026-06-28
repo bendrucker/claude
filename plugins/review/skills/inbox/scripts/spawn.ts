@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { buildWtArgs, type PermissionMode, PERMISSION_MODES } from "./args";
 import { layoutArgs } from "./layout";
 import { derivePaneName } from "./parse";
 import { addReview, createReview, readState, writeState } from "./store";
@@ -27,17 +28,32 @@ const argv = cli({
       description:
         "Target tmux session for review panes (defaults to splitting the current pane as a sidebar)",
     },
+    permissionMode: {
+      type: String,
+      description: `Claude permission mode for the spawned session (one of ${PERMISSION_MODES.join(", ")}); omit to keep Claude's default`,
+    },
   },
 });
 
 const url = argv._.url;
 const repoPath = argv.flags.repoPath;
 const dataDir = argv.flags.dataDir;
+const permissionModeFlag = argv.flags.permissionMode;
 
 if (!repoPath) {
   console.error("--repo-path (-C) is required: local path to the repository");
   process.exit(1);
 }
+
+if (
+  permissionModeFlag !== undefined &&
+  !(PERMISSION_MODES as readonly string[]).includes(permissionModeFlag)
+) {
+  console.error(`--permission-mode must be one of: ${PERMISSION_MODES.join(", ")}`);
+  process.exit(1);
+}
+
+const permissionMode = permissionModeFlag as PermissionMode | undefined;
 
 const sessionId = crypto.randomUUID();
 const paneName = derivePaneName(url);
@@ -58,20 +74,7 @@ const prompt = argv.flags.context
 // `sync` removes it later by the same stored name), and `-x claude` execs the
 // review session in the new worktree. Args after `--` are shell-escaped by wt,
 // so the prompt passes through intact.
-const wtArgs = [
-  "wt",
-  "switch",
-  "--create",
-  paneName,
-  "-x",
-  "claude",
-  "--",
-  "--session-id",
-  sessionId,
-  "--name",
-  paneName,
-  prompt,
-];
+const wtArgs = buildWtArgs({ paneName, sessionId, prompt, permissionMode });
 
 const wtCmd = wtArgs.map((arg) => Bun.$.escape(arg)).join(" ");
 

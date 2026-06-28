@@ -1,7 +1,8 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["config:recommended", "schedule:weekly", ":preserveSemverRanges"],
-  enabledManagers: ["custom.regex"],
+  minimumReleaseAge: "7 days",
+  internalChecksFilter: "strict",
   customManagers: [
     {
       customType: "regex",
@@ -27,11 +28,16 @@
   ],
   packageRules: [
     {
+      matchUpdateTypes: ["minor", "patch"],
+      automerge: true,
+    },
+    {
       matchManagers: ["custom.regex"],
       matchFileNames: ["user/settings.json"],
       commitMessagePrefix: "chore(plugins):",
       additionalBranchPrefix: "plugin-",
       semanticCommits: "disabled",
+      automerge: false,
     },
   ],
 }

@@ -282,7 +282,6 @@
     "ast-grep@ast-grep-marketplace": true,
     "worktrunk@worktrunk": true,
     "plan@bendrucker": true,
-    "playground@claude-plugins-official": true,
     "linear-cli@linear-cli": true,
     "tmux@bendrucker": true,
     "bun@bendrucker": true,

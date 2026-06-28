@@ -41,7 +41,7 @@ allowed-tools:
 
 The body conveys what the diff cannot: why this change, what you decided along the way, and how you know it works. The reviewer reads the diff for what changed, so don't restate it. Spend the body on intent and the decisions a reviewer can't reconstruct from the code.
 
-Mine the conversation that produced this change. The substance lives there: decisions and the alternatives you rejected, deviations from the issue or plan, theories you tried and overturned, what you observed testing locally, limitations you ruled out, naming or scope you settled by hand. Put it in the body, where the reviewer will read it. Keep it out of code comments.
+Mine the conversation that produced this change. The substance lives there: decisions and the alternatives you rejected, the scope you added or dropped, theories you tried and overturned, what you observed testing locally, limitations you ruled out, naming or scope you settled by hand. Put it in the body as a self-contained decision, not as a delta against a plan the reviewer never saw. Keep it out of code comments.
 
 - Open with what changed (a bare verb: "Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when the change needs justifying. Don't restate the title.
 - Length tracks substance, not diff size. A subtle one-line fix may need paragraphs. A large mechanical change may need two sentences.
@@ -59,7 +59,7 @@ When a PR template is provided in context above, follow its structure instead of
 - Leave checklists (checkbox items) untouched for the user to complete manually
 - Remove HTML comments (`<!-- ... -->`) that serve as placeholder instructions
 - Map skill-generated content into corresponding template sections:
-  - Description/summary sections: the opening plus the conversation substance (decisions, deviations, what you observed testing)
+  - Description/summary sections: the opening plus the conversation substance (decisions, scope added or dropped, what you observed testing)
   - Changes/what sections: follow the `## Changes` guidance in `sections.md`
   - Testing/verification sections: follow the `## Testing` guidance in `sections.md`
   - Issue/references sections: the motivating issue ref and `## References` content

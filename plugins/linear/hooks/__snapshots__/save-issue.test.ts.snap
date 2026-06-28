@@ -1,0 +1,229 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`normalizeInput flat input is not mutated 1`] = `
+{
+  "input": {
+    "team": "ENG",
+    "title": "x",
+  },
+  "mutated": false,
+}
+`;
+
+exports[`normalizeInput single issue wrapper is unwrapped 1`] = `
+{
+  "input": {
+    "team": "ENG",
+    "title": "x",
+  },
+  "mutated": true,
+}
+`;
+
+exports[`normalizeInput input wrapper is unwrapped 1`] = `
+{
+  "input": {
+    "team": "ENG",
+    "title": "x",
+  },
+  "mutated": true,
+}
+`;
+
+exports[`normalizeInput parameters wrapper is unwrapped 1`] = `
+{
+  "input": {
+    "team": "ENG",
+    "title": "x",
+  },
+  "mutated": true,
+}
+`;
+
+exports[`normalizeInput issueId is aliased to id 1`] = `
+{
+  "input": {
+    "id": "abc-123",
+    "title": "x",
+  },
+  "mutated": true,
+}
+`;
+
+exports[`normalizeInput issueId is dropped when id is already present 1`] = `
+{
+  "input": {
+    "id": "real-id",
+  },
+  "mutated": true,
+}
+`;
+
+exports[`normalizeInput unknown fields are preserved untouched 1`] = `
+{
+  "input": {
+    "labels": [
+      "bug",
+    ],
+    "priority": 2,
+    "title": "x",
+  },
+  "mutated": false,
+}
+`;
+
+exports[`normalizeInput a multi-key object is not treated as a wrapper 1`] = `
+{
+  "input": {
+    "issue": "ENG-1",
+    "title": "x",
+  },
+  "mutated": false,
+}
+`;
+
+exports[`processInput create assigned to me injects Todo 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "assignee": "me",
+      "state": "Todo",
+      "team": "ENG",
+      "title": "Fix bug",
+    },
+  },
+}
+`;
+
+exports[`processInput create unassigned injects Backlog 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "state": "Backlog",
+      "team": "ENG",
+      "title": "Research perf",
+    },
+  },
+}
+`;
+
+exports[`processInput create with empty assignee injects Backlog 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "assignee": "",
+      "state": "Backlog",
+      "team": "ENG",
+      "title": "x",
+    },
+  },
+}
+`;
+
+exports[`processInput create preserves extra fields 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "labels": [
+        "bug",
+      ],
+      "priority": 2,
+      "state": "Backlog",
+      "team": "ENG",
+      "title": "x",
+    },
+  },
+}
+`;
+
+exports[`processInput create with no title is denied 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "Creating an issue requires \`title\`. To update an existing issue instead, pass its \`id\`.",
+  },
+}
+`;
+
+exports[`processInput create with explicit state passes through unchanged 1`] = `null`;
+
+exports[`processInput nested issue wrapper create is unwrapped and allowed 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "state": "Backlog",
+      "team": "ENG",
+      "title": "x",
+    },
+  },
+}
+`;
+
+exports[`processInput issueId-only is aliased to id and treated as an allowed update 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "id": "abc-123",
+      "title": "Renamed",
+    },
+  },
+}
+`;
+
+exports[`processInput update with id and no state is not modified 1`] = `null`;
+
+exports[`processInput update with explicit state is not modified 1`] = `null`;
+
+exports[`processInput update with issueId is normalized and allowed 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "id": "abc-123",
+      "state": "Done",
+    },
+  },
+}
+`;
+
+exports[`processInput works with the local MCP create_issue tool name 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "state": "Backlog",
+      "team": "ENG",
+      "title": "x",
+    },
+  },
+}
+`;
+
+exports[`processInput works with the plugin MCP create_issue tool name 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "state": "Backlog",
+      "team": "ENG",
+      "title": "x",
+    },
+  },
+}
+`;

@@ -1,11 +1,12 @@
 import type { Comment } from "./types";
 
 /**
- * SQL comment extraction without a grammar. SQL has no tree-sitter wasm at an ABI
- * the pinned runtime can load, but its comment syntax is small enough to scan
- * directly. The scanner skips string and quoted-identifier literals so a `--` or
- * `/*` inside one is never mistaken for a comment, which is the only thing a naive
- * regex gets wrong.
+ * SQL comment extraction with a dedicated scanner. Shiki's `sql` grammar does not
+ * recognize dollar-quoted bodies (`$$…$$`, `$tag$…$tag$`), so a `--` or `/*`
+ * inside a Postgres or DuckDB function body would read as a comment. SQL's comment
+ * syntax is small enough to scan directly instead. The scanner skips string,
+ * quoted-identifier, and dollar-quoted literals so a `--` or `/*` inside one is
+ * never mistaken for a comment, which is the only thing a naive regex gets wrong.
  *
  * Block comments nest, matching DuckDB and PostgreSQL: a `/*` inside a block
  * comment opens a level that must be closed before the comment ends.

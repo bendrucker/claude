@@ -6,18 +6,12 @@
  */
 
 /**
- * Most languages have a vendored tree-sitter grammar in `grammars/`. SQL has no
- * compatible grammar wasm, so it uses a string-aware scanner (`sql.ts`) instead.
+ * A Shiki language id, mapped from a file extension by `languageForPath`. Most
+ * languages route through Shiki's TextMate grammars (loaded from `node_modules`
+ * on demand). SQL is the exception: it uses a string-aware scanner (`sql.ts`)
+ * that understands dollar-quoted bodies, which no Shiki grammar handles.
  */
-export type Language =
-  | "python"
-  | "typescript"
-  | "tsx"
-  | "javascript"
-  | "go"
-  | "rust"
-  | "bash"
-  | "sql";
+export type Language = string;
 
 /**
  * `line` is a single-line comment (`#`, `//`). `block` is a delimited comment

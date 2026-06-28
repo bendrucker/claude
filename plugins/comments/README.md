@@ -9,12 +9,15 @@ against a two-type model of when a comment earns its place.
 
 ## Contents
 
-- **`comments:audit`** skill: extract comments with tree-sitter, scope them to a
-  diff's added lines, and judge the introduced comments with an LLM calibrated to
-  the owner's comment model. Supports the working tree, a branch base, an explicit
-  ref, and a GitLab merge request. Flag-only by default; `--fix` adds suggestions.
-- **`detection/`**: deterministic tree-sitter comment extraction, unified-diff
-  parsing and base resolution, diff-scoping, and high-precision advisory tells.
+- **`comments:audit`** skill: extract comments with Shiki (TextMate grammars),
+  scope them to a diff's added lines, and judge the introduced comments with an
+  LLM calibrated to the owner's comment model. Supports the working tree, a branch
+  base, an explicit ref, and a GitLab merge request. Flag-only by default. `--fix`
+  adds suggestions.
+- **`detection/`**: deterministic comment extraction over Shiki's TextMate
+  grammars, with broad language coverage loaded from `node_modules` on demand. SQL
+  uses a dedicated `sql.ts` scanner for dollar-quote and nested-block fidelity.
+  Also unified-diff parsing and base resolution, diff-scoping, and advisory tells.
 - **`judge/`**: the Anthropic judge harness and its versioned `prompt.md`.
 - **`evals/`**: the labeled fixture corpus and the precision/recall eval with a
   must-pass-negative ship gate.

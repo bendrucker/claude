@@ -1,91 +1,174 @@
-import { join } from "node:path";
-import Parser from "web-tree-sitter";
+import {
+  type BundledLanguage,
+  bundledLanguages,
+  createHighlighter,
+  type Highlighter,
+  type ThemedToken,
+} from "shiki";
 import { extractSqlComments } from "./sql";
 import type { Comment, CommentKind, Language } from "./types";
 
-type TSNode = Parser.SyntaxNode;
+/**
+ * A bare theme with no token styling. The grammar alone produces the scopes we
+ * read, so this keeps Shiki's 1.8MB bundled theme set out of the dependency. The
+ * name avoids `none`, which Shiki treats as a plain theme with no grammar state.
+ */
+const theme = { name: "bare", settings: [] };
 
-let initPromise: Promise<void> | null = null;
+let highlighterPromise: Promise<Highlighter> | null = null;
 
-function init(): Promise<void> {
-  if (initPromise == null) initPromise = Parser.init();
-  return initPromise;
-}
-
-const languages = new Map<Language, Parser.Language>();
-
-async function loadLanguage(language: Language): Promise<Parser.Language> {
-  const cached = languages.get(language);
-  if (cached != null) return cached;
-  const wasmPath = join(import.meta.dirname, "..", "grammars", `tree-sitter-${language}.wasm`);
-  const lang = await Parser.Language.load(wasmPath);
-  languages.set(language, lang);
-  return lang;
-}
-
-function classifyComment(text: string): CommentKind {
-  if (text.startsWith("/**")) return "docstring";
-  if (text.startsWith("/*")) return "block";
-  return "line";
-}
-
-function toComment(node: TSNode, kind: CommentKind): Comment {
-  return {
-    kind,
-    text: node.text,
-    startLine: node.startPosition.row + 1,
-    endLine: node.endPosition.row + 1,
-    startColumn: node.startPosition.column,
-    endColumn: node.endPosition.column,
-  };
-}
-
-function samePosition(a: TSNode, b: TSNode): boolean {
-  return (
-    a.startPosition.row === b.startPosition.row && a.startPosition.column === b.startPosition.column
-  );
-}
-
-function isPythonDocstring(node: TSNode): boolean {
-  const statement = node.parent;
-  if (statement == null || statement.type !== "expression_statement") return false;
-  const body = statement.parent;
-  if (body == null || (body.type !== "block" && body.type !== "module")) return false;
-  for (let i = 0; i < body.childCount; i++) {
-    const child = body.child(i);
-    if (child == null) continue;
-    if (child.type === "comment") continue;
-    return samePosition(child, statement);
+function getHighlighter(): Promise<Highlighter> {
+  if (highlighterPromise == null) {
+    highlighterPromise = createHighlighter({ themes: [theme], langs: [] });
   }
-  return false;
+  return highlighterPromise;
 }
 
-const commentTypes = new Set(["comment", "line_comment", "block_comment"]);
+function bundledLanguage(language: Language): BundledLanguage | null {
+  return language in bundledLanguages ? (language as BundledLanguage) : null;
+}
 
-function collect(node: TSNode, language: Language, comments: Comment[]): void {
-  if (commentTypes.has(node.type)) {
-    comments.push(toComment(node, classifyComment(node.text)));
-  } else if (language === "python" && node.type === "string" && isPythonDocstring(node)) {
-    comments.push(toComment(node, "docstring"));
+async function loadLanguage(highlighter: Highlighter, language: BundledLanguage): Promise<void> {
+  if (highlighter.getLoadedLanguages().includes(language)) return;
+  await highlighter.loadLanguage(bundledLanguages[language]);
+}
+
+function scopesOf(token: ThemedToken): string[] {
+  return token.explanation?.flatMap((e) => e.scopes.map((s) => s.scopeName)) ?? [];
+}
+
+function kindForScopes(scopes: string[]): CommentKind | null {
+  const has = (sub: string) => scopes.some((s) => s.includes(sub));
+  if (
+    has("comment.block.documentation") ||
+    has("comment.line.documentation") ||
+    has("string.quoted.docstring")
+  ) {
+    return "docstring";
   }
-  for (let i = 0; i < node.childCount; i++) {
-    const child = node.child(i);
-    if (child != null) collect(child, language, comments);
+  if (has("comment.block")) return "block";
+  if (has("comment.line")) return "line";
+  return null;
+}
+
+function isCommentScope(scope: string): boolean {
+  return scope.includes("comment.") || scope.includes("string.quoted.docstring");
+}
+
+function mergeKind(a: CommentKind, b: CommentKind): CommentKind {
+  const rank = { line: 0, block: 1, docstring: 2 };
+  return rank[a] >= rank[b] ? a : b;
+}
+
+/**
+ * A Python docstring scope is a real docstring only if the nearest preceding
+ * significant line (non-blank, non-`#`) ends with `:` (a block opener) or there
+ * is none (module start). This approximates "first statement of block/module"
+ * without a parser, limiting the strings Shiki scopes as docstrings to those in
+ * true docstring position.
+ */
+function isDocstringPosition(lines: string[], startLine: number): boolean {
+  for (let i = startLine - 2; i >= 0; i--) {
+    const trimmed = (lines[i] ?? "").trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    return trimmed.endsWith(":");
   }
+  return true;
+}
+
+function extract(highlighter: Highlighter, source: string, language: BundledLanguage): Comment[] {
+  const lines = source.split("\n");
+  const { tokens } = highlighter.codeToTokens(source, {
+    lang: language,
+    theme,
+    includeExplanation: "scopeName",
+  });
+
+  // Whether a comment-ish scope is still open at each line's end, chaining the
+  // grammar state line to line, so a multi-line block can be coalesced.
+  const openAfter: boolean[] = [];
+  let state: ReturnType<Highlighter["getLastGrammarState"]> | undefined;
+  for (const line of lines) {
+    const next = highlighter.getLastGrammarState(line, {
+      lang: language,
+      theme,
+      ...(state != null && { grammarState: state }),
+    });
+    const scopes = next?.getScopes() ?? [];
+    openAfter.push(scopes.some(isCommentScope));
+    state = next;
+  }
+
+  const lineStart: number[] = [];
+  let offset = 0;
+  for (const line of lines) {
+    lineStart.push(offset);
+    offset += line.length + 1;
+  }
+
+  const comments: Comment[] = [];
+  let current: Comment | null = null;
+  tokens.forEach((lineTokens, index) => {
+    const lineNo = index + 1;
+    for (const token of lineTokens) {
+      if (token.content.length === 0) continue;
+      const kind = kindForScopes(scopesOf(token));
+      if (kind == null) continue;
+      const startColumn = token.offset - (lineStart[index] ?? 0);
+      const endColumn = startColumn + token.content.length;
+      // Merge the token into the current comment when it abuts it on the same
+      // line, or when it sits on a later line that the comment scope stayed open
+      // through (a multi-line block, even across blank interior lines). A gap on
+      // the same line, or a closed scope, starts a new comment, so adjacent `//`
+      // lines and `/* a */ code /* b */` stay separate.
+      if (
+        current != null &&
+        ((lineNo === current.endLine && startColumn === current.endColumn) ||
+          (lineNo > current.endLine && openAfter[index - 1]))
+      ) {
+        current.endLine = lineNo;
+        current.endColumn = endColumn;
+        current.kind = mergeKind(current.kind, kind);
+      } else {
+        if (current != null) comments.push(current);
+        // C-family grammars fold the whitespace before a trailing comment into
+        // the opening token; start at the first non-whitespace so the text and
+        // startColumn line up with the delimiter.
+        const lead = token.content.length - token.content.trimStart().length;
+        current = {
+          kind,
+          text: "",
+          startLine: lineNo,
+          endLine: lineNo,
+          startColumn: startColumn + lead,
+          endColumn,
+        };
+      }
+    }
+  });
+  if (current != null) comments.push(current);
+
+  for (const comment of comments) {
+    const start = (lineStart[comment.startLine - 1] ?? 0) + comment.startColumn;
+    const end = (lineStart[comment.endLine - 1] ?? 0) + comment.endColumn;
+    comment.text = source.slice(start, end);
+  }
+
+  if (language === "python") {
+    return comments.filter(
+      (comment) => comment.kind !== "docstring" || isDocstringPosition(lines, comment.startLine),
+    );
+  }
+  return comments;
 }
 
 export async function extractComments(source: string, language: Language): Promise<Comment[]> {
   if (language === "sql") return extractSqlComments(source);
-  await init();
-  const lang = await loadLanguage(language);
-  const parser = new Parser();
-  parser.setLanguage(lang);
-  const tree = parser.parse(source);
-  if (tree == null) throw new Error(`failed to parse ${language} source`);
-  const comments: Comment[] = [];
-  collect(tree.rootNode, language, comments);
-  comments.sort((a, b) => a.startLine - b.startLine || a.startColumn - b.startColumn);
-  return comments;
+  const bundled = bundledLanguage(language);
+  if (bundled == null) return [];
+  const highlighter = await getHighlighter();
+  await loadLanguage(highlighter, bundled);
+  return extract(highlighter, source, bundled);
 }
 
 const extensions: Record<string, Language> = {
@@ -98,9 +181,19 @@ const extensions: Record<string, Language> = {
   cjs: "javascript",
   go: "go",
   rs: "rust",
-  sh: "bash",
-  bash: "bash",
+  sh: "shellscript",
+  bash: "shellscript",
   sql: "sql",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  cc: "cpp",
+  cxx: "cpp",
+  hpp: "cpp",
+  hh: "cpp",
+  rb: "ruby",
+  java: "java",
+  kt: "kotlin",
 };
 
 export function languageForPath(path: string): Language | null {

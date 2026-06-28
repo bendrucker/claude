@@ -282,7 +282,6 @@
     "ast-grep@ast-grep-marketplace": true,
     "worktrunk@worktrunk": true,
     "plan@bendrucker": true,
-    "playground@claude-plugins-official": true,
     "linear-cli@linear-cli": true,
     "tmux@bendrucker": true,
     "bun@bendrucker": true,
@@ -314,7 +313,7 @@
     "ast-grep-marketplace": {
       "source": {
         "source": "github",
-        "repo": "ast-grep/claude-skill",
+        "repo": "ast-grep/agent-skill",
         "ref": "577f4d4507678f2c8cee150fae25e6ce309f70b1"
       }
     },
@@ -393,7 +392,6 @@
       "shortcuts:*",
       "dscl:*",
       "git:*",
-      "gh:*",
       "linear:*",
       "code:*"
     ]

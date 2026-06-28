@@ -197,9 +197,6 @@ jobs:
           plugin="plugins/${{ matrix.plugin.name }}"
           deps=$(find "$plugin" -name package.json -not -path '*/node_modules/*' -not -path '*/.bun-cache/*' \
             -print0 | xargs -0 jq -r '[.dependencies // {}, .devDependencies // {}] | map(keys) | flatten[]' 2>/dev/null | sort -u)
-          if echo "$deps" | grep -q '^sharp$'; then
-            sudo apt-get update && sudo apt-get install -y libvips-dev
-          fi
           if echo "$deps" | grep -q '^playwright$'; then
             bun "$plugin/node_modules/.bin/playwright" install chromium --with-deps
           fi

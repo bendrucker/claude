@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: shells out to gh (Go binary) for TLS-bearing API calls
 
 import { type ExecSyncOptions, execSync } from "node:child_process";
 import { cli } from "cleye";

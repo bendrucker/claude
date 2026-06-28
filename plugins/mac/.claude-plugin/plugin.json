@@ -1,6 +1,6 @@
 {
   "name": "mac",
-  "description": "macOS-specific automation, sandbox workarounds, and system integration",
+  "description": "macOS-specific automation and system integration",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

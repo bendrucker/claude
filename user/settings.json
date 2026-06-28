@@ -393,7 +393,6 @@
       "shortcuts:*",
       "dscl:*",
       "git:*",
-      "gh:*",
       "linear:*",
       "code:*"
     ]

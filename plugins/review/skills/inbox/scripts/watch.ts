@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: queue sources and state.ts sync shell out to gh/wt/tmux for TLS-bearing API calls
 
 import { join } from "node:path";
 import { cli } from "cleye";

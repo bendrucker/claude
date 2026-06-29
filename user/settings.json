@@ -300,7 +300,7 @@
       "source": {
         "source": "github",
         "repo": "anthropics/claude-plugins-official",
-        "ref": "27d2b86d72da27c64585150857cee8472ad47abb"
+        "ref": "3dc50d51835dc85f7a3f77d593dd9a565a87276b"
       }
     },
     "astral-sh": {

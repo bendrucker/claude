@@ -22,7 +22,9 @@
         '"repo":\\s*"(?<depName>[^"]+/[^"]+)"[^}]*"ref":\\s*"(?<currentDigest>[0-9a-f]{40})"',
       ],
       currentValueTemplate: "main",
-      datasourceTemplate: "github-digest",
+      packageNameTemplate: "https://github.com/{{{depName}}}",
+      datasourceTemplate: "git-refs",
+      versioningTemplate: "git",
     },
   ],
   packageRules: [

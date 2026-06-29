@@ -10,7 +10,7 @@ import type {
   StopHookInput,
   SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { readStdinJson, writeStdoutJson } from "../../../packages/toolkit/index";
 
 const execAsync = promisify(exec);
 

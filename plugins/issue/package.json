@@ -2,7 +2,7 @@
   "name": "issue",
   "private": true,
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+    "@bendrucker/claude-plugin-toolkit": "^0.1.0",
     "cleye": "^2.0.0"
   }
 }

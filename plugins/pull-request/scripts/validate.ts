@@ -1,17 +1,15 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import {
+  type PreToolUseHookInput,
+  preToolUse,
+  readStdinJson,
+  writeStdoutJson,
+} from "@bendrucker/claude-plugin-toolkit";
 import { processInput } from "./validate-body";
 
 function denyWithError(reason: string): void {
-  writeStdoutJson({
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: reason,
-    },
-  } satisfies SyncHookJSONOutput);
+  writeStdoutJson(preToolUse.deny(reason));
 }
 
 async function main(): Promise<void> {

@@ -1,4 +1,4 @@
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@bendrucker/claude-plugin-toolkit";
 
 function hasBashCommand(input: unknown): input is { command: string } {
   return (

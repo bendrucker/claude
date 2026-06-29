@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import { isGeneratedFile, processInput } from "./check";
 
 function mockInput(filePath: string): PreToolUseHookInput {

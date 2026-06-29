@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "@bendrucker/claude-plugin-toolkit";
 import { $ } from "bun";
 import { formatDenyOutput, processInput } from "./block-default-branch-commit";
 

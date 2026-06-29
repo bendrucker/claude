@@ -2,7 +2,7 @@
 
 import { join, relative } from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { readStdinJson, writeStdoutJson } from "../../../packages/toolkit/index";
 import { parseLcov, uncoveredLines } from "../../../scripts/coverage/lcov";
 
 const repoRoot = join(import.meta.dirname, "..", "..", "..");

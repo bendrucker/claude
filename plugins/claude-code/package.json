@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@constellos/claude-code-kit": "^0.4.0"
+    "@bendrucker/claude-plugin-toolkit": "^0.1.0"
   }
 }

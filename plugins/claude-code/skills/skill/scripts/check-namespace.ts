@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 
 import { basename } from "node:path";
-import type { PostToolUseInput } from "@constellos/claude-code-kit";
-import { readStdinJson } from "@constellos/claude-code-kit/runners";
+import { type PostToolUseHookInput, runHook } from "@bendrucker/claude-plugin-toolkit";
 
 export function extractPluginName(filePath: string): string | null {
   const match = filePath.match(/plugins\/([^/]+)\//);
@@ -67,11 +66,11 @@ export function checkSkillNamespace(name: string, pluginName: string): string[] 
   return warnings;
 }
 
-export async function processHookInput(input: PostToolUseInput): Promise<string[]> {
+export async function processHookInput(input: PostToolUseHookInput): Promise<string[]> {
   const warnings: string[] = [];
 
   if (input.tool_name !== "Write" && input.tool_name !== "Edit") return warnings;
-  const filePath = input.tool_input.file_path;
+  const filePath = (input.tool_input as { file_path?: string }).file_path;
   if (!filePath) return warnings;
 
   const pluginName = extractPluginName(filePath);
@@ -97,20 +96,11 @@ export async function processHookInput(input: PostToolUseInput): Promise<string[
   return warnings;
 }
 
-async function main(): Promise<void> {
-  let input: PostToolUseInput;
-  try {
-    input = await readStdinJson<PostToolUseInput>();
-  } catch {
-    return;
-  }
-
-  const warnings = await processHookInput(input);
-  for (const warning of warnings) {
-    console.error(warning);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook<PostToolUseHookInput, never>(async (input) => {
+    for (const warning of await processHookInput(input)) {
+      console.error(warning);
+    }
+    return null;
+  });
 }

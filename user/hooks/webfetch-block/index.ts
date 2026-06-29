@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { readStdinJson, writeStdoutJson } from "@bendrucker/claude-plugin-toolkit";
 
 export type WebFetchInput = { url: string; prompt: string };
 

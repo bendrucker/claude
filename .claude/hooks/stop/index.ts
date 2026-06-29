@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { isAbsolute, relative, sep } from "node:path";
 import { promisify } from "node:util";
 import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { readStdinJson, writeStdoutJson } from "../../../packages/toolkit/index";
 
 const execFileAsync = promisify(execFile);
 const PREK_TIMEOUT = 120_000;

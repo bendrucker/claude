@@ -4,7 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import {
   extractBacktickedHexCandidates,
   extractBodyFilePath,

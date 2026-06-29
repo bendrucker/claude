@@ -86,10 +86,16 @@ input=$(cat)
 file_path=$(echo "$input" | jq -r '.tool_input.file_path')
 ```
 
-Or use `@constellos/claude-code-kit/runners`:
+Or use `@bendrucker/claude-plugin-toolkit`, whose `runHook` reads and parses stdin, runs the handler, and writes any non-null return to stdout:
 ```typescript
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-const input = await readStdinJson<PreToolUseHookInput>();
+import { type PreToolUseHookInput, runHook, type SyncHookJSONOutput } from "@bendrucker/claude-plugin-toolkit";
+
+if (import.meta.main) {
+  runHook<PreToolUseHookInput, SyncHookJSONOutput>((input) => {
+    // return a hook output object, or null to do nothing
+    return null;
+  });
+}
 ```
 
 ## Hook Output

@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-
-export type FileInput = {
-  file_path?: string;
-};
+import {
+  type FileInput,
+  type PreToolUseHookInput,
+  preToolUse,
+  runHook,
+  type SyncHookJSONOutput,
+} from "@bendrucker/claude-plugin-toolkit";
 
 const GENERATED_MARKER = /^\/\/\s*Code\s+generated.*DO\s+NOT\s+EDIT\.$/;
 
@@ -51,35 +52,12 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   const content = await file.text();
 
   if (isGeneratedFile(content)) {
-    return {
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason: `Cannot modify generated Go file: ${filePath}`,
-      },
-    };
+    return preToolUse.deny(`Cannot modify generated Go file: ${filePath}`);
   }
 
   return null;
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[go/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = await processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook<PreToolUseHookInput, SyncHookJSONOutput>(processInput);
 }

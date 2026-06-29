@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PostToolUseInput } from "@constellos/claude-code-kit";
+import type { PostToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import {
   checkSkillNamespace,
   checkStuttering,
@@ -14,7 +14,7 @@ import {
 } from "./check-namespace";
 import { makePostToolUseInput } from "./test-support";
 
-function mockWriteInput(filePath: string): PostToolUseInput {
+function mockWriteInput(filePath: string): PostToolUseHookInput {
   return makePostToolUseInput({ tool_input: { file_path: filePath, content: "" } });
 }
 

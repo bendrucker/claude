@@ -60,7 +60,7 @@
     "plugins/claude-code": {
       "name": "claude-code",
       "dependencies": {
-        "@constellos/claude-code-kit": "^0.4.0",
+        "@bendrucker/claude-plugin-toolkit": "^0.1.0",
       },
     },
     "plugins/claude-code/skills/session": {
@@ -97,8 +97,7 @@
     "plugins/git": {
       "name": "git",
       "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
+        "@bendrucker/claude-plugin-toolkit": "^0.1.0",
       },
     },
     "plugins/github": {
@@ -123,14 +122,13 @@
     "plugins/go": {
       "name": "go",
       "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
+        "@bendrucker/claude-plugin-toolkit": "^0.1.0",
       },
     },
     "plugins/issue": {
       "name": "issue",
       "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+        "@bendrucker/claude-plugin-toolkit": "^0.1.0",
         "cleye": "^2.0.0",
       },
     },
@@ -144,7 +142,6 @@
       "name": "mac",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "acorn": "^8.15.0",
         "cleye": "^2.0.0",
       },
@@ -186,8 +183,7 @@
     "plugins/pull-request": {
       "name": "pull-request",
       "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
+        "@bendrucker/claude-plugin-toolkit": "^0.1.0",
       },
     },
     "plugins/review": {
@@ -200,8 +196,7 @@
     "plugins/shortcuts": {
       "name": "shortcuts",
       "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
+        "@bendrucker/claude-plugin-toolkit": "^0.1.0",
       },
     },
     "plugins/things": {
@@ -209,7 +204,6 @@
       "version": "1.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "cleye": "^2.0.0",
         "table": "^6.9.0",
       },
@@ -240,8 +234,7 @@
       "name": "ui-design",
       "version": "0.1.0",
       "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
+        "@bendrucker/claude-plugin-toolkit": "^0.1.0",
         "@xmldom/xmldom": "^0.9.8",
         "cleye": "^2.2.1",
         "playwright": "^1.50.1",
@@ -271,7 +264,6 @@
       "name": "x-callback-url",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
   },

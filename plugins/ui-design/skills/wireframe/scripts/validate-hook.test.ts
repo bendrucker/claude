@@ -3,7 +3,7 @@ import path from "node:path";
 import type {
   PostToolUseHookInput,
   PostToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "@bendrucker/claude-plugin-toolkit";
 
 import { isSvgFile, processInput } from "./validate-hook";
 

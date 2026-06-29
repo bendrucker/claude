@@ -2,7 +2,7 @@
 
 import { join } from "node:path";
 import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { readStdinJson, writeStdoutJson } from "../../../packages/toolkit/index";
 
 // Mirrors VIOLATION_EXIT in scripts/check-plugin-deps.ts. Deliberately a
 // literal rather than an import: importing the checker would pull its module

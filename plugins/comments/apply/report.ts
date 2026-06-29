@@ -1,4 +1,3 @@
-import type { Tell } from "../detection/tells";
 import type { Verdict } from "../judge/schema";
 
 /** ANSI colors (0-15) remap under the terminal theme, so they adapt to light/dark. */
@@ -9,18 +8,17 @@ export const color = {
   yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
 };
 
-/** One flagged comment to render: location, advisory tells, and the judge's verdict. */
+/** One flagged comment to render: location and the judge's verdict. */
 export interface ReportItem {
   path: string;
   startLine: number;
-  tells: Tell[];
   verdict: Verdict;
 }
 
 /**
  * Render the flagged comments grouped by file as `path:line  category
- * confidence  rationale`, with advisory tells as a marker. With `fix`, a
- * suggestion and any keep-lines follow. Non-slop items are dropped.
+ * confidence  rationale`. With `fix`, a suggestion and any keep-lines follow.
+ * Non-slop items are dropped.
  */
 export function renderReport(items: ReportItem[], options: { fix: boolean }): string {
   const flagged = items.filter((item) => item.verdict.isSlop);
@@ -36,11 +34,10 @@ export function renderReport(items: ReportItem[], options: { fix: boolean }): st
   const blocks: string[] = [];
   for (const [path, group] of byFile) {
     const lines = [color.bold(path)];
-    for (const { startLine, tells, verdict } of group) {
-      const advisory = tells.length ? color.yellow(` [${tells.map((t) => t.id).join(",")}]`) : "";
+    for (const { startLine, verdict } of group) {
       const conf =
         verdict.confidence === "high" ? color.red(verdict.confidence) : verdict.confidence;
-      lines.push(`  ${color.dim(`:${startLine}`)}  ${verdict.category}  ${conf}${advisory}`);
+      lines.push(`  ${color.dim(`:${startLine}`)}  ${verdict.category}  ${conf}`);
       lines.push(`      ${verdict.rationale}`);
       if (options.fix && verdict.suggestedFix) {
         lines.push(color.dim(`      fix: ${verdict.suggestedFix}`));

@@ -90,10 +90,11 @@ verdicts stay on disk, off the conversation, for `apply` to read.
 bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [--fix]
 ```
 
-Default apply joins verdicts to the recorded ranges, re-verifies each comment's
-current text still matches (skipping any that drifted), trims the slop, and
-commits to a fresh `comments/audit-<hash>` branch off HEAD. The review surface is
-`git diff HEAD~1`. Apply requires a clean working tree.
+Default apply re-extracts the judged files and matches verdicts to comments by
+id at their current position, trims the slop, and commits to a fresh
+`comments/audit-<hash>` branch off HEAD. A comment that moved or changed since
+preflight gets a new id, matches no verdict, and is skipped. The review surface
+is `git diff HEAD~1`. Apply requires a clean working tree.
 
 `--report` prints the findings grouped by file (`path:line  category  confidence
 rationale`) and writes nothing. Use it to review before applying, or on a dirty

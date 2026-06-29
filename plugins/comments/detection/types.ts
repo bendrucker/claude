@@ -1,5 +1,5 @@
 /**
- * Shared contracts across the detection pipeline. extract → diff → scope → tells
+ * Shared contracts across the detection pipeline. extract → diff → scope → collect
  * all speak these types so each stage is independently testable. Line numbers are
  * 1-based and inclusive everywhere, matching unified-diff line numbers and the
  * human-facing `path:line` output.

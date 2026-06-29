@@ -6,7 +6,7 @@ import { $ } from "bun";
 import { cli, command } from "cleye";
 import { applyToBranch, isCleanTree } from "../../../apply/branch";
 import { computeFileEdits, type EditItem } from "../../../apply/edits";
-import { collectVerdicts, hasDrifted, type JoinedItem, joinVerdicts } from "../../../apply/join";
+import { collectVerdicts, matchVerdicts } from "../../../apply/join";
 import { color, type ReportItem, renderReport } from "../../../apply/report";
 import {
   type CollectedComment,
@@ -16,9 +16,11 @@ import {
   resolveMrSource,
 } from "../../../detection/collect";
 import type { DiffOptions } from "../../../detection/diff";
+import { extractComments, languageForPath } from "../../../detection/extract";
 import { rankComments, type SortKey } from "../../../detection/rank";
-import { detectTells } from "../../../detection/tells";
-import { buildJob, type Manifest, writeJob } from "../../../judge/job";
+import type { Comment } from "../../../detection/types";
+import { buildJob, type JobShard, writeJob } from "../../../judge/job";
+import type { Verdict } from "../../../judge/schema";
 
 const WORKFLOW_PATH = join(import.meta.dirname, "..", "..", "..", "workflow", "judge.workflow.js");
 
@@ -153,40 +155,36 @@ const preflightCmd = command(
   },
 );
 
-function toReportItem(item: JoinedItem): ReportItem {
+function toEditItem(comment: Comment, verdict: Verdict): EditItem {
   return {
-    path: item.entry.path,
-    startLine: item.entry.startLine,
-    // ManifestEntry is a superset of Comment, so detectTells reads it directly.
-    tells: detectTells(item.entry),
-    verdict: item.verdict,
+    startLine: comment.startLine,
+    endLine: comment.endLine,
+    startColumn: comment.startColumn,
+    endColumn: comment.endColumn,
+    kind: comment.kind,
+    verdict,
   };
 }
 
-function toEditItem(item: JoinedItem): EditItem {
-  return {
-    startLine: item.entry.startLine,
-    endLine: item.entry.endLine,
-    startColumn: item.entry.startColumn,
-    endColumn: item.entry.endColumn,
-    kind: item.entry.kind,
-    verdict: item.verdict,
-  };
-}
-
-async function readVerdictShards(verdictsDir: string): Promise<unknown[]> {
+async function readJsonFiles(dir: string, prefix: string): Promise<unknown[]> {
   let names: string[];
   try {
-    names = await readdir(verdictsDir);
+    names = await readdir(dir);
   } catch {
     return [];
   }
-  const verdictFiles = names.filter(
-    (name) => name.startsWith("verdict-") && name.endsWith(".json"),
-  );
+  const matching = names.filter((name) => name.startsWith(prefix) && name.endsWith(".json"));
   return Promise.all(
-    verdictFiles.map(async (name) => JSON.parse(await Bun.file(join(verdictsDir, name)).text())),
+    matching.map(async (name) => JSON.parse(await Bun.file(join(dir, name)).text())),
   );
+}
+
+/** The files a job judged, recovered from the shards rather than a separate manifest. */
+async function judgedPaths(jobDir: string): Promise<string[]> {
+  const shards = (await readJsonFiles(jobDir, "shard-")) as JobShard[];
+  const paths = new Set<string>();
+  for (const shard of shards) for (const comment of shard.comments) paths.add(comment.path);
+  return [...paths];
 }
 
 const applyCmd = command(
@@ -206,9 +204,8 @@ const applyCmd = command(
       process.exit(1);
     }
 
-    const manifestFile = Bun.file(join(job, "manifest.json"));
-    if (!(await manifestFile.exists())) {
-      console.error(`No manifest at ${job}. Pass the job dir printed by preflight.`);
+    if (!(await Bun.file(join(job, "job-args.json")).exists())) {
+      console.error(`No job at ${job}. Pass the job dir printed by preflight.`);
       process.exit(1);
     }
 
@@ -223,46 +220,40 @@ const applyCmd = command(
       process.exit(1);
     }
 
-    const manifest = JSON.parse(await manifestFile.text()) as Manifest;
-    const shards = await readVerdictShards(join(job, "verdicts"));
-    if (shards.length === 0) {
+    const verdictShards = await readJsonFiles(join(job, "verdicts"), "verdict-");
+    if (verdictShards.length === 0) {
       console.error(`No verdicts in ${join(job, "verdicts")}. Run the judge workflow first.`);
       process.exit(1);
     }
-    const items = joinVerdicts(manifest, collectVerdicts(shards));
-
-    const byPath = new Map<string, JoinedItem[]>();
-    for (const item of items) {
-      const list = byPath.get(item.entry.path) ?? [];
-      list.push(item);
-      byPath.set(item.entry.path, list);
-    }
+    const verdicts = collectVerdicts(verdictShards);
 
     const reportItems: ReportItem[] = [];
     const editsByPath = new Map<string, string>();
-    const driftSkips: string[] = [];
+    const matched = new Set<string>();
     const manualSkips: string[] = [];
 
-    for (const [path, group] of byPath) {
+    // Re-extract each judged file and match verdicts by id at the comment's
+    // current range. A verdict whose id no longer re-extracts has drifted.
+    for (const path of await judgedPaths(job)) {
+      const language = languageForPath(path);
       const file = Bun.file(path);
-      const source = (await file.exists()) ? await file.text() : null;
+      if (!language || !(await file.exists())) continue;
+      const source = await file.text();
       const editItems: EditItem[] = [];
-      for (const item of group) {
-        reportItems.push(toReportItem(item));
-        if (!item.verdict.isSlop) continue;
-        if (source == null || hasDrifted(source, item.entry)) {
-          driftSkips.push(`${path}:${item.entry.startLine}`);
-          continue;
-        }
-        editItems.push(toEditItem(item));
+      for (const match of matchVerdicts(path, await extractComments(source, language), verdicts)) {
+        matched.add(match.id);
+        reportItems.push({ path, startLine: match.comment.startLine, verdict: match.verdict });
+        if (match.verdict.isSlop) editItems.push(toEditItem(match.comment, match.verdict));
       }
-      if (source != null && editItems.length > 0) {
+      if (editItems.length > 0) {
         const result = computeFileEdits(source, editItems);
         for (const skip of result.skips)
           manualSkips.push(`${path}:${skip.startLine}  ${skip.detail}`);
         if (result.content !== source) editsByPath.set(path, result.content);
       }
     }
+
+    const driftSkips = [...verdicts.keys()].filter((id) => !matched.has(id));
 
     if (report) {
       console.log(renderReport(reportItems, { fix }));
@@ -285,7 +276,9 @@ const applyCmd = command(
 
     if (driftSkips.length > 0) {
       console.error(
-        color.yellow(`Skipped ${driftSkips.length} drifted comment(s): ${driftSkips.join(", ")}`),
+        color.yellow(
+          `Skipped ${driftSkips.length} judged comment(s) no longer found at preflight position (file changed since preflight).`,
+        ),
       );
     }
     if (manualSkips.length > 0) {

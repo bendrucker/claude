@@ -5,19 +5,17 @@ import { extractComments, languageForPath } from "./extract";
 import { commentId } from "./identity";
 import { type CommentScore, scoreComment } from "./rank";
 import { scopeIntroduced } from "./scope";
-import { detectTells, type Tell } from "./tells";
 import type { Comment, FileDiff, IntroducedComment, Language } from "./types";
 import { listTrackedCodeFiles, matchesPathGlobs } from "./walk";
 
 /**
- * One extracted comment carrying everything the judge and the applier need: its
- * stable id, the line-numbered context window, the advisory tells, and its
- * intrinsic complexity score. The unit both scopes (diff and repo) produce.
+ * One extracted comment carrying everything the judge needs: its stable id, the
+ * line-numbered context window, and its intrinsic complexity score. The unit both
+ * scopes (diff and repo) produce.
  */
 export interface CollectedComment extends IntroducedComment {
   id: string;
   context: string;
-  tells: Tell[];
   score: CommentScore;
 }
 
@@ -70,7 +68,6 @@ function toCollected(
     language,
     id: commentId(path, comment),
     context: contextWindow(lines, comment),
-    tells: detectTells(comment),
     score: scoreComment(comment),
   };
 }

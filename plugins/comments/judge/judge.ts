@@ -1,33 +1,17 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import type { CommentKind, Language } from "../detection/types";
 import type { SlopCategory, Verdict } from "./schema";
 
 /**
- * Prompt and verdict-parsing primitives for the judge.
- *
- * The genuinely shared core is the versioned prompt (loadPrompt, sha256), the
- * shard size (BATCH_SIZE), and per-verdict validation (parseVerdict). The
- * product path builds id-keyed shards in `job.ts` and joins them in
- * `apply/join.ts`. The positional batch helpers here (formatBatch,
- * parseBatchVerdicts, judgeComments) serve only the calibration oracle under
- * `evals/`, which scores a fixed corpus by index. The prompt is a committed,
- * versioned artifact. Every run records its sha256, so a prompt edit
- * invalidates prior numbers.
+ * Shared judge primitives: the versioned prompt and per-verdict validation. The
+ * product path shards comments in `job.ts` for the agent fan-out to judge, and
+ * `apply/join.ts` validates the verdicts that come back. The calibration oracle
+ * under `evals/` scores a fixed corpus. The prompt is a committed, versioned
+ * artifact, and every run records its sha256, so a prompt edit invalidates prior
+ * numbers.
  */
 
 export const PROMPT_PATH = join(import.meta.dirname, "prompt.md");
-
-/** One comment the judge scores, with the context the rubric needs. */
-export interface CommentJudgeInput {
-  path: string;
-  language: Language;
-  kind: CommentKind;
-  /** The comment text, exactly as it appears in source. */
-  text: string;
-  /** Surrounding source lines, numbered, for the what-on-dense call. */
-  context: string;
-}
 
 export function sha256(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -43,76 +27,14 @@ export async function loadPrompt(promptPath: string = PROMPT_PATH): Promise<Vers
   return { text, sha256: sha256(text) };
 }
 
-/**
- * Renders a batch as indexed entries the model scores. Stable across calls so
- * the same inputs cache and hash identically. Each entry is delimited by a
- * banner carrying its index, so a dropped or reordered entry is detectable.
- */
-export function formatBatch(inputs: CommentJudgeInput[]): string {
-  return inputs
-    .map((input, index) => {
-      return [
-        `===== COMMENT ${index} =====`,
-        `path: ${input.path}`,
-        `language: ${input.language}`,
-        `kind: ${input.kind}`,
-        `--- comment text ---`,
-        input.text,
-        `--- surrounding code ---`,
-        input.context,
-      ].join("\n");
-    })
-    .join("\n\n");
-}
-
-/**
- * Parses the `{ verdicts: [{ index, verdict }] }` batch shape, validating that
- * every index in 0..expected-1 is present exactly once, and returns verdicts
- * ordered by index.
- */
-export function parseBatchVerdicts(json: string, expected: number): Verdict[] {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch (error) {
-    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`);
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("Judge batch must be a JSON object");
-  }
-  const entries = (parsed as Record<string, unknown>).verdicts;
-  if (!Array.isArray(entries)) throw new Error('Judge batch missing "verdicts" array');
-  const verdicts = new Array<Verdict | undefined>(expected);
-  const seen = new Set<number>();
-  for (const entry of entries) {
-    if (typeof entry !== "object" || entry === null) {
-      throw new Error("Judge batch entries must be objects");
-    }
-    const record = entry as Record<string, unknown>;
-    const index = record.index;
-    if (typeof index !== "number" || !Number.isInteger(index)) {
-      throw new Error("Judge batch entry index must be an integer");
-    }
-    if (index < 0 || index >= expected) {
-      throw new Error(`Judge batch index ${index} out of range (expected 0..${expected - 1})`);
-    }
-    if (seen.has(index)) {
-      throw new Error(`Judge batch index ${index} appears more than once`);
-    }
-    verdicts[index] = parseVerdict(record.verdict, `index ${index}`);
-    seen.add(index);
-  }
-  if (seen.size !== expected) {
-    throw new Error(`Judge batch covered ${seen.size} of ${expected} comments`);
-  }
-  return verdicts as Verdict[];
-}
+/** Comments judged per shard on the product path, and per batch in the oracle. */
+export const BATCH_SIZE = 20;
 
 /**
  * Validates one verdict object's shape, returning a typed `Verdict`. `label`
- * identifies the entry in error messages (a batch index, or a comment id on the
- * apply path). Shared so the agent fan-out and the oracle reject malformed
- * verdicts identically.
+ * identifies the entry in error messages (a comment id on the apply path, or a
+ * batch index in the oracle). Shared so the agent fan-out and the oracle reject
+ * malformed verdicts identically.
  */
 export function parseVerdict(value: unknown, label: string | number): Verdict {
   if (typeof value !== "object" || value === null) {
@@ -144,21 +66,4 @@ export function parseVerdict(value: unknown, label: string | number): Verdict {
     );
   }
   return verdict;
-}
-
-/** Judges a batch of comments. The seam tests mock; the oracle's SDK call implements. */
-export type CommentJudge = (inputs: CommentJudgeInput[]) => Promise<Verdict[]>;
-
-export const BATCH_SIZE = 20;
-
-export async function judgeComments(
-  judge: CommentJudge,
-  inputs: CommentJudgeInput[],
-): Promise<Verdict[]> {
-  const batches: CommentJudgeInput[][] = [];
-  for (let i = 0; i < inputs.length; i += BATCH_SIZE) {
-    batches.push(inputs.slice(i, i + BATCH_SIZE));
-  }
-  const results = await Promise.all(batches.map((batch) => judge(batch)));
-  return results.flat();
 }

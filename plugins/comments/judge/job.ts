@@ -21,23 +21,8 @@ export interface JobShard {
   comments: ShardComment[];
 }
 
-/** The recorded range the applier id-joins a verdict back to. */
-export interface ManifestEntry {
-  path: string;
-  language: Language;
-  kind: CommentKind;
-  text: string;
-  startLine: number;
-  endLine: number;
-  startColumn: number;
-  endColumn: number;
-}
-
-export type Manifest = Record<string, ManifestEntry>;
-
 export interface JobDescriptor {
   shards: JobShard[];
-  manifest: Manifest;
   promptText: string;
   promptSha: string;
 }
@@ -62,24 +47,10 @@ function toShardComment(comment: CollectedComment): ShardComment {
   };
 }
 
-function toManifestEntry(comment: CollectedComment): ManifestEntry {
-  return {
-    path: comment.path,
-    language: comment.language,
-    kind: comment.kind,
-    text: comment.text,
-    startLine: comment.startLine,
-    endLine: comment.endLine,
-    startColumn: comment.startColumn,
-    endColumn: comment.endColumn,
-  };
-}
-
 /**
- * Partition ranked comments into shards (preserving rank order so the biggest
- * win judge and stream first), load and pin the prompt, and record the manifest
- * the applier joins against. The Bun side shards once. The sandboxed Workflow
- * cannot re-shard, so one shard maps 1:1 to one agent.
+ * Partition ranked comments into shards, preserving rank order so the biggest
+ * wins judge and stream first, and pin the prompt. The Bun side shards once. The
+ * sandboxed Workflow cannot re-shard, so one shard maps 1:1 to one agent.
  */
 export async function buildJob(
   comments: CollectedComment[],
@@ -97,10 +68,7 @@ export async function buildJob(
     });
   }
 
-  const manifest: Manifest = {};
-  for (const comment of comments) manifest[comment.id] = toManifestEntry(comment);
-
-  return { shards, manifest, promptText, promptSha: base.sha256 };
+  return { shards, promptText, promptSha: base.sha256 };
 }
 
 /** A shard's id paired with the path the agent reads it from. */
@@ -132,18 +100,15 @@ export const DEFAULT_JOB_BASE = join(tmpdir(), "comments-audit");
 /** Content-hash the descriptor so re-running identical input reuses the same job dir. */
 function jobHash(descriptor: JobDescriptor): string {
   return sha256(
-    JSON.stringify({
-      shards: descriptor.shards,
-      manifest: descriptor.manifest,
-      promptSha: descriptor.promptSha,
-    }),
+    JSON.stringify({ shards: descriptor.shards, promptSha: descriptor.promptSha }),
   ).slice(0, 16);
 }
 
 /**
- * Materialize the job under a content-keyed dir: one `shard-<n>.json` per shard,
- * a `manifest.json`, and a `job-args.json` the model hands to the Workflow tool.
- * The verdicts dir is created so agents can `Bash`-write into it.
+ * Materialize the job under a content-keyed dir: one `shard-<n>.json` per shard
+ * and a `job-args.json` the model hands to the Workflow tool. The verdicts dir is
+ * created so agents can `Bash`-write into it. Apply reads the shards back to know
+ * which files were judged, then re-extracts to recover each comment's range.
  */
 export async function writeJob(
   descriptor: JobDescriptor,
@@ -159,8 +124,6 @@ export async function writeJob(
   const shards: ShardRef[] = shardWrites.map((write) => write.ref);
   await Promise.all(shardWrites.map((write) => Bun.write(write.ref.path, write.body)));
 
-  await Bun.write(join(jobDir, "manifest.json"), JSON.stringify(descriptor.manifest, null, 2));
-
   const args: JobArgs = {
     shards,
     promptText: descriptor.promptText,
@@ -173,12 +136,13 @@ export async function writeJob(
 
   await mkdir(verdictsDir, { recursive: true });
 
+  const count = descriptor.shards.reduce((total, shard) => total + shard.comments.length, 0);
   return {
     jobDir,
     argsPath,
     verdictsDir,
     shards,
-    count: Object.keys(descriptor.manifest).length,
+    count,
     shardCount: descriptor.shards.length,
   };
 }

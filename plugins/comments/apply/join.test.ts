@@ -1,21 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { Manifest, ManifestEntry } from "../judge/job";
+import { commentId } from "../detection/identity";
+import type { Comment } from "../detection/types";
 import type { Verdict } from "../judge/schema";
-import { collectVerdicts, hasDrifted, joinVerdicts, textAtRange } from "./join";
-
-function entry(over: Partial<ManifestEntry> = {}): ManifestEntry {
-  return {
-    path: "a.ts",
-    language: "typescript",
-    kind: "line",
-    text: "// hi",
-    startLine: 2,
-    endLine: 2,
-    startColumn: 0,
-    endColumn: 5,
-    ...over,
-  };
-}
+import { collectVerdicts, matchVerdicts } from "./join";
 
 function verdict(over: Partial<Verdict> = {}): Verdict {
   return {
@@ -23,6 +10,18 @@ function verdict(over: Partial<Verdict> = {}): Verdict {
     category: "restate-the-what",
     confidence: "high",
     rationale: "r",
+    ...over,
+  };
+}
+
+function comment(over: Partial<Comment> = {}): Comment {
+  return {
+    kind: "line",
+    text: "// hi",
+    startLine: 2,
+    endLine: 2,
+    startColumn: 0,
+    endColumn: 5,
     ...over,
   };
 }
@@ -61,48 +60,26 @@ describe("collectVerdicts", () => {
   });
 });
 
-describe("joinVerdicts", () => {
-  const manifest: Manifest = { a: entry(), b: entry({ path: "b.ts" }) };
+describe("matchVerdicts", () => {
+  const path = "a.ts";
+  const a = comment({ text: "// a", startLine: 1, endColumn: 4 });
+  const b = comment({ text: "// b", startLine: 5, endColumn: 4 });
 
-  test("joins every manifest entry to its verdict", () => {
-    const verdicts = new Map([
-      ["a", verdict()],
-      ["b", verdict({ isSlop: false, category: null })],
-    ]);
-    const joined = joinVerdicts(manifest, verdicts);
-    expect(joined.map((j) => j.id)).toEqual(["a", "b"]);
+  test("matches a re-extracted comment to the verdict its id names", () => {
+    const verdicts = new Map([[commentId(path, a), verdict()]]);
+    const matches = matchVerdicts(path, [a, b], verdicts);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.comment).toBe(a);
+    expect(matches[0]?.id).toBe(commentId(path, a));
   });
 
-  test("rejects a verdict with no manifest entry", () => {
-    const verdicts = new Map([
-      ["a", verdict()],
-      ["b", verdict()],
-      ["c", verdict()],
-    ]);
-    expect(() => joinVerdicts(manifest, verdicts)).toThrow(/no manifest entry/);
+  test("leaves a comment whose id carries no verdict untouched", () => {
+    expect(matchVerdicts(path, [a, b], new Map())).toEqual([]);
   });
 
-  test("rejects an incomplete join", () => {
-    expect(() => joinVerdicts(manifest, new Map([["a", verdict()]]))).toThrow(/Missing verdicts/);
-  });
-});
-
-describe("drift detection", () => {
-  const source = "ab\n// hi\ncd";
-
-  test("reads the current text at a recorded range", () => {
-    expect(textAtRange(source, entry())).toBe("// hi");
-  });
-
-  test("is not drifted when the recorded text still sits at the range", () => {
-    expect(hasDrifted(source, entry())).toBe(false);
-  });
-
-  test("is drifted when the text at the range changed", () => {
-    expect(hasDrifted(source, entry({ text: "// bye" }))).toBe(true);
-  });
-
-  test("is drifted when the range falls outside the file", () => {
-    expect(hasDrifted(source, entry({ startLine: 50, endLine: 50 }))).toBe(true);
+  test("treats a changed comment as drift: a new id finds no verdict", () => {
+    const verdicts = new Map([[commentId(path, a), verdict()]]);
+    const moved = comment({ text: "// a", startLine: 2, endColumn: 4 });
+    expect(matchVerdicts(path, [moved], verdicts)).toEqual([]);
   });
 });

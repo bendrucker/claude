@@ -1,19 +1,12 @@
-import { lineStartOffsets, sliceRange } from "../detection/offsets";
-import type { Manifest, ManifestEntry } from "../judge/job";
+import { commentId } from "../detection/identity";
+import type { Comment } from "../detection/types";
 import { parseVerdict } from "../judge/judge";
 import type { Verdict } from "../judge/schema";
 
-export interface JoinedItem {
-  id: string;
-  entry: ManifestEntry;
-  verdict: Verdict;
-}
-
 /**
  * Fold the verdict shards the agents wrote into one id→verdict map, validating
- * each verdict's shape and rejecting a duplicate id. Mirrors the rigor of the
- * oracle's batch parse, so a malformed agent verdict is a hard error here rather
- * than silently corrupting a file at apply time.
+ * each verdict's shape and rejecting a duplicate id. A malformed agent verdict is
+ * a hard error here rather than silently corrupting a file at apply time.
  */
 export function collectVerdicts(shards: unknown[]): Map<string, Verdict> {
   const map = new Map<string, Verdict>();
@@ -37,47 +30,30 @@ export function collectVerdicts(shards: unknown[]): Map<string, Verdict> {
   return map;
 }
 
+/** A re-extracted comment paired with the verdict that named its id. */
+export interface CommentMatch {
+  id: string;
+  comment: Comment;
+  verdict: Verdict;
+}
+
 /**
- * Join verdicts back to manifest entries by id. Every manifest comment must have
- * exactly one verdict and every verdict must name a known comment: an unknown,
- * duplicate, or missing id is a hard error, never a silent drop.
+ * Match verdicts to freshly extracted comments by recomputing each comment's id.
+ * A comment whose id carries a verdict is matched at its current range. The id
+ * encodes path, position, and text, so a comment that moved or changed since
+ * preflight yields a new id, finds no verdict, and is left untouched. The id
+ * match is the drift check.
  */
-export function joinVerdicts(manifest: Manifest, verdicts: Map<string, Verdict>): JoinedItem[] {
-  const known = new Set(Object.keys(manifest));
-  for (const id of verdicts.keys()) {
-    if (!known.has(id)) throw new Error(`Verdict id ${id} has no manifest entry`);
-  }
-  const items: JoinedItem[] = [];
-  const missing: string[] = [];
-  for (const [id, entry] of Object.entries(manifest)) {
+export function matchVerdicts(
+  path: string,
+  comments: Comment[],
+  verdicts: Map<string, Verdict>,
+): CommentMatch[] {
+  const matches: CommentMatch[] = [];
+  for (const comment of comments) {
+    const id = commentId(path, comment);
     const verdict = verdicts.get(id);
-    if (!verdict) {
-      missing.push(id);
-      continue;
-    }
-    items.push({ id, entry, verdict });
+    if (verdict) matches.push({ id, comment, verdict });
   }
-  if (missing.length > 0) {
-    throw new Error(`Missing verdicts for ${missing.length} comment(s): ${missing.join(", ")}`);
-  }
-  return items;
-}
-
-/** The current text at a manifest entry's recorded range, or null if out of bounds. */
-export function textAtRange(source: string, entry: ManifestEntry): string | null {
-  const lines = source.split("\n");
-  if (entry.startLine < 1 || entry.endLine > lines.length) return null;
-  return sliceRange(
-    source,
-    lineStartOffsets(lines),
-    entry.startLine,
-    entry.startColumn,
-    entry.endLine,
-    entry.endColumn,
-  );
-}
-
-/** True when the file no longer carries the recorded comment text at its range. */
-export function hasDrifted(source: string, entry: ManifestEntry): boolean {
-  return textAtRange(source, entry) !== entry.text;
+  return matches;
 }

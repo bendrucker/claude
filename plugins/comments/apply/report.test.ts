@@ -16,7 +16,7 @@ function verdict(over: Partial<Verdict> = {}): Verdict {
 }
 
 function reportItem(over: Partial<ReportItem> = {}): ReportItem {
-  return { path: "src/a.ts", startLine: 4, tells: [], verdict: verdict(), ...over };
+  return { path: "src/a.ts", startLine: 4, verdict: verdict(), ...over };
 }
 
 describe("renderReport", () => {
@@ -34,7 +34,6 @@ describe("renderReport", () => {
           reportItem({
             path: "src/b.ts",
             startLine: 9,
-            tells: [{ id: "section-banner", reason: "" }],
             verdict: verdict({ category: "section-divider", confidence: "low" }),
           }),
         ],
@@ -47,7 +46,7 @@ describe("renderReport", () => {
       Paraphrases the line.
 
 src/b.ts
-  :9  section-divider  low [section-banner]
+  :9  section-divider  low
       Paraphrases the line."
 `);
   });

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { judgeComments, loadPrompt } from "../judge/judge";
+import { loadPrompt } from "../judge/judge";
 import type { Verdict } from "../judge/schema";
 import { type Fixture, fixtureToInput, loadFixtures, scoreResults } from "./eval";
-import { anthropicCommentJudge } from "./oracle";
+import { anthropicCommentJudge, judgeComments } from "./oracle";
 
 function fixture(over: Partial<Fixture>): Fixture {
   return {

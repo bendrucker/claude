@@ -27,13 +27,12 @@ and a deterministic apply.
   reports the findings. `--report`, `--fix`, `--path`, `--sort`, and `--limit`
   tune scope and output.
 - **`detection/`**: comment extraction over Shiki's TextMate grammars, the diff
-  and repo collectors, intrinsic-complexity ranking, stable comment ids, and
-  advisory tells.
-- **`judge/`**: the batching and parsing primitives, the job builder, the
-  verdict schema, and the versioned `prompt.md`.
+  and repo collectors, intrinsic-complexity ranking, and stable comment ids.
+- **`judge/`**: the versioned `prompt.md`, the verdict schema, per-verdict
+  validation, and the job builder that shards comments for the Workflow.
 - **`workflow/`**: the committed Workflow script the skill hands the job to.
-- **`apply/`**: the deterministic edit engine, the verdict id-join with drift
-  detection, the branch writer, and the report renderer.
+- **`apply/`**: the deterministic edit engine, the verdict id-match against
+  re-extracted comments, the branch writer, and the report renderer.
 - **`evals/`**: the labeled fixture corpus, the precision/recall eval, and the
   SDK calibration oracle behind a must-pass-negative ship gate.
 - A preventive steering rule lives at `user/rules/code-comments.md`, scoped by

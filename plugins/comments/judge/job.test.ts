@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CollectedComment } from "../detection/collect";
 import { scoreComment } from "../detection/rank";
-import { buildJob, type Manifest, writeJob } from "./job";
+import { buildJob, writeJob } from "./job";
 import { loadPrompt } from "./judge";
 
 function collected(i: number): CollectedComment {
@@ -23,7 +23,6 @@ function collected(i: number): CollectedComment {
     language: "typescript",
     id: `id-${i}`,
     context: `ctx ${i}`,
-    tells: [],
     score: scoreComment(comment),
   };
 }
@@ -74,7 +73,7 @@ describe("buildJob prompt", () => {
 });
 
 describe("writeJob", () => {
-  test("round-trips the manifest and writes one file per shard plus args", async () => {
+  test("writes one file per shard plus args, with a content-keyed shard contract", async () => {
     const base = join(tmpdir(), `comments-job-test-${process.pid}`);
     try {
       const descriptor = await buildJob(many(21), { fix: false });
@@ -85,10 +84,8 @@ describe("writeJob", () => {
       expect(written.shards).toHaveLength(2);
       expect(written.shards.map((s: { id: number }) => s.id)).toEqual([0, 1]);
 
-      const manifest = JSON.parse(
-        await Bun.file(join(written.jobDir, "manifest.json")).text(),
-      ) as Manifest;
-      expect(manifest).toEqual(descriptor.manifest);
+      const firstShard = JSON.parse(await Bun.file(written.shards[0]?.path ?? "").text());
+      expect(firstShard.comments).toHaveLength(20);
 
       const args = JSON.parse(await Bun.file(written.argsPath).text());
       expect(args.shards).toEqual(written.shards);

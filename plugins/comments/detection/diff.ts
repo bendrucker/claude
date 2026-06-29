@@ -1,7 +1,6 @@
 import { $ } from "bun";
+import parseDiff from "parse-diff";
 import type { FileDiff, LineRange } from "./types";
-
-const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
 function coalesce(lineNumbers: number[]): LineRange[] {
   const ranges: LineRange[] = [];
@@ -16,65 +15,29 @@ function coalesce(lineNumbers: number[]): LineRange[] {
   return ranges;
 }
 
-function newPath(plusLine: string): string | null {
-  const raw = (plusLine.slice(4).split("\t")[0] ?? "").trim();
-  if (raw === "/dev/null") return null;
+/** The new-file path from a `+++` header, with the `b/` prefix and any timestamp dropped. */
+function newPath(to: string | undefined): string | null {
+  const raw = (to?.split("\t")[0] ?? "").trim();
+  if (raw === "" || raw === "/dev/null") return null;
   return raw.startsWith("b/") ? raw.slice(2) : raw;
 }
 
 /**
  * Parse a unified diff into the added/modified line ranges per file, expressed
  * in the NEW version of each file. Deleted files (`+++ /dev/null`) are skipped.
+ * `parse-diff` does the hunk arithmetic; an `add` change carries its new-file
+ * line number directly.
  */
 export function parseUnifiedDiff(diffText: string): FileDiff[] {
   const files: FileDiff[] = [];
-
-  let path: string | null = null;
-  let added: number[] = [];
-  let newLine = 0;
-
-  const flush = () => {
-    if (path !== null) {
-      files.push({ path, added: coalesce(added) });
-    }
-    path = null;
-    added = [];
-    newLine = 0;
-  };
-
-  for (const line of diffText.split("\n")) {
-    if (line.startsWith("diff --git")) {
-      flush();
-      continue;
-    }
-    if (line.startsWith("+++ ")) {
-      flush();
-      path = newPath(line);
-      continue;
-    }
-    if (line.startsWith("--- ")) {
-      continue;
-    }
-    const header = line.match(HUNK_HEADER);
-    if (header) {
-      newLine = Number(header[1]);
-      continue;
-    }
-    if (path === null) {
-      continue;
-    }
-    if (line.startsWith("+")) {
-      added.push(newLine);
-      newLine += 1;
-    } else if (line.startsWith("-")) {
-      // Removed from the old file: the new-file counter does not advance.
-    } else {
-      // Context line (leading space) or hunk filler advances the new file.
-      newLine += 1;
-    }
+  for (const file of parseDiff(diffText)) {
+    const path = newPath(file.to);
+    if (path === null) continue;
+    const added = file.chunks.flatMap((chunk) =>
+      chunk.changes.filter((change) => change.type === "add").map((change) => change.ln),
+    );
+    files.push({ path, added: coalesce(added) });
   }
-
-  flush();
   return files;
 }
 

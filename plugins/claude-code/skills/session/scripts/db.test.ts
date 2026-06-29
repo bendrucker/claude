@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
@@ -24,6 +24,20 @@ function queryParams(overrides: Record<string, string | null> = {}) {
 let db: Database;
 let tmpDir: string;
 let importsDir: string;
+
+// The first `INSTALL ... FROM community` downloads the markdown/yaml extensions over
+// the network, which can exceed the default per-test timeout on a cold CI runner.
+// Warm the shared extension cache once so the per-test LOAD reads from disk.
+beforeAll(async () => {
+  const warmDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-warm-"));
+  const warm = await getDb(warmDir);
+  try {
+    await loadExtensions(warm);
+  } finally {
+    warm.close();
+    await rm(warmDir, { recursive: true, force: true });
+  }
+}, 120_000);
 
 async function importFixtureHost(label: string, opts: { source?: string } = {}) {
   const projects = path.join(importsDir, label, "projects");

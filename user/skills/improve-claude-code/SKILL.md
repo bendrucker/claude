@@ -114,6 +114,10 @@ Present all plans. For each, propose a `/code-review` effort (typically `low`; `
 
 For each approved plan, launch a background `general-purpose` agent with `isolation: "worktree"`. Each agent implements the plan, runs `bun test`, runs `/code-review <effort>` with the level chosen during planning, commits, and creates the PR via `pull-request:create`. Pass the same domain skills from the planning step.
 
+#### Linting in Worktrees
+
+Agents must run `bun run check` (biome) before pushing, but biome aborts inside `.worktrees/` with "nested root configuration": each sibling worktree carries its own `biome.json`. So `tsc` and `bun test` pass while CI's `lint` job (a clean single-branch checkout) fails on import-sort and format violations in the agent's own new files. Lint via a checkout outside the repo tree: `git archive origin/<branch>` into a `$TMPDIR` directory in a single shell call (sandbox temp does not persist across Bash calls), run `bunx --bun @biomejs/biome@2 check --write --max-diagnostics=none` there, copy changed files back into the worktree, and amend. Rebase onto `origin/main` before implementing if local main is stale, so files `main` deleted don't resurface as CI-only failures.
+
 #### PR body
 
 Include an `Original Task` link so the PR traces back to the Things todo:
@@ -125,6 +129,8 @@ Original Task: [<todo-title>](https://things.bendrucker.me/show?id=<todo-id>)
 ## Monitor CI and Fix Failures
 
 Use `github:actions-monitor` agents (one per PR) to collect pass/fail status. For failures, launch a worktree agent with the logs and branch to fix, test, and push. Re-monitor after fixes.
+
+When the `lint` job fails, ignore the pre-existing `noNonNullAssertion` warnings (a red herring that dominates the log) and isolate the error-severity rules with `--diagnostic-level=error --max-diagnostics=none`, run in an external git-archive checkout (never inside the repo tree, per the nested-root abort above). Fix with `--write`, copy the files into the failing PR's `.worktrees/agent-*` checkout, then commit and push from there.
 
 ## Annotate Things
 

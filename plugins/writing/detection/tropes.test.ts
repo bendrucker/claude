@@ -176,6 +176,38 @@ describe("scan", () => {
     }
   });
 
+  describe("no X needed brag", () => {
+    // The flag side is open-ended: these artifact nouns are not enumerated
+    // anywhere in the detector, proving it generalizes past a fixed list.
+    const flag = [
+      "Handlers are auto-discovered, no config needed.",
+      "It runs inline (no wrapper needed).",
+      "Spin it up with no docker needed.",
+      "Drop the file in place, no namespace required.",
+      "It reads the token directly, no auth needed.",
+    ];
+    const allow = [
+      "Reviewed the helper, no change needed.",
+      "No further action needed here.",
+      "Patch-ids matched, no rebase needed.",
+      "No adjustment needed, it scales on its own.",
+      "It is no longer needed.",
+      "There is no way the runtime needed that much memory.",
+    ];
+
+    for (const text of flag) {
+      it(`flags: "${text}"`, () => {
+        expect(firstByTier(scan(text), "context")?.category).toBe("no X needed brag");
+      });
+    }
+
+    for (const text of allow) {
+      it(`allows: ${JSON.stringify(text)}`, () => {
+        expect(scan(text).find((m) => m.category === "no X needed brag")).toBeUndefined();
+      });
+    }
+  });
+
   describe("parallelism", () => {
     const flag = [
       "It is not just fast, but also reliable",

@@ -22,8 +22,8 @@ describe("preToolUse", () => {
     });
   });
 
-  test("context carries additionalContext only", () => {
-    expect(preToolUse.context("info")).toEqual({
+  test("additionalContext carries the field by its API name", () => {
+    expect(preToolUse.additionalContext("info")).toEqual({
       hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: "info" },
     });
   });
@@ -46,8 +46,8 @@ describe("preToolUse", () => {
 });
 
 describe("postToolUse", () => {
-  test("context carries additionalContext", () => {
-    expect(postToolUse.context("done")).toEqual({
+  test("additionalContext carries the field by its API name", () => {
+    expect(postToolUse.additionalContext("done")).toEqual({
       hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: "done" },
     });
   });

@@ -29,5 +29,5 @@ export function formatDecision(decision: "deny" | "ask", reason: string): SyncHo
 }
 
 export function formatContext(context: string): SyncHookJSONOutput {
-  return preToolUse.context(context);
+  return preToolUse.additionalContext(context);
 }

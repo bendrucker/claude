@@ -38,7 +38,7 @@ export async function processInput(
   const message = await ensureTrailingNewline(filePath);
 
   if (message) {
-    return postToolUse.context(`[newline/ensure] ${message}`);
+    return postToolUse.additionalContext(`[newline/ensure] ${message}`);
   }
 
   return null;

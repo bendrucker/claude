@@ -52,7 +52,7 @@ export async function processInput(
   await clearState("newline", filePath);
 
   if (message) {
-    return postToolUse.context(`[newline/preserve] ${message}`);
+    return postToolUse.additionalContext(`[newline/preserve] ${message}`);
   }
 
   return null;

@@ -99,7 +99,7 @@ export function formatOutput(
   lineNumber: number,
   pattern: string,
 ): SyncHookJSONOutput {
-  return postToolUse.context(
+  return postToolUse.additionalContext(
     `Type ignore added in ${filePath}:${lineNumber} (${pattern}). Spawn type-ignore:fixer agent in background to fix ONLY this specific ignore, not other ignores in the file.`,
   );
 }

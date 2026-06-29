@@ -14,7 +14,7 @@ export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | 
   const response = JSON.stringify(input.tool_response ?? "");
   if (!response.includes("invalid_grant")) return null;
 
-  return postToolUse.context(
+  return postToolUse.additionalContext(
     "glab OAuth token expired. Run: glab auth login --hostname gitlab.com --git-protocol ssh (requires dangerouslyDisableSandbox: true for browser OAuth flow)",
   );
 }

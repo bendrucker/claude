@@ -1,5 +1,4 @@
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export type {
   PostToolUseHookInput,
@@ -8,12 +7,26 @@ export type {
   PreToolUseHookSpecificOutput,
   SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-export { readStdinJson, writeStdoutJson };
 
 export type WriteInput = { file_path: string; content: string };
 export type EditInput = { file_path: string; old_string: string; new_string: string };
 export type FileInput = { file_path?: string };
 export type WebFetchInput = { url: string; prompt?: string };
+
+/** Read the full stdin payload and JSON-parse it. */
+export async function readStdinJson<T = unknown>(): Promise<T> {
+  const data = await Bun.stdin.text();
+  try {
+    return JSON.parse(data) as T;
+  } catch (error) {
+    throw new Error(`Failed to parse JSON input: ${error}`);
+  }
+}
+
+/** Write a value to stdout as a single line of JSON. */
+export function writeStdoutJson(output: unknown): void {
+  process.stdout.write(`${JSON.stringify(output)}\n`);
+}
 
 function basename(filePath: string): string {
   return filePath.replace(/\/+$/, "").split("/").pop() ?? "";
@@ -97,7 +110,7 @@ export const preToolUse = {
       },
     };
   },
-  context(additionalContext: string): SyncHookJSONOutput {
+  additionalContext(additionalContext: string): SyncHookJSONOutput {
     return {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -120,7 +133,7 @@ export const preToolUse = {
 };
 
 export const postToolUse = {
-  context(additionalContext: string): SyncHookJSONOutput {
+  additionalContext(additionalContext: string): SyncHookJSONOutput {
     return {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",

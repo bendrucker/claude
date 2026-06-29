@@ -23,23 +23,48 @@ Tools and workflows for managing issues, projects, and teams in Linear.
 - `view`: fetch a single issue; include its `url` for anything you may reference.
 - `comment`: comment on an issue, using full URLs per [Issue References](#issue-references).
 
-Pick MCP tools or the `linear api` CLI per [Tool Selection](#tool-selection).
+Pick a tool path per [Tool Selection](#tool-selection).
 
 ## Tool Selection
 
-1. **MCP tools** - simple operations (create/update/query single issues, basic filters)
-2. **`linear api` CLI** - complex queries, bulk operations, or anything not supported by MCP tools
+Three runtime paths reach Linear, in order of preference:
+
+1. **Claude.ai connector** (`mcp__claude_ai_Linear__save_issue`, `get_issue`) is the primary path. One tool, `save_issue`, handles both create and update. See [Creating vs Updating](#creating-vs-updating).
+2. **Local or plugin MCP** (`create_issue`, `update_issue`, `list_issues`) exposes separate tools for create and update. Use it for simple single-issue operations when the connector is unavailable.
+3. **`linear` CLI and raw GraphQL** is the fallback for what the connector and MCP tools do not cover (complex queries, bulk operations). Defer to the `linear-cli:linear-cli` skill for the CLI surface. See [GraphQL API](#graphql-api).
+
+## Creating vs Updating
+
+The connector's `save_issue` creates or updates from a single tool, keyed on whether you pass an `id`. Check before every call:
+
+- **Create**: omit `id`. `title` is **required** (omitting it produces "title is required when creating an issue").
+- **Update**: pass `id` (from `get_issue`). `title` is optional; send only the fields you change.
+- Use flat top-level keys. No wrapper objects (`issue`, `input`, `parameters`), and the field is `id`, not `issueId`.
+- Omit relation fields the connector does not natively support.
+
+Create (`id` absent, `title` present):
+
+```json
+{
+  "team": "ENG",
+  "title": "Fix authentication bug",
+  "assignee": "me",
+  "state": "Todo"
+}
+```
+
+Update (`id` present, change only what you need):
+
+```json
+{
+  "id": "ENG-123",
+  "state": "In Progress"
+}
+```
+
+The local and plugin MCP variants split these into `create_issue` and `update_issue`, shown in the examples below. The create precondition (`title` required) applies to both paths.
 
 ## Conventions
-
-#### Creating vs Updating
-
-The Claude.ai Linear connector exposes a single tool, `save_issue`, for both creating and updating issues:
-
-- **Create**: omit the issue id. `title` is **required** (omitting it produces "title is required when creating an issue").
-- **Update**: supply the issue id. `title` is optional.
-
-The local and plugin variants use separate tools (`create_issue` and `update_issue`), used in the examples below. When connected via the Claude.ai connector, substitute `save_issue` and apply the preconditions above.
 
 ### Issue References
 

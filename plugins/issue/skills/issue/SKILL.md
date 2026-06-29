@@ -16,8 +16,6 @@ allowed-tools:
 
 Work on this issue: $ARGUMENTS
 
-Register the target issue for auto-approve: `bun ${CLAUDE_PLUGIN_ROOT}/scripts/set-target.ts --session-id ${CLAUDE_SESSION_ID} "$ARGUMENTS"`
-
 Fetch the issue, apply [safety guidelines](safety.md), then work autonomously — create a branch, commit, and open a PR following the `pull-request:create` skill.
 
 After a `/compact`, review this file to restore context.

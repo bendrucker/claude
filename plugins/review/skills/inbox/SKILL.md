@@ -41,7 +41,7 @@ Orchestrate live PR/MR reviews in tmux. You are the sidebar orchestrator: fetch 
 
 When `--queue` is set, another skill has already gathered, triaged, and ordered the reviews.
 
-Skip [Fetch Pending Reviews](#fetch-pending-reviews) and [Present Results](#present-results). Take the queue from the invoking context as given: spawn each review in the order received, passing its triage summary as the `spawn.ts` `--context` so the session opens with the caller's framing. Everything from [Spawn Review Sessions](#spawn-review-sessions) onward, the sidebar resize, layout, monitoring, and worktree reclamation, is unchanged.
+Skip [Fetch Pending Reviews](#fetch-pending-reviews) and [Present Results](#present-results). Take the queue from the invoking context as given: spawn each review in the order received, passing its triage summary as the `spawn.ts` `--context` so the session opens with the caller's framing. If the caller supplies a permission mode, forward it to `spawn.ts` via `--permission-mode`. Everything from [Spawn Review Sessions](#spawn-review-sessions) onward, the sidebar resize, layout, monitoring, and worktree reclamation, is unchanged.
 
 ## Fetch Pending Reviews
 
@@ -79,7 +79,11 @@ bun ${CLAUDE_SKILL_DIR}/scripts/spawn.ts <pr-url> --repo-path <local-path> --dat
 
 `spawn.ts` handles `--worktree` for branch isolation, tmux layout computation, and state tracking. Pass `--context` with PR metadata (title, author, description summary) so the spawned review session has immediate context. Panes cycle in groups of 3: one horizontal split (new column at 70% width for the first, equal width after), then two vertical splits stacking in the column.
 
-Before spawning the first pane, resize the orchestrator to a sidebar:
+Pass `--session <name>` to open reviews in a tmux session other than the one you orchestrate from. Without it, `spawn.ts` splits the orchestrator's own pane.
+
+Pass `--permission-mode <default|acceptEdits|plan|bypassPermissions>` to set the spawned Claude session's permission mode. Omit it to keep Claude's default mode.
+
+Resize the orchestrator to a sidebar before spawning the first pane, but only when the panes share your window. Skip the resize under `--session`, since the orchestrator does not share the panes' window.
 
 ```bash
 tmux resize-pane -t $TMUX_PANE -x 30%
@@ -163,7 +167,7 @@ Two rules for any command you hand `Monitor`:
 
 #### React to Each Event
 
-For each emitted URL, spawn a session without prompting, reusing [Resolve the Local Repo Path](#resolve-the-local-repo-path). In unattended runs there is no one to answer the clone prompt, so skip any review whose repo is not cloned locally and report it rather than blocking the loop. `spawn.ts` refuses a URL already tracked, so a URL re-emitted before its `spawn.ts` lands is a no-op.
+For each emitted URL, spawn a session without prompting, reusing [Resolve the Local Repo Path](#resolve-the-local-repo-path). If the caller supplied a permission mode, forward it to `spawn.ts` via `--permission-mode`. In unattended runs there is no one to answer the clone prompt, so skip any review whose repo is not cloned locally and report it rather than blocking the loop. `spawn.ts` refuses a URL already tracked, so a URL re-emitted before its `spawn.ts` lands is a no-op.
 
 #### Pacing and Stopping
 

@@ -15,13 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/bun-install
 
       - name: Check
         run: bun run check
@@ -30,13 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/bun-install
 
       - name: TypeScript build
         run: bun run build
@@ -45,13 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/bun-install
 
       - name: Run tests
         run: bun test ./.claude ./user scripts/
@@ -62,13 +50,9 @@ jobs:
       plugins: ${{ steps.list.outputs.plugins }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/bun-install
 
       - name: Test packages
         run: bun test packages/
@@ -148,7 +132,7 @@ jobs:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Inspect plugin
         id: inspect
@@ -160,15 +144,17 @@ jobs:
           echo "has_tests=$(find "plugins/$plugin" -name '*.test.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_integration_tests=$(find "plugins/$plugin" -name '*.integration.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_swift=$(find "plugins/$plugin" -name '*.swift' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+          echo "has_playwright=$(find "plugins/$plugin" -name package.json -not -path '*/node_modules/*' -print0 | xargs -0 grep -lF '"playwright"' 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Install Claude Code CLI
+        id: cli
+        background: true
         run: curl -fsSL https://claude.ai/install.sh | bash
+
+      - uses: ./.github/actions/bun-install
+
+      - name: Wait for CLI
+        wait: cli
 
       - name: Validate plugin
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
@@ -197,15 +183,20 @@ jobs:
             bun run --cwd "plugins/${{ matrix.plugin.name }}" build
           fi
 
+      - name: Cache Playwright browsers
+        if: runner.os == 'Linux' && steps.inspect.outputs.has_playwright == 'true'
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: playwright-${{ runner.os }}-
+
       - name: Install system dependencies
         if: runner.os == 'Linux'
         run: |
           plugin="plugins/${{ matrix.plugin.name }}"
           deps=$(find "$plugin" -name package.json -not -path '*/node_modules/*' -not -path '*/.bun-cache/*' \
             -print0 | xargs -0 jq -r '[.dependencies // {}, .devDependencies // {}] | map(keys) | flatten[]' 2>/dev/null | sort -u)
-          if echo "$deps" | grep -q '^sharp$'; then
-            sudo apt-get update && sudo apt-get install -y libvips-dev
-          fi
           if echo "$deps" | grep -q '^playwright$'; then
             bun "$plugin/node_modules/.bin/playwright" install chromium --with-deps
           fi
@@ -242,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Check markdown links
         uses: gaurav-nelson/github-action-markdown-link-check@v1
@@ -255,13 +246,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/bun-install
 
       - name: Lint skills
         run: bun run skill-lint "user/skills/*"
@@ -271,15 +258,11 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/bun-install
 
       - name: Measure coverage on changed files
         run: |
@@ -292,7 +275,7 @@ jobs:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2

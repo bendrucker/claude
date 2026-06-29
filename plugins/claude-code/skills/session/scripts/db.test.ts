@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
@@ -6,6 +6,12 @@ import { $ } from "bun";
 import { type Database, dirExists, ensureIndex, getDb, rebuildViews, runQuery } from "./db";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
+const resourcesDir = path.join(import.meta.dirname, "..", "resources");
+const plansFixtureDir = path.join(import.meta.dirname, "..", "fixtures", "plans");
+
+async function loadExtensions(database: Database) {
+  await database.run(await Bun.file(path.join(resourcesDir, "extensions.sql")).text());
+}
 
 function filterParams(overrides: Record<string, string | null> = {}) {
   return { after_date: null, before_date: null, project: null, host: null, ...overrides };
@@ -18,6 +24,20 @@ function queryParams(overrides: Record<string, string | null> = {}) {
 let db: Database;
 let tmpDir: string;
 let importsDir: string;
+
+// The first `INSTALL ... FROM community` downloads the markdown/yaml extensions over
+// the network, which can exceed the default per-test timeout on a cold CI runner.
+// Warm the shared extension cache once so the per-test LOAD reads from disk.
+beforeAll(async () => {
+  const warmDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-warm-"));
+  const warm = await getDb(warmDir);
+  try {
+    await loadExtensions(warm);
+  } finally {
+    warm.close();
+    await rm(warmDir, { recursive: true, force: true });
+  }
+}, 120_000);
 
 async function importFixtureHost(label: string, opts: { source?: string } = {}) {
   const projects = path.join(importsDir, label, "projects");
@@ -935,5 +955,138 @@ describe("plan_calls view and plans query", () => {
       min_plans: "3",
     });
     expect(rows.find((r) => r.session_id === "plan-session")).toBeUndefined();
+  });
+});
+
+describe("plan-sections query", () => {
+  const plansGlob = path.join(plansFixtureDir, "*.md");
+  const featurePlan = path.join(plansFixtureDir, "feature-plan.md");
+
+  type Section = {
+    session_id: string | null;
+    outcome: string | null;
+    title: string;
+    level: number;
+    file_path: string;
+  };
+
+  beforeEach(async () => {
+    await loadExtensions(db);
+  });
+
+  async function insertDiskPlan() {
+    // A plan_calls row whose planFilePath points at an on-disk fixture, so its
+    // sections join to session context. content_items rebuilds from raw on rebuildViews.
+    const assistant = JSON.stringify({
+      type: "assistant",
+      sessionId: "disk-plan-session",
+      cwd: "/Users/test/project",
+      timestamp: "2026-02-01T10:00:00.000Z",
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id: "disk-plan-1",
+            name: "ExitPlanMode",
+            input: { plan: "# Feature Plan", planFilePath: featurePlan },
+          },
+        ],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
+    });
+    const result = JSON.stringify({
+      type: "user",
+      sessionId: "disk-plan-session",
+      timestamp: "2026-02-01T10:01:00.000Z",
+      message: {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: "disk-plan-1",
+            content: "User has approved your plan. You can now start coding.",
+          },
+        ],
+      },
+    });
+    for (const [type, line, ts] of [
+      ["assistant", assistant, "2026-02-01T10:00:00"],
+      ["user", result, "2026-02-01T10:01:00"],
+    ] as const) {
+      await db.run(
+        `INSERT INTO raw (host, session_id, type, project_path, timestamp, data)
+         VALUES ('local', 'disk-plan-session', $type, '/Users/test/project',
+                 $ts::TIMESTAMP, $line::JSON)`,
+        { type, ts, line },
+      );
+    }
+    await rebuildViews(db);
+  }
+
+  it("parses one row per section with level and title", async () => {
+    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    const feature = rows.filter((r) => r.file_path === featurePlan);
+    expect(feature.map((r) => r.title)).toEqual([
+      "Feature Plan",
+      "Context",
+      "Plan",
+      "Queue Sizing",
+      "Verification",
+    ]);
+    expect(feature.find((r) => r.title === "Queue Sizing")?.level).toBe(3);
+  });
+
+  it("finds plans whose sections lack a Verification heading", async () => {
+    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    const byFile = new Map<string, Set<string>>();
+    for (const r of rows) {
+      if (!byFile.has(r.file_path)) byFile.set(r.file_path, new Set());
+      byFile.get(r.file_path)!.add(r.title);
+    }
+    const missing = [...byFile.entries()]
+      .filter(([, titles]) => !titles.has("Verification"))
+      .map(([file]) => file);
+    expect(missing).toContain(path.join(plansFixtureDir, "quick-plan.md"));
+    expect(missing).not.toContain(featurePlan);
+  });
+
+  it("joins sections to the session that produced the plan", async () => {
+    await insertDiskPlan();
+    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+
+    const feature = rows.filter((r) => r.file_path === featurePlan);
+    expect(feature.length).toBeGreaterThan(0);
+    for (const r of feature) {
+      expect(r.session_id).toBe("disk-plan-session");
+      expect(r.outcome).toBe("approved");
+    }
+
+    // quick-plan.md has no matching plan_calls row, so the LEFT JOIN leaves it null.
+    const quick = rows.filter((r) => r.file_path === path.join(plansFixtureDir, "quick-plan.md"));
+    expect(quick.length).toBeGreaterThan(0);
+    for (const r of quick) expect(r.session_id).toBeNull();
+  });
+
+  it("omits a plan whose planFilePath does not exist on disk (cross-host/deleted)", async () => {
+    // The plan-session fixture's planFilePath is /Users/test/.claude/plans/plan-session.md,
+    // outside the glob. The LEFT JOIN from sections means that plan yields no section rows.
+    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    expect(rows.some((r) => r.session_id === "plan-session")).toBe(false);
+  });
+});
+
+describe("frontmatter query", () => {
+  it("parses name and description from a SKILL.md frontmatter", async () => {
+    await loadExtensions(db);
+    const skill = path.join(import.meta.dirname, "..", "SKILL.md");
+    const rows = await runQuery<{ file_path: string; name: string; description: string }>(
+      db,
+      "frontmatter",
+      { frontmatter_glob: skill },
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.name).toBe("claude-code:session");
+    expect(rows[0]?.description).toContain("DuckDB index");
   });
 });

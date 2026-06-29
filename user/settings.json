@@ -1,10 +1,68 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "theme": "auto",
+  "fallbackModel": ["sonnet"],
+  "cleanupPeriodDays": 90,
+  "autoMode": {
+    "hard_deny": [
+      "$defaults",
+      "Never git push to the default branch (main or master).",
+      "Never force-push to a shared branch or any branch you do not own; only your own stacked-PR branches may be force-pushed."
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Pause before destructive filesystem operations such as rm -rf or overwriting existing files outside tmp/ and .worktrees/.",
+      "Do not create a pull request or merge request on a third-party repository (one I do not own or maintain) unless I explicitly asked for one; offer it for confirmation first."
+    ]
+  },
   "attribution": {
     "commit": "",
     "pr": ""
   },
+  "footerLinksRegexes": [
+    {
+      "type": "regex",
+      "pattern": "\\b(?<repo>[A-Za-z0-9][\\w.-]*/[A-Za-z0-9][\\w.-]*)#(?<number>\\d+)\\b",
+      "url": "https://github.com/{repo}/issues/{number}",
+      "label": "{repo}#{number}"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\bPEP[ -]?(?<number>\\d{3,4})\\b",
+      "url": "https://peps.python.org/pep-{number}/",
+      "label": "PEP {number}"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\bRFC[ -]?(?<number>\\d{3,5})\\b",
+      "url": "https://datatracker.ietf.org/doc/html/rfc{number}",
+      "label": "RFC {number}"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(?<id>CVE-\\d{4}-\\d{4,})\\b",
+      "url": "https://nvd.nist.gov/vuln/detail/{id}",
+      "label": "{id}"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\bCWE-(?<number>\\d+)\\b",
+      "url": "https://cwe.mitre.org/data/definitions/{number}.html",
+      "label": "CWE-{number}"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(?<id>GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4})\\b",
+      "url": "https://github.com/advisories/{id}",
+      "label": "{id}"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(?<id>GO-\\d{4}-\\d+)\\b",
+      "url": "https://pkg.go.dev/vuln/{id}",
+      "label": "{id}"
+    }
+  ],
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
@@ -19,6 +77,7 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:pypi.org)",
       "WebFetch(domain:rubygems.org)",
+      "WebFetch(domain:community-extensions.duckdb.org)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
@@ -224,7 +283,6 @@
     "ast-grep@ast-grep-marketplace": true,
     "worktrunk@worktrunk": true,
     "plan@bendrucker": true,
-    "playground@claude-plugins-official": true,
     "linear-cli@linear-cli": true,
     "tmux@bendrucker": true,
     "bun@bendrucker": true,
@@ -243,20 +301,20 @@
       "source": {
         "source": "github",
         "repo": "anthropics/claude-plugins-official",
-        "ref": "27d2b86d72da27c64585150857cee8472ad47abb"
+        "ref": "3dc50d51835dc85f7a3f77d593dd9a565a87276b"
       }
     },
     "astral-sh": {
       "source": {
         "source": "github",
         "repo": "astral-sh/claude-code-plugins",
-        "ref": "f8034678a15ad751aae6a2b684daebac416267a1"
+        "ref": "f3ce88a7ba830f53afd6d944c1d0278ed318e142"
       }
     },
     "ast-grep-marketplace": {
       "source": {
         "source": "github",
-        "repo": "ast-grep/claude-skill",
+        "repo": "ast-grep/agent-skill",
         "ref": "577f4d4507678f2c8cee150fae25e6ce309f70b1"
       }
     },
@@ -264,7 +322,7 @@
       "source": {
         "source": "github",
         "repo": "max-sixty/worktrunk",
-        "ref": "v0.60.0"
+        "ref": "v0.62.0"
       }
     },
     "linear-cli": {
@@ -278,7 +336,7 @@
       "source": {
         "source": "github",
         "repo": "vercel-labs/agent-browser",
-        "ref": "v0.28.0"
+        "ref": "v0.31.1"
       }
     }
   },
@@ -288,6 +346,7 @@
     "allowAppleEvents": true,
     "network": {
       "allowLocalBinding": true,
+      "allowMachLookup": ["com.apple.trustd.agent"],
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
         "~/.tmux",
@@ -334,7 +393,6 @@
       "shortcuts:*",
       "dscl:*",
       "git:*",
-      "gh:*",
       "linear:*",
       "code:*"
     ]
@@ -356,7 +414,7 @@
   "preferredNotifChannel": "terminal_bell",
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "teammateMode": "auto",
+  "teammateMode": "in-process",
   "env": {
     "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",

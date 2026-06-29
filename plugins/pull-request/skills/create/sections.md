@@ -4,6 +4,8 @@ What goes in the body, and what to leave out. The create and update skills both 
 
 The body conveys what the diff cannot. The reviewer reads the code for what changed. Use the body for why it changed, the decisions you made, and how you know it works. If a sentence only restates what the diff shows, cut it.
 
+Write the body to stand on its own. The reviewer has the diff and the linked issue and nothing else — not your plan, not the issue you were handed, not the session that produced the change. Every reference must point to something they can open: a linked issue, a PR, a permalink. A phrase like "the plan", "as originally planned", or "the issue specified" points at an artifact they can't see, so it lands as a dead end. State the decision itself instead of the gap between it and an instruction only you saw.
+
 Write in active voice and first person for your own calls. "I chose X over Y because…", "I traced this to…". Don't write passively ("X was added", "the bug was caused by…"). Keep the prose plain. Technical terms are fine. Marketing and model flourishes (`source of truth`, `fail loudly`, `escape hatch`, `cleanly`, `wires up`) are not. Load the `writing` skill for the full set of tropes.
 
 ## Shape
@@ -33,7 +35,7 @@ A heading has slipped into a sentence when it carries a comma, a trailing period
 The most valuable content is the substance that lived in the session but never reached the code. Review the conversation that produced the change and surface what applies. This belongs in the PR body, not in code comments where Claude tends to leak it.
 
 - Decisions and the alternatives you rejected. Name what you chose against and why you didn't take it.
-- Deviations from the issue or plan. Where the implementation departed from what was specified, and the scope you added or dropped (an extra `allowed-tools` entry, files touched beyond the plan, a feature cut).
+- Scope you added or dropped, and decisions that took a different path than the obvious or specified one (an extra `allowed-tools` entry, a feature cut, files touched beyond the core change). Surface the substance — but state it as a self-contained decision, what you did and why, never as a delta against a plan or instruction the reader never saw. Write "I added a `Bash(git push:*)` entry because the workflow pushes the branch," not "I added an entry beyond what the plan listed." The reason makes it land; the comparison to an unseen plan does not.
 - Overturned theories. A root cause you diagnosed then disproved, an approach you built then abandoned. The diff shows the destination. The reviewer benefits from the wrong turn you already ruled out.
 - What you observed testing locally. The actual result, surprise, or failure mode, not just "verified". Benchmark or cost numbers. What you couldn't test and the concrete reason ("brew install failed locally", not "needs a real machine").
 - Limitations you ruled out. A workaround you considered and rejected as too fragile, a feature deferred as structural. This explains non-changes a reviewer might otherwise question.
@@ -46,7 +48,7 @@ Not every PR has all of these. Include only what a reviewer would act on. True b
 
 - Visual or GUI work: screenshots or a recording of the result. Rejected layouts. Bugs only live rendering surfaced.
 - Backend or API work: an example request and response. The mechanism proof for a fix (what breaks without it). Performance numbers.
-- Config, tooling, or prose: scope deviations, what you deliberately did not build, and the evidence that grounds the design.
+- Config, tooling, or prose: the scope you added or dropped, what you deliberately did not build, and the evidence that grounds the design.
 
 ## Ground Claims in Evidence
 
@@ -76,3 +78,4 @@ Related links, issues, or reviews that aren't the motivating issue. Use `Closes 
 - Test counts, "all tests pass", coverage inventories.
 - Count-padding ("six detectors, three and three"). The number is rarely the point.
 - The consequence chain (`, so the…`) used as a filler connective, and the antithesis (`not just X but Y`, `X instead of Y`) used as framing. Both read as tics when habitual.
+- Indirect references to an artifact the reader can't open: "deviations from the plan", "as originally planned", "the plan assumed", "per the plan", "the issue specified", a `## Deviations From the Plan` heading. The deviation's substance is worth keeping; framing it as a gap against an unseen plan, issue, or conversation is the tell. Restate it as a decision that stands on its own.

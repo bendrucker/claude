@@ -1,6 +1,6 @@
 # Mac
 
-macOS-specific automation, sandbox workarounds, and system integration.
+macOS-specific automation and system integration.
 
 ## Contents
 
@@ -9,30 +9,17 @@ macOS-specific automation, sandbox workarounds, and system integration.
 - **jxa** — JXA language guide for writing JavaScript for Automation code
 - **jxa-run** — App-scoped JXA runner with AST-based Application() validation
 
-### Hooks
-
-- **sandbox** — Detects Go binaries and disables sandbox for TLS cert verification. Matches both `Bash` and `Monitor` tool calls.
-
 ### Scripts
 
 - `scripts/jxa.ts` — App-scoped JXA runner with AST-based `Application()` validation
 - `scripts/open-url.ts` — Scheme-scoped URL opener with scheme validation
 
-## Sandbox bypass marker
+## Sandbox
 
-The sandbox hook auto-disables Seatbelt for two cases:
+Go-based CLIs and Launch Services handoffs run sandboxed. Two `sandbox` keys in `user/settings.json` cover them profile-wide:
 
-1. The invoked executable is a Go binary (detected by the `__go_buildinfo` byte marker in the first 64KB of the binary).
-2. A `bun <script>` or `node <script>` invocation, where the script's first 64KB contains the literal string `claude:dangerouslyDisableSandbox`.
-
-The second mechanism is opt-in. Plugins that ship a wrapper script which shells out to Go binaries (`gh`, `glab`, `terraform`, etc.) can add a comment near the top of the script:
-
-```ts
-#!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: shells out to gh for TLS-bearing API calls
-```
-
-The marker is inert on Linux and inert when the `mac` plugin is not installed. It only activates when this hook is running on macOS.
+- `sandbox.network.allowMachLookup: ["com.apple.trustd.agent"]` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification (`gh`, `glab`, `terraform`, `kubectl`, `go`).
+- `sandbox.allowAppleEvents: true` covers Apple Events and Launch Services `open`/URL-scheme handoff (`open-url.ts`, the Things scripts).
 
 ## Testing
 

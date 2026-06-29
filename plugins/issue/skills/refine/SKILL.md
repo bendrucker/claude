@@ -66,9 +66,8 @@ State facts, not hedging. Name the function, file, or behavior rather than descr
 
 Link to code. Use permalinks for GitHub (`https://github.com/{owner}/{repo}/blob/{sha}/path#L10-L20`) and file paths elsewhere (`path/to/file:10-20`).
 
+Don't use spaced em dashes. Split into two sentences without a semicolon or unspaced substitute.
+
 ## Issue Trackers
 
-Fetch with `get_issue`, output refinement for review, update only after approval.
-
-- Linear: `mcp__linear__get_issue`, `mcp__linear__update_issue`, or `mcp__claude_ai_Linear__get_issue`, `mcp__claude_ai_Linear__save_issue`
-- GitHub: `mcp__github__get_issue`, `mcp__github__update_issue`
+Fetch the issue, output the refinement for approval, and update the tracker only after approval. Defer tracker-save mechanics to the platform skill. For Linear, use `linear:linear`.

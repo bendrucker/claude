@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { execFile } from "node:child_process";
-import { relative } from "node:path";
+import { isAbsolute, relative, sep } from "node:path";
 import { promisify } from "node:util";
 import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
@@ -62,6 +62,17 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   return [...files];
 }
 
+export function scopePaths(files: string[], cwd: string): string[] {
+  const scoped: string[] = [];
+  for (const file of files) {
+    const rel = relative(cwd, file);
+    if (rel !== "" && !isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`)) {
+      scoped.push(rel);
+    }
+  }
+  return scoped;
+}
+
 export async function processStop(input: StopHookInput): Promise<SyncHookJSONOutput | null> {
   if (input.stop_hook_active) {
     return null;
@@ -76,7 +87,10 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
     return null;
   }
 
-  const relativePaths = files.map((f) => relative(input.cwd, f));
+  const relativePaths = scopePaths(files, input.cwd);
+  if (relativePaths.length === 0) {
+    return null;
+  }
 
   try {
     await execFileAsync("bun", ["install", "--cwd", input.cwd]);

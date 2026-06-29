@@ -68,15 +68,17 @@ function updateSummary(): void {
     text += ` (+${entries.length - 1})`;
   }
 
-  const color = "#d97757";
-  const crust = "#11111b";
-  const fg = "#cdd6f4";
-  const surface = "#313244";
+  // ANSI colours 0-15 are remapped by the terminal's Catppuccin theme, so the
+  // status segment adapts to light and dark mode (see scripts.md).
+  const accent = "colour3";
+  const crust = "colour0";
+  const fg = "colour7";
+  const surface = "colour8";
   const sep = "\uE0B6";
 
   const styled = [
-    `#[fg=${color}]${sep}`,
-    `#[fg=${crust},bg=${color}]󰂞 `,
+    `#[fg=${accent}]${sep}`,
+    `#[fg=${crust},bg=${accent}]󰂞 `,
     `#[fg=${fg},bg=${surface}] ${text}`,
     `#[fg=${surface}] `,
   ].join("");

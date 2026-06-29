@@ -72,6 +72,93 @@ const RESULT_SENTENCES = [
   /^(?:\w+\s+){0,3}pass(?:es|ed|ing)?(?:\s|$)/im,
 ];
 
+// "no X needed" is a marketing brag when X is an artifact the design lacks
+// ("no config needed"), but a legitimate status report when X is an action that
+// was not required ("no change needed"). The artifact side is open-ended, so we
+// flag the construction and carve out the status side, whose vocabulary is
+// concentrated: function words, deverbal nouns (-tion/-sion/-ment), and dev
+// actions. A determiner in the gap marks a clause boundary ("no way the runtime
+// needed ..."), not an intervening adjective.
+const NO_X_CONSTRUCTION = /\bno\s+((?:\w+\s+){0,3}?)(\w+)\s+(?:needed|required|necessary)\b/gi;
+const NO_X_FUNCTION_WORDS = new Set([
+  "longer",
+  "more",
+  "further",
+  "additional",
+  "extra",
+  "fewer",
+  "less",
+  "other",
+]);
+const NO_X_ACTION_WORDS = new Set([
+  "change",
+  "changes",
+  "fix",
+  "fixes",
+  "edit",
+  "edits",
+  "work",
+  "move",
+  "moves",
+  "update",
+  "updates",
+  "override",
+  "overrides",
+  "touch",
+  "tweak",
+  "tweaks",
+  "patch",
+  "patches",
+  "bump",
+  "bumps",
+  "swap",
+  "swaps",
+  "merge",
+  "merges",
+  "sync",
+  "run",
+  "runs",
+  "check",
+  "checks",
+  "review",
+  "reviews",
+  "test",
+  "tests",
+  "cleanup",
+  "dedup",
+  "retry",
+  "retries",
+  "rebuild",
+  "rebase",
+  "restack",
+  "restart",
+  "reload",
+  "resize",
+  "reorder",
+  "recompile",
+  "redeploy",
+  "reinstall",
+  "rerun",
+  "refactor",
+]);
+const DEVERBAL_NOUN = /(?:tion|sion|ment)s?$/i;
+
+function isStatusHead(head: string): boolean {
+  const word = head.toLowerCase();
+  return NO_X_FUNCTION_WORDS.has(word) || NO_X_ACTION_WORDS.has(word) || DEVERBAL_NOUN.test(word);
+}
+
+function noXNeededHits(text: string): Hits {
+  for (const match of text.matchAll(NO_X_CONSTRUCTION)) {
+    const gap = match[1] ?? "";
+    const head = match[2] ?? "";
+    if (gap.split(/\s+/).some((token) => DETERMINERS.test(token))) continue;
+    if (isStatusHead(head)) continue;
+    return { count: 1, sample: match[0].trim() };
+  }
+  return { count: 0, sample: "" };
+}
+
 function testResultHits(text: string): Hits {
   for (const sentence of text.split(/[.!?\n]+/)) {
     const s = sentence.trim();
@@ -423,6 +510,28 @@ export const PATTERNS: PatternDef[] = [
       "Pre-dates the curation principle; no corpus evidence recorded. Each word in this list was identified as promotional AI vocabulary, but none has a per-entry corpus audit. Candidates for migration to vocabulary.txt once audited.",
     retire:
       "Migrate each entry to vocabulary.txt after a corpus audit confirms lift. Remove entries that fail the audit (not distinctive or dead).",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "no X needed brag",
+    test: noXNeededHits,
+    message: (matched) =>
+      `"${matched}" advertises what the design avoids. Describe what it does instead.`,
+    positives: [
+      "Handlers are auto-discovered, no config needed.",
+      "It runs inline (no wrapper needed).",
+      "Spin it up with no docker needed.",
+    ],
+    negatives: [
+      "Reviewed the helper, no change needed.",
+      "No further action needed here.",
+      "There is no way the runtime needed that much memory.",
+    ],
+    evidence:
+      'User flagged this trope directly; the working branch was named for it. The brag advertises an absent artifact ("no config/wrapper/docker needed") and its noun space is open-ended, so the detector flags the construction and carves out legitimate status reports instead. The assistant corpus shows why: status reports concentrate in a small set (change, action, fix, deverbal -tion/-sion/-ment nouns, re- dev verbs) while brags scatter across an unbounded artifact vocabulary. An allowlist of brag nouns goes stale; a status carve-out fails toward a visible, prunable over-nudge. A clean distinctiveness audit against the hand-written PR baseline is outstanding: user-role session text is contaminated because it contains pasted assistant output.',
+    retire:
+      "Add a word to the status carve-out (NO_X_ACTION_WORDS) when writing:scan shows it producing a false-positive nudge. Remove the pattern when the construction stops appearing in assistant deliverables or in corrective-feedback moments.",
   },
   {
     tier: "context",

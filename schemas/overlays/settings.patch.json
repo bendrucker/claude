@@ -9,6 +9,15 @@
   },
   {
     "op": "add",
+    "path": "/properties/sandbox/properties/network/properties/allowMachLookup",
+    "value": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "macOS mach services the sandbox may look up (e.g. com.apple.trustd.agent for Go/Security.framework TLS)"
+    }
+  },
+  {
+    "op": "add",
     "path": "/properties/theme",
     "value": {
       "type": "string",

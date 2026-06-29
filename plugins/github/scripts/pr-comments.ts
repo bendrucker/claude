@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: shells out to gh (Go binary) for TLS-bearing API calls
 
 import { cli } from "cleye";
 import { type Author, isBot, isReviewTarget, loadExtraReviewers } from "./reviewers";

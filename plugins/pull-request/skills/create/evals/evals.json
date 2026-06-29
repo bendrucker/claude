@@ -17,10 +17,11 @@
     {
       "id": 2,
       "prompt": "Create a PR for this skill change. We deviated from the plan: an extra allowed-tools entry was added beyond what the plan listed, and you renamed the two modes mid-session at my request.",
-      "expected_output": "A body that surfaces the scope deviation and the user-driven rename as the decisions they were, organized by concept.",
+      "expected_output": "A body that surfaces the added scope and the user-driven rename as the self-contained decisions they were, organized by concept, without framing them as a delta against a plan the reader can't see.",
       "files": [],
       "expectations": [
-        "The body states the deviation from the plan (the extra scope added) rather than smoothing it over",
+        "The body states the added scope (the extra allowed-tools entry) as a decision with its reason, rather than smoothing it over",
+        "It does not reference 'the plan', 'as planned', or any unseen spec or conversation; the scope change reads as a self-contained decision",
         "It does not make a false claim that contradicts the diff (e.g. naming the wrong set of additions)",
         "The user-driven naming decision is surfaced as a decision, not presented as obvious",
         "Changes are organized by concept, never as **path**: description bullets"

@@ -307,7 +307,7 @@
       "source": {
         "source": "github",
         "repo": "astral-sh/claude-code-plugins",
-        "ref": "f8034678a15ad751aae6a2b684daebac416267a1"
+        "ref": "f3ce88a7ba830f53afd6d944c1d0278ed318e142"
       }
     },
     "ast-grep-marketplace": {

@@ -13,7 +13,9 @@ Never use `workspace:*` in distributed plugin code. Plugins ship as raw director
 
 Shared plugin code must instead be a **published** npm package referenced by a plain semver range, never `workspace:*`. The canonical example is [`@bendrucker/claude-plugin-toolkit`](../../packages/toolkit) (`"^0.1.0"`), which centralizes the hook runner, output builders, and input types. A plain range that matches a workspace member resolves both ways: `bun install` links the local `packages/toolkit` directory during development and CI, and end users fetch the published package from npm. Publishing is manual (see the package README). Land plugin migrations only after the referenced version is on npm.
 
-Repo-internal tooling (`scripts/`, `.claude/hooks/`) is not distributed, so it must import `packages/` code via relative paths (e.g. `../packages/marketplace/index`) instead of the `@bendrucker/*` specifier. That keeps it running in fresh worktrees without `bun install`, which the Worktrunk `post-start` hook (`.config/wt.toml`) runs for new worktrees but not for `Agent(isolation='worktree')` worktrees.
+Repo-internal tooling (`scripts/`, `.claude/hooks/`) is not distributed, so it must import `packages/` code via relative paths (e.g. `../packages/marketplace/index`, or `../../../packages/toolkit/index` from `.claude/hooks/<name>/`) instead of the `@bendrucker/*` specifier. That keeps it running in fresh worktrees without `bun install`, which the Worktrunk `post-start` hook (`.config/wt.toml`) runs for new worktrees but not for `Agent(isolation='worktree')` worktrees. The toolkit's runtime code has no value imports beyond Bun globals (its SDK import is type-only, erased at runtime), so a relative import of it resolves with no install.
+
+`user/hooks/` is the exception. It is symlinked to `~/.claude/hooks/`, so a relative path into `packages/` would not survive the symlink. Those hooks import the toolkit by its `@bendrucker/claude-plugin-toolkit` specifier, which resolves because the root `package.json` declares the toolkit (so `bun install` links it into the repo's `node_modules`, where Bun finds it via the symlink target's real path).
 
 # Script Conventions
 

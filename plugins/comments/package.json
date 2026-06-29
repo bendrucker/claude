@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.104.1",
     "cleye": "^2.2.1",
     "shiki": "^4.3.0",
     "table": "^6.9.0"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.104.1"
   }
 }

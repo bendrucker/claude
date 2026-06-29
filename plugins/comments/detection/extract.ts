@@ -5,6 +5,7 @@ import {
   type Highlighter,
   type ThemedToken,
 } from "shiki";
+import { lineStartOffsets, sliceRange } from "./offsets";
 import type { Comment, CommentKind, Language } from "./types";
 
 /**
@@ -98,12 +99,7 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
     state = next;
   }
 
-  const lineStart: number[] = [];
-  let offset = 0;
-  for (const line of lines) {
-    lineStart.push(offset);
-    offset += line.length + 1;
-  }
+  const lineStart = lineStartOffsets(lines);
 
   const comments: Comment[] = [];
   let current: Comment | null = null;
@@ -148,9 +144,14 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
   if (current != null) comments.push(current);
 
   for (const comment of comments) {
-    const start = (lineStart[comment.startLine - 1] ?? 0) + comment.startColumn;
-    const end = (lineStart[comment.endLine - 1] ?? 0) + comment.endColumn;
-    comment.text = source.slice(start, end);
+    comment.text = sliceRange(
+      source,
+      lineStart,
+      comment.startLine,
+      comment.startColumn,
+      comment.endLine,
+      comment.endColumn,
+    );
   }
 
   if (language === "python") {

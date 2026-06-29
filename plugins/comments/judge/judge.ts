@@ -1,19 +1,20 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import Anthropic from "@anthropic-ai/sdk";
 import type { CommentKind, Language } from "../detection/types";
-import { batchVerdictSchema, type SlopCategory, type Verdict } from "./schema";
+import type { SlopCategory, Verdict } from "./schema";
 
 /**
- * Meaning-layer LLM judge for introduced code comments. Batch-only: scores N
- * comments per call by 0-based index.
+ * Prompt and verdict-parsing primitives for the judge.
  *
- * The what-on-dense vs what-on-simple distinction is subtle, so the judge
- * defaults to Sonnet. The prompt is a committed, versioned artifact. Every run
- * records its sha256, so a prompt edit invalidates prior numbers.
+ * The genuinely shared core is the versioned prompt (loadPrompt, sha256), the
+ * shard size (BATCH_SIZE), and per-verdict validation (parseVerdict). The
+ * product path builds id-keyed shards in `job.ts` and joins them in
+ * `apply/join.ts`. The positional batch helpers here (formatBatch,
+ * parseBatchVerdicts, judgeComments) serve only the calibration oracle under
+ * `evals/`, which scores a fixed corpus by index. The prompt is a committed,
+ * versioned artifact. Every run records its sha256, so a prompt edit
+ * invalidates prior numbers.
  */
-
-export const JUDGE_MODEL = "claude-sonnet-4-6";
 
 export const PROMPT_PATH = join(import.meta.dirname, "prompt.md");
 
@@ -98,7 +99,7 @@ export function parseBatchVerdicts(json: string, expected: number): Verdict[] {
     if (seen.has(index)) {
       throw new Error(`Judge batch index ${index} appears more than once`);
     }
-    verdicts[index] = parseVerdict(record.verdict, index);
+    verdicts[index] = parseVerdict(record.verdict, `index ${index}`);
     seen.add(index);
   }
   if (seen.size !== expected) {
@@ -107,22 +108,28 @@ export function parseBatchVerdicts(json: string, expected: number): Verdict[] {
   return verdicts as Verdict[];
 }
 
-function parseVerdict(value: unknown, index: number): Verdict {
+/**
+ * Validates one verdict object's shape, returning a typed `Verdict`. `label`
+ * identifies the entry in error messages (a batch index, or a comment id on the
+ * apply path). Shared so the agent fan-out and the oracle reject malformed
+ * verdicts identically.
+ */
+export function parseVerdict(value: unknown, label: string | number): Verdict {
   if (typeof value !== "object" || value === null) {
-    throw new Error(`Judge verdict ${index} must be an object`);
+    throw new Error(`Judge verdict ${label} must be an object`);
   }
   const record = value as Record<string, unknown>;
   if (typeof record.isSlop !== "boolean") {
-    throw new Error(`Judge verdict ${index} "isSlop" must be a boolean`);
+    throw new Error(`Judge verdict ${label} "isSlop" must be a boolean`);
   }
   if (record.category !== null && typeof record.category !== "string") {
-    throw new Error(`Judge verdict ${index} "category" must be a string or null`);
+    throw new Error(`Judge verdict ${label} "category" must be a string or null`);
   }
   if (typeof record.confidence !== "string") {
-    throw new Error(`Judge verdict ${index} "confidence" must be a string`);
+    throw new Error(`Judge verdict ${label} "confidence" must be a string`);
   }
   if (typeof record.rationale !== "string") {
-    throw new Error(`Judge verdict ${index} "rationale" must be a string`);
+    throw new Error(`Judge verdict ${label} "rationale" must be a string`);
   }
   const verdict: Verdict = {
     isSlop: record.isSlop,
@@ -139,38 +146,8 @@ function parseVerdict(value: unknown, index: number): Verdict {
   return verdict;
 }
 
-/** Judges a batch of comments. The seam tests mock; the SDK call implements. */
+/** Judges a batch of comments. The seam tests mock; the oracle's SDK call implements. */
 export type CommentJudge = (inputs: CommentJudgeInput[]) => Promise<Verdict[]>;
-
-export interface AnthropicJudgeOptions {
-  prompt: string;
-  model?: string;
-}
-
-/**
- * Real judge over the Messages API: temperature 0, structured JSON output,
- * prompt cached as a stable system prefix so repeated calls share it.
- */
-export function anthropicCommentJudge(options: AnthropicJudgeOptions): CommentJudge {
-  const client = new Anthropic();
-  const model = options.model ?? JUDGE_MODEL;
-  return async (inputs: CommentJudgeInput[]) => {
-    if (inputs.length === 0) return [];
-    const response = await client.messages.create({
-      model,
-      max_tokens: 4096,
-      temperature: 0,
-      system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
-      output_config: { format: { type: "json_schema", schema: batchVerdictSchema() } },
-      messages: [{ role: "user", content: formatBatch(inputs) }],
-    });
-    const block = response.content.find((b) => b.type === "text");
-    if (!block) {
-      throw new Error(`Judge response contained no text block (stop: ${response.stop_reason})`);
-    }
-    return parseBatchVerdicts(block.text, inputs.length);
-  };
-}
 
 export const BATCH_SIZE = 20;
 

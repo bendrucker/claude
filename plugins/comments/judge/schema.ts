@@ -1,6 +1,6 @@
 /**
  * The judge verdict contract. One verdict per introduced comment. The taxonomy
- * is the corpus-validated v1 set; the judge must never flag the two justified
+ * is the corpus-validated v1 set. The judge must never flag the two justified
  * comment types (what-on-dense, why-on-simple) or genuine design rationale.
  */
 
@@ -38,9 +38,10 @@ export interface Verdict {
   /** Present only with `--fix`: a concrete rewrite, trim, or delete suggestion. */
   suggestedFix?: string;
   /**
-   * For a mixed block where only some lines are slop: the 1-based source lines
-   * worth keeping. Empty means delete the whole comment. Omitted when the
-   * comment is judged as a single unit.
+   * For a mixed block where only some lines are slop: the lines worth keeping,
+   * numbered 1-based and relative to the comment (line 1 is the comment's first
+   * line). Empty means delete the whole comment. Omitted when the comment is
+   * judged as a single unit.
    */
   trimToLines?: number[];
 }
@@ -72,6 +73,7 @@ export function verdictSchema(): Record<string, unknown> {
 /**
  * Batch schema: the judge scores N comments per call, returning verdicts by the
  * 0-based index it was given, so a dropped or reordered entry is detectable.
+ * Used by the calibration oracle, which renders an indexed batch.
  */
 export function batchVerdictSchema(): Record<string, unknown> {
   return {
@@ -86,6 +88,33 @@ export function batchVerdictSchema(): Record<string, unknown> {
             verdict: verdictSchema(),
           },
           required: ["index", "verdict"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["verdicts"],
+    additionalProperties: false,
+  };
+}
+
+/**
+ * Batch schema keyed by the stable comment id rather than a positional index.
+ * The agent fan-out reads a shard of id-tagged comments and returns one verdict
+ * per id, so the applier can id-join verdicts back to recorded ranges.
+ */
+export function batchVerdictKeyedSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: {
+      verdicts: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            verdict: verdictSchema(),
+          },
+          required: ["id", "verdict"],
           additionalProperties: false,
         },
       },

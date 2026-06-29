@@ -3,39 +3,56 @@
 Detect AI slop code comments in a diff and steer clean comment generation.
 
 LLMs over-produce low-value comments: restatement of simple code, narration of
-the change, self-praise, and section-divider banners. This plugin audits any diff
-for those, scoped to only the comments a change introduced, and judges them
-against a two-type model of when a comment earns its place.
+the change, self-praise, and section-divider banners. This plugin extracts
+comments deterministically, judges them against a two-type model of when a
+comment earns its place, and trims the slop on a review branch.
+
+## Scopes
+
+One pipeline, two scopes selected by a flag:
+
+- Diff scope (default, `--base <ref>`, `--mr <iid>`): the comments a change
+  introduced, scoped to added and modified lines.
+- Repo scope (`--all`): every tracked code file's comments, for sweeping a
+  slop-heavy codebase into a large reviewable deletion.
+
+Both run extraction, intrinsic-complexity ranking, an agent fan-out for judging,
+and a deterministic apply.
 
 ## Contents
 
-- **`comments:audit`** skill: extract comments with Shiki (TextMate grammars),
-  scope them to a diff's added lines, and judge the introduced comments with an
-  LLM calibrated to the owner's comment model. Supports the working tree, a branch
-  base, an explicit ref, and a GitLab merge request. Flag-only by default. `--fix`
-  adds suggestions.
-- **`detection/`**: deterministic comment extraction over Shiki's TextMate
-  grammars, with broad language coverage loaded from `node_modules` on demand.
-  Also unified-diff parsing and base resolution, diff-scoping, and advisory tells.
-- **`judge/`**: the Anthropic judge harness and its versioned `prompt.md`.
-- **`evals/`**: the labeled fixture corpus and the precision/recall eval with a
-  must-pass-negative ship gate.
+- **`comments:audit`** skill: the three-step pipeline. `preflight` extracts,
+  ranks, and builds the judging job. The committed Workflow fans out one agent
+  per shard to judge. `apply` trims the slop to a `comments/audit-*` branch or
+  reports the findings. `--report`, `--fix`, `--path`, `--sort`, and `--limit`
+  tune scope and output.
+- **`detection/`**: comment extraction over Shiki's TextMate grammars, the diff
+  and repo collectors, intrinsic-complexity ranking, stable comment ids, and
+  advisory tells.
+- **`judge/`**: the batching and parsing primitives, the job builder, the
+  verdict schema, and the versioned `prompt.md`.
+- **`workflow/`**: the committed Workflow script the skill hands the job to.
+- **`apply/`**: the deterministic edit engine, the verdict id-join with drift
+  detection, the branch writer, and the report renderer.
+- **`evals/`**: the labeled fixture corpus, the precision/recall eval, and the
+  SDK calibration oracle behind a must-pass-negative ship gate.
 - A preventive steering rule lives at `user/rules/code-comments.md`, scoped by
   path to code files.
 
 ## Testing
 
-Deterministic extraction, diff parsing, scoping, and tells:
+Deterministic extraction, ranking, the job builder, the edit engine, and the
+verdict join:
 
 ```bash
 bun test plugins/comments
 ```
 
-The judge eval needs `ANTHROPIC_API_KEY`:
+The eval's ship gate runs the SDK oracle and needs `ANTHROPIC_API_KEY`:
 
 ```bash
 bun run plugins/comments/evals/eval.ts --gate
 ```
 
-The ship gate is zero flags on the must-pass negatives (canonical-API docstrings,
+The gate is zero flags on the must-pass negatives (canonical-API docstrings,
 genuine why-comments, regression-test rationale).

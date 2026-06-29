@@ -1,61 +1,102 @@
 ---
 name: comments:audit
 description: >-
-  Audit a diff for AI slop code comments: restatement, narration/decision-log,
-  self-praise, docstring-scope, and section-divider banners. Scopes to only the
-  comments a change introduced and judges them against the two-type comment model.
-  Use when reviewing a branch, working tree, or merge request for low-value
-  comments before merge.
-argument-hint: "[--base <ref>] [--mr <iid>] [--fix]"
+  Audit code comments for AI slop: restatement, narration/decision-log,
+  self-praise, docstring-scope, and section-divider banners. Audits a diff (the
+  comments a change introduced) or a whole repo, ranks by intrinsic complexity,
+  fans out judging agents, and applies the trims to a fresh branch. Use when
+  reviewing a branch or merge request, or sweeping a slop-heavy codebase.
+argument-hint: "[--all] [--base <ref>] [--mr <iid>] [--path <glob>] [--sort <key>] [--limit <n>] [--report] [--fix]"
 disable-model-invocation: true
 allowed-tools:
   - Bash
   - Read
+  - Workflow
 ---
 
 # Comments Audit
 
-Find low-value comments that a change introduced, scoped to added and modified
-lines so pre-existing comments are never flagged. A deterministic Shiki pass
-extracts comments over TextMate grammars, the diff scopes them, and an LLM judge
-calibrated to the owner's comment model decides which are slop.
+Find low-value comments and trim them. A deterministic Shiki pass extracts
+comments over TextMate grammars, the scope selects which to judge, a fan-out of
+Claude Code agents judges each against the owner's comment model, and a
+deterministic applier writes the trims to a branch. The judge flags a comment
+only when it fails the bar: a comment earns its place when it adds information
+not readily available in the adjacent code. See [`judge/prompt.md`](../../judge/prompt.md)
+for the full model and carve-outs.
 
-The judge only flags a comment when it fails the bar: a comment earns its place
-when it adds information not readily available in the adjacent code. See
-[`judge/prompt.md`](../../judge/prompt.md) for the full model and carve-outs.
+The pipeline is three steps: `preflight` (extract, rank, build the job), the
+Workflow tool (judge), and `apply` (write the trims or report them).
 
-## Prerequisites
+## Scope and Flags
 
-Set `ANTHROPIC_API_KEY` in the environment. The judge calls the Anthropic
-Messages API. The deterministic extraction and scoping need no key.
+Two scopes run the same pipeline. The flags select scope and narrow it:
 
-## Arguments
+- Default, `--base <ref>`, `--mr <iid>`: diff scope. Judges the comments a change
+  introduced. Default is the working tree (staged plus unstaged). `--base main`
+  is the merge-base with a ref. `--mr <iid>` is a GitLab merge request over `glab`.
+- `--all`: repo scope. Judges every tracked code file's comments.
+- `--path <glob>`: narrow either scope to matching paths. Repeatable. Prefer it on
+  a first `--all` run on a large repo to cap the agent count.
+- `--sort lines|chars|score` (default `score`): rank by intrinsic comment
+  complexity so the longest, densest comments judge first.
+- `--limit <n>`: keep only the top N ranked comments.
+- `--fix`: ask the judge for a concrete suggestion per finding.
+- `--report`: at apply time, print findings instead of writing a branch.
 
-Forward `$ARGUMENTS` to `audit.ts` (see [Run](#run)):
+## Preflight
 
-- `--base <ref>`: judge comments introduced versus the merge-base with `<ref>`
-  (e.g. `--base main`). Default: the working tree (staged plus unstaged).
-- `--mr <iid>`: judge comments introduced by a GitLab merge request. Fetches the
-  diff and file content over `glab`.
-- `--fix`: include a concrete suggestion per flagged comment (rewrite-to-why,
-  trim-to-lines, or delete). Default: flag only.
-- `--model <id>`: override the judge model. Default: the harness default.
-
-## Run
+Run from the repository you are auditing (the script resolves the git root
+itself, so stay in the target repo rather than `cd`-ing into the plugin):
 
 ```bash
-cd <plugin-dir> && bun skills/audit/scripts/audit.ts $ARGUMENTS
+bun <plugin-dir>/skills/audit/scripts/audit.ts preflight $ARGUMENTS
 ```
 
-The script resolves the base, extracts and scopes the introduced comments, runs
-the judge, and prints findings grouped by file as `path:line  category
-confidence  rationale`. Deterministic tells (ticket breadcrumbs, hardcoded
-line-number cross-references, section banners) are surfaced as an advisory marker
-next to a finding; they do not gate the judge. Exit status is 0 with a report; it
-is not a CI gate.
+This extracts and ranks the comments, builds the judging job on disk, and prints
+a human summary (`N comments / M files / ~K agents / ~T tokens`) followed by a
+machine block:
 
-## Output
+```
+<preflight>
+{"scriptPath": "...", "argsPath": "...", "jobDir": "...", "count": N, "shardCount": K}
+</preflight>
+```
 
-Each finding lists the file, the comment's line, the slop category, the judge's
-confidence, and a one-line rationale. With `--fix`, a suggestion follows. A clean
-diff prints nothing to flag.
+Read the `<preflight>` block. Present the count, file count, and rough token
+estimate to the user. **Wait for the user to confirm before fanning out.** Nothing
+runs until they do. A 5,000-comment repo is roughly 250 agents; `--path` and
+`--limit` cap that.
+
+`--all` requires a clean working tree, because it reads the working tree but
+applies from HEAD. Commit or stash first if preflight reports a dirty tree.
+
+## Judge
+
+On confirmation, read `argsPath` (it is JSON) and call the Workflow tool with the
+`scriptPath` from the preflight block and `args` set to the parsed contents of
+`argsPath`:
+
+```
+Workflow({ scriptPath: <scriptPath>, args: <parsed job-args.json> })
+```
+
+Each agent reads one shard, judges its comments, and writes verdicts to disk. The
+workflow logs a small summary (shard count and how many were flagged). The bulk
+verdicts stay on disk, off the conversation, for `apply` to read.
+
+## Apply
+
+```bash
+bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [--fix]
+```
+
+Default apply joins verdicts to the recorded ranges, re-verifies each comment's
+current text still matches (skipping any that drifted), trims the slop, and
+commits to a fresh `comments/audit-<hash>` branch off HEAD. The review surface is
+`git diff HEAD~1`. Apply requires a clean working tree.
+
+`--report` prints the findings grouped by file (`path:line  category  confidence
+rationale`) and writes nothing. Use it to review before applying, or on a dirty
+tree. Comments the applier cannot trim safely (a comment interleaved with code, a
+trim that would break a block delimiter) are left in place and listed for manual
+handling.

@@ -1,208 +1,306 @@
 #!/usr/bin/env bun
 
+import { readdir } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { $ } from "bun";
-import { cli } from "cleye";
-import { type DiffOptions, resolveDiff } from "../../../detection/diff";
-import { extractComments, languageForPath } from "../../../detection/extract";
-import { scopeIntroduced } from "../../../detection/scope";
-import { detectTells, type Tell } from "../../../detection/tells";
-import type { Comment, FileDiff, IntroducedComment } from "../../../detection/types";
+import { cli, command } from "cleye";
+import { applyToBranch, isCleanTree } from "../../../apply/branch";
+import { computeFileEdits, type EditItem } from "../../../apply/edits";
+import { collectVerdicts, hasDrifted, type JoinedItem, joinVerdicts } from "../../../apply/join";
+import { color, type ReportItem, renderReport } from "../../../apply/report";
 import {
-  type AnthropicJudgeOptions,
-  anthropicCommentJudge,
-  type CommentJudgeInput,
-  judgeComments,
-  loadPrompt,
-} from "../../../judge/judge";
-import type { Verdict } from "../../../judge/schema";
+  type CollectedComment,
+  collectDiff,
+  collectRepo,
+  type MrSource,
+  resolveMrSource,
+} from "../../../detection/collect";
+import type { DiffOptions } from "../../../detection/diff";
+import { rankComments, type SortKey } from "../../../detection/rank";
+import { detectTells } from "../../../detection/tells";
+import { buildJob, type Manifest, writeJob } from "../../../judge/job";
 
-/** Source lines of context on each side of a comment, for the what-on-dense call. */
-const CONTEXT_LINES = 8;
+const WORKFLOW_PATH = join(import.meta.dirname, "..", "..", "..", "workflow", "judge.workflow.js");
 
-/** ANSI colors (0-15) remap under the terminal theme, so they adapt to light/dark. */
-const color = {
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-};
+const SORT_KEYS: SortKey[] = ["lines", "chars", "score"];
 
-/**
- * The new version of a changed file. Local modes read the working tree (it
- * reflects HEAD plus uncommitted work). An MR is fetched from its source ref.
- */
-async function newFileContent(
-  path: string,
-  options: DiffOptions,
-  mrSource: MrSource | null,
-): Promise<string | null> {
-  if (options.mr && mrSource) {
-    const encoded = encodeURIComponent(path);
-    const raw =
-      await $`glab api projects/${mrSource.projectId}/repository/files/${encoded}/raw?ref=${mrSource.ref}`
-        .quiet()
-        .nothrow();
-    return raw.exitCode === 0 ? raw.text() : null;
-  }
-  const file = Bun.file(path);
-  return (await file.exists()) ? file.text() : null;
-}
-
-interface MrSource {
-  projectId: string;
-  ref: string;
-}
-
-async function resolveMrSource(iid: string): Promise<MrSource | null> {
-  const result = await $`glab mr view ${iid} -F json`.quiet().nothrow();
-  if (result.exitCode !== 0) return null;
-  const record = JSON.parse(result.text()) as Record<string, unknown>;
-  const projectId = record.source_project_id;
-  const diffRefs = record.diff_refs as Record<string, unknown> | undefined;
-  const ref = diffRefs?.head_sha ?? record.sha;
-  if (projectId == null || typeof ref !== "string") return null;
-  return { projectId: String(projectId), ref };
-}
-
-/** Build the line-numbered window of source the judge reads around a comment. */
-function contextWindow(source: string, comment: Comment): string {
-  const lines = source.split("\n");
-  const start = Math.max(1, comment.startLine - CONTEXT_LINES);
-  const end = Math.min(lines.length, comment.endLine + CONTEXT_LINES);
-  const out: string[] = [];
-  for (let n = start; n <= end; n++) out.push(`${n}: ${lines[n - 1]}`);
-  return out.join("\n");
-}
-
-interface Finding {
-  comment: IntroducedComment;
-  context: string;
-  tells: Tell[];
-}
-
-/** Extract and scope the introduced comments in one changed file. */
-async function collectFile(
-  file: FileDiff,
-  options: DiffOptions,
-  mrSource: MrSource | null,
-): Promise<Finding[]> {
-  const language = languageForPath(file.path);
-  if (!language || file.added.length === 0) return [];
-  const source = await newFileContent(file.path, options, mrSource);
-  if (source == null) {
-    console.error(color.dim(`skipped ${file.path}: could not read new file content`));
-    return [];
-  }
-  const comments = await extractComments(source, language);
-  return scopeIntroduced(comments, file.added).map((comment) => ({
-    comment: { ...comment, path: file.path, language },
-    context: contextWindow(source, comment),
-    tells: detectTells(comment),
-  }));
-}
-
-/** Collect the introduced comments across every changed file, reading files concurrently. */
-async function collectFindings(
-  diffs: FileDiff[],
-  options: DiffOptions,
-  mrSource: MrSource | null,
-): Promise<Finding[]> {
-  const perFile = await Promise.all(diffs.map((file) => collectFile(file, options, mrSource)));
-  return perFile.flat();
-}
-
-function toJudgeInput(finding: Finding): CommentJudgeInput {
-  return {
-    path: finding.comment.path,
-    language: finding.comment.language,
-    kind: finding.comment.kind,
-    text: finding.comment.text,
-    context: finding.context,
-  };
-}
-
-function render(findings: Finding[], verdicts: Verdict[], fix: boolean): string {
-  const flagged = findings
-    .map((finding, i) => ({ finding, verdict: verdicts[i] }))
-    .filter((pair): pair is { finding: Finding; verdict: Verdict } =>
-      Boolean(pair.verdict?.isSlop),
-    );
-  if (flagged.length === 0) return color.dim("No slop comments found in the introduced comments.");
-
-  const byFile = new Map<string, Array<{ finding: Finding; verdict: Verdict }>>();
-  for (const pair of flagged) {
-    const list = byFile.get(pair.finding.comment.path) ?? [];
-    list.push(pair);
-    byFile.set(pair.finding.comment.path, list);
-  }
-
-  const blocks: string[] = [];
-  for (const [path, pairs] of byFile) {
-    const lines = [color.bold(path)];
-    for (const { finding, verdict } of pairs) {
-      const advisory = finding.tells.length
-        ? color.yellow(` [${finding.tells.map((t) => t.id).join(",")}]`)
-        : "";
-      const conf =
-        verdict.confidence === "high" ? color.red(verdict.confidence) : verdict.confidence;
-      lines.push(
-        `  ${color.dim(`:${finding.comment.startLine}`)}  ${verdict.category}  ${conf}${advisory}`,
-      );
-      lines.push(`      ${verdict.rationale}`);
-      if (fix && verdict.suggestedFix) lines.push(color.dim(`      fix: ${verdict.suggestedFix}`));
-      if (verdict.trimToLines?.length) {
-        lines.push(color.dim(`      keep lines: ${verdict.trimToLines.join(", ")}`));
-      }
-    }
-    blocks.push(lines.join("\n"));
-  }
-  return blocks.join("\n\n");
-}
-
-const argv = cli({
-  name: "audit",
-  flags: {
-    base: {
-      type: String,
-      description: "Judge comments introduced vs the merge-base with this ref",
-    },
-    mr: { type: String, description: "Judge comments introduced by a GitLab merge request (iid)" },
-    fix: {
-      type: Boolean,
-      default: false,
-      description: "Include a concrete suggestion per finding",
-    },
-    model: { type: String, description: "Override the judge model" },
-  },
-});
-
-const options: DiffOptions = {};
-if (argv.flags.base) options.base = argv.flags.base;
-if (argv.flags.mr) options.mr = argv.flags.mr;
-const mrSource = argv.flags.mr ? await resolveMrSource(argv.flags.mr) : null;
-if (argv.flags.mr && !mrSource) {
-  console.error("Could not resolve the merge request's source ref via glab.");
+function parseSort(value: string): SortKey {
+  if ((SORT_KEYS as string[]).includes(value)) return value as SortKey;
+  console.error(
+    `Invalid --sort ${JSON.stringify(value)}; expected one of ${SORT_KEYS.join(", ")}.`,
+  );
   process.exit(1);
 }
 
-const diffs = await resolveDiff(options);
-const findings = await collectFindings(diffs, options, mrSource);
-if (findings.length === 0) {
-  console.log(color.dim("No introduced comments to judge."));
-  process.exit(0);
+/**
+ * Operate from the git repo root so repo-relative paths (from `git diff` and
+ * `git ls-files`) resolve for reads, writes, and `git add`, wherever the script
+ * was invoked from.
+ */
+async function chdirToRepoRoot(): Promise<void> {
+  const result = await $`git rev-parse --show-toplevel`.quiet().nothrow();
+  const root = result.text().trim();
+  if (result.exitCode !== 0 || !root) {
+    console.error("Not inside a git repository.");
+    process.exit(1);
+  }
+  process.chdir(root);
 }
 
-const base = await loadPrompt();
-const promptText = argv.flags.fix
-  ? `${base.text}\n\nFor this run, populate suggestedFix for every flagged comment with a concrete rewrite, trim, or delete.`
-  : base.text;
-console.error(
-  color.dim(
-    `Judging ${findings.length} introduced comment(s) (prompt ${base.sha256.slice(0, 12)})`,
-  ),
+function preview(text: string): string {
+  const firstLine = text.split("\n")[0] ?? "";
+  return firstLine.length > 64 ? `${firstLine.slice(0, 61)}...` : firstLine;
+}
+
+const preflightCmd = command(
+  {
+    name: "preflight",
+    flags: {
+      base: {
+        type: String,
+        description: "Diff scope: comments introduced vs the merge-base with <ref>",
+      },
+      mr: {
+        type: String,
+        description: "Diff scope: comments introduced by a GitLab merge request (iid)",
+      },
+      all: {
+        type: Boolean,
+        default: false,
+        description: "Repo scope: every tracked code file's comments",
+      },
+      path: { type: [String], description: "Narrow either scope to paths matching these globs" },
+      sort: { type: String, default: "score", description: "Rank by lines | chars | score" },
+      limit: { type: Number, description: "Keep only the top N ranked comments" },
+      fix: {
+        type: Boolean,
+        default: false,
+        description: "Ask the judge for a suggestion per finding",
+      },
+    },
+  },
+  async (parsed) => {
+    await chdirToRepoRoot();
+    const { base, mr, all, path, sort, limit, fix } = parsed.flags;
+    const pathGlobs = path ?? [];
+    const sortKey = parseSort(sort);
+
+    let comments: CollectedComment[];
+    if (all) {
+      if (!(await isCleanTree())) {
+        console.error(
+          "Working tree is not clean. --all reads the working tree but applies from HEAD. Commit or stash first.",
+        );
+        process.exit(1);
+      }
+      comments = await collectRepo({ pathGlobs });
+    } else {
+      const options: DiffOptions = {};
+      if (base) options.base = base;
+      if (mr) options.mr = mr;
+      let mrSource: MrSource | null = null;
+      if (mr) {
+        mrSource = await resolveMrSource(mr);
+        if (!mrSource) {
+          console.error("Could not resolve the merge request's source ref via glab.");
+          process.exit(1);
+        }
+      }
+      comments = await collectDiff(options, mrSource, { pathGlobs });
+    }
+
+    const ranked = rankComments(comments, sortKey);
+    const limited = typeof limit === "number" ? ranked.slice(0, limit) : ranked;
+    if (limited.length === 0) {
+      console.log(color.dim("No comments to judge."));
+      return;
+    }
+
+    const descriptor = await buildJob(limited, { fix });
+    const written = await writeJob(descriptor);
+    // An --mr job records comment text from the remote MR ref, but apply trims
+    // the local tree from HEAD. Persist the scope so apply can refuse to branch
+    // off a local checkout that would read every comment as drift.
+    await Bun.write(join(written.jobDir, "scope.json"), JSON.stringify({ mr: mr ?? null }));
+
+    const fileCount = new Set(limited.map((c) => c.path)).size;
+    const tokens = Math.ceil(
+      limited.reduce((sum, c) => sum + c.text.length + c.context.length, 0) / 4,
+    );
+
+    console.log(
+      color.bold(
+        `${limited.length} comments / ${fileCount} files / ~${written.shardCount} agents / ~${tokens} tokens (rough)`,
+      ),
+    );
+    for (const c of limited.slice(0, 10)) {
+      console.log(
+        `  ${color.dim(String(c.score.score).padStart(5))}  ${c.path}:${c.startLine}  ${preview(c.text)}`,
+      );
+    }
+    console.log("");
+    console.log("<preflight>");
+    console.log(
+      JSON.stringify({
+        scriptPath: WORKFLOW_PATH,
+        argsPath: written.argsPath,
+        jobDir: written.jobDir,
+        count: written.count,
+        shardCount: written.shardCount,
+      }),
+    );
+    console.log("</preflight>");
+  },
 );
-const judgeOptions: AnthropicJudgeOptions = { prompt: promptText };
-if (argv.flags.model) judgeOptions.model = argv.flags.model;
-const judge = anthropicCommentJudge(judgeOptions);
-const verdicts = await judgeComments(judge, findings.map(toJudgeInput));
-console.log(render(findings, verdicts, argv.flags.fix));
+
+function toReportItem(item: JoinedItem): ReportItem {
+  return {
+    path: item.entry.path,
+    startLine: item.entry.startLine,
+    // ManifestEntry is a superset of Comment, so detectTells reads it directly.
+    tells: detectTells(item.entry),
+    verdict: item.verdict,
+  };
+}
+
+function toEditItem(item: JoinedItem): EditItem {
+  return {
+    startLine: item.entry.startLine,
+    endLine: item.entry.endLine,
+    startColumn: item.entry.startColumn,
+    endColumn: item.entry.endColumn,
+    kind: item.entry.kind,
+    verdict: item.verdict,
+  };
+}
+
+async function readVerdictShards(verdictsDir: string): Promise<unknown[]> {
+  let names: string[];
+  try {
+    names = await readdir(verdictsDir);
+  } catch {
+    return [];
+  }
+  const verdictFiles = names.filter(
+    (name) => name.startsWith("verdict-") && name.endsWith(".json"),
+  );
+  return Promise.all(
+    verdictFiles.map(async (name) => JSON.parse(await Bun.file(join(verdictsDir, name)).text())),
+  );
+}
+
+const applyCmd = command(
+  {
+    name: "apply",
+    flags: {
+      job: { type: String, description: "The job dir printed by preflight" },
+      report: { type: Boolean, default: false, description: "Print findings instead of applying" },
+      fix: { type: Boolean, default: false, description: "Include suggestions in the report" },
+    },
+  },
+  async (parsed) => {
+    await chdirToRepoRoot();
+    const { job, report, fix } = parsed.flags;
+    if (!job) {
+      console.error("--job <dir> is required.");
+      process.exit(1);
+    }
+
+    const manifestFile = Bun.file(join(job, "manifest.json"));
+    if (!(await manifestFile.exists())) {
+      console.error(`No manifest at ${job}. Pass the job dir printed by preflight.`);
+      process.exit(1);
+    }
+
+    const scopeFile = Bun.file(join(job, "scope.json"));
+    const scope = (await scopeFile.exists())
+      ? (JSON.parse(await scopeFile.text()) as { mr?: string | null })
+      : { mr: null };
+    if (scope.mr && !report) {
+      console.error(
+        `This job audited merge request !${scope.mr} from its remote source. Apply writes trims to the local tree from HEAD, so every comment would read as drift. Re-run with --report, or check out the MR branch and re-run preflight with --base.`,
+      );
+      process.exit(1);
+    }
+
+    const manifest = JSON.parse(await manifestFile.text()) as Manifest;
+    const shards = await readVerdictShards(join(job, "verdicts"));
+    if (shards.length === 0) {
+      console.error(`No verdicts in ${join(job, "verdicts")}. Run the judge workflow first.`);
+      process.exit(1);
+    }
+    const items = joinVerdicts(manifest, collectVerdicts(shards));
+
+    const byPath = new Map<string, JoinedItem[]>();
+    for (const item of items) {
+      const list = byPath.get(item.entry.path) ?? [];
+      list.push(item);
+      byPath.set(item.entry.path, list);
+    }
+
+    const reportItems: ReportItem[] = [];
+    const editsByPath = new Map<string, string>();
+    const driftSkips: string[] = [];
+    const manualSkips: string[] = [];
+
+    for (const [path, group] of byPath) {
+      const file = Bun.file(path);
+      const source = (await file.exists()) ? await file.text() : null;
+      const editItems: EditItem[] = [];
+      for (const item of group) {
+        reportItems.push(toReportItem(item));
+        if (!item.verdict.isSlop) continue;
+        if (source == null || hasDrifted(source, item.entry)) {
+          driftSkips.push(`${path}:${item.entry.startLine}`);
+          continue;
+        }
+        editItems.push(toEditItem(item));
+      }
+      if (source != null && editItems.length > 0) {
+        const result = computeFileEdits(source, editItems);
+        for (const skip of result.skips)
+          manualSkips.push(`${path}:${skip.startLine}  ${skip.detail}`);
+        if (result.content !== source) editsByPath.set(path, result.content);
+      }
+    }
+
+    if (report) {
+      console.log(renderReport(reportItems, { fix }));
+    } else {
+      const branch = `comments/audit-${basename(job)}`;
+      if (editsByPath.size === 0) {
+        console.log(color.dim("Nothing to apply."));
+      } else if (!(await isCleanTree())) {
+        console.error(
+          "Working tree is not clean. Commit or stash before applying, or use --report.",
+        );
+        process.exit(1);
+      } else {
+        await applyToBranch(editsByPath, { branch });
+        console.log(
+          `Trimmed ${editsByPath.size} file(s) on branch ${color.bold(branch)}. Review with git diff HEAD~1.`,
+        );
+      }
+    }
+
+    if (driftSkips.length > 0) {
+      console.error(
+        color.yellow(`Skipped ${driftSkips.length} drifted comment(s): ${driftSkips.join(", ")}`),
+      );
+    }
+    if (manualSkips.length > 0) {
+      console.error(color.yellow(`Left ${manualSkips.length} comment(s) for manual handling:`));
+      for (const skip of manualSkips) console.error(`  ${skip}`);
+    }
+  },
+);
+
+cli(
+  {
+    name: "audit",
+    commands: [preflightCmd, applyCmd],
+  },
+  (parsed) => {
+    parsed.showHelp();
+  },
+);

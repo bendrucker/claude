@@ -6,14 +6,13 @@ import { cli } from "cleye";
 import { table } from "table";
 import type { CommentKind, Language } from "../detection/types";
 import {
-  anthropicCommentJudge,
   type CommentJudge,
   type CommentJudgeInput,
-  JUDGE_MODEL,
   judgeComments,
   loadPrompt,
 } from "../judge/judge";
 import { SLOP_CATEGORIES, type SlopCategory, type Verdict } from "../judge/schema";
+import { anthropicCommentJudge, JUDGE_MODEL } from "./oracle";
 
 /**
  * One labeled comment with the surrounding context the judge sees. `label`

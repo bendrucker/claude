@@ -1,7 +1,11 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import {
+  type PreToolUseHookInput,
+  preToolUse,
+  runHook,
+  type SyncHookJSONOutput,
+} from "@bendrucker/claude-plugin-toolkit";
 
 const targetableCommands = new Set([
   "split-window",
@@ -58,34 +62,14 @@ export function processInput(input: PreToolUseHookInput, pane?: string): SyncHoo
   const rewritten = injectTarget(command, pane);
   if (!rewritten) return null;
 
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      updatedInput: {
-        command: rewritten,
-      },
-      additionalContext: `tmux target auto-injected: -t "${pane}" (your pane). To target the user's active pane, resolve it explicitly:\n  target=$(tmux display-message -p '#{pane_id}') && tmux <cmd> -t "$target" ...`,
-    },
-  };
-}
-
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[tmux/target] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = processInput(input, process.env.TMUX_PANE);
-  if (output) {
-    writeStdoutJson(output);
-  }
+  return preToolUse.updatedInput(
+    { command: rewritten },
+    `tmux target auto-injected: -t "${pane}" (your pane). To target the user's active pane, resolve it explicitly:\n  target=$(tmux display-message -p '#{pane_id}') && tmux <cmd> -t "$target" ...`,
+  );
 }
 
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook<PreToolUseHookInput, SyncHookJSONOutput>((input) =>
+    processInput(input, process.env.TMUX_PANE),
+  );
 }

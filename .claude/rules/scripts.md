@@ -9,9 +9,11 @@ Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs
 
 #### Workspace Dependencies
 
-Auto-install does not cover `workspace:*` specifiers. Scripts that import workspace packages (`@bendrucker/*`) need `bun install` first to create the `node_modules` symlinks; without it they fail with `Cannot find module`. The project Worktrunk `post-start` hook (`.config/wt.toml`) runs `bun install` for new worktrees so this resolves automatically, but it does not cover `Agent(isolation='worktree')` worktrees, which skip wt hooks.
+Never use `workspace:*` in distributed plugin code. Plugins ship as raw directories via the marketplace, so the specifier is never rewritten to a real version. On an end user's machine the hook runs `bun install --cwd ${CLAUDE_PLUGIN_ROOT}`, and Bun auto-install only fetches registry packages. A `workspace:*` specifier points at a package that exists only in this monorepo, so it fails with `Cannot find module`.
 
-Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` code via relative paths (e.g. `../packages/marketplace/index`) instead of the `@bendrucker/*` specifier, so it runs in fresh worktrees without install. Reserve workspace specifiers for distributed plugin code, which cannot use relative imports across the plugin boundary.
+Shared plugin code must instead be a **published** npm package referenced by a plain semver range, never `workspace:*`. The canonical example is [`@bendrucker/claude-plugin-toolkit`](../../packages/toolkit) (`"^0.1.0"`), which centralizes the hook runner, output builders, and input types. A plain range that matches a workspace member resolves both ways: `bun install` links the local `packages/toolkit` directory during development and CI, and end users fetch the published package from npm. Publishing is manual (see the package README). Land plugin migrations only after the referenced version is on npm.
+
+Repo-internal tooling (`scripts/`, `.claude/hooks/`) is not distributed, so it must import `packages/` code via relative paths (e.g. `../packages/marketplace/index`) instead of the `@bendrucker/*` specifier. That keeps it running in fresh worktrees without `bun install`, which the Worktrunk `post-start` hook (`.config/wt.toml`) runs for new worktrees but not for `Agent(isolation='worktree')` worktrees.
 
 # Script Conventions
 

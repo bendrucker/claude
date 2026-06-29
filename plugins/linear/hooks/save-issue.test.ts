@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import { getDefaultState, normalizeInput, processInput } from "./save-issue";
 
 function mockInput(

@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@bendrucker/claude-plugin-toolkit";
 import { check, collectText } from "./check-tropes";
 
 async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {

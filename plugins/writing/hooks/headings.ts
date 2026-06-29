@@ -1,4 +1,4 @@
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import { apStyleTitleCase } from "ap-style-title-case";
 import type { Heading, Paragraph, Strong, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";

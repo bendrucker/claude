@@ -2,12 +2,15 @@
 
 import { mkdirSync } from "node:fs";
 import * as path from "node:path";
-import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import {
+  type EditInput,
+  type PostToolUseHookInput,
+  postToolUse,
+  runHook,
+  type SyncHookJSONOutput,
+  type WriteInput,
+} from "@bendrucker/claude-plugin-toolkit";
 import { EXTENSION_MAP, LANGUAGES, TARGET_EXTENSIONS } from "./languages";
-
-export type WriteInput = { file_path: string; content: string };
-export type EditInput = { file_path: string; old_string: string; new_string: string };
 
 export interface PatternMatch {
   label: string;
@@ -96,12 +99,9 @@ export function formatOutput(
   lineNumber: number,
   pattern: string,
 ): SyncHookJSONOutput {
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PostToolUse",
-      additionalContext: `Type ignore added in ${filePath}:${lineNumber} (${pattern}). Spawn type-ignore:fixer agent in background to fix ONLY this specific ignore, not other ignores in the file.`,
-    },
-  };
+  return postToolUse.context(
+    `Type ignore added in ${filePath}:${lineNumber} (${pattern}). Spawn type-ignore:fixer agent in background to fix ONLY this specific ignore, not other ignores in the file.`,
+  );
 }
 
 export async function processInput(
@@ -151,23 +151,6 @@ export async function processInput(
   return formatOutput(filePath, lineNumber, pattern.label);
 }
 
-async function main(): Promise<void> {
-  let input: PostToolUseHookInput;
-  try {
-    input = await readStdinJson<PostToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[type-ignore] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = await processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook<PostToolUseHookInput, SyncHookJSONOutput>(processInput);
 }

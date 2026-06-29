@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
-import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { PostToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import { formatOutput, isCleanupAgentActive, processInput } from "../hooks/detect";
 
 const MARKER_DIR = "/tmp/claude/type-ignore-active";

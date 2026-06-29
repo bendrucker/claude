@@ -1,7 +1,11 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import {
+  type PreToolUseHookInput,
+  preToolUse,
+  runHook,
+  type SyncHookJSONOutput,
+} from "@bendrucker/claude-plugin-toolkit";
 
 export type CreateIssueInput = {
   id?: string;
@@ -66,14 +70,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   // that names neither tool, since this hook fires for both save_issue and
   // create_issue, so the model can recover by supplying title or id.
   if (isCreate && !title) {
-    return {
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason:
-          "Creating an issue requires `title`. To update an existing issue instead, pass its `id`.",
-      },
-    };
+    return preToolUse.deny(
+      "Creating an issue requires `title`. To update an existing issue instead, pass its `id`.",
+    );
   }
 
   // Preserve the original default-state behavior: inject a default only when
@@ -101,23 +100,6 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   };
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[linear/save-issue] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook<PreToolUseHookInput, SyncHookJSONOutput>(processInput);
 }

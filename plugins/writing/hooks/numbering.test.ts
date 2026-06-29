@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "@bendrucker/claude-plugin-toolkit";
 import { formatDecision } from "./io";
 import { check, checkCode, checkMarkdown, hasNumberingHint } from "./numbering";
 

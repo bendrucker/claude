@@ -1,9 +1,10 @@
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import {
+  type PreToolUseHookInput,
+  preToolUse,
+  type SyncHookJSONOutput,
+} from "@bendrucker/claude-plugin-toolkit";
 
-export type { SyncHookJSONOutput };
-
-export type WriteInput = { file_path: string; content: string };
-export type EditInput = { file_path: string; new_string: string };
+export type { EditInput, SyncHookJSONOutput, WriteInput } from "@bendrucker/claude-plugin-toolkit";
 
 // A checker's finding: the formatted hook output plus the rule category the
 // dispatcher uses for session-scoped repeat suppression and the run log.
@@ -24,20 +25,9 @@ export function isPlanMode(input: PreToolUseHookInput): boolean {
 }
 
 export function formatDecision(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: decision,
-      permissionDecisionReason: reason,
-    },
-  };
+  return preToolUse[decision](reason);
 }
 
 export function formatContext(context: string): SyncHookJSONOutput {
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      additionalContext: context,
-    },
-  };
+  return preToolUse.context(context);
 }

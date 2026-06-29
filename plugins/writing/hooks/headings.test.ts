@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "@bendrucker/claude-plugin-toolkit";
 import { check, checkBoldAsHeading, checkSentenceHeading, checkTitleCase } from "./headings";
 
 function mockWriteInput(filePath: string, content: string): PreToolUseHookInput {

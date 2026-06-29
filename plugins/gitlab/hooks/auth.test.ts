@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { PostToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import { processInput } from "./auth";
 
 function mockInput(command: string, toolResponse: unknown = {}): PostToolUseHookInput {

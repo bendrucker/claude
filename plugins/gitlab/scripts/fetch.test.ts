@@ -2,8 +2,8 @@ import { describe, expect, it, test } from "bun:test";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
-import { formatOutput, isGitLabUrl, parseGitLabUrl, processInput } from "./fetch";
+} from "@bendrucker/claude-plugin-toolkit";
+import { isGitLabUrl, parseGitLabUrl, processInput } from "./fetch";
 
 function mockInput(url: string): PreToolUseHookInput {
   return {
@@ -112,22 +112,6 @@ describe("parseGitLabUrl", () => {
     const result = parseGitLabUrl(url);
     expect(result?.type).toBe(type);
     expect(result?.suggestion).toBe(suggestion);
-  });
-});
-
-describe("formatOutput", () => {
-  test.each<{ name: string; decision: "deny" | "ask"; reason: string }>([
-    { name: "formats deny decision", decision: "deny", reason: "Use glab instead" },
-    { name: "formats ask decision", decision: "ask", reason: "Unknown pattern" },
-  ])("$name", ({ decision, reason }) => {
-    const output = formatOutput(decision, reason);
-    expect(output).toEqual({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: decision,
-        permissionDecisionReason: reason,
-      },
-    });
   });
 });
 

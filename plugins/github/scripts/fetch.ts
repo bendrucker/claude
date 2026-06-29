@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import {
+  type PreToolUseHookInput,
+  preToolUse,
+  runHook,
+  type SyncHookJSONOutput,
+  type WebFetchInput,
+} from "@bendrucker/claude-plugin-toolkit";
 import UrlPattern from "url-pattern";
-
-export type WebFetchInput = { url: string; prompt: string };
 
 type RouteMatch = {
   type: string;
@@ -114,19 +117,6 @@ export function parseGitHubUrl(url: string): { type: string; suggestion: string 
   return null;
 }
 
-export function formatOutput(
-  decision: "allow" | "deny" | "ask",
-  reason: string,
-): SyncHookJSONOutput {
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: decision,
-      permissionDecisionReason: reason,
-    },
-  };
-}
-
 export function isRawGitHubUrl(url: string): boolean {
   return url.startsWith("https://raw.githubusercontent.com/");
 }
@@ -135,8 +125,7 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   const { url } = input.tool_input as WebFetchInput;
 
   if (isRawGitHubUrl(url)) {
-    return formatOutput(
-      "deny",
+    return preToolUse.deny(
       `Use: gh api repos/{owner}/{repo}/contents/{path}?ref={ref} to fetch raw file contents.`,
     );
   }
@@ -147,29 +136,12 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 
   const parsed = parseGitHubUrl(url);
   if (parsed) {
-    return formatOutput("deny", parsed.suggestion);
+    return preToolUse.deny(parsed.suggestion);
   }
 
   return null;
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[github/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook<PreToolUseHookInput, SyncHookJSONOutput>(processInput);
 }

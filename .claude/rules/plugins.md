@@ -37,4 +37,4 @@ Plugin `settings.json` only supports `agent` and `subagentStatusLine` keys. Don'
 
 ## Dependencies
 
-Plugin-specific dependencies go in the plugin's own `plugins/<name>/package.json`, added to the root `workspaces` array. No cross-plugin imports, and no reaching into `packages/` via relative paths. If two plugins need shared code, extract it to an npm workspace package and declare the dependency in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.
+Plugin-specific dependencies go in the plugin's own `plugins/<name>/package.json`, added to the root `workspaces` array. No cross-plugin imports, and no reaching into `packages/` via relative paths. If two plugins need shared code, extract it to a published npm package and declare the dependency in each plugin's `package.json` by plain semver, never `workspace:*` (see [`scripts.md`](scripts.md) for why distributed code cannot use workspace specifiers). The canonical example is [`@bendrucker/claude-plugin-toolkit`](../../packages/toolkit), which holds the shared hook runner, output builders, and input types. Run `bun scripts/check-plugin-imports.ts` to verify.

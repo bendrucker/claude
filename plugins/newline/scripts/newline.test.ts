@@ -7,7 +7,7 @@ import type {
   PostToolUseHookInput,
   PostToolUseHookSpecificOutput,
   PreToolUseHookInput,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "@bendrucker/claude-plugin-toolkit";
 import fc from "fast-check";
 import { processInput as checkInput, hasTrailingNewline } from "./check";
 import { processInput as ensureInput, ensureTrailingNewline } from "./ensure";

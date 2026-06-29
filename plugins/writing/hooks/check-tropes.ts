@@ -1,4 +1,4 @@
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import { extractComments } from "../detection/comments";
 import { isProseFile } from "../detection/paths";
 import {

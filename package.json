@@ -24,6 +24,7 @@
     "packages/validate",
     "packages/marketplace",
     "plugins/plan",
+    "packages/toolkit",
     "plugins/tmux",
     "plugins/mac",
     "plugins/x-callback-url",
@@ -47,8 +48,8 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+    "@bendrucker/claude-plugin-toolkit": "^0.1.0",
     "@biomejs/biome": "^2.3.13",
-    "@constellos/claude-code-kit": "^0.4.0",
     "@types/bun": "^1.3.12",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",

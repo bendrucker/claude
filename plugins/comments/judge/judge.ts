@@ -6,13 +6,11 @@ import { batchVerdictSchema, type SlopCategory, type Verdict } from "./schema";
 
 /**
  * Meaning-layer LLM judge for introduced code comments. Batch-only: scores N
- * comments per call by 0-based index, mirroring the heading judge in the
- * writing skill's analyze pipeline (SDK usage, temperature 0, cached system
- * prompt, sha256-pinned prompt, a mockable seam, parse-with-validation).
+ * comments per call by 0-based index.
  *
  * The what-on-dense vs what-on-simple distinction is subtle, so the judge
- * defaults to Sonnet. The prompt is a committed, versioned artifact; every run
- * can record its sha256 so a prompt edit invalidates prior numbers.
+ * defaults to Sonnet. The prompt is a committed, versioned artifact. Every run
+ * records its sha256, so a prompt edit invalidates prior numbers.
  */
 
 export const JUDGE_MODEL = "claude-sonnet-4-6";
@@ -69,7 +67,7 @@ export function formatBatch(inputs: CommentJudgeInput[]): string {
 /**
  * Parses the `{ verdicts: [{ index, verdict }] }` batch shape, validating that
  * every index in 0..expected-1 is present exactly once, and returns verdicts
- * ordered by index. Mirrors parseHeadingVerdicts in the writing judge.
+ * ordered by index.
  */
 export function parseBatchVerdicts(json: string, expected: number): Verdict[] {
   let parsed: unknown;

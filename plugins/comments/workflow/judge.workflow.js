@@ -4,27 +4,29 @@ export const meta = {
   phases: [{ title: "Judge" }],
 };
 
-// args = { shards: [{ id, path }], promptPath, promptSha, schema, verdictsDir }
+// job = { shards: [{ id, path }], promptPath, promptSha, schema, verdictsDir }
+// The Workflow tool delivers args as a JSON string, so parse it before use.
 // The Bun side already sharded in ranked order, so each shard maps 1:1 to one
 // agent. The schema reaches the agent through args; the rubric is a file the agent
-// reads (args.promptPath), keeping the large rubric text out of the tool-call args
+// reads (job.promptPath), keeping the large rubric text out of the tool-call args
 // and the sandboxed script free of imports. The summary is logged rather than
 // returned: the verdicts live on disk for the apply step, off the orchestrator
 // context, and a top-level return is not valid module syntax.
 
+const job = typeof args === "string" ? JSON.parse(args) : args;
 const CONCURRENCY = 8;
 
 async function judgeShard(shardPath, shardId) {
   const prompt = [
-    `Read the comment-slop rubric at this exact path: ${args.promptPath}`,
+    `Read the comment-slop rubric at this exact path: ${job.promptPath}`,
     `Read the JSON file at this exact path: ${shardPath}`,
     'It contains { "id": <shard id>, "comments": [{ "id", "path", "language", "kind", "text", "context" }] }.',
     'Judge every comment in the shard against the rubric. Produce exactly one verdict per comment, keyed by its "id".',
-    `Write the object { "verdicts": [{ "id": <comment id>, "verdict": { ... } }] } to this exact path with a Bash heredoc: ${args.verdictsDir}/verdict-${shardId}.json`,
+    `Write the object { "verdicts": [{ "id": <comment id>, "verdict": { ... } }] } to this exact path with a Bash heredoc: ${job.verdictsDir}/verdict-${shardId}.json`,
     'Return that same { "verdicts": [...] } object as your structured output.',
   ].join("\n");
   return agent(prompt, {
-    schema: args.schema,
+    schema: job.schema,
     label: `judge:shard-${shardId}`,
     phase: "Judge",
   });
@@ -32,7 +34,7 @@ async function judgeShard(shardPath, shardId) {
 
 phase("Judge");
 
-const shards = args.shards;
+const shards = job.shards;
 const results = [];
 for (let i = 0; i < shards.length; i += CONCURRENCY) {
   const batch = shards.slice(i, i + CONCURRENCY);
@@ -47,4 +49,4 @@ for (const result of results) {
   }
 }
 
-log(`Judged ${shards.length} shard(s); ${flagged} flagged. Verdicts in ${args.verdictsDir}`);
+log(`Judged ${shards.length} shard(s); ${flagged} flagged. Verdicts in ${job.verdictsDir}`);

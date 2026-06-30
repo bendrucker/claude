@@ -24,7 +24,7 @@ export interface CommentJudgeInput {
   context: string;
 }
 
-/** Judges a batch of comments. The eval tests mock this; the SDK call implements it. */
+/** Judges a batch of comments. The eval tests mock this. The SDK call implements it. */
 export type CommentJudge = (inputs: CommentJudgeInput[]) => Promise<Verdict[]>;
 
 const xml = new XMLBuilder({

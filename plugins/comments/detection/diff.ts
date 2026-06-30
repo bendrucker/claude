@@ -25,7 +25,7 @@ function newPath(to: string | undefined): string | null {
 /**
  * Parse a unified diff into the added/modified line ranges per file, expressed
  * in the NEW version of each file. Deleted files (`+++ /dev/null`) are skipped.
- * `parse-diff` does the hunk arithmetic; an `add` change carries its new-file
+ * `parse-diff` does the hunk arithmetic. An `add` change carries its new-file
  * line number directly.
  */
 export function parseUnifiedDiff(diffText: string): FileDiff[] {

@@ -43,8 +43,13 @@ in AI writing tells. Treat these as voice to strip, not as content:
 - **Contrastive framing.** "X rather than Y", "instead of Y", "not Y", "A, not
   B", "without Y-ing". Defining the behavior by contrast with a path the code
   does not take pads a restatement with an extra clause. The fact is what the
-  code does. State that plainly. Credit the contrast only when the rejected path
-  is a real trap and naming it stops a concrete mistake.
+  code does. State that plainly. Set a high bar on "real trap": if stripping the
+  contrast leaves the fact standing, the action is `rewrite`, not `keep`. Reserve
+  `keep` for a contrast that is itself the load-bearing fact, a documented
+  invariant the reader must respect, never an "X rather than Y" wrapper you can
+  delete and still keep the information. A comment that explains a stateful
+  effect by contrasting it with the prior state is usually a `rewrite`: keep the
+  effect, drop the "rather than the old way" tail.
 - **Pseudo-rationale / marketing vocabulary.** Abstract, impressive words that
   name no concrete mechanism: "review surface", "the product path", "surfaces",
   "spans", "concentrates", "seamless", "robust", "survives". If
@@ -71,7 +76,13 @@ is actually present.
 - **restate-the-what**: paraphrases simple adjacent code, adds no reason. The
   dominant trim case. `# increment the counter` over `count += 1`. A docstring
   that re-narrates the six lines below it. Re-listing in prose the cases,
-  branches, or fields the adjacent code already enumerates is restatement.
+  branches, or fields the adjacent code already enumerates is restatement. A
+  multi-line header on a SQL query or a function contract that re-narrates what
+  the query selects, the columns it returns, or the steps it runs is restatement,
+  however analytical it reads. Such a header earns `keep` only for the line that
+  states a fact the code cannot (a non-obvious data shape, a filter's load-bearing
+  reason). Trim it, or `trimToLines` to that one line, when the rest only
+  describes the query in words.
 - **narration**: a diary of the change rather than documentation of the code.
   Migration stories repeated across helpers; roadmap/ticket breadcrumbs
   (`arrives with ENG-2065`, `ENG-2217 tracks this`); cross-reference pointers

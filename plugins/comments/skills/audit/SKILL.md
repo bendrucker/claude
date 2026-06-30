@@ -16,13 +16,15 @@ allowed-tools:
 
 # Comments Audit
 
-Find low-value comments and trim them. A deterministic Shiki pass extracts
+Find low-value comments and act on them. A deterministic Shiki pass extracts
 comments over TextMate grammars, the scope selects which to judge, a fan-out of
 Claude Code agents judges each against the owner's comment model, and a
-deterministic applier writes the trims to a branch. The judge flags a comment
-only when it fails the bar: a comment earns its place when it adds information
-not readily available in the adjacent code. See [`judge/prompt.md`](../../judge/prompt.md)
-for the full model and carve-outs.
+deterministic applier writes the changes to a branch. The judge returns one of
+three actions per comment: `keep` (it earns its place), `trim` (it carries no
+fact, delete or shorten it), or `rewrite` (it carries a real fact under AI voice,
+strip the voice and keep the fact). A comment earns its place when it adds
+information not readily available in the adjacent code. See
+[`judge/prompt.md`](../../judge/prompt.md) for the full model and carve-outs.
 
 The pipeline is three steps: `preflight` (extract, rank, build the job), the
 Workflow tool (judge), and `apply` (write the trims or report them).
@@ -91,13 +93,15 @@ bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [
 ```
 
 Default apply re-extracts the judged files and matches verdicts to comments by
-id at their current position, trims the slop, and commits to a fresh
-`comments/audit-<hash>` branch off HEAD. A comment that moved or changed since
-preflight gets a new id, matches no verdict, and is skipped. The review surface
-is `git diff HEAD~1`. Apply requires a clean working tree.
+id at their current position, applies the trims and rewrites, and commits to a
+fresh `comments/audit-<hash>` branch off HEAD. A `rewrite` replaces the comment
+span in place with the de-voiced text, so the diff shows the cleaned comment. A
+comment that moved or changed since preflight gets a new id, matches no verdict,
+and is skipped. Review the result with `git diff HEAD~1`. Apply requires a clean
+working tree.
 
-`--report` prints the findings grouped by file (`path:line  category  confidence
-rationale`) and writes nothing. Use it to review before applying, or on a dirty
-tree. Comments the applier cannot trim safely (a comment interleaved with code, a
-trim that would break a block delimiter) are left in place and listed for manual
-handling.
+`--report` prints the findings grouped by file (`path:line  action  category
+confidence  rationale`, with an old → new preview for each rewrite) and writes
+nothing. Use it to review before applying, or on a dirty tree. Comments the
+applier cannot change safely (a comment interleaved with code, a trim that would
+break a block delimiter) are left in place and listed for manual handling.

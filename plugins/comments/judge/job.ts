@@ -80,7 +80,7 @@ export interface ShardRef {
 /** The Workflow `args`: how each agent finds its shard, the rubric, and where verdicts land. */
 export interface JobArgs {
   shards: ShardRef[];
-  promptText: string;
+  promptPath: string;
   promptSha: string;
   schema: Record<string, unknown>;
   verdictsDir: string;
@@ -105,10 +105,12 @@ function jobHash(descriptor: JobDescriptor): string {
 }
 
 /**
- * Materialize the job under a content-keyed dir: one `shard-<n>.json` per shard
- * and a `job-args.json` the model hands to the Workflow tool. The verdicts dir is
- * created so agents can `Bash`-write into it. Apply reads the shards back to know
- * which files were judged, then re-extracts to recover each comment's range.
+ * Materialize the job under a content-keyed dir: one `shard-<n>.json` per shard,
+ * the rubric as `prompt.md`, and a `job-args.json` the model hands to the Workflow
+ * tool. The rubric is a file the judging agent reads rather than args text, so the
+ * args the model passes stay small. The verdicts dir is created so agents can
+ * `Bash`-write into it. Apply reads the shards back to know which files were
+ * judged, then re-extracts to recover each comment's range.
  */
 export async function writeJob(
   descriptor: JobDescriptor,
@@ -124,9 +126,12 @@ export async function writeJob(
   const shards: ShardRef[] = shardWrites.map((write) => write.ref);
   await Promise.all(shardWrites.map((write) => Bun.write(write.ref.path, write.body)));
 
+  const promptPath = join(jobDir, "prompt.md");
+  await Bun.write(promptPath, descriptor.promptText);
+
   const args: JobArgs = {
     shards,
-    promptText: descriptor.promptText,
+    promptPath,
     promptSha: descriptor.promptSha,
     schema: batchVerdictKeyedSchema(),
     verdictsDir,

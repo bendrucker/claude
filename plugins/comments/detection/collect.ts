@@ -19,6 +19,20 @@ export interface CollectedComment extends IntroducedComment {
   score: CommentScore;
 }
 
+/** A header marker that announces a file is machine-written. */
+const GENERATED_MARKER = /@generated|do not edit/i;
+
+/**
+ * Generated files carry machine-written comments the audit must never touch.
+ * Skip TypeScript declaration files and any file whose head announces it is
+ * generated. Only the head is scanned so a deep comment that happens to say "do
+ * not edit this line" does not exempt a hand-written file.
+ */
+export function isGeneratedFile(path: string, source: string): boolean {
+  if (path.endsWith(".d.ts")) return true;
+  return GENERATED_MARKER.test(source.slice(0, 2000));
+}
+
 export interface MrSource {
   projectId: string;
   ref: string;
@@ -84,6 +98,7 @@ async function collectDiffFile(
     console.error(`skipped ${file.path}: could not read new file content`);
     return [];
   }
+  if (isGeneratedFile(file.path, source)) return [];
   const lines = source.split("\n");
   const comments = await extractComments(source, language);
   return scopeIntroduced(comments, file.added).map((comment) =>
@@ -117,6 +132,7 @@ async function collectRepoFile(path: string): Promise<CollectedComment[]> {
   const file = Bun.file(path);
   if (!(await file.exists())) return [];
   const source = await file.text();
+  if (isGeneratedFile(path, source)) return [];
   const lines = source.split("\n");
   const comments = await extractComments(source, language);
   return comments.map((comment) => toCollected(path, language, comment, lines));

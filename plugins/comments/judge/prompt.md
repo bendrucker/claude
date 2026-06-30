@@ -87,22 +87,11 @@ lists), it is slop even when a neighboring clause is real why. Set `isSlop: true
 and trim to the why-only lines rather than passing the whole block. Reserve a pass
 for blocks that are why throughout.
 
-## Input and Output
+## Verdicts
 
-The user message is one or more blocks of the form:
-
-```
-===== COMMENT <index> =====
-path: <file path>
-language: <language>
-kind: line | block | docstring
---- comment text ---
-<the comment>
---- surrounding code ---
-<line-numbered source around the comment>
-```
-
-Return a verdict for every index, exactly once. Per verdict:
+Each comment you judge carries its path, language, kind (line, block, or
+docstring), text, and the surrounding line-numbered source. Return exactly one
+verdict per comment. Per verdict:
 
 - `isSlop`: true only when the comment fails the bar.
 - `category`: the matching category when `isSlop`, else `null`.

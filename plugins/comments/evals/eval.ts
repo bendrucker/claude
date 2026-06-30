@@ -6,7 +6,13 @@ import { cli } from "cleye";
 import { table } from "table";
 import type { CommentKind, Language } from "../detection/types";
 import { loadPrompt } from "../judge/judge";
-import { SLOP_CATEGORIES, type SlopCategory, type Verdict } from "../judge/schema";
+import {
+  SLOP_CATEGORIES,
+  type SlopCategory,
+  VERDICT_ACTIONS,
+  type Verdict,
+  type VerdictAction,
+} from "../judge/schema";
 import {
   anthropicCommentJudge,
   type CommentJudge,
@@ -16,9 +22,10 @@ import {
 } from "./oracle";
 
 /**
- * One labeled comment with the surrounding context the judge sees. `label`
- * partitions the corpus: `slop` must be flagged, `ok` is a must-pass negative
- * the judge must never flag. The `ok` set is the ship gate.
+ * One labeled comment with the surrounding context the judge sees. `action`
+ * partitions the corpus: `keep` is a must-pass negative the judge must never
+ * trim or rewrite, `trim` must be trimmed, `rewrite` must be rewritten. The
+ * `keep` set is the ship gate: trimming a justified comment is destructive.
  */
 export interface Fixture {
   id: string;
@@ -27,8 +34,10 @@ export interface Fixture {
   kind: CommentKind;
   comment: string;
   context: string;
-  label: "slop" | "ok";
+  action: VerdictAction;
   category: SlopCategory | null;
+  /** For `action: "rewrite"`: the owner's gold de-voiced text, for hand spot-checks. */
+  rewrite?: string | null;
   trimToLines?: number[];
   source?: string;
   note?: string;
@@ -52,16 +61,19 @@ function validateFixture(value: unknown, file: string): Fixture {
     throw new Error(`Fixture ${file} is not an object`);
   }
   const record = value as Record<string, unknown>;
-  const label = record.label;
-  if (label !== "slop" && label !== "ok") {
-    throw new Error(`Fixture ${file} has invalid label ${JSON.stringify(label)}`);
+  const action = record.action;
+  if (typeof action !== "string" || !VERDICT_ACTIONS.includes(action as VerdictAction)) {
+    throw new Error(`Fixture ${file} has invalid action ${JSON.stringify(action)}`);
   }
   const category = record.category ?? null;
-  if (label === "ok" && category !== null) {
-    throw new Error(`Fixture ${file} is "ok" but carries a category`);
+  if (action === "keep" && category !== null) {
+    throw new Error(`Fixture ${file} is "keep" but carries a category`);
   }
-  if (label === "slop" && !SLOP_CATEGORIES.includes(category as SlopCategory)) {
+  if (action !== "keep" && !SLOP_CATEGORIES.includes(category as SlopCategory)) {
     throw new Error(`Fixture ${file} has invalid slop category ${JSON.stringify(category)}`);
+  }
+  if (action === "rewrite" && (typeof record.rewrite !== "string" || record.rewrite.length === 0)) {
+    throw new Error(`Fixture ${file} is "rewrite" but carries no gold rewrite text`);
   }
   for (const key of ["id", "path", "language", "kind", "comment", "context"]) {
     if (typeof record[key] !== "string" || (record[key] as string).length === 0) {
@@ -75,9 +87,10 @@ function validateFixture(value: unknown, file: string): Fixture {
     kind: record.kind as CommentKind,
     comment: record.comment as string,
     context: record.context as string,
-    label,
+    action: action as VerdictAction,
     category: category as SlopCategory | null,
   };
+  if (typeof record.rewrite === "string") fixture.rewrite = record.rewrite;
   if (Array.isArray(record.trimToLines)) fixture.trimToLines = record.trimToLines as number[];
   if (typeof record.source === "string") fixture.source = record.source;
   if (typeof record.note === "string") fixture.note = record.note;
@@ -94,84 +107,84 @@ export function fixtureToInput(fixture: Fixture): CommentJudgeInput {
   };
 }
 
+export interface ActionMismatch {
+  id: string;
+  expected: VerdictAction;
+  predicted: VerdictAction;
+}
+
 export interface Metrics {
-  truePositives: number;
-  falsePositives: number;
-  trueNegatives: number;
-  falseNegatives: number;
-  precision: number;
-  recall: number;
-  /** The must-pass-negative violations: `ok` fixtures the judge flagged. */
-  falsePositiveIds: string[];
-  /** `slop` fixtures the judge missed. */
-  falseNegativeIds: string[];
-  /** For flagged slop, how often the predicted category matched the label. */
+  total: number;
+  /** Fixtures whose predicted action matched the label. */
+  correct: number;
+  /** correct / total, the action-accuracy gate. 1 when there is nothing to score. */
+  accuracy: number;
+  /** Every fixture whose predicted action differed from the label. */
+  mismatches: ActionMismatch[];
+  /** Destructive subset: `keep` fixtures the judge trimmed or rewrote. The ship gate. */
+  keepViolations: string[];
+  /** For correctly actioned `trim`/`rewrite`, how often the category also matched. */
   categoryMatches: number;
 }
 
 /**
- * Pure scorer over aligned fixtures and verdicts. A `slop` fixture is a positive;
- * a flag (`isSlop`) is a predicted positive. Precision and recall are computed on
- * the slop class. Division by zero yields 1 (nothing to get wrong).
+ * Pure scorer over aligned fixtures and verdicts, on a three-action basis. A
+ * fixture is correct when the predicted action equals its label. `keepViolations`
+ * isolate the destructive errors: a `keep` comment the judge trimmed or rewrote.
+ * An empty corpus yields accuracy 1 (nothing to get wrong).
  */
 export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics {
   if (fixtures.length !== verdicts.length) {
     throw new Error(`Scored ${verdicts.length} verdicts against ${fixtures.length} fixtures`);
   }
   const metrics: Metrics = {
-    truePositives: 0,
-    falsePositives: 0,
-    trueNegatives: 0,
-    falseNegatives: 0,
-    precision: 1,
-    recall: 1,
-    falsePositiveIds: [],
-    falseNegativeIds: [],
+    total: 0,
+    correct: 0,
+    accuracy: 1,
+    mismatches: [],
+    keepViolations: [],
     categoryMatches: 0,
   };
   for (const [i, fixture] of fixtures.entries()) {
     const verdict = verdicts[i];
     if (!verdict) continue;
-    const isSlop = fixture.label === "slop";
-    if (isSlop && verdict.isSlop) {
-      metrics.truePositives++;
-      if (verdict.category === fixture.category) metrics.categoryMatches++;
-    } else if (isSlop && !verdict.isSlop) {
-      metrics.falseNegatives++;
-      metrics.falseNegativeIds.push(fixture.id);
-    } else if (!isSlop && verdict.isSlop) {
-      metrics.falsePositives++;
-      metrics.falsePositiveIds.push(fixture.id);
+    metrics.total++;
+    if (verdict.action === fixture.action) {
+      metrics.correct++;
+      if (fixture.action !== "keep" && verdict.category === fixture.category) {
+        metrics.categoryMatches++;
+      }
     } else {
-      metrics.trueNegatives++;
+      metrics.mismatches.push({
+        id: fixture.id,
+        expected: fixture.action,
+        predicted: verdict.action,
+      });
+      if (fixture.action === "keep") metrics.keepViolations.push(fixture.id);
     }
   }
-  const predictedPositives = metrics.truePositives + metrics.falsePositives;
-  const actualPositives = metrics.truePositives + metrics.falseNegatives;
-  metrics.precision = predictedPositives === 0 ? 1 : metrics.truePositives / predictedPositives;
-  metrics.recall = actualPositives === 0 ? 1 : metrics.truePositives / actualPositives;
+  metrics.accuracy = metrics.total === 0 ? 1 : metrics.correct / metrics.total;
   return metrics;
 }
 
 function report(fixtures: Fixture[], verdicts: Verdict[], metrics: Metrics): string {
-  const rows: string[][] = [["id", "label", "expected", "predicted", "category", "ok"]];
+  const rows: string[][] = [["id", "expected", "predicted", "category", "ok"]];
   for (const [i, fixture] of fixtures.entries()) {
     const verdict = verdicts[i];
     if (!verdict) continue;
-    const correct = (fixture.label === "slop") === verdict.isSlop;
+    const correct = verdict.action === fixture.action;
     rows.push([
       fixture.id,
-      fixture.label,
-      fixture.category ?? "-",
-      verdict.isSlop ? "slop" : "ok",
+      fixture.action,
+      verdict.action,
       verdict.category ?? "-",
       correct ? "y" : "N",
     ]);
   }
   const summary = [
-    `precision ${metrics.precision.toFixed(2)}  recall ${metrics.recall.toFixed(2)}`,
-    `TP ${metrics.truePositives}  FP ${metrics.falsePositives}  TN ${metrics.trueNegatives}  FN ${metrics.falseNegatives}`,
-    `category matches ${metrics.categoryMatches}/${metrics.truePositives}`,
+    `accuracy ${metrics.accuracy.toFixed(2)}  (${metrics.correct}/${metrics.total})`,
+    `keep violations ${metrics.keepViolations.length}`,
+    `category matches ${metrics.categoryMatches}`,
   ].join("\n");
   return `${table(rows)}\n${summary}`;
 }
@@ -185,9 +198,9 @@ async function run(judge: CommentJudge, gate: boolean): Promise<number> {
   const verdicts = await judgeComments(judge, fixtures.map(fixtureToInput));
   const metrics = scoreResults(fixtures, verdicts);
   console.log(report(fixtures, verdicts, metrics));
-  if (gate && metrics.falsePositives > 0) {
+  if (gate && metrics.keepViolations.length > 0) {
     console.error(
-      `\nSHIP GATE FAILED: judge flagged ${metrics.falsePositives} must-pass comment(s): ${metrics.falsePositiveIds.join(", ")}`,
+      `\nSHIP GATE FAILED: judge did not keep ${metrics.keepViolations.length} must-keep comment(s): ${metrics.keepViolations.join(", ")}`,
     );
     return 1;
   }
@@ -202,7 +215,7 @@ if (import.meta.main) {
       gate: {
         type: Boolean,
         default: false,
-        description: "Exit non-zero on any must-pass false positive",
+        description: "Exit non-zero when the judge trims or rewrites a must-keep comment",
       },
     },
   });

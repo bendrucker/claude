@@ -1,0 +1,12 @@
+{
+  "id": "branch-is-clean-tree-plain-keep",
+  "path": "plugins/comments/apply/branch.ts",
+  "language": "typescript",
+  "kind": "docstring",
+  "comment": "/** True when `git status --porcelain` reports nothing, the apply precondition. */",
+  "context": "5: }\n6: \n7: /** True when `git status --porcelain` reports nothing, the apply precondition. */\n8: export async function isCleanTree(): Promise<boolean> {\n9:   const status = await $`git status --porcelain`.quiet().nothrow();\n10:   return status.text().trim().length === 0;\n11: }",
+  "action": "keep",
+  "category": null,
+  "source": "comment-skill branch.ts:7",
+  "note": "Over-rewrite guard. A plain, factual one-line doc that names the precondition the boolean encodes. It carries no AI voice, so it must stay keep. Pins that the judge does not reword a clean comment just because rewrite is now an available action."
+}

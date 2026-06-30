@@ -1,12 +1,13 @@
 /**
  * The judge verdict contract. One verdict per introduced comment. The taxonomy
- * is the corpus-validated v1 set. The judge must never flag the two justified
- * comment types (what-on-dense, why-on-simple) or genuine design rationale.
+ * is the corpus-validated v1 set plus `voice` for the rewrite case. The judge
+ * must never trim the two justified comment types (what-on-dense, why-on-simple)
+ * or genuine design rationale.
  */
 
 /**
  * Slop categories, in descending corpus frequency. `null` category accompanies
- * `isSlop: false`.
+ * `action: "keep"`.
  *
  * - `restate-the-what`: paraphrases simple adjacent code, adds no reason.
  * - `narration`: diary of the change (migration story, roadmap/ticket
@@ -15,6 +16,7 @@
  * - `docstring-scope`: documents callers/callees/impl, or uses prose where a
  *   type belongs.
  * - `section-divider`: title-case banners and rule lines. Lowest confidence.
+ * - `voice`: carries a real, load-bearing fact but in AI voice. The rewrite case.
  */
 export const SLOP_CATEGORIES = [
   "restate-the-what",
@@ -22,19 +24,38 @@ export const SLOP_CATEGORIES = [
   "self-praise",
   "docstring-scope",
   "section-divider",
+  "voice",
 ] as const;
 
 export type SlopCategory = (typeof SLOP_CATEGORIES)[number];
 
+/**
+ * What the applier does with a comment.
+ *
+ * - `keep`: it earns its place and is cleanly written. Leave it.
+ * - `trim`: it carries no fact a competent reader lacks. Delete it, or trim to
+ *   the worthwhile lines via `trimToLines`.
+ * - `rewrite`: it carries a real fact under AI voice. Strip the voice, keep the
+ *   fact. `rewrite` holds the de-voiced comment text.
+ */
+export const VERDICT_ACTIONS = ["keep", "trim", "rewrite"] as const;
+
+export type VerdictAction = (typeof VERDICT_ACTIONS)[number];
+
 export type Confidence = "low" | "medium" | "high";
 
 export interface Verdict {
-  isSlop: boolean;
-  /** The slop category when `isSlop`, else `null`. */
+  action: VerdictAction;
+  /** The slop category for `trim`/`rewrite`, `null` for `keep`. */
   category: SlopCategory | null;
   confidence: Confidence;
-  /** One sentence: why this is or is not slop, in the owner's two-type model. */
+  /** One sentence: the fact the comment does or does not carry, and the voice stripped if rewriting. */
   rationale: string;
+  /**
+   * For `action: "rewrite"`: the de-voiced comment text, including its
+   * delimiters. `null` for `keep` and `trim`.
+   */
+  rewrite: string | null;
   /** Present only with `--fix`: a concrete rewrite, trim, or delete suggestion. */
   suggestedFix?: string;
   /**
@@ -54,18 +75,19 @@ export function verdictSchema(): Record<string, unknown> {
   return {
     type: "object",
     properties: {
-      isSlop: { type: "boolean" },
+      action: { type: "string", enum: [...VERDICT_ACTIONS] },
       category: {
         anyOf: [{ type: "string", enum: [...SLOP_CATEGORIES] }, { type: "null" }],
       },
       confidence: { type: "string", enum: ["low", "medium", "high"] },
       rationale: { type: "string" },
+      rewrite: { anyOf: [{ type: "string" }, { type: "null" }] },
       suggestedFix: { anyOf: [{ type: "string" }, { type: "null" }] },
       trimToLines: {
         anyOf: [{ type: "array", items: { type: "integer" } }, { type: "null" }],
       },
     },
-    required: ["isSlop", "category", "confidence", "rationale"],
+    required: ["action", "confidence", "rationale"],
     additionalProperties: false,
   };
 }

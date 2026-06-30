@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import type { SlopCategory, Verdict } from "./schema";
+import {
+  type Confidence,
+  type SlopCategory,
+  VERDICT_ACTIONS,
+  type Verdict,
+  type VerdictAction,
+} from "./schema";
 
 /**
  * Shared judge primitives: the versioned prompt and per-verdict validation. The
@@ -41,10 +47,14 @@ export function parseVerdict(value: unknown, label: string | number): Verdict {
     throw new Error(`Judge verdict ${label} must be an object`);
   }
   const record = value as Record<string, unknown>;
-  if (typeof record.isSlop !== "boolean") {
-    throw new Error(`Judge verdict ${label} "isSlop" must be a boolean`);
+  if (
+    typeof record.action !== "string" ||
+    !VERDICT_ACTIONS.includes(record.action as VerdictAction)
+  ) {
+    throw new Error(`Judge verdict ${label} "action" must be one of ${VERDICT_ACTIONS.join(", ")}`);
   }
-  if (record.category !== null && typeof record.category !== "string") {
+  const action = record.action as VerdictAction;
+  if (record.category != null && typeof record.category !== "string") {
     throw new Error(`Judge verdict ${label} "category" must be a string or null`);
   }
   if (typeof record.confidence !== "string") {
@@ -53,11 +63,21 @@ export function parseVerdict(value: unknown, label: string | number): Verdict {
   if (typeof record.rationale !== "string") {
     throw new Error(`Judge verdict ${label} "rationale" must be a string`);
   }
+  const hasRewrite = typeof record.rewrite === "string" && record.rewrite.length > 0;
+  if (action === "rewrite" && !hasRewrite) {
+    throw new Error(
+      `Judge verdict ${label} "rewrite" must be a non-empty string when action is "rewrite"`,
+    );
+  }
+  if (action !== "rewrite" && hasRewrite) {
+    throw new Error(`Judge verdict ${label} "rewrite" is only valid when action is "rewrite"`);
+  }
   const verdict: Verdict = {
-    isSlop: record.isSlop,
-    category: record.category as SlopCategory | null,
-    confidence: record.confidence as Verdict["confidence"],
+    action,
+    category: (record.category ?? null) as SlopCategory | null,
+    confidence: record.confidence as Confidence,
     rationale: record.rationale,
+    rewrite: action === "rewrite" ? (record.rewrite as string) : null,
   };
   if (typeof record.suggestedFix === "string") verdict.suggestedFix = record.suggestedFix;
   if (Array.isArray(record.trimToLines)) {

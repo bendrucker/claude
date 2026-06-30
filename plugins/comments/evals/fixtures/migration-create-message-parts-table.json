@@ -5,7 +5,7 @@
   "kind": "line",
   "comment": "# Create message_parts table",
   "context": "30: def upgrade() -> None:\n31:     \"\"\"Upgrade schema.\"\"\"\n32:     # Create message_parts table\n33:     op.create_table(\n34:         \"message_parts\",\n35:         # Primary key and foreign keys\n36:         sa.Column(\"id\", sa.UUID(), nullable=False),\n37:         sa.Column(\"message_id\", sa.UUID(), nullable=False),\n38:         sa.Column(\"order\", sa.Integer(), nullable=False),\n39:         sa.Column(\"type\", sa.String(), nullable=False),",
-  "label": "slop",
+  "action": "trim",
   "category": "restate-the-what",
   "trimToLines": null,
   "source": "main migrations/b67beab2a3fa:32",

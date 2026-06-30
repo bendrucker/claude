@@ -5,7 +5,7 @@
   "kind": "block",
   "comment": "# Parse precision/scale off a Tooling FieldDefinition DataType label, e.g.\n# \"Currency(16, 2)\". Salesforce's two numbers are digits left/right of the decimal,\n# so the DuckDB width is their sum (see _duckdb_type). The integer precision/scale\n# columns on FieldDefinition are unreliable (0 for ~55% of numeric fields), so the\n# label is the precision source.",
   "context": "51: _CANONICAL_NAME_RE = re.compile(r\"^[A-Za-z0-9_]+$\")\n52: # The connector stamps timestamps at nanosecond precision; datetime parses six\n53: # fractional digits, so clip the tail before parsing.\n54: _NANOS_RE = re.compile(r\"(\\.\\d{6})\\d+\")\n55: # Parse precision/scale off a Tooling FieldDefinition DataType label, e.g.\n56: # \"Currency(16, 2)\". Salesforce's two numbers are digits left/right of the decimal,\n57: # so the DuckDB width is their sum (see _duckdb_type). The integer precision/scale\n58: # columns on FieldDefinition are unreliable (0 for ~55% of numeric fields), so the\n59: # label is the precision source.\n60: _DATATYPE_PS_RE = re.compile(r\"^(?:Currency|Number|Percent)\\((\\d+),\\s*(\\d+)\\)$\")",
-  "label": "ok",
+  "action": "keep",
   "category": null,
   "trimToLines": null,
   "source": "main master.py:55",

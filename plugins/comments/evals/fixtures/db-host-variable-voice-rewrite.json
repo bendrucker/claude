@@ -1,0 +1,13 @@
+{
+  "id": "db-host-variable-voice-rewrite",
+  "path": "plugins/claude-code/skills/session/scripts/db.ts",
+  "language": "typescript",
+  "kind": "line",
+  "comment": "// Clear the per-host indexing variable so a query reusing this connection without\n  // an explicit host param spans all hosts rather than inheriting the last one.",
+  "context": "259:   if (imported) {\n260:     await rebuildViews(db);\n261:   }\n262: \n263:   // Clear the per-host indexing variable so a query reusing this connection without\n264:   // an explicit host param spans all hosts rather than inheriting the last one.\n265:   await db.run(\"SET VARIABLE host = NULL\");\n266: \n267:   if (marker) {\n268:     await Bun.write(marker, \"\");\n269:   }",
+  "action": "rewrite",
+  "category": "voice",
+  "rewrite": "// Reset the per-host variable so a later query with no host param covers every host.",
+  "source": "comment-skill db.ts:263",
+  "note": "Owner labeled this bad for the contrastive 'spans all hosts rather than inheriting the last one'. The load-bearing fact (resetting the variable un-scopes later host-less queries) survives; the 'rather than' framing is the voice to strip. Gold rewrite is provisional pending owner confirmation. The gate scores the action only."
+}

@@ -6,10 +6,11 @@ import { collectVerdicts, matchVerdicts } from "./join";
 
 function verdict(over: Partial<Verdict> = {}): Verdict {
   return {
-    isSlop: true,
+    action: "trim",
     category: "restate-the-what",
     confidence: "high",
     rationale: "r",
+    rewrite: null,
     ...over,
   };
 }
@@ -34,10 +35,10 @@ describe("collectVerdicts", () => {
   test("folds shards into one id-keyed map", () => {
     const map = collectVerdicts([
       shard([{ id: "a", verdict: verdict() }]),
-      shard([{ id: "b", verdict: verdict({ isSlop: false, category: null }) }]),
+      shard([{ id: "b", verdict: verdict({ action: "keep", category: null }) }]),
     ]);
     expect(map.size).toBe(2);
-    expect(map.get("b")?.isSlop).toBe(false);
+    expect(map.get("b")?.action).toBe("keep");
   });
 
   test("rejects a duplicate id across shards", () => {
@@ -52,7 +53,7 @@ describe("collectVerdicts", () => {
   test("rejects a malformed verdict", () => {
     expect(() =>
       collectVerdicts([{ verdicts: [{ id: "a", verdict: { category: null } }] }]),
-    ).toThrow(/isSlop/);
+    ).toThrow(/"action"/);
   });
 
   test("rejects a shard missing the verdicts array", () => {

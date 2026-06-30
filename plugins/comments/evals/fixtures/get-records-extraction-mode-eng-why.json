@@ -5,7 +5,7 @@
   "kind": "line",
   "comment": "# extraction_mode is NULL until ENG-2068; only name it when present.",
   "context": "1201:     status = coverage.get(\"status\")\n1202:     status_note = \"\" if status == _COVERAGE_STATUS_OK else f\" (status: {status})\"\n1203:     # extraction_mode is NULL until ENG-2068; only name it when present.\n1204:     mode = coverage.get(\"extraction_mode\")\n1205:     mode_text = f\"{mode} extraction, \" if mode else \"\"\n1206:     return (\n1207:         f\"Coverage: {mode_text}{coverage.get('asserted_row_count')} record(s) \"\n1208:         f\"extracted so far (at least this many) as of {freshness_text}{status_note}.\"\n1209:     )",
-  "label": "ok",
+  "action": "keep",
   "category": null,
   "trimToLines": null,
   "source": "main get_records.py:1203",

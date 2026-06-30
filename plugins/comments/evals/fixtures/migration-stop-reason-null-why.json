@@ -5,7 +5,7 @@
   "kind": "block",
   "comment": "# Null out any legacy/unknown values so the constraint can be added. NULL is\n    # accepted by the constraint (an IN check is satisfied, not false, for NULL).",
   "context": "24: def upgrade() -> None:\n25:     \"\"\"Upgrade schema.\"\"\"\n26:     # Null out any legacy/unknown values so the constraint can be added. NULL is\n27:     # accepted by the constraint (an IN check is satisfied, not false, for NULL).\n28:     op.execute(\n29:         f\"UPDATE messages SET stop_reason = NULL WHERE stop_reason NOT IN ({_VALUES})\"\n30:     )\n31:     op.create_check_constraint(\n32:         \"check_message_stop_reason\",\n33:         \"messages\",\n34:         f\"stop_reason IN ({_VALUES})\",\n35:     )",
-  "label": "ok",
+  "action": "keep",
   "category": null,
   "trimToLines": null,
   "source": "main migrations/eb8ee9d4839c:26",

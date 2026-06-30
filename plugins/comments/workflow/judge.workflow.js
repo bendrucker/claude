@@ -45,7 +45,9 @@ for (let i = 0; i < shards.length; i += CONCURRENCY) {
 let flagged = 0;
 for (const result of results) {
   if (result && Array.isArray(result.verdicts)) {
-    flagged += result.verdicts.filter((entry) => entry.verdict?.isSlop).length;
+    flagged += result.verdicts.filter(
+      (entry) => entry.verdict?.action && entry.verdict.action !== "keep",
+    ).length;
   }
 }
 

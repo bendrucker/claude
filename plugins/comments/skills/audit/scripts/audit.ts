@@ -243,8 +243,14 @@ const applyCmd = command(
       const editItems: EditItem[] = [];
       for (const match of matchVerdicts(path, await extractComments(source, language), verdicts)) {
         matched.add(match.id);
-        reportItems.push({ path, startLine: match.comment.startLine, verdict: match.verdict });
-        if (match.verdict.isSlop) editItems.push(toEditItem(match.comment, match.verdict));
+        reportItems.push({
+          path,
+          startLine: match.comment.startLine,
+          verdict: match.verdict,
+          text: match.comment.text,
+        });
+        if (match.verdict.action !== "keep")
+          editItems.push(toEditItem(match.comment, match.verdict));
       }
       if (editItems.length > 0) {
         const result = computeFileEdits(source, editItems);

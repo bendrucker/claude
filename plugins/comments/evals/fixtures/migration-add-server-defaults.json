@@ -5,7 +5,7 @@
   "kind": "line",
   "comment": "# Add missing server defaults to messages table timestamps",
   "context": "21: def upgrade() -> None:\n22:     \"\"\"Upgrade schema.\"\"\"\n23:     # Add missing server defaults to messages table timestamps\n24:     op.alter_column(\"messages\", \"created_at\", server_default=sa.text(\"now()\"))\n25:     op.alter_column(\"messages\", \"updated_at\", server_default=sa.text(\"now()\"))\n26: \n27: \n28: def downgrade() -> None:\n29:     \"\"\"Downgrade schema.\"\"\"\n30:     # Remove server defaults from messages table timestamps\n31:     op.alter_column(\"messages\", \"created_at\", server_default=None)\n32:     op.alter_column(\"messages\", \"updated_at\", server_default=None)",
-  "label": "slop",
+  "action": "trim",
   "category": "restate-the-what",
   "trimToLines": null,
   "source": "main migrations/ece562436709:23",

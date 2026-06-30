@@ -12,7 +12,7 @@ function fixture(over: Partial<Fixture>): Fixture {
     kind: "line",
     comment: "# c",
     context: "1: x = 1",
-    label: "slop",
+    action: "trim",
     category: "restate-the-what",
     ...over,
   };
@@ -20,58 +20,56 @@ function fixture(over: Partial<Fixture>): Fixture {
 
 function verdict(over: Partial<Verdict>): Verdict {
   return {
-    isSlop: true,
+    action: "trim",
     category: "restate-the-what",
     confidence: "high",
     rationale: "r",
+    rewrite: null,
     ...over,
   };
 }
 
 describe("scoreResults", () => {
-  test("counts a confusion matrix and computes precision/recall", () => {
+  test("scores action accuracy and isolates destructive keep violations", () => {
     const fixtures = [
-      fixture({ id: "tp", label: "slop" }),
-      fixture({ id: "fn", label: "slop" }),
-      fixture({ id: "fp", label: "ok", category: null }),
-      fixture({ id: "tn", label: "ok", category: null }),
+      fixture({ id: "trim-ok", action: "trim" }),
+      fixture({ id: "rewrite-ok", action: "rewrite", category: "voice", rewrite: "# fact" }),
+      fixture({ id: "keep-violated", action: "keep", category: null }),
+      fixture({ id: "keep-ok", action: "keep", category: null }),
     ];
     const verdicts = [
-      verdict({ isSlop: true }),
-      verdict({ isSlop: false, category: null }),
-      verdict({ isSlop: true }),
-      verdict({ isSlop: false, category: null }),
+      verdict({ action: "trim" }),
+      verdict({ action: "rewrite", category: "voice", rewrite: "# fact" }),
+      verdict({ action: "trim" }),
+      verdict({ action: "keep", category: null }),
     ];
     const m = scoreResults(fixtures, verdicts);
-    expect(m.truePositives).toBe(1);
-    expect(m.falseNegatives).toBe(1);
-    expect(m.falsePositives).toBe(1);
-    expect(m.trueNegatives).toBe(1);
-    expect(m.precision).toBeCloseTo(0.5);
-    expect(m.recall).toBeCloseTo(0.5);
-    expect(m.falsePositiveIds).toEqual(["fp"]);
-    expect(m.falseNegativeIds).toEqual(["fn"]);
+    expect(m.total).toBe(4);
+    expect(m.correct).toBe(3);
+    expect(m.accuracy).toBeCloseTo(0.75);
+    expect(m.mismatches).toEqual([{ id: "keep-violated", expected: "keep", predicted: "trim" }]);
+    expect(m.keepViolations).toEqual(["keep-violated"]);
   });
 
-  test("category match only counts when the flagged category equals the label", () => {
+  test("category match only counts when an action match also matches the category", () => {
     const fixtures = [
-      fixture({ id: "a", category: "restate-the-what" }),
-      fixture({ id: "b", category: "narration" }),
+      fixture({ id: "a", action: "trim", category: "restate-the-what" }),
+      fixture({ id: "b", action: "trim", category: "narration" }),
     ];
     const verdicts = [
-      verdict({ isSlop: true, category: "restate-the-what" }),
-      verdict({ isSlop: true, category: "restate-the-what" }),
+      verdict({ action: "trim", category: "restate-the-what" }),
+      verdict({ action: "trim", category: "restate-the-what" }),
     ];
     const m = scoreResults(fixtures, verdicts);
-    expect(m.truePositives).toBe(2);
+    expect(m.correct).toBe(2);
     expect(m.categoryMatches).toBe(1);
   });
 
-  test("a corpus with no positives yields recall 1 and precision 1 when nothing is flagged", () => {
-    const fixtures = [fixture({ id: "n", label: "ok", category: null })];
-    const m = scoreResults(fixtures, [verdict({ isSlop: false, category: null })]);
-    expect(m.precision).toBe(1);
-    expect(m.recall).toBe(1);
+  test("a clean keep corpus yields accuracy 1 and no violations", () => {
+    const fixtures = [fixture({ id: "n", action: "keep", category: null })];
+    const m = scoreResults(fixtures, [verdict({ action: "keep", category: null })]);
+    expect(m.accuracy).toBe(1);
+    expect(m.keepViolations).toEqual([]);
   });
 
   test("throws when verdict count does not match fixtures", () => {
@@ -80,34 +78,37 @@ describe("scoreResults", () => {
 });
 
 describe("fixture corpus", () => {
-  test("every committed fixture is valid and the corpus has both labels", async () => {
+  test("every committed fixture is valid and the corpus spans all three actions", async () => {
     const fixtures = await loadFixtures();
     expect(fixtures.length).toBeGreaterThan(0);
-    expect(fixtures.some((f) => f.label === "slop")).toBe(true);
-    expect(fixtures.some((f) => f.label === "ok")).toBe(true);
+    expect(fixtures.some((f) => f.action === "keep")).toBe(true);
+    expect(fixtures.some((f) => f.action === "trim")).toBe(true);
+    expect(fixtures.some((f) => f.action === "rewrite")).toBe(true);
     const ids = fixtures.map((f) => f.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const f of fixtures) {
       expect(f.context.length).toBeGreaterThan(0);
       expect(fixtureToInput(f).text).toBe(f.comment);
+      if (f.action === "rewrite") expect(f.rewrite?.length).toBeGreaterThan(0);
     }
   });
 });
 
-// Live ship gate: the judge must not flag any must-pass `ok` fixture. Self-skips
-// without an API key so CI stays deterministic; run locally with ANTHROPIC_API_KEY.
+// Live ship gate: the judge must keep every must-keep fixture (never trim or
+// rewrite a justified comment). Self-skips without an API key so CI stays
+// deterministic; run locally with ANTHROPIC_API_KEY.
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 
 describe("ship gate", () => {
   test.skipIf(!hasKey)(
-    "judge flags zero must-pass negatives",
+    "judge keeps every must-keep comment",
     async () => {
-      const fixtures = (await loadFixtures()).filter((f) => f.label === "ok");
+      const fixtures = (await loadFixtures()).filter((f) => f.action === "keep");
       const prompt = await loadPrompt();
       const judge = anthropicCommentJudge({ prompt: prompt.text });
       const verdicts = await judgeComments(judge, fixtures.map(fixtureToInput));
-      const flagged = fixtures.filter((_, i) => verdicts[i]?.isSlop).map((f) => f.id);
-      expect(flagged).toEqual([]);
+      const violated = fixtures.filter((_, i) => verdicts[i]?.action !== "keep").map((f) => f.id);
+      expect(violated).toEqual([]);
     },
     120_000,
   );

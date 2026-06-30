@@ -5,7 +5,7 @@
   "kind": "docstring",
   "comment": "\"\"\"Upgrade schema.\n\n    Refactors message_parts table to use Pydantic AI naming conventions:\n    - Renames columns to match Pydantic AI API\n    - Removes AI SDK-specific columns\n    - Updates constraints\n    \"\"\"",
   "context": "21: def upgrade() -> None:\n22:     \"\"\"Upgrade schema.\n23: \n24:     Refactors message_parts table to use Pydantic AI naming conventions:\n25:     - Renames columns to match Pydantic AI API\n26:     - Removes AI SDK-specific columns\n27:     - Updates constraints\n28:     \"\"\"\n29:     # Rename columns to match Pydantic AI naming\n30:     op.alter_column(\"message_parts\", \"text_text\", new_column_name=\"text_content\")\n31:     op.alter_column(\"message_parts\", \"tool_input\", new_column_name=\"tool_args\")\n32:     op.alter_column(\"message_parts\", \"tool_output\", new_column_name=\"tool_content\")",
-  "label": "slop",
+  "action": "trim",
   "category": "docstring-scope",
   "trimToLines": null,
   "source": "main migrations/9f1891b12937:22",

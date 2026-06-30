@@ -92,36 +92,107 @@ function applyFull(
 }
 
 /**
- * Rewrite a file by trimming the slop comments. Builds a deletion mask plus
- * per-line replacements over `source.split("\n")` and applies them once, never
- * mutating line indices mid-loop. Cases:
+ * Replace a comment's span with the judge's de-voiced rewrite. The rewrite text
+ * carries the delimiters but no leading indentation; the applier owns it. For a
+ * full-line comment the span's lines become the indented rewrite lines. For a
+ * trailing line comment the rewrite is spliced after the code, one space apart.
+ * Anything else (a trailing block, code interleaved on the line) is skipped and
+ * flagged, the same conservative bar trims use.
+ */
+function applyRewrite(
+  item: EditItem,
+  lines: string[],
+  deletions: Set<number>,
+  spanInserts: Map<number, string[]>,
+  skips: EditSkip[],
+): void {
+  const rewrite = item.verdict.rewrite;
+  if (!rewrite) {
+    skips.push({
+      startLine: item.startLine,
+      reason: "manual",
+      detail: "rewrite verdict carried no rewrite text",
+    });
+    return;
+  }
+  const before = (lines[item.startLine - 1] ?? "").slice(0, item.startColumn);
+  const after = (lines[item.endLine - 1] ?? "").slice(item.endColumn);
+  const wsBefore = before.trim().length === 0;
+  const wsAfter = after.trim().length === 0;
+  const rewriteLines = rewrite.split("\n");
+
+  if (wsBefore && wsAfter) {
+    const indent = before;
+    spanInserts.set(
+      item.startLine,
+      rewriteLines.map((line) => `${indent}${line}`.replace(/\s+$/, "")),
+    );
+    for (let n = item.startLine; n <= item.endLine; n++) deletions.add(n);
+    return;
+  }
+
+  if (!wsBefore && wsAfter && item.kind === "line" && item.startLine === item.endLine) {
+    const code = before.replace(/\s+$/, "");
+    spanInserts.set(item.startLine, [`${code} ${rewriteLines.join(" ")}`.replace(/\s+$/, "")]);
+    deletions.add(item.startLine);
+    return;
+  }
+
+  skips.push({
+    startLine: item.startLine,
+    reason: "manual",
+    detail: "comment is interleaved with code on its line",
+  });
+}
+
+/**
+ * Rewrite a file by acting on each comment's verdict. Builds a deletion mask,
+ * per-line replacements, and span inserts over `source.split("\n")`, then applies
+ * them once, never mutating line indices mid-loop. By action:
  *
- * - full-line comment (whitespace either side) → delete its lines;
- * - trailing line comment after code → strip it, keeping the leading code;
- * - block/docstring with `trimToLines` → keep those comment-relative lines;
+ * - `keep` → left untouched;
+ * - `trim` with `trimToLines` → keep those comment-relative lines, drop the rest;
+ * - `trim` whole, full-line comment → delete its lines;
+ * - `trim` whole, trailing line comment after code → strip it, keep the code;
+ * - `rewrite` → replace the comment span with the indented de-voiced text;
  * - anything that would risk broken syntax → skip and flag for manual handling.
  *
  * Overlapping verdicts on one line resolve with deletion winning over a replace.
- * Non-slop verdicts are ignored.
+ * A span insert at a line takes precedence over its own span's deletions.
  */
 export function computeFileEdits(source: string, items: EditItem[]): FileEditResult {
   const lines = source.split("\n");
   const deletions = new Set<number>();
   const replacements = new Map<number, string>();
+  const spanInserts = new Map<number, string[]>();
   const skips: EditSkip[] = [];
 
   for (const item of items) {
-    if (!item.verdict.isSlop) continue;
-    const keep = keepLines(item);
-    if (keep != null) {
-      applyTrim(item, keep, deletions, skips);
-    } else {
-      applyFull(item, lines, deletions, replacements, skips);
+    switch (item.verdict.action) {
+      case "keep":
+        break;
+      case "trim": {
+        const keep = keepLines(item);
+        if (keep != null) {
+          applyTrim(item, keep, deletions, skips);
+        } else {
+          applyFull(item, lines, deletions, replacements, skips);
+        }
+        break;
+      }
+      case "rewrite":
+        applyRewrite(item, lines, deletions, spanInserts, skips);
+        break;
     }
   }
 
   const out: string[] = [];
   for (let n = 1; n <= lines.length; n++) {
+    const insert = spanInserts.get(n);
+    if (insert) {
+      out.push(...insert);
+      continue;
+    }
     if (deletions.has(n)) continue;
     out.push(replacements.has(n) ? (replacements.get(n) as string) : (lines[n - 1] as string));
   }

@@ -5,7 +5,7 @@
   "kind": "line",
   "comment": "# Update check constraint to use new tool types",
   "context": "44: \n45:     # Update check constraint to use new tool types\n46:     op.create_check_constraint(\n47:         \"tool_fields_required\",\n48:         \"message_parts\",\n49:         \"CASE WHEN type IN ('tool_call', 'tool_return') THEN tool_call_id IS NOT NULL ELSE TRUE END\",\n50:     )\n51: \n52:     # Update check constraint for text type with new column name\n53:     op.drop_constraint(\"text_required_for_text_type\", \"message_parts\", type_=\"check\")\n54:     op.create_check_constraint(",
-  "label": "slop",
+  "action": "trim",
   "category": "restate-the-what",
   "trimToLines": null,
   "source": "main migrations/9f1891b12937:45",

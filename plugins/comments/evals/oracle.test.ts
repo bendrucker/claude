@@ -22,10 +22,11 @@ function input(overrides: Partial<CommentJudgeInput> = {}): CommentJudgeInput {
 
 function verdict(overrides: Partial<Verdict> = {}): Verdict {
   return {
-    isSlop: true,
+    action: "trim",
     category: "restate-the-what",
     confidence: "high",
     rationale: "Paraphrases the adjacent line.",
+    rewrite: null,
     ...overrides,
   };
 }
@@ -39,7 +40,7 @@ function batchJson(verdicts: Verdict[], indices: number[]): string {
 describe("parseBatchVerdicts", () => {
   test("returns verdicts ordered by index with full coverage", () => {
     const a = verdict({ rationale: "a" });
-    const b = verdict({ isSlop: false, category: null, rationale: "b" });
+    const b = verdict({ action: "keep", category: null, rationale: "b" });
     const json = batchJson([b, a], [1, 0]);
     const result = parseBatchVerdicts(json, 2);
     expect(result).toEqual([a, b]);

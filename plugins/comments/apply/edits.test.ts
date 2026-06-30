@@ -6,10 +6,11 @@ import { computeFileEdits, type EditItem } from "./edits";
 
 function verdict(over: Partial<Verdict> = {}): Verdict {
   return {
-    isSlop: true,
+    action: "trim",
     category: "restate-the-what",
     confidence: "high",
     rationale: "r",
+    rewrite: null,
     ...over,
   };
 }
@@ -121,7 +122,7 @@ describe("computeFileEdits resolution", () => {
     expect(result.content).toBe("keep();\nmore();");
   });
 
-  test("ignores non-slop verdicts", () => {
+  test("ignores keep verdicts", () => {
     const source = "// kept\ncode();";
     const result = computeFileEdits(source, [
       item({
@@ -129,10 +130,86 @@ describe("computeFileEdits resolution", () => {
         endLine: 1,
         startColumn: 0,
         endColumn: 7,
-        verdict: verdict({ isSlop: false }),
+        verdict: verdict({ action: "keep", category: null }),
       }),
     ]);
     expect(result.content).toBe(source);
+  });
+});
+
+describe("computeFileEdits action: rewrite", () => {
+  test("replaces a full-line comment with the indented de-voiced text", () => {
+    const source = "code();\n    // spans all hosts rather than the last one\n    more();";
+    const result = computeFileEdits(source, [
+      item({
+        startLine: 2,
+        endLine: 2,
+        startColumn: 4,
+        endColumn: 49,
+        verdict: verdict({
+          action: "rewrite",
+          category: "voice",
+          rewrite: "// each host keeps its own connection",
+        }),
+      }),
+    ]);
+    expect(result.content).toBe("code();\n    // each host keeps its own connection\n    more();");
+    expect(result.skips).toEqual([]);
+  });
+
+  test("splices a rewritten trailing line comment after the code", () => {
+    const source = "count += 1; // bumps the counter, matching the bash original";
+    const result = computeFileEdits(source, [
+      item({
+        startLine: 1,
+        endLine: 1,
+        startColumn: 12,
+        endColumn: source.length,
+        verdict: verdict({
+          action: "rewrite",
+          category: "voice",
+          rewrite: "// retries reuse the same counter",
+        }),
+      }),
+    ]);
+    expect(result.content).toBe("count += 1; // retries reuse the same counter");
+  });
+
+  test("replaces a multi-line block with indented rewrite lines", () => {
+    const source = "a();\n  /**\n   * surfaces the product path\n   */\n  b();";
+    const result = computeFileEdits(source, [
+      item({
+        startLine: 2,
+        endLine: 4,
+        startColumn: 2,
+        endColumn: 5,
+        kind: "block",
+        verdict: verdict({
+          action: "rewrite",
+          category: "voice",
+          rewrite: "/**\n * Returns the resolved request path.\n */",
+        }),
+      }),
+    ]);
+    expect(result.content).toBe(
+      "a();\n  /**\n   * Returns the resolved request path.\n   */\n  b();",
+    );
+  });
+
+  test("skips a rewrite of a block interleaved with code on its line", () => {
+    const source = "x = 1; /* note */ y = 2;";
+    const result = computeFileEdits(source, [
+      item({
+        startLine: 1,
+        endLine: 1,
+        startColumn: 7,
+        endColumn: 17,
+        kind: "block",
+        verdict: verdict({ action: "rewrite", category: "voice", rewrite: "/* fact */" }),
+      }),
+    ]);
+    expect(result.content).toBe(source);
+    expect(result.skips[0]?.detail).toMatch(/interleaved/);
   });
 });
 

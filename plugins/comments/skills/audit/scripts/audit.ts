@@ -74,6 +74,7 @@ const preflightCmd = command(
       path: { type: [String], description: "Narrow either scope to paths matching these globs" },
       sort: { type: String, default: "score", description: "Rank by lines | chars | score" },
       limit: { type: Number, description: "Keep only the top N ranked comments" },
+      shardSize: { type: Number, description: "Comments per judging agent (default 20)" },
       fix: {
         type: Boolean,
         default: false,
@@ -83,7 +84,7 @@ const preflightCmd = command(
   },
   async (parsed) => {
     await chdirToRepoRoot();
-    const { base, mr, all, path, sort, limit, fix } = parsed.flags;
+    const { base, mr, all, path, sort, limit, shardSize, fix } = parsed.flags;
     const pathGlobs = path ?? [];
     const sortKey = parseSort(sort);
 
@@ -118,7 +119,7 @@ const preflightCmd = command(
       return;
     }
 
-    const descriptor = await buildJob(limited, { fix });
+    const descriptor = await buildJob(limited, { fix, ...(shardSize ? { shardSize } : {}) });
     const written = await writeJob(descriptor);
     // An --mr job records comment text from the remote MR ref, but apply trims
     // the local tree from HEAD. Persist the scope so apply can refuse to branch

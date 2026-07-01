@@ -32,6 +32,11 @@ each concern, or go through the motions?" Status is a signal. The code is the ve
 All diff and file reading happens in Explore sub-agents. Your main session holds only the structured
 verdicts they return, never raw diffs, keeping my development context free.
 
+## Context
+
+- Remote URL: !`git remote get-url origin 2>/dev/null || echo "unavailable"`
+- Branch: !`git branch --show-current 2>/dev/null || echo "unavailable"`
+
 ## Workflow
 
 ### Resolve Target

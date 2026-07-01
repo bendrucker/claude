@@ -138,7 +138,7 @@ Dynamic context works alongside other skill features:
 
 ### Gotchas
 
-- Commands run in the **project root**, not the skill directory. For plugin skills, use `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` to reference skill-local scripts. `${CLAUDE_SKILL_DIR}` works in hooks and allowed-tools but NOT in `!` context.
+- Commands run in the **project root**, not the skill directory. For plugin skills, use `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` to reference skill-local scripts. `${CLAUDE_SKILL_DIR}` also expands in `!` context, the body, and `allowed-tools`, but NOT in the frontmatter `hooks:` block (there it resolves to empty; reference bundled scripts by `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` in hook commands).
 - **stderr is discarded** — only stdout replaces the placeholder.
 - Failed commands produce empty output. Handle this in the command itself with a fallback (e.g., `some-cmd 2>/dev/null || echo "unavailable"`).
 - Commands run **synchronously and sequentially**. Avoid slow commands that would delay skill loading.

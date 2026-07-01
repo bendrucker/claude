@@ -101,6 +101,42 @@ describe("extractComments: sql", () => {
   });
 });
 
+describe("extractComments: line-run coalescing", () => {
+  test("coalesces a run of same-column line comments into one", async () => {
+    const source = ["-- first line", "-- second line", "-- third line"].join("\n");
+    const comments = await extractComments(source, "sql");
+    expect(comments).toHaveLength(1);
+    expect(comments[0]).toMatchObject({
+      kind: "line",
+      text: "-- first line\n-- second line\n-- third line",
+      startLine: 1,
+      endLine: 3,
+    });
+  });
+
+  test("a blank line ends the run", async () => {
+    expect(await summarize(["// a", "// b", "", "// c"].join("\n"), "typescript")).toEqual([
+      { kind: "line", text: "// a\n// b" },
+      { kind: "line", text: "// c" },
+    ]);
+  });
+
+  test("a column change ends the run", async () => {
+    const source = ["// top", "  // indented"].join("\n");
+    expect(await summarize(source, "typescript")).toEqual([
+      { kind: "line", text: "// top" },
+      { kind: "line", text: "// indented" },
+    ]);
+  });
+
+  test("a line comment does not merge into a following block comment", async () => {
+    expect(await summarize(["// line", "/* block */"].join("\n"), "typescript")).toEqual([
+      { kind: "line", text: "// line" },
+      { kind: "block", text: "/* block */" },
+    ]);
+  });
+});
+
 describe("extractComments: cpp has no vendored grammar", () => {
   test("returns // and /* */ but not preprocessor directives", async () => {
     const source = [

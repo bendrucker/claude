@@ -61,6 +61,34 @@ function mergeKind(a: CommentKind, b: CommentKind): CommentKind {
 }
 
 /**
+ * Merge a contiguous run of line comments at the same column into one comment,
+ * so multi-line prose written as a `//`/`--` run is judged and trimmed as a
+ * paragraph rather than line by line. A blank gap or a column change ends the
+ * run, keeping standalone comments over distinct code separate. Block and
+ * docstring comments already coalesce via their open scope, so only `line` runs
+ * are merged here.
+ */
+function coalesceLineRuns(comments: Comment[]): Comment[] {
+  const merged: Comment[] = [];
+  for (const comment of comments) {
+    const prev = merged[merged.length - 1];
+    if (
+      prev != null &&
+      prev.kind === "line" &&
+      comment.kind === "line" &&
+      comment.startLine === prev.endLine + 1 &&
+      comment.startColumn === prev.startColumn
+    ) {
+      prev.endLine = comment.endLine;
+      prev.endColumn = comment.endColumn;
+    } else {
+      merged.push(comment);
+    }
+  }
+  return merged;
+}
+
+/**
  * A Python docstring scope is a real docstring only if the nearest preceding
  * significant line (non-blank, non-`#`) ends with `:` (a block opener) or there
  * is none (module start). This approximates "first statement of block/module"
@@ -143,7 +171,9 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
   });
   if (current != null) comments.push(current);
 
-  for (const comment of comments) {
+  const merged = coalesceLineRuns(comments);
+
+  for (const comment of merged) {
     comment.text = sliceRange(
       source,
       lineStart,
@@ -155,11 +185,11 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
   }
 
   if (language === "python") {
-    return comments.filter(
+    return merged.filter(
       (comment) => comment.kind !== "docstring" || isDocstringPosition(lines, comment.startLine),
     );
   }
-  return comments;
+  return merged;
 }
 
 export async function extractComments(source: string, language: Language): Promise<Comment[]> {

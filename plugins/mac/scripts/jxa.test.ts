@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { validateAppScope } from "./jxa";
+import type { RunResult } from "./jxa";
+import { isRetriableAppleEventsError, runWithRetry, validateAppScope } from "./jxa";
 
 describe("validateAppScope", () => {
   it("allows Application matching the target app", () => {
@@ -58,5 +59,81 @@ describe("validateAppScope", () => {
   it("allows scripts with no Application calls", () => {
     const result = validateAppScope("var x = 1 + 2;", "Things3");
     expect(result).toEqual({ valid: true, violations: [] });
+  });
+});
+
+describe("isRetriableAppleEventsError", () => {
+  it("matches the -10004 privilege-violation code in stderr", () => {
+    expect(isRetriableAppleEventsError(1, "execution error: not allowed (-10004)")).toBe(true);
+  });
+
+  it("matches the -600 code in stderr", () => {
+    expect(isRetriableAppleEventsError(1, "execution error: isn't running (-600)")).toBe(true);
+  });
+
+  it("matches a Connection Invalid XPC hiccup", () => {
+    expect(
+      isRetriableAppleEventsError(1, "Connection Invalid to com.apple.hiservices-xpcservice"),
+    ).toBe(true);
+  });
+
+  it("matches when the retriable code surfaces as the exit code", () => {
+    expect(isRetriableAppleEventsError(-10004, "")).toBe(true);
+    expect(isRetriableAppleEventsError(-600, "")).toBe(true);
+  });
+
+  it("does not match an unrelated execution error", () => {
+    expect(isRetriableAppleEventsError(1, "execution error: Can't get item 5 (-1728)")).toBe(false);
+  });
+
+  it("does not match success", () => {
+    expect(isRetriableAppleEventsError(0, "")).toBe(false);
+  });
+});
+
+describe("runWithRetry", () => {
+  const noSleep = () => Promise.resolve();
+
+  function runner(results: RunResult[]) {
+    const calls: string[][] = [];
+    const run = (args: string[]) => {
+      calls.push(args);
+      const next = results.shift();
+      if (!next) throw new Error("runner called more times than expected");
+      return Promise.resolve(next);
+    };
+    return { run, calls };
+  }
+
+  it("retries once on a retriable error then succeeds", async () => {
+    const { run, calls } = runner([
+      { code: 1, stdout: "", stderr: "execution error (-10004)" },
+      { code: 0, stdout: "ok", stderr: "" },
+    ]);
+    const result = await runWithRetry(["-e", "x"], run, noSleep);
+    expect(result).toEqual({ code: 0, stdout: "ok", stderr: "" });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("retries once then surfaces the real error", async () => {
+    const persistent: RunResult = { code: 1, stdout: "", stderr: "Connection Invalid" };
+    const { run, calls } = runner([persistent, { ...persistent }]);
+    const result = await runWithRetry(["-e", "x"], run, noSleep);
+    expect(result).toEqual(persistent);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("does not retry a non-retriable failure", async () => {
+    const { run, calls } = runner([{ code: 1, stdout: "", stderr: "syntax error (-2740)" }]);
+    const result = await runWithRetry(["-e", "x"], run, noSleep);
+    expect(result).toEqual({ code: 1, stdout: "", stderr: "syntax error (-2740)" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not retry on success", async () => {
+    const { run, calls } = runner([{ code: 0, stdout: "2", stderr: "" }]);
+    const result = await runWithRetry(["-e", "1 + 1"], run, noSleep);
+    expect(result).toEqual({ code: 0, stdout: "2", stderr: "" });
+    expect(calls).toHaveLength(1);
   });
 });

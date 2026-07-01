@@ -78,6 +78,53 @@ export function validateAppScope(source: string, app: string): ValidationResult 
   return { valid: violations.length === 0, violations };
 }
 
+export interface RunResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+// AppleEvents error codes that are safe to retry. They surface as transient XPC
+// dispatcher hiccups on the first event after a cold session: errAEPrivilegeError
+// (-10004) and errAEEventNotHandled / "application isn't running" (-600). A retry
+// clears them.
+const RETRIABLE_APPLE_EVENTS_CODES = [-10004, -600];
+
+export function isRetriableAppleEventsError(exitCode: number, stderr: string): boolean {
+  if (stderr.includes("Connection Invalid")) return true;
+  return RETRIABLE_APPLE_EVENTS_CODES.some(
+    (code) => exitCode === code || stderr.includes(`(${code})`),
+  );
+}
+
+async function runOsascript(args: string[]): Promise<RunResult> {
+  const proc = Bun.spawn(["osascript", ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  const code = await proc.exited;
+  return { code, stdout, stderr };
+}
+
+const RETRY_DELAY_MS = 300;
+
+export async function runWithRetry(
+  args: string[],
+  run: (args: string[]) => Promise<RunResult>,
+  sleep: (ms: number) => Promise<void> = Bun.sleep,
+): Promise<RunResult> {
+  const first = await run(args);
+  if (first.code === 0 || !isRetriableAppleEventsError(first.code, first.stderr)) {
+    return first;
+  }
+  await sleep(RETRY_DELAY_MS);
+  return run(args);
+}
+
 if (import.meta.main) {
   const { cli } = await import("cleye");
 
@@ -121,10 +168,8 @@ if (import.meta.main) {
     process.exit(1);
   }
 
-  const proc = Bun.spawn(["osascript", ...osascriptArgs], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await proc.exited;
+  const { code, stdout, stderr } = await runWithRetry(osascriptArgs, runOsascript);
+  await Bun.write(Bun.stdout, stdout);
+  await Bun.write(Bun.stderr, stderr);
   process.exit(code);
 }

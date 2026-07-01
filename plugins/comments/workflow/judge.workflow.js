@@ -22,7 +22,8 @@ async function judgeShard(shardPath, shardId) {
     `Read the JSON file at this exact path: ${shardPath}`,
     'It contains { "id": <shard id>, "comments": [{ "id", "path", "language", "kind", "text", "context" }] }.',
     'Judge every comment in the shard against the rubric. Produce exactly one verdict per comment, keyed by its "id".',
-    `Write the object { "verdicts": [{ "id": <comment id>, "verdict": { ... } }] } to this exact path with a Bash heredoc: ${job.verdictsDir}/verdict-${shardId}.json`,
+    `Write the object { "verdicts": [{ "id": <comment id>, "verdict": { ... } }] } to this exact path with the Write tool: ${job.verdictsDir}/verdict-${shardId}.json`,
+    'Use the Write tool, not a Bash heredoc: the Bash tool escapes "!" to "\\!", which is not a valid JSON escape and corrupts the file.',
     'Return that same { "verdicts": [...] } object as your structured output.',
   ].join("\n");
   return agent(prompt, {

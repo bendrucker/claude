@@ -76,10 +76,8 @@ export function matchRoute(path: string): RouteMatch | null {
 }
 
 export function parseGitHubUrl(url: string): { type: string; suggestion: string } | null {
-  // Strip the GitHub prefix to simplify pattern matching
   const path = url.slice("https://github.com/".length);
 
-  // Try pattern with additional path segments
   const pathMatch = repoPathPattern.match(path);
   if (pathMatch) {
     const subpath = pathMatch._ || "";
@@ -105,7 +103,6 @@ export function parseGitHubUrl(url: string): { type: string; suggestion: string 
     return null;
   }
 
-  // Try base pattern (repo root without trailing slash)
   const baseMatch = repoBasePattern.match(path);
   if (baseMatch) {
     return {

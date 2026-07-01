@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// Detect and output PR/MR template content from the repository
-// Outputs: template content if found, nothing otherwise
 
 import { execSync } from "node:child_process";
 import { join } from "node:path";

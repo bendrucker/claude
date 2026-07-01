@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { filterCodeFiles } from "./walk";
+import { excludeVendored, filterCodeFiles, isVendoredPath } from "./walk";
 
 describe("filterCodeFiles", () => {
   const files = [
@@ -38,5 +38,25 @@ describe("filterCodeFiles", () => {
 
   test("an empty glob list keeps every code file", () => {
     expect(filterCodeFiles(files, [])).toEqual(filterCodeFiles(files));
+  });
+});
+
+describe("vendored trees", () => {
+  const roots = ["plugins/x/skills/vendored"];
+
+  test("isVendoredPath matches files under a root, not siblings or the root name", () => {
+    expect(isVendoredPath("plugins/x/skills/vendored/util.py", roots)).toBe(true);
+    expect(isVendoredPath("plugins/x/skills/vendored-other/util.py", roots)).toBe(false);
+    expect(isVendoredPath("plugins/x/skills/own.ts", roots)).toBe(false);
+  });
+
+  test("excludeVendored drops files under any root", () => {
+    const files = ["plugins/x/skills/vendored/util.py", "plugins/x/skills/own.ts"];
+    expect(excludeVendored(files, roots)).toEqual(["plugins/x/skills/own.ts"]);
+  });
+
+  test("an empty root list keeps every file", () => {
+    const files = ["a.ts", "b/c.py"];
+    expect(excludeVendored(files, [])).toEqual(files);
   });
 });

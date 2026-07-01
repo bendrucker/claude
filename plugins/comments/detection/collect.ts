@@ -6,7 +6,7 @@ import { commentId } from "./identity";
 import { type CommentScore, scoreComment } from "./rank";
 import { scopeIntroduced } from "./scope";
 import type { Comment, FileDiff, IntroducedComment, Language } from "./types";
-import { listTrackedCodeFiles, matchesPathGlobs } from "./walk";
+import { isVendoredPath, listTrackedCodeFiles, listVendoredRoots, matchesPathGlobs } from "./walk";
 
 /**
  * One extracted comment carrying everything the judge needs: its stable id, the
@@ -121,7 +121,10 @@ export async function collectDiff(
   collect: CollectOptions = {},
 ): Promise<CollectedComment[]> {
   const matches = matchesPathGlobs(collect.pathGlobs);
-  const diffs = (await resolveDiff(options)).filter((file) => matches(file.path));
+  const [resolved, vendoredRoots] = await Promise.all([resolveDiff(options), listVendoredRoots()]);
+  const diffs = resolved.filter(
+    (file) => matches(file.path) && isVendoredPath(file.path, vendoredRoots) === false,
+  );
   const perFile = await Promise.all(diffs.map((file) => collectDiffFile(file, options, mrSource)));
   return perFile.flat();
 }

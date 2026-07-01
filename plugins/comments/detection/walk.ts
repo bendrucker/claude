@@ -27,12 +27,43 @@ export function filterCodeFiles(files: string[], pathGlobs?: string[]): string[]
   return files.filter((path) => languageForPath(path) != null && matches(path));
 }
 
+/** True when `path` sits under one of the vendored roots. */
+export function isVendoredPath(path: string, vendoredRoots: string[]): boolean {
+  return vendoredRoots.some((root) => path.startsWith(`${root}/`));
+}
+
+/** Drop files under a vendored root. Pure over its inputs. */
+export function excludeVendored(files: string[], vendoredRoots: string[]): string[] {
+  if (vendoredRoots.length === 0) return files;
+  return files.filter((path) => isVendoredPath(path, vendoredRoots) === false);
+}
+
 /**
- * Every tracked code file in the repo, narrowed by `--path` globs. The `--all`
- * source: `git ls-files` is the only impurity, the filter is pure.
+ * Directories that carry their own `LICENSE` distinct from the repo root, taken
+ * as vendored third-party trees the audit must not touch. Editing them diverges
+ * from upstream and is not ours to do. A root-level license is the repo's own and
+ * is ignored. `git ls-files` is the only impurity.
+ */
+export async function listVendoredRoots(): Promise<string[]> {
+  const result = await $`git ls-files`.quiet().nothrow();
+  const roots = new Set<string>();
+  for (const file of result.text().split("\n").filter(Boolean)) {
+    const slash = file.lastIndexOf("/");
+    if (slash === -1) continue;
+    if (/^LICENSE(\.(txt|md))?$/i.test(file.slice(slash + 1))) roots.add(file.slice(0, slash));
+  }
+  return [...roots];
+}
+
+/**
+ * Every tracked code file in the repo, narrowed by `--path` globs and stripped of
+ * vendored trees. `git ls-files` is the only impurity, the filters are pure.
  */
 export async function listTrackedCodeFiles(options: WalkOptions = {}): Promise<string[]> {
-  const result = await $`git ls-files`.quiet().nothrow();
+  const [result, vendoredRoots] = await Promise.all([
+    $`git ls-files`.quiet().nothrow(),
+    listVendoredRoots(),
+  ]);
   const files = result.text().split("\n").filter(Boolean);
-  return filterCodeFiles(files, options.pathGlobs);
+  return excludeVendored(filterCodeFiles(files, options.pathGlobs), vendoredRoots);
 }

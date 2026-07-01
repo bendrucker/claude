@@ -199,6 +199,32 @@ describe("filterThreads", () => {
     expect(result[0]!.comments.nodes[0]!.author?.login).toBe("jacob");
   });
 
+  it("keeps the viewer's resolved threads with includeResolved in reviewer role", () => {
+    const threads = [
+      makeThread({ isResolved: true, comments: [makeComment("DouweM", "2025-01-15")] }),
+      makeThread({ isResolved: true, comments: [makeComment("bendrucker", "2025-01-15")] }),
+    ];
+    const result = filterThreads(threads, {
+      role: "reviewer",
+      viewer: "DouweM",
+      includeResolved: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.comments.nodes[0]!.author?.login).toBe("DouweM");
+    expect(result[0]!.isResolved).toBe(true);
+  });
+
+  it("drops resolved threads by default when the flag is unset", () => {
+    const threads = [
+      makeThread({ isResolved: true, comments: [makeComment("DouweM", "2025-01-15")] }),
+    ];
+    const result = filterThreads(threads, {
+      role: "reviewer",
+      viewer: "DouweM",
+    });
+    expect(result).toHaveLength(0);
+  });
+
   it("keeps review-target threads in reviewer role (bots overrides opener filter)", () => {
     const threads = [
       makeThread({ comments: [makeComment("copilot", "2025-01-15", "comment", "Bot")] }),
@@ -403,6 +429,22 @@ describe("formatThreads", () => {
       bots: true,
     });
     expect(output).not.toContain("Showing threads started by");
+  });
+
+  it("tags resolved threads and counts them with includeResolved", () => {
+    const output = formatThreads(
+      [makeThread({ isResolved: true }), makeThread({ isResolved: false })],
+      2,
+      { ...baseOptions, includeResolved: true },
+    );
+    expect(output).toContain("(resolved)");
+    expect(output).toContain("2 of 2 total threads (1 resolved)");
+  });
+
+  it("omits the resolved tag and count without includeResolved", () => {
+    const output = formatThreads([makeThread({ isResolved: false })], 2, baseOptions);
+    expect(output).not.toContain("(resolved)");
+    expect(output).toContain("1 unresolved of 2 total threads");
   });
 
   it("collapses repeated files under a single header", () => {

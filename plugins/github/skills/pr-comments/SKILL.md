@@ -1,7 +1,7 @@
 ---
 name: github:pr-comments
 description: Fetch, reply to, and resolve review threads on a GitHub pull request. Use when checking what review feedback needs addressing, whether threads are resolved, replying to review comments, or clearing AI-reviewer threads after acting on them.
-argument-hint: "<pr-url> [--role author|reviewer] [--bots]"
+argument-hint: "<pr-url> [--role author|reviewer] [--bots] [--include-resolved]"
 allowed-tools:
   ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts:*)", "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts:*)"]
 hooks:
@@ -37,7 +37,7 @@ Fetch unresolved review threads from a GitHub pull request, filtered for context
 ## Usage
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts <pr-url> [--role author|reviewer] [--since last-review|<date>] [--bots]
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts <pr-url> [--role author|reviewer] [--since last-review|<date>] [--bots] [--include-resolved]
 ```
 
 ## Arguments
@@ -46,6 +46,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts <pr-url> [--role author|reviewe
 - `--role`: `author` or `reviewer` (default: auto-detect based on authenticated user)
 - `--since`: filter to threads with activity since `last-review` or an ISO date
 - `--bots`: only review-bot threads (accounts the API types as `Bot`), plus any logins in `$CLAUDE_PLUGIN_DATA/reviewers.txt`
+- `--include-resolved`: resolved threads are excluded by default. This flag includes them for follow-up-style flows that must surface silently resolved threads. Resolved threads carry a `(resolved)` tag.
 
 ## Role
 

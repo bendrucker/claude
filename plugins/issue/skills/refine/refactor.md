@@ -12,7 +12,7 @@ What changes, what doesn't. State behavior changes explicitly (usually none).
 
 ### Approach
 
-Strategy (incremental vs. big bang), key transformations, risks. Skip for single-file or atomic refactors; include when strategy, migration, or rollback matters.
+Strategy (incremental vs. big bang), key transformations, risks. Skip for single-file or atomic refactors; include when strategy, migration, or rollback matters. Don't enumerate thin, unevaluated options. State the chosen strategy, or the goal plus acceptance criteria.
 
 ### Validation
 

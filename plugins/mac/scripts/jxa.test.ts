@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { RunResult } from "./jxa";
-import { isTransientAppleEventsError, runWithRetry, validateAppScope } from "./jxa";
+import { isRetriableAppleEventsError, runWithRetry, validateAppScope } from "./jxa";
 
 describe("validateAppScope", () => {
   it("allows Application matching the target app", () => {
@@ -62,32 +62,32 @@ describe("validateAppScope", () => {
   });
 });
 
-describe("isTransientAppleEventsError", () => {
+describe("isRetriableAppleEventsError", () => {
   it("matches the -10004 privilege-violation code in stderr", () => {
-    expect(isTransientAppleEventsError(1, "execution error: not allowed (-10004)")).toBe(true);
+    expect(isRetriableAppleEventsError(1, "execution error: not allowed (-10004)")).toBe(true);
   });
 
   it("matches the -600 code in stderr", () => {
-    expect(isTransientAppleEventsError(1, "execution error: isn't running (-600)")).toBe(true);
+    expect(isRetriableAppleEventsError(1, "execution error: isn't running (-600)")).toBe(true);
   });
 
   it("matches a Connection Invalid XPC hiccup", () => {
     expect(
-      isTransientAppleEventsError(1, "Connection Invalid to com.apple.hiservices-xpcservice"),
+      isRetriableAppleEventsError(1, "Connection Invalid to com.apple.hiservices-xpcservice"),
     ).toBe(true);
   });
 
-  it("matches when the transient code surfaces as the exit code", () => {
-    expect(isTransientAppleEventsError(-10004, "")).toBe(true);
-    expect(isTransientAppleEventsError(-600, "")).toBe(true);
+  it("matches when the retriable code surfaces as the exit code", () => {
+    expect(isRetriableAppleEventsError(-10004, "")).toBe(true);
+    expect(isRetriableAppleEventsError(-600, "")).toBe(true);
   });
 
   it("does not match an unrelated execution error", () => {
-    expect(isTransientAppleEventsError(1, "execution error: Can't get item 5 (-1728)")).toBe(false);
+    expect(isRetriableAppleEventsError(1, "execution error: Can't get item 5 (-1728)")).toBe(false);
   });
 
   it("does not match success", () => {
-    expect(isTransientAppleEventsError(0, "")).toBe(false);
+    expect(isRetriableAppleEventsError(0, "")).toBe(false);
   });
 });
 
@@ -105,7 +105,7 @@ describe("runWithRetry", () => {
     return { run, calls };
   }
 
-  it("retries once on a transient error then succeeds", async () => {
+  it("retries once on a retriable error then succeeds", async () => {
     const { run, calls } = runner([
       { code: 1, stdout: "", stderr: "execution error (-10004)" },
       { code: 0, stdout: "ok", stderr: "" },
@@ -123,7 +123,7 @@ describe("runWithRetry", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("does not retry a non-transient failure", async () => {
+  it("does not retry a non-retriable failure", async () => {
     const { run, calls } = runner([{ code: 1, stdout: "", stderr: "syntax error (-2740)" }]);
     const result = await runWithRetry(["-e", "x"], run, noSleep);
     expect(result).toEqual({ code: 1, stdout: "", stderr: "syntax error (-2740)" });

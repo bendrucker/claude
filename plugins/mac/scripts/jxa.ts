@@ -84,14 +84,15 @@ export interface RunResult {
   stderr: string;
 }
 
-// AppleEvents error codes for transient XPC dispatcher hiccups seen on the first
-// event after a cold session: errAEPrivilegeError (-10004) and errAEEventNotHandled
-// / "application isn't running" (-600). A retry clears them.
-const TRANSIENT_APPLE_EVENTS_CODES = [-10004, -600];
+// AppleEvents error codes that are safe to retry. They surface as transient XPC
+// dispatcher hiccups on the first event after a cold session: errAEPrivilegeError
+// (-10004) and errAEEventNotHandled / "application isn't running" (-600). A retry
+// clears them.
+const RETRIABLE_APPLE_EVENTS_CODES = [-10004, -600];
 
-export function isTransientAppleEventsError(exitCode: number, stderr: string): boolean {
+export function isRetriableAppleEventsError(exitCode: number, stderr: string): boolean {
   if (stderr.includes("Connection Invalid")) return true;
-  return TRANSIENT_APPLE_EVENTS_CODES.some(
+  return RETRIABLE_APPLE_EVENTS_CODES.some(
     (code) => exitCode === code || stderr.includes(`(${code})`),
   );
 }
@@ -109,7 +110,7 @@ async function runOsascript(args: string[]): Promise<RunResult> {
   return { code, stdout, stderr };
 }
 
-const TRANSIENT_RETRY_DELAY_MS = 300;
+const RETRY_DELAY_MS = 300;
 
 export async function runWithRetry(
   args: string[],
@@ -117,10 +118,10 @@ export async function runWithRetry(
   sleep: (ms: number) => Promise<void> = Bun.sleep,
 ): Promise<RunResult> {
   const first = await run(args);
-  if (first.code === 0 || !isTransientAppleEventsError(first.code, first.stderr)) {
+  if (first.code === 0 || !isRetriableAppleEventsError(first.code, first.stderr)) {
     return first;
   }
-  await sleep(TRANSIENT_RETRY_DELAY_MS);
+  await sleep(RETRY_DELAY_MS);
   return run(args);
 }
 

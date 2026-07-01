@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { isTransientAppleEventsError, runWithRetry, validateAppScope } from "./jxa";
 import type { RunResult } from "./jxa";
+import { isTransientAppleEventsError, runWithRetry, validateAppScope } from "./jxa";
 
 describe("validateAppScope", () => {
   it("allows Application matching the target app", () => {

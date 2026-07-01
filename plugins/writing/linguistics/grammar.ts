@@ -37,9 +37,8 @@ function isAttributive(tokens: TaggedToken[], index: number): boolean {
 }
 
 /**
- * The positional rule from issue #745: a finite verb is clause evidence
- * only when a subject candidate precedes it and the verb is not the
- * entire heading. Single-token inputs never flag.
+ * A finite verb is clause evidence only when a subject candidate precedes it
+ * and the verb is not the entire heading. Single-token inputs never flag.
  */
 export function finiteVerbWithSubject(tokens: TaggedToken[]): { index: number } | null {
   if (tokens.length <= 1) return null;

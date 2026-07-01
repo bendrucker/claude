@@ -37,7 +37,6 @@ export interface ReportInput {
   corrective: CorrectiveRow[];
 }
 
-// A candidate phrase plus its baseline rate and a spot-checkable quote.
 export interface CandidatePhrase extends LiftRow {
   baselineCount: number;
   baselinePerM: number;

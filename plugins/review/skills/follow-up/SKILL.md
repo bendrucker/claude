@@ -90,7 +90,9 @@ status.
 
 #### GitHub
 
-Use the `github:pr-comments` skill's script to fetch threads. Run with `--role reviewer` to get threads started by the authenticated user. For resolved threads, use the GraphQL API via `gh api graphql` to query `pullRequest.reviewThreads`, filtering to threads where the first comment author matches the viewer.
+Use the `github:pr-comments` skill's script with `--role reviewer --include-resolved` to get every thread you started, resolved and unresolved, each with its full comment chain so silent resolves are visible. Do not pass `--since`. Follow-up needs the whole history.
+
+If a query ever needs hand-authoring, write it to a file with the Write tool and pass `gh api graphql -F query=@file`. Never use an inline shell heredoc. A `!` in a GraphQL type marker breaks under the Bash tool's escaping.
 
 #### GitLab
 

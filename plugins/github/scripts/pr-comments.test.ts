@@ -215,7 +215,9 @@ describe("filterThreads", () => {
   });
 
   it("drops resolved threads by default when the flag is unset", () => {
-    const threads = [makeThread({ isResolved: true, comments: [makeComment("DouweM", "2025-01-15")] })];
+    const threads = [
+      makeThread({ isResolved: true, comments: [makeComment("DouweM", "2025-01-15")] }),
+    ];
     const result = filterThreads(threads, {
       role: "reviewer",
       viewer: "DouweM",

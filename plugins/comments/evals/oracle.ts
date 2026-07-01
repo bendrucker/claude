@@ -5,10 +5,9 @@ import { BATCH_SIZE, parseVerdict } from "../judge/judge";
 import { batchVerdictSchema, type Verdict } from "../judge/schema";
 
 /**
- * The calibration oracle: the Anthropic SDK judge that survives only under
- * `evals/`. The product path fans out Claude Code agents instead. This remains
- * the deterministic ground truth the fixture corpus is scored against. It renders
- * an indexed batch, scores it at temperature 0, and validates the response.
+ * The calibration oracle: the Anthropic SDK judge used only under `evals/`, the
+ * deterministic ground truth the fixture corpus is scored against. It renders an
+ * indexed batch, scores it at temperature 0, and validates the response.
  */
 
 export const JUDGE_MODEL = "claude-sonnet-4-6";

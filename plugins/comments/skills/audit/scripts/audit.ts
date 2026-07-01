@@ -198,7 +198,7 @@ async function readJsonFiles(dir: string, prefix: string): Promise<unknown[]> {
   );
 }
 
-/** The files a job judged, recovered from the shards rather than a separate manifest. */
+/** The files a job judged, recovered from the shards. */
 async function judgedPaths(jobDir: string): Promise<string[]> {
   const shards = (await readJsonFiles(jobDir, "shard-")) as JobShard[];
   const paths = new Set<string>();

@@ -20,7 +20,7 @@ Include subsections selectively.
 
 #### Approach
 
-High-level implementation. Reference existing patterns. Skip for trivially-designed features.
+High-level implementation. Reference existing patterns. Skip for trivially-designed features. Don't enumerate thin, unevaluated options. State the chosen approach, or the goal plus acceptance criteria, and leave option-weighing to a real decision.
 
 #### Changes
 

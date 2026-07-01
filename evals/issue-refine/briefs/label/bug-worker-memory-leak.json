@@ -1,0 +1,15 @@
+{
+  "id": "L-bug-leak",
+  "type": "bug",
+  "size": "full",
+  "project": "synthetic",
+  "brief": "The background job processor leaks memory under sustained load. Heap climbs steadily and the worker gets OOM-killed after roughly six hours. Restarting clears it. We suspect something is holding references to completed jobs so they never get collected.",
+  "context": {
+    "files": [
+      "jobs/worker.py (JobWorker.run pulls jobs off the queue in a loop)",
+      "jobs/registry.py (JobRegistry tracks in-flight jobs in a dict keyed by job id)",
+      "jobs/metrics.py (MetricsCollector appends a record per completed job)"
+    ],
+    "related_issues": []
+  }
+}

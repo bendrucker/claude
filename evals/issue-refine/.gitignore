@@ -1,0 +1,7 @@
+# Local-only: real issue content (internal work) and reviewer feedback.
+raw/
+data/
+feedback/
+
+# A/B run snapshots and outputs (transient)
+ab/

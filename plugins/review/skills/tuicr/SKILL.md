@@ -22,6 +22,11 @@ Core layer for reviewing changes through a live [tuicr](https://github.com/agavr
 You launch and drive it in a sibling pane; the TUI is the user's. `review:self` (inbound) and
 `review:peer` (outbound) build on this.
 
+## Context
+
+- Repo: !`git rev-parse --show-toplevel 2>/dev/null || echo "unavailable"`
+- Sessions: !`tuicr review list --repo . 2>/dev/null || echo "none"`
+
 ## Session Discovery
 
 tuicr persists each review as a session with a `slug`. The CLI is the agent's interface; the TUI

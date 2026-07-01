@@ -2,8 +2,8 @@
 name: improve-claude-code
 disable-model-invocation: true
 description: |
-  Triage and batch-implement Claude-tagged Things todos as PRs for the claude config repo, or discover improvement candidates from session history.
-  Use when the user wants to work on their Claude Code improvement backlog, process Things todos tagged claude-code, batch-implement configuration changes, or mine session history for grounded config-change candidates (Discover mode).
+  Triage and batch-implement Claude-tagged Things todos as PRs for the claude config repo, discover improvement candidates from session history, or watch open PRs to implement review feedback and close shipped todos.
+  Use when the user wants to work on their Claude Code improvement backlog, process Things todos tagged claude-code, batch-implement configuration changes, mine session history for grounded config-change candidates (Discover mode), or watch this skill's open PRs for review feedback and merges (Watch mode).
 allowed-tools:
   - Skill(things:jxa)
   - Skill(things:url)
@@ -11,6 +11,7 @@ allowed-tools:
   - Skill(pull-request:create)
   - Skill(code-review)
   - Skill(github:actions-monitor)
+  - Skill(github:pr-comments)
 ---
 
 # Improve Claude Code
@@ -18,6 +19,8 @@ allowed-tools:
 Work through the `claude-code` Things backlog: fetch todos, triage with the user, then plan and implement each in parallel as separate PRs.
 
 The backlog has two sources. The user files todos tagged `claude-code` by hand (and `agent-ideas` files external-harvest ideas in the same shape). **Discover mode** adds a second source: it mines this machine's session history for config-change candidates, grounds them against the live config, and files the keepers as `claude-code` todos. Both sources feed the one implement loop below. Discover is upstream of triage, not a replacement.
+
+**Watch mode** is the downstream follow-on. Once PRs exist, it tracks them under `/loop`, implements review feedback as it lands, and closes each backing todo on merge. See [Watch](#watch).
 
 All Things interaction goes through the `things:jxa` and `things:url` skills (never inline JXA). PRs go through `pull-request:create` (never `gh pr create`).
 
@@ -136,3 +139,26 @@ Use `things:url` to update each todo based on its PR outcome:
 ## Summary
 
 Output a bulleted list (one entry per todo): PR link (pass/fail), Things URL (`https://things.bendrucker.me/show?id=<todo-id>`), title.
+
+## Watch
+
+A follow-on mode for the PRs this skill opened. Run it under `/loop` self-paced so each tick re-checks every open PR from the batch, acts on new review feedback and merges, then sleeps. Watch implements requested changes and pushes them. It never merges for you, and it ends the loop once every tracked PR is merged or closed.
+
+Invoke as `/loop /improve-claude-code watch`. Recover the PR-to-todo mapping from each PR's `Original Task` link.
+
+#### Each Tick
+
+Walk every open tracked PR once and handle its state:
+
+- CI red: launch a worktree agent with the failing logs and branch to fix, test, and push, the same as [Monitor CI and Fix Failures](#monitor-ci-and-fix-failures).
+- A reviewer thread requests a change: launch a worktree agent to implement it, run `bun test` and `biome check`, then commit and push. Reply to the thread naming the change and its commit. Leave the thread unresolved for the reviewer, and do not merge.
+- Merged: close the backing Things todo. Append the PR link, mark it completed, and remove the `claude-code` tag via `things:url`.
+- Closed without merging: leave the todo tagged `claude-code` with a note so it resurfaces next run.
+
+Fetch reviewer threads with the `github:pr-comments` script (`--role reviewer --include-resolved`), never a hand-authored GraphQL query. Report one status line per PR each tick.
+
+#### Guardrails
+
+Auto-implement covers review changes and CI fixes only. A reviewer question or design objection pauses for you with the thread quoted, no edit.
+
+Every push re-runs CI, so a PR often carries across ticks rather than resolving in one pass. That is expected under `/loop`.

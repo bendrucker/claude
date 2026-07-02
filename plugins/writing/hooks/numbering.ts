@@ -103,6 +103,20 @@ export async function checkCode(content: string, ext: string): Promise<string | 
   return null;
 }
 
+async function fileAlreadyNumbered(filePath: string, ext: string): Promise<boolean> {
+  let existing: string;
+  try {
+    const file = Bun.file(filePath);
+    if (!(await file.exists())) return false;
+    existing = await file.text();
+  } catch {
+    return false;
+  }
+
+  const match = isMarkdownFile(ext) ? checkMarkdown(existing) : await checkCode(existing, ext);
+  return match !== null;
+}
+
 export async function processInput(
   input: PreToolUseHookInput,
   mode: Mode,
@@ -138,6 +152,13 @@ export async function processInput(
   }
 
   if (!match) {
+    return null;
+  }
+
+  // Numbering already present in the target file was adjudicated when it was
+  // introduced (approved by the user or pre-existing). Only first
+  // introductions should prompt.
+  if (await fileAlreadyNumbered(filePath, ext)) {
     return null;
   }
 

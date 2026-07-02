@@ -1,5 +1,9 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
@@ -399,6 +403,71 @@ describe("plan mode", () => {
   it("still asks when permission_mode is not plan", async () => {
     const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
     expect(output?.permissionDecision).toBe("ask");
+  });
+});
+
+describe("already-numbered files", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "numbering-test-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("allows Edit when the file already has numbered headings", async () => {
+    const filePath = join(dir, "review.md");
+    await Bun.write(filePath, "# Findings\n\n## 1. First issue\n\nDetails.\n");
+    const output = await getOutput(mockEditInput(filePath, "## 2. Second issue"), "edit");
+    expect(output).toBeNull();
+  });
+
+  it("asks when Edit introduces numbering into a clean file", async () => {
+    const filePath = join(dir, "clean.md");
+    await Bun.write(filePath, "# Findings\n\nDetails.\n");
+    const output = await getOutput(mockEditInput(filePath, "## 1. First issue"), "edit");
+    expect(output?.permissionDecision).toBe("ask");
+  });
+
+  it("allows non-numbered Edit to an already-numbered file", async () => {
+    const filePath = join(dir, "review.md");
+    await Bun.write(filePath, "# Findings\n\n## 1. First issue\n");
+    const output = await getOutput(mockEditInput(filePath, "More details."), "edit");
+    expect(output).toBeNull();
+  });
+
+  it("allows Write overwriting a file that already has numbered headings", async () => {
+    const filePath = join(dir, "review.md");
+    await Bun.write(filePath, "## 1. First issue\n");
+    const output = await getOutput(
+      mockWriteInput(filePath, "## 1. First issue\n\n## 2. Second issue\n"),
+      "write",
+    );
+    expect(output).toBeNull();
+  });
+
+  it("asks when Write creates a new numbered file", async () => {
+    const filePath = join(dir, "new.md");
+    const output = await getOutput(mockWriteInput(filePath, "# 1. Introduction"), "write");
+    expect(output?.permissionDecision).toBe("ask");
+  });
+
+  describe.skipIf(!hasSg())("code files (requires sg)", () => {
+    it("allows Edit when the file already has numbered identifiers", async () => {
+      const filePath = join(dir, "main.go");
+      await Bun.write(filePath, "package main\nfunc step1() {}\n");
+      const output = await getOutput(mockEditInput(filePath, "func step2() {}"), "edit");
+      expect(output).toBeNull();
+    });
+
+    it("asks when Edit introduces numbering into a clean code file", async () => {
+      const filePath = join(dir, "main.go");
+      await Bun.write(filePath, "package main\nfunc processItems() {}\n");
+      const output = await getOutput(mockEditInput(filePath, "func step1() {}"), "edit");
+      expect(output?.permissionDecision).toBe("ask");
+    });
   });
 });
 

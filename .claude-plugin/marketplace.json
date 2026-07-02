@@ -163,6 +163,11 @@
       "name": "tmux",
       "description": "Tmux session awareness and pane interaction",
       "source": "./plugins/tmux"
+    },
+    {
+      "name": "comments",
+      "description": "Detect AI slop code comments in a diff and steer clean comment generation",
+      "source": "./plugins/comments"
     }
   ]
 }

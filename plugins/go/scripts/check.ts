@@ -15,18 +15,15 @@ export function isGeneratedFile(content: string): boolean {
   let foundCode = false;
 
   for (const line of lines) {
-    // Skip blank lines
     if (/^\s*$/.test(line)) {
       continue;
     }
 
-    // Check for code generated marker
     if (GENERATED_MARKER.test(line)) {
       foundMarker = true;
       continue;
     }
 
-    // Check if this is a comment line
     if (line.startsWith("//") || line.startsWith("/*")) {
       continue;
     }
@@ -42,7 +39,6 @@ export function isGeneratedFile(content: string): boolean {
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   const { file_path: filePath } = input.tool_input as FileInput;
 
-  // Only check .go files
   if (!filePath || !filePath.endsWith(".go")) {
     return null;
   }

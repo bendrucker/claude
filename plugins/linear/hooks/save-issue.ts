@@ -80,7 +80,6 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   // creating and state is absent. Never override an explicitly set state.
   const needsDefaultState = isCreate && !state;
 
-  // Nothing to fix and no state to inject: pass the call through untouched.
   if (!mutated && !needsDefaultState) {
     return null;
   }

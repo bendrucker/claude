@@ -61,7 +61,6 @@ export function checkMarkdown(content: string): string | null {
 }
 
 export async function checkCode(content: string, ext: string): Promise<string | null> {
-  // Check if sg is available
   try {
     execSync("command -v sg", { stdio: ["pipe", "pipe", "pipe"] });
   } catch {

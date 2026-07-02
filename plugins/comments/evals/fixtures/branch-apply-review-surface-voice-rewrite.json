@@ -1,0 +1,13 @@
+{
+  "id": "branch-apply-review-surface-voice-rewrite",
+  "path": "plugins/comments/apply/branch.ts",
+  "language": "typescript",
+  "kind": "docstring",
+  "comment": "/**\n * Land the trims as a single commit on a fresh branch off HEAD, so the review\n * surface is a normal `git diff`. Requires a clean working tree: the branch is\n * the only mutation, and a dirty tree would carry unrelated changes into it.\n */",
+  "context": "11: }\n12: \n13: /**\n14:  * Land the trims as a single commit on a fresh branch off HEAD, so the review\n15:  * surface is a normal `git diff`. Requires a clean working tree: the branch is\n16:  * the only mutation, and a dirty tree would carry unrelated changes into it.\n17:  */\n18: export async function applyToBranch(\n19:   editsByPath: Map<string, string>,\n20:   options: ApplyOptions,\n21: ): Promise<void> {",
+  "action": "rewrite",
+  "category": "voice",
+  "rewrite": "/**\n * Land the trims as a single commit on a fresh branch off HEAD, so the result is\n * a normal `git diff`. Requires a clean working tree: the branch is the only\n * mutation, and a dirty tree would carry unrelated changes into it.\n */",
+  "source": "comment-skill branch.ts:13",
+  "note": "Owner labeled this bad for the marketing noun 'review surface'. The load-bearing facts (one commit on a fresh branch off HEAD, the clean-tree precondition) survive; only the abstract noun needs replacing. Gold rewrite is provisional pending owner confirmation. The gate scores the action only."
+}

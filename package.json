@@ -27,6 +27,7 @@
     "plugins/mac",
     "plugins/x-callback-url",
     "plugins/review",
+    "plugins/comments",
     ".claude/skills/agent-ideas"
   ],
   "scripts": {

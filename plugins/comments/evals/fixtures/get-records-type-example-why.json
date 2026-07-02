@@ -1,0 +1,13 @@
+{
+  "id": "get-records-type-example-why",
+  "path": "src/agents/whirl/integrations/salesforce/duckdb/get_records.py",
+  "language": "python",
+  "kind": "block",
+  "comment": "# Concrete, parseable example per scalar type family, so a conversion retry\n# shows the agent a value shaped like the column that actually failed rather\n# than a blanket TIMESTAMP hint.",
+  "context": "960: \n961: # Concrete, parseable example per scalar type family, so a conversion retry\n962: # shows the agent a value shaped like the column that actually failed rather\n963: # than a blanket TIMESTAMP hint.\n964: _TYPE_EXAMPLE = {\n965:     \"TIMESTAMP\": \"'2026-01-31T00:00:00'\",\n966:     \"TIMESTAMP_S\": \"'2026-01-31T00:00:00'\",\n967:     \"TIMESTAMP_MS\": \"'2026-01-31T00:00:00'\",\n968:     \"TIMESTAMP_NS\": \"'2026-01-31T00:00:00'\",\n969:     \"DATE\": \"'2026-01-31'\",\n970:     \"TIME\": \"'13:45:00'\",\n971:     \"BOOLEAN\": \"true\",\n972:     \"INTEGER\": \"42\",",
+  "action": "keep",
+  "category": null,
+  "trimToLines": null,
+  "source": "jacob/!680 get_records.py:961",
+  "note": "Must-pass. Genuine why: it states the intent behind the lookup table (give a retry a value shaped like the failing column instead of a generic hint), which the dict literal alone cannot convey. Clarifying intent that cannot be readily inferred from the code."
+}

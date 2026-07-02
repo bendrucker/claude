@@ -4,6 +4,9 @@
 node_modules/
 .DS_Store
 **/fixtures/
+# The comments plugin's eval corpus is committed labeled data. Re-include it
+# against the global `fixtures` ignore.
+!plugins/comments/evals/fixtures/
 
 # Generated coverage output (bun test --coverage)
 /coverage/

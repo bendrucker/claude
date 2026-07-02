@@ -50,7 +50,6 @@ export interface HookCommandContext {
   file: string;
   /** The raw matcher entry, for access to `.matcher`. */
   entry: MatcherEntry;
-  /** Individual command object. */
   command: HookCommand;
 }
 

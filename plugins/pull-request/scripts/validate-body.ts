@@ -17,6 +17,9 @@ const TEST_COUNT_PATTERN =
 // over-structured. Reimplemented locally to avoid a cross-plugin import.
 const SMALL_BODY_WORD_LIMIT = 150;
 
+const AUTOLINK_REASON =
+  "Commit SHAs and issue/MR refs (`#123`, `!45`) auto-link on GitHub/GitLab. Backticks render them as code and suppress the link. Write them bare.";
+
 const CHANGES_HEADING_PATTERN = /^##\s+Changes\b/m;
 const TESTING_HEADING_PATTERN = /^##\s+Testing\b/m;
 
@@ -55,6 +58,50 @@ export function hasFileTourBullets(body: string): boolean {
   return false;
 }
 
+// Backticked hex run that could be a commit SHA. Only a filter: the git object
+// database settles whether a candidate is a real commit.
+const BACKTICKED_HEX_PATTERN = /`([0-9a-f]{7,40})`/g;
+
+// Backticked issue/MR reference: `#123`, `!45`, or `owner/repo#12`. Digits-only
+// after the sigil rules out CSS ids (`#main`) and code annotations. `@mentions`
+// are deliberately excluded because they have legitimate uses in code and prose.
+const BACKTICKED_REF_PATTERN = /`(?:[\w.-]+\/[\w.-]+)?[#!]\d+`/;
+
+export function extractBacktickedHexCandidates(body: string): string[] {
+  return Array.from(body.matchAll(BACKTICKED_HEX_PATTERN), (match) => match[1]).filter(
+    (token): token is string => token !== undefined,
+  );
+}
+
+export function hasBacktickedRef(body: string): boolean {
+  return BACKTICKED_REF_PATTERN.test(body);
+}
+
+export function gitCommitVerifier(cwd: string): (sha: string) => Promise<boolean> {
+  return async (sha) => {
+    try {
+      const proc = Bun.spawn(["git", "rev-parse", "--verify", "--quiet", `${sha}^{commit}`], {
+        cwd,
+        stdout: "ignore",
+        stderr: "ignore",
+      });
+      return (await proc.exited) === 0;
+    } catch {
+      return false;
+    }
+  };
+}
+
+export async function findBacktickedCommits(
+  candidates: string[],
+  verify: (sha: string) => Promise<boolean>,
+): Promise<string[]> {
+  const results = await Promise.all(
+    candidates.map(async (candidate) => ((await verify(candidate)) ? candidate : null)),
+  );
+  return results.filter((sha): sha is string => sha !== null);
+}
+
 export function extractBodyFilePath(command: string): string | null {
   const match = command.match(/--body-file[=\s]([^\s]+)/);
   return match?.[1] ?? null;
@@ -73,18 +120,21 @@ function warn(reasons: string[]): SyncHookJSONOutput {
   };
 }
 
-export function validateBody(body: string): SyncHookJSONOutput | null {
-  if (TEST_COUNT_PATTERN.test(body)) {
-    return {
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason:
-          "Testing section should not mention test counts. Describe what is covered instead.",
-      },
-    };
+function denyForTestCount(body: string): SyncHookJSONOutput | null {
+  if (!TEST_COUNT_PATTERN.test(body)) {
+    return null;
   }
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason:
+        "Testing section should not mention test counts. Describe what is covered instead.",
+    },
+  };
+}
 
+function structuralReasons(body: string): string[] {
   const reasons: string[] = [];
   if (hasReflexiveScaffold(body)) {
     reasons.push(
@@ -96,11 +146,20 @@ export function validateBody(body: string): SyncHookJSONOutput | null {
       "Bullets shaped like `- **path/to/file**: ...` narrate a file tour. Describe the conceptual change instead of walking the diff file by file.",
     );
   }
-  if (reasons.length > 0) {
-    return warn(reasons);
+  if (hasBacktickedRef(body)) {
+    reasons.push(AUTOLINK_REASON);
+  }
+  return reasons;
+}
+
+export function validateBody(body: string): SyncHookJSONOutput | null {
+  const deny = denyForTestCount(body);
+  if (deny) {
+    return deny;
   }
 
-  return null;
+  const reasons = structuralReasons(body);
+  return reasons.length > 0 ? warn(reasons) : null;
 }
 
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
@@ -120,5 +179,20 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   }
 
   const body = await file.text();
-  return validateBody(body);
+
+  const deny = denyForTestCount(body);
+  if (deny) {
+    return deny;
+  }
+
+  const reasons = structuralReasons(body);
+
+  const cwd = input.cwd ?? process.cwd();
+  const candidates = extractBacktickedHexCandidates(body);
+  const commits = await findBacktickedCommits(candidates, gitCommitVerifier(cwd));
+  if (commits.length > 0 && !reasons.includes(AUTOLINK_REASON)) {
+    reasons.push(AUTOLINK_REASON);
+  }
+
+  return reasons.length > 0 ? warn(reasons) : null;
 }

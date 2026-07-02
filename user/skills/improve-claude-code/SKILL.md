@@ -22,11 +22,13 @@ The backlog has two sources. The user files todos tagged `claude-code` by hand (
 
 **Watch mode** is the downstream follow-on. Once PRs exist, it tracks them under `/loop`, implements review feedback as it lands, and closes each backing todo on merge. See [Watch](#watch).
 
+In every mode, the loop itself is in scope: this skill's own SKILL.md, the `claude-code:session` skill's queries and views, and the Things scripts the loop depends on. Findings in that class may be dispatched to background worktree agents immediately, even when everything else routes to planning or triage discussion.
+
 All Things interaction goes through the `things:jxa` and `things:url` skills (never inline JXA). PRs go through `pull-request:create` (never `gh pr create`).
 
 ## Discover
 
-Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers. Discover never auto-implements and never auto-files: filing is an explicit user choice, implementing is a separate run of the loop below. The engine is the `claude-code:session` skill's fan-out, whose `references/discovery.md` carries the recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
+Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers. Discover never auto-files: filing is an explicit user choice. Implementing is a separate run of the loop below, unless the user opts into [Direct Implementation](#direct-implementation) for the run. The engine is the `claude-code:session` skill's fan-out, whose `references/discovery.md` carries the recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
 
 #### Refresh
 
@@ -65,7 +67,13 @@ One todo per candidate, not one blob. Filing lands findings in the same backlog 
 
 #### Hand Off
 
-Report how many todos landed. The existing triage, plan, implement, PR, CI, and annotate phases run on them later, unchanged. Filing is the default terminal action of Discover mode; implementing is a separate, explicit choice (run the loop below when ready).
+Report how many todos landed. The existing triage, plan, implement, PR, CI, and annotate phases run on them later, unchanged. Filing is the default terminal action of Discover mode. Implementing is a separate, explicit choice: run the loop below when ready, or opt into [Direct Implementation](#direct-implementation) at the start of a run.
+
+#### Direct Implementation
+
+Implement-as-you-go is an opt-in alternative to filing, chosen explicitly by the user per run. When the user asks for direct implementation, dispatch one background `general-purpose` agent with `isolation: "worktree"` for each grounded finding as soon as it lands, while the rest of the run continues. Each agent folds grounding in: it verifies the finding against the live config first, and if the config already addresses it, reports "not grounded" and changes nothing. Otherwise it implements, tests, runs `/code-review`, and opens a PR via `pull-request:create`. Collect the PR links at the end for the user to review locally or on GitHub.
+
+These PRs have no backing Things todo, so skip the `Original Task` link. Instead the body carries an Evidence section (local-host evidence only, never content from an egress-blocked host) plus one `Discovery: <fingerprint>` line per finding. Dedup today scans only Things notes, so these markers stay invisible until that scan is extended to PR bodies. Until then, a finding implemented this way can resurface as `new` on the next run.
 
 #### Cadence
 

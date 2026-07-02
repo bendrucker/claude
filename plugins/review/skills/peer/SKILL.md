@@ -27,6 +27,13 @@ allowed-tools:
 
 Assist me in reviewing this PR: $ARGUMENTS
 
+## Context
+
+Your own login as the reviewer. Everyone else in the diff and threads is either the author, addressed as "you", or a third party (see [tone.md](tone.md)). Whichever platform applies resolves. The other reads `unavailable`.
+
+- GitHub user: !`gh api graphql -f query='{viewer{login}}' --jq .data.viewer.login 2>/dev/null | grep . || echo "unavailable"`
+- GitLab user: !`glab api user 2>/dev/null | jq -r .username 2>/dev/null | grep . || echo "unavailable"`
+
 ## Arguments
 
 - `--triage`: assess the PR for sequencing instead of reviewing it. Produce a one-line summary of what it changes and an estimated review effort, then stop. Default: off, which runs the full review workflow below.
@@ -50,7 +57,7 @@ If not on the branch, first run `gh pr checkout` to switch.
 
 ## Workflow
 
-1. **Research** - Gather context (see [research.md](research.md))
+1. **Research** - Gather context and identify participants (see [research.md](research.md))
 2. **Context** - Determine review context using repository visibility. Private repositories use [corporate](references/corporate.md) defaults. Public repositories use [open-source](references/open-source.md) defaults. Check visibility via the platform API (`gh api repos/OWNER/REPO --jq .visibility` or `glab api projects/ENCODED_PATH | jq .visibility`). If ambiguous, ask me.
 3. **Review** - Examine changed files and existing comments
 4. **Delegate** - Run `/code-review` for code-quality analysis. Summarize the diff (rough line count, files touched, sensitive areas) and signals from the PR body, propose an effort level with one-line reasoning, and confirm via `AskUserQuestion` before invoking. Skip the call for trivial PRs (docs-only, dep bumps). Effort heuristics:

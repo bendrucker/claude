@@ -1,0 +1,4 @@
+# Mined comment bodies and labels contain imported work-repo content that must
+# not leave this machine. Never commit them to this public marketplace repo.
+data/
+labels/

@@ -3,6 +3,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CollectedComment } from "../detection/collect";
+import { commentFeatures } from "../detection/features";
 import { scoreComment } from "../detection/rank";
 import { buildJob, writeJob } from "./job";
 import { loadPrompt } from "./judge";
@@ -24,6 +25,7 @@ function collected(i: number): CollectedComment {
     id: `id-${i}`,
     context: `ctx ${i}`,
     score: scoreComment(comment),
+    features: commentFeatures(comment, [text]),
   };
 }
 

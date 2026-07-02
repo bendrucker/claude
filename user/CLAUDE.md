@@ -30,6 +30,7 @@ Every customization costs tokens on every session. Before adding one, define how
 - Always use the `pull-request:create` skill to create pull requests. If the skill is unavailable, create the PR with an empty body.
 - When executing build commands, output to `/dev/null` to avoid creating binaries.
 - Store temporary files in `tmp/` directory.
+- The sandbox can write `/tmp`, `$TMPDIR`, and the repo. Never disable the sandbox for file writes; only bypass after a sandboxed run of that command actually failed.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
 
 ### Bash `!` Escaping Bug

@@ -92,7 +92,6 @@ export function parseGitLabUrl(url: string): { type: string; suggestion: string 
 
   // No /-/ means this is a project root (possibly with nested groups)
   // Match: group/project or group/subgroup/project etc.
-  // Must have at least one slash and no special characters that indicate other pages
   const pathWithoutSlash = path.replace(/\/$/, "");
   if (pathWithoutSlash.includes("/") && !pathWithoutSlash.includes("?")) {
     return {

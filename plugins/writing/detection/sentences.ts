@@ -16,11 +16,6 @@ export function splitSentences(text: string): string[] {
     .filter((s) => !HEADING.test(s));
 }
 
-/**
- * Split text into paragraphs (blank-line separated), then for each paragraph
- * return its constituent sentences via splitSentences. Empty paragraphs are
- * dropped.
- */
 export function splitParagraphs(text: string): string[][] {
   return text
     .split(/\n{2,}/)

@@ -40,8 +40,6 @@ async function checkMatchers(): Promise<string[]> {
         const tool = match[2];
         if (!server || !tool) continue;
 
-        // Determine plugin name: use known mapping, or fall back to
-        // enabled plugin names that match the server name
         const pluginName = knownServers.get(server) ?? (enabledNames.has(server) ? server : null);
         if (!pluginName) continue;
 

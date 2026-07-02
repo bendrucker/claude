@@ -61,7 +61,6 @@ export interface DocumentRateRow {
 }
 
 export interface CorpusRateTrends {
-  /** Number of documents analyzed. */
   documentCount: number;
   /** Mean action-verb opener rate across documents (0–1). */
   meanActionVerbOpenerRate: number;

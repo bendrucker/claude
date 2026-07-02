@@ -9,12 +9,10 @@ import {
 } from "./schema";
 
 /**
- * Shared judge primitives: the versioned prompt and per-verdict validation. The
- * product path shards comments in `job.ts` for the agent fan-out to judge, and
- * `apply/join.ts` validates the verdicts that come back. The calibration oracle
- * under `evals/` scores a fixed corpus. The prompt is a committed, versioned
- * artifact, and every run records its sha256, so a prompt edit invalidates prior
- * numbers.
+ * Shared judge primitives: the versioned prompt and per-verdict validation, used
+ * by both the agent fan-out and the eval oracle. The prompt is a committed,
+ * versioned artifact, and every run records its sha256, so a prompt edit
+ * invalidates prior numbers.
  */
 
 export const PROMPT_PATH = join(import.meta.dirname, "prompt.md");
@@ -33,7 +31,7 @@ export async function loadPrompt(promptPath: string = PROMPT_PATH): Promise<Vers
   return { text, sha256: sha256(text) };
 }
 
-/** Comments judged per shard on the product path, and per batch in the oracle. */
+/** Comments per shard in production, and per batch in the oracle. */
 export const BATCH_SIZE = 20;
 
 /**

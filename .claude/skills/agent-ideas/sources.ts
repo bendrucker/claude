@@ -29,7 +29,6 @@ export interface Source {
 }
 
 export const sources: Source[] = [
-  // --- Seeds (confirmed this session) ---
   {
     name: "Simon Willison",
     feedUrl: "https://simonwillison.net/atom/everything/",
@@ -74,7 +73,6 @@ export const sources: Source[] = [
     xHandle: "dillon_mulroy",
   },
 
-  // --- Discovered: confirmed feed (citation-graph run) ---
   {
     name: "Armin Ronacher",
     feedUrl: "https://lucumr.pocoo.org/feed.atom",
@@ -82,10 +80,9 @@ export const sources: Source[] = [
     xHandle: "mitsuhiko",
   },
 
-  // --- Discovered: high/medium relevance, feeds resolved during the foundation pass ---
   {
-    // humanlayer.dev is a Next.js app with no discoverable RSS feed as of the
-    // foundation pass; handled via the browser fallback until a feed surfaces.
+    // humanlayer.dev is a Next.js app with no discoverable RSS feed; handled via
+    // the browser fallback until a feed surfaces.
     name: "Dex Horthy",
     feedUrl: null,
     sourceType: "x-only",

@@ -21,8 +21,6 @@ function hasTests(dir: string): boolean {
   }
 }
 
-// Walk up from a file toward the repo root, returning the nearest ancestor
-// directory that directly contains test files.
 function nearestTestDir(relFile: string): string {
   let dir = dirname(relFile);
   while (dir && dir !== "." && dir !== "..") {

@@ -38,7 +38,7 @@ echo '<json>' | bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts [--json] [--c
 |--------|-------|-------------|
 | `find-todos.js` | `<tag\|project> <name> [--logbook]` | Find todos by tag (across Inbox/Today/Anytime/Upcoming/Someday) or project |
 | `query-list.js` | `<list-id>` | Query todos from any built-in list |
-| `query-logbook.js` | `<start-iso> <end-iso>` | Query logbook with early termination. Full scans of 10k+ items are slow. |
+| `query-logbook.js` | `<start-iso> <end-iso> [--notes-contains <substring>]` | Query logbook with early termination. Full scans of 10k+ items are slow. `--notes-contains` filters by notes substring and includes `notes` in output (e.g. to find `Discovery:` markers). |
 | `query-metadata.js` | `<projects\|areas\|tags>` | List projects, areas, or tags (tags omit todoCount for performance) |
 | `export-markdown.js` | `[list-id]` | Export a list to markdown checklist |
 

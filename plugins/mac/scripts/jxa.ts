@@ -86,8 +86,9 @@ export interface RunResult {
 
 // AppleEvents error codes that are safe to retry. They surface as transient XPC
 // dispatcher hiccups on the first event after a cold session: errAEPrivilegeError
-// (-10004) and errAEEventNotHandled / "application isn't running" (-600). A retry
-// clears them.
+// (-10004) and errAEEventNotHandled / "application isn't running" (-600). Retries
+// clear the transient case; a persistent failure (e.g. a sandbox deny) still
+// surfaces after the final attempt.
 const RETRIABLE_APPLE_EVENTS_CODES = [-10004, -600];
 
 export function isRetriableAppleEventsError(exitCode: number, stderr: string): boolean {
@@ -110,19 +111,33 @@ async function runOsascript(args: string[]): Promise<RunResult> {
   return { code, stdout, stderr };
 }
 
-const RETRY_DELAY_MS = 300;
+const RETRY_DELAYS_MS = [300, 900];
 
 export async function runWithRetry(
   args: string[],
   run: (args: string[]) => Promise<RunResult>,
   sleep: (ms: number) => Promise<void> = Bun.sleep,
 ): Promise<RunResult> {
-  const first = await run(args);
-  if (first.code === 0 || !isRetriableAppleEventsError(first.code, first.stderr)) {
-    return first;
+  let result = await run(args);
+  for (const delay of RETRY_DELAYS_MS) {
+    if (result.code === 0 || !isRetriableAppleEventsError(result.code, result.stderr)) {
+      return result;
+    }
+    await sleep(delay);
+    result = await run(args);
   }
-  await sleep(RETRY_DELAY_MS);
-  return run(args);
+  return result;
+}
+
+// Forward osascript's output on the process streams. Bun.write(Bun.stdout, ...)
+// is unsafe here: BunFile writes replace file contents, so when stdout and
+// stderr share one capture file (`2>&1`) the stderr write truncates everything
+// stdout just wrote. process.*.write appends at the fd offset, and setting
+// exitCode instead of calling process.exit lets pending pipe writes flush.
+export function emitResult({ code, stdout, stderr }: RunResult): void {
+  process.stdout.write(stdout);
+  process.stderr.write(stderr);
+  process.exitCode = code;
 }
 
 if (import.meta.main) {
@@ -168,8 +183,5 @@ if (import.meta.main) {
     process.exit(1);
   }
 
-  const { code, stdout, stderr } = await runWithRetry(osascriptArgs, runOsascript);
-  await Bun.write(Bun.stdout, stdout);
-  await Bun.write(Bun.stderr, stderr);
-  process.exit(code);
+  emitResult(await runWithRetry(osascriptArgs, runOsascript));
 }

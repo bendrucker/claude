@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { join } from "node:path";
 import type { RunResult } from "./jxa";
 import { isRetriableAppleEventsError, runWithRetry, validateAppScope } from "./jxa";
 
@@ -115,12 +116,18 @@ describe("runWithRetry", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("retries once then surfaces the real error", async () => {
+  it("retries with backoff then surfaces the persistent error", async () => {
     const persistent: RunResult = { code: 1, stdout: "", stderr: "Connection Invalid" };
-    const { run, calls } = runner([persistent, { ...persistent }]);
-    const result = await runWithRetry(["-e", "x"], run, noSleep);
+    const { run, calls } = runner([persistent, { ...persistent }, { ...persistent }]);
+    const delays: number[] = [];
+    const sleep = (ms: number) => {
+      delays.push(ms);
+      return Promise.resolve();
+    };
+    const result = await runWithRetry(["-e", "x"], run, sleep);
     expect(result).toEqual(persistent);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
+    expect(delays).toEqual([300, 900]);
   });
 
   it("does not retry a non-retriable failure", async () => {
@@ -135,5 +142,27 @@ describe("runWithRetry", () => {
     const result = await runWithRetry(["-e", "1 + 1"], run, noSleep);
     expect(result).toEqual({ code: 0, stdout: "2", stderr: "" });
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("emitResult", () => {
+  // Regression: stdout and stderr sharing one open file description (`2>&1`,
+  // how shell tools capture combined output). Bun.write(Bun.stderr, ...) used
+  // replace semantics on regular files, truncating the stdout content.
+  it("preserves stdout when stderr shares the capture file", async () => {
+    const dir = process.env.TMPDIR ?? "/tmp";
+    const capture = join(dir, `jxa-emit-${Date.now()}.txt`);
+    const fixture = join(dir, `jxa-emit-fixture-${Date.now()}.ts`);
+    const jxaPath = join(import.meta.dirname, "jxa.ts");
+    await Bun.write(
+      fixture,
+      `import { emitResult } from ${JSON.stringify(jxaPath)};\n` +
+        `emitResult({ code: 0, stdout: "OUT\\n", stderr: "ERR\\n" });\n`,
+    );
+
+    const proc = Bun.spawn(["sh", "-c", `bun '${fixture}' > '${capture}' 2>&1`]);
+    expect(await proc.exited).toBe(0);
+
+    expect(await Bun.file(capture).text()).toBe("OUT\nERR\n");
   });
 });

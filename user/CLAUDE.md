@@ -36,6 +36,11 @@ Every customization costs tokens on every session. Before adding one, define how
 
 The Bash tool escapes `!` to `\!` on every path, including single quotes and heredocs, breaking `jq !=`, `awk !~`, and similar operators ([#2941](https://github.com/anthropics/claude-code/issues/2941), [#10335](https://github.com/anthropics/claude-code/issues/10335)). For `jq`, use `| not` instead of `!=`. For anything else, author the content with the Write tool, then run it. No shell quoting or heredoc bypasses the escape.
 
+## Planning
+
+- Keep plans focused and under roughly 10k characters. Large plans get rejected: in my session history, no plan over 11k characters was ever approved.
+- When I redirect a plan, revise the sections my feedback touches. Do not regrow the whole plan, and never re-present a plan unchanged.
+
 ## Git
 
 - Never `git push` to the default branch (usually `main` or `master`) unless I explicitly instruct you.

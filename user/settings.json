@@ -1,6 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "theme": "auto",
+  "skillOverrides": {
+    "claude-in-chrome": "off",
+    "dataviz": "user-invocable-only"
+  },
   "fallbackModel": ["sonnet"],
   "cleanupPeriodDays": 90,
   "autoMode": {

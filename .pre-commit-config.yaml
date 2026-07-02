@@ -10,7 +10,7 @@ repos:
       - id: plugin-validate
         name: Plugin validation
         language: system
-        files: \.claude-plugin/plugin\.json$
+        files: ^plugins/[^/]+/\.claude-plugin/plugin\.json$
         entry: scripts/prek-check.sh plugin-validate
 
       - id: hooks-validate

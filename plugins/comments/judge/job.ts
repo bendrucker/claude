@@ -4,7 +4,6 @@ import { join } from "node:path";
 import type { CollectedComment } from "../detection/collect";
 import type { CommentKind, Language } from "../detection/types";
 import { BATCH_SIZE, loadPrompt, sha256 } from "./judge";
-import { batchVerdictKeyedSchema } from "./schema";
 
 /** What an agent reads to judge one comment: id-tagged, with rubric context. */
 export interface ShardComment {
@@ -82,7 +81,6 @@ export interface JobArgs {
   shards: ShardRef[];
   promptPath: string;
   promptSha: string;
-  schema: Record<string, unknown>;
   verdictsDir: string;
 }
 
@@ -133,7 +131,6 @@ export async function writeJob(
     shards,
     promptPath,
     promptSha: descriptor.promptSha,
-    schema: batchVerdictKeyedSchema(),
     verdictsDir,
   };
   const argsPath = join(jobDir, "job-args.json");

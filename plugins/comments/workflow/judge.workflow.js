@@ -1,55 +1,61 @@
 export const meta = {
   name: "comments-judge",
   description: "Judge extracted code comments for AI slop, one agent per shard",
-  phases: [{ title: "Judge" }],
+  phases: [{ title: "Judge", model: "sonnet" }],
 };
 
-// job = { shards: [{ id, path }], promptPath, promptSha, schema, verdictsDir }
+// job = { shards: [{ id, path }], promptPath, promptSha, verdictsDir }
 // The Workflow tool delivers args as a JSON string, so parse it before use.
 // The Bun side already sharded in ranked order, so each shard maps 1:1 to one
-// agent. The schema reaches the agent through args; the rubric is a file the agent
-// reads (job.promptPath), keeping the large rubric text out of the tool-call args
-// and the sandboxed script free of imports. The summary is logged rather than
-// returned: the verdicts live on disk for the apply step, off the orchestrator
-// context, and a top-level return is not valid module syntax.
+// agent. The rubric is a file the agent reads (job.promptPath), keeping the
+// large rubric text out of the tool-call args and the sandboxed script free of
+// imports. Verdicts land on disk for the apply step, off the orchestrator
+// context; `apply/join.ts` validates them there, so the agent's structured
+// output is only the small summary the log needs.
 
 const job = typeof args === "string" ? JSON.parse(args) : args;
-const CONCURRENCY = 8;
 
-async function judgeShard(shardPath, shardId) {
+// The eval gate (evals/eval.ts --gate) has cleared the rubric on sonnet, so the
+// judge is pinned there rather than inheriting the session model. Re-clear the
+// gate on a cheaper model before lowering this.
+const JUDGE_MODEL = "sonnet";
+
+const SUMMARY_SCHEMA = {
+  type: "object",
+  properties: {
+    total: { type: "integer" },
+    flagged: { type: "integer" },
+  },
+  required: ["total", "flagged"],
+  additionalProperties: false,
+};
+
+function judgeShard(shard) {
   const prompt = [
     `Read the comment-slop rubric at this exact path: ${job.promptPath}`,
-    `Read the JSON file at this exact path: ${shardPath}`,
+    `Read the JSON file at this exact path: ${shard.path}`,
     'It contains { "id": <shard id>, "comments": [{ "id", "path", "language", "kind", "text", "context" }] }.',
     'Judge every comment in the shard against the rubric. Produce exactly one verdict per comment, keyed by its "id".',
-    `Write the object { "verdicts": [{ "id": <comment id>, "verdict": { ... } }] } to this exact path with the Write tool: ${job.verdictsDir}/verdict-${shardId}.json`,
+    `Write the object { "verdicts": [{ "id": <comment id>, "verdict": { ... } }] } to this exact path with the Write tool: ${job.verdictsDir}/verdict-${shard.id}.json`,
     'Use the Write tool, not a Bash heredoc: the Bash tool escapes "!" to "\\!", which is not a valid JSON escape and corrupts the file.',
-    'Return that same { "verdicts": [...] } object as your structured output.',
+    "Per verdict include: action (keep | trim | rewrite), category (the failing shape, null for keep), confidence (low | medium | high), rationale (one sentence), rewrite (the de-voiced comment text, only when action is rewrite, else null), and trimToLines (only for a partial trim of a multi-line block).",
+    'Your structured output is only the summary: { "total": <comments judged>, "flagged": <verdicts with action other than keep> }.',
   ].join("\n");
   return agent(prompt, {
-    schema: job.schema,
-    label: `judge:shard-${shardId}`,
+    schema: SUMMARY_SCHEMA,
+    model: JUDGE_MODEL,
+    label: `judge:shard-${shard.id}`,
     phase: "Judge",
   });
 }
 
 phase("Judge");
 
-const shards = job.shards;
-const results = [];
-for (let i = 0; i < shards.length; i += CONCURRENCY) {
-  const batch = shards.slice(i, i + CONCURRENCY);
-  const batchResults = await parallel(batch.map((shard) => () => judgeShard(shard.path, shard.id)));
-  results.push(...batchResults);
-}
+const results = await parallel(job.shards.map((shard) => () => judgeShard(shard)));
 
 let flagged = 0;
 for (const result of results) {
-  if (result && Array.isArray(result.verdicts)) {
-    flagged += result.verdicts.filter(
-      (entry) => entry.verdict?.action && entry.verdict.action !== "keep",
-    ).length;
-  }
+  if (result && typeof result.flagged === "number") flagged += result.flagged;
 }
 
-log(`Judged ${shards.length} shard(s); ${flagged} flagged. Verdicts in ${job.verdictsDir}`);
+log(`Judged ${job.shards.length} shard(s); ${flagged} flagged. Verdicts in ${job.verdictsDir}`);

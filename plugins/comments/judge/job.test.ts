@@ -91,7 +91,6 @@ describe("writeJob", () => {
       expect(args.shards).toEqual(written.shards);
       expect(args.promptSha).toBe(descriptor.promptSha);
       expect(args.verdictsDir).toBe(written.verdictsDir);
-      expect(args.schema.properties.verdicts.items.required).toEqual(["id", "verdict"]);
 
       expect(args.promptText).toBeUndefined();
       expect(await Bun.file(args.promptPath).text()).toBe(descriptor.promptText);

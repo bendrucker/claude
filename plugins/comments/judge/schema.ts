@@ -119,29 +119,3 @@ export function batchVerdictSchema(): Record<string, unknown> {
   };
 }
 
-/**
- * Batch schema keyed by the stable comment id rather than a positional index.
- * The agent fan-out reads a shard of id-tagged comments and returns one verdict
- * per id, so the applier can id-join verdicts back to recorded ranges.
- */
-export function batchVerdictKeyedSchema(): Record<string, unknown> {
-  return {
-    type: "object",
-    properties: {
-      verdicts: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            verdict: verdictSchema(),
-          },
-          required: ["id", "verdict"],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ["verdicts"],
-    additionalProperties: false,
-  };
-}

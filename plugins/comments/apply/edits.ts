@@ -186,15 +186,28 @@ export function computeFileEdits(source: string, items: EditItem[]): FileEditRes
     }
   }
 
+  const isBlank = (line: string): boolean => line.trim().length === 0;
   const out: string[] = [];
+  let lastPushedBlank = false;
   for (let n = 1; n <= lines.length; n++) {
     const insert = spanInserts.get(n);
     if (insert) {
-      out.push(...insert);
+      if (insert.length > 0) {
+        for (const line of insert) out.push(line);
+        lastPushedBlank = isBlank(insert[insert.length - 1] as string);
+      }
       continue;
     }
     if (deletions.has(n)) continue;
-    out.push(replacements.has(n) ? (replacements.get(n) as string) : (lines[n - 1] as string));
+    const line = replacements.has(n) ? (replacements.get(n) as string) : (lines[n - 1] as string);
+    // A trim can leave a surviving blank line next to a blank we already kept,
+    // collapsing `blank / deleted comment / blank` into a double blank. Drop it,
+    // but only when a neighbor was deleted, so unrelated blank runs are untouched.
+    if (isBlank(line) && lastPushedBlank && (deletions.has(n - 1) || deletions.has(n + 1))) {
+      continue;
+    }
+    out.push(line);
+    lastPushedBlank = isBlank(line);
   }
   return { content: out.join("\n"), skips };
 }

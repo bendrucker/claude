@@ -44,6 +44,22 @@ describe("computeFileEdits case (a): full-line comment", () => {
     ]);
     expect(result.content).toBe("a();\nb();");
   });
+
+  test("collapses the surrounding blanks when a banner is deleted", () => {
+    const source = "const x = 1;\n\n// banner\n\nconst y = 2;";
+    const result = computeFileEdits(source, [
+      item({ startLine: 3, endLine: 3, startColumn: 0, endColumn: 9 }),
+    ]);
+    expect(result.content).toBe("const x = 1;\n\nconst y = 2;");
+  });
+
+  test("leaves a pre-existing double blank far from any deletion intact", () => {
+    const source = "const x = 1;\n// banner\nconst y = 2;\n\n\nconst z = 3;";
+    const result = computeFileEdits(source, [
+      item({ startLine: 2, endLine: 2, startColumn: 0, endColumn: 9 }),
+    ]);
+    expect(result.content).toBe("const x = 1;\nconst y = 2;\n\n\nconst z = 3;");
+  });
 });
 
 describe("computeFileEdits case (b): trailing comment", () => {

@@ -34,10 +34,7 @@ Good:
 
 ### Third Parties
 
-Name someone only when they are not the author, such as a past contributor whose change is relevant. Use their handle.
-
-Good:
-- "This reverts the guard @carol added in #412, so the null case is unhandled again."
+Only @-mention other users when a notification/mention is explicitly requested.
 
 ## Severity
 

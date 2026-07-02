@@ -54,6 +54,8 @@ Not every PR has all of these. Include only what a reviewer would act on. True b
 
 Prefer showing to asserting. Link a permalink to the exact lines instead of paraphrasing code. Blockquote the doc or spec you reason from. Paste the real error, stack trace, or test output in a fence rather than describing it. "Reverting the fix makes `TestX` fail with `exit 2`" beats "added a test for the fix".
 
+Leave commit SHAs and issue/MR references bare. GitHub and GitLab auto-link a bare SHA and a bare `#N` / `!N` / `owner/repo#N`. Backticks render them as code and suppress the link, so write them unbacktick'd.
+
 ## Optional Sections
 
 Use these only when the body is long enough to earn them. A small PR stays a paragraph.

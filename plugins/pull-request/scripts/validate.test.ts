@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import {
+  extractBacktickedHexCandidates,
   extractBodyFilePath,
+  findBacktickedCommits,
+  hasBacktickedRef,
   hasFileTourBullets,
   hasReflexiveScaffold,
   processInput,
@@ -180,6 +184,70 @@ describe("hasFileTourBullets", () => {
   });
 });
 
+describe("extractBacktickedHexCandidates", () => {
+  it("pulls a backticked short SHA", () => {
+    expect(extractBacktickedHexCandidates("a `2554da15` b")).toEqual(["2554da15"]);
+  });
+
+  it("returns a backticked 40-char SHA", () => {
+    const sha = "2554da150000000000000000000000000000abcd";
+    expect(extractBacktickedHexCandidates(`Builds on \`${sha}\`.`)).toEqual([sha]);
+  });
+
+  it("ignores a bare (unbackticked) hex run", () => {
+    expect(extractBacktickedHexCandidates("commit 2554da15 landed")).toEqual([]);
+  });
+
+  it("ignores a backticked non-hex identifier", () => {
+    expect(extractBacktickedHexCandidates("calls `getUser` then")).toEqual([]);
+  });
+
+  it("ignores a backticked file path", () => {
+    expect(extractBacktickedHexCandidates("see `src/cache.ts`")).toEqual([]);
+  });
+});
+
+describe("findBacktickedCommits", () => {
+  const known = new Set(["2554da15", "dc8acf12"]);
+  const fakeVerifier = (sha: string) => Promise.resolve(known.has(sha));
+
+  it("returns candidates the verifier confirms", async () => {
+    const candidates = extractBacktickedHexCandidates("Builds on `2554da15`.");
+    expect(await findBacktickedCommits(candidates, fakeVerifier)).toEqual(["2554da15"]);
+  });
+
+  it("drops a hex candidate the verifier rejects", async () => {
+    const candidates = extractBacktickedHexCandidates("random `deadbeef` hash");
+    expect(await findBacktickedCommits(candidates, fakeVerifier)).toEqual([]);
+  });
+});
+
+describe("hasBacktickedRef", () => {
+  it("flags a backticked issue/PR ref", () => {
+    expect(hasBacktickedRef("Closes `#123`")).toBe(true);
+  });
+
+  it("flags a backticked GitLab MR ref", () => {
+    expect(hasBacktickedRef("See `!45`")).toBe(true);
+  });
+
+  it("flags a backticked cross-repo ref", () => {
+    expect(hasBacktickedRef("Relates to `owner/repo#12`")).toBe(true);
+  });
+
+  it("does not flag a bare ref", () => {
+    expect(hasBacktickedRef("Closes #123")).toBe(false);
+  });
+
+  it("does not flag a backticked mention", () => {
+    expect(hasBacktickedRef("thanks `@user`")).toBe(false);
+  });
+
+  it("does not flag a backticked CSS id", () => {
+    expect(hasBacktickedRef("the `#main` selector")).toBe(false);
+  });
+});
+
 describe("processInput", () => {
   let tempDir: string;
 
@@ -191,10 +259,16 @@ describe("processInput", () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  function createInput(command: string): PreToolUseHookInput {
+  const repoRoot = path.join(import.meta.dir, "..", "..", "..");
+  const headSha = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" })
+    .stdout.trim()
+    .slice(0, 12);
+
+  function createInput(command: string, cwd?: string): PreToolUseHookInput {
     return {
       tool_name: "Bash",
       tool_input: { command },
+      ...(cwd ? { cwd } : {}),
     } as PreToolUseHookInput;
   }
 
@@ -228,6 +302,34 @@ describe("processInput", () => {
     await Bun.write(bodyFile, "## Test plan\nAdded 5 tests");
     const result = await processInput(createInput(`gh pr create --body-file ${bodyFile}`));
     expect(result).not.toBeNull();
+    expect(getPermissionDecision(result)).toBe("deny");
+  });
+
+  it("warns on a backticked real commit SHA", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    await Bun.write(bodyFile, `Builds on \`${headSha}\`.`);
+    const result = await processInput(
+      createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
+    );
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("auto-link");
+  });
+
+  it("does not warn on a bare commit SHA", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    await Bun.write(bodyFile, `Builds on ${headSha}.`);
+    const result = await processInput(
+      createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("lets a test-count deny precede a backticked SHA warning", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    await Bun.write(bodyFile, `Builds on \`${headSha}\`.\n\nAdded 5 tests`);
+    const result = await processInput(
+      createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
+    );
     expect(getPermissionDecision(result)).toBe("deny");
   });
 });

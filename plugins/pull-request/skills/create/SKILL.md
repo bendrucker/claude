@@ -47,7 +47,7 @@ Mine the conversation that produced this change. The substance lives there: deci
 - Length tracks substance, not diff size. A subtle one-line fix may need paragraphs. A large mechanical change may need two sentences.
 - Default to prose. Use `##` sections only when the body is long enough to need them. Small PRs are a tight paragraph with no headers.
 - Reference the motivating issue at the end of the opening (`Closes #N`, `Fixes #N`, or `#N` if not closing). Related-for-context issues go in a `## References` section, never bare at the bottom.
-- Wrap code identifiers in backticks: function names, class names, file paths, endpoints, status codes.
+- Wrap code identifiers in backticks: function names, class names, file paths, endpoints, status codes. Do not backtick anything the platform auto-links: commit SHAs and issue/MR references (`#N`, `!N`, `owner/repo#N`). Backticks render them as code and kill the link. Write them bare.
 
 See [`sections.md`](sections.md) for the substance catalog (what to surface, by change type), optional-section guidance, how to ground claims in evidence, and the slop patterns to cut. Load the `writing` skill for the full set of tropes to avoid.
 

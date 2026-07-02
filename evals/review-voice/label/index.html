@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Review Voice Labeler</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #1e1e2e;
+        --panel: #282a36;
+        --text: #cdd6f4;
+        --muted: #9399b2;
+        --good: #a6e3a1;
+        --bad: #f38ba8;
+        --skip: #f9e2af;
+        --accent: #89b4fa;
+        --border: #45475a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 15px/1.55 -apple-system, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        position: sticky;
+        top: 0;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        padding: 12px 20px;
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      header .counts { color: var(--muted); font-size: 13px; }
+      header .counts b { color: var(--text); }
+      main { max-width: 820px; margin: 0 auto; padding: 24px 20px 120px; }
+      .meta { color: var(--muted); font-size: 13px; margin-bottom: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
+      .meta .tag { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 1px 8px; }
+      .body {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 18px 20px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 15px;
+      }
+      .body code { background: #11111b; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+      textarea {
+        width: 100%;
+        margin-top: 14px;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font: inherit;
+        resize: vertical;
+        min-height: 60px;
+      }
+      .actions { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg); border-top: 1px solid var(--border); padding: 14px 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 9px 18px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+      }
+      button.good { border-color: var(--good); color: var(--good); }
+      button.bad { border-color: var(--bad); color: var(--bad); }
+      button.skip { border-color: var(--skip); color: var(--skip); }
+      button.nav { color: var(--muted); }
+      button:hover { filter: brightness(1.25); }
+      .verdict { font-weight: 700; }
+      .verdict.good { color: var(--good); }
+      .verdict.bad { color: var(--bad); }
+      .verdict.skip { color: var(--skip); }
+      label.filter { color: var(--muted); font-size: 13px; margin-left: auto; display: flex; gap: 6px; align-items: center; }
+      kbd { background: #11111b; border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Review Voice</strong>
+      <span class="counts" id="counts"></span>
+      <label class="filter"><input type="checkbox" id="unlabeledOnly" /> unlabeled only</label>
+    </header>
+    <main>
+      <div class="meta" id="meta"></div>
+      <div class="body" id="body">Loading…</div>
+      <textarea id="note" placeholder="Note (why is this good/bad?)"></textarea>
+    </main>
+    <div class="actions">
+      <button class="nav" id="prev">← Prev</button>
+      <button class="good" id="good">Good <kbd>g</kbd></button>
+      <button class="bad" id="bad">Bad <kbd>b</kbd></button>
+      <button class="skip" id="skip">Skip <kbd>s</kbd></button>
+      <button class="nav" id="next">Next →</button>
+    </div>
+
+    <script>
+      let candidates = [];
+      let labels = {};
+      let order = [];
+      let pos = 0;
+
+      const $ = (id) => document.getElementById(id);
+
+      function escapeHtml(s) {
+        return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+      }
+      function renderBody(s) {
+        return escapeHtml(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+      }
+
+      function rebuildOrder() {
+        const only = $("unlabeledOnly").checked;
+        order = candidates
+          .map((_, i) => i)
+          .filter((i) => !only || !labels[candidates[i].id]);
+        if (order.length === 0) order = candidates.map((_, i) => i);
+        if (pos >= order.length) pos = order.length - 1;
+        if (pos < 0) pos = 0;
+      }
+
+      function updateCounts() {
+        const vals = Object.values(labels);
+        const g = vals.filter((v) => v.label === "good").length;
+        const b = vals.filter((v) => v.label === "bad").length;
+        const s = vals.filter((v) => v.label === "skip").length;
+        $("counts").innerHTML =
+          `<b>${g + b + s}</b>/${candidates.length} labeled &middot; ` +
+          `<b>${g}</b> good &middot; <b>${b}</b> bad &middot; <b>${s}</b> skip`;
+      }
+
+      function render() {
+        rebuildOrder();
+        const c = candidates[order[pos]];
+        if (!c) return;
+        const existing = labels[c.id];
+        const verdict = existing
+          ? ` &middot; <span class="verdict ${existing.label}">${existing.label.toUpperCase()}</span>`
+          : "";
+        $("meta").innerHTML =
+          `<span class="tag">${pos + 1}/${order.length}</span>` +
+          `<span class="tag">${escapeHtml(c.host)}</span>` +
+          `<span class="tag">${escapeHtml(c.workdir)}</span>` +
+          `<span class="tag">${escapeHtml(c.source)}${c.line ? ":" + c.line : ""}</span>` +
+          verdict;
+        $("body").innerHTML = renderBody(c.body);
+        $("note").value = existing?.note ?? "";
+        updateCounts();
+      }
+
+      async function save(label) {
+        const c = candidates[order[pos]];
+        if (!c) return;
+        const note = $("note").value;
+        labels[c.id] = { id: c.id, label, note };
+        await fetch("/api/label", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id: c.id, label, note }),
+        });
+        if (pos < order.length - 1) pos++;
+        render();
+      }
+
+      function move(delta) {
+        pos = Math.max(0, Math.min(order.length - 1, pos + delta));
+        render();
+      }
+
+      $("good").onclick = () => save("good");
+      $("bad").onclick = () => save("bad");
+      $("skip").onclick = () => save("skip");
+      $("prev").onclick = () => move(-1);
+      $("next").onclick = () => move(1);
+      $("unlabeledOnly").onchange = () => { pos = 0; render(); };
+
+      document.addEventListener("keydown", (e) => {
+        if (e.target.tagName === "TEXTAREA") return;
+        if (e.key === "g") save("good");
+        else if (e.key === "b") save("bad");
+        else if (e.key === "s") save("skip");
+        else if (e.key === "ArrowLeft") move(-1);
+        else if (e.key === "ArrowRight") move(1);
+      });
+
+      async function boot() {
+        candidates = await (await fetch("/api/candidates")).json();
+        labels = await (await fetch("/api/labels")).json();
+        render();
+      }
+      boot();
+    </script>
+  </body>
+</html>

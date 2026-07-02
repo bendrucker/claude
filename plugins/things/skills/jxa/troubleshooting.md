@@ -26,8 +26,9 @@ Sandbox errors typically mention:
 - `Operation not permitted`
 - `Sandbox: deny`
 - File path access errors
+- `A privilege violation occurred. (-10004)`
 
-The skill's inline hook automatically runs wrapper commands outside the sandbox. If you still see sandbox errors, verify the hook is active or run the command with `dangerouslyDisableSandbox: true`.
+Sandboxed `osascript` Apple Events to Things3 fail with `-10004` even with `sandbox.allowAppleEvents` set (that key covers Launch Services `open`/URL handoff, not `osascript`). The `mac:jxa-run` skill's inline hook runs the JXA runner outside the sandbox for this reason. If you see `-10004`, verify that hook is active or run the command with `dangerouslyDisableSandbox: true`.
 
 ## Updates Not Working
 

@@ -15,18 +15,6 @@ allowed-tools:
   - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
   - "Bash(cat ~/.claude/projects/:*)"
   - Bash(ls:*)
-hooks:
-  PreToolUse:
-    - matcher: "Bash(tmux:*)"
-      hooks:
-        - type: command
-          command: |
-            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
-    - matcher: "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
-      hooks:
-        - type: command
-          command: |
-            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
 ---
 
 # Review Inbox

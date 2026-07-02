@@ -4,30 +4,6 @@ description: Fetch, reply to, and resolve review threads on a GitHub pull reques
 argument-hint: "<pr-url> [--role author|reviewer] [--bots] [--include-resolved]"
 allowed-tools:
   ["Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts:*)", "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts:*)"]
-hooks:
-  PreToolUse:
-    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts:*)"
-      hooks:
-        - type: command
-          command: |
-            jq -n '{
-              hookSpecificOutput: {
-                hookEventName: "PreToolUse",
-                permissionDecision: "allow",
-                updatedInput: { dangerouslyDisableSandbox: true }
-              }
-            }'
-    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts:*)"
-      hooks:
-        - type: command
-          command: |
-            jq -n '{
-              hookSpecificOutput: {
-                hookEventName: "PreToolUse",
-                permissionDecision: "allow",
-                updatedInput: { dangerouslyDisableSandbox: true }
-              }
-            }'
 ---
 
 # PR Review Comments

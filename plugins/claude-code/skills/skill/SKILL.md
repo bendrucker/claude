@@ -184,10 +184,6 @@ Static resources: templates, images, diagrams, lookup tables, schemas.
 
 Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use lowercase for all other files. Keep references one level deep. For files >100 lines, include a table of contents.
 
-## Development Process
-
-Use the `skill-creator` skill for interactive skill creation workflows — it drives the full lifecycle of drafting, testing with parallel subagents, benchmarking, and iterating. This skill provides the plugin-specific constraints (namespacing, structure, validation) that skill-creator applies during creation.
-
 ## Validation
 
 A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md files are edited. For manual checks, run `bun run skill-lint path/to/skill/` from the project root.

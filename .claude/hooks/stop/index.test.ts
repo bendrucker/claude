@@ -3,7 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StopHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { parseTranscript, processStop, scopePaths } from ".";
+import { type PrekOutcome, parseTranscript, processStop, scopePaths } from ".";
+import type { BaselineVerifier } from "./baseline";
 
 let tempDir: string;
 
@@ -154,6 +155,97 @@ describe("processStop", () => {
     };
 
     expect(await processStop(input)).toBeNull();
+  });
+
+  it("tracks a pre-existing failure across the session: notice, prune on fix, block on re-break", async () => {
+    const filePath = join(tempDir, "flow", "edited.ts");
+    await Bun.write(filePath, "export {}");
+
+    const transcriptPath = join(tempDir, "transcript-flow.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+    const input: StopHookInput = {
+      hook_event_name: "Stop",
+      session_id: "flow-test",
+      transcript_path: transcriptPath,
+      cwd: join(tempDir, "flow"),
+      stop_hook_active: false,
+      permission_mode: "default",
+    };
+
+    const failedOutput = [
+      "Settings validation......................................................Failed",
+      "- hook id: settings-validate",
+      "- exit code: 1",
+      "",
+      "  user/settings.json: /sandbox: must NOT have additional properties",
+      "",
+    ].join("\n");
+    const passedOutput =
+      "Settings validation......................................................Passed\n";
+
+    const statePath = join(tempDir, "flow-state.json");
+    const failsAtBaseline: BaselineVerifier = async (checks) =>
+      new Map(checks.map((c) => [c.name, { failed: true, lines: c.lines }]));
+    const mustNotVerify: BaselineVerifier = () => {
+      throw new Error("verify must not be called");
+    };
+    const run = (outcome: PrekOutcome) => async () => outcome;
+    const failing = run({ ok: false, output: failedOutput });
+    const passing = run({ ok: true, output: passedOutput });
+
+    const noticed = await processStop(input, {
+      runPrek: failing,
+      verify: failsAtBaseline,
+      statePath,
+    });
+    expect(noticed?.decision).toBeUndefined();
+    expect(noticed?.systemMessage).toContain("Pre-existing check failure");
+
+    const repeat = await processStop(input, {
+      runPrek: failing,
+      verify: mustNotVerify,
+      statePath,
+    });
+    expect(repeat).toBeNull();
+
+    const fixed = await processStop(input, {
+      runPrek: passing,
+      verify: mustNotVerify,
+      statePath,
+    });
+    expect(fixed).toBeNull();
+
+    const rebroken = await processStop(input, {
+      runPrek: failing,
+      verify: mustNotVerify,
+      statePath,
+    });
+    expect(rebroken?.decision).toBe("block");
+    expect(rebroken?.reason).toContain("must NOT have additional properties");
+  });
+
+  it("blocks with raw output when prek fails without parseable check sections", async () => {
+    const filePath = join(tempDir, "raw", "edited.ts");
+    await Bun.write(filePath, "export {}");
+
+    const transcriptPath = join(tempDir, "transcript-raw.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+    const input: StopHookInput = {
+      hook_event_name: "Stop",
+      session_id: "raw-test",
+      transcript_path: transcriptPath,
+      cwd: join(tempDir, "raw"),
+      stop_hook_active: false,
+      permission_mode: "default",
+    };
+
+    const output = await processStop(input, {
+      runPrek: async () => ({ ok: false, output: "error: config is broken" }),
+    });
+    expect(output?.decision).toBe("block");
+    expect(output?.reason).toContain("error: config is broken");
   });
 
   it("returns null when every collected file is out-of-tree", async () => {

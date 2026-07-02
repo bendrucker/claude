@@ -5,6 +5,15 @@ import { isAbsolute, relative, sep } from "node:path";
 import { promisify } from "node:util";
 import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import {
+  type BaselineVerifier,
+  createVerifier,
+  evaluateStop,
+  parsePrekOutput,
+  readState,
+  stateFilePath,
+  writeState,
+} from "./baseline";
 
 const execFileAsync = promisify(execFile);
 const PREK_TIMEOUT = 120_000;
@@ -73,7 +82,45 @@ export function scopePaths(files: string[], cwd: string): string[] {
   return scoped;
 }
 
-export async function processStop(input: StopHookInput): Promise<SyncHookJSONOutput | null> {
+export interface PrekOutcome {
+  ok: boolean;
+  output: string;
+  errorKind?: "enoent" | "timeout";
+}
+
+async function runPrek(cwd: string, files: string[]): Promise<PrekOutcome> {
+  try {
+    await execFileAsync("bun", ["install", "--cwd", cwd]);
+    const { stdout, stderr } = await execFileAsync("prek", ["run", "--files", ...files], {
+      cwd,
+      timeout: PREK_TIMEOUT,
+    });
+    return { ok: true, output: stdout + stderr };
+  } catch (error) {
+    const execError = error as {
+      code?: string;
+      killed?: boolean;
+      stdout?: string;
+      stderr?: string;
+    };
+    const output = ((execError.stdout || "") + (execError.stderr || "")).trim();
+
+    if (execError.code === "ENOENT") return { ok: false, output, errorKind: "enoent" };
+    if (execError.killed) return { ok: false, output, errorKind: "timeout" };
+    return { ok: false, output: output || (error as Error).message };
+  }
+}
+
+export interface StopDeps {
+  runPrek?: typeof runPrek;
+  verify?: BaselineVerifier;
+  statePath?: string;
+}
+
+export async function processStop(
+  input: StopHookInput,
+  deps: StopDeps = {},
+): Promise<SyncHookJSONOutput | null> {
   if (input.stop_hook_active) {
     return null;
   }
@@ -92,36 +139,40 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
     return null;
   }
 
-  try {
-    await execFileAsync("bun", ["install", "--cwd", input.cwd]);
-    await execFileAsync("prek", ["run", "--files", ...relativePaths], {
-      cwd: input.cwd,
-      timeout: PREK_TIMEOUT,
-    });
-    return null;
-  } catch (error) {
-    const execError = error as {
-      code?: string;
-      killed?: boolean;
-      stdout?: string;
-      stderr?: string;
-    };
-    const output = ((execError.stdout || "") + (execError.stderr || "")).trim();
+  const outcome = await (deps.runPrek ?? runPrek)(input.cwd, relativePaths);
 
-    let context: string;
-    if (execError.code === "ENOENT") {
-      context = "prek is not installed or not in PATH";
-    } else if (execError.killed) {
-      context = `Checks timed out after ${PREK_TIMEOUT / 1000}s. Partial output:\n\n${output}`;
-    } else {
-      context = `Check failures:\n\n${output || (error as Error).message}`;
-    }
-
+  if (outcome.errorKind === "enoent") {
+    return { decision: "block", reason: "prek is not installed or not in PATH" };
+  }
+  if (outcome.errorKind === "timeout") {
     return {
       decision: "block",
-      reason: context,
+      reason: `Checks timed out after ${PREK_TIMEOUT / 1000}s. Partial output:\n\n${outcome.output}`,
     };
   }
+
+  const results = parsePrekOutput(outcome.output);
+  if (!outcome.ok && !results.some((result) => result.status === "failed")) {
+    return { decision: "block", reason: `Check failures:\n\n${outcome.output}` };
+  }
+
+  const statePath = deps.statePath ?? stateFilePath(input.session_id, input.cwd);
+  const state = await readState(statePath);
+  const before = JSON.stringify(state);
+  const verify =
+    deps.verify ??
+    createVerifier({
+      cwd: input.cwd,
+      transcriptPath: input.transcript_path,
+      files: relativePaths,
+    });
+
+  const output = await evaluateStop(state, results, verify);
+  if (JSON.stringify(state) !== before) {
+    // A failed state write must not discard the decision.
+    await writeState(statePath, state).catch(() => {});
+  }
+  return output;
 }
 
 async function main(): Promise<void> {

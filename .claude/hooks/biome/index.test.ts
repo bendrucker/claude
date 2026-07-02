@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { exec } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import type {
   PostToolUseHookInput,
   PreToolUseHookInput,
@@ -16,6 +18,8 @@ import {
   runBiomeCheck,
   runBiomeFix,
 } from ".";
+
+const execAsync = promisify(exec);
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures");
 
@@ -86,6 +90,23 @@ async function copyFixture(name: string, destDir: string): Promise<string> {
   return dest;
 }
 
+// A git repo whose Biome config excludes ignored.ts. Checking that file makes
+// Biome report "no files were processed", which must not read as a lint
+// failure. The git init matters: runBiomeCheck resolves its cwd from the
+// file's git toplevel, which is where Biome discovers this config.
+async function createIgnoredFixture(baseDir: string): Promise<string> {
+  const repoDir = await mkdtemp(join(baseDir, "ignored-repo-"));
+  await execAsync("git init", { cwd: repoDir });
+  await Bun.write(
+    join(repoDir, "biome.json"),
+    JSON.stringify({ files: { includes: ["**", "!**/ignored.ts"] } }),
+  );
+  const filePath = join(repoDir, "ignored.ts");
+  const content = await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text();
+  await Bun.write(filePath, content);
+  return filePath;
+}
+
 describe("biome hook", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "biome-test-"));
@@ -113,6 +134,11 @@ describe("biome hook", () => {
       const result = await runBiomeCheck(filePath);
       expect(result).not.toBeNull();
       expect(result).toContain("noDuplicateObjectKeys");
+    });
+
+    it("returns null for files the Biome config ignores", async () => {
+      const filePath = await createIgnoredFixture(tempDir);
+      expect(await runBiomeCheck(filePath)).toBeNull();
     });
   });
 
@@ -297,6 +323,15 @@ describe("biome hook", () => {
       expect(result?.decision).toBe("block");
       expect(result?.reason).toContain("Biome check failed");
       expect(result?.reason).toContain("noDuplicateObjectKeys");
+    });
+
+    it("returns null when the only modified file is ignored by Biome config", async () => {
+      const filePath = await createIgnoredFixture(tempDir);
+      const transcriptPath = join(tempDir, `transcript-ignored-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+      const input = mockStopHookInput(transcriptPath);
+      expect(await processStop(input)).toBeNull();
     });
 
     it("processes multiple files in parallel", async () => {

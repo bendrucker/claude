@@ -118,4 +118,3 @@ export function batchVerdictSchema(): Record<string, unknown> {
     additionalProperties: false,
   };
 }
-

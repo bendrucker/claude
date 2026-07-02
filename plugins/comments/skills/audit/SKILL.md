@@ -94,10 +94,12 @@ bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [
 
 Default apply re-extracts the judged files and matches verdicts to comments by
 id at their current position, applies the trims and rewrites, and commits to a
-fresh `comments/audit-<hash>` branch off HEAD. A `rewrite` replaces the comment
-span in place with the de-voiced text, so the diff shows the cleaned comment. A
-comment that moved or changed since preflight gets a new id, matches no verdict,
-and is skipped. Review the result with `git diff HEAD~1`. Apply requires a clean
+fresh `comments/audit-<hash>` branch off HEAD. The commit is built with git
+plumbing, so the working tree is never modified and the current branch stays
+checked out. A `rewrite` replaces the comment span in place with the de-voiced
+text, so the diff shows the cleaned comment. A comment that moved or changed
+since preflight gets a new id, matches no verdict, and is skipped. Review the
+result with `git diff HEAD..comments/audit-<hash>`. Apply requires a clean
 working tree.
 
 `--report` prints the findings grouped by file (`path:line  action  category

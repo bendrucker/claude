@@ -276,7 +276,7 @@ const applyCmd = command(
       } else {
         await applyToBranch(editsByPath, { branch });
         console.log(
-          `Trimmed ${editsByPath.size} file(s) on branch ${color.bold(branch)}. Review with git diff HEAD~1.`,
+          `Trimmed ${editsByPath.size} file(s) on branch ${color.bold(branch)}. Review with git diff HEAD..${branch}.`,
         );
       }
     }

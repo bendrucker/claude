@@ -61,4 +61,4 @@ Additional queries available in `resources/queries/`:
 - `sandbox-path-deny-recurrence`: `Operation not permitted` Bash failures bucketed into concrete config gaps (worktree writes, tmux sockets, process substitution, mktemp, TLS, SSH agent), with recurrence and date span.
 - `catalog-reinjection-thrash-sessions`: sessions re-injecting the full skill catalog and deferred-tools delta many times, with an estimated token total. The thrash detector. Tune via `min_injections`.
 - `top-sessions-by-output`: sessions ranked by total output tokens, the runaway or unattended-session detector. Tune via `limit`.
-- `stop-hook-noop-detector`: Stop hooks that never produce stdout, a decision, or a non-zero exit. Pure-overhead removal candidates.
+- `stop-hook-noop-detector`: Stop hooks that never produce stdout, a decision, a block, or a non-zero exit. Pure-overhead removal candidates. Blocking errors carry no command and group under the bare hook event name; check the `blocks` column before calling anything overhead.

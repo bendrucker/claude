@@ -42,6 +42,10 @@ Two scopes run the same pipeline. The flags select scope and narrow it:
 - `--sort lines|chars|score` (default `score`): rank by intrinsic comment
   complexity so the longest, densest comments judge first.
 - `--limit <n>`: keep only the top N ranked comments.
+
+Both scopes exempt machine-meaningful comments deterministically: lint and
+compiler directives (`eslint-disable`, `noqa`, `go:generate`), shebang lines,
+and license headers never reach the judge.
 - `--fix`: ask the judge for a concrete suggestion per finding.
 - `--report`: at apply time, print findings instead of writing a branch.
 

@@ -29,7 +29,10 @@ and a deterministic apply.
   `comments/audit-*` branch or reports the findings. `--report`, `--fix`,
   `--path`, `--sort`, and `--limit` tune scope and output.
 - **`detection/`**: comment extraction over Shiki's TextMate grammars, the diff
-  and repo collectors, intrinsic-complexity ranking, and stable comment ids.
+  and repo collectors, intrinsic-complexity ranking, stable comment ids, and the
+  exemption gate that keeps tool directives, shebangs, and license headers away
+  from the judge. Per-comment deterministic features land in the job dir beside
+  the verdicts, accumulating labeled pairs for a future routing layer.
 - **`judge/`**: the versioned `prompt.md`, the verdict schema, per-verdict
   validation, and the job builder that shards comments for the Workflow.
 - **`workflow/`**: the committed Workflow script the skill hands the job to.

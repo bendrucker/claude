@@ -1,6 +1,8 @@
 import { $ } from "bun";
 import { contextWindow } from "./context";
 import { type DiffOptions, resolveDiff } from "./diff";
+import { isExemptComment } from "./exempt";
+import { type CommentFeatures, commentFeatures } from "./features";
 import { extractComments, languageForPath } from "./extract";
 import { commentId } from "./identity";
 import { type CommentScore, scoreComment } from "./rank";
@@ -17,6 +19,7 @@ export interface CollectedComment extends IntroducedComment {
   id: string;
   context: string;
   score: CommentScore;
+  features: CommentFeatures;
 }
 
 /** A header marker that announces a file is machine-written. */
@@ -83,6 +86,7 @@ function toCollected(
     id: commentId(path, comment),
     context: contextWindow(lines, comment),
     score: scoreComment(comment),
+    features: commentFeatures(comment, lines),
   };
 }
 
@@ -101,9 +105,9 @@ async function collectDiffFile(
   if (isGeneratedFile(file.path, source)) return [];
   const lines = source.split("\n");
   const comments = await extractComments(source, language);
-  return scopeIntroduced(comments, file.added).map((comment) =>
-    toCollected(file.path, language, comment, lines),
-  );
+  return scopeIntroduced(comments, file.added)
+    .filter((comment) => isExemptComment(comment) === false)
+    .map((comment) => toCollected(file.path, language, comment, lines));
 }
 
 export interface CollectOptions {
@@ -138,7 +142,9 @@ async function collectRepoFile(path: string): Promise<CollectedComment[]> {
   if (isGeneratedFile(path, source)) return [];
   const lines = source.split("\n");
   const comments = await extractComments(source, language);
-  return comments.map((comment) => toCollected(path, language, comment, lines));
+  return comments
+    .filter((comment) => isExemptComment(comment) === false)
+    .map((comment) => toCollected(path, language, comment, lines));
 }
 
 /** Every comment in every tracked code file, narrowed by `--path` globs. The `--all` scope. */

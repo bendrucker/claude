@@ -24,6 +24,15 @@ import type { Verdict } from "../../../judge/schema";
 
 const WORKFLOW_PATH = join(import.meta.dirname, "..", "..", "..", "workflow", "judge.workflow.js");
 
+/**
+ * Fixed token cost of one judging agent beyond its comment payload: the Claude
+ * Code system prompt and tool schemas (~15k), the rubric read (~2.5k), and the
+ * multi-turn read/write/output cycle. The preflight estimate is the number the
+ * user consents to, so it must include this, not just payload; overhead
+ * dominates payload at the default shard size.
+ */
+const AGENT_OVERHEAD_TOKENS = 25_000;
+
 const SORT_KEYS: SortKey[] = ["lines", "chars", "score"];
 
 function parseSort(value: string): SortKey {
@@ -126,10 +135,19 @@ const preflightCmd = command(
     // off a local checkout that would read every comment as drift.
     await Bun.write(join(written.jobDir, "scope.json"), JSON.stringify({ mr: mr ?? null }));
 
+    // Deterministic features per judged comment, keyed by the same id the
+    // verdicts use. Each run leaves a (features, verdict) pair in its job dir,
+    // the training data for routing obvious comments away from the judge later.
+    const features = Object.fromEntries(
+      limited.map((c) => [c.id, { path: c.path, startLine: c.startLine, ...c.features }]),
+    );
+    await Bun.write(join(written.jobDir, "features.json"), JSON.stringify(features, null, 2));
+
     const fileCount = new Set(limited.map((c) => c.path)).size;
-    const tokens = Math.ceil(
+    const payloadTokens = Math.ceil(
       limited.reduce((sum, c) => sum + c.text.length + c.context.length, 0) / 4,
     );
+    const tokens = payloadTokens + written.shardCount * AGENT_OVERHEAD_TOKENS;
 
     console.log(
       color.bold(

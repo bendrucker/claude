@@ -38,8 +38,8 @@ The Bash tool escapes `!` to `\!` on every path, including single quotes and her
 
 ## Planning
 
-- Keep plans focused and under roughly 10k characters. Large plans get rejected: in my session history, no plan over 11k characters was ever approved.
-- When I redirect a plan, revise the sections my feedback touches. Do not regrow the whole plan, and never re-present a plan unchanged.
+- Keep plans focused and under roughly 10k characters.
+- When I redirect a plan, revise the sections my feedback covers. Do not exclusively grow the whole plan or log every decision and revision.
 
 ## Git
 

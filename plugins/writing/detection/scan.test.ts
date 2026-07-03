@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import { scanAll } from "./scan";
 
 describe("scanAll", () => {
@@ -38,19 +38,15 @@ describe("scanAll", () => {
   const dense =
     "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
 
-  it("applies fileOnly patterns for prose files", () => {
-    const categories = scanAll(dense, "notes.md").map((r) => r.category);
-    expect(categories).toContain("connector density");
-  });
-
-  it("skips fileOnly patterns for non-prose files", () => {
-    const categories = scanAll(dense, "script.ts").map((r) => r.category);
-    expect(categories).not.toContain("connector density");
-  });
-
-  it("applies fileOnly patterns when no path is given", () => {
-    const categories = scanAll(dense).map((r) => r.category);
-    expect(categories).toContain("connector density");
+  test.each<[string, string | undefined, boolean]>([
+    ["applies fileOnly patterns for prose files", "notes.md", true],
+    ["skips fileOnly patterns for non-prose files", "script.ts", false],
+    ["applies fileOnly patterns when no path is given", undefined, true],
+  ])("%s", (_name, path, contains) => {
+    const categories = scanAll(dense, path).map((r) => r.category);
+    contains
+      ? expect(categories).toContain("connector density")
+      : expect(categories).not.toContain("connector density");
   });
 
   it("reports the position of the connector density sample", () => {

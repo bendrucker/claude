@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import fc from "fast-check";
 import { firstByTier, type PatternMatch, regexCatalog, scan, stripCode } from "./tropes";
 
 describe("regexCatalog", () => {
@@ -32,6 +33,33 @@ describe("stripCode", () => {
 
   it("preserves non-code text", () => {
     expect(stripCode("This is plain text")).toBe("This is plain text");
+  });
+
+  // Text whose backticks only form single-line inline spans or well-formed
+  // fenced blocks. That is stripCode's intended domain: inline code that spans
+  // a newline is replaced by equal-width spaces, which drops the newline and
+  // collapses the line count.
+  const plainSegment = fc.string().map((s) => s.replace(/[`\n]/g, ""));
+  const inlineCodeLine = fc
+    .tuple(
+      plainSegment,
+      fc.string().map((s) => s.replace(/[`\n]/g, "") || "x"),
+      plainSegment,
+    )
+    .map(([pre, code, post]) => `${pre}\`${code}\`${post}`);
+  const fencedBlock = fc
+    .array(plainSegment)
+    .map((lines) => `\`\`\`\n${lines.join("\n")}\n\`\`\``);
+  const codeSafeText = fc
+    .array(fc.oneof(plainSegment, inlineCodeLine, fencedBlock))
+    .map((blocks) => blocks.join("\n"));
+
+  it("preserves line count for well-formed code spans", () => {
+    fc.assert(
+      fc.property(codeSafeText, (text) => {
+        expect(stripCode(text).split("\n")).toHaveLength(text.split("\n").length);
+      }),
+    );
   });
 });
 
@@ -399,16 +427,11 @@ describe("scan", () => {
   });
 
   describe("sycophantic acknowledgment", () => {
-    it("flags: You're right", () => {
-      expect(firstByTier(scan("You're right, that was wrong."), "deny")?.category).toBe(
-        "sycophantic acknowledgment",
-      );
-    });
-
-    it("flags: You're absolutely right", () => {
-      expect(firstByTier(scan("You're absolutely right about that."), "deny")?.category).toBe(
-        "sycophantic acknowledgment",
-      );
+    it.each([
+      "You're right, that was wrong.",
+      "You're absolutely right about that.",
+    ])("flags: %j", (text) => {
+      expect(firstByTier(scan(text), "deny")?.category).toBe("sycophantic acknowledgment");
     });
 
     it("allows: turn right", () => {
@@ -582,30 +605,17 @@ describe("scan", () => {
   });
 
   describe("hedging observation", () => {
-    it("flags: looks like", () => {
-      expect(firstByTier(scan("This looks like a regression."), "context")?.category).toBe(
-        "hedging observation",
-      );
-    });
-
-    it("flags: appears to", () => {
-      expect(firstByTier(scan("The fix appears to hold."), "context")?.category).toBe(
-        "hedging observation",
-      );
+    it.each(["This looks like a regression.", "The fix appears to hold."])("flags: %j", (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("hedging observation");
     });
   });
 
   describe("filler", () => {
-    it("flags: 'it's worth noting that'", () => {
-      expect(
-        firstByTier(scan("It's worth noting that the cache is cold."), "context")?.category,
-      ).toBe("filler");
-    });
-
-    it("flags: 'in terms of'", () => {
-      expect(firstByTier(scan("In terms of latency, it improved."), "context")?.category).toBe(
-        "filler",
-      );
+    it.each([
+      "It's worth noting that the cache is cold.",
+      "In terms of latency, it improved.",
+    ])("flags: %j", (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("filler");
     });
 
     it("allows prose without filler markers", () => {

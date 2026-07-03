@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import fc from "fast-check";
 import {
   addNgrams,
   cleanText,
@@ -191,6 +192,19 @@ describe("processRows", () => {
     const fromCorpus = processCorpus(text, [2, 3]);
     expect(fromRows.tokens).toBe(fromCorpus.tokens);
     expect(fromRows.ngrams.get(2)?.get("let me")).toBe(fromCorpus.ngrams.get(2)?.get("let me"));
+  });
+
+  test("single-session stats agree with processCorpus for any text and sizes", () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        fc.uniqueArray(fc.integer({ min: 1, max: 5 }), { minLength: 1 }),
+        (text, sizes) => {
+          const fromRows = processRows([{ session_id: "s1", text }], sizes).stats;
+          expect(fromRows).toEqual(processCorpus(text, sizes));
+        },
+      ),
+    );
   });
 });
 

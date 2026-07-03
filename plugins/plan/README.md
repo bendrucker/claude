@@ -5,7 +5,6 @@ Planning mode guidelines and context injection for Claude Code.
 ## Contents
 
 - **Hook**: Automatically injects planning guidelines when entering plan mode (via Shift+Tab or EnterPlanMode tool)
-- **Skill**: `plan:guidelines` - Detailed planning best practices for when explicit guidance is needed
 
 ## How It Works
 

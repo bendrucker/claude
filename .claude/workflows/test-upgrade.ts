@@ -1,69 +1,34 @@
 export const meta = {
   name: "test-upgrade",
-  description: "Fan out per-plugin test refactors (tables, snapshots, properties) into one PR per unit",
-  whenToUse: "After the testing technique-selection rule is on main, to upgrade existing test suites unit by unit",
+  description: "Fan out per-unit test refactors (tables, snapshots, properties) into one PR per unit",
+  whenToUse:
+    "To apply the testing rule's technique-selection guide across existing suites, one test-upgrade-<unit> PR per unit. args: {units?: string[], targets?: {[unit]: string}}",
   phases: [
-    { title: "Ground", detail: "load the rule and reference text once" },
+    { title: "Ground", detail: "load the technique-selection rule text once" },
+    { title: "Discover", detail: "enumerate units that have test files" },
     { title: "Audit", detail: "read each unit's tests against the rule, emit a worklist" },
     { title: "Apply", detail: "refactor in isolated worktrees; mechanical work on sonnet" },
     { title: "Verify", detail: "test, review the diff, branch, push, open the PR" },
   ],
 };
 
-const REPO = "/Users/ben/src/bendrucker/claude";
-
-const ALL_UNITS = [
-  {
-    name: "writing",
-    paths: ["plugins/writing"],
-    targets:
-      "hooks/numbering.test.ts (language-by-pattern matrix as one table), detection/tropes.test.ts (tables), voice-delta.test.ts and ngram.test.ts (inline snapshots), linguistics/preprocess.ts (idempotence property)",
+const UNITS_SCHEMA = {
+  type: "object",
+  required: ["units"],
+  properties: {
+    units: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["name", "paths"],
+        properties: {
+          name: { type: "string" },
+          paths: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
   },
-  {
-    name: "type-ignore",
-    paths: ["plugins/type-ignore"],
-    targets: "hooks/detect.test.ts (~30 near-identical blocks as a language-by-token table)",
-  },
-  {
-    name: "gitlab",
-    paths: ["plugins/gitlab"],
-    targets:
-      "watch.test.ts (tables for parseProject, normalizePipelineStatus, parseMrUrl), fetch.test.ts (inline snapshots), merge-request/scripts/diff.ts (hunk membership property)",
-  },
-  {
-    name: "github",
-    paths: ["plugins/github"],
-    targets: "watch.test.ts (deriveChecksState table), fetch.test.ts (inline snapshots)",
-  },
-  {
-    name: "tmux",
-    paths: ["plugins/tmux"],
-    targets: "hooks/target.test.ts (tables), injectTarget to hasExistingTarget roundtrip property",
-  },
-  {
-    name: "comments",
-    paths: ["plugins/comments"],
-    targets:
-      "detection/rank.ts properties (permutation invariance, idempotence, no drops or dupes), apply/edits.ts properties (order independence, unedited-region preservation)",
-  },
-  {
-    name: "claude-code",
-    paths: ["plugins/claude-code", "packages/skill-lint"],
-    targets:
-      "session/scripts/db.test.ts (field-by-field expects to inline snapshots), skill-lint rules as a table",
-  },
-  {
-    name: "pull-request",
-    paths: ["plugins/pull-request"],
-    targets: "scripts/validate.test.ts (formatted messages to inline snapshots)",
-  },
-  {
-    name: "scripts",
-    paths: ["scripts"],
-    targets:
-      "scripts/coverage/lcov.ts properties: formatRanges roundtrip and order independence, merge commutativity, covered/uncovered partition",
-  },
-];
+};
 
 const AUDIT_SCHEMA = {
   type: "object",
@@ -114,26 +79,43 @@ const VERIFY_SCHEMA = {
 phase("Ground");
 const ground = await agent(
   [
-    `Return, verbatim and clearly delimited, the contents of two files in ${REPO}:`,
-    "1. The '## Technique Selection' section of .claude/rules/testing.md",
-    "2. All of plugins/bun/skills/bun/references/testing.md",
+    "Return, verbatim, the '## Technique Selection' section of .claude/rules/testing.md in the current repo.",
     "No commentary.",
   ].join("\n"),
   { label: "ground:rule-text", phase: "Ground", effort: "low" },
 );
 
-const units = Array.isArray(args?.units)
-  ? ALL_UNITS.filter((u) => args.units.includes(u.name))
-  : ALL_UNITS;
+phase("Discover");
+const discovered = await agent(
+  [
+    "Enumerate the test units of the current repo. A unit is a directory that owns *.test.ts files and maps to one CI job:",
+    "- each plugins/<name> directory containing test files (name = plugin dir name)",
+    "- each packages/<name> directory containing test files",
+    "- root-level directories with test files (scripts/, hooks/, .claude/), named after the directory",
+    "Paths are repo-relative. Do not modify anything.",
+  ].join("\n"),
+  { label: "discover:units", phase: "Discover", effort: "low", schema: UNITS_SCHEMA },
+);
+
+const units = discovered.units.filter(
+  (u) => !Array.isArray(args?.units) || args.units.includes(u.name),
+);
+const hints = args?.targets ?? {};
+log(`${units.length} units to audit`);
+
+function testCommand(unit) {
+  return `bun test ${unit.paths.map((p) => `./${p}`).join(" ")}`;
+}
 
 function auditPrompt(unit) {
+  const hint = hints[unit.name];
   return [
-    `Audit the tests under ${unit.paths.map((p) => `${REPO}/${p}`).join(" and ")} against the repo's testing technique-selection rule.`,
+    `Audit the tests under ${unit.paths.join(" and ")} against the repo's testing technique-selection rule.`,
     "",
-    "Rule and API reference:",
+    "Rule text:",
     ground,
     "",
-    `Known candidates from an earlier survey (verify each, extend or drop as the code warrants): ${unit.targets}`,
+    hint ? `Known candidates from an earlier survey (verify each, extend or drop as the code warrants): ${hint}` : "",
     "",
     "Read every *.test.ts file in the unit. Emit a worklist item per opportunity:",
     "- technique 'table': two or more test() blocks differing only in data",
@@ -153,14 +135,14 @@ function mechanicalPrompt(unit, items) {
     "",
     "Apply ONLY the table and snapshot refactors below. Do not add property tests. Do not commit.",
     "",
-    "Rule and API reference:",
+    "Rule text:",
     ground,
     "",
     `Worklist for ${unit.name}:`,
     JSON.stringify(items, null, 2),
     "",
     "Hard constraints: no behavior change (the same things are asserted before and after), net test LOC down,",
-    `and \`bun test ${unit.paths.map((p) => (p.startsWith(".") ? `./${p}` : p)).join(" ")}\` green when you finish.`,
+    `and \`${testCommand(unit)}\` green when you finish.`,
     "Use `bun test <file> --update-snapshots` to fill inline snapshots, then review what it wrote.",
     "If a refactor would change what is asserted, leave that site alone and record it as an escalation.",
     "Return the absolute path of your worktree (pwd) as 'worktree'.",
@@ -176,7 +158,7 @@ function propertyPrompt(unit, items, workspace) {
     "",
     "Add the property tests and arbitraries below. Do not commit.",
     "",
-    "Rule and API reference:",
+    "Rule text:",
     ground,
     "",
     `Worklist for ${unit.name}:`,
@@ -185,7 +167,7 @@ function propertyPrompt(unit, items, workspace) {
     "For each property: one fc.assert(fc.property(...)) with expect inside, plus a small example table if none exists.",
     "Constrain arbitraries (or fc.pre) rather than filtering. Define typed fc.record arbitraries next to the tests.",
     "Seed-check every property: temporarily mutate the target function, confirm the property fails and shrinks, then revert the mutation.",
-    `Finish with \`bun test ${unit.paths.map((p) => (p.startsWith(".") ? `./${p}` : p)).join(" ")}\` green.`,
+    `Finish with \`${testCommand(unit)}\` green.`,
     "If an invariant does not actually hold, do not weaken it to pass: record an escalation instead.",
     "Return the absolute path of your worktree (pwd) as 'worktree'.",
   ].join("\n");
@@ -195,7 +177,7 @@ function verifyPrompt(unit, audit, workspace, escalations) {
   return [
     `cd ${workspace}. This worktree holds uncommitted test refactors for ${unit.name}.`,
     "",
-    `1. Run \`AGENT=1 bun test ${unit.paths.map((p) => (p.startsWith(".") ? `./${p}` : p)).join(" ")}\` and require it green.`,
+    `1. Run \`AGENT=1 ${testCommand(unit)}\` and require it green.`,
     "2. Review `git diff` in full: refactored sites must assert the same things as before, and pure refactors must reduce LOC.",
     "   Property tests may add lines. Recompute the unit's test LOC (wc -l over *.test.ts) as testLocAfter.",
     `   Test LOC before the refactor was ${audit.testLoc}.`,

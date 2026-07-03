@@ -15,7 +15,6 @@
       "Skill(claude-code:hook)",
       "Skill(claude-code:session)",
       "Skill(claude-code:skill)",
-      "Skill(claude-code:skill-creator)",
       "Skill(code-review)",
       "Skill(git:conflicts)",
       "Skill(github:actions-monitor)",

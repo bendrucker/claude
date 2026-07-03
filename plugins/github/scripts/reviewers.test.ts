@@ -1,23 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { isBot, isReviewTarget, parseReviewers } from "./reviewers";
+import { type Author, isBot, isReviewTarget, parseReviewers } from "./reviewers";
 
 describe("isBot", () => {
-  test("matches accounts the API typed as Bot", () => {
-    expect(isBot({ login: "copilot-pull-request-reviewer", __typename: "Bot" })).toBe(true);
-    expect(isBot({ login: "coderabbitai[bot]", __typename: "Bot" })).toBe(true);
-  });
-
-  test("rejects accounts typed as User even with a bot-like login", () => {
-    expect(isBot({ login: "bendrucker", __typename: "User" })).toBe(false);
-    expect(isBot({ login: "coderabbitai", __typename: "User" })).toBe(false);
-  });
-
-  test("rejects an author with no typename", () => {
-    expect(isBot({ login: "mystery" })).toBe(false);
-  });
-
-  test("rejects null", () => {
-    expect(isBot(null)).toBe(false);
+  test.each<[Author | null, boolean]>([
+    [{ login: "copilot-pull-request-reviewer", __typename: "Bot" }, true],
+    [{ login: "coderabbitai[bot]", __typename: "Bot" }, true],
+    [{ login: "bendrucker", __typename: "User" }, false],
+    [{ login: "coderabbitai", __typename: "User" }, false],
+    [{ login: "mystery" }, false],
+    [null, false],
+  ])("isBot(%p) -> %p", (account, expected) => {
+    expect(isBot(account)).toBe(expected);
   });
 });
 
@@ -29,21 +22,12 @@ describe("parseReviewers", () => {
 });
 
 describe("isReviewTarget", () => {
-  test("includes API bots", () => {
-    expect(isReviewTarget({ login: "x", __typename: "Bot" })).toBe(true);
-  });
-
-  test("includes listed accounts the API types as User", () => {
-    expect(isReviewTarget({ login: "Jacob", __typename: "User" }, new Set(["jacob"]))).toBe(true);
-  });
-
-  test("excludes unlisted humans", () => {
-    expect(isReviewTarget({ login: "bendrucker", __typename: "User" }, new Set(["jacob"]))).toBe(
-      false,
-    );
-  });
-
-  test("rejects null", () => {
-    expect(isReviewTarget(null)).toBe(false);
+  test.each<[Author | null, Set<string> | undefined, boolean]>([
+    [{ login: "x", __typename: "Bot" }, undefined, true],
+    [{ login: "Jacob", __typename: "User" }, new Set(["jacob"]), true],
+    [{ login: "bendrucker", __typename: "User" }, new Set(["jacob"]), false],
+    [null, undefined, false],
+  ])("isReviewTarget(%p, %p) -> %p", (account, set, expected) => {
+    expect(isReviewTarget(account, set)).toBe(expected);
   });
 });

@@ -102,18 +102,85 @@ fn.mockImplementation((a, b) => a * b);
 fn.mockReturnValue(42);
 ```
 
-## Snapshot Testing
+## Parametrized Tests
 
-Compare output to saved snapshots:
+`test.each` runs one test per table row. Type the table explicitly so row mistakes fail at compile time:
 
 ```ts
-expect(value).toMatchSnapshot();
+// Tuple rows: positional args, %s/%d/%p placeholders in the title
+test.each<[string, number]>([
+  ["", 0],
+  ["a", 1],
+])("length of %p is %d", (input, expected) => {
+  expect(input.length).toBe(expected);
+});
+
+// Object rows: named fields, $field placeholders in the title
+test.each<{ name: string; input: string; expected: number }>([
+  { name: "empty string", input: "", expected: 0 },
+  { name: "single char", input: "a", expected: 1 },
+])("$name", ({ input, expected }) => {
+  expect(input.length).toBe(expected);
+});
 ```
 
-Update snapshots with `--update-snapshots`:
+`describe.each` parametrizes an entire suite the same way.
+
+## Snapshot Testing
+
+Prefer inline snapshots. Call the matcher with no argument and bun writes the received value into the test file on the first run:
+
+```ts
+expect(render(items)).toMatchInlineSnapshot();
+
+// after the first run, the file contains:
+expect(render(items)).toMatchInlineSnapshot(`
+"src/a.ts
+  :4  trim  restate-the-what  high"
+`);
+```
+
+File snapshots (`toMatchSnapshot()`) write to `__snapshots__/*.snap` next to the test file. Use them only when the output is too large to inline (roughly 20+ lines) or shared across tests.
+
+When output changes intentionally, rerun with `--update-snapshots` to rewrite both kinds:
 
 ```bash
-bun test --update-snapshots
+bun test path/to/file.test.ts --update-snapshots
+```
+
+## Property-Based Testing
+
+[fast-check](https://fast-check.dev) works under `bun test` with no adapter. Wrap a property in `fc.assert`. On failure it shrinks to a minimal counterexample and prints the seed that reproduces it:
+
+```ts
+import fc from "fast-check";
+import { expect, test } from "bun:test";
+
+test("encode/decode roundtrip", () => {
+  fc.assert(
+    fc.property(fc.array(fc.integer()), (values) => {
+      expect(decode(encode(values))).toEqual(values);
+    }),
+  );
+});
+```
+
+- Put `expect` calls inside the property. Any throw fails the run.
+- Constrain generation with arbitrary options (`fc.integer({ min: 1 })`, `fc.string({ minLength: 1 })`) or `fc.pre(condition)` rather than generating and filtering.
+- Replay a reported failure with `fc.assert(prop, { seed: <printed seed> })`.
+
+Define typed arbitraries for domain types next to the tests and reuse them:
+
+```ts
+const finding = fc.record<Finding>({
+  path: fc.string({ minLength: 1 }),
+  line: fc.integer({ min: 1 }),
+  severity: fc.constantFrom("low", "high"),
+});
+
+// Seeded sample when an example test needs a filler instance
+const [base] = fc.sample(finding, { seed: 1, numRuns: 1 });
+const item = { ...base, path: "src/a.ts" };
 ```
 
 ## Key Flags

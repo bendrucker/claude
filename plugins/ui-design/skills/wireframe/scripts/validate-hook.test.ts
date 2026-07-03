@@ -18,55 +18,51 @@ function makeInput(toolName: string, filePath: string): PostToolUseHookInput {
 }
 
 describe("isSvgFile", () => {
-  it("returns true for .svg files", () => {
-    expect(isSvgFile("/path/to/file.svg")).toBe(true);
-    expect(isSvgFile("file.svg")).toBe(true);
-  });
-
-  it("returns false for non-svg files", () => {
-    expect(isSvgFile("/path/to/file.png")).toBe(false);
-    expect(isSvgFile("/path/to/file.ts")).toBe(false);
-    expect(isSvgFile("/path/to/file")).toBe(false);
-  });
-
-  it("handles edge cases", () => {
-    expect(isSvgFile(".svg")).toBe(false);
-    expect(isSvgFile("/path/to/.svg")).toBe(false);
-    expect(isSvgFile("/path/to/file.SVG")).toBe(false);
+  it.each<[string, boolean]>([
+    ["/path/to/file.svg", true],
+    ["file.svg", true],
+    ["/path/to/file.png", false],
+    ["/path/to/file.ts", false],
+    ["/path/to/file", false],
+    [".svg", false],
+    ["/path/to/.svg", false],
+    ["/path/to/file.SVG", false],
+  ])("isSvgFile(%p) is %p", (input, expected) => {
+    expect(isSvgFile(input)).toBe(expected);
   });
 });
 
 describe("processInput", () => {
-  it("returns null for non-Write/Edit tools", async () => {
-    const result = await processInput(makeInput("Read", "/path/to/file.svg"));
-    expect(result).toBeNull();
-  });
+  it.each<{ name: string; tool: string; path: string; expected: null | string }>([
+    { name: "non-Write/Edit tools", tool: "Read", path: "/path/to/file.svg", expected: null },
+    { name: "non-SVG files", tool: "Write", path: "/path/to/file.ts", expected: null },
+    {
+      name: "valid SVG",
+      tool: "Write",
+      path: path.join(assetsDir, "login-screen.svg"),
+      expected: null,
+    },
+    {
+      name: "invalid SVG",
+      tool: "Write",
+      path: path.join(fixturesDir, "missing-dimensions.svg"),
+      expected: "missing-dimensions",
+    },
+    {
+      name: "Edit tool",
+      tool: "Edit",
+      path: path.join(fixturesDir, "overlapping-elements.svg"),
+      expected: "overlap",
+    },
+  ])("handles $name", async ({ tool, path: filePath, expected }) => {
+    const result = await processInput(makeInput(tool, filePath));
 
-  it("returns null for non-SVG files", async () => {
-    const result = await processInput(makeInput("Write", "/path/to/file.ts"));
-    expect(result).toBeNull();
-  });
-
-  it("returns null for valid SVG", async () => {
-    const result = await processInput(makeInput("Write", path.join(assetsDir, "login-screen.svg")));
-    expect(result).toBeNull();
-  });
-
-  it("returns violations for invalid SVG", async () => {
-    const result = await processInput(
-      makeInput("Write", path.join(fixturesDir, "missing-dimensions.svg")),
-    );
-    expect(result).not.toBeNull();
-    const output = result?.hookSpecificOutput as PostToolUseHookSpecificOutput | undefined;
-    expect(output?.additionalContext).toContain("missing-dimensions");
-  });
-
-  it("works with Edit tool", async () => {
-    const result = await processInput(
-      makeInput("Edit", path.join(fixturesDir, "overlapping-elements.svg")),
-    );
-    expect(result).not.toBeNull();
-    const output = result?.hookSpecificOutput as PostToolUseHookSpecificOutput | undefined;
-    expect(output?.additionalContext).toContain("overlap");
+    if (expected === null) {
+      expect(result).toBeNull();
+    } else {
+      expect(result).not.toBeNull();
+      const output = result?.hookSpecificOutput as PostToolUseHookSpecificOutput | undefined;
+      expect(output?.additionalContext).toContain(expected);
+    }
   });
 });

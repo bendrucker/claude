@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
+import type { PostToolUseInput } from "@constellos/claude-code-kit";
 import { processPostToolUse } from "./check-lint";
 import type { SkillLintResult } from "./skill-lint/types";
 
@@ -46,38 +47,25 @@ function postToolUseInput(filePath: string) {
 }
 
 describe("processPostToolUse", () => {
-  it("returns lint issues for SKILL.md writes", async () => {
-    const output = await processPostToolUse(
-      postToolUseInput("/plugins/gitlab/skills/ci/SKILL.md"),
-      fakeLintSkill,
-    );
-    expect(output).toMatchObject({
-      hookSpecificOutput: {
-        hookEventName: "PostToolUse",
-        additionalContext: expect.stringContaining("name-format"),
-      },
-    });
-  });
-
-  it("returns null for passing lint", async () => {
-    const output = await processPostToolUse(
-      postToolUseInput("/passing/skills/ci/SKILL.md"),
-      fakeLintSkill,
-    );
-    expect(output).toBeNull();
-  });
-
-  it("ignores non-SKILL.md files", async () => {
-    const output = await processPostToolUse(
-      postToolUseInput("/plugins/gitlab/skills/ci/scripts/run.ts"),
-      fakeLintSkill,
-    );
-    expect(output).toBeNull();
-  });
-
-  it("ignores non-file tools", async () => {
-    const output = await processPostToolUse(
-      {
+  test.each<{ name: string; input: PostToolUseInput; expectLint: boolean }>([
+    {
+      name: "returns lint issues for SKILL.md writes",
+      input: postToolUseInput("/plugins/gitlab/skills/ci/SKILL.md"),
+      expectLint: true,
+    },
+    {
+      name: "returns null for passing lint",
+      input: postToolUseInput("/passing/skills/ci/SKILL.md"),
+      expectLint: false,
+    },
+    {
+      name: "ignores non-SKILL.md files",
+      input: postToolUseInput("/plugins/gitlab/skills/ci/scripts/run.ts"),
+      expectLint: false,
+    },
+    {
+      name: "ignores non-file tools",
+      input: {
         session_id: "test",
         transcript_path: "/tmp/transcript.jsonl",
         cwd: "/tmp",
@@ -88,8 +76,19 @@ describe("processPostToolUse", () => {
         tool_input: { command: "ls" },
         tool_response: { output: "", exit_code: 0 },
       },
-      fakeLintSkill,
-    );
-    expect(output).toBeNull();
+      expectLint: false,
+    },
+  ])("$name", async ({ input, expectLint }) => {
+    const output = await processPostToolUse(input, fakeLintSkill);
+    if (expectLint) {
+      expect(output).toMatchObject({
+        hookSpecificOutput: {
+          hookEventName: "PostToolUse",
+          additionalContext: expect.stringContaining("name-format"),
+        },
+      });
+    } else {
+      expect(output).toBeNull();
+    }
   });
 });

@@ -8,39 +8,32 @@ describe("selectColumns", () => {
     ["Task 2", "completed", "2025-02-01", "Project B"],
   ];
 
-  test("returns input unchanged when columns is undefined", () => {
-    const [h, r] = selectColumns(headers, rows, undefined);
-    expect(h).toEqual(headers);
-    expect(r).toEqual(rows);
-  });
-
-  test("returns input unchanged when columns is empty", () => {
-    const [h, r] = selectColumns(headers, rows, []);
-    expect(h).toEqual(headers);
-    expect(r).toEqual(rows);
-  });
-
-  test("filters to selected columns", () => {
-    const [h, r] = selectColumns(headers, rows, ["name", "project"]);
-    expect(h).toEqual(["Name", "Project"]);
-    expect(r).toEqual([
-      ["Task 1", "Project A"],
-      ["Task 2", "Project B"],
-    ]);
-  });
-
-  test("preserves column order from the columns argument", () => {
-    const [h, r] = selectColumns(headers, rows, ["project", "name"]);
-    expect(h).toEqual(["Project", "Name"]);
-    expect(r).toEqual([
-      ["Project A", "Task 1"],
-      ["Project B", "Task 2"],
-    ]);
-  });
-
-  test("normalizes column names with hyphens and case", () => {
-    const [h] = selectColumns(headers, rows, ["due-date"]);
-    expect(h).toEqual(["Due Date"]);
+  test.each<[string, string[] | undefined, string[], string[][] | undefined]>([
+    ["returns input unchanged when columns is undefined", undefined, headers, rows],
+    ["returns input unchanged when columns is empty", [], headers, rows],
+    [
+      "filters to selected columns",
+      ["name", "project"],
+      ["Name", "Project"],
+      [
+        ["Task 1", "Project A"],
+        ["Task 2", "Project B"],
+      ],
+    ],
+    [
+      "preserves column order from the columns argument",
+      ["project", "name"],
+      ["Project", "Name"],
+      [
+        ["Project A", "Task 1"],
+        ["Project B", "Task 2"],
+      ],
+    ],
+    ["normalizes column names with hyphens and case", ["due-date"], ["Due Date"], undefined],
+  ])("%s", (_name, columns, expectedHeaders, expectedRows) => {
+    const [h, r] = selectColumns(headers, rows, columns);
+    expect(h).toEqual(expectedHeaders);
+    if (expectedRows) expect(r).toEqual(expectedRows);
   });
 
   test("exits with error for unknown column", () => {

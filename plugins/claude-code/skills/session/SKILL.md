@@ -100,6 +100,7 @@ Every query also takes an optional `host` param. Omit it to span every machine (
 - `skill-auto-vs-explicit`: per skill, model-auto (empty args) vs explicit/slash invocations, the core `disable-model-invocation` lever. Params: `min_calls` (default 1), `after_date`, `before_date`, `project`, `host`.
 - `sandbox-bypass-effective-command`: top `dangerouslyDisableSandbox` commands normalized to their real verb after stripping a leading `cd <path>` wrapper (`excludedCommands` candidates). Params: `min_count` (default 5), `after_date`, `before_date`, `project`, `host`.
 - `plans`: sessions that used plan mode (ExitPlanMode), with per-session plan count, redirect/approved breakdown, and a `replan_tier` label (`single` / `replan` / `off-rails` for plan_count >= 3). Sorted by plan_count descending. Params: `min_plans` (default 1), `after_date`, `before_date`, `project`, `host`.
+- `hook-config-vs-observed`: hooks CONFIGURED on disk (plugin `hooks.json`, `~/.claude/settings.json`, `.claude/settings.json`) left-joined against DISTINCT hooks OBSERVED in `hook_events`, surfacing `observed_fires = 0` rows: hooks that never left a trace, the blind spot every other hook query misses because a silently-succeeding hook produces no event at all. Params: `after_date`, `before_date`, `project`, `host` (scopes the observed side only), `hook` (glob on configured command), `hook_config_glob` (override the plugin-cache glob).
 
 ### Markdown and YAML on Disk
 

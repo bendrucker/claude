@@ -50,7 +50,7 @@ The plan is a do-now spec:
 
 - Open with the non-negotiable conventions and a stop condition (implement, ship, end). Without a stop condition, the implementing session absorbs the next job too.
 - Deferred design goes to a separate linked file the implementer is told not to open, with one pointer line in the plan. A handoff plan heavy with deferred design forces the implementing session to re-plan work the original session never resolved.
-- Resolved decisions and research synthesis move to a companion `<plan>.decisions.md` that the plan links.
+- Resolved decisions and research synthesis move to a companion `<plan>-decisions.md` that the plan links.
 - Keep plans focused and under roughly 10k characters. Past that, plans get rejected: split the scope or consolidate before presenting.
 
 ## Verification

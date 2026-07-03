@@ -728,7 +728,7 @@ describe("hook_events", () => {
 
   it("unwraps the message from a hook_blocking_error", async () => {
     const [row] = await db.query<{ reason: string; blocked: boolean }>(
-      "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error'",
+      "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error' AND session_id = 'hooks-session'",
     );
     expect(row?.reason).toBe("Biome check failed. Auto-fix was attempted but issues remain.");
     expect(row?.blocked).toBe(true);

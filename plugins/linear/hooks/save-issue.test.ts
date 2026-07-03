@@ -1,4 +1,4 @@
-import { describe, expect, it, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { getDefaultState, normalizeInput, processInput } from "./save-issue";
 
@@ -18,16 +18,12 @@ function mockInput(
 }
 
 describe("getDefaultState", () => {
-  it("returns Backlog when no assignee", () => {
-    expect(getDefaultState(undefined)).toBe("Backlog");
-  });
-
-  it("returns Todo when assignee is set", () => {
-    expect(getDefaultState("me")).toBe("Todo");
-  });
-
-  it("returns Backlog when assignee is empty string", () => {
-    expect(getDefaultState("")).toBe("Backlog");
+  test.each<[string, string | undefined, string]>([
+    ["returns Backlog when no assignee", undefined, "Backlog"],
+    ["returns Todo when assignee is set", "me", "Todo"],
+    ["returns Backlog when assignee is empty string", "", "Backlog"],
+  ])("%s", (_name, assignee, expected) => {
+    expect(getDefaultState(assignee)).toBe(expected);
   });
 });
 
@@ -72,17 +68,10 @@ describe("processInput", () => {
     expect(processInput(mockInput(toolInput))).toMatchSnapshot();
   });
 
-  it("works with the local MCP create_issue tool name", () => {
-    expect(
-      processInput(mockInput({ title: "x", team: "ENG" }, "mcp__linear__create_issue")),
-    ).toMatchSnapshot();
-  });
-
-  it("works with the plugin MCP create_issue tool name", () => {
-    expect(
-      processInput(
-        mockInput({ title: "x", team: "ENG" }, "mcp__plugin_linear_linear__create_issue"),
-      ),
-    ).toMatchSnapshot();
+  test.each<[string, string]>([
+    ["local MCP create_issue tool name", "mcp__linear__create_issue"],
+    ["plugin MCP create_issue tool name", "mcp__plugin_linear_linear__create_issue"],
+  ])("works with the %s", (_name, toolName) => {
+    expect(processInput(mockInput({ title: "x", team: "ENG" }, toolName))).toMatchSnapshot();
   });
 });

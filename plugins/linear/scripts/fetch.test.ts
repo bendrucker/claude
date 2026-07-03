@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
@@ -24,44 +24,35 @@ function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | n
 }
 
 describe("isPublicUrl", () => {
-  it("allows docs URLs", () => {
-    expect(isPublicUrl("https://linear.app/docs")).toBe(true);
-    expect(isPublicUrl("https://linear.app/docs/due-dates")).toBe(true);
-    expect(isPublicUrl("https://linear.app/docs/due-dates.md")).toBe(true);
-  });
-
-  it("allows developers URLs", () => {
-    expect(isPublicUrl("https://linear.app/developers")).toBe(true);
-    expect(isPublicUrl("https://linear.app/developers/api")).toBe(true);
-  });
-
-  it("allows changelog URLs", () => {
-    expect(isPublicUrl("https://linear.app/changelog")).toBe(true);
-    expect(isPublicUrl("https://linear.app/changelog/2024")).toBe(true);
-  });
-
-  it("blocks workspace URLs", () => {
-    expect(isPublicUrl("https://linear.app/myteam/issue/ABC-123")).toBe(false);
-    expect(isPublicUrl("https://linear.app/myteam/project/abc")).toBe(false);
+  test.each<[string, boolean]>([
+    ["https://linear.app/docs", true],
+    ["https://linear.app/docs/due-dates", true],
+    ["https://linear.app/docs/due-dates.md", true],
+    ["https://linear.app/developers", true],
+    ["https://linear.app/developers/api", true],
+    ["https://linear.app/changelog", true],
+    ["https://linear.app/changelog/2024", true],
+    ["https://linear.app/myteam/issue/ABC-123", false],
+    ["https://linear.app/myteam/project/abc", false],
+  ])("%s is public: %p", (url, expected) => {
+    expect(isPublicUrl(url)).toBe(expected);
   });
 });
 
 describe("processInput", () => {
-  it("allows public docs URLs", () => {
-    expect(processInput(mockInput("https://linear.app/docs/due-dates"))).toBeNull();
-    expect(processInput(mockInput("https://linear.app/developers"))).toBeNull();
-    expect(processInput(mockInput("https://linear.app/changelog"))).toBeNull();
-  });
-
-  it("denies workspace issue URLs", () => {
-    const output = getOutput(mockInput("https://linear.app/myteam/issue/ABC-123"));
+  test.each<[string, string, string | null]>([
+    ["allows public docs URL", "https://linear.app/docs/due-dates", null],
+    ["allows public developers URL", "https://linear.app/developers", null],
+    ["allows public changelog URL", "https://linear.app/changelog", null],
+    ["denies workspace issue URLs", "https://linear.app/myteam/issue/ABC-123", "Linear MCP"],
+    ["denies workspace project URLs", "https://linear.app/myteam/project/abc123", "Linear MCP"],
+  ])("%s", (_name, url, expectedReason) => {
+    const output = getOutput(mockInput(url));
+    if (expectedReason === null) {
+      expect(output).toBeNull();
+      return;
+    }
     expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toContain("Linear MCP");
-  });
-
-  it("denies workspace project URLs", () => {
-    const output = getOutput(mockInput("https://linear.app/myteam/project/abc123"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toContain("Linear MCP");
+    expect(output?.permissionDecisionReason).toContain(expectedReason);
   });
 });

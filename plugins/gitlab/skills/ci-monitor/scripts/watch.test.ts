@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
+import fc from "fast-check";
 import {
   clearApiErrors,
   computeInterval,
@@ -6,6 +7,7 @@ import {
   type Event,
   type ExecFn,
   type ExecResult,
+  type InternalState,
   initialState,
   isNotFoundError,
   normalizePipelineStatus,
@@ -57,154 +59,182 @@ const ok = (stdout: string): ExecResult => ({ ok: true, stdout });
 const noopSleep = (): Promise<void> => Promise.resolve();
 
 describe("parseMrUrl", () => {
-  it("parses a standard group/project MR URL", () => {
-    const parsed = parseMrUrl("https://gitlab.com/gitlab-org/gitlab/-/merge_requests/456");
-    expect(parsed.project).toBe("gitlab-org/gitlab");
-    expect(parsed.projectEncoded).toBe("gitlab-org%2Fgitlab");
-    expect(parsed.iid).toBe(456);
+  test.each<{
+    name: string;
+    url: string;
+    project: string;
+    projectEncoded: string;
+    iid: number;
+  }>([
+    {
+      name: "parses a standard group/project MR URL",
+      url: "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/456",
+      project: "gitlab-org/gitlab",
+      projectEncoded: "gitlab-org%2Fgitlab",
+      iid: 456,
+    },
+    {
+      name: "parses a nested subgroup MR URL",
+      url: "https://gitlab.com/group/subgroup/project/-/merge_requests/7",
+      project: "group/subgroup/project",
+      projectEncoded: "group%2Fsubgroup%2Fproject",
+      iid: 7,
+    },
+    {
+      name: "tolerates trailing path segments",
+      url: "https://gitlab.com/group/project/-/merge_requests/12/diffs",
+      project: "group/project",
+      projectEncoded: "group%2Fproject",
+      iid: 12,
+    },
+  ])("$name", ({ url, project, projectEncoded, iid }) => {
+    const parsed = parseMrUrl(url);
+    expect(parsed.project).toBe(project);
+    expect(parsed.projectEncoded).toBe(projectEncoded);
+    expect(parsed.iid).toBe(iid);
   });
 
-  it("parses a nested subgroup MR URL", () => {
-    const parsed = parseMrUrl("https://gitlab.com/group/subgroup/project/-/merge_requests/7");
-    expect(parsed.project).toBe("group/subgroup/project");
-    expect(parsed.projectEncoded).toBe("group%2Fsubgroup%2Fproject");
-    expect(parsed.iid).toBe(7);
-  });
-
-  it("tolerates trailing path segments", () => {
-    const parsed = parseMrUrl("https://gitlab.com/group/project/-/merge_requests/12/diffs");
-    expect(parsed.iid).toBe(12);
-    expect(parsed.project).toBe("group/project");
-  });
-
-  it("rejects non-GitLab URLs", () => {
-    expect(() => parseMrUrl("https://github.com/owner/repo/pull/1")).toThrow();
-  });
-
-  it("rejects URLs missing merge_requests segment", () => {
-    expect(() => parseMrUrl("https://gitlab.com/group/project/-/issues/1")).toThrow();
-  });
-
-  it("rejects URLs without a group segment", () => {
-    expect(() => parseMrUrl("https://gitlab.com/project/-/merge_requests/1")).toThrow();
+  test.each<{ name: string; url: string }>([
+    { name: "rejects non-GitLab URLs", url: "https://github.com/owner/repo/pull/1" },
+    {
+      name: "rejects URLs missing merge_requests segment",
+      url: "https://gitlab.com/group/project/-/issues/1",
+    },
+    {
+      name: "rejects URLs without a group segment",
+      url: "https://gitlab.com/project/-/merge_requests/1",
+    },
+  ])("$name", ({ url }) => {
+    expect(() => parseMrUrl(url)).toThrow();
   });
 });
 
 describe("parseProject", () => {
-  it("parses an HTTPS remote URL", () => {
-    expect(parseProject("https://gitlab.com/group/project.git")).toBe("group/project");
+  test.each<{ name: string; remote: string; project: string }>([
+    {
+      name: "parses an HTTPS remote URL",
+      remote: "https://gitlab.com/group/project.git",
+      project: "group/project",
+    },
+    {
+      name: "parses an HTTPS remote URL without .git suffix",
+      remote: "https://gitlab.com/group/project",
+      project: "group/project",
+    },
+    {
+      name: "parses an HTTPS remote URL with nested subgroups",
+      remote: "https://gitlab.com/group/subgroup/project.git",
+      project: "group/subgroup/project",
+    },
+    {
+      name: "parses an SCP-style SSH remote URL",
+      remote: "git@gitlab.com:group/project.git",
+      project: "group/project",
+    },
+    {
+      name: "parses an SCP-style SSH remote URL with nested subgroups",
+      remote: "git@gitlab.com:group/subgroup/project.git",
+      project: "group/subgroup/project",
+    },
+    {
+      name: "parses an ssh:// protocol remote URL",
+      remote: "ssh://git@gitlab.com/group/project.git",
+      project: "group/project",
+    },
+    {
+      name: "parses an ssh:// protocol remote URL with nested subgroups",
+      remote: "ssh://git@gitlab.com/group/subgroup/project.git",
+      project: "group/subgroup/project",
+    },
+    {
+      name: "strips a trailing slash after .git stripping",
+      remote: "https://gitlab.com/group/project.git/",
+      project: "group/project",
+    },
+  ])("$name", ({ remote, project }) => {
+    expect(parseProject(remote)).toBe(project);
   });
 
-  it("parses an HTTPS remote URL without .git suffix", () => {
-    expect(parseProject("https://gitlab.com/group/project")).toBe("group/project");
-  });
-
-  it("parses an HTTPS remote URL with nested subgroups", () => {
-    expect(parseProject("https://gitlab.com/group/subgroup/project.git")).toBe(
-      "group/subgroup/project",
-    );
-  });
-
-  it("parses an SCP-style SSH remote URL", () => {
-    expect(parseProject("git@gitlab.com:group/project.git")).toBe("group/project");
-  });
-
-  it("parses an SCP-style SSH remote URL with nested subgroups", () => {
-    expect(parseProject("git@gitlab.com:group/subgroup/project.git")).toBe(
-      "group/subgroup/project",
-    );
-  });
-
-  it("parses an ssh:// protocol remote URL", () => {
-    expect(parseProject("ssh://git@gitlab.com/group/project.git")).toBe("group/project");
-  });
-
-  it("parses an ssh:// protocol remote URL with nested subgroups", () => {
-    expect(parseProject("ssh://git@gitlab.com/group/subgroup/project.git")).toBe(
-      "group/subgroup/project",
-    );
-  });
-
-  it("strips a trailing slash after .git stripping", () => {
-    expect(parseProject("https://gitlab.com/group/project.git/")).toBe("group/project");
-  });
-
-  it("throws when the path has no group segment", () => {
-    expect(() => parseProject("https://gitlab.com/project.git")).toThrow();
-  });
-
-  it("throws when the remote URL cannot be parsed", () => {
-    expect(() => parseProject("not-a-url")).toThrow();
-  });
-
-  it("throws on an empty string", () => {
-    expect(() => parseProject("")).toThrow();
+  test.each<{ name: string; remote: string }>([
+    { name: "throws when the path has no group segment", remote: "https://gitlab.com/project.git" },
+    { name: "throws when the remote URL cannot be parsed", remote: "not-a-url" },
+    { name: "throws on an empty string", remote: "" },
+  ])("$name", ({ remote }) => {
+    expect(() => parseProject(remote)).toThrow();
   });
 });
 
 describe("normalizePipelineStatus", () => {
-  it("maps terminal states", () => {
-    expect(normalizePipelineStatus("success")).toBe("success");
-    expect(normalizePipelineStatus("failed")).toBe("failing");
-    expect(normalizePipelineStatus("canceled")).toBe("failing");
-  });
-
-  it("maps running states", () => {
-    expect(normalizePipelineStatus("running")).toBe("running");
-  });
-
-  it("maps queued-like states", () => {
-    expect(normalizePipelineStatus("pending")).toBe("queued");
-    expect(normalizePipelineStatus("created")).toBe("queued");
-    expect(normalizePipelineStatus("manual")).toBe("queued");
-  });
-
-  it("maps skipped to success and covers remaining queued-like states", () => {
-    expect(normalizePipelineStatus("skipped")).toBe("success");
-    expect(normalizePipelineStatus("waiting_for_resource")).toBe("queued");
-    expect(normalizePipelineStatus("preparing")).toBe("queued");
-    expect(normalizePipelineStatus("scheduled")).toBe("queued");
-  });
-
-  it("falls back to running for unknown statuses", () => {
-    expect(normalizePipelineStatus("totally-made-up-status")).toBe("running");
-    expect(normalizePipelineStatus("")).toBe("running");
+  test.each<[string, InternalState]>([
+    ["success", "success"],
+    ["failed", "failing"],
+    ["canceled", "failing"],
+    ["running", "running"],
+    ["pending", "queued"],
+    ["created", "queued"],
+    ["manual", "queued"],
+    ["skipped", "success"],
+    ["waiting_for_resource", "queued"],
+    ["preparing", "queued"],
+    ["scheduled", "queued"],
+    ["totally-made-up-status", "running"],
+    ["", "running"],
+  ])("normalizes %p to %p", (status, normalized) => {
+    expect(normalizePipelineStatus(status)).toBe(normalized);
   });
 });
 
 describe("isNotFoundError", () => {
-  it("detects 404 in stderr", () => {
-    expect(isNotFoundError("HTTP 404: Not Found")).toBe(true);
-    expect(isNotFoundError("error: 404 returned")).toBe(true);
-  });
-
-  it("detects 'not found' phrasing case-insensitively", () => {
-    expect(isNotFoundError("Pipeline Not Found")).toBe(true);
-    expect(isNotFoundError("pipeline not found")).toBe(true);
-  });
-
-  it("returns false for unrelated errors", () => {
-    expect(isNotFoundError("connection reset")).toBe(false);
-    expect(isNotFoundError("")).toBe(false);
-    expect(isNotFoundError("500 internal server error")).toBe(false);
+  test.each<[string, boolean]>([
+    ["HTTP 404: Not Found", true],
+    ["error: 404 returned", true],
+    ["Pipeline Not Found", true],
+    ["pipeline not found", true],
+    ["connection reset", false],
+    ["", false],
+    ["500 internal server error", false],
+  ])("%p is %p", (message, expected) => {
+    expect(isNotFoundError(message)).toBe(expected);
   });
 });
 
 describe("computeInterval", () => {
-  it("returns fast poll floor when no data (first PR on branch)", () => {
-    expect(computeInterval([])).toBe(30);
+  test.each<{ name: string; durations: number[]; expected: number }>([
+    {
+      name: "returns fast poll floor when no data (first PR on branch)",
+      durations: [],
+      expected: 30,
+    },
+    { name: "adds a 30 second buffer to the average", durations: [60, 120], expected: 120 },
+    {
+      name: "clamps interval to a 30 second floor for very short pipelines",
+      durations: [0],
+      expected: 30,
+    },
+    { name: "clamps to 600 seconds", durations: [1200, 1200], expected: 600 },
+  ])("$name", ({ durations, expected }) => {
+    expect(computeInterval(durations)).toBe(expected);
   });
 
-  it("adds a 30 second buffer to the average", () => {
-    expect(computeInterval([60, 120])).toBe(120);
-  });
-
-  it("clamps interval to a 30 second floor for very short pipelines", () => {
-    expect(computeInterval([0])).toBe(30);
-  });
-
-  it("clamps to 600 seconds", () => {
-    expect(computeInterval([1200, 1200])).toBe(600);
+  test("stays within [30, 600] and agrees with a clamped-average oracle", () => {
+    fc.assert(
+      fc.property(fc.array(fc.integer({ min: 0 })), (durations) => {
+        const result = computeInterval(durations);
+        expect(result).toBeGreaterThanOrEqual(30);
+        expect(result).toBeLessThanOrEqual(600);
+        const oracle =
+          durations.length === 0
+            ? 30
+            : Math.min(
+                600,
+                Math.max(
+                  30,
+                  Math.round(durations.reduce((a, b) => a + b, 0) / durations.length + 30),
+                ),
+              );
+        expect(result).toBe(oracle);
+      }),
+    );
   });
 });
 

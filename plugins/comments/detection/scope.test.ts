@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import fc from "fast-check";
 import { overlaps, scopeIntroduced } from "./scope";
 import type { Comment, LineRange } from "./types";
 
@@ -15,6 +16,33 @@ function comment(startLine: number, endLine: number, text = "comment"): Comment 
 
 function range(start: number, end: number): LineRange {
   return { start, end };
+}
+
+const commentArb: fc.Arbitrary<Comment> = fc
+  .record({
+    startLine: fc.integer({ min: 1, max: 30 }),
+    span: fc.integer({ min: 0, max: 8 }),
+    text: fc.string(),
+  })
+  .map(({ startLine, span, text }) => ({
+    kind: "line",
+    text,
+    startLine,
+    endLine: startLine + span,
+    startColumn: 0,
+    endColumn: text.length,
+  }));
+
+const rangeArb: fc.Arbitrary<LineRange> = fc
+  .record({ start: fc.integer({ min: 1, max: 30 }), span: fc.integer({ min: 0, max: 8 }) })
+  .map(({ start, span }) => ({ start, end: start + span }));
+
+/** Independent oracle: enumerate the comment's lines and test membership in the range. */
+function sharesLine(comment: Comment, range: LineRange): boolean {
+  for (let line = comment.startLine; line <= comment.endLine; line++) {
+    if (line >= range.start && line <= range.end) return true;
+  }
+  return false;
 }
 
 describe("overlaps", () => {
@@ -48,6 +76,14 @@ describe("overlaps", () => {
 
   test("comment one line after range.end", () => {
     expect(overlaps(comment(10, 11), range(5, 9))).toBe(false);
+  });
+
+  test("agrees with per-line interval intersection", () => {
+    fc.assert(
+      fc.property(commentArb, rangeArb, (c, r) => {
+        expect(overlaps(c, r)).toBe(sharesLine(c, r));
+      }),
+    );
   });
 });
 
@@ -91,5 +127,20 @@ describe("scopeIntroduced", () => {
     expect(result).not.toBe(comments);
     expect(comments).toHaveLength(2);
     expect(added).toEqual([range(5, 5)]);
+  });
+
+  test("is the order-preserving filter of overlapping comments, leaving inputs untouched", () => {
+    fc.assert(
+      fc.property(fc.array(commentArb), fc.array(rangeArb), (comments, added) => {
+        const commentsBefore = structuredClone(comments);
+        const addedBefore = structuredClone(added);
+        const result = scopeIntroduced(comments, added);
+        const expected = comments.filter((c) => added.some((r) => sharesLine(c, r)));
+        expect(result).toEqual(expected);
+        expect(result).not.toBe(comments);
+        expect(comments).toEqual(commentsBefore);
+        expect(added).toEqual(addedBefore);
+      }),
+    );
   });
 });

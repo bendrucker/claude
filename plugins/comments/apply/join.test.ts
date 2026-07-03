@@ -41,23 +41,21 @@ describe("collectVerdicts", () => {
     expect(map.get("b")?.action).toBe("keep");
   });
 
-  test("rejects a duplicate id across shards", () => {
-    expect(() =>
-      collectVerdicts([
-        shard([{ id: "a", verdict: verdict() }]),
-        shard([{ id: "a", verdict: verdict() }]),
-      ]),
-    ).toThrow(/appears more than once/);
-  });
+  const duplicateId = [
+    shard([{ id: "a", verdict: verdict() }]),
+    shard([{ id: "a", verdict: verdict() }]),
+  ];
 
-  test("rejects a malformed verdict", () => {
-    expect(() =>
-      collectVerdicts([{ verdicts: [{ id: "a", verdict: { category: null } }] }]),
-    ).toThrow(/"action"/);
-  });
-
-  test("rejects a shard missing the verdicts array", () => {
-    expect(() => collectVerdicts([{}])).toThrow(/"verdicts" array/);
+  test.each<[string, unknown[], RegExp]>([
+    ["rejects a duplicate id across shards", duplicateId, /appears more than once/],
+    [
+      "rejects a malformed verdict",
+      [{ verdicts: [{ id: "a", verdict: { category: null } }] }],
+      /"action"/,
+    ],
+    ["rejects a shard missing the verdicts array", [{}], /"verdicts" array/],
+  ])("%s", (_name, shards, error) => {
+    expect(() => collectVerdicts(shards)).toThrow(error);
   });
 });
 

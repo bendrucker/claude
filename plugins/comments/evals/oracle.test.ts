@@ -52,39 +52,32 @@ describe("parseBatchVerdicts", () => {
     expect(result[0]).toEqual(v);
   });
 
-  test("throws when an index is missing", () => {
-    const json = batchJson([verdict(), verdict()], [0, 0]);
-    expect(() => parseBatchVerdicts(json, 2)).toThrow(/appears more than once/);
+  const duplicateIndex = JSON.stringify({
+    verdicts: [
+      { index: 0, verdict: verdict() },
+      { index: 0, verdict: verdict() },
+    ],
   });
 
-  test("throws when coverage is incomplete", () => {
-    const json = batchJson([verdict()], [0]);
-    expect(() => parseBatchVerdicts(json, 2)).toThrow(/covered 1 of 2/);
-  });
-
-  test("throws on a duplicate index", () => {
-    const json = JSON.stringify({
-      verdicts: [
-        { index: 0, verdict: verdict() },
-        { index: 0, verdict: verdict() },
-      ],
-    });
-    expect(() => parseBatchVerdicts(json, 2)).toThrow(/appears more than once/);
-  });
-
-  test("throws on an out-of-range index", () => {
-    const json = batchJson([verdict()], [5]);
-    expect(() => parseBatchVerdicts(json, 1)).toThrow(/out of range/);
-  });
-
-  test("throws on invalid JSON", () => {
-    expect(() => parseBatchVerdicts("not json", 1)).toThrow(/invalid JSON/);
-  });
-
-  test("throws when verdicts is not an array", () => {
-    expect(() => parseBatchVerdicts(JSON.stringify({ verdicts: {} }), 1)).toThrow(
+  test.each<[string, string, number, RegExp]>([
+    [
+      "throws when an index is missing",
+      batchJson([verdict(), verdict()], [0, 0]),
+      2,
+      /appears more than once/,
+    ],
+    ["throws when coverage is incomplete", batchJson([verdict()], [0]), 2, /covered 1 of 2/],
+    ["throws on a duplicate index", duplicateIndex, 2, /appears more than once/],
+    ["throws on an out-of-range index", batchJson([verdict()], [5]), 1, /out of range/],
+    ["throws on invalid JSON", "not json", 1, /invalid JSON/],
+    [
+      "throws when verdicts is not an array",
+      JSON.stringify({ verdicts: {} }),
+      1,
       /"verdicts" array/,
-    );
+    ],
+  ])("%s", (_name, json, count, error) => {
+    expect(() => parseBatchVerdicts(json, count)).toThrow(error);
   });
 });
 

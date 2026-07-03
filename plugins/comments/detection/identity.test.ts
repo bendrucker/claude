@@ -23,18 +23,14 @@ describe("commentId", () => {
     expect(commentId("a.ts", comment())).toBe(commentId("a.ts", comment()));
   });
 
-  test("changes when the path changes", () => {
-    expect(commentId("a.ts", comment())).not.toBe(commentId("b.ts", comment()));
-  });
+  const baseline = commentId("a.ts", comment());
 
-  test("changes when the text changes", () => {
-    expect(commentId("a.ts", comment())).not.toBe(
-      commentId("a.ts", comment({ text: "// different" })),
-    );
-  });
-
-  test("changes when the position changes", () => {
-    expect(commentId("a.ts", comment())).not.toBe(commentId("a.ts", comment({ startLine: 6 })));
-    expect(commentId("a.ts", comment())).not.toBe(commentId("a.ts", comment({ startColumn: 4 })));
+  test.each<{ name: string; path: string; override?: Partial<Comment> }>([
+    { name: "path", path: "b.ts" },
+    { name: "text", path: "a.ts", override: { text: "// different" } },
+    { name: "startLine", path: "a.ts", override: { startLine: 6 } },
+    { name: "startColumn", path: "a.ts", override: { startColumn: 4 } },
+  ])("changes when the $name changes", ({ path, override }) => {
+    expect(commentId(path, comment(override))).not.toBe(baseline);
   });
 });

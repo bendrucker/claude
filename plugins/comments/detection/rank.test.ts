@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { rankComments, scoreComment } from "./rank";
+import fc from "fast-check";
+import { rankComments, scoreComment, type SortKey } from "./rank";
 import type { Comment } from "./types";
 
 function comment(over: Partial<Comment> = {}): Comment {
@@ -12,6 +13,32 @@ function comment(over: Partial<Comment> = {}): Comment {
     endColumn: 12,
     ...over,
   };
+}
+
+const commentArb: fc.Arbitrary<Comment> = fc
+  .record({
+    text: fc.string({ maxLength: 40 }),
+    startLine: fc.integer({ min: 1, max: 100 }),
+    span: fc.integer({ min: 0, max: 20 }),
+  })
+  .map(({ text, startLine, span }) => ({
+    kind: "line",
+    text,
+    startLine,
+    endLine: startLine + span,
+    startColumn: 0,
+    endColumn: text.length,
+  }));
+
+/** Independent stable sort: descending metric, original index breaks ties. */
+function rankOracle<T extends Comment>(comments: T[], sort: SortKey): T[] {
+  return comments
+    .map((comment, index) => ({ comment, index }))
+    .sort((a, b) => {
+      const diff = scoreComment(b.comment)[sort] - scoreComment(a.comment)[sort];
+      return diff !== 0 ? diff : a.index - b.index;
+    })
+    .map((entry) => entry.comment);
 }
 
 describe("scoreComment", () => {
@@ -66,5 +93,21 @@ describe("rankComments", () => {
     const input = [a, b];
     expect(rankComments(input)).toEqual([a, b]);
     expect(input).toEqual([a, b]);
+  });
+
+  test("is a stable non-ascending sort by the chosen metric that leaves the input untouched", () => {
+    fc.assert(
+      fc.property(
+        fc.array(commentArb),
+        fc.constantFrom<SortKey>("score", "lines", "chars"),
+        (comments, sort) => {
+          const before = comments.slice();
+          const result = rankComments(comments, sort);
+          expect(result).toEqual(rankOracle(comments, sort));
+          expect(result).not.toBe(comments);
+          expect(comments).toEqual(before);
+        },
+      ),
+    );
   });
 });

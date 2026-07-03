@@ -23,6 +23,7 @@
     "plugins/gitlab",
     "packages/validate",
     "packages/marketplace",
+    "plugins/plan",
     "plugins/tmux",
     "plugins/mac",
     "plugins/x-callback-url",

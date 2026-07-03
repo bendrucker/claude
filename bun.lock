@@ -160,6 +160,13 @@
         "@constellos/claude-code-kit": "^0.4.0",
       },
     },
+    "plugins/plan": {
+      "name": "@bendrucker/claude-plan",
+      "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+        "@constellos/claude-code-kit": "^0.4.0",
+      },
+    },
     "plugins/pull-request": {
       "name": "pull-request",
       "dependencies": {
@@ -298,6 +305,8 @@
     "@bendrucker/claude-comments": ["@bendrucker/claude-comments@workspace:plugins/comments"],
 
     "@bendrucker/claude-marketplace": ["@bendrucker/claude-marketplace@workspace:packages/marketplace"],
+
+    "@bendrucker/claude-plan": ["@bendrucker/claude-plan@workspace:plugins/plan"],
 
     "@bendrucker/claude-review": ["@bendrucker/claude-review@workspace:plugins/review"],
 

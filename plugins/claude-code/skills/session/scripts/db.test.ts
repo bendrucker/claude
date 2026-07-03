@@ -818,7 +818,9 @@ describe("activity query", () => {
     expect(bySignal.get("auto-continuations")).toBe(1);
     expect(bySignal.get("compactions")).toBe(1);
     expect(bySignal.get("mode: auto")).toBe(1);
-    expect(bySignal.get("mode: plan")).toBe(1);
+    // hooks-session contributes one, plan-iterations-session (added for the
+    // plan-iterations query) contributes a second.
+    expect(bySignal.get("mode: plan")).toBe(2);
   });
 });
 
@@ -992,6 +994,89 @@ describe("plan_calls view and plans query", () => {
     const handoff = rows.find((r) => r.session_id === "handoff-session");
     expect(handoff?.replan_tier).toBe("single");
     expect(Number(handoff?.handoff_count)).toBe(1);
+  });
+});
+
+describe("plan-iterations query", () => {
+  // plan-iterations-session presents three plans: A,B,C (rejected) -> A,B,C,D,E
+  // (rejected, append-only) -> A,D,F (approved, a real prune). Exercises growth,
+  // carry-over, and removal in the same session.
+  type PlanIterationRow = {
+    sid: string;
+    plan_seq: bigint;
+    outcome: string;
+    lines_added: bigint | null;
+    lines_removed: bigint | null;
+    lines_carried: bigint | null;
+    carry_over_ratio: number | null;
+    secs_since_prev: bigint | null;
+    secs_to_first_plan: bigint | null;
+    human_msgs: bigint;
+  };
+
+  async function planIterationRows() {
+    const rows = await runQuery<PlanIterationRow>(db, "plan-iterations", {
+      after_date: null,
+      before_date: null,
+      project: null,
+      host: null,
+      min_plans: "1",
+    });
+    return rows
+      .filter((r) => r.sid === "plan-ite")
+      .sort((a, b) => Number(a.plan_seq) - Number(b.plan_seq));
+  }
+
+  it("leaves growth/removal/carry-over and secs_since_prev null on the first present", async () => {
+    const rows = await planIterationRows();
+    expect(rows).toHaveLength(3);
+    const first = rows[0];
+    expect(first?.outcome).toBe("redirected");
+    expect(first?.lines_added).toBeNull();
+    expect(first?.lines_removed).toBeNull();
+    expect(first?.lines_carried).toBeNull();
+    expect(first?.carry_over_ratio).toBeNull();
+    expect(first?.secs_since_prev).toBeNull();
+  });
+
+  it("measures append-only growth on the second present: added 2, removed 0, carried 3, ratio 0.60", async () => {
+    const rows = await planIterationRows();
+    const second = rows[1];
+    expect(second?.outcome).toBe("redirected");
+    expect(Number(second?.lines_added)).toBe(2);
+    expect(Number(second?.lines_removed)).toBe(0);
+    expect(Number(second?.lines_carried)).toBe(3);
+    expect(second?.carry_over_ratio).toBe(0.6);
+    expect(Number(second?.secs_since_prev)).toBe(300);
+  });
+
+  it("measures a real prune on the third present: added 1, removed 3, carried 2", async () => {
+    const rows = await planIterationRows();
+    const third = rows[2];
+    expect(third?.outcome).toBe("approved");
+    expect(Number(third?.lines_added)).toBe(1);
+    expect(Number(third?.lines_removed)).toBe(3);
+    expect(Number(third?.lines_carried)).toBe(2);
+    expect(Number(third?.secs_since_prev)).toBe(300);
+  });
+
+  it("reports secs_to_first_plan from the plan-mode record and human_msgs from last-prompt records, repeated on every row", async () => {
+    const rows = await planIterationRows();
+    for (const row of rows) {
+      expect(Number(row.secs_to_first_plan)).toBe(300);
+      expect(Number(row.human_msgs)).toBe(2);
+    }
+  });
+
+  it("excludes sessions below min_plans threshold", async () => {
+    const rows = await runQuery<PlanIterationRow>(db, "plan-iterations", {
+      after_date: null,
+      before_date: null,
+      project: null,
+      host: null,
+      min_plans: "4",
+    });
+    expect(rows.find((r) => r.sid === "plan-ite")).toBeUndefined();
   });
 });
 

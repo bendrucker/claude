@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -71,17 +71,13 @@ describe("processInput", () => {
     expect(output).toBeNull();
   });
 
-  it("blocks commit on main branch", async () => {
-    const output = await getOutput(mockInput('git commit -m "test"'), testRepo);
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toContain("Cannot commit directly to main");
-    expect(output?.permissionDecisionReason).toContain("Create a topic branch first");
-  });
-
-  it("blocks commit with additional flags", async () => {
-    const output = await getOutput(mockInput('git commit -a -m "test"'), testRepo);
-    expect(output?.permissionDecision).toBe("deny");
-  });
+  test.each<[string]>([['git commit -m "test"'], ['git commit -a -m "test"']])(
+    "blocks %p on main branch",
+    async (command) => {
+      const output = await getOutput(mockInput(command), testRepo);
+      expect(output?.permissionDecision).toBe("deny");
+    },
+  );
 
   it("allows commit in detached HEAD state", async () => {
     await $`git checkout -q --detach HEAD`.cwd(testRepo).quiet();

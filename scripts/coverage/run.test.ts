@@ -10,16 +10,10 @@ describe("resolveScope", () => {
     [".claude/hooks/biome/index.ts", "./.claude"],
     [".claude/skills/agent-ideas/sources.ts", "./.claude"],
     ["user/rules/typescript.md", "./user"],
+    [join(repoRoot, "packages/validate/run.ts"), "packages/validate/"],
+    ["scripts/coverage/run.ts", "./scripts/coverage"],
   ])("%s -> %s", (file, expected) => {
     expect(resolveScope(file)).toBe(expected);
-  });
-
-  test("accepts absolute paths", () => {
-    expect(resolveScope(join(repoRoot, "packages/validate/run.ts"))).toBe("packages/validate/");
-  });
-
-  test("falls back to the nearest ancestor dir containing tests", () => {
-    expect(resolveScope("scripts/coverage/run.ts")).toBe("./scripts/coverage");
   });
 });
 

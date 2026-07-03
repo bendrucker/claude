@@ -17,14 +17,17 @@ describe("terminalReport", () => {
   });
 
   test("lists files, percentages, and uncovered ranges", () => {
-    // Color codes wrap the percentage and detail file name, so assert on
-    // substrings that survive between the escapes.
     const out = terminalReport([fileCoverage("a.ts", { 1: 1, 2: 0, 3: 0, 4: 1 })]);
-    expect(out).toContain("a.ts");
-    expect(out).toContain("50.0%");
-    expect(out).toContain("2-3");
-    expect(out).toContain("Uncovered lines:");
-    expect(out).toContain(": 2, 3");
+    expect(out).toMatchInlineSnapshot(`
+      "╔══════╤═════════╤═══════════╗
+      ║ File │ % Lines │ Uncovered ║
+      ╟──────┼─────────┼───────────╢
+      ║ a.ts │ \x1B[31m50.0%\x1B[39m   │ 2-3       ║
+      ╚══════╧═════════╧═══════════╝
+
+      Uncovered lines:
+      \x1B[31ma.ts\x1B[0m: 2, 3"
+    `);
   });
 
   test("omits the uncovered detail section when everything is covered", () => {
@@ -37,9 +40,13 @@ describe("terminalReport", () => {
 describe("githubReport", () => {
   test("builds a markdown summary table", () => {
     const summary = githubReport([fileCoverage("a.ts", { 1: 1, 2: 0, 3: 0 })]);
-    expect(summary).toContain("## Coverage");
-    expect(summary).toContain("| `a.ts` |");
-    expect(summary).toContain("33.3%");
+    expect(summary).toMatchInlineSnapshot(`
+      "## Coverage
+
+      | File | % Lines | Uncovered |
+      | --- | --- | --- |
+      | \`a.ts\` | 33.3% | 2-3 |"
+    `);
   });
 
   test("reports no data for an empty set", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
 import { extractMermaidBlocks, validateContent, validateFile } from "./validate";
@@ -6,21 +6,22 @@ import { extractMermaidBlocks, validateContent, validateFile } from "./validate"
 const fixturesDir = join(import.meta.dirname, "fixtures");
 
 describe("extractMermaidBlocks", () => {
-  it("extracts a single block", () => {
-    const content = `# Test
+  test.each<{ name: string; content: string; length: number; contains?: string[]; line?: number }>([
+    {
+      name: "extracts a single block",
+      content: `# Test
 \`\`\`mermaid
 flowchart LR
     A --> B
 \`\`\`
-`;
-    const blocks = extractMermaidBlocks(content);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.content).toContain("flowchart LR");
-    expect(blocks[0]?.line).toBe(3);
-  });
-
-  it("extracts multiple blocks", () => {
-    const content = `# Test
+`,
+      length: 1,
+      contains: ["flowchart LR"],
+      line: 3,
+    },
+    {
+      name: "extracts multiple blocks",
+      content: `# Test
 \`\`\`mermaid
 flowchart LR
     A --> B
@@ -30,82 +31,76 @@ flowchart LR
 sequenceDiagram
     A->>B: msg
 \`\`\`
-`;
-    const blocks = extractMermaidBlocks(content);
-    expect(blocks).toHaveLength(2);
-    expect(blocks[0]?.content).toContain("flowchart");
-    expect(blocks[1]?.content).toContain("sequenceDiagram");
-  });
-
-  it("returns empty array when no mermaid blocks", () => {
-    const content = `# Test
+`,
+      length: 2,
+      contains: ["flowchart", "sequenceDiagram"],
+    },
+    {
+      name: "returns empty array when no mermaid blocks",
+      content: `# Test
 \`\`\`javascript
 console.log('hello');
 \`\`\`
-`;
-    const blocks = extractMermaidBlocks(content);
-    expect(blocks).toHaveLength(0);
-  });
-
-  it("handles unclosed blocks gracefully", () => {
-    const content = `# Test
+`,
+      length: 0,
+    },
+    {
+      name: "handles unclosed blocks gracefully",
+      content: `# Test
 \`\`\`mermaid
 flowchart LR
     A --> B
-`;
+`,
+      length: 0,
+    },
+  ])("$name", ({ content, length, contains, line }) => {
     const blocks = extractMermaidBlocks(content);
-    expect(blocks).toHaveLength(0);
+    expect(blocks).toHaveLength(length);
+    contains?.forEach((substring, index) => expect(blocks[index]?.content).toContain(substring));
+    if (line !== undefined) expect(blocks[0]?.line).toBe(line);
   });
 });
 
 describe("validateContent", () => {
-  it("validates valid flowchart", async () => {
-    const content = `\`\`\`mermaid
+  test.each<{ name: string; content: string; errorCount: number; messageContains?: string }>([
+    {
+      name: "validates valid flowchart",
+      content: `\`\`\`mermaid
 flowchart LR
     A --> B
-\`\`\``;
-    const errors = await validateContent(content);
-    expect(errors).toHaveLength(0);
-  });
-
-  it("reports empty block error", async () => {
-    const content = `\`\`\`mermaid
-\`\`\``;
-    const errors = await validateContent(content);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]?.message).toContain("Empty");
-  });
-
-  it("reports syntax errors", async () => {
-    const content = `\`\`\`mermaid
+\`\`\``,
+      errorCount: 0,
+    },
+    {
+      name: "reports empty block error",
+      content: `\`\`\`mermaid
+\`\`\``,
+      errorCount: 1,
+      messageContains: "Empty",
+    },
+    {
+      name: "reports syntax errors",
+      content: `\`\`\`mermaid
 flowchart XY
     A --> B
-\`\`\``;
+\`\`\``,
+      errorCount: 1,
+    },
+  ])("$name", async ({ content, errorCount, messageContains }) => {
     const errors = await validateContent(content);
-    expect(errors).toHaveLength(1);
+    expect(errors).toHaveLength(errorCount);
+    if (messageContains !== undefined) expect(errors[0]?.message).toContain(messageContains);
   });
 });
 
-describe("valid fixtures", () => {
-  it("validates all blocks in valid.md", async () => {
-    const result = await validateFile(join(fixturesDir, "valid.md"));
-    expect(result.errors).toHaveLength(0);
-    expect(result.blocks).toBe(11);
-  });
-});
-
-describe("invalid fixtures", () => {
-  it("reports errors for all blocks in invalid.md", async () => {
-    const result = await validateFile(join(fixturesDir, "invalid.md"));
-    expect(result.errors.length).toBe(result.blocks);
-    expect(result.blocks).toBe(8);
-  });
-});
-
-describe("no mermaid blocks", () => {
-  it("reports zero blocks and zero errors", async () => {
-    const result = await validateFile(join(fixturesDir, "no-mermaid.md"));
-    expect(result.blocks).toBe(0);
-    expect(result.errors).toHaveLength(0);
+describe("validateFile fixtures", () => {
+  test.each<{ name: string; file: string; blocks: number; errors: number }>([
+    { name: "valid.md", file: "valid.md", blocks: 11, errors: 0 },
+    { name: "invalid.md", file: "invalid.md", blocks: 8, errors: 8 },
+    { name: "no-mermaid.md", file: "no-mermaid.md", blocks: 0, errors: 0 },
+  ])("$name", async ({ file, blocks, errors }) => {
+    const result = await validateFile(join(fixturesDir, file));
+    expect(result.blocks).toBe(blocks);
+    expect(result.errors).toHaveLength(errors);
   });
 });

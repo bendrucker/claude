@@ -17,22 +17,19 @@ function comment(overrides: Partial<TuicrComment>): TuicrComment {
 }
 
 describe("deriveAnchor", () => {
-  test("uses the new side when tuicr stamps it", () => {
-    expect(deriveAnchor(comment({ start_line: 150, end_line: 150, side: "new" }))).toEqual({
-      side: "new",
-      line: 150,
-      path: "user/settings.json",
-    });
-  });
-
-  test("uses the old side for a removed line", () => {
-    expect(
-      deriveAnchor(comment({ path: "old.txt", start_line: 11, end_line: 11, side: "old" })),
-    ).toEqual({
-      side: "old",
-      line: 11,
-      path: "old.txt",
-    });
+  test.each<[string, Partial<TuicrComment>, ReturnType<typeof deriveAnchor>]>([
+    [
+      "uses the new side when tuicr stamps it",
+      { start_line: 150, end_line: 150, side: "new" },
+      { side: "new", line: 150, path: "user/settings.json" },
+    ],
+    [
+      "uses the old side for a removed line",
+      { path: "old.txt", start_line: 11, end_line: 11, side: "old" },
+      { side: "old", line: 11, path: "old.txt" },
+    ],
+  ])("%s", (_name, overrides, expected) => {
+    expect(deriveAnchor(comment(overrides))).toEqual(expected);
   });
 
   test("defaults to the new side when side is omitted on a line comment", () => {
@@ -47,13 +44,11 @@ describe("deriveAnchor", () => {
 });
 
 describe("decodeComments", () => {
-  test("decodes a bare array of comments", () => {
-    const comments = decodeComments(JSON.stringify([comment({ id: "c1" })]));
+  test.each<[string, unknown]>([
+    ["decodes a bare array of comments", [comment({ id: "c1" })]],
+    ["decodes a { comments: [...] } envelope", { comments: [comment({ id: "c1" })] }],
+  ])("%s", (_name, payload) => {
+    const comments = decodeComments(JSON.stringify(payload));
     expect(comments.map((c) => c.id)).toEqual(["c1"]);
-  });
-
-  test("decodes a { comments: [...] } envelope", () => {
-    const comments = decodeComments(JSON.stringify({ comments: [comment({ id: "c2" })] }));
-    expect(comments.map((c) => c.id)).toEqual(["c2"]);
   });
 });

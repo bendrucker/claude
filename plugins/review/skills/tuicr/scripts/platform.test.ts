@@ -117,92 +117,70 @@ index 1111111..2222222 100644
 });
 
 describe("toGitHubComment", () => {
-  test("maps a new-side comment to RIGHT", () => {
-    expect(
-      toGitHubComment(comment({ start_line: 150, end_line: 150, side: "new" }), {
-        commitId: "abc123",
-      }),
-    ).toEqual({
-      path: "user/settings.json",
-      line: 150,
-      side: "RIGHT",
-      commit_id: "abc123",
-      body: "comment",
-    });
-  });
-
-  test("maps an old-side deletion to LEFT", () => {
-    expect(
-      toGitHubComment(comment({ path: "old.txt", start_line: 11, end_line: 11, side: "old" }), {
-        commitId: "abc123",
-      }),
-    ).toEqual({
-      path: "old.txt",
-      line: 11,
-      side: "LEFT",
-      commit_id: "abc123",
-      body: "comment",
-    });
+  test.each<[string, Partial<TuicrComment>, ReturnType<typeof toGitHubComment>]>([
+    [
+      "maps a new-side comment to RIGHT",
+      { start_line: 150, end_line: 150, side: "new" },
+      {
+        path: "user/settings.json",
+        line: 150,
+        side: "RIGHT",
+        commit_id: "abc123",
+        body: "comment",
+      },
+    ],
+    [
+      "maps an old-side deletion to LEFT",
+      { path: "old.txt", start_line: 11, end_line: 11, side: "old" },
+      { path: "old.txt", line: 11, side: "LEFT", commit_id: "abc123", body: "comment" },
+    ],
+  ])("%s", (_name, overrides, expected) => {
+    expect(toGitHubComment(comment(overrides), { commitId: "abc123" })).toEqual(expected);
   });
 });
 
 describe("toGitLabPosition", () => {
   const refs = { base_sha: "base", head_sha: "head", start_sha: "start" };
 
-  test("sets new_line for a new-side comment and defaults old_path to new_path", () => {
-    expect(
-      toGitLabPosition(comment({ start_line: 150, end_line: 150, side: "new" }), refs, {
-        newPath: "user/settings.json",
-      }),
-    ).toEqual({
-      position_type: "text",
-      base_sha: "base",
-      head_sha: "head",
-      start_sha: "start",
-      new_path: "user/settings.json",
-      old_path: "user/settings.json",
-      new_line: 150,
-    });
-  });
-
-  test("sets old_line for an old-side deletion", () => {
-    expect(
-      toGitLabPosition(
-        comment({ path: "old.txt", start_line: 11, end_line: 11, side: "old" }),
-        refs,
-        {
-          newPath: "old.txt",
-        },
-      ),
-    ).toEqual({
-      position_type: "text",
-      base_sha: "base",
-      head_sha: "head",
-      start_sha: "start",
-      new_path: "old.txt",
-      old_path: "old.txt",
-      old_line: 11,
-    });
-  });
-
-  test("carries distinct old_path for a rename", () => {
-    expect(
-      toGitLabPosition(
-        comment({ path: "src/new-name.ts", start_line: 7, end_line: 7, side: "new" }),
-        refs,
-        {
-          newPath: "src/new-name.ts",
-          oldPath: "src/old-name.ts",
-        },
-      ),
-    ).toEqual({
-      position_type: "text",
-      base_sha: "base",
-      head_sha: "head",
-      start_sha: "start",
-      new_path: "src/new-name.ts",
-      old_path: "src/old-name.ts",
-      new_line: 7,
-    });
+  test.each<
+    [
+      string,
+      Partial<TuicrComment>,
+      Parameters<typeof toGitLabPosition>[2],
+      ReturnType<typeof toGitLabPosition>,
+    ]
+  >([
+    [
+      "sets new_line for a new-side comment and defaults old_path to new_path",
+      { start_line: 150, end_line: 150, side: "new" },
+      { newPath: "user/settings.json" },
+      {
+        ...refs,
+        position_type: "text",
+        new_path: "user/settings.json",
+        old_path: "user/settings.json",
+        new_line: 150,
+      },
+    ],
+    [
+      "sets old_line for an old-side deletion",
+      { path: "old.txt", start_line: 11, end_line: 11, side: "old" },
+      { newPath: "old.txt" },
+      { ...refs, position_type: "text", new_path: "old.txt", old_path: "old.txt", old_line: 11 },
+    ],
+    [
+      "carries distinct old_path for a rename",
+      { path: "src/new-name.ts", start_line: 7, end_line: 7, side: "new" },
+      { newPath: "src/new-name.ts", oldPath: "src/old-name.ts" },
+      {
+        ...refs,
+        position_type: "text",
+        new_path: "src/new-name.ts",
+        old_path: "src/old-name.ts",
+        new_line: 7,
+      },
+    ],
+  ])("%s", (_name, overrides, options, expected) => {
+    expect(toGitLabPosition(comment(overrides), refs, options)).toEqual(expected);
   });
 });

@@ -17,20 +17,15 @@ describe("layoutArgs", () => {
     }
   });
 
-  test("first pane: horizontal split at 70% against orchestrator", () => {
-    expect(layoutArgs(0, undefined)).toEqual(["-h", "-d", "-l", "70%", "-t", "%0"]);
-  });
-
-  test("second pane: vertical split against last pane", () => {
-    expect(layoutArgs(1, "%1")).toEqual(["-v", "-d", "-t", "%1"]);
-  });
-
-  test("third pane: vertical split against last pane", () => {
-    expect(layoutArgs(2, "%2")).toEqual(["-v", "-d", "-t", "%2"]);
-  });
-
-  test("fourth pane: new horizontal split column", () => {
-    expect(layoutArgs(3, "%3")).toEqual(["-h", "-d", "-t", "%3"]);
+  test.each<[number, string | undefined, string | undefined, string[]]>([
+    [0, undefined, undefined, ["-h", "-d", "-l", "70%", "-t", "%0"]],
+    [1, "%1", undefined, ["-v", "-d", "-t", "%1"]],
+    [2, "%2", undefined, ["-v", "-d", "-t", "%2"]],
+    [3, "%3", undefined, ["-h", "-d", "-t", "%3"]],
+    [0, undefined, "reviews", ["-h", "-d", "-t", "reviews"]],
+    [1, "%1", "reviews", ["-v", "-d", "-t", "%1"]],
+  ])("index=%p lastPane=%p target=%p", (index, lastPane, target, expected) => {
+    expect(layoutArgs(index, lastPane, target)).toEqual(expected);
   });
 
   test("throws when TMUX_PANE is not set", () => {
@@ -40,16 +35,8 @@ describe("layoutArgs", () => {
     );
   });
 
-  test("first pane with target session: split that session, no sidebar carve-out", () => {
-    expect(layoutArgs(0, undefined, "reviews")).toEqual(["-h", "-d", "-t", "reviews"]);
-  });
-
   test("target session does not require TMUX_PANE for the first pane", () => {
     delete process.env.TMUX_PANE;
     expect(layoutArgs(0, undefined, "reviews")).toEqual(["-h", "-d", "-t", "reviews"]);
-  });
-
-  test("subsequent panes chain off the last pane even with a target session", () => {
-    expect(layoutArgs(1, "%1", "reviews")).toEqual(["-v", "-d", "-t", "%1"]);
   });
 });

@@ -1,30 +1,22 @@
 import { describe, expect, test } from "bun:test";
-import { fetchUrls, newUrls } from "./poll";
+import { type FetchResult, fetchUrls, newUrls } from "./poll";
 
 describe("fetchUrls", () => {
-  test("returns ok:true with extracted URLs on success", async () => {
-    const result = await fetchUrls(
+  test.each<[string, string, FetchResult]>([
+    [
+      "success",
       `echo '[{"url":"https://example.test/1"},{"url":"https://example.test/2"}]'`,
-    );
-    expect(result).toEqual({
-      ok: true,
-      urls: ["https://example.test/1", "https://example.test/2"],
-    });
-  });
-
-  test("returns ok:true with empty array when queue is empty", async () => {
-    const result = await fetchUrls("echo '[]'");
-    expect(result).toEqual({ ok: true, urls: [] });
-  });
-
-  test("returns ok:false with stderr reason when command exits non-zero", async () => {
-    const result = await fetchUrls("echo 'auth failed' >&2; exit 1");
-    expect(result).toEqual({ ok: false, reason: "auth failed" });
-  });
-
-  test("returns ok:false with exit-code reason when command fails with no stderr", async () => {
-    const result = await fetchUrls("exit 2");
-    expect(result).toEqual({ ok: false, reason: "exited with code 2" });
+      { ok: true, urls: ["https://example.test/1", "https://example.test/2"] },
+    ],
+    ["empty queue", "echo '[]'", { ok: true, urls: [] }],
+    [
+      "non-zero exit with stderr",
+      "echo 'auth failed' >&2; exit 1",
+      { ok: false, reason: "auth failed" },
+    ],
+    ["non-zero exit with no stderr", "exit 2", { ok: false, reason: "exited with code 2" }],
+  ])("%s", async (_name, cmd, expected) => {
+    expect(await fetchUrls(cmd)).toEqual(expected);
   });
 
   test("returns ok:false when output is not valid JSON", async () => {
@@ -37,27 +29,12 @@ describe("fetchUrls", () => {
 });
 
 describe("newUrls", () => {
-  test("keeps only URLs not already tracked", () => {
-    const tracked = new Set(["https://example.test/1"]);
-    expect(newUrls(["https://example.test/1", "https://example.test/2"], tracked)).toEqual([
-      "https://example.test/2",
-    ]);
-  });
-
-  test("dedupes a URL that appears on more than one platform", () => {
-    expect(newUrls(["https://example.test/2", "https://example.test/2"], new Set())).toEqual([
-      "https://example.test/2",
-    ]);
-  });
-
-  test("preserves fetch order", () => {
-    expect(newUrls(["https://example.test/3", "https://example.test/2"], new Set())).toEqual([
-      "https://example.test/3",
-      "https://example.test/2",
-    ]);
-  });
-
-  test("returns nothing when every fetched URL is tracked", () => {
-    expect(newUrls(["https://example.test/1"], new Set(["https://example.test/1"]))).toEqual([]);
+  test.each<[string, string[], Set<string>, string[]]>([
+    ["keeps only untracked URLs", ["u1", "u2"], new Set(["u1"]), ["u2"]],
+    ["dedupes a URL seen on more than one platform", ["u2", "u2"], new Set(), ["u2"]],
+    ["preserves fetch order", ["u3", "u2"], new Set(), ["u3", "u2"]],
+    ["returns nothing when every URL is tracked", ["u1"], new Set(["u1"]), []],
+  ])("%s", (_name, urls, tracked, expected) => {
+    expect(newUrls(urls, tracked)).toEqual(expected);
   });
 });

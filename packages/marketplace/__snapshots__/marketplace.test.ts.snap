@@ -1,0 +1,71 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`loadPlugins joins a fully-present local plugin 1`] = `
+{
+  "dir": "<root>/plugins/alpha",
+  "enabled": true,
+  "hookMatcher": "Bash",
+  "listing": {
+    "description": "Alpha plugin",
+    "local": true,
+    "name": "alpha",
+    "source": "./plugins/alpha",
+  },
+  "manifest": {
+    "name": "alpha",
+  },
+  "mcpServers": [
+    "alpha-server",
+  ],
+  "name": "alpha",
+}
+`;
+
+exports[`loadPlugins listed local plugin that is disabled 1`] = `
+{
+  "dir": "<root>/plugins/beta",
+  "enabled": false,
+  "hookMatcher": undefined,
+  "listing": {
+    "local": true,
+    "name": "beta",
+    "source": "./plugins/beta",
+  },
+  "manifest": {
+    "name": "beta",
+  },
+  "mcpServers": [],
+  "name": "beta",
+}
+`;
+
+exports[`loadPlugins on-disk plugin missing from the marketplace keeps dir without listing 1`] = `
+{
+  "dir": "<root>/plugins/orphan",
+  "enabled": false,
+  "hookMatcher": undefined,
+  "manifest": {
+    "name": "orphan",
+  },
+  "mcpServers": [],
+  "name": "orphan",
+}
+`;
+
+exports[`loadPlugins remote-sourced listing has no dir and is not local 1`] = `
+{
+  "dir": undefined,
+  "enabled": false,
+  "hookMatcher": undefined,
+  "listing": {
+    "local": false,
+    "name": "remote-only",
+    "source": {
+      "repo": "owner/remote-only",
+      "source": "github",
+    },
+  },
+  "mcpServers": [],
+  "name": "remote-only",
+}
+`;

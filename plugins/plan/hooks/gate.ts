@@ -14,9 +14,9 @@ const DENY_REASON =
   "document), lead with a short 'Changed since last plan' block, and re-present.";
 
 const ASK_REASON =
-  "This plan is over 12k characters; no plan over ~11.4k has been approved in two " +
-  "months. Consider consolidating superseded content into <plan>.decisions.md or " +
-  "splitting scope. Approve to present anyway.";
+  "This plan exceeds 12k characters. Plans this large are rarely approved; " +
+  "consolidate superseded content into <plan>.decisions.md or split the scope. " +
+  "Approve to present anyway.";
 
 function formatDecision(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
   return {

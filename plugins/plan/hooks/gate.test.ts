@@ -97,7 +97,7 @@ describe("size advisory", () => {
     expect(await decision(bigPlan("a"))).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: expect.stringContaining("over 12k characters"),
+      permissionDecisionReason: expect.stringContaining("exceeds 12k characters"),
     });
   });
 

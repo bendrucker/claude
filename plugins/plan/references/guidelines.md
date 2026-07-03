@@ -49,9 +49,9 @@ Defer naming to implementation when the deliverable is not the code itself (an i
 The plan is a do-now spec:
 
 - Open with the non-negotiable conventions and a stop condition (implement, ship, end). Without a stop condition, the implementing session absorbs the next job too.
-- Deferred design goes to a separate linked file the implementer is told not to open, with one pointer line in the plan. A handoff plan that was 40-45% deferred design cost the implementing session 221k tokens planning the next epic.
+- Deferred design goes to a separate linked file the implementer is told not to open, with one pointer line in the plan. A handoff plan heavy with deferred design forces the implementing session to re-plan work the original session never resolved.
 - Resolved decisions and research synthesis move to a companion `<plan>.decisions.md` that the plan links.
-- Keep plans focused and under roughly 10k characters. No plan over 11.4k characters has been approved in two months. Past 10k, consolidate or split.
+- Keep plans focused and under roughly 10k characters. Past that, plans get rejected: split the scope or consolidate before presenting.
 
 ## Verification
 
@@ -73,7 +73,7 @@ A redirect is new input scoped to what it names. On each iteration:
 - Consolidate before every re-present. A superseded design collapses to a two-line pointer: what it was, why it was parked, where the artifact lives. Resolved research moves to the decisions file. A plan that argues with its earlier self has stopped being a plan.
 - Lead the re-present with a short "Changed since last plan" block. The full document lives in the plan file the user reads at handoff. The re-present is for the delta.
 - Treat every AskUserQuestion answer from this session as a constraint. Before ExitPlanMode, verify the plan satisfies each one.
-- Question the axis, not the plan. When feedback or investigation opens an axis with more than one viable position (scope breadth, framework positioning, naming, execution shape), fire one batched AskUserQuestion before drafting into it. One unasked axis cost two full re-present cycles of a 47-50k-character plan.
+- Question the axis, not the plan. When feedback or investigation opens an axis with more than one viable position (scope breadth, framework positioning, naming, execution shape), fire one batched AskUserQuestion before drafting into it. An unasked axis question costs full re-present cycles; one batched question is cheaper than one re-present.
 
 ## Naming and Conventions
 

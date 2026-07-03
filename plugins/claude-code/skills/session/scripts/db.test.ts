@@ -728,7 +728,7 @@ describe("hook_events", () => {
 
   it("unwraps the message from a hook_blocking_error", async () => {
     const [row] = await db.query<{ reason: string; blocked: boolean }>(
-      "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error'",
+      "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error' AND session_id = 'hooks-session'",
     );
     expect(row?.reason).toBe("Biome check failed. Auto-fix was attempted but issues remain.");
     expect(row?.blocked).toBe(true);
@@ -955,6 +955,90 @@ describe("plan_calls view and plans query", () => {
       min_plans: "3",
     });
     expect(rows.find((r) => r.session_id === "plan-session")).toBeUndefined();
+  });
+
+  it("classifies a terminal rejection with no edits after as outcome=handoff", async () => {
+    // handoff-session ends on a rejected plan followed only by a Read, the
+    // reject-and-handoff workflow (implement from the plan file in a fresh session).
+    const rows = await db.query<{ outcome: string }>(
+      "SELECT outcome FROM plan_calls WHERE session_id = 'handoff-session'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.outcome).toBe("handoff");
+  });
+
+  it("keeps a terminal rejection followed by file edits as outcome=redirected", async () => {
+    const rows = await db.query<{ outcome: string }>(
+      "SELECT outcome FROM plan_calls WHERE session_id = 'plan-abandon-session'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.outcome).toBe("redirected");
+  });
+
+  it("counts handoffs separately from redirects in plan_sessions", async () => {
+    const [row] = await db.query<{ redirect_count: bigint; handoff_count: bigint }>(
+      "SELECT redirect_count, handoff_count FROM plan_sessions WHERE session_id = 'handoff-session'",
+    );
+    expect(Number(row?.redirect_count)).toBe(0);
+    expect(Number(row?.handoff_count)).toBe(1);
+  });
+
+  it("tiers a handoff-only session as single, keyed on mid-session redirects", async () => {
+    const rows = await runQuery<{ session_id: string; replan_tier: string; handoff_count: bigint }>(
+      db,
+      "plans",
+      { after_date: null, before_date: null, project: null, host: null, min_plans: null },
+    );
+    const handoff = rows.find((r) => r.session_id === "handoff-session");
+    expect(handoff?.replan_tier).toBe("single");
+    expect(Number(handoff?.handoff_count)).toBe(1);
+  });
+});
+
+describe("replayed line dedupe", () => {
+  // replay.jsonl duplicates its tool_use, tool_result, and hook attachment lines
+  // verbatim (same uuid) further down the file, the rewind/resume replay shape.
+  it("keeps one content_items row per replayed tool_use and tool_result", async () => {
+    const uses = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM content_items WHERE type = 'tool_use' AND id = 'rp-tool-1'",
+    );
+    expect(Number(uses[0]?.n)).toBe(1);
+    const results = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM content_items WHERE type = 'tool_result' AND tool_use_id = 'rp-tool-1'",
+    );
+    expect(Number(results[0]?.n)).toBe(1);
+  });
+
+  it("keeps one tool_calls row per replayed tool_use", async () => {
+    const rows = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM tool_calls WHERE tool_id = 'rp-tool-1'",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+
+  it("keeps one hook_events row per replayed hook attachment", async () => {
+    const rows = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM hook_events WHERE session_id = 'replay-session' AND kind = 'hook_blocking_error'",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+});
+
+describe("stop-hook-noop-detector query", () => {
+  it("counts blocking errors so a Stop gate is not a noop candidate", async () => {
+    const rows = await runQuery<{
+      command: string;
+      fires: bigint;
+      with_stdout: bigint;
+      with_decision: bigint;
+      nonzero_exit: bigint;
+      blocks: bigint;
+    }>(db, "stop-hook-noop-detector", filterParams());
+    // Blocking errors carry no command, so they group under the bare hook name.
+    const gate = rows.find((r) => r.command === "Stop");
+    expect(gate).toBeDefined();
+    expect(Number(gate?.blocks)).toBe(Number(gate?.fires));
+    expect(Number(gate?.blocks)).toBeGreaterThan(0);
   });
 });
 

@@ -49,6 +49,11 @@ FROM messages
 WHERE type = 'assistant'
 GROUP BY host, session_id, message_id;
 
+-- Session rewind/resume replays JSONL lines verbatim (same uuid, usually later in the
+-- same file), so tool_use/tool_result rows would double-count without dedupe. Two
+-- passes: drop replayed source lines (same record uuid, keep the latest copy), then
+-- drop residual duplicate tool ids that arrive under fresh uuids (e.g. an Agent
+-- tool_use echoed into its subagent transcript).
 CREATE OR REPLACE TABLE content_items AS
 WITH src AS (
   SELECT
@@ -65,6 +70,11 @@ WITH src AS (
     r.data->>'$.attributionAgent'  AS attribution_agent
   FROM raw r
   WHERE r.type IN ('user', 'assistant')
+  QUALIFY (r.data->>'$.uuid') IS NULL
+    OR ROW_NUMBER() OVER (
+         PARTITION BY r.host, r.session_id, (r.data->>'$.uuid')
+         ORDER BY r.source_line DESC, r.source_file DESC
+       ) = 1
 )
 SELECT
   s.host,
@@ -87,7 +97,12 @@ SELECT
   s.attribution_agent
 FROM src s,
 LATERAL (SELECT unnest(json_extract(s.message_content, '$[*]')) AS item) t
-WHERE json_type(s.message_content) = 'ARRAY';
+WHERE json_type(s.message_content) = 'ARRAY'
+QUALIFY COALESCE(id, tool_use_id) IS NULL
+  OR ROW_NUMBER() OVER (
+       PARTITION BY s.host, type, COALESCE(id, tool_use_id)
+       ORDER BY s.source_line DESC, s.source_file DESC
+     ) = 1;
 
 CREATE OR REPLACE VIEW tool_calls AS
 SELECT
@@ -313,6 +328,8 @@ FROM raw;
 -- Every attachment record (the richest non-chat category: hooks, diagnostics,
 -- skill/tool listings, plan/auto mode, queued commands, command permissions, ...).
 -- `kind` is the attachment subtype; `attachment` is its full payload.
+-- Replayed lines (rewind/resume, same uuid) are deduped so per-event counts stay
+-- one row per event; the latest copy wins.
 CREATE OR REPLACE VIEW attachments AS
 SELECT
   host,
@@ -328,7 +345,12 @@ SELECT
   (data->'$.attachment')            AS attachment,
   data
 FROM raw
-WHERE type = 'attachment';
+WHERE type = 'attachment'
+QUALIFY (data->>'$.uuid') IS NULL
+  OR ROW_NUMBER() OVER (
+       PARTITION BY host, session_id, (data->>'$.uuid')
+       ORDER BY source_line DESC, source_file DESC
+     ) = 1;
 
 -- System events: per-turn timing, stop-hook summaries, compaction boundaries,
 -- API errors/retries, scheduled-task fires, local slash commands, away summaries.
@@ -366,12 +388,18 @@ WHERE type = 'system';
 -- exact hook script (NULL for blocking_error / permission_decision records).
 CREATE OR REPLACE VIEW hook_events AS
 WITH att AS (
+  -- Dedupe replayed lines (rewind/resume, same uuid) so a block never counts twice.
   SELECT
     host, session_id, project_path, timestamp, source_file, source_line,
     (data->'$.attachment') AS a
   FROM raw
   WHERE type = 'attachment'
     AND (data->>'$.attachment.type') LIKE 'hook%'
+  QUALIFY (data->>'$.uuid') IS NULL
+    OR ROW_NUMBER() OVER (
+         PARTITION BY host, session_id, (data->>'$.uuid')
+         ORDER BY source_line DESC, source_file DESC
+       ) = 1
 ),
 parsed AS (
   SELECT
@@ -499,10 +527,12 @@ WHERE type = 'pr-link';
 -- Plan-mode calls: one row per ExitPlanMode tool_use, joined with its tool_result to
 -- classify the outcome. `plan_seq` is 1-based within the session ordered by timestamp.
 -- Outcome classification: 'approved' when the result contains "approved your plan";
--- 'redirected' when it contains "doesn't want to proceed" or "was rejected" (the user
--- typed feedback instead of clicking approve); 'unknown' for anything else (cancelled,
--- null, etc.). Full plan text is in `data->'$.input.plan'`; not materialized here
--- because plans can be several KB each.
+-- 'handoff' when the session's last plan was rejected and no file edits follow it in
+-- that session (the user deliberately ends the session on the plan and implements
+-- from the plan file in a fresh one); 'redirected' for any other rejection (the user
+-- typed feedback instead of clicking approve, mid-session churn); 'unknown' for
+-- anything else (cancelled, null, etc.). Full plan text is in `data->'$.input.plan'`;
+-- not materialized here because plans can be several KB each.
 CREATE OR REPLACE VIEW plan_calls AS
 WITH calls AS (
   SELECT
@@ -521,6 +551,19 @@ WITH calls AS (
    AND r.type = 'tool_result'
   WHERE ci.type = 'tool_use'
     AND ci.name = 'ExitPlanMode'
+),
+seq AS (
+  SELECT
+    calls.*,
+    ROW_NUMBER() OVER (
+      PARTITION BY host, session_id
+      ORDER BY timestamp
+    ) AS plan_seq,
+    ROW_NUMBER() OVER (
+      PARTITION BY host, session_id
+      ORDER BY timestamp DESC
+    ) = 1 AS is_terminal
+  FROM calls
 )
 SELECT
   host,
@@ -533,18 +576,27 @@ SELECT
   CASE
     WHEN (result_content) LIKE '%approved your plan%'              THEN 'approved'
     WHEN (result_content) LIKE '%want to proceed%'
-      OR (result_content) LIKE '%was rejected%'                    THEN 'redirected'
+      OR (result_content) LIKE '%was rejected%'                    THEN
+      CASE
+        WHEN is_terminal AND NOT EXISTS (
+          SELECT 1
+          FROM tool_calls tc
+          WHERE tc.host = seq.host
+            AND tc.session_id = seq.session_id
+            AND tc.tool_name IN ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
+            AND tc.file_path IS NOT NULL
+            AND tc.timestamp > seq.timestamp
+        ) THEN 'handoff'
+        ELSE 'redirected'
+      END
     ELSE 'unknown'
   END AS outcome,
-  ROW_NUMBER() OVER (
-    PARTITION BY host, session_id
-    ORDER BY timestamp
-  ) AS plan_seq
-FROM calls;
+  plan_seq
+FROM seq;
 
 -- Session-level plan aggregates: one row per session that used plan mode, with counts
--- broken down by outcome. Sessions with plan_count >= 2 are replan candidates; >= 3
--- are off-rails candidates.
+-- broken down by outcome. `redirect_count` is mid-session churn only; a terminal
+-- rejection with no edits afterward lands in `handoff_count` (see plan_calls).
 CREATE OR REPLACE VIEW plan_sessions AS
 SELECT
   host,
@@ -553,6 +605,7 @@ SELECT
   COUNT(*)                                               AS plan_count,
   COUNT(*) FILTER (WHERE outcome = 'redirected')         AS redirect_count,
   COUNT(*) FILTER (WHERE outcome = 'approved')           AS approved_count,
+  COUNT(*) FILTER (WHERE outcome = 'handoff')            AS handoff_count,
   COUNT(*) FILTER (WHERE outcome = 'unknown')            AS unknown_count,
   MIN(timestamp)                                         AS first_plan_ts,
   MAX(timestamp)                                         AS last_plan_ts

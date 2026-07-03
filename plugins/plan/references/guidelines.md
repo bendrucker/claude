@@ -13,9 +13,16 @@ Read before you propose, and show the reading in the plan's Context. These have 
 
 A plan that proposes a signature, abstraction, constant list, or storage path without showing the code it has to fit is premature.
 
+## Convergence Before Plan Mode
+
+Investigate to convergence first. Plan mode transcribes findings that are already settled. An approved plan can spend under two minutes in plan mode because every choice was resolved before it opened.
+
+- For an investigation task, present the root cause as standalone prose the user can correct before any fix plan exists. A diagnosis frozen inside a plan's Context gets regenerated verbatim instead of corrected.
+- Subagents return findings. Author the plan in your own prose. A plan forwarded from a subagent cannot absorb a redirect, because its author never held the design reasoning.
+
 ## Minimal-First Scope
 
-When the request names a vague noun ("a skill", "a few rules", "a workflow"), state the smallest change that satisfies the literal ask, then offer heavier work as named tiers. A guard, rule, or test that catches zero existing cases is speculative: ask before adding it. After a one-line correction, make only the responsive change and re-present.
+When the request names a vague noun ("a skill", "a few rules", "a workflow"), state the smallest change that satisfies the literal ask, then offer heavier work as named tiers. A guard, rule, or test that catches zero existing cases is speculative: ask before adding it.
 
 This relaxes when the user asked for thorough upfront planning (`interview:plan`). There, depth is the point.
 
@@ -37,6 +44,15 @@ Inline on first use is enough. A separate definitions section is optional. Two r
 
 Defer naming to implementation when the deliverable is not the code itself (an issue, a design doc). Do not anchor the plan on a coined type, exception, or module name.
 
+## Plan Shape
+
+The plan is a do-now spec:
+
+- Open with the non-negotiable conventions and a stop condition (implement, ship, end). Without a stop condition, the implementing session absorbs the next job too.
+- Deferred design goes to a separate linked file the implementer is told not to open, with one pointer line in the plan. A handoff plan that was 40-45% deferred design cost the implementing session 221k tokens planning the next epic.
+- Resolved decisions and research synthesis move to a companion `<plan>.decisions.md` that the plan links.
+- Keep plans focused and under roughly 10k characters. No plan over 11.4k characters has been approved in two months. Past 10k, consolidate or split.
+
 ## Verification
 
 Aim for at least one criterion that fails when the change is wrong while the suite still passes. The shape:
@@ -49,6 +65,16 @@ Aim for at least one criterion that fails when the change is wrong while the sui
 
 Without the before/after contrast, a criterion only restates intent. Mechanical checks (`make test`, lint, typecheck, build) are necessary but not sufficient: list them once and confirm a named target exists before citing it. A criterion must be able to fail for a reason other than the edit not applying, so do not verify by asserting the diff landed (deleted attribute absent, added clause present).
 
+## Revision
+
+A redirect is new input scoped to what it names. On each iteration:
+
+- Revise the sections the feedback covers. Untouched sections stay untouched. Do not regrow the whole plan or log every decision and revision. Never re-present text unchanged after a rejection.
+- Consolidate before every re-present. A superseded design collapses to a two-line pointer: what it was, why it was parked, where the artifact lives. Resolved research moves to the decisions file. A plan that argues with its earlier self has stopped being a plan.
+- Lead the re-present with a short "Changed since last plan" block. The full document lives in the plan file the user reads at handoff. The re-present is for the delta.
+- Treat every AskUserQuestion answer from this session as a constraint. Before ExitPlanMode, verify the plan satisfies each one.
+- Question the axis, not the plan. When feedback or investigation opens an axis with more than one viable position (scope breadth, framework positioning, naming, execution shape), fire one batched AskUserQuestion before drafting into it. One unasked axis cost two full re-present cycles of a 47-50k-character plan.
+
 ## Naming and Conventions
 
 Before naming symbols, files, directories, or headings, check what already governs them:
@@ -59,7 +85,7 @@ Before naming symbols, files, directories, or headings, check what already gover
 
 ## Pauses
 
-A pause or bare interrupt in plan mode is a stop signal. Present and wait. Do not edit silently and re-submit, and do not re-present an unchanged plan.
+A pause or bare interrupt in plan mode is a stop signal. Present and wait. Do not edit silently and re-submit.
 
 ## Carryovers
 

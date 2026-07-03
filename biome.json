@@ -49,7 +49,7 @@
     }
   },
   "files": {
-    "includes": ["**/*.ts", "**/*.js", "**/*.json"],
+    "includes": ["**/*.ts", "**/*.js", "**/*.json", "!.claude/workflows/**"],
     "ignoreUnknown": true
   },
   "overrides": [

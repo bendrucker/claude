@@ -15,20 +15,22 @@ function mockInput(command: string): PreToolUseHookInput {
 }
 
 describe("parseTmuxCommand", () => {
-  test.each<{ name: string; input: string; expected: { subcommand: string; rest: string } | null }>([
-    {
-      name: "extracts subcommand and rest",
-      input: "tmux split-window -h -d",
-      expected: { subcommand: "split-window", rest: " -h -d" },
-    },
-    {
-      name: "handles subcommand with no args",
-      input: "tmux split-window",
-      expected: { subcommand: "split-window", rest: "" },
-    },
-    { name: "returns null for non-tmux command", input: "ls -la", expected: null },
-    { name: "returns null for empty string", input: "", expected: null },
-  ])("$name", ({ input, expected }) => {
+  test.each<{ name: string; input: string; expected: { subcommand: string; rest: string } | null }>(
+    [
+      {
+        name: "extracts subcommand and rest",
+        input: "tmux split-window -h -d",
+        expected: { subcommand: "split-window", rest: " -h -d" },
+      },
+      {
+        name: "handles subcommand with no args",
+        input: "tmux split-window",
+        expected: { subcommand: "split-window", rest: "" },
+      },
+      { name: "returns null for non-tmux command", input: "ls -la", expected: null },
+      { name: "returns null for empty string", input: "", expected: null },
+    ],
+  )("$name", ({ input, expected }) => {
     expect(parseTmuxCommand(input)).toEqual(expected);
   });
 });
@@ -54,8 +56,16 @@ describe("injectTarget", () => {
       command: "tmux split-window -h -d",
       expected: 'tmux split-window -t "%5" -h -d',
     },
-    { name: "injects target for alias", command: "tmux splitw -h", expected: 'tmux splitw -t "%5" -h' },
-    { name: "returns null for non-targetable command", command: "tmux list-sessions", expected: null },
+    {
+      name: "injects target for alias",
+      command: "tmux splitw -h",
+      expected: 'tmux splitw -t "%5" -h',
+    },
+    {
+      name: "returns null for non-targetable command",
+      command: "tmux list-sessions",
+      expected: null,
+    },
     {
       name: "returns null when -t already present",
       command: "tmux split-window -t %3 -h",

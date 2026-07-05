@@ -1,69 +1,53 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { printCaptured } from "./inbox";
 
 describe("printCaptured", () => {
-  test("prints title when present", () => {
-    const log = spyOn(console, "log").mockImplementation(() => {});
-    try {
-      printCaptured(new Map([["title", "Buy milk"]]));
-      expect(log).toHaveBeenCalledWith("captured: Buy milk");
-    } finally {
-      log.mockRestore();
-    }
+  let log: ReturnType<typeof spyOn>;
+
+  beforeEach(() => {
+    log = spyOn(console, "log").mockImplementation(() => {});
   });
 
-  test("prints first line and count for multi-line titles", () => {
-    const log = spyOn(console, "log").mockImplementation(() => {});
-    try {
-      printCaptured(new Map([["titles", "Buy milk\nWalk dog\nCall mom"]]));
-      expect(log).toHaveBeenCalledWith("captured: Buy milk (+2 more)");
-    } finally {
-      log.mockRestore();
-    }
+  afterEach(() => {
+    log.mockRestore();
   });
 
-  test("prints titles without suffix when only one line", () => {
-    const log = spyOn(console, "log").mockImplementation(() => {});
-    try {
-      printCaptured(new Map([["titles", "Just one"]]));
-      expect(log).toHaveBeenCalledWith("captured: Just one");
-    } finally {
-      log.mockRestore();
-    }
-  });
-
-  test("ignores blank lines in titles count", () => {
-    const log = spyOn(console, "log").mockImplementation(() => {});
-    try {
-      printCaptured(new Map([["titles", "Buy milk\n\n  \nWalk dog"]]));
-      expect(log).toHaveBeenCalledWith("captured: Buy milk (+1 more)");
-    } finally {
-      log.mockRestore();
-    }
-  });
-
-  test("falls back to (untitled) when neither title nor titles present", () => {
-    const log = spyOn(console, "log").mockImplementation(() => {});
-    try {
-      printCaptured(new Map([["notes", "just notes"]]));
-      expect(log).toHaveBeenCalledWith("captured: (untitled)");
-    } finally {
-      log.mockRestore();
-    }
-  });
-
-  test("prefers title over titles when both present", () => {
-    const log = spyOn(console, "log").mockImplementation(() => {});
-    try {
-      printCaptured(
-        new Map([
-          ["title", "Primary"],
-          ["titles", "Secondary"],
-        ]),
-      );
-      expect(log).toHaveBeenCalledWith("captured: Primary");
-    } finally {
-      log.mockRestore();
-    }
+  test.each<{ name: string; captured: Map<string, string>; expected: string }>([
+    {
+      name: "prints title when present",
+      captured: new Map([["title", "Buy milk"]]),
+      expected: "captured: Buy milk",
+    },
+    {
+      name: "prints first line and count for multi-line titles",
+      captured: new Map([["titles", "Buy milk\nWalk dog\nCall mom"]]),
+      expected: "captured: Buy milk (+2 more)",
+    },
+    {
+      name: "prints titles without suffix when only one line",
+      captured: new Map([["titles", "Just one"]]),
+      expected: "captured: Just one",
+    },
+    {
+      name: "ignores blank lines in titles count",
+      captured: new Map([["titles", "Buy milk\n\n  \nWalk dog"]]),
+      expected: "captured: Buy milk (+1 more)",
+    },
+    {
+      name: "falls back to (untitled) when neither title nor titles present",
+      captured: new Map([["notes", "just notes"]]),
+      expected: "captured: (untitled)",
+    },
+    {
+      name: "prefers title over titles when both present",
+      captured: new Map([
+        ["title", "Primary"],
+        ["titles", "Secondary"],
+      ]),
+      expected: "captured: Primary",
+    },
+  ])("$name", ({ captured, expected }) => {
+    printCaptured(captured);
+    expect(log).toHaveBeenCalledWith(expected);
   });
 });

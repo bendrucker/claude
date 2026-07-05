@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import {
   type Comment,
   detectRole,
@@ -45,14 +45,14 @@ function makeReview(login: string, date: string, state = "CHANGES_REQUESTED"): R
 }
 
 describe("parseUrl", () => {
-  it("parses a valid GitHub PR URL", () => {
-    const result = parseUrl("https://github.com/pydantic/pydantic-ai/pull/3772");
-    expect(result).toEqual({ owner: "pydantic", repo: "pydantic-ai", number: 3772 });
-  });
-
-  it("parses PR URL with trailing path segments", () => {
-    const result = parseUrl("https://github.com/owner/repo/pull/123/files");
-    expect(result).toEqual({ owner: "owner", repo: "repo", number: 123 });
+  test.each<[string, { owner: string; repo: string; number: number }]>([
+    [
+      "https://github.com/pydantic/pydantic-ai/pull/3772",
+      { owner: "pydantic", repo: "pydantic-ai", number: 3772 },
+    ],
+    ["https://github.com/owner/repo/pull/123/files", { owner: "owner", repo: "repo", number: 123 }],
+  ])("parses %p", (url, expected) => {
+    expect(parseUrl(url)).toEqual(expected);
   });
 
   it("throws on non-PR GitHub URL", () => {
@@ -65,12 +65,11 @@ describe("parseUrl", () => {
 });
 
 describe("detectRole", () => {
-  it("returns author when viewer is the PR author", () => {
-    expect(detectRole("bendrucker", "bendrucker")).toBe("author");
-  });
-
-  it("returns reviewer when viewer is not the PR author", () => {
-    expect(detectRole("DouweM", "bendrucker")).toBe("reviewer");
+  test.each<[string, string, Role]>([
+    ["bendrucker", "bendrucker", "author"],
+    ["DouweM", "bendrucker", "reviewer"],
+  ])("detectRole(viewer=%p, author=%p) -> %p", (viewer, author, expected) => {
+    expect(detectRole(viewer, author)).toBe(expected);
   });
 });
 

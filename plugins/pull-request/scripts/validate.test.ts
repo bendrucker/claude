@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
@@ -39,26 +39,14 @@ const LONG_PROSE = Array(40)
   .join(" ");
 
 describe("extractBodyFilePath", () => {
-  it("returns null when command has no --body-file", () => {
-    expect(extractBodyFilePath("gh pr create --title 'Test'")).toBeNull();
-  });
-
-  it("extracts path with space separator", () => {
-    expect(extractBodyFilePath("gh pr create --body-file /tmp/body.md")).toBe("/tmp/body.md");
-  });
-
-  it("extracts path with equals separator", () => {
-    expect(extractBodyFilePath("gh pr create --body-file=/tmp/body.md")).toBe("/tmp/body.md");
-  });
-
-  it("handles path with spaces in quotes", () => {
-    expect(extractBodyFilePath('gh pr create --body-file "/tmp/my file.md"')).toBe('"/tmp/my');
-  });
-
-  it("extracts path when --body-file is not at end", () => {
-    expect(extractBodyFilePath("gh pr create --body-file /tmp/body.md --draft")).toBe(
-      "/tmp/body.md",
-    );
+  test.each<[string, string | null]>([
+    ["gh pr create --title 'Test'", null],
+    ["gh pr create --body-file /tmp/body.md", "/tmp/body.md"],
+    ["gh pr create --body-file=/tmp/body.md", "/tmp/body.md"],
+    ['gh pr create --body-file "/tmp/my file.md"', '"/tmp/my'],
+    ["gh pr create --body-file /tmp/body.md --draft", "/tmp/body.md"],
+  ])("extractBodyFilePath(%p) -> %p", (command, expected) => {
+    expect(extractBodyFilePath(command)).toBe(expected);
   });
 });
 
@@ -69,32 +57,14 @@ describe("validateBody", () => {
     ).toBeNull();
   });
 
-  it("denies body with 'Added N tests' pattern", () => {
-    const result = validateBody("## Test plan\nAdded 5 tests for the new feature");
-    expect(result).not.toBeNull();
-    expect(getPermissionDecision(result)).toBe("deny");
-  });
-
-  it("denies body with 'Added N unit tests' pattern", () => {
-    const result = validateBody("## Test plan\nAdded 3 unit tests");
-    expect(result).not.toBeNull();
-    expect(getPermissionDecision(result)).toBe("deny");
-  });
-
-  it("denies body with 'Added N integration tests' pattern", () => {
-    const result = validateBody("## Test plan\nAdded 2 integration tests");
-    expect(result).not.toBeNull();
-    expect(getPermissionDecision(result)).toBe("deny");
-  });
-
-  it("denies body with 'N tests' pattern", () => {
-    const result = validateBody("## Test plan\n5 tests verify the behavior");
-    expect(result).not.toBeNull();
-    expect(getPermissionDecision(result)).toBe("deny");
-  });
-
-  it("denies body with lowercase 'added' pattern", () => {
-    const result = validateBody("## Test plan\nadded 10 tests");
+  test.each<[string, string]>([
+    ["'Added N tests' pattern", "## Test plan\nAdded 5 tests for the new feature"],
+    ["'Added N unit tests' pattern", "## Test plan\nAdded 3 unit tests"],
+    ["'Added N integration tests' pattern", "## Test plan\nAdded 2 integration tests"],
+    ["'N tests' pattern", "## Test plan\n5 tests verify the behavior"],
+    ["lowercase 'added' pattern", "## Test plan\nadded 10 tests"],
+  ])("denies body with %s", (_name, body) => {
+    const result = validateBody(body);
     expect(result).not.toBeNull();
     expect(getPermissionDecision(result)).toBe("deny");
   });
@@ -148,62 +118,54 @@ describe("validateBody", () => {
 });
 
 describe("hasReflexiveScaffold", () => {
-  it("flags a small body with both Changes and Testing headings", () => {
-    expect(hasReflexiveScaffold("## Changes\n\n- x\n\n## Testing\n\ny")).toBe(true);
-  });
-
-  it("does not flag when only one heading is present", () => {
-    expect(hasReflexiveScaffold("## Changes\n\n- x")).toBe(false);
-  });
-
-  it("does not flag a body at or over the word limit", () => {
-    const body = `${LONG_PROSE}\n\n## Changes\n\n- x\n\n## Testing\n\ny`;
-    expect(hasReflexiveScaffold(body)).toBe(false);
+  test.each<[string, string, boolean]>([
+    [
+      "flags a small body with both Changes and Testing headings",
+      "## Changes\n\n- x\n\n## Testing\n\ny",
+      true,
+    ],
+    ["does not flag when only one heading is present", "## Changes\n\n- x", false],
+    [
+      "does not flag a body at or over the word limit",
+      `${LONG_PROSE}\n\n## Changes\n\n- x\n\n## Testing\n\ny`,
+      false,
+    ],
+  ])("%s", (_name, input, expected) => {
+    expect(hasReflexiveScaffold(input)).toBe(expected);
   });
 });
 
 describe("hasFileTourBullets", () => {
-  it("flags a bold label with a path separator", () => {
-    expect(hasFileTourBullets("- **src/cache.ts**: adds a cache")).toBe(true);
-  });
-
-  it("flags a bold label that ends in a file extension", () => {
-    expect(hasFileTourBullets("* **cache.ts**: adds a cache")).toBe(true);
-  });
-
-  it("flags a bold label wrapped in backticks denoting a path", () => {
-    expect(hasFileTourBullets("- **`lib/foo.ts`**: refactors it")).toBe(true);
-  });
-
-  it("does not flag a plain concept label", () => {
-    expect(hasFileTourBullets("- **Caching**: stores records in memory")).toBe(false);
-  });
-
-  it("does not flag a multi-word concept label", () => {
-    expect(hasFileTourBullets("- **Retry logic**: backs off exponentially")).toBe(false);
+  test.each<[string, string, boolean]>([
+    ["flags a bold label with a path separator", "- **src/cache.ts**: adds a cache", true],
+    ["flags a bold label that ends in a file extension", "* **cache.ts**: adds a cache", true],
+    [
+      "flags a bold label wrapped in backticks denoting a path",
+      "- **`lib/foo.ts`**: refactors it",
+      true,
+    ],
+    ["does not flag a plain concept label", "- **Caching**: stores records in memory", false],
+    [
+      "does not flag a multi-word concept label",
+      "- **Retry logic**: backs off exponentially",
+      false,
+    ],
+  ])("%s", (_name, input, expected) => {
+    expect(hasFileTourBullets(input)).toBe(expected);
   });
 });
 
 describe("extractBacktickedHexCandidates", () => {
-  it("pulls a backticked short SHA", () => {
-    expect(extractBacktickedHexCandidates("a `2554da15` b")).toEqual(["2554da15"]);
-  });
+  const sha40 = "2554da150000000000000000000000000000abcd";
 
-  it("returns a backticked 40-char SHA", () => {
-    const sha = "2554da150000000000000000000000000000abcd";
-    expect(extractBacktickedHexCandidates(`Builds on \`${sha}\`.`)).toEqual([sha]);
-  });
-
-  it("ignores a bare (unbackticked) hex run", () => {
-    expect(extractBacktickedHexCandidates("commit 2554da15 landed")).toEqual([]);
-  });
-
-  it("ignores a backticked non-hex identifier", () => {
-    expect(extractBacktickedHexCandidates("calls `getUser` then")).toEqual([]);
-  });
-
-  it("ignores a backticked file path", () => {
-    expect(extractBacktickedHexCandidates("see `src/cache.ts`")).toEqual([]);
+  test.each<[string, string, string[]]>([
+    ["pulls a backticked short SHA", "a `2554da15` b", ["2554da15"]],
+    ["returns a backticked 40-char SHA", `Builds on \`${sha40}\`.`, [sha40]],
+    ["ignores a bare (unbackticked) hex run", "commit 2554da15 landed", []],
+    ["ignores a backticked non-hex identifier", "calls `getUser` then", []],
+    ["ignores a backticked file path", "see `src/cache.ts`", []],
+  ])("%s", (_name, input, expected) => {
+    expect(extractBacktickedHexCandidates(input)).toEqual(expected);
   });
 });
 
@@ -211,40 +173,25 @@ describe("findBacktickedCommits", () => {
   const known = new Set(["2554da15", "dc8acf12"]);
   const fakeVerifier = (sha: string) => Promise.resolve(known.has(sha));
 
-  it("returns candidates the verifier confirms", async () => {
-    const candidates = extractBacktickedHexCandidates("Builds on `2554da15`.");
-    expect(await findBacktickedCommits(candidates, fakeVerifier)).toEqual(["2554da15"]);
-  });
-
-  it("drops a hex candidate the verifier rejects", async () => {
-    const candidates = extractBacktickedHexCandidates("random `deadbeef` hash");
-    expect(await findBacktickedCommits(candidates, fakeVerifier)).toEqual([]);
+  test.each<[string, string, string[]]>([
+    ["returns candidates the verifier confirms", "Builds on `2554da15`.", ["2554da15"]],
+    ["drops a hex candidate the verifier rejects", "random `deadbeef` hash", []],
+  ])("%s", async (_name, input, expected) => {
+    const candidates = extractBacktickedHexCandidates(input);
+    expect(await findBacktickedCommits(candidates, fakeVerifier)).toEqual(expected);
   });
 });
 
 describe("hasBacktickedRef", () => {
-  it("flags a backticked issue/PR ref", () => {
-    expect(hasBacktickedRef("Closes `#123`")).toBe(true);
-  });
-
-  it("flags a backticked GitLab MR ref", () => {
-    expect(hasBacktickedRef("See `!45`")).toBe(true);
-  });
-
-  it("flags a backticked cross-repo ref", () => {
-    expect(hasBacktickedRef("Relates to `owner/repo#12`")).toBe(true);
-  });
-
-  it("does not flag a bare ref", () => {
-    expect(hasBacktickedRef("Closes #123")).toBe(false);
-  });
-
-  it("does not flag a backticked mention", () => {
-    expect(hasBacktickedRef("thanks `@user`")).toBe(false);
-  });
-
-  it("does not flag a backticked CSS id", () => {
-    expect(hasBacktickedRef("the `#main` selector")).toBe(false);
+  test.each<[string, string, boolean]>([
+    ["flags a backticked issue/PR ref", "Closes `#123`", true],
+    ["flags a backticked GitLab MR ref", "See `!45`", true],
+    ["flags a backticked cross-repo ref", "Relates to `owner/repo#12`", true],
+    ["does not flag a bare ref", "Closes #123", false],
+    ["does not flag a backticked mention", "thanks `@user`", false],
+    ["does not flag a backticked CSS id", "the `#main` selector", false],
+  ])("%s", (_name, input, expected) => {
+    expect(hasBacktickedRef(input)).toBe(expected);
   });
 });
 

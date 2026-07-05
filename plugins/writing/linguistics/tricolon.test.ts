@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
+import fc from "fast-check";
 import type { CoarseTag } from "./tags";
 import { normalizedDistance, tagShape, tricolonHits } from "./tricolon";
+
+const tagShapeArb = fc.array(
+  fc.constantFrom<CoarseTag>("NOUN", "VERB", "ADJ", "ADV", "PRON", "ADP", "CONJ", "AUX"),
+);
 
 const PARALLEL_TRIPLE =
   "The parser validates the incoming request payload quickly. " +
@@ -23,6 +28,18 @@ describe("normalizedDistance", () => {
 
   it("normalizes by the longer sequence", () => {
     expect(normalizedDistance(["NOUN", "VERB"], ["NOUN", "VERB", "ADV", "ADV"])).toBe(0.5);
+  });
+
+  it("is bounded in [0,1], symmetric, and zero on the diagonal", () => {
+    fc.assert(
+      fc.property(tagShapeArb, tagShapeArb, (a, b) => {
+        const d = normalizedDistance(a, b);
+        expect(d).toBeGreaterThanOrEqual(0);
+        expect(d).toBeLessThanOrEqual(1);
+        expect(normalizedDistance(b, a)).toBe(d);
+        expect(normalizedDistance(a, a)).toBe(0);
+      }),
+    );
   });
 });
 

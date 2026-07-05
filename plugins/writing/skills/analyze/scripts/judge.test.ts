@@ -259,16 +259,32 @@ describe("judgeCorpus", () => {
       model: "claude-haiku-4-5",
       estimatedCostUsd: 0.01,
     });
-    expect(audit.documents).toBe(3);
-    expect(audit.promptSha256).toBe("abc123");
-    const density = audit.criteria[0];
-    expect(density?.id).toBe("information-density");
-    expect(density?.flagged).toBe(2);
-    expect(density?.total).toBe(3);
-    expect(density?.spans).toEqual(["All tests pass.", "Updated three files."]);
     const sycophancy = audit.criteria.find((c) => c.id === "sycophancy");
-    expect(sycophancy?.flagged).toBe(1);
-    expect(sycophancy?.spans).toEqual([]);
+    expect({
+      documents: audit.documents,
+      promptSha256: audit.promptSha256,
+      density: audit.criteria[0],
+      sycophancy: sycophancy && { flagged: sycophancy.flagged, spans: sycophancy.spans },
+    }).toMatchInlineSnapshot(`
+      {
+        "density": {
+          "flagged": 2,
+          "id": "information-density",
+          "question": "Given that the reviewer has the diff, does this text tell them anything they could not see for themselves?",
+          "spans": [
+            "All tests pass.",
+            "Updated three files.",
+          ],
+          "total": 3,
+        },
+        "documents": 3,
+        "promptSha256": "abc123",
+        "sycophancy": {
+          "flagged": 1,
+          "spans": [],
+        },
+      }
+    `);
   });
 
   test("caps sampled spans", async () => {

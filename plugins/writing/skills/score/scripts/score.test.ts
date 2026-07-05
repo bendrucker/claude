@@ -91,13 +91,24 @@ describe("buildReport", () => {
 });
 
 describe("renderTable", () => {
-  const cases: Array<{ name: string; text: string }> = [
-    { name: "header with word count and category rows", text: "a — b" },
-    { name: "no patterns for clean prose", text: "The function reads input." },
-  ];
+  it("header with word count and category rows", () => {
+    expect(renderTable(buildReport("a — b", "doc.md", { comments: false }))).toMatchInlineSnapshot(`
+      "prose (2 words)
+      ╔════════════════╤══════╤═════════════╗
+      ║ Category       │ Hits │ Density /1k ║
+      ╟────────────────┼──────┼─────────────╢
+      ║ spaced em dash │ 1    │ 500.0       ║
+      ╚════════════════╧══════╧═════════════╝"
+    `);
+  });
 
-  it.each(cases)("$name", ({ text }) => {
-    expect(renderTable(buildReport(text, "doc.md", { comments: false }))).toMatchSnapshot();
+  it("no patterns for clean prose", () => {
+    expect(
+      renderTable(buildReport("The function reads input.", "doc.md", { comments: false })),
+    ).toMatchInlineSnapshot(`
+      "prose (4 words)
+      No patterns detected."
+    `);
   });
 });
 

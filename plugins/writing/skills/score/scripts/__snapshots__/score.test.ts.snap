@@ -1,19 +1,5 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`renderTable header with word count and category rows 1`] = `
-"prose (2 words)
-╔════════════════╤══════╤═════════════╗
-║ Category       │ Hits │ Density /1k ║
-╟────────────────┼──────┼─────────────╢
-║ spaced em dash │ 1    │ 500.0       ║
-╚════════════════╧══════╧═════════════╝"
-`;
-
-exports[`renderTable no patterns for clean prose 1`] = `
-"prose (4 words)
-No patterns detected."
-`;
-
 exports[`renderVoiceDeltaTable rate, baseline, and delta columns for in-register text 1`] = `
 "Voice Delta Features
 ╔═════════════════════════════════════════════════╤══════════════════╤═══════╤═══════════╤════════╗

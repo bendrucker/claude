@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -74,17 +74,15 @@ function mockMcp(toolName: string, toolInput: Record<string, unknown>): PreToolU
 }
 
 describe("plan files", () => {
-  it("skips Write to plan file with spaced em dash", async () => {
-    const input = mockWrite("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path =
-      `${process.env.HOME}/.claude/plans/my-plan.md`;
-    expect(await processInput(input)).toBeNull();
-  });
+  const planPath = `${process.env.HOME}/.claude/plans/my-plan.md`;
 
-  it("skips Edit to plan file with spaced em dash", async () => {
-    const input = mockEdit("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path =
-      `${process.env.HOME}/.claude/plans/my-plan.md`;
+  test.each<["Write" | "Edit"]>([
+    ["Write"],
+    ["Edit"],
+  ])("skips %s to plan file with spaced em dash", async (tool) => {
+    const input =
+      tool === "Write" ? mockWrite("This \u2014 is bad") : mockEdit("This \u2014 is bad");
+    (input.tool_input as Record<string, unknown>).file_path = planPath;
     expect(await processInput(input)).toBeNull();
   });
 
@@ -120,31 +118,30 @@ describe("plan mode", () => {
 describe("memory files", () => {
   const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
 
-  it("skips Write to memory file with spaced em dash", async () => {
-    const input = mockWrite("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = memoryPath;
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("skips Edit to memory file with spaced em dash", async () => {
-    const input = mockEdit("This \u2014 is bad");
+  test.each<["Write" | "Edit"]>([
+    ["Write"],
+    ["Edit"],
+  ])("skips %s to memory file with spaced em dash", async (tool) => {
+    const input =
+      tool === "Write" ? mockWrite("This \u2014 is bad") : mockEdit("This \u2014 is bad");
     (input.tool_input as Record<string, unknown>).file_path = memoryPath;
     expect(await processInput(input)).toBeNull();
   });
 });
 
 describe("wordlist files", () => {
-  it("skips Write to wordlist file containing flagged vocabulary", async () => {
-    const input = mockWrite("delve\ntapestry\nbolstered\n");
-    (input.tool_input as Record<string, unknown>).file_path =
-      "/Users/test/plugins/writing/wordlists/vocabulary.txt";
-    expect(await processInput(input)).toBeNull();
-  });
+  const wordlistPath = "/Users/test/plugins/writing/wordlists/vocabulary.txt";
 
-  it("skips Edit to wordlist file", async () => {
-    const input = mockEdit("delve\nadded entry\n");
-    (input.tool_input as Record<string, unknown>).file_path =
-      "/Users/test/plugins/writing/wordlists/vocabulary.txt";
+  test.each<[string, string, string]>([
+    [
+      "skips Write to wordlist file containing flagged vocabulary",
+      "Write",
+      "delve\ntapestry\nbolstered\n",
+    ],
+    ["skips Edit to wordlist file", "Edit", "delve\nadded entry\n"],
+  ])("%s", async (_name, tool, content) => {
+    const input = tool === "Write" ? mockWrite(content) : mockEdit(content);
+    (input.tool_input as Record<string, unknown>).file_path = wordlistPath;
     expect(await processInput(input)).toBeNull();
   });
 

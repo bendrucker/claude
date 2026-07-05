@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import fc from "fast-check";
-import { rankComments, scoreComment, type SortKey } from "./rank";
+import { rankComments, type SortKey, scoreComment } from "./rank";
 import type { Comment } from "./types";
 
 function comment(over: Partial<Comment> = {}): Comment {

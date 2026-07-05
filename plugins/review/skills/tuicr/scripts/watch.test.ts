@@ -32,19 +32,13 @@ describe("describeComment", () => {
 });
 
 describe("newComments", () => {
-  test("returns only comments whose IDs are not yet seen", () => {
-    const seen = new Set(["c1"]);
-    const comments = [comment({ id: "c1" }), comment({ id: "c2" })];
-    expect(newComments(seen, comments).map((c) => c.id)).toEqual(["c2"]);
-  });
-
-  test("skips comments without an ID", () => {
-    const comments = [comment({ id: "" }), comment({ id: "c2" })];
-    expect(newComments(new Set(), comments).map((c) => c.id)).toEqual(["c2"]);
-  });
-
-  test("returns nothing when all are seen", () => {
-    const comments = [comment({ id: "c1" }), comment({ id: "c2" })];
-    expect(newComments(new Set(["c1", "c2"]), comments)).toEqual([]);
+  test.each<[string, string[], string[], string[]]>([
+    ["returns only comments whose IDs are not yet seen", ["c1"], ["c1", "c2"], ["c2"]],
+    ["skips comments without an ID", [], ["", "c2"], ["c2"]],
+    ["returns nothing when all are seen", ["c1", "c2"], ["c1", "c2"], []],
+  ])("%s", (_name, seenIds, commentIds, expected) => {
+    const seen = new Set(seenIds);
+    const comments = commentIds.map((id) => comment({ id }));
+    expect(newComments(seen, comments).map((c) => c.id)).toEqual(expected);
   });
 });

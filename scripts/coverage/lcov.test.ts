@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import fc from "fast-check";
 import {
   coveredLines,
+  type FileCoverage,
   formatLcov,
   formatRanges,
   lineCoverage,
@@ -8,6 +10,21 @@ import {
   parseLcov,
   uncoveredLines,
 } from "./lcov";
+
+const pathChar = fc.constantFrom(
+  ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-".split(""),
+);
+
+const fileCoverage = fc.record<FileCoverage>({
+  file: fc.array(pathChar, { minLength: 1 }).map((chars) => chars.join("")),
+  lineHits: fc
+    .uniqueArray(fc.tuple(fc.integer({ min: 1 }), fc.nat()), {
+      selector: ([line]) => line,
+    })
+    .map((entries) => new Map(entries)),
+  functionsFound: fc.nat(),
+  functionsHit: fc.nat(),
+});
 
 function defined<T>(value: T | undefined): T {
   if (value === undefined) throw new Error("expected a value");
@@ -41,11 +58,21 @@ end_of_record
 describe("parseLcov", () => {
   test("extracts file, line hits, and function totals", () => {
     const a = defined(parseLcov(SINGLE)[0]);
-    expect(a.file).toBe("src/a.ts");
-    expect(a.functionsFound).toBe(2);
-    expect(a.functionsHit).toBe(1);
-    expect(a.lineHits.get(1)).toBe(5);
-    expect(a.lineHits.get(2)).toBe(0);
+    expect(a).toMatchInlineSnapshot(`
+      {
+        "file": "src/a.ts",
+        "functionsFound": 2,
+        "functionsHit": 1,
+        "lineHits": 
+      Map {
+          1 => 5,
+          2 => 0,
+          3 => 0,
+          4 => 2,
+        }
+      ,
+      }
+    `);
   });
 
   test("parses multiple records", () => {
@@ -110,9 +137,20 @@ end_of_record
 });
 
 describe("formatLcov", () => {
-  test("round-trips through the parser", () => {
-    const records = parseLcov(MULTI);
+  test.each<{ name: string; text: string }>([
+    { name: "single record", text: SINGLE },
+    { name: "multiple records", text: MULTI },
+  ])("round-trips $name through the parser", ({ text }) => {
+    const records = parseLcov(text);
     expect(parseLcov(formatLcov(records))).toEqual(records);
+  });
+
+  test("round-trips any records through the parser", () => {
+    fc.assert(
+      fc.property(fc.array(fileCoverage), (records) => {
+        expect(parseLcov(formatLcov(records))).toEqual(records);
+      }),
+    );
   });
 
   test("emits empty string for no records", () => {

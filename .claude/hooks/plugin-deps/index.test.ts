@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -57,19 +57,18 @@ process.exit(${VIOLATION_EXIT});`,
     expect(output?.reason).toContain('missing dependency "cleye"');
   });
 
-  it("reports a non-blocking systemMessage when the checker crashes", async () => {
-    const checker = await fakeChecker(
-      "crash.ts",
-      `throw new Error("Cannot find module '@bendrucker/claude-marketplace'");`,
-    );
+  test.each<{ name: string; crashes: boolean }>([
+    { name: "reports a non-blocking systemMessage when the checker crashes", crashes: true },
+    { name: "does not block when the checker script is missing", crashes: false },
+  ])("$name", async ({ crashes }) => {
+    const checker = crashes
+      ? await fakeChecker(
+          "crash.ts",
+          `throw new Error("Cannot find module '@bendrucker/claude-marketplace'");`,
+        )
+      : join(tempDir, "missing.ts");
 
     const output = await processStop(stopInput(), checker);
-    expect(output?.decision).toBeUndefined();
-    expect(output?.systemMessage).toContain("checker could not run");
-  });
-
-  it("does not block when the checker script is missing", async () => {
-    const output = await processStop(stopInput(), join(tempDir, "missing.ts"));
     expect(output?.decision).toBeUndefined();
     expect(output?.systemMessage).toContain("checker could not run");
   });

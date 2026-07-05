@@ -73,20 +73,18 @@ describe("formatHint", () => {
 });
 
 describe("processPostToolUse", () => {
-  test("ignores non-edit tools", async () => {
+  test.each<{ name: string; toolName: string; filePath: string }>([
+    { name: "ignores non-edit tools", toolName: "Read", filePath: sourceFile },
+    {
+      name: "ignores test files",
+      toolName: "Edit",
+      filePath: join(workDir, "sample.test.ts"),
+    },
+  ])("$name", async ({ toolName, filePath }) => {
     const result = await processPostToolUse({
       hook_event_name: "PostToolUse",
-      tool_name: "Read",
-      tool_input: { file_path: sourceFile },
-    } as Parameters<typeof processPostToolUse>[0]);
-    expect(result).toBeNull();
-  });
-
-  test("ignores test files", async () => {
-    const result = await processPostToolUse({
-      hook_event_name: "PostToolUse",
-      tool_name: "Edit",
-      tool_input: { file_path: join(workDir, "sample.test.ts") },
+      tool_name: toolName,
+      tool_input: { file_path: filePath },
     } as Parameters<typeof processPostToolUse>[0]);
     expect(result).toBeNull();
   });

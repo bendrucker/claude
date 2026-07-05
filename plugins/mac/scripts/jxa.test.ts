@@ -1,94 +1,86 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import { join } from "node:path";
 import type { RunResult } from "./jxa";
 import { isRetriableAppleEventsError, runWithRetry, validateAppScope } from "./jxa";
 
+type ScopeResult = { valid: boolean; violations: string[] };
+const valid: ScopeResult = { valid: true, violations: [] };
+const commentedOutSource = [
+  "// Application('Mail')",
+  'var app = Application("Things3");',
+  "app.name();",
+].join("\n");
+
 describe("validateAppScope", () => {
-  it("allows Application matching the target app", () => {
-    const result = validateAppScope('Application("Things3").lists()', "Things3");
-    expect(result).toEqual({ valid: true, violations: [] });
-  });
-
-  it("rejects Application targeting a different app", () => {
-    const result = validateAppScope('Application("Mail").inbox()', "Things3");
-    expect(result).toEqual({ valid: false, violations: ["Mail"] });
-  });
-
-  it("allows Application.currentApplication()", () => {
-    const result = validateAppScope(
-      "var app = Application.currentApplication(); app.includeStandardAdditions = true;",
-      "Things3",
-    );
-    expect(result).toEqual({ valid: true, violations: [] });
-  });
-
-  it("detects mixed target and foreign apps", () => {
-    const result = validateAppScope(
-      'Application("Things3").name(); Application("Mail").inbox()',
-      "Things3",
-    );
-    expect(result).toEqual({ valid: false, violations: ["Mail"] });
-  });
-
-  it("ignores Application in comments", () => {
-    const source = [
-      "// Application('Mail')",
-      'var app = Application("Things3");',
-      "app.name();",
-    ].join("\n");
-    const result = validateAppScope(source, "Things3");
-    expect(result).toEqual({ valid: true, violations: [] });
-  });
-
-  it("ignores Application in string literals", () => {
-    const source = 'var s = "Application(\'Mail\')"; Application("Things3").name();';
-    const result = validateAppScope(source, "Things3");
-    expect(result).toEqual({ valid: true, violations: [] });
-  });
-
-  it("strips shebang before parsing", () => {
-    const source =
-      '#!/usr/bin/env osascript -l JavaScript\nfunction run() { Application("Things3").name(); }';
-    const result = validateAppScope(source, "Things3");
-    expect(result).toEqual({ valid: true, violations: [] });
+  test.each<{ name: string; source: string; expected: ScopeResult }>([
+    {
+      name: "allows Application matching the target app",
+      source: 'Application("Things3").lists()',
+      expected: valid,
+    },
+    {
+      name: "rejects Application targeting a different app",
+      source: 'Application("Mail").inbox()',
+      expected: { valid: false, violations: ["Mail"] },
+    },
+    {
+      name: "allows Application.currentApplication()",
+      source: "var app = Application.currentApplication(); app.includeStandardAdditions = true;",
+      expected: valid,
+    },
+    {
+      name: "detects mixed target and foreign apps",
+      source: 'Application("Things3").name(); Application("Mail").inbox()',
+      expected: { valid: false, violations: ["Mail"] },
+    },
+    { name: "ignores Application in comments", source: commentedOutSource, expected: valid },
+    {
+      name: "ignores Application in string literals",
+      source: 'var s = "Application(\'Mail\')"; Application("Things3").name();',
+      expected: valid,
+    },
+    {
+      name: "strips shebang before parsing",
+      source:
+        '#!/usr/bin/env osascript -l JavaScript\nfunction run() { Application("Things3").name(); }',
+      expected: valid,
+    },
+    { name: "allows scripts with no Application calls", source: "var x = 1 + 2;", expected: valid },
+  ])("$name", ({ source, expected }) => {
+    expect(validateAppScope(source, "Things3")).toEqual(expected);
   });
 
   it("throws on syntax errors", () => {
     expect(() => validateAppScope("function {{{", "Things3")).toThrow("Failed to parse JXA source");
   });
-
-  it("allows scripts with no Application calls", () => {
-    const result = validateAppScope("var x = 1 + 2;", "Things3");
-    expect(result).toEqual({ valid: true, violations: [] });
-  });
 });
 
 describe("isRetriableAppleEventsError", () => {
-  it("matches the -10004 privilege-violation code in stderr", () => {
-    expect(isRetriableAppleEventsError(1, "execution error: not allowed (-10004)")).toBe(true);
-  });
-
-  it("matches the -600 code in stderr", () => {
-    expect(isRetriableAppleEventsError(1, "execution error: isn't running (-600)")).toBe(true);
-  });
-
-  it("matches a Connection Invalid XPC hiccup", () => {
-    expect(
-      isRetriableAppleEventsError(1, "Connection Invalid to com.apple.hiservices-xpcservice"),
-    ).toBe(true);
-  });
-
-  it("matches when the retriable code surfaces as the exit code", () => {
-    expect(isRetriableAppleEventsError(-10004, "")).toBe(true);
-    expect(isRetriableAppleEventsError(-600, "")).toBe(true);
-  });
-
-  it("does not match an unrelated execution error", () => {
-    expect(isRetriableAppleEventsError(1, "execution error: Can't get item 5 (-1728)")).toBe(false);
-  });
-
-  it("does not match success", () => {
-    expect(isRetriableAppleEventsError(0, "")).toBe(false);
+  test.each<[string, number, string, boolean]>([
+    [
+      "matches the -10004 privilege-violation code in stderr",
+      1,
+      "execution error: not allowed (-10004)",
+      true,
+    ],
+    ["matches the -600 code in stderr", 1, "execution error: isn't running (-600)", true],
+    [
+      "matches a Connection Invalid XPC hiccup",
+      1,
+      "Connection Invalid to com.apple.hiservices-xpcservice",
+      true,
+    ],
+    ["matches the -10004 code surfacing as the exit code", -10004, "", true],
+    ["matches the -600 code surfacing as the exit code", -600, "", true],
+    [
+      "does not match an unrelated execution error",
+      1,
+      "execution error: Can't get item 5 (-1728)",
+      false,
+    ],
+    ["does not match success", 0, "", false],
+  ])("%s", (_name, code, stderr, expected) => {
+    expect(isRetriableAppleEventsError(code, stderr)).toBe(expected);
   });
 });
 

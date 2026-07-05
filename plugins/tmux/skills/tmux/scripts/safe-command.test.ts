@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
 const script = join(import.meta.dir, "safe-command.sh");
@@ -23,26 +23,19 @@ function isAllow(output: string): boolean {
 }
 
 describe("safe-command", () => {
-  it("auto-allows read-only commands", async () => {
-    expect(isAllow(await run("tmux capture-pane -p"))).toBe(true);
-    expect(isAllow(await run("tmux display-message -p '#{pane_id}'"))).toBe(true);
-    expect(isAllow(await run("tmux list-windows"))).toBe(true);
-  });
-
-  it("auto-allows within-window layout and pane commands", async () => {
-    expect(isAllow(await run("tmux select-pane -t %3"))).toBe(true);
-    expect(isAllow(await run("tmux resize-pane -D 5"))).toBe(true);
-  });
-
-  it("does not auto-allow window-navigation commands", async () => {
-    expect(await run("tmux select-window -t :2")).toBe("");
-    expect(await run("tmux switch-client -t other")).toBe("");
-    expect(await run("tmux next-window")).toBe("");
-    expect(await run("tmux previous-window")).toBe("");
-    expect(await run("tmux last-window")).toBe("");
-  });
-
-  it("does not auto-allow non-tmux commands", async () => {
-    expect(await run("ls -la")).toBe("");
+  test.each<{ command: string; allowed: boolean }>([
+    { command: "tmux capture-pane -p", allowed: true },
+    { command: "tmux display-message -p '#{pane_id}'", allowed: true },
+    { command: "tmux list-windows", allowed: true },
+    { command: "tmux select-pane -t %3", allowed: true },
+    { command: "tmux resize-pane -D 5", allowed: true },
+    { command: "tmux select-window -t :2", allowed: false },
+    { command: "tmux switch-client -t other", allowed: false },
+    { command: "tmux next-window", allowed: false },
+    { command: "tmux previous-window", allowed: false },
+    { command: "tmux last-window", allowed: false },
+    { command: "ls -la", allowed: false },
+  ])("$command -> allowed=$allowed", async ({ command, allowed }) => {
+    expect(isAllow(await run(command))).toBe(allowed);
   });
 });

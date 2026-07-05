@@ -47,9 +47,7 @@ describe("stripCode", () => {
       plainSegment,
     )
     .map(([pre, code, post]) => `${pre}\`${code}\`${post}`);
-  const fencedBlock = fc
-    .array(plainSegment)
-    .map((lines) => `\`\`\`\n${lines.join("\n")}\n\`\`\``);
+  const fencedBlock = fc.array(plainSegment).map((lines) => `\`\`\`\n${lines.join("\n")}\n\`\`\``);
   const codeSafeText = fc
     .array(fc.oneof(plainSegment, inlineCodeLine, fencedBlock))
     .map((blocks) => blocks.join("\n"));

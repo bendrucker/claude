@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import type { Operation } from "rfc6902";
-import { applyOverlay, findRedundantOps, getPointer } from "./overlay";
+import { applyOverlay, findRedundantOps, getPointer, type RedundantOp } from "./overlay";
 
 describe("applyOverlay", () => {
   it("adds and replaces without mutating the base", () => {
@@ -28,40 +28,34 @@ describe("applyOverlay", () => {
 });
 
 describe("getPointer", () => {
-  it("resolves nested paths and decodes escapes", () => {
-    const value = { a: { "b/c": { "~x": 1 } } };
-    expect(getPointer(value, "/a/b~1c/~0x")).toBe(1);
-    expect(getPointer(value, "")).toBe(value);
-  });
-
-  it("returns undefined for missing segments", () => {
-    expect(getPointer({ a: 1 }, "/a/b")).toBeUndefined();
-    expect(getPointer({}, "/missing")).toBeUndefined();
+  const nested = { a: { "b/c": { "~x": 1 } } };
+  test.each<[unknown, string, unknown]>([
+    [nested, "/a/b~1c/~0x", 1],
+    [nested, "", nested],
+    [{ a: 1 }, "/a/b", undefined],
+    [{}, "/missing", undefined],
+  ])("getPointer(%p, %p) is %p", (value, pointer, expected) => {
+    expect(getPointer(value, pointer)).toEqual(expected);
   });
 });
 
 describe("findRedundantOps", () => {
-  it("flags add/replace ops the base already satisfies", () => {
-    const base = { properties: { theme: { type: "string" }, name: { type: "string" } } };
-    const patch: Operation[] = [
-      { op: "add", path: "/properties/theme", value: { type: "string" } },
-      { op: "add", path: "/properties/extra", value: { type: "boolean" } },
-    ];
+  const changedReplace: Operation = { op: "replace", path: "/$id", value: "mine" };
+  const removeOp: Operation = { op: "remove", path: "/properties/gone" };
 
-    const redundant = findRedundantOps(base, patch);
-
-    expect(redundant).toEqual([{ index: 0, path: "/properties/theme" }]);
-  });
-
-  it("does not flag a replace that changes the value", () => {
-    const base = { $id: "upstream" };
-    const patch: Operation[] = [{ op: "replace", path: "/$id", value: "mine" }];
-    expect(findRedundantOps(base, patch)).toEqual([]);
-  });
-
-  it("ignores remove operations", () => {
-    const base = { properties: {} };
-    const patch: Operation[] = [{ op: "remove", path: "/properties/gone" }];
-    expect(findRedundantOps(base, patch)).toEqual([]);
+  test.each<[string, Record<string, unknown>, Operation[], RedundantOp[]]>([
+    [
+      "flags add/replace ops the base already satisfies",
+      { properties: { theme: { type: "string" }, name: { type: "string" } } },
+      [
+        { op: "add", path: "/properties/theme", value: { type: "string" } },
+        { op: "add", path: "/properties/extra", value: { type: "boolean" } },
+      ],
+      [{ index: 0, path: "/properties/theme" }],
+    ],
+    ["does not flag a replace that changes the value", { $id: "upstream" }, [changedReplace], []],
+    ["ignores remove operations", { properties: {} }, [removeOp], []],
+  ])("%s", (_name, base, patch, expected) => {
+    expect(findRedundantOps(base, patch)).toEqual(expected);
   });
 });

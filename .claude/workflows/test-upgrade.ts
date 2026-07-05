@@ -144,6 +144,7 @@ function mechanicalPrompt(unit, items) {
     "Hard constraints: no behavior change (the same things are asserted before and after), net test LOC down,",
     `and \`${testCommand(unit)}\` green when you finish.`,
     "Use `bun test <file> --update-snapshots` to fill inline snapshots, then review what it wrote.",
+    "Run `bunx biome check --write` on every file you changed: the formatter reflows table/array literals and the linter catches issues like arrow-body forEach returning a value. CI runs `bun run check` and fails the whole job on one error.",
     "If a refactor would change what is asserted, leave that site alone and record it as an escalation.",
     "Return the absolute path of your worktree (pwd) as 'worktree'.",
   ].join("\n");
@@ -168,6 +169,7 @@ function propertyPrompt(unit, items, workspace) {
     "Constrain arbitraries (or fc.pre) rather than filtering. Define typed fc.record arbitraries next to the tests.",
     "Seed-check every property: temporarily mutate the target function, confirm the property fails and shrinks, then revert the mutation.",
     `Finish with \`${testCommand(unit)}\` green.`,
+    "Run `bunx biome check --write` on every file you changed. CI runs `bun run check` and fails on one lint or format error.",
     "If an invariant does not actually hold, do not weaken it to pass: record an escalation instead.",
     "Return the absolute path of your worktree (pwd) as 'worktree'.",
   ].join("\n");
@@ -178,15 +180,16 @@ function verifyPrompt(unit, audit, workspace, escalations) {
     `cd ${workspace}. This worktree holds uncommitted test refactors for ${unit.name}.`,
     "",
     `1. Run \`AGENT=1 ${testCommand(unit)}\` and require it green.`,
-    "2. Review `git diff` in full: refactored sites must assert the same things as before, and pure refactors must reduce LOC.",
+    "2. Run `bun run check` (biome) and require it clean. This is the same gate CI's `lint` job runs, and it fails the job on a single format or lint error. Biome truncates output at 20 diagnostics and the repo carries pre-existing warnings, so scope it to your changed files (`bunx biome check <files>`) to surface the real error. Apply `bunx biome check --write` for safe fixes; hand-fix the rest (e.g. an arrow-body `forEach` that returns `expect(...)` becomes a block body). Do not push until this is clean.",
+    "3. Review `git diff` in full: refactored sites must assert the same things as before, and pure refactors must reduce LOC.",
     "   Property tests may add lines. Recompute the unit's test LOC (wc -l over *.test.ts) as testLocAfter.",
     `   Test LOC before the refactor was ${audit.testLoc}.`,
-    `3. Outstanding escalations from the apply stage: ${escalations.length ? escalations.join("; ") : "none"}.`,
+    `4. Outstanding escalations from the apply stage: ${escalations.length ? escalations.join("; ") : "none"}.`,
     "   If any escalation or diff concern makes the change unsafe to ship as-is, return status 'escalated' with notes and stop before pushing.",
-    `4. Otherwise: \`git checkout -b test-upgrade-${unit.name}\`, commit everything with subject \`test(${unit.name}): apply testing conventions\`,`,
+    `5. Otherwise: \`git checkout -b test-upgrade-${unit.name}\`, commit everything with subject \`test(${unit.name}): apply testing conventions\`,`,
     "   push with -u, and open a PR by following plugins/pull-request/skills/create/SKILL.md (read it from the worktree).",
     `   The PR body must state test LOC before (${audit.testLoc}) and after, what was tabled/snapshotted, and each property's invariant.`,
-    "5. Return status 'pr' with the PR URL, or 'skipped'/'escalated' with notes. Never guess on a judgment call: escalate it.",
+    "6. Return status 'pr' with the PR URL, or 'skipped'/'escalated' with notes. Never guess on a judgment call: escalate it.",
   ].join("\n");
 }
 

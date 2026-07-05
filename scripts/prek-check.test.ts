@@ -22,7 +22,10 @@ async function run(...args: string[]): Promise<RunResult> {
 
 describe("prek-check plugin-validate", () => {
   it.each<[string, string]>([
-    ["relative path pointing outside the tree", "../../other/plugins/foo/.claude-plugin/plugin.json"],
+    [
+      "relative path pointing outside the tree",
+      "../../other/plugins/foo/.claude-plugin/plugin.json",
+    ],
     ["absolute path", "/abs/plugins/foo/.claude-plugin/plugin.json"],
   ])("skips a %s without ENOENT", async (_name, path) => {
     const { exitCode, stderr } = await run("plugin-validate", path);

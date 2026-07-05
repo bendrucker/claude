@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
-import fc from "fast-check";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,6 +8,7 @@ import type {
   PostToolUseHookSpecificOutput,
   PreToolUseHookInput,
 } from "@anthropic-ai/claude-agent-sdk";
+import fc from "fast-check";
 import { processInput as checkInput, hasTrailingNewline } from "./check";
 import { processInput as ensureInput, ensureTrailingNewline } from "./ensure";
 import { processInput as preserveInput, preserveNewlineState } from "./preserve";

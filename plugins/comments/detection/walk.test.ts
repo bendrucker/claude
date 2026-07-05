@@ -11,33 +11,33 @@ describe("filterCodeFiles", () => {
     "vendor/lib.go",
   ];
 
-  test("keeps only paths that map to a known language", () => {
-    expect(filterCodeFiles(files)).toEqual([
-      "src/auth.ts",
-      "src/main.py",
-      "queries/report.sql",
-      "vendor/lib.go",
-    ]);
-  });
-
-  test("intersects a single path glob with the language filter", () => {
-    expect(filterCodeFiles(files, ["src/**"])).toEqual(["src/auth.ts", "src/main.py"]);
-  });
-
-  test("keeps a path matching any of several globs", () => {
-    expect(filterCodeFiles(files, ["src/**", "queries/**"])).toEqual([
-      "src/auth.ts",
-      "src/main.py",
-      "queries/report.sql",
-    ]);
-  });
-
-  test("a glob matching only non-code files yields nothing", () => {
-    expect(filterCodeFiles(files, ["docs/**"])).toEqual([]);
-  });
-
-  test("an empty glob list keeps every code file", () => {
-    expect(filterCodeFiles(files, [])).toEqual(filterCodeFiles(files));
+  test.each<{ name: string; globs?: string[]; expected: string[] }>([
+    {
+      name: "keeps only paths that map to a known language (no globs)",
+      expected: ["src/auth.ts", "src/main.py", "queries/report.sql", "vendor/lib.go"],
+    },
+    {
+      name: "intersects a single path glob with the language filter",
+      globs: ["src/**"],
+      expected: ["src/auth.ts", "src/main.py"],
+    },
+    {
+      name: "keeps a path matching any of several globs",
+      globs: ["src/**", "queries/**"],
+      expected: ["src/auth.ts", "src/main.py", "queries/report.sql"],
+    },
+    {
+      name: "a glob matching only non-code files yields nothing",
+      globs: ["docs/**"],
+      expected: [],
+    },
+    {
+      name: "an empty glob list keeps every code file",
+      globs: [],
+      expected: ["src/auth.ts", "src/main.py", "queries/report.sql", "vendor/lib.go"],
+    },
+  ])("$name", ({ globs, expected }) => {
+    expect(filterCodeFiles(files, globs)).toEqual(expected);
   });
 });
 

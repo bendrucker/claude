@@ -27,205 +27,210 @@ function item(over: Partial<EditItem> = {}): EditItem {
   };
 }
 
-describe("computeFileEdits case (a): full-line comment", () => {
-  test("deletes a single full-line comment", () => {
-    const source = "const x = 1;\n// restate\nconst y = 2;";
-    const result = computeFileEdits(source, [
-      item({ startLine: 2, endLine: 2, startColumn: 0, endColumn: 10 }),
-    ]);
-    expect(result.content).toBe("const x = 1;\nconst y = 2;");
-    expect(result.skips).toEqual([]);
-  });
+describe("computeFileEdits", () => {
+  const trailingSrc = "count += 1; // increment";
+  const trailingRewrite = "count += 1; // bumps the counter, matching the bash original";
 
-  test("deletes a multi-line block on its own lines", () => {
-    const source = "a();\n/* line one\n   line two */\nb();";
-    const result = computeFileEdits(source, [
-      item({ startLine: 2, endLine: 3, startColumn: 0, endColumn: 14, kind: "block" }),
-    ]);
-    expect(result.content).toBe("a();\nb();");
-  });
-
-  test("collapses the surrounding blanks when a banner is deleted", () => {
-    const source = "const x = 1;\n\n// banner\n\nconst y = 2;";
-    const result = computeFileEdits(source, [
-      item({ startLine: 3, endLine: 3, startColumn: 0, endColumn: 9 }),
-    ]);
-    expect(result.content).toBe("const x = 1;\n\nconst y = 2;");
-  });
-
-  test("leaves a pre-existing double blank far from any deletion intact", () => {
-    const source = "const x = 1;\n// banner\nconst y = 2;\n\n\nconst z = 3;";
-    const result = computeFileEdits(source, [
-      item({ startLine: 2, endLine: 2, startColumn: 0, endColumn: 9 }),
-    ]);
-    expect(result.content).toBe("const x = 1;\nconst y = 2;\n\n\nconst z = 3;");
-  });
-});
-
-describe("computeFileEdits case (b): trailing comment", () => {
-  test("strips a trailing line comment, keeping the code and dropping trailing space", () => {
-    const source = "count += 1; // increment";
-    const result = computeFileEdits(source, [
-      item({ startLine: 1, endLine: 1, startColumn: 12, endColumn: source.length }),
-    ]);
-    expect(result.content).toBe("count += 1;");
-  });
-
-  test("skips a trailing block with code after it on the same line", () => {
-    const source = "x = 1; /* note */ y = 2;";
-    const result = computeFileEdits(source, [
-      item({ startLine: 1, endLine: 1, startColumn: 7, endColumn: 17, kind: "block" }),
-    ]);
-    expect(result.content).toBe(source);
-    expect(result.skips).toHaveLength(1);
-    expect(result.skips[0]?.detail).toMatch(/interleaved/);
-  });
-});
-
-describe("computeFileEdits case (c): trimToLines", () => {
-  test("keeps the comment-relative line and deletes the rest of the span", () => {
-    const source = "op = 1;\n# Data migration: convert\n# tool calls have args\ndo_thing();";
-    const result = computeFileEdits(source, [
-      item({
-        startLine: 2,
-        endLine: 3,
-        startColumn: 0,
-        endColumn: 22,
-        kind: "line",
-        verdict: verdict({ trimToLines: [2] }),
-      }),
-    ]);
-    expect(result.content).toBe("op = 1;\n# tool calls have args\ndo_thing();");
-  });
-
-  test("skips a trim that would drop a block's opening or closing delimiter", () => {
-    const source = "a();\n/**\n * keep this\n * drop this\n */\nb();";
-    const result = computeFileEdits(source, [
-      item({
-        startLine: 2,
-        endLine: 5,
-        startColumn: 0,
-        endColumn: 3,
-        kind: "docstring",
-        verdict: verdict({ trimToLines: [2] }),
-      }),
-    ]);
-    expect(result.content).toBe(source);
-    expect(result.skips[0]?.detail).toMatch(/delimiter/);
-  });
-
-  test("an empty trim falls back to full deletion", () => {
-    const source = "x = 1;\n// gone\ny = 2;";
-    const result = computeFileEdits(source, [
-      item({
-        startLine: 2,
-        endLine: 2,
-        startColumn: 0,
-        endColumn: 7,
-        verdict: verdict({ trimToLines: [] }),
-      }),
-    ]);
-    expect(result.content).toBe("x = 1;\ny = 2;");
-  });
-});
-
-describe("computeFileEdits resolution", () => {
-  test("deletion wins over a replacement on the same line", () => {
-    const source = "keep();\nval(); // note\nmore();";
-    const wholeLine = item({ startLine: 2, endLine: 2, startColumn: 0, endColumn: 14 });
-    const trailing = item({ startLine: 2, endLine: 2, startColumn: 7, endColumn: 14 });
-    const result = computeFileEdits(source, [trailing, wholeLine]);
-    expect(result.content).toBe("keep();\nmore();");
-  });
-
-  test("ignores keep verdicts", () => {
-    const source = "// kept\ncode();";
-    const result = computeFileEdits(source, [
-      item({
-        startLine: 1,
-        endLine: 1,
-        startColumn: 0,
-        endColumn: 7,
-        verdict: verdict({ action: "keep", category: null }),
-      }),
-    ]);
-    expect(result.content).toBe(source);
-  });
-});
-
-describe("computeFileEdits action: rewrite", () => {
-  test("replaces a full-line comment with the indented de-voiced text", () => {
-    const source = "code();\n    // spans all hosts rather than the last one\n    more();";
-    const result = computeFileEdits(source, [
-      item({
-        startLine: 2,
-        endLine: 2,
-        startColumn: 4,
-        endColumn: 49,
-        verdict: verdict({
-          action: "rewrite",
-          category: "voice",
-          rewrite: "// each host keeps its own connection",
+  test.each<{
+    name: string;
+    source: string;
+    items: EditItem[];
+    expected: string;
+    skipsEmpty?: boolean;
+    skipsLength?: number;
+    skipDetail?: RegExp;
+  }>([
+    {
+      name: "case (a): deletes a single full-line comment",
+      source: "const x = 1;\n// restate\nconst y = 2;",
+      items: [item({ startLine: 2, endLine: 2, startColumn: 0, endColumn: 10 })],
+      expected: "const x = 1;\nconst y = 2;",
+      skipsEmpty: true,
+    },
+    {
+      name: "case (a): deletes a multi-line block on its own lines",
+      source: "a();\n/* line one\n   line two */\nb();",
+      items: [item({ startLine: 2, endLine: 3, startColumn: 0, endColumn: 14, kind: "block" })],
+      expected: "a();\nb();",
+    },
+    {
+      name: "case (a): collapses the surrounding blanks when a banner is deleted",
+      source: "const x = 1;\n\n// banner\n\nconst y = 2;",
+      items: [item({ startLine: 3, endLine: 3, startColumn: 0, endColumn: 9 })],
+      expected: "const x = 1;\n\nconst y = 2;",
+    },
+    {
+      name: "case (a): leaves a pre-existing double blank far from any deletion intact",
+      source: "const x = 1;\n// banner\nconst y = 2;\n\n\nconst z = 3;",
+      items: [item({ startLine: 2, endLine: 2, startColumn: 0, endColumn: 9 })],
+      expected: "const x = 1;\nconst y = 2;\n\n\nconst z = 3;",
+    },
+    {
+      name: "case (b): strips a trailing line comment, keeping the code and dropping trailing space",
+      source: trailingSrc,
+      items: [item({ startLine: 1, endLine: 1, startColumn: 12, endColumn: trailingSrc.length })],
+      expected: "count += 1;",
+    },
+    {
+      name: "case (b): skips a trailing block with code after it on the same line",
+      source: "x = 1; /* note */ y = 2;",
+      items: [item({ startLine: 1, endLine: 1, startColumn: 7, endColumn: 17, kind: "block" })],
+      expected: "x = 1; /* note */ y = 2;",
+      skipsLength: 1,
+      skipDetail: /interleaved/,
+    },
+    {
+      name: "case (c): keeps the comment-relative line and deletes the rest of the span",
+      source: "op = 1;\n# Data migration: convert\n# tool calls have args\ndo_thing();",
+      items: [
+        item({
+          startLine: 2,
+          endLine: 3,
+          startColumn: 0,
+          endColumn: 22,
+          kind: "line",
+          verdict: verdict({ trimToLines: [2] }),
         }),
-      }),
-    ]);
-    expect(result.content).toBe("code();\n    // each host keeps its own connection\n    more();");
-    expect(result.skips).toEqual([]);
-  });
-
-  test("splices a rewritten trailing line comment after the code", () => {
-    const source = "count += 1; // bumps the counter, matching the bash original";
-    const result = computeFileEdits(source, [
-      item({
-        startLine: 1,
-        endLine: 1,
-        startColumn: 12,
-        endColumn: source.length,
-        verdict: verdict({
-          action: "rewrite",
-          category: "voice",
-          rewrite: "// retries reuse the same counter",
+      ],
+      expected: "op = 1;\n# tool calls have args\ndo_thing();",
+    },
+    {
+      name: "case (c): skips a trim that would drop a block's opening or closing delimiter",
+      source: "a();\n/**\n * keep this\n * drop this\n */\nb();",
+      items: [
+        item({
+          startLine: 2,
+          endLine: 5,
+          startColumn: 0,
+          endColumn: 3,
+          kind: "docstring",
+          verdict: verdict({ trimToLines: [2] }),
         }),
-      }),
-    ]);
-    expect(result.content).toBe("count += 1; // retries reuse the same counter");
-  });
-
-  test("replaces a multi-line block with indented rewrite lines", () => {
-    const source = "a();\n  /**\n   * surfaces the product path\n   */\n  b();";
-    const result = computeFileEdits(source, [
-      item({
-        startLine: 2,
-        endLine: 4,
-        startColumn: 2,
-        endColumn: 5,
-        kind: "block",
-        verdict: verdict({
-          action: "rewrite",
-          category: "voice",
-          rewrite: "/**\n * Returns the resolved request path.\n */",
+      ],
+      expected: "a();\n/**\n * keep this\n * drop this\n */\nb();",
+      skipDetail: /delimiter/,
+    },
+    {
+      name: "case (c): an empty trim falls back to full deletion",
+      source: "x = 1;\n// gone\ny = 2;",
+      items: [
+        item({
+          startLine: 2,
+          endLine: 2,
+          startColumn: 0,
+          endColumn: 7,
+          verdict: verdict({ trimToLines: [] }),
         }),
-      }),
-    ]);
-    expect(result.content).toBe(
-      "a();\n  /**\n   * Returns the resolved request path.\n   */\n  b();",
-    );
-  });
-
-  test("skips a rewrite of a block interleaved with code on its line", () => {
-    const source = "x = 1; /* note */ y = 2;";
-    const result = computeFileEdits(source, [
-      item({
-        startLine: 1,
-        endLine: 1,
-        startColumn: 7,
-        endColumn: 17,
-        kind: "block",
-        verdict: verdict({ action: "rewrite", category: "voice", rewrite: "/* fact */" }),
-      }),
-    ]);
-    expect(result.content).toBe(source);
-    expect(result.skips[0]?.detail).toMatch(/interleaved/);
+      ],
+      expected: "x = 1;\ny = 2;",
+    },
+    {
+      name: "resolution: deletion wins over a replacement on the same line",
+      source: "keep();\nval(); // note\nmore();",
+      items: [
+        item({ startLine: 2, endLine: 2, startColumn: 7, endColumn: 14 }),
+        item({ startLine: 2, endLine: 2, startColumn: 0, endColumn: 14 }),
+      ],
+      expected: "keep();\nmore();",
+    },
+    {
+      name: "resolution: ignores keep verdicts",
+      source: "// kept\ncode();",
+      items: [
+        item({
+          startLine: 1,
+          endLine: 1,
+          startColumn: 0,
+          endColumn: 7,
+          verdict: verdict({ action: "keep", category: null }),
+        }),
+      ],
+      expected: "// kept\ncode();",
+    },
+    {
+      name: "action: rewrite replaces a full-line comment with the indented de-voiced text",
+      source: "code();\n    // spans all hosts rather than the last one\n    more();",
+      items: [
+        item({
+          startLine: 2,
+          endLine: 2,
+          startColumn: 4,
+          endColumn: 49,
+          verdict: verdict({
+            action: "rewrite",
+            category: "voice",
+            rewrite: "// each host keeps its own connection",
+          }),
+        }),
+      ],
+      expected: "code();\n    // each host keeps its own connection\n    more();",
+      skipsEmpty: true,
+    },
+    {
+      name: "action: rewrite splices a rewritten trailing line comment after the code",
+      source: trailingRewrite,
+      items: [
+        item({
+          startLine: 1,
+          endLine: 1,
+          startColumn: 12,
+          endColumn: trailingRewrite.length,
+          verdict: verdict({
+            action: "rewrite",
+            category: "voice",
+            rewrite: "// retries reuse the same counter",
+          }),
+        }),
+      ],
+      expected: "count += 1; // retries reuse the same counter",
+    },
+    {
+      name: "action: rewrite replaces a multi-line block with indented rewrite lines",
+      source: "a();\n  /**\n   * surfaces the product path\n   */\n  b();",
+      items: [
+        item({
+          startLine: 2,
+          endLine: 4,
+          startColumn: 2,
+          endColumn: 5,
+          kind: "block",
+          verdict: verdict({
+            action: "rewrite",
+            category: "voice",
+            rewrite: "/**\n * Returns the resolved request path.\n */",
+          }),
+        }),
+      ],
+      expected: "a();\n  /**\n   * Returns the resolved request path.\n   */\n  b();",
+    },
+    {
+      name: "action: rewrite skips a rewrite of a block interleaved with code on its line",
+      source: "x = 1; /* note */ y = 2;",
+      items: [
+        item({
+          startLine: 1,
+          endLine: 1,
+          startColumn: 7,
+          endColumn: 17,
+          kind: "block",
+          verdict: verdict({ action: "rewrite", category: "voice", rewrite: "/* fact */" }),
+        }),
+      ],
+      expected: "x = 1; /* note */ y = 2;",
+      skipDetail: /interleaved/,
+    },
+  ])("$name", ({ source, items, expected, skipsEmpty, skipsLength, skipDetail }) => {
+    const result = computeFileEdits(source, items);
+    expect(result.content).toBe(expected);
+    if (skipsEmpty) {
+      expect(result.skips).toEqual([]);
+    }
+    if (skipsLength !== undefined) {
+      expect(result.skips).toHaveLength(skipsLength);
+    }
+    if (skipDetail) {
+      expect(result.skips[0]?.detail).toMatch(skipDetail);
+    }
   });
 });
 

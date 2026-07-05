@@ -68,14 +68,12 @@ describe("unchanged re-present", () => {
     expect(await decision("My plan, revised")).toBeNull();
   });
 
-  it("allows a changed plan", async () => {
+  it.each<{ name: string; changedPlan: string }>([
+    { name: "allows a changed plan", changedPlan: "My revised plan" },
+    { name: "treats trailing-whitespace-only changes as changed", changedPlan: "My plan \n" },
+  ])("$name", async ({ changedPlan }) => {
     await decision("My plan");
-    expect(await decision("My revised plan")).toBeNull();
-  });
-
-  it("treats trailing-whitespace-only changes as changed", async () => {
-    await decision("My plan");
-    expect(await decision("My plan \n")).toBeNull();
+    expect(await decision(changedPlan)).toBeNull();
   });
 
   it("updates the stored hash on allow, so re-presenting the new text denies", async () => {

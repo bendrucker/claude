@@ -901,6 +901,46 @@ describe("pr_links view", () => {
   });
 });
 
+describe("outcomes query", () => {
+  const metrics = (rows: { metric: string; count: bigint }[]) =>
+    Object.fromEntries(rows.map((r) => [r.metric, Number(r.count)]));
+
+  it("classifies every session's terminal state", async () => {
+    const rows = await runQuery<{ metric: string; count: bigint }>(
+      db,
+      "outcomes",
+      filterParams({ ongoing_hours: null }),
+    );
+    // shipped covers both signals: hooks-session via its pr-link record,
+    // ship-session via a git push Bash command with no pr-link
+    expect(metrics(rows)).toEqual({
+      "sessions: shipped": 2,
+      "sessions: ongoing": 1,
+      "sessions: handed-off": 1,
+      "sessions: abandoned-with-edits": 2,
+      "sessions: no-artifact": 11,
+      "prs opened (distinct urls)": 1,
+      "prs needing multiple sessions": 0,
+    });
+  });
+
+  it("widens the ongoing window via ongoing_hours without reclassifying shipped work", async () => {
+    const rows = await runQuery<{ metric: string; count: bigint }>(
+      db,
+      "outcomes",
+      filterParams({ ongoing_hours: "1000" }),
+    );
+    // 1000 hours reaches past the corpus start, so every unshipped session
+    // reads as ongoing; the shipped ones keep their state
+    expect(metrics(rows)).toEqual({
+      "sessions: shipped": 2,
+      "sessions: ongoing": 15,
+      "prs opened (distinct urls)": 1,
+      "prs needing multiple sessions": 0,
+    });
+  });
+});
+
 describe("attribution and skill-activity query", () => {
   it("exposes attribution on tool_calls", async () => {
     const [row] = await db.query<{ attribution_skill: string }>(

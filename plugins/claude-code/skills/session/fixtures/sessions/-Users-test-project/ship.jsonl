@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Push the release branch"},"sessionId":"ship-session","cwd":"/Users/test/project","gitBranch":"main","timestamp":"2024-01-23T09:00:00.000Z","uuid":"sh-1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"sh-bash-1","name":"Bash","input":{"command":"git push origin main","description":"Push commits to origin"}}]},"sessionId":"ship-session","cwd":"/Users/test/project","timestamp":"2024-01-23T09:01:00.000Z","uuid":"sh-2"}

@@ -40,21 +40,27 @@ PR all the way to merged.
 
 ## Context
 
-Gathered at invocation with bang-execution, so the decide step reads them without
+Gathered at invocation with bang-execution, so the decide step reads it without
 spending a tool call:
 
 - Working tree and untracked files: !`git status --short`
-- Committed changes vs `main`: !`git diff --stat main...HEAD`
 
-Untracked files appear only in the first list, so union both for the full
-changed-file set. `main` is the assumed base.
+This signal is base-independent. The committed diff needs a base, which the decide
+step resolves first.
 
 ## Decide What Applies
 
-Gate each pass on what the change contains. Read the Context above for the file
-set and its size, and run `git diff` on the relevant paths only where a judgment
-call needs the content (whether the diff introduces code comments, whether a code
-change is a pure refactor). The full matrix, the effort-inference table, and the
+Resolve the base before diffing. In a Worktrunk stack the parent is the branch
+recorded in `.git/wt/stack`, so diff against that. Otherwise the base is `main`.
+Diffing the tip against its own parent (`git diff <base>...HEAD`) keeps a stacked
+branch gated on its own layer instead of every layer beneath it. A hardcoded
+`main` would pull the whole stack in and inflate the file set.
+
+Gate each pass on what the change contains. Read the Context above for the
+working-tree state, then run `git diff <base>...HEAD` (plus a plain `git diff` for
+uncommitted work) for the file set, its size, and the content behind any judgment
+call: whether the diff introduces code comments, whether a code change is a pure
+refactor. The full matrix, the effort-inference table, and the
 `code-review`-versus-`simplify` heuristic live in
 [`references/passes.md`](references/passes.md). The short version:
 
@@ -98,7 +104,9 @@ Order:
 1. **`comments:audit`** first, because it needs a clean working tree and lands
    its trims through a branch fast-forward (see [Comment
    Trims](#comment-trims)). The other fix passes dirty the tree, so running the
-   comment pass first keeps the tree clean for it.
+   comment pass first keeps the tree clean for it. This pass pauses at preflight
+   to show an agent-count summary and wait for approval, so it interrupts the
+   otherwise unattended flow. That is expected.
 2. **Correctness and quality**: `code-review <effort> --fix` or `simplify`. These
    apply their own fixes to the working tree.
 3. **`writing:review`** over the touched prose. It surfaces prose findings.
@@ -113,10 +121,13 @@ working tree, so the branch's changes must be committed for it to land the trims
 
 `comments:audit` commits its trims to a fresh `comments/audit-<hash>` branch off
 `HEAD` and leaves the working tree untouched. Ship needs those trims on the
-shipping branch. Run `comments:audit --base <base> --fix` and capture the exact
-branch name it prints. Then dispatch a short-lived `general-purpose` Agent,
-passing it that branch name, to fast-forward the shipping branch onto the audit
-commit and delete the temp branch:
+shipping branch. Run `comments:audit --base <base> --fix` and capture the branch
+name it prints.
+
+When the audit finds nothing to trim it writes no branch. There is nothing to
+fast-forward, so skip this step. Only when a branch name was printed, dispatch a
+short-lived `general-purpose` Agent, passing it that name, to fast-forward the
+shipping branch onto the audit commit and delete the temp branch:
 
 ```
 git merge --ff-only comments/audit-<hash>

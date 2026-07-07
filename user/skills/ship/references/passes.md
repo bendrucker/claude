@@ -76,6 +76,10 @@ The audit commit is a single commit off the same `HEAD`, so the fast-forward
 never conflicts. Ship dispatches the merge to a short-lived `general-purpose`
 Agent so ship's own command surface stays limited to `git diff` and `git status`.
 
+A clean audit writes no branch. When `comments:audit` reports nothing to trim,
+there is no `comments/audit-<hash>` to merge, so skip the fast-forward rather than
+running it against a branch that does not exist.
+
 Two alternatives were rejected:
 
 - **`--report` plus inline apply**: pulls the full findings into ship's context,

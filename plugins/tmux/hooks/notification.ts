@@ -109,6 +109,9 @@ async function main(): Promise<void> {
   const pane = process.env.TMUX_PANE ?? tmuxQuery("display-message", "-p", "#{pane_id}");
   if (!pane) return;
 
+  // hooks.json wraps the --clear invocation in an inline shell guard that
+  // skips the bun startup entirely when this pane has no notification marker,
+  // so this arm only runs when there is actually something to clear.
   if (argv.flags.clear) {
     tmux("set-option", "-gu", paneOptionKey(pane));
     updateSummary();

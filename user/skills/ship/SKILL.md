@@ -2,9 +2,7 @@
 name: ship
 disable-model-invocation: true
 description: >-
-  Finish a branch: infer which review passes the change warrants, run them, open
-  the PR, babysit CI to green, triage bot comments, and refresh the body from a
-  clean context. Invoke as /ship when a change is ready to send.
+  Finish a branch: infer which review passes the change warrants, run them, open the PR, babysit CI to green, triage bot comments, and refresh the body from a clean context.
 argument-hint: "[--merge] [--effort <level>] [--simplify] [--skip <pass>] [--base <ref>]"
 allowed-tools:
   - Agent
@@ -23,159 +21,74 @@ allowed-tools:
 
 # Ship
 
-Finish the current branch with one command. Ship reads the diff, decides which
-review passes it warrants, runs them in sequence, opens the PR, watches CI to
-green, and refreshes the body from a clean context.
+Gate review passes on the diff, run them in order, open the PR, babysit CI to green, refresh the body from a clean context. Each pass fans out on its own; ship only gates and orders.
 
-Ship is a decider and sequencer, not a worker. Each pass it runs fans out on its
-own (`code-review`, `simplify`, `comments:audit`, `writing:review`, `verify`, and
-`pull-request:babysit` all dispatch their own agents or watchers). Ship's job is
-to gate the optional passes so the diff only pays for the reviewers it earns, then
-run the finishing sequence in the right order.
-
-The default end state is **green and ready**: CI passing, bot comments triaged,
-body refreshed, stopped for your own web review. `--merge` opts into driving the
-PR all the way to merged.
+Default end state **green and ready**: CI green, bot comments triaged, body refreshed, stopped for your web review. `--merge` drives to merged.
 
 ## Context
 
-Gathered at invocation with bang-execution, so the decide step reads it without a
-tool call:
-
-- Working tree and untracked files: !`git status --short`
-
-This is base-independent. The committed diff needs a base, resolved below.
+- Working tree: !`git status --short`
 
 ## Decide What Applies
 
-Resolve the base before diffing. It defaults to `main`. On a stacked branch pass
-`--base <parent>` so gating sees only the tip layer. Diff the tip against the base
-with `git diff <base>...HEAD`.
+Resolve the base: default `main`, or `--base <parent>` on a stack. Diff `git diff <base>...HEAD`, plus a plain `git diff` for uncommitted work. Gate each pass on the file set, its size, and the content behind any judgment call (new comments, refactor or new behavior). Full matrix and heuristics: [`references/passes.md`](references/passes.md).
 
-Gate each pass on what the change contains. Read the Context above for the
-working-tree state, then run `git diff <base>...HEAD` (plus a plain `git diff` for
-uncommitted work) for the file set, its size, and the content behind any judgment
-call: whether the diff introduces code comments, whether a code change is a pure
-refactor. The full matrix, the effort-inference table, and the
-`code-review`-versus-`simplify` heuristic live in
-[`references/passes.md`](references/passes.md). The short version:
+- **`plan:review`**: an approved plan is in context (Claude Code injects a `~/.claude/plans/` file). No plan, skip.
+- **Correctness and quality**: code changed. Exactly one of `code-review <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
+- **`comments:audit`**: diff adds code comments.
+- **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
+- **`verify`**: diff has a runtime surface. Declines tests-only and docs-only itself.
 
-- **`plan:review`** runs when the work was built against an approved plan, meaning
-  Claude Code injected a `~/.claude/plans/` file into this session. The trigger is
-  the plan's presence, so a session with no approved plan skips it.
-- **Correctness and quality** runs when the diff changes code, as exactly one of
-  `code-review <effort> --fix` (default) or `simplify` (pure refactor with no new
-  behavior). A docs-only or config-only diff skips it.
-- **`comments:audit`** runs when the diff introduces code comments.
-- **`writing:review`** runs when the diff touches prose (`.md`, `.mdx`, `.rst`,
-  docs).
-- **`verify`** runs when the diff has a runtime surface. It declines tests-only
-  and docs-only diffs on its own, so passing it a docs change is a no-op, not a
-  failure.
-
-Infer, don't interrogate. Present the plan in one line and proceed:
-
-> Ship plan: `code-review medium --fix` → `verify` → create → babysit. Skipping
-> comments (no new comments) and writing (no prose).
-
-Use `AskUserQuestion` only when a call is genuinely ambiguous: a diff that could
-be a refactor or a behavior change, or an effort that could be `medium` or
-`high`. One question, then run.
+Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQuestion` only on a real toss-up: refactor versus behavior change, or `medium` versus `high` effort.
 
 ## Flags
 
-- `--merge` drives the PR to merged (babysit `--merge`). Default is green and
-  ready.
-- `--effort <low|medium|high|max|ultra>` overrides the inferred `code-review`
-  effort.
-- `--simplify` forces the `simplify` path over `code-review`.
-- `--skip <pass>` drops a gated pass. Repeatable. Pass names: `plan`,
-  `code-review`, `simplify`, `comments`, `writing`, `verify`.
-- `--base <ref>` sets the diff base for gating. Default `main`. On a stack, pass
-  the parent branch so gating sees only the tip layer.
+- `--merge`: drive to merged (babysit `--merge`). Default: green and ready.
+- `--effort <low|medium|high|max|ultra>`: override inferred `code-review` effort.
+- `--simplify`: force `simplify` over `code-review`.
+- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `code-review`, `simplify`, `comments`, `writing`, `verify`.
+- `--base <ref>`: diff base for gating. Default `main`; on a stack, the parent branch.
 
 ## Pre-PR Reviews
 
-Run the gated review passes before creating the PR, serialized. `code-review
---fix`, `simplify`, and the comment trims all write to the branch, so they cannot
-apply in parallel.
+Serialized before create: `code-review --fix`, `simplify`, and comment trims all write to the branch.
 
-Order:
+1. **`plan:review`** (if gated in). Read-only, so it runs first. Surface its findings; handle fix-before-merge drift now, so the passes below cover the resulting fixes.
+2. **`comments:audit`**: needs a clean tree (the fix passes dirty it), lands trims via fast-forward (see [Comment Trims](#comment-trims)). Pauses at preflight for an agent-count approval.
+3. **Correctness and quality**: `code-review <effort> --fix` or `simplify`.
+4. **`writing:review`** over touched prose. Address salient findings before the body is written.
+5. **`verify`** end to end.
 
-1. **`plan:review`** first, when a plan gated it in. It is read-only: it forks a
-   clean-context agent over the plan and the diff and reports divergence and
-   follow-ups without touching the tree. Surface its findings and handle any
-   fix-before-merge drift before moving on, so the passes below cover whatever
-   those fixes produce.
-2. **`comments:audit`**, because it needs a clean working tree and lands its trims
-   through a branch fast-forward (see [Comment Trims](#comment-trims)). The other
-   fix passes dirty the tree, so running the comment pass before them keeps the
-   tree clean for it. This pass pauses at preflight for an agent-count approval, so
-   it interrupts the otherwise unattended flow.
-3. **Correctness and quality**: `code-review <effort> --fix` or `simplify`. These
-   apply their own fixes to the working tree.
-4. **`writing:review`** over the touched prose. It surfaces prose findings.
-   Address the salient ones before the body is written.
-5. **`verify`** to exercise the change end to end.
-
-If the working tree is dirty when ship reaches the comment pass, say so and ask
-whether to commit first. `comments:audit` operates on `HEAD` and requires a clean
-working tree, so the branch's changes must be committed for it to land the trims.
+Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 
 #### Comment Trims
 
-`comments:audit` commits its trims to a fresh `comments/audit-<hash>` branch off
-`HEAD` and leaves the working tree untouched. Ship needs those trims on the
-shipping branch. Run `comments:audit --base <base> --fix` and capture the branch
-name it prints.
-
-When the audit finds nothing to trim it writes no branch. There is nothing to
-fast-forward, so skip this step. Only when a branch name was printed, dispatch a
-short-lived `general-purpose` Agent, passing it that name, to fast-forward the
-shipping branch onto the audit commit and delete the temp branch:
+`comments:audit` commits trims to a fresh `comments/audit-<hash>` branch off `HEAD`, leaving the tree untouched. Run `comments:audit --base <base> --fix` and capture the branch name. No branch means nothing to trim: skip. Otherwise dispatch a short-lived `general-purpose` Agent with that name to fast-forward and delete it:
 
 ```
 git merge --ff-only comments/audit-<hash>
 git branch -d comments/audit-<hash>
 ```
 
-The fast-forward is always clean, since the audit commit sits directly on `HEAD`.
-The merge runs in the dispatched Agent so ship's own commands stay `git diff` and
-`git status`. See [`references/passes.md`](references/passes.md) for the rejected
-alternatives.
+The commit sits on `HEAD`, so the fast-forward is clean. It runs in the Agent to keep ship's own commands to `git diff` and `git status`. Rejected alternatives: [`references/passes.md`](references/passes.md).
 
 ## Create
 
-Run `pull-request:create` to commit the accumulated working-tree fixes, push, and
-open the PR. Capture the PR URL it prints. The babysit and body-refresh steps
-both need it.
+`pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
 
 ## Babysit
 
-Run `pull-request:babysit <url>` to watch CI and fix trivial failures until
-green.
+`pull-request:babysit <url>` watches CI and fixes trivial failures to green.
 
-- Add `--reviews` so babysit hands bot comments to `pull-request:follow-up
-  --auto` after the first green. Default this on: bot review triage is part of
-  finishing.
-- Add `--merge` only when `/ship --merge` was passed. Without it, babysit stops
-  at green and ready.
+- `--reviews` (default on): after first green, hand bot comments to `pull-request:follow-up --auto`.
+- `--merge`: only when `/ship --merge` was passed; else stop at green.
 
-Babysit owns the follow-up loop and the CI waits. Ship does not poll on its own.
+Babysit owns the CI waits and the follow-up loop. Ship never polls.
 
 ## Refresh the Body
 
-Dispatch a background `general-purpose` Agent to run `pull-request:update <url>`,
-on a cheaper model when one is set. It reads the final PR and the merged diff, not
-this session's transcript. Use `general-purpose`, never `fork`: a fork inherits
-this context and would reintroduce the diary narration.
-
-This is what kills the diary effect. The rewriter never saw the review
-back-and-forth, so it describes the merged diff as a finished change, with no
-"initially" or "after review". The cheaper out-of-context model also cuts the
-rewrite's cost.
+Dispatch a background `general-purpose` Agent (cheaper model if set) to run `pull-request:update <url>`. Never `fork`: it must read the final PR and diff cold, not this session's transcript, so the body describes the finished change with no review narration.
 
 ## Report
 
-Close with the PR link, which passes ran and which were gated out, and the final
-state (green and ready, or merging).
+PR link, passes run and gated out, final state (green and ready, or merging).

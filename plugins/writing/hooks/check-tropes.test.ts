@@ -261,6 +261,60 @@ describe("diff-aware filtering", () => {
   });
 });
 
+describe("semicolon splices", () => {
+  function codeEdit(newString: string, oldString: string): PreToolUseHookInput {
+    const input = mockEdit(newString, oldString);
+    (input.tool_input as Record<string, unknown>).file_path = "index.ts";
+    return input;
+  }
+
+  it("flags a code-file edit introducing a spliced comment", async () => {
+    const result = await processInput(
+      codeEdit("// keep sorted; callers rely on order\nconst x = 1;", "const x = 1;"),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    const ctx = (result?.hookSpecificOutput as { additionalContext: string }).additionalContext;
+    expect(ctx).toContain("semicolon");
+  });
+
+  it("ignores a pre-existing spliced comment untouched by the edit", async () => {
+    const result = await processInput(
+      codeEdit(
+        "// keep sorted; callers rely on order\nconst x = 2;",
+        "// keep sorted; callers rely on order\nconst x = 1;",
+      ),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("ignores commented-out code in a code file", async () => {
+    expect(
+      await processInput(codeEdit("// foo(); bar()\nconst x = 1;", "const x = 1;")),
+    ).toBeNull();
+  });
+
+  it("ignores splices in code outside comments", async () => {
+    expect(
+      await processInput(codeEdit('const label = "cold start; warm later";', "const label = 1;")),
+    ).toBeNull();
+  });
+
+  it("flags two splices in a short prose file", async () => {
+    const result = await processInput(
+      mockWrite(
+        "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.",
+      ),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("stays silent on a single semicolon in prose", async () => {
+    expect(
+      await processInput(mockWrite("The cache starts cold; the first request fills it.")),
+    ).toBeNull();
+  });
+});
+
 describe("MultiEdit", () => {
   it("returns null when all old_string values are flagged but new_string values are clean", async () => {
     const input = mockMultiEdit([

@@ -11,7 +11,7 @@ Structural rules for rewriting text. Vocabulary and pattern violations are caugh
 
 ## Clause Connectors
 
-Don't join independent clauses with a semicolon or em dash. Split them into two sentences. At most one connector-joined sentence per paragraph, and only when the clauses can't stand alone.
+Don't join independent clauses with a semicolon or em dash. Split them into two sentences. Swapping one connector for another is not a fix. At most one connector-joined sentence per paragraph, and only when the clauses can't stand alone.
 
 ## Filler
 

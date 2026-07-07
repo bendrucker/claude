@@ -198,6 +198,24 @@ function connectorDensityHits(text: string): Hits {
   return { count: connected.length, sample: first.slice(Math.max(0, i - 20), i + 24).trim() };
 }
 
+// A splice joins clauses with "; " where letters flank the boundary. The
+// letter guards keep commented-out code (`foo(); bar()`), digit-led references
+// ("2; see below"), and bare separators from counting as clause joins. List
+// items are skipped: their semicolons usually separate enumerated fragments,
+// and connector density already covers dense list semicolons.
+const SEMICOLON_SPLICE = /[a-z]; [a-z]/i;
+const PROSE_SPLICE_MIN = 2;
+
+export function semicolonSpliceHits(text: string, minSplices: number): Hits {
+  const spliced = splitSentences(text).filter(
+    (s) => !LIST_ITEM.test(s) && SEMICOLON_SPLICE.test(s),
+  );
+  if (spliced.length < minSplices) return { count: 0, sample: "" };
+  const first = spliced[0] as string;
+  const i = SEMICOLON_SPLICE.exec(first)?.index ?? 0;
+  return { count: spliced.length, sample: first.slice(Math.max(0, i - 20), i + 24).trim() };
+}
+
 const openerPatterns: PatternDef[] = WORDLISTS.openers
   ? [
       {
@@ -476,6 +494,28 @@ export const PATTERNS: PatternDef[] = [
       "Pre-dates the curation principle; no corpus evidence recorded. The 30%-density threshold was set empirically to avoid false positives on definition-list bullets. Validated against the committed test suite.",
     retire:
       "Remove or raise the threshold if corpus analysis shows the pattern fires heavily on user text (not distinctive) or if a powered labeling pass shows precision below the hook bar.",
+  },
+  {
+    tier: "context",
+    layer: "cross-sentence",
+    category: "semicolon splice",
+    test: (text) => semicolonSpliceHits(text, PROSE_SPLICE_MIN),
+    fileOnly: true,
+    message: (matched) =>
+      `Semicolons join independent clauses here (e.g. "${matched}"). This is the em-dash run-on respelled. Split each into two sentences rather than swapping connectors.`,
+    positives: [
+      "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.",
+      "The hook fires on every edit; the scan runs first. The reminder never blocks; it only nudges.",
+    ],
+    negatives: [
+      "The cache starts cold; the first request fills it. The retry logic backs off.",
+      "- compile the sources; link the objects\n- package the build; ship the artifact",
+      "The count was 2; see below. The limit was 3; see above.",
+    ],
+    evidence:
+      "2026-07 session-history analysis found semicolon clause-joins at high rate in assistant deliverables after the em dash ban. Substitution drift relocated the run-on habit instead of fixing sentence structure. Short texts (PR bodies, commit messages) sit below the connector-density gate (5+ sentences, 30% density), so a two-splice floor covers them. An occasional single semicolon never fires.",
+    retire:
+      "Remove when the deliverable corpus shows the splice rate at or below the hand-written baseline for a 30-day window, or when a labeling pass shows precision below the hook bar. The claude-code:session semicolons-per-1000-words query is the evidence stream.",
   },
   {
     tier: "context",

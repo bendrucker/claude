@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { cli } from "cleye";
 import { table } from "table";
+import { extractComments } from "../../../detection/comments";
 import { isProseFile } from "../../../detection/paths";
 import { scanAll } from "../../../detection/scan";
 import { stripCode } from "../../../detection/tropes";
@@ -58,19 +59,6 @@ function customVocabularyScore(
 ): CategoryScore {
   const hits = match(stripCode(text)).count;
   return { category: CUSTOM_VOCABULARY, hits, density: density(hits, wordCount) };
-}
-
-const SINGLE_LINE_COMMENT = /(?:^|\s)(?:\/\/|#)[^\n]*/g;
-
-// Pull single-line comments (`//`, `#`) out of source so they score as prose.
-// No AST: this catches the common case and treats every comment line as prose
-// regardless of language, which is the point of scoring comments separately.
-export function extractComments(text: string): string {
-  const lines: string[] = [];
-  for (const match of text.matchAll(SINGLE_LINE_COMMENT)) {
-    lines.push(match[0].replace(/^\s*(?:\/\/|#)\s?/, ""));
-  }
-  return lines.join("\n");
 }
 
 export function scoreText(

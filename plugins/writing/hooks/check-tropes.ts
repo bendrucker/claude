@@ -2,8 +2,15 @@
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import { isMemoryPath, isPlanPath } from "../detection/paths";
-import { firstByTier, type PatternMatch, scan, scanIntroduced } from "../detection/tropes";
+import { extractComments } from "../detection/comments";
+import { isMemoryPath, isPlanPath, isProseFile } from "../detection/paths";
+import {
+  firstByTier,
+  type PatternMatch,
+  scan,
+  scanIntroduced,
+  semicolonSpliceHits,
+} from "../detection/tropes";
 import { formatContext, formatDecision, isPlanMode, type SyncHookJSONOutput } from "./io";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
@@ -139,6 +146,23 @@ function buildFileOpReminder(
   return `${deny.message} You introduced this in your edit to ${target}. Issue a follow-up Edit that targets only the text you just changed. Do not modify unrelated parts of the file, including other pre-existing tropes.`;
 }
 
+// Comments are short, so density gates cannot work there: a single introduced
+// splice fires. Diff-aware like scanIntroduced, comparing splice counts across
+// the old and new comment text.
+const COMMENT_SPLICE_MIN = 1;
+
+function commentSplice(
+  pair: { newText: string; oldText: string },
+  filePath: string | undefined,
+): string | null {
+  if (!filePath || isProseFile(filePath)) return null;
+  const newHits = semicolonSpliceHits(extractComments(pair.newText), COMMENT_SPLICE_MIN);
+  if (newHits.count === 0) return null;
+  const oldHits = semicolonSpliceHits(extractComments(pair.oldText), COMMENT_SPLICE_MIN);
+  if (newHits.count <= oldHits.count) return null;
+  return `A code comment splices clauses with a semicolon ("${newHits.sample}"). Comments can be fragments. Use a period or drop a word.`;
+}
+
 async function processFileOp(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   const pair = await collectFileOpPair(input);
   if (!pair) return null;
@@ -152,6 +176,9 @@ async function processFileOp(input: PreToolUseHookInput): Promise<SyncHookJSONOu
 
   const context = firstByTier(matches, "context");
   if (context) return formatContext(context.message);
+
+  const splice = commentSplice(pair, filePath);
+  if (splice) return formatContext(splice);
 
   return null;
 }

@@ -1,7 +1,7 @@
 ---
 name: logs
 description: >-
-  Given a GitHub Actions run ID and PR URL, fetches failing-job logs, writes full logs to a temp file, and returns a structured summary of failures. Invoked by the `github:actions-monitor` skill on failing-status events. Examples: <example>Context: An actions-monitor status event reports a failing run. user: "Run ID 19876543210 failed on https://github.com/owner/repo/pull/42" assistant: "I'll use the logs agent to fetch the failing-job logs, write them to a temp file, and summarize the failures." <commentary>The logs agent is designed exactly for this: extract failure context from a run ID.</commentary></example>
+  Given a GitHub Actions run ID and PR URL, fetches failing-job logs, writes full logs to a temp file, and returns a structured summary of failures. Invoked by the `github:actions-monitor` skill on failing-status events.
 tools: Bash(gh run view:*), Bash(gh run list:*), Bash(jq:*), Bash(mkdir:*), Write, Read, Grep
 model: haiku
 ---

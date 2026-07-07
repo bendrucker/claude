@@ -168,6 +168,11 @@
       "name": "comments",
       "description": "Detect AI slop code comments in a diff and steer clean comment generation",
       "source": "./plugins/comments"
+    },
+    {
+      "name": "meme",
+      "description": "Generate memes from images: classic Impact macros, labels, and TV-subtitle captions",
+      "source": "./plugins/meme"
     }
   ]
 }

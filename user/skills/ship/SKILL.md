@@ -5,7 +5,7 @@ description: >-
   Finish a branch: infer which review passes the diff warrants, run them, open
   the PR, babysit CI to green, triage bot comments, and refresh the body from a
   clean context. Invoke as /ship when a change is ready to send.
-argument-hint: "[--merge] [--effort <level>] [--simplify] [--skip <pass>]"
+argument-hint: "[--merge] [--effort <level>] [--simplify] [--skip <pass>] [--base <ref>]"
 allowed-tools:
   - Agent
   - AskUserQuestion
@@ -50,11 +50,11 @@ step resolves first.
 
 ## Decide What Applies
 
-Resolve the base before diffing. In a Worktrunk stack the parent is the branch
-recorded in `.git/wt/stack`, so diff against that. Otherwise the base is `main`.
-Diffing the tip against its own parent (`git diff <base>...HEAD`) keeps a stacked
-branch gated on its own layer instead of every layer beneath it. A hardcoded
-`main` would pull the whole stack in and inflate the file set.
+Resolve the base before diffing. It defaults to `main`. On a stacked branch pass
+`--base <parent>` so gating sees only the tip layer. Diffing against `main` from
+inside a stack pulls in every layer beneath the tip and inflates the file set,
+which can mis-gate a docs-only tip as a code change. Diff the tip against the base
+with `git diff <base>...HEAD`.
 
 Gate each pass on what the change contains. Read the Context above for the
 working-tree state, then run `git diff <base>...HEAD` (plus a plain `git diff` for
@@ -92,6 +92,8 @@ be a refactor or a behavior change, or an effort that could be `medium` or
 - `--simplify` forces the `simplify` path over `code-review`.
 - `--skip <pass>` drops a gated pass. Repeatable. Pass names: `code-review`,
   `simplify`, `comments`, `writing`, `verify`.
+- `--base <ref>` sets the diff base for gating. Default `main`. On a stack, pass
+  the parent branch so gating sees only the tip layer.
 
 ## Pre-PR Reviews
 

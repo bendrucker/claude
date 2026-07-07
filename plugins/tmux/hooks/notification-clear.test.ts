@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import hooks from "./hooks.json";
 
-const clearCommand = hooks.hooks.PreToolUse.flatMap((matcher) => matcher.hooks)
+const found = hooks.hooks.PreToolUse.flatMap((matcher) => matcher.hooks)
   .map((hook) => hook.command)
   .find((command) => command.includes("--clear"));
-if (!clearCommand) throw new Error("hooks.json is missing the PreToolUse --clear command");
+if (!found) throw new Error("hooks.json is missing the PreToolUse --clear command");
+const clearCommand = found;
 
 describe("PreToolUse --clear guard", () => {
   let binDir: string;

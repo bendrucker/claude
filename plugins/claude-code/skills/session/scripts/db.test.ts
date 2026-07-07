@@ -1375,6 +1375,96 @@ describe("skill-config-vs-observed query", () => {
   });
 });
 
+describe("index-health query", () => {
+  const projectsGlob = path.join(fixturesDir, "**", "*.jsonl");
+
+  type Health = { check_name: string; status: string; subject: string; detail: string };
+
+  function healthParams(overrides: Record<string, string | null> = {}) {
+    return {
+      projects_glob: projectsGlob,
+      min_active_days: null,
+      new_days: null,
+      stale_days: null,
+      ...overrides,
+    };
+  }
+
+  it("flags a kind that went silent beyond its own historical gap", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const silent = rows.filter((r) => r.check_name === "stream-silent");
+    expect(silent.map((r) => r.subject)).toEqual(["attachment:health-quiet"]);
+    expect(silent[0]?.status).toBe("alert");
+    expect(silent[0]?.detail).toContain("worst historical gap 1");
+  });
+
+  it("reports a kind first seen late in the corpus as new, not kinds as old as the index", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const fresh = rows.filter((r) => r.check_name === "stream-new");
+    expect(fresh.map((r) => r.subject)).toEqual(["attachment:health-fresh"]);
+    expect(fresh[0]?.status).toBe("info");
+  });
+
+  it("summarizes kinds whose rows carry no timestamp", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const nullTs = rows.find((r) => r.check_name === "null-timestamp-kinds");
+    expect(nullTs?.status).toBe("info");
+    expect(nullTs?.detail).toContain("health-marker (2)");
+  });
+
+  it("reports the corpus window per host and no disk gap when the glob matches", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const windows = rows.filter((r) => r.check_name === "corpus-window");
+    expect(windows.map((r) => r.subject)).toEqual(["local"]);
+    expect(rows.some((r) => r.check_name === "disk-not-indexed")).toBe(false);
+    expect(rows.some((r) => r.check_name === "indexed-not-on-disk")).toBe(false);
+  });
+
+  it("alerts on disk files missing from the index", async () => {
+    const extraDir = path.join(tmpDir, "extra-projects", "-Users-test-extra");
+    mkdirSync(extraDir, { recursive: true });
+    await Bun.write(
+      path.join(extraDir, "unindexed.jsonl"),
+      '{"type":"user","message":{"role":"user","content":"hi"},"sessionId":"extra","timestamp":"2024-02-01T00:00:00.000Z","uuid":"ex-1"}\n',
+    );
+    const rows = await runQuery<Health>(
+      db,
+      "index-health",
+      healthParams({ projects_glob: path.join(tmpDir, "extra-projects", "**", "*.jsonl") }),
+    );
+    const missing = rows.find((r) => r.check_name === "disk-not-indexed");
+    expect(missing?.status).toBe("alert");
+    expect(missing?.subject).toBe("1 files");
+    expect(missing?.detail).toContain("unindexed.jsonl");
+    // With the glob pointed away from the fixtures, every indexed file reads as deleted.
+    expect(rows.find((r) => r.check_name === "indexed-not-on-disk")?.status).toBe("info");
+  });
+
+  it("alerts on an imported host whose newest record lags the corpus", async () => {
+    const staleProjects = path.join(importsDir, "stale", "projects", "-Users-test-stale");
+    mkdirSync(staleProjects, { recursive: true });
+    await Bun.write(
+      path.join(staleProjects, "old.jsonl"),
+      '{"type":"user","message":{"role":"user","content":"old work"},"sessionId":"stale-session","timestamp":"2023-12-01T00:00:00.000Z","uuid":"st-1"}\n',
+    );
+    await Bun.write(
+      path.join(importsDir, "stale", "manifest.json"),
+      `${JSON.stringify({
+        host: "stale",
+        source: "stale:.claude/projects/",
+        imported_at: "2024-01-01T00:00:00Z",
+        policy: { block_egress: true },
+      })}\n`,
+    );
+    await reindex();
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const stale = rows.find((r) => r.check_name === "host-staleness");
+    expect(stale?.status).toBe("alert");
+    expect(stale?.subject).toBe("stale");
+    expect(stale?.detail).toContain("days behind the corpus");
+  });
+});
+
 describe("frontmatter query", () => {
   it("parses name and description from a SKILL.md frontmatter", async () => {
     await loadExtensions(db);

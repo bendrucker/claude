@@ -56,53 +56,74 @@ function validateFraction(value: unknown, path: string): number {
   return value;
 }
 
+function validateString(value: unknown, path: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    fail(path, "required non-empty string");
+  }
+  return value;
+}
+
+function oneOf<T extends string>(value: unknown, options: readonly T[], path: string): T {
+  if (typeof value !== "string" || !(options as readonly string[]).includes(value)) {
+    fail(path, `expected one of ${options.join(", ")}`);
+  }
+  return value as T;
+}
+
 function validateRegion(value: unknown, path: string): Region {
   if (!isRecord(value)) fail(path, "expected an object {x, y, w, h}");
-  for (const key of ["x", "y", "w", "h"]) {
-    validateFraction(value[key], `${path}.${key}`);
+  return {
+    x: validateFraction(value.x, `${path}.x`),
+    y: validateFraction(value.y, `${path}.y`),
+    w: validateFraction(value.w, `${path}.w`),
+    h: validateFraction(value.h, `${path}.h`),
+  };
+}
+
+function validateStyle(value: unknown, path: string): StyleOverrides {
+  if (!isRecord(value)) fail(path, "expected an object");
+  const style: StyleOverrides = {};
+  if (value.fill !== undefined) style.fill = validateString(value.fill, `${path}.fill`);
+  if (value.stroke !== undefined) style.stroke = validateString(value.stroke, `${path}.stroke`);
+  if (value.fontSize !== undefined) {
+    style.fontSize = validateFraction(value.fontSize, `${path}.fontSize`);
   }
-  return value as unknown as Region;
+  if (value.font !== undefined) style.font = validateString(value.font, `${path}.font`);
+  if (value.uppercase !== undefined) {
+    if (typeof value.uppercase !== "boolean") fail(`${path}.uppercase`, "expected a boolean");
+    style.uppercase = value.uppercase;
+  }
+  return style;
 }
 
 function validateBox(value: unknown, path: string): TextBox {
   if (!isRecord(value)) fail(path, "expected an object");
-  if (typeof value.text !== "string" || value.text.length === 0) {
-    fail(`${path}.text`, "required non-empty string");
-  }
-  if (value.preset !== undefined && !presetNames.includes(value.preset as PresetName)) {
-    fail(`${path}.preset`, `expected one of ${presetNames.join(", ")}`);
-  }
   if (value.anchor !== undefined && value.region !== undefined) {
     fail(path, "anchor and region are mutually exclusive");
   }
-  if (value.anchor !== undefined && !anchors.includes(value.anchor as Anchor)) {
-    fail(`${path}.anchor`, `expected one of ${anchors.join(", ")}`);
+  const box: TextBox = { text: validateString(value.text, `${path}.text`) };
+  if (value.preset !== undefined) {
+    box.preset = oneOf(value.preset, presetNames, `${path}.preset`);
   }
-  if (value.region !== undefined) validateRegion(value.region, `${path}.region`);
-  if (value.align !== undefined && !["left", "center", "right"].includes(value.align as string)) {
-    fail(`${path}.align`, "expected left, center, or right");
+  if (value.anchor !== undefined) box.anchor = oneOf(value.anchor, anchors, `${path}.anchor`);
+  if (value.region !== undefined) box.region = validateRegion(value.region, `${path}.region`);
+  if (value.align !== undefined) {
+    box.align = oneOf(value.align, ["left", "center", "right"], `${path}.align`);
   }
-  if (value.valign !== undefined && !["top", "middle", "bottom"].includes(value.valign as string)) {
-    fail(`${path}.valign`, "expected top, middle, or bottom");
+  if (value.valign !== undefined) {
+    box.valign = oneOf(value.valign, ["top", "middle", "bottom"], `${path}.valign`);
   }
-  if (value.style !== undefined) {
-    if (!isRecord(value.style)) fail(`${path}.style`, "expected an object");
-    if (value.style.fontSize !== undefined) {
-      validateFraction(value.style.fontSize, `${path}.style.fontSize`);
-    }
-  }
-  return value as unknown as TextBox;
+  if (value.style !== undefined) box.style = validateStyle(value.style, `${path}.style`);
+  return box;
 }
 
 function validateCaption(value: unknown, path: string): Caption {
   if (!isRecord(value)) fail(path, "expected an object");
-  if (typeof value.text !== "string" || value.text.length === 0) {
-    fail(`${path}.text`, "required non-empty string");
+  const caption: Caption = { text: validateString(value.text, `${path}.text`) };
+  if (value.position !== undefined) {
+    caption.position = oneOf(value.position, ["top", "bottom"], `${path}.position`);
   }
-  if (value.position !== undefined && !["top", "bottom"].includes(value.position as string)) {
-    fail(`${path}.position`, "expected top or bottom");
-  }
-  return value as unknown as Caption;
+  return caption;
 }
 
 export function validateSpec(value: unknown): Spec {

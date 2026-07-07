@@ -16,7 +16,7 @@ exports[`validateSpec rejects region out of range 1`] = `"spec.boxes[0].region.w
 
 exports[`validateSpec rejects bad fontSize override 1`] = `"spec.boxes[0].style.fontSize: expected a number between 0 and 1, got 40"`;
 
-exports[`validateSpec rejects bad caption position 1`] = `"spec.captions[0].position: expected top or bottom"`;
+exports[`validateSpec rejects bad caption position 1`] = `"spec.captions[0].position: expected one of top, bottom"`;
 
 exports[`specFromFlags rejects no flags 1`] = `"flags: requires at least one of --top, --bottom, --subtitle, --caption, or --spec"`;
 

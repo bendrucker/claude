@@ -821,6 +821,27 @@ describe("activity query", () => {
     // hooks-session contributes one, plan-iterations-session (added for the
     // plan-iterations query) contributes a second.
     expect(bySignal.get("mode: plan")).toBe(2);
+    // one system:api_error plus one assistant isApiErrorMessage marker, the
+    // surface that replaced it in newer CLI versions
+    expect(bySignal.get("api errors/retries")).toBe(2);
+  });
+
+  it("scopes timestamp-less signals by their session's last activity", async () => {
+    const windowed = await runQuery<{ signal: string; count: bigint }>(
+      db,
+      "activity",
+      filterParams({ after_date: "2024-01-01", before_date: "2024-02-15" }),
+    );
+    const inWindow = new Map(windowed.map((r) => [r.signal, Number(r.count)]));
+    expect(inWindow.get("prompts submitted")).toBe(2);
+
+    const later = await runQuery<{ signal: string; count: bigint }>(
+      db,
+      "activity",
+      filterParams({ after_date: "2025-01-01" }),
+    );
+    const outOfWindow = new Map(later.map((r) => [r.signal, Number(r.count)]));
+    expect(outOfWindow.get("prompts submitted")).toBe(0);
   });
 });
 
@@ -869,12 +890,14 @@ describe("file_operations view and files query", () => {
 });
 
 describe("pr_links view", () => {
-  it("links a session to the PR it produced", async () => {
-    const [row] = await db.query<{ pr_number: bigint; repository: string; session_id: string }>(
-      "SELECT pr_number, repository, session_id FROM pr_links WHERE session_id = 'hooks-session'",
+  it("dedupes re-emitted links to one row keeping the first emission's timestamp", async () => {
+    const rows = await db.query<{ pr_number: bigint; repository: string; ts: string }>(
+      "SELECT pr_number, repository, timestamp::VARCHAR AS ts FROM pr_links WHERE session_id = 'hooks-session'",
     );
-    expect(Number(row?.pr_number)).toBe(42);
-    expect(row?.repository).toBe("test/project");
+    expect(rows).toHaveLength(1);
+    expect(Number(rows[0]?.pr_number)).toBe(42);
+    expect(rows[0]?.repository).toBe("test/project");
+    expect(rows[0]?.ts).toStartWith("2024-01-19 10:08:30");
   });
 });
 

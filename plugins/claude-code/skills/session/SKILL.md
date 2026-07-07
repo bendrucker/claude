@@ -40,7 +40,7 @@ After refresh, query the DB with the `duckdb` CLI or any DuckDB client. Querying
 
 ```bash
 DB_PATH=$(${CLAUDE_SKILL_DIR}/scripts/refresh.ts)
-duckdb -readonly "$DB_PATH" "SELECT model, SUM(output_tokens) FROM messages WHERE type = 'assistant' GROUP BY model"
+duckdb -readonly "$DB_PATH" "SELECT model, SUM(output_tokens) FROM message_usage GROUP BY model"
 duckdb -readonly "$DB_PATH" < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
 ```
 
@@ -194,7 +194,7 @@ Every table and view carries a `host` column (`local` for this machine, the labe
 - `content_items`: one row per element of `data->'$.message.content'`, with pinned columns (`type`, `name`, `id`, `tool_use_id`, `text`, `content`, `is_error`), the parent's attribution (`attribution_skill`/`plugin`/`agent`), plus `data JSON` (the content item) and `tool_use_result JSON` (merged from the parent message). Replayed lines from session rewind/resume are deduped (by record uuid, then by tool id), so tool_use/tool_result counts are one row per event.
 - `diagnostics`: one row per type-checker/linter/LSP diagnostic surfaced in-session. Columns: `file`, `severity`, `source`, `code`, `message`. Unnested from `diagnostics` attachments.
 - `file_operations`: one row per `Read`/`Write`/`Edit`/`MultiEdit`/`NotebookEdit`, with `operation`, `file_path`, and attribution. What you work on, and under which skill/plugin/agent.
-- `pr_links`: pull requests opened from a session. Columns: `pr_number`, `repository`, `url`, `session_id`. Join to `sessions` to connect work to shipped outcomes.
+- `pr_links`: pull requests opened from a session, one row per distinct link (the harness re-emits the record across turns; the view dedupes and keeps the first emission's timestamp). Columns: `pr_number`, `repository`, `url`, `session_id`. Join to `sessions` to connect work to shipped outcomes.
 - `text_content`: one row per prose text item across user and assistant messages. Columns: `session_id`, `timestamp`, `role`, `model` (NULL for user), `project_path`, `text` (fenced and inline-backtick code stripped), `raw_text`, `source_file`, `source_line`.
 - `sessions`: aggregated session-level stats (start/end time, duration, message counts).
 - `tool_calls`: one row per tool use, with `file_path` and `command` (from the tool input) and attribution (`attribution_skill`/`plugin`/`agent`).

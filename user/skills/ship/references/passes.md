@@ -6,22 +6,42 @@ the shipping branch.
 
 ## Gating Matrix
 
-Read the diff against the base plus the working tree. Gate each pass on what the
-diff actually contains:
+Most passes gate on the diff. Read it against the base plus the working tree, and
+gate each on what it contains. `plan:review` is the exception: it gates on whether
+the session was built against an approved plan.
 
-| Diff contains | Pass | Notes |
+| Trigger | Pass | Notes |
 |---|---|---|
+| An approved plan for the session | `plan:review` | Context-gated. See [Plan Review](#plan-review) |
 | Code changes | `code-review <effort> --fix` or `simplify` | Exactly one of the two. Skipped on a docs-only or config-only diff |
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | Prose-gated |
 | A runtime surface | `verify` | Skips tests-only and docs-only diffs itself |
 
 The gating is what saves context. A docs-only change skips `code-review` and
-`verify`. A code-only change skips `writing:review`. Never run a reviewer the
-diff does not warrant.
+`verify`. A code-only change skips `writing:review`. An ad-hoc change with no plan
+skips `plan:review`. Never run a reviewer the change does not warrant.
 
-`--skip <pass>` drops any gated pass. `code-review`, `simplify`, `comments`,
-`writing`, `verify`.
+`--skip <pass>` drops any gated pass. `plan`, `code-review`, `simplify`,
+`comments`, `writing`, `verify`.
+
+## Plan Review
+
+`plan:review` gates on whether the session was built against an approved plan. Run
+it when Claude Code injected one (`~/.claude/plans/<name>.md`) into the session. An
+ad-hoc change with no plan has nothing to review against, so skip it.
+
+It is read-only. It forks a clean-context agent over the plan and the diff and
+reports divergences, requirements drift, and ranked follow-ups. It writes nothing
+to the tree. That is why it runs first, ahead of the fix passes: its follow-ups
+frame what the rest of the sequence and the author still need to address, and any
+drift fix it prompts then flows through `code-review` and `verify` like the rest of
+the change.
+
+Forking a clean context is what the review depends on. The session that built the
+change carries a justification for every departure, so drift reads as normal from
+inside it. A reviewer starting clean judges the delta on its merits. `plan:review`
+owns sourcing the plan and diffing it, so ship only decides whether to run it.
 
 ## Effort Inference
 

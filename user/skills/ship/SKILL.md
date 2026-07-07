@@ -2,7 +2,7 @@
 name: ship
 disable-model-invocation: true
 description: >-
-  Finish a branch: infer which review passes the diff warrants, run them, open
+  Finish a branch: infer which review passes the change warrants, run them, open
   the PR, babysit CI to green, triage bot comments, and refresh the body from a
   clean context. Invoke as /ship when a change is ready to send.
 argument-hint: "[--merge] [--effort <level>] [--simplify] [--skip <pass>] [--base <ref>]"
@@ -11,6 +11,7 @@ allowed-tools:
   - AskUserQuestion
   - Bash(git diff:*)
   - Bash(git status:*)
+  - Skill(plan:review)
   - Skill(code-review)
   - Skill(simplify)
   - Skill(verify)
@@ -59,6 +60,9 @@ refactor. The full matrix, the effort-inference table, and the
 `code-review`-versus-`simplify` heuristic live in
 [`references/passes.md`](references/passes.md). The short version:
 
+- **`plan:review`** runs when the work was built against an approved plan, meaning
+  Claude Code injected a `~/.claude/plans/` file into this session. The trigger is
+  the plan's presence, so a session with no approved plan skips it.
 - **Correctness and quality** runs when the diff changes code, as exactly one of
   `code-review <effort> --fix` (default) or `simplify` (pure refactor with no new
   behavior). A docs-only or config-only diff skips it.
@@ -85,8 +89,8 @@ be a refactor or a behavior change, or an effort that could be `medium` or
 - `--effort <low|medium|high|max|ultra>` overrides the inferred `code-review`
   effort.
 - `--simplify` forces the `simplify` path over `code-review`.
-- `--skip <pass>` drops a gated pass. Repeatable. Pass names: `code-review`,
-  `simplify`, `comments`, `writing`, `verify`.
+- `--skip <pass>` drops a gated pass. Repeatable. Pass names: `plan`,
+  `code-review`, `simplify`, `comments`, `writing`, `verify`.
 - `--base <ref>` sets the diff base for gating. Default `main`. On a stack, pass
   the parent branch so gating sees only the tip layer.
 
@@ -98,16 +102,21 @@ apply in parallel.
 
 Order:
 
-1. **`comments:audit`** first, because it needs a clean working tree and lands
-   its trims through a branch fast-forward (see [Comment
-   Trims](#comment-trims)). The other fix passes dirty the tree, so running the
-   comment pass first keeps the tree clean for it. This pass pauses at preflight
-   for an agent-count approval, so it interrupts the otherwise unattended flow.
-2. **Correctness and quality**: `code-review <effort> --fix` or `simplify`. These
+1. **`plan:review`** first, when a plan gated it in. It is read-only: it forks a
+   clean-context agent over the plan and the diff and reports divergence and
+   follow-ups without touching the tree. Surface its findings and handle any
+   fix-before-merge drift before moving on, so the passes below cover whatever
+   those fixes produce.
+2. **`comments:audit`**, because it needs a clean working tree and lands its trims
+   through a branch fast-forward (see [Comment Trims](#comment-trims)). The other
+   fix passes dirty the tree, so running the comment pass before them keeps the
+   tree clean for it. This pass pauses at preflight for an agent-count approval, so
+   it interrupts the otherwise unattended flow.
+3. **Correctness and quality**: `code-review <effort> --fix` or `simplify`. These
    apply their own fixes to the working tree.
-3. **`writing:review`** over the touched prose. It surfaces prose findings.
+4. **`writing:review`** over the touched prose. It surfaces prose findings.
    Address the salient ones before the body is written.
-4. **`verify`** to exercise the change end to end.
+5. **`verify`** to exercise the change end to end.
 
 If the working tree is dirty when ship reaches the comment pass, say so and ask
 whether to commit first. `comments:audit` operates on `HEAD` and requires a clean

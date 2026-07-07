@@ -37,7 +37,9 @@ At least one box or caption is required. `style` fields are sparse overrides on 
 |--------|------|----------|
 | `classic` | Impact, uppercase, white fill, thick black stroke | anchor top, max size 0.10 x H |
 | `label` | Helvetica bold, mixed case, black fill, thin white stroke | anchor center, max size 0.06 x H |
-| `subtitle` | Helvetica bold, mixed case, yellow `#ffe400`, thin black outline | anchor bottom, max size 0.045 x H |
+| `subtitle` | Helvetica bold, mixed case, yellow `#ffe400`, black outline | anchor bottom, max size 0.045 x H |
+
+Yellow reads as closed captions. For quoted dialogue or stylized show text (song lyrics, character lines) that is not meant to look like captioning, override to white: `"style": { "fill": "#ffffff" }`.
 
 Anchors map to canned regions: top `{x: 0.05, y: 0.02, w: 0.9, h: 0.3}`, bottom `{x: 0.05, y: 0.68, w: 0.9, h: 0.3}`, center `{x: 0.05, y: 0.35, w: 0.9, h: 0.3}`.
 

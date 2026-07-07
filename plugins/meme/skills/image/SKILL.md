@@ -19,7 +19,7 @@ Overlay meme text on an image with a deterministic renderer. You judge layout, p
 
 ## Workflow
 
-1. Resolve the image. Use the user's path directly. If they only describe an image, WebSearch for it and download with `curl -L -o tmp/<name>.jpg <url>`. Never pass a URL to the renderer.
+1. Resolve the image. Use the user's path directly. If they name a meme format instead of a path, check the template library first (below). Otherwise WebSearch for the image and download with `curl -L -o tmp/<name>.jpg <url>`. Never pass a URL to the renderer.
 2. Read the image. Note the subjects, where faces and action are, contrast, and aspect ratio.
 3. Choose a mode:
    - Top/bottom macro text: `--top` / `--bottom`
@@ -35,6 +35,13 @@ Overlay meme text on an image with a deterministic renderer. You judge layout, p
    ```
 
    Report the path. If the clipboard copy is declined or fails, reveal the file instead: `open -R <path>`.
+
+## Template Library
+
+`${CLAUDE_PLUGIN_DATA}/templates/` holds the user's meme templates, synced outside git. Never copy its images into the repo. Each image may have a sidecar spec of the same basename (`drake.jpg` + `drake.json`): a ready-made layout whose `text` values are `<slot descriptions>` and whose `description` says how the format works.
+
+- User names a format: `ls` the library and match by filename. With a sidecar, copy it to `tmp/`, replace each slot with the actual joke, and render with `--spec`. Panel counts matter: fill every slot the joke needs and drop boxes the format leaves empty.
+- No sidecar (new template): Read the image, trace regions, render, iterate. Once the layout looks right, save it back as a sidecar with `<slot description>` placeholders so the next use skips the tracing.
 
 ## Rendering
 

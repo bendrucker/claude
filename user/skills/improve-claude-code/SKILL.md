@@ -28,7 +28,7 @@ All Things interaction goes through the `things:jxa` and `things:url` skills (ne
 
 ## Discover
 
-Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers. Discover never auto-files: filing is an explicit user choice. Implementing is a separate run of the loop below, unless the user opts into [Direct Implementation](#direct-implementation) for the run. The engine is the `claude-code:session` skill's fan-out, whose `references/discovery.md` carries the recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
+Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers. Interactive Discover never auto-files: filing is an explicit user choice. The one exception is [Scheduled](#scheduled), the unattended variant, which auto-files high-confidence grounded candidates. Implementing is a separate run of the loop below, unless the user opts into [Direct Implementation](#direct-implementation) for the run. The engine is the `claude-code:session` skill's fan-out, whose `references/discovery.md` carries the recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
 
 #### Refresh
 
@@ -54,7 +54,7 @@ Suppress `already-filed` and `already-shipped` from the actionable set; still co
 
 #### Digest
 
-The only guaranteed output. Write `tmp/claude-discovery-digest-<YYYY-Www>.md`, ranked and grouped high to low confidence. Each entry shows the finding, its grounding note, the SQL that produced it, and its dedup status. Default `host=local` for config-change candidates; cite imported hosts as corroborating counts only, never pasting raw `content`/`command`/`stdout` from an egress-blocked host (see host safety in `references/discovery.md`). **Never auto-file from this step.**
+The only guaranteed output. Write `tmp/claude-discovery-digest-<YYYY-Www>.md`, ranked and grouped high to low confidence. Each entry shows the finding, its grounding note, the SQL that produced it, and its dedup status. Default `host=local` for config-change candidates; cite imported hosts as corroborating counts only, never pasting raw `content`/`command`/`stdout` from an egress-blocked host (see host safety in `references/discovery.md`). **Never auto-file from this step in an interactive run.** Only the [Scheduled](#scheduled) path files without asking, and it files after the digest lands.
 
 #### File the Keepers
 
@@ -75,9 +75,15 @@ Implement-as-you-go is an opt-in alternative to filing, chosen explicitly by the
 
 These PRs have no backing Things todo, so skip the `Original Task` link. Instead the body carries an Evidence section (local-host evidence only, never content from an egress-blocked host) plus one `Discovery: <fingerprint>` line per finding. Dedup today scans only Things notes, so these markers stay invisible until that scan is extended to PR bodies. Until then, a finding implemented this way can resurface as `new` on the next run.
 
+#### Scheduled
+
+Invoked as `discover --scheduled`, this is the unattended weekly variant. It runs the same refresh, fan-out, grounding, dedup, and digest pipeline as an interactive run. After the digest is written, it auto-files every candidate that is `new`, `grounded`, and `confidence == high` as a `claude-code` Things todo via `things:url`, using the exact title, notes, and `Discovery: <fingerprint>` format from [File the Keepers](#file-the-keepers). Medium and low confidence candidates land in the digest only. Because dismissal is not tracked, they resurface as `new` on the next run, where an interactive pass can file them.
+
+A scheduled run never prompts (no `AskUserQuestion`), never implements ([Direct Implementation](#direct-implementation) is interactive-only), and ends after reporting how many todos it filed. Everything downstream is unchanged: the filed todos wait in the same backlog for a later interactive triage and implement pass.
+
 #### Cadence
 
-On-demand is primary: invoke this skill in Discover mode at your terminal. A weekly run is optional and must run **locally** (a `/loop` or `/schedule` trigger on this machine). The session DB and the `duckdb` CLI live here, so the `agent-ideas` headless-then-teleport bridge does not apply (that works only because RSS is public). A documented option, not built infrastructure.
+On-demand is primary: invoke this skill in Discover mode at your terminal. The weekly run is committed infrastructure: `user/launchd/me.bendrucker.claude.discover.plist` runs `discover --scheduled` Mondays at 07:23 on the always-on Mac Studio (install and log instructions in `user/launchd/README.md`). It must run **locally** because the session DB and the `duckdb` CLI live on that machine, so the `agent-ideas` headless-then-teleport bridge does not apply (that works only because RSS is public).
 
 #### Fingerprint
 

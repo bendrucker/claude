@@ -888,8 +888,10 @@ describe("outcomes query", () => {
       "outcomes",
       filterParams({ ongoing_hours: null }),
     );
+    // shipped covers both signals: hooks-session via its pr-link record,
+    // ship-session via a git push Bash command with no pr-link
     expect(metrics(rows)).toEqual({
-      "sessions: shipped": 1,
+      "sessions: shipped": 2,
       "sessions: ongoing": 1,
       "sessions: handed-off": 1,
       "sessions: abandoned-with-edits": 2,
@@ -905,9 +907,14 @@ describe("outcomes query", () => {
       "outcomes",
       filterParams({ ongoing_hours: "1000" }),
     );
-    const byMetric = metrics(rows);
-    expect(byMetric["sessions: shipped"]).toBe(1);
-    expect(byMetric["sessions: ongoing"]).toBe(15);
+    // 1000 hours reaches past the corpus start, so every unshipped session
+    // reads as ongoing; the shipped ones keep their state
+    expect(metrics(rows)).toEqual({
+      "sessions: shipped": 2,
+      "sessions: ongoing": 15,
+      "prs opened (distinct urls)": 1,
+      "prs needing multiple sessions": 0,
+    });
   });
 });
 

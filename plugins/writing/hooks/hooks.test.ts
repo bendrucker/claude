@@ -23,78 +23,35 @@ function findCommand(matcher: string, script: string): string {
 
 describe("PreToolUse gating", () => {
   test("matchers, guards, and if conditions", () => {
-    const view = preToolUse.map((entry) => ({
-      matcher: entry.matcher,
-      hooks: entry.hooks.map((hook) => ({
-        script: scriptName(hook.command),
-        guarded: hook.command.startsWith("in=$(cat);"),
-        if: hook.if ?? null,
-      })),
-    }));
-    expect(view).toMatchInlineSnapshot(`
-      [
-        {
-          "hooks": [
-            {
-              "guarded": true,
-              "if": null,
-              "script": "numbering",
-            },
-            {
-              "guarded": false,
-              "if": "Write(**/*.md)",
-              "script": "headings",
-            },
-            {
-              "guarded": false,
-              "if": null,
-              "script": "check-tropes",
-            },
-          ],
-          "matcher": "Write",
-        },
-        {
-          "hooks": [
-            {
-              "guarded": true,
-              "if": null,
-              "script": "numbering",
-            },
-            {
-              "guarded": false,
-              "if": "Edit(**/*.md)",
-              "script": "headings",
-            },
-            {
-              "guarded": false,
-              "if": null,
-              "script": "check-tropes",
-            },
-          ],
-          "matcher": "Edit",
-        },
-        {
-          "hooks": [
-            {
-              "guarded": false,
-              "if": null,
-              "script": "check-tropes",
-            },
-          ],
-          "matcher": "MultiEdit",
-        },
-        {
-          "hooks": [
-            {
-              "guarded": true,
-              "if": null,
-              "script": "check-tropes",
-            },
-          ],
-          "matcher": "Bash",
-        },
-      ]
-    `);
+    const view = Object.fromEntries(
+      preToolUse.map((entry) => [
+        entry.matcher,
+        Object.fromEntries(
+          entry.hooks.map((hook) => [
+            scriptName(hook.command),
+            { guarded: hook.command.startsWith("in=$(cat);"), if: hook.if ?? null },
+          ]),
+        ),
+      ]),
+    );
+    expect(view).toEqual({
+      Write: {
+        numbering: { guarded: true, if: null },
+        headings: { guarded: false, if: "Write(**/*.md)" },
+        "check-tropes": { guarded: false, if: null },
+      },
+      Edit: {
+        numbering: { guarded: true, if: null },
+        headings: { guarded: false, if: "Edit(**/*.md)" },
+        "check-tropes": { guarded: false, if: null },
+      },
+      MultiEdit: {
+        "check-tropes": { guarded: false, if: null },
+      },
+      Bash: {
+        "check-tropes": { guarded: true, if: null },
+      },
+    });
   });
 
   test("Bash guard alternation is derived from the flags check-tropes extracts", () => {

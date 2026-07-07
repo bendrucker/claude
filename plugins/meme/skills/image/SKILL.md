@@ -1,0 +1,59 @@
+---
+name: image
+description: Generate a meme by overlaying text on an image. Use when asked to make a meme, caption an image, add meme text, or produce classic Impact macros, TV-subtitle stills, white-bar captions, or multi-label formats (Drake, distracted boyfriend, whiteboard).
+argument-hint: "[image-path] [meme text or idea]"
+allowed-tools:
+  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/render.ts:*)"
+hooks:
+  PreToolUse:
+    - matcher: "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/render.ts:*)"
+      hooks:
+        - type: command
+          command: "bun ${CLAUDE_PLUGIN_ROOT}/skills/image/scripts/setup.ts"
+          once: true
+---
+
+# Meme Image
+
+Overlay meme text on an image with a deterministic renderer. You judge layout, placement, and legibility; the script guarantees the classic look (Impact stroke, subtitle yellow, caption bars).
+
+## Workflow
+
+1. Resolve the image. Use the user's path directly. If they only describe an image, WebSearch for it and download with `curl -L -o tmp/<name>.jpg <url>`. Never pass a URL to the renderer.
+2. Read the image. Note the subjects, where faces and action are, contrast, and aspect ratio.
+3. Choose a mode:
+   - Top/bottom macro text: `--top` / `--bottom`
+   - TV-subtitle quote (yellow, bottom center): `--subtitle`
+   - White bar above or below the image: `--caption` (optionally `--caption-position top|bottom`, default top)
+   - Multi-label formats or custom placement: write a JSON spec file. Read [references/spec.md](references/spec.md) first.
+4. Pick the output filename. It is part of the joke: witty and meme-relevant, kebab or snake case, `.png`. Never `meme.png` or another generic name. If the user supplies a filename, use theirs.
+5. Render, then Read the output PNG. Check legibility, that text does not cover key subjects, line-break placement, and any fit warnings on stderr. Adjust and re-render until it reads well.
+6. Deliver: copy the file reference to the clipboard so a paste keeps the filename:
+
+   ```sh
+   osascript -e 'set the clipboard to POSIX file "<absolute output path>"'
+   ```
+
+   Report the path. If the clipboard copy is declined or fails, reveal the file instead: `open -R <path>`.
+
+## Rendering
+
+```sh
+bun ${CLAUDE_SKILL_DIR}/scripts/render.ts <image> [flags] -o tmp/<joke-name>.png
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--top`, `--bottom` | Classic Impact macro text |
+| `--subtitle` | TV-subtitle text at the bottom |
+| `--caption` | White-bar caption (expands the canvas); `--caption-position top\|bottom` |
+| `--spec`, `-s` | JSON layout spec file (mutually exclusive with the text flags) |
+| `--out`, `-o` | Output PNG path (always required) |
+
+On success the script prints the absolute output path. Fit problems are warnings, not errors: the text still renders at the shrink floor. Treat every warning as a cue to shorten text or enlarge its region.
+
+## Gotchas
+
+- The Bash tool escapes `!` to `\!`, which corrupts flag values. If any text contains `!`, Write a spec file to `tmp/` and render with `--spec` instead of text flags.
+- Images narrower than 400px are auto-upscaled 2x before drawing, so tiny templates still get readable text. Expect output dimensions to differ from the input.
+- Spec coordinates and font sizes are normalized (0-1 fractions of image dimensions). Judge placement from the Read image in fractions, not pixels: Read may downscale.

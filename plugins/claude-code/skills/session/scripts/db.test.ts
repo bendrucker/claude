@@ -878,6 +878,39 @@ describe("pr_links view", () => {
   });
 });
 
+describe("outcomes query", () => {
+  const metrics = (rows: { metric: string; count: bigint }[]) =>
+    Object.fromEntries(rows.map((r) => [r.metric, Number(r.count)]));
+
+  it("classifies every session's terminal state", async () => {
+    const rows = await runQuery<{ metric: string; count: bigint }>(
+      db,
+      "outcomes",
+      filterParams({ ongoing_hours: null }),
+    );
+    expect(metrics(rows)).toEqual({
+      "sessions: shipped": 1,
+      "sessions: ongoing": 1,
+      "sessions: handed-off": 1,
+      "sessions: abandoned-with-edits": 2,
+      "sessions: no-artifact": 11,
+      "prs opened (distinct urls)": 1,
+      "prs needing multiple sessions": 0,
+    });
+  });
+
+  it("widens the ongoing window via ongoing_hours without reclassifying shipped work", async () => {
+    const rows = await runQuery<{ metric: string; count: bigint }>(
+      db,
+      "outcomes",
+      filterParams({ ongoing_hours: "1000" }),
+    );
+    const byMetric = metrics(rows);
+    expect(byMetric["sessions: shipped"]).toBe(1);
+    expect(byMetric["sessions: ongoing"]).toBe(15);
+  });
+});
+
 describe("attribution and skill-activity query", () => {
   it("exposes attribution on tool_calls", async () => {
     const [row] = await db.query<{ attribution_skill: string }>(

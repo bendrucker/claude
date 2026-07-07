@@ -20,6 +20,12 @@ export const LINE_HEIGHT = 1.15;
 export const REGION_PADDING = 0.04;
 /** Absolute shrink floor in pixels, below which text is unreadable. */
 export const MIN_FONT_PX = 12;
+/**
+ * Strokes straddle the glyph edge and the fill covers the inner half, so
+ * below this lineWidth the visible outline drops under a pixel and reads
+ * as no outline at all.
+ */
+export const MIN_STROKE_PX = 3;
 
 export const presets: Record<PresetName, PresetStyle> = {
   classic: {
@@ -49,7 +55,7 @@ export const presets: Record<PresetName, PresetStyle> = {
     fontWeight: "bold",
     fill: "#ffe400",
     stroke: "#000000",
-    strokeWidthRatio: 1 / 14,
+    strokeWidthRatio: 1 / 7,
     uppercase: false,
     maxFontSize: 0.045,
     minFontSize: 0.02,

@@ -18,7 +18,7 @@ import {
   padRegion,
   resolveRegion,
 } from "./layout";
-import { caption as captionStyle, LINE_HEIGHT, presets } from "./presets";
+import { caption as captionStyle, LINE_HEIGHT, MIN_STROKE_PX, presets } from "./presets";
 import { type Caption, type Spec, specFromFlags, type TextBox, validateSpec } from "./spec";
 
 /** Below this width, text at readable px sizes crowds the image; upscale 2x first. */
@@ -158,7 +158,7 @@ function drawBox(
   ctx.textAlign = align;
   ctx.textBaseline = "top";
   ctx.lineJoin = "round";
-  ctx.lineWidth = fit.fontPx * preset.strokeWidthRatio;
+  ctx.lineWidth = Math.max(MIN_STROKE_PX, fit.fontPx * preset.strokeWidthRatio);
   ctx.strokeStyle = box.style?.stroke ?? preset.stroke;
   ctx.fillStyle = box.style?.fill ?? preset.fill;
   fit.lines.forEach((line, i) => {

@@ -1,6 +1,13 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import fc from "fast-check";
-import { firstByTier, type PatternMatch, regexCatalog, scan, stripCode } from "./tropes";
+import {
+  firstByTier,
+  type PatternMatch,
+  regexCatalog,
+  scan,
+  semicolonSpliceHits,
+  stripCode,
+} from "./tropes";
 
 describe("regexCatalog", () => {
   it("returns globalized regex patterns for counting", () => {
@@ -396,6 +403,67 @@ describe("scan", () => {
       it(`skips in ${path}`, () => {
         expect(
           scan(semicolons, path).find((m) => m.category === "connector density"),
+        ).toBeUndefined();
+      });
+    }
+  });
+
+  describe("semicolon splice", () => {
+    const twoSplices =
+      "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.";
+    const oneSplice =
+      "The cache starts cold; the first request fills it. The retry logic backs off.";
+
+    test.each<{ name: string; text: string; min: number; count: number }>([
+      { name: "two splices counted at the prose threshold", text: twoSplices, min: 2, count: 2 },
+      { name: "one splice silent at the prose threshold", text: oneSplice, min: 2, count: 0 },
+      { name: "one splice counted at the comment threshold", text: oneSplice, min: 1, count: 1 },
+      {
+        name: "list-item semicolons skipped",
+        text: "- compile the sources; link the objects\n- package the build; ship the artifact",
+        min: 1,
+        count: 0,
+      },
+      {
+        name: "digit before the semicolon is not a splice",
+        text: "The count was 2; see below. The limit was 3; see above.",
+        min: 1,
+        count: 0,
+      },
+      {
+        name: "commented-out code is not a splice",
+        text: "foo(); bar()",
+        min: 1,
+        count: 0,
+      },
+      {
+        name: "uppercase clauses still splice",
+        text: "The cache starts cold; The first request fills it. It retries; It succeeds.",
+        min: 2,
+        count: 2,
+      },
+    ])("$name", ({ text, min, count }) => {
+      expect(semicolonSpliceHits(text, min).count).toBe(count);
+    });
+
+    it("flags two splices in short prose below the density gate", () => {
+      expect(scan(twoSplices).find((m) => m.category === "semicolon splice")).toBeDefined();
+    });
+
+    it("stays silent on a single splice in prose", () => {
+      expect(scan(oneSplice).find((m) => m.category === "semicolon splice")).toBeUndefined();
+    });
+
+    it("detects in prose files", () => {
+      expect(
+        scan(twoSplices, "doc.md").find((m) => m.category === "semicolon splice"),
+      ).toBeDefined();
+    });
+
+    for (const path of ["script.sh", "index.ts"]) {
+      it(`skips in ${path}`, () => {
+        expect(
+          scan(twoSplices, path).find((m) => m.category === "semicolon splice"),
         ).toBeUndefined();
       });
     }

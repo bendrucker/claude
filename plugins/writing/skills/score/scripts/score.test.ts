@@ -1,14 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { compileStemmedWordlist } from "../../../detection/wordlists";
 import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
-import {
-  buildReport,
-  extractComments,
-  renderTable,
-  renderVoiceDeltaTable,
-  scoreComments,
-  scoreText,
-} from "./score";
+import { buildReport, renderTable, renderVoiceDeltaTable, scoreComments, scoreText } from "./score";
 
 function category(report: ReturnType<typeof buildReport>, group: string, name: string) {
   return report.groups.find((g) => g.group === group)?.categories.find((c) => c.category === name);
@@ -41,16 +34,6 @@ describe("scoreText", () => {
     const score = scoreText("The widget powers the widgets.", undefined, match);
     const custom = score.categories.find((c) => c.category === "custom vocabulary");
     expect(custom?.hits).toBe(2);
-  });
-});
-
-describe("extractComments", () => {
-  it("pulls single-line // and # comments and drops the markers", () => {
-    const src = ["const x = 1; // leverage the cache", "# delve into config", "code()"].join("\n");
-    const comments = extractComments(src);
-    expect(comments).toContain("leverage the cache");
-    expect(comments).toContain("delve into config");
-    expect(comments).not.toContain("code()");
   });
 });
 

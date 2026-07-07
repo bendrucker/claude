@@ -16,7 +16,7 @@ The hook enforces these automatically. Vocabulary and marketing-verb lists are i
 
 - Never use spaced em dashes (` — `).
 - Avoid "not just X, but also Y" parallelism. Simplify.
-- Don't join independent clauses with em dashes, semicolons, or hyphens. Write two sentences. Swapping one connector for another is not a fix.
+- Don't join independent clauses with em dashes, semicolons, or hyphens. Write two sentences. Swapping one connector for another is not a fix. A rare semicolon is fine only when the clauses genuinely can't stand alone.
 - Don't structure bullets as `- **path/to/file**: description`.
 - Use `####` headers instead of `**Label:**` for labeled subsections.
 - Headings name the topic in a couple of words. No verbs, no `Topic: clause`, no sentence-shaped headings. Move the explanation into the body.

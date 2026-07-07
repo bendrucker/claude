@@ -4,7 +4,7 @@
 
 - Prefer concise, direct responses.
 - Minimize unnecessary explanations unless requested.
-- Don't join clauses with semicolons or em dashes. Write two short sentences.
+- Don't join independent clauses with semicolons or em dashes. End the clause with a period. Swapping one connector for another is not a fix. Semicolons only at rare, normal-English cadence.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
 - Use natural line breaks unless the surrounding code is wrapped at a specific column.
 - Include a trailing newline in all new files.

@@ -15,6 +15,7 @@ describe("validateSpec", () => {
     ["region out of range", { boxes: [{ text: "hi", region: { x: 0, y: 0, w: 2, h: 1 } }] }],
     ["bad fontSize override", { boxes: [{ text: "hi", style: { fontSize: 40 } }] }],
     ["bad caption position", { captions: [{ text: "hi", position: "left" }] }],
+    ["non-boolean linkFontSizes", { linkFontSizes: "yes", boxes: [{ text: "hi" }] }],
   ])("rejects %s", (_name, spec) => {
     expect(() => validateSpec(spec)).toThrowErrorMatchingSnapshot();
   });

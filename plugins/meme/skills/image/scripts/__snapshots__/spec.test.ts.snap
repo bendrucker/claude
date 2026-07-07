@@ -21,3 +21,5 @@ exports[`validateSpec rejects bad caption position 1`] = `"spec.captions[0].posi
 exports[`specFromFlags rejects no flags 1`] = `"flags: requires at least one of --top, --bottom, --subtitle, --caption, or --spec"`;
 
 exports[`specFromFlags rejects bad caption position 1`] = `"--caption-position: expected top or bottom"`;
+
+exports[`validateSpec rejects non-boolean linkFontSizes 1`] = `"spec.linkFontSizes: expected a boolean"`;

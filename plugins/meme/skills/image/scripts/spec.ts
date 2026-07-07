@@ -34,6 +34,8 @@ export interface Caption {
 export interface Spec {
   boxes?: TextBox[];
   captions?: Caption[];
+  /** Re-fit all boxes at the smallest fitted font size so panels match. */
+  linkFontSizes?: boolean;
 }
 
 const anchors: Anchor[] = ["top", "bottom", "center"];
@@ -138,6 +140,12 @@ export function validateSpec(value: unknown): Spec {
     fail("spec.captions", "expected an array");
   }
   const spec: Spec = {};
+  if (value.linkFontSizes !== undefined) {
+    if (typeof value.linkFontSizes !== "boolean") {
+      fail("spec.linkFontSizes", "expected a boolean");
+    }
+    spec.linkFontSizes = value.linkFontSizes;
+  }
   if (Array.isArray(boxes)) {
     spec.boxes = boxes.map((box, i) => validateBox(box, `spec.boxes[${i}]`));
   }

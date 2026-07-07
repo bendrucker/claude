@@ -13,12 +13,21 @@ import sharp from "sharp";
 import {
   captionBarHeight,
   defaultValign,
+  type FitResult,
   fitText,
   type Measure,
+  type PxRegion,
   padRegion,
   resolveRegion,
 } from "./layout";
-import { caption as captionStyle, LINE_HEIGHT, MIN_STROKE_PX, presets } from "./presets";
+import {
+  type Anchor,
+  caption as captionStyle,
+  LINE_HEIGHT,
+  MIN_STROKE_PX,
+  type PresetStyle,
+  presets,
+} from "./presets";
 import { type Caption, type Spec, specFromFlags, type TextBox, validateSpec } from "./spec";
 
 /** Below this width, text at readable px sizes crowds the image; upscale 2x first. */
@@ -108,16 +117,23 @@ function drawCaption(ctx: SKRSContext2D, layout: CaptionLayout, y: number, width
   });
 }
 
-function drawBox(
+interface BoxLayout {
+  box: TextBox;
+  preset: PresetStyle;
+  font: ResolvedFont;
+  region: PxRegion;
+  anchor: Anchor;
+  fit: FitResult;
+}
+
+function layoutBox(
   ctx: SKRSContext2D,
   box: TextBox,
   imageWidth: number,
   imageHeight: number,
-  offsetY: number,
-  warnings: string[],
-  index: number,
   classicFamily: string,
-): void {
+  fontPxCap?: number,
+): BoxLayout {
   const preset = presets[box.preset ?? "classic"];
   const family =
     box.style?.font ?? (preset.fontFamily === "Impact" ? classicFamily : preset.fontFamily);
@@ -129,13 +145,46 @@ function drawBox(
   const uppercase = box.style?.uppercase ?? preset.uppercase;
   const text = uppercase ? box.text.toUpperCase() : box.text;
 
+  const maxFontPx = (box.style?.fontSize ?? preset.maxFontSize) * imageHeight;
   const fit = fitText(text, {
     maxWidth: region.w,
     maxHeight: region.h,
-    maxFontPx: (box.style?.fontSize ?? preset.maxFontSize) * imageHeight,
+    maxFontPx: fontPxCap === undefined ? maxFontPx : Math.min(maxFontPx, fontPxCap),
     minFontPx: preset.minFontSize * imageHeight,
     measure,
   });
+  return { box, preset, font, region, anchor, fit };
+}
+
+/**
+ * Multi-panel formats read wrong when each panel fits its text independently,
+ * so linkFontSizes re-lays every box at the smallest fitted size.
+ */
+export function layoutBoxes(
+  ctx: SKRSContext2D,
+  spec: Spec,
+  imageWidth: number,
+  imageHeight: number,
+  classicFamily: string,
+): BoxLayout[] {
+  const layouts = (spec.boxes ?? []).map((box) =>
+    layoutBox(ctx, box, imageWidth, imageHeight, classicFamily),
+  );
+  if (!spec.linkFontSizes || layouts.length < 2) return layouts;
+  const minPx = Math.min(...layouts.map((l) => l.fit.fontPx));
+  return layouts.map((l) =>
+    l.fit.fontPx > minPx ? layoutBox(ctx, l.box, imageWidth, imageHeight, classicFamily, minPx) : l,
+  );
+}
+
+function drawBox(
+  ctx: SKRSContext2D,
+  layout: BoxLayout,
+  offsetY: number,
+  warnings: string[],
+  index: number,
+): void {
+  const { box, preset, font, region, anchor, fit } = layout;
   if (fit.overflow) {
     warnings.push(
       `box ${index}: text does not fit at the minimum font size; it renders anyway but may spill out of its region. Shorten the text or enlarge the region.`,
@@ -209,8 +258,8 @@ export async function render(
 
   const warnings: string[] = [];
   const classic = await classicFontFamily();
-  (spec.boxes ?? []).forEach((box, i) => {
-    drawBox(ctx, box, image.width, image.height, bars.top, warnings, i, classic);
+  layoutBoxes(ctx, spec, image.width, image.height, classic).forEach((layout, i) => {
+    drawBox(ctx, layout, bars.top, warnings, i);
   });
 
   const absolute = resolve(outPath);

@@ -2,8 +2,9 @@ import { beforeAll, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createCanvas } from "@napi-rs/canvas";
 import sharp from "sharp";
-import { render } from "./render";
+import { layoutBoxes, render } from "./render";
 
 const dir = mkdtempSync(join(tmpdir(), "meme-render-"));
 const png = join(dir, "input.png");
@@ -63,6 +64,31 @@ test("images narrower than 400px upscale 2x", async () => {
   const out = join(dir, "tiny.png");
   const result = await render({ boxes: [{ text: "tiny" }] }, tiny, out);
   expect({ width: result.width, height: result.height }).toEqual({ width: 240, height: 180 });
+});
+
+test("linkFontSizes re-fits every box at the smallest fitted size", () => {
+  const ctx = createCanvas(1, 1).getContext("2d");
+  const boxes = [
+    { text: "hi", preset: "label" as const, region: { x: 0, y: 0, w: 0.4, h: 0.3 } },
+    {
+      text: "a considerably longer run of text that must shrink to fit",
+      preset: "label" as const,
+      region: { x: 0.5, y: 0, w: 0.2, h: 0.12 },
+    },
+  ];
+  const [short, long] = layoutBoxes(ctx, { boxes }, 800, 600, "sans-serif");
+  if (!short || !long) throw new Error("expected two layouts");
+  expect(short.fit.fontPx).toBeGreaterThan(long.fit.fontPx);
+  const [shortLinked, longLinked] = layoutBoxes(
+    ctx,
+    { boxes, linkFontSizes: true },
+    800,
+    600,
+    "sans-serif",
+  );
+  if (!shortLinked || !longLinked) throw new Error("expected two layouts");
+  expect(shortLinked.fit.fontPx).toBe(longLinked.fit.fontPx);
+  expect(longLinked.fit.fontPx).toBe(long.fit.fontPx);
 });
 
 test("text that cannot fit warns instead of erroring", async () => {

@@ -25,11 +25,12 @@ JSON file passed via `--spec`. Use it for multi-label formats, custom placement,
   ],
   "captions": [
     { "text": "required", "position": "top | bottom (default top)" }
-  ]
+  ],
+  "linkFontSizes": false
 }
 ```
 
-At least one box or caption is required. `style` fields are sparse overrides on the preset; `fontSize` sets the starting size, and text still shrinks if it does not fit.
+At least one box or caption is required. `style` fields are sparse overrides on the preset; `fontSize` sets the starting size, and text still shrinks if it does not fit. `linkFontSizes: true` re-fits every box at the smallest fitted size; use it for multi-panel formats (Drake, Gru) where mismatched panel text reads wrong.
 
 ## Presets
 

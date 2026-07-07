@@ -142,7 +142,10 @@ stale_hosts AS (
       || ' days behind the corpus; cross-host queries read this host as idle. '
       || 'Re-sync it (SKILL.md "Re-syncing")' AS detail
   FROM host_span h, corpus c
-  WHERE DATE_DIFF('day', h.last_ts, c.max_ts)
+  -- Imported hosts only: the remediation is a re-sync, which does not apply to
+  -- local. A lagging local corpus shows up as disk-not-indexed instead.
+  WHERE h.host != 'local'
+    AND DATE_DIFF('day', h.last_ts, c.max_ts)
         > COALESCE(TRY_CAST(getvariable('stale_days') AS INTEGER), 2)
 ),
 null_ts AS (

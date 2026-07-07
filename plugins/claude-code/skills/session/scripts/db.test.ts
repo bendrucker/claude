@@ -1458,10 +1458,12 @@ describe("index-health query", () => {
     );
     await reindex();
     const rows = await runQuery<Health>(db, "index-health", healthParams());
-    const stale = rows.find((r) => r.check_name === "host-staleness");
-    expect(stale?.status).toBe("alert");
-    expect(stale?.subject).toBe("stale");
-    expect(stale?.detail).toContain("days behind the corpus");
+    const staleness = rows.filter((r) => r.check_name === "host-staleness");
+    // exactly the imported host: local never alerts, its remediation (re-sync)
+    // does not apply
+    expect(staleness.map((r) => r.subject)).toEqual(["stale"]);
+    expect(staleness[0]?.status).toBe("alert");
+    expect(staleness[0]?.detail).toContain("days behind the corpus");
   });
 });
 

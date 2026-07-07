@@ -512,17 +512,21 @@ WHERE tool_name IN ('Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit')
 
 -- Pull requests opened from a session, linking session_id to the PR it produced.
 -- The outcome side of the loop: join back to sessions to see what work shipped.
+-- The harness re-emits the pr-link record on later turns of the same session, so the
+-- raw rows repeat each link many times; group to one row per distinct link, keeping
+-- the first emission's timestamp.
 CREATE OR REPLACE VIEW pr_links AS
 SELECT
   host,
   session_id,
-  project_path,
-  timestamp,
+  arg_min(project_path, timestamp)        AS project_path,
+  MIN(timestamp)                          AS timestamp,
   TRY_CAST(data->>'$.prNumber' AS BIGINT) AS pr_number,
   (data->>'$.prRepository')               AS repository,
   (data->>'$.prUrl')                      AS url
 FROM raw
-WHERE type = 'pr-link';
+WHERE type = 'pr-link'
+GROUP BY host, session_id, pr_number, repository, url;
 
 -- Plan-mode calls: one row per ExitPlanMode tool_use, joined with its tool_result to
 -- classify the outcome. `plan_seq` is 1-based within the session ordered by timestamp.

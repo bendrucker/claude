@@ -112,9 +112,23 @@ describe.skipIf(!hasSg())("checkCode (requires sg)", () => {
     ["detects Python class Phase2", "class Phase2:\n    pass", "py", "Phase2"],
     ["allows descriptive Python names", "def process_items():\n    pass", "py", null],
     ["detects TypeScript function step1()", "function step1() {}", "ts", "step1"],
+    ["detects TSX function step1()", "function step1() {}", "tsx", "step1"],
   ])("%s", async (_name, content, lang, expected) => {
     const match = await checkCode(content, lang);
     expected === null ? expect(match).toBeNull() : expect(match).toContain(expected);
+  });
+});
+
+describe("checkCode extension gating", () => {
+  test.each<[string]>([
+    ["sh"],
+    ["json"],
+    ["yml"],
+    ["txt"],
+    ["sql"],
+    [""],
+  ])("returns null for uncovered extension %p without scanning", async (ext) => {
+    expect(await checkCode("function step1() {}", ext)).toBeNull();
   });
 });
 

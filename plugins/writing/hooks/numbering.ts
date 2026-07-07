@@ -60,7 +60,24 @@ export function checkMarkdown(content: string): string | null {
   return null;
 }
 
+// Extensions the numbering.yml languages cover. Gates subprocess spawns and
+// must stay in sync with the numbering matchers in hooks.json (see hooks.test.ts).
+export const SG_EXTENSIONS = new Set([
+  "go",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "ts",
+  "tsx",
+  "mts",
+  "cts",
+  "py",
+]);
+
 export async function checkCode(content: string, ext: string): Promise<string | null> {
+  if (!SG_EXTENSIONS.has(ext)) return null;
+
   try {
     execSync("command -v sg", { stdio: ["pipe", "pipe", "pipe"] });
   } catch {

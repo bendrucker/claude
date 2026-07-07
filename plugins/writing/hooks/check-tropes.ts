@@ -8,69 +8,6 @@ import { formatContext, formatDecision, isPlanMode, type SyncHookJSONOutput } fr
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
-const MIN_PROSE_LENGTH = 20;
-
-const SKIPPED_KEYS = new Set([
-  "old_string",
-  "oldstring",
-  "old_str",
-  "pattern",
-  "match",
-  "search",
-  "search_query",
-  "query",
-]);
-
-function shouldSkipKey(key: string | undefined): boolean {
-  if (!key) return false;
-  const lower = key.toLowerCase();
-  if (SKIPPED_KEYS.has(lower)) return true;
-  return lower.startsWith("old_");
-}
-
-function isProse(value: string): boolean {
-  if (value.length < MIN_PROSE_LENGTH) return false;
-  if (/^https?:\/\//.test(value)) return false;
-  if (/^[A-Za-z0-9_-]+$/.test(value)) return false;
-  return /\s/.test(value);
-}
-
-type ProseEntry = { key: string | undefined; value: string };
-
-function extractProseEntries(value: unknown, key?: string): ProseEntry[] {
-  if (shouldSkipKey(key)) return [];
-  if (typeof value === "string") return isProse(value) ? [{ key, value }] : [];
-  if (Array.isArray(value)) return value.flatMap((item) => extractProseEntries(item, key));
-  if (typeof value === "object" && value !== null) {
-    return Object.entries(value).flatMap(([childKey, childValue]) =>
-      extractProseEntries(childValue, childKey),
-    );
-  }
-  return [];
-}
-
-function extractProse(value: unknown, key?: string): string[] {
-  return extractProseEntries(value, key).map((entry) => entry.value);
-}
-
-const PROSE_TOOL_PATTERN =
-  /\b(?:issue|ticket|story|epic|document|doc|page|wiki|note|comment|message|post|reply|thread|discussion|review|article|memo)\b/;
-
-const PROSE_KEY_PATTERN =
-  /\b(?:description|body|content|text|title|summary|comment|message|note|details)\b/;
-
-function tokenize(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ");
-}
-
-function isProseTool(toolName: string): boolean {
-  return PROSE_TOOL_PATTERN.test(tokenize(toolName));
-}
-
-function isProseKey(key: string | undefined): boolean {
-  return key !== undefined && PROSE_KEY_PATTERN.test(tokenize(key));
-}
-
 function extractBodyFilePath(command: string): string | null {
   const match = command.match(/--body-file[=\s](\S+)/);
   return match?.[1] ?? null;
@@ -162,18 +99,7 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     return texts;
   }
 
-  return extractProse(toolInput);
-}
-
-async function collectLexicalText(input: PreToolUseHookInput): Promise<string[]> {
-  const toolName = input.tool_name;
-
-  if (toolName === "Bash") return collectText(input);
-
-  const toolInput = input.tool_input as Record<string, unknown>;
-  const entries = extractProseEntries(toolInput);
-  if (isProseTool(toolName)) return entries.map((entry) => entry.value);
-  return entries.filter((entry) => isProseKey(entry.key)).map((entry) => entry.value);
+  return [];
 }
 
 function isPlanFile(input: PreToolUseHookInput): boolean {
@@ -229,13 +155,11 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJS
   const texts = await collectText(input);
   if (texts.length === 0) return null;
 
-  const structural = firstByTier(scan(texts.join("\n"), undefined, "sideEffect"), "deny");
-  if (structural?.structural) return formatDecision("deny", structural.message);
+  const matches = scan(texts.join("\n"), undefined, "sideEffect");
+  const deny = firstByTier(matches, "deny");
+  if (deny?.structural) return formatDecision("deny", deny.message);
 
-  const lexical = await collectLexicalText(input);
-  if (lexical.length === 0) return null;
-  const matches = scan(lexical.join("\n"), undefined, "sideEffect");
-  const match = firstByTier(matches, "deny") ?? firstByTier(matches, "context");
+  const match = deny ?? firstByTier(matches, "context");
   if (match) return formatContext(match.message);
 
   return null;

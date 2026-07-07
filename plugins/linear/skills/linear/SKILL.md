@@ -23,11 +23,11 @@ The connector and MCP paths need no CLI. The CLI-only operations (relations, bul
 
 `$0` (optional verb) routes to an operation; pass the rest (issue id, title, filters) as its params. With no verb, infer the operation from the request.
 
-- `create`: create an issue. See [Creating vs Updating](#creating-vs-updating) and [Issue Status](#issue-status).
+- `create`: create an issue. See [Creating vs Updating](#creating-vs-updating) and Issue Status in [references/conventions.md](references/conventions.md).
 - `update`: update an issue by id. See [Creating vs Updating](#creating-vs-updating).
-- `list`: query issues. See [Querying Issues](#querying-issues).
+- `list`: query issues. See Querying Issues in [references/conventions.md](references/conventions.md).
 - `view`: fetch a single issue; include its `url` for anything you may reference.
-- `comment`: comment on an issue, using full URLs per [Issue References](#issue-references).
+- `comment`: comment on an issue, using full URLs per Issue References in [references/conventions.md](references/conventions.md).
 
 Pick a tool path per [Tool Selection](#tool-selection).
 
@@ -70,110 +70,15 @@ Update (`id` present, change only what you need):
 }
 ```
 
-The local and plugin MCP variants split these into `create_issue` and `update_issue`, shown in the examples below. The create precondition (`title` required) applies to both paths.
+The local and plugin MCP variants split these into `create_issue` and `update_issue` with the same flat field shapes. The create precondition (`title` required) applies to both paths.
 
 ## Saving a Structured Issue File
 
-Several skills hand off a Markdown file with YAML frontmatter for issue metadata and a body below the closing `---`. Issue refinement emits one, project planning emits a similar file, and others will follow. This section maps that shape to a Linear issue. The schema varies by producer, so read the file's frontmatter to see which keys it actually carries, extract them with whatever fits that file, and write the body to its own file so it passes by path and stays out of context.
-
-Map the metadata keys these files tend to carry onto the `linear` CLI:
-
-| Frontmatter | Linear |
-|-------------|--------|
-| `title` | `--title` |
-| body (below the closing `---`) | `--description-file <path>` |
-| `labels` | one `--label` per entry |
-| `priority` (`urgent`, `high`, `medium`, `low`) | `--priority` `1`..`4` |
-| `relations` (`blocks`, `blocked-by`, `related`, `duplicate-of`) | `linear issue relation add <id> <type> <relatedId>` |
-
-A relation's `type` is the frontmatter key, except `duplicate-of` maps to `duplicate`. Its `relatedId` is the issue identifier in the relation's tracker URL. For keys the file omits, or ones this table does not name, map them when Linear has a matching field and ask when the mapping is unclear.
-
-Routing fields (team, assignee, state) are not in the file. Take them from the user at save time. Default the state from assignment as in [Issue Status](#issue-status). `getDefaultState` in `hooks/save-issue.ts` encodes that rule.
-
-### Simple Saves
-
-When the file declares no relations, the connector `save_issue` is enough: pass the title, the body as `description`, the labels, and the routing fields, per [Creating vs Updating](#creating-vs-updating). This is the default.
-
-### Relations
-
-The connector and MCP tools cannot set relations, so a file that declares any needs the `linear` CLI. When the Environment block shows it is not installed, save through the connector and report the relation targets you skipped so the user can add them by hand.
-
-With the CLI present, create the issue with the body by file, then add one relation per entry from the parsed frontmatter:
-
-```bash
-new_id=$(linear issue create --title "$title" --description-file "$body_file" \
-  --team "$team" --state "$state" | grep -oE '[A-Z][A-Z0-9]*-[0-9]+' | head -1)
-linear issue relation add "$new_id" blocked-by ENG-100
-```
-
-Add `--label`, `--assignee`, and `--priority` when the file carries them. The `linear-cli:linear-cli` skill documents the full CLI surface.
+Skills that emit a Markdown file with YAML frontmatter (issue refinement, project planning) hand off here. [references/structured-file.md](references/structured-file.md) maps that frontmatter onto Linear fields, covers routing fields taken from the user at save time, and shows the `linear` CLI commands required when the file declares relations.
 
 ## Conventions
 
-### Issue References
-
-When writing text that references other issues (descriptions, comments, updates), never use bare identifiers like `ENG-123`. Linear auto-renders issue URLs as inline previews, so use the full URL:
-
-- **Bare URL**: `https://linear.app/workspace/issue/ENG-123` (renders as an inline preview)
-- **Hyperlinked text**: `[the auth bug](https://linear.app/workspace/issue/ENG-123)` (when linking specific words is more natural)
-
-Both MCP tools and GraphQL queries return a `url` field on issues. Always include `url` when querying issues you may reference in writing.
-
-### Issue Status
-
-When creating issues, set status based on assignment:
-
-- **Assigned to me** (`assignee: "me"`): Set `state: "Todo"`
-- **Unassigned**: Set `state: "Backlog"`
-
-Example:
-```typescript
-// Issue for myself
-await linear.create_issue({
-  team: "ENG",
-  title: "Fix authentication bug",
-  assignee: "me",
-  state: "Todo"
-})
-
-// Unassigned issue
-await linear.create_issue({
-  team: "ENG",
-  title: "Research API performance",
-  state: "Backlog"
-})
-```
-
-### Querying Issues
-
-Use `assignee: "me"` to filter issues assigned to the authenticated user:
-
-```typescript
-// My issues
-await linear.list_issues({ assignee: "me" })
-
-// Team backlog
-await linear.list_issues({ team: "ENG", state: "Backlog" })
-```
-
-### Labels
-
-Use label names directly in `create_issue` and `update_issue` — no need to look up IDs:
-
-```typescript
-await linear.create_issue({
-  team: "ENG",
-  title: "Update documentation",
-  labels: ["documentation", "high-priority"]
-})
-```
-
-**Label Lookup**: Labels can exist at the workspace or team level. Check both:
-
-1. Workspace labels: `list_issue_labels()` (no team filter)
-2. Team labels: `list_issue_labels({ team: "TEAM" })`
-
-If a label isn't found at the workspace level, check the team before concluding it doesn't exist.
+[references/conventions.md](references/conventions.md) holds the house rules: reference issues by full URL (never bare `ENG-123`), default state from assignment (assigned to me is `Todo`, unassigned is `Backlog`), query with `assignee: "me"`, and pass label names directly (checking workspace then team when looking one up). Apply it whenever you create, update, comment, or query.
 
 ## GraphQL API
 

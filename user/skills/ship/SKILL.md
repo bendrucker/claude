@@ -18,8 +18,6 @@ allowed-tools:
   - Skill(writing:review)
   - Skill(pull-request:create)
   - Skill(pull-request:babysit)
-  - Skill(pull-request:update)
-  - Skill(pull-request:follow-up)
 ---
 
 # Ship
@@ -40,20 +38,17 @@ PR all the way to merged.
 
 ## Context
 
-Gathered at invocation with bang-execution, so the decide step reads it without
-spending a tool call:
+Gathered at invocation with bang-execution, so the decide step reads it without a
+tool call:
 
 - Working tree and untracked files: !`git status --short`
 
-This signal is base-independent. The committed diff needs a base, which the decide
-step resolves first.
+This is base-independent. The committed diff needs a base, resolved below.
 
 ## Decide What Applies
 
 Resolve the base before diffing. It defaults to `main`. On a stacked branch pass
-`--base <parent>` so gating sees only the tip layer. Diffing against `main` from
-inside a stack pulls in every layer beneath the tip and inflates the file set,
-which can mis-gate a docs-only tip as a code change. Diff the tip against the base
+`--base <parent>` so gating sees only the tip layer. Diff the tip against the base
 with `git diff <base>...HEAD`.
 
 Gate each pass on what the change contains. Read the Context above for the
@@ -107,8 +102,7 @@ Order:
    its trims through a branch fast-forward (see [Comment
    Trims](#comment-trims)). The other fix passes dirty the tree, so running the
    comment pass first keeps the tree clean for it. This pass pauses at preflight
-   to show an agent-count summary and wait for approval, so it interrupts the
-   otherwise unattended flow. That is expected.
+   for an agent-count approval, so it interrupts the otherwise unattended flow.
 2. **Correctness and quality**: `code-review <effort> --fix` or `simplify`. These
    apply their own fixes to the working tree.
 3. **`writing:review`** over the touched prose. It surfaces prose findings.
@@ -136,10 +130,10 @@ git merge --ff-only comments/audit-<hash>
 git branch -d comments/audit-<hash>
 ```
 
-The audit commit is a single commit off the same `HEAD`, so the fast-forward is
-always clean. The merge lives in the dispatched Agent to keep ship's own command
-surface to `git diff` and `git status`. See [`references/passes.md`](references/passes.md)
-for why this resolution over the alternatives.
+The fast-forward is always clean, since the audit commit sits directly on `HEAD`.
+The merge runs in the dispatched Agent so ship's own commands stay `git diff` and
+`git status`. See [`references/passes.md`](references/passes.md) for the rejected
+alternatives.
 
 ## Create
 
@@ -162,32 +156,17 @@ Babysit owns the follow-up loop and the CI waits. Ship does not poll on its own.
 
 ## Refresh the Body
 
-Dispatch a background `general-purpose` Agent to run `pull-request:update <url>`.
-It reads the final PR and the merged diff, not this session's transcript. Use
-`general-purpose`, never `fork`: a fork inherits this session's context and would
-reintroduce the diary narration this step exists to remove.
+Dispatch a background `general-purpose` Agent to run `pull-request:update <url>`,
+on a cheaper model when one is set. It reads the final PR and the merged diff, not
+this session's transcript. Use `general-purpose`, never `fork`: a fork inherits
+this context and would reintroduce the diary narration.
 
-This is the mechanism that kills the diary effect. The rewriter never saw the
-review back-and-forth, so it describes the merged diff as a finished change. No
-"initially", no "after review", no narration of passes that ran. The clean
-context is the point, so backgrounding is a convenience, not a requirement. This
-is the last step, so blocking on it costs little.
-
-Run the Agent on a cheaper model when one is set. Out-of-context on a cheaper
-model serves both goals at once: it removes the diary narration and cuts the cost
-of the rewrite.
+This is what kills the diary effect. The rewriter never saw the review
+back-and-forth, so it describes the merged diff as a finished change, with no
+"initially" or "after review". The cheaper out-of-context model also cuts the
+rewrite's cost.
 
 ## Report
 
-Close with:
-
-- The PR link.
-- Which passes ran, and which were gated out.
-- The final state: green and ready, or merging.
-
-## Cost Levers
-
-Gating the optional passes is the biggest saver. A docs-only diff never spends
-context on `code-review` or `verify`. A code-only diff never spends it on
-`writing:review`. Effort tracks the diff rather than defaulting high, and the
-body-refresh Agent runs out of context on a cheaper model.
+Close with the PR link, which passes ran and which were gated out, and the final
+state (green and ready, or merging).

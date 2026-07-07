@@ -8,15 +8,20 @@ import { formatContext, formatDecision, isPlanMode, type SyncHookJSONOutput } fr
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
+// The full set of Bash prose surfaces this hook scans. The hooks.json Bash
+// guard is derived from these; hooks.test.ts enforces the sync.
+export const PROSE_FLAGS = ["--body", "--message", "--description", "--title"] as const;
+export const BODY_FILE_FLAG = "--body-file";
+
+const BODY_FILE_PATTERN = new RegExp(`${BODY_FILE_FLAG}[=\\s](\\S+)`);
+
 function extractBodyFilePath(command: string): string | null {
-  const match = command.match(/--body-file[=\s](\S+)/);
+  const match = command.match(BODY_FILE_PATTERN);
   return match?.[1] ?? null;
 }
 
-const INLINE_ARG_PATTERNS = new Map(
-  ["--body", "--message", "--description", "--title"].map(
-    (flag) => [flag, new RegExp(`${flag}[= ](?:"([^"]+)"|'([^']+)')`)] as const,
-  ),
+const INLINE_ARG_PATTERNS = new Map<string, RegExp>(
+  PROSE_FLAGS.map((flag) => [flag, new RegExp(`${flag}[= ](?:"([^"]+)"|'([^']+)')`)]),
 );
 
 function extractInlineArg(command: string, flag: string): string | null {
@@ -92,7 +97,7 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     if (bodyFile && (await Bun.file(bodyFile).exists())) {
       texts.push(await Bun.file(bodyFile).text());
     }
-    for (const flag of ["--body", "--message", "--description", "--title"]) {
+    for (const flag of PROSE_FLAGS) {
       const value = extractInlineArg(toolInput.command, flag);
       if (value) texts.push(value);
     }

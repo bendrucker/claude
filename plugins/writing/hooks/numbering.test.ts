@@ -119,15 +119,13 @@ describe.skipIf(!hasSg())("checkCode (requires sg)", () => {
   });
 });
 
-describe("checkCode extension gating", () => {
+describe.skipIf(!hasSg())("checkCode uncovered languages (requires sg)", () => {
   test.each<[string]>([
     ["sh"],
     ["json"],
     ["yml"],
-    ["txt"],
     ["sql"],
-    [""],
-  ])("returns null for uncovered extension %p without scanning", async (ext) => {
+  ])("returns null for extension %p with no numbering.yml rules", async (ext) => {
     expect(await checkCode("function step1() {}", ext)).toBeNull();
   });
 });

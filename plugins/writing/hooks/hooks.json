@@ -7,8 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts\" write",
-            "if": "Write(**/*.md)|Write(**/*.markdown)|Write(**/*.go)|Write(**/*.js)|Write(**/*.jsx)|Write(**/*.mjs)|Write(**/*.cjs)|Write(**/*.ts)|Write(**/*.tsx)|Write(**/*.mts)|Write(**/*.cts)|Write(**/*.py)"
+            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qiE '(step|phase|part).{0,8}[0-9]|[0-9]\\.( |\\\\t)'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts\" write; fi"
           },
           {
             "type": "command",
@@ -26,8 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts\" edit",
-            "if": "Edit(**/*.md)|Edit(**/*.markdown)|Edit(**/*.go)|Edit(**/*.js)|Edit(**/*.jsx)|Edit(**/*.mjs)|Edit(**/*.cjs)|Edit(**/*.ts)|Edit(**/*.tsx)|Edit(**/*.mts)|Edit(**/*.cts)|Edit(**/*.py)"
+            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qiE '(step|phase|part).{0,8}[0-9]|[0-9]\\.( |\\\\t)'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts\" edit; fi"
           },
           {
             "type": "command",
@@ -54,8 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\"",
-            "if": "Bash(gh *)|Bash(glab *)|Bash(linear *)"
+            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qE -- '--(body|message|description|title)[-= ]'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\"; fi"
           }
         ]
       }

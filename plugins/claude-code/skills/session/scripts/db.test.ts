@@ -1245,6 +1245,73 @@ describe("plan-sections query", () => {
   });
 });
 
+describe("skill-config-vs-observed query", () => {
+  const skillsFixtureDir = path.join(import.meta.dirname, "..", "fixtures", "skills");
+
+  type SkillRow = {
+    source: string;
+    skill_name: string;
+    description_chars: bigint;
+    disable_model_invocation: boolean;
+    calls: bigint;
+    sessions: bigint;
+    last_seen: Date | null;
+  };
+
+  beforeEach(async () => {
+    await loadExtensions(db);
+  });
+
+  async function skillRows(overrides: Record<string, string | null> = {}) {
+    return runQuery<SkillRow>(
+      db,
+      "skill-config-vs-observed",
+      filterParams({
+        skill: null,
+        plugin_skill_glob: path.join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
+        user_skill_glob: path.join(skillsFixtureDir, "user/*/SKILL.md"),
+        project_skill_glob: path.join(skillsFixtureDir, "project/*/SKILL.md"),
+        ...overrides,
+      }),
+    );
+  }
+
+  it("counts observed calls for a plugin skill, pinning one cache copy", async () => {
+    const rows = await skillRows();
+    const peer = rows.filter((r) => r.skill_name === "review:peer");
+    expect(peer).toHaveLength(1);
+    expect(peer[0]?.source).toBe("plugin:test-marketplace/review");
+    expect(Number(peer[0]?.calls)).toBe(2);
+    expect(Number(peer[0]?.sessions)).toBe(1);
+    expect(peer[0]?.last_seen).not.toBeNull();
+  });
+
+  it("matches bare observed calls to an entry skill (plugin = skill)", async () => {
+    const rows = await skillRows();
+    const solo = rows.find((r) => r.skill_name === "solo:solo");
+    expect(Number(solo?.calls)).toBe(1);
+  });
+
+  it("sorts zero-fire skills first across all three sources", async () => {
+    const rows = await skillRows();
+    const zero = rows.filter((r) => Number(r.calls) === 0).map((r) => r.skill_name);
+    expect(zero).toEqual(expect.arrayContaining(["review:inbox", "never-used", "scratch"]));
+    expect(rows.slice(0, zero.length).every((r) => Number(r.calls) === 0)).toBe(true);
+
+    const never = rows.find((r) => r.skill_name === "never-used");
+    expect(never?.source).toBe("user:~/.claude/skills");
+    expect(never?.disable_model_invocation).toBe(true);
+    expect(never?.last_seen).toBeNull();
+    expect(Number(never?.sessions)).toBe(0);
+    expect(Number(never?.description_chars)).toBeGreaterThan(0);
+  });
+
+  it("filters configured names by skill glob", async () => {
+    const rows = await skillRows({ skill: "review:*" });
+    expect(rows.map((r) => r.skill_name).sort()).toEqual(["review:inbox", "review:peer"]);
+  });
+});
+
 describe("frontmatter query", () => {
   it("parses name and description from a SKILL.md frontmatter", async () => {
     await loadExtensions(db);

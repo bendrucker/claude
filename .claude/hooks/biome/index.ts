@@ -34,7 +34,16 @@ function getExtension(filePath: string): string {
   return parts.length > 1 ? (parts.at(-1) ?? "") : "";
 }
 
+// Workflow scripts persisted under session state (<transcript dir>/workflows/
+// scripts/) are generated runtime artifacts: the workflow runner wraps them in
+// an async function body, so their top-level `return` is valid at runtime but
+// can never parse as a standalone module.
+const WORKFLOW_SCRIPT_SEGMENT = "/workflows/scripts/";
+
 function isBiomeFile(filePath: string): boolean {
+  if (filePath.includes(WORKFLOW_SCRIPT_SEGMENT)) {
+    return false;
+  }
   const ext = getExtension(filePath);
   return BIOME_EXTENSIONS.has(ext);
 }

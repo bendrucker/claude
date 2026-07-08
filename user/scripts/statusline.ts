@@ -1,25 +1,15 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname } from "node:path";
 import { styleText } from "node:util";
 import { dialGlyph } from "./glyphs";
+import { expandTilde, type RateLimits } from "./rate-limits";
 
 interface CurrentUsage {
   input_tokens?: number;
   output_tokens?: number;
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
-}
-
-interface RateLimitWindow {
-  used_percentage?: number;
-  resets_at?: number;
-}
-
-interface RateLimits {
-  five_hour?: RateLimitWindow;
-  seven_day?: RateLimitWindow;
 }
 
 interface StatusInput {
@@ -221,7 +211,7 @@ export async function emitRateLimits(input: StatusInput, target: string): Promis
   const limits = input.rate_limits;
   if (!limits) return;
 
-  const path = target.startsWith("~/") ? join(homedir(), target.slice(2)) : target;
+  const path = expandTilde(target);
   mkdirSync(dirname(path), { recursive: true });
   await Bun.write(path, `${JSON.stringify(limits)}\n`);
 }

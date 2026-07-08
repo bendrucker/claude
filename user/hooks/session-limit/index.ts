@@ -1,20 +1,10 @@
 #!/usr/bin/env bun
 
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { SyncHookJSONOutput, UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-
-interface RateLimitWindow {
-  used_percentage?: number;
-  resets_at?: number;
-}
-
-interface RateLimits {
-  five_hour?: RateLimitWindow;
-  seven_day?: RateLimitWindow;
-}
+import { expandTilde, type RateLimits } from "../../scripts/rate-limits";
 
 // Highest announced band per window, keyed to the block it applies to. A changed
 // resets_at means the block rolled over, so the band no longer applies.
@@ -25,18 +15,55 @@ export interface Marker {
   sevenDayResetsAt: number;
 }
 
-export const FIVE_HOUR_THRESHOLDS = [90, 95, 100];
-export const SEVEN_DAY_THRESHOLDS = [95];
+// A band pairs its threshold with the message emitted on crossing, so a threshold
+// can never exist without a message (no silent empty injection). Adding one is a
+// single entry.
+interface Band {
+  threshold: number;
+  message: (resetsAt: number, nowMs: number) => string;
+}
 
 // Auto-scheduling a wake-up caps out around an hour. Past this horizon the model
 // defers to the user instead of scheduling.
 const WAKEUP_HORIZON_MS = 55 * 60 * 1000;
 
-// Highest crossed threshold, or 0 when the percentage is below all of them.
-export function band(pct: number, thresholds: readonly number[]): number {
-  let crossed = 0;
-  for (const threshold of thresholds) {
-    if (pct >= threshold) crossed = threshold;
+export const FIVE_HOUR_BANDS: Band[] = [
+  {
+    threshold: 90,
+    message: (resetsAt) =>
+      `You are at 90% of the current 5-hour usage block (resets ${formatResetTime(resetsAt)}). Favor efficient work and avoid starting large non-essential tasks.`,
+  },
+  {
+    threshold: 95,
+    message: (resetsAt) =>
+      `You are at 95% of the current 5-hour usage block (resets ${formatResetTime(resetsAt)}). Prefer finishing in-flight work over starting anything new, and batch tool calls.`,
+  },
+  {
+    threshold: 100,
+    message: (resetsAt, nowMs) => {
+      const reset = formatResetTime(resetsAt);
+      const withinHorizon = resetsAt * 1000 - nowMs <= WAKEUP_HORIZON_MS;
+      const resume = withinHorizon
+        ? `then schedule a wake-up for just after ${reset} (no need to ask) so work resumes on a fresh block, and stop`
+        : `then tell the user to return at ${reset} to resume on a fresh block, and stop`;
+      return `The 5-hour usage block is exhausted (resets ${reset}). Every further request now spends overage credits. Finish only in-flight work, ${resume}. Start no new work.`;
+    },
+  },
+];
+
+export const SEVEN_DAY_BANDS: Band[] = [
+  {
+    threshold: 95,
+    message: (resetsAt) =>
+      `You are at 95% of the 7-day usage limit. A 5-hour wait will not restore this. Minimize spend until the weekly reset (${formatResetTime(resetsAt)}).`,
+  },
+];
+
+// Highest band whose threshold the percentage has crossed, or null when below all.
+export function crossedBand(pct: number, bands: Band[]): Band | null {
+  let crossed: Band | null = null;
+  for (const band of bands) {
+    if (pct >= band.threshold) crossed = band;
   }
   return crossed;
 }
@@ -47,29 +74,6 @@ export function formatResetTime(resetsAt: number): string {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function fiveHourMessage(bandValue: number, resetsAt: number, nowMs: number): string {
-  const reset = formatResetTime(resetsAt);
-  switch (bandValue) {
-    case 90:
-      return `You are at 90% of the current 5-hour usage block (resets ${reset}). Favor efficient work and avoid starting large non-essential tasks.`;
-    case 95:
-      return `You are at 95% of the current 5-hour usage block (resets ${reset}). Prefer finishing in-flight work over starting anything new, and batch tool calls.`;
-    case 100: {
-      const withinHorizon = resetsAt * 1000 - nowMs <= WAKEUP_HORIZON_MS;
-      const resume = withinHorizon
-        ? `then schedule a wake-up for just after ${reset} (no need to ask) so work resumes on a fresh block, and stop`
-        : `then tell the user to return at ${reset} to resume on a fresh block, and stop`;
-      return `The 5-hour usage block is exhausted (resets ${reset}). Every further request now spends overage credits. Finish only in-flight work, ${resume}. Start no new work.`;
-    }
-    default:
-      return "";
-  }
-}
-
-function sevenDayMessage(resetsAt: number): string {
-  return `You are at 95% of the 7-day usage limit. A 5-hour wait will not restore this. Minimize spend until the weekly reset (${formatResetTime(resetsAt)}).`;
 }
 
 export function evaluate(
@@ -89,19 +93,19 @@ export function evaluate(
   const messages: string[] = [];
 
   let fiveBand = priorFiveBand;
-  const currentFive = band(fivePct, FIVE_HOUR_THRESHOLDS);
-  if (currentFive > priorFiveBand) {
-    messages.push(fiveHourMessage(currentFive, fiveResetsAt, nowMs));
-    fiveBand = currentFive;
+  const crossedFive = crossedBand(fivePct, FIVE_HOUR_BANDS);
+  if (crossedFive && crossedFive.threshold > priorFiveBand) {
+    messages.push(crossedFive.message(fiveResetsAt, nowMs));
+    fiveBand = crossedFive.threshold;
   }
 
   let sevenBand = priorSevenBand;
   const sevenPct = rl.seven_day?.used_percentage;
   if (typeof sevenPct === "number") {
-    const currentSeven = band(sevenPct, SEVEN_DAY_THRESHOLDS);
-    if (currentSeven > priorSevenBand) {
-      messages.push(sevenDayMessage(sevenResetsAt));
-      sevenBand = currentSeven;
+    const crossedSeven = crossedBand(sevenPct, SEVEN_DAY_BANDS);
+    if (crossedSeven && crossedSeven.threshold > priorSevenBand) {
+      messages.push(crossedSeven.message(sevenResetsAt, nowMs));
+      sevenBand = crossedSeven.threshold;
     }
   }
 
@@ -117,8 +121,9 @@ export function evaluate(
 }
 
 function rateLimitsPath(): string {
-  const target = process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH ?? "~/.vibe-island/cache/rl.json";
-  return target.startsWith("~/") ? join(homedir(), target.slice(2)) : target;
+  return expandTilde(
+    process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH ?? "~/.vibe-island/cache/rl.json",
+  );
 }
 
 function markerPath(sessionId: string): string {
@@ -134,6 +139,16 @@ async function readJson<T>(path: string): Promise<T | null> {
   }
 }
 
+function markerChanged(prev: Marker | null, next: Marker): boolean {
+  return (
+    !prev ||
+    prev.fiveHourBand !== next.fiveHourBand ||
+    prev.fiveHourResetsAt !== next.fiveHourResetsAt ||
+    prev.sevenDayBand !== next.sevenDayBand ||
+    prev.sevenDayResetsAt !== next.sevenDayResetsAt
+  );
+}
+
 export async function processInput(
   input: UserPromptSubmitHookInput,
   nowMs: number,
@@ -145,14 +160,19 @@ export async function processInput(
   if (!rl) return null;
 
   const path = markerPath(sessionId);
-  const result = evaluate(rl, await readJson<Marker>(path), nowMs);
+  const prev = await readJson<Marker>(path);
+  const result = evaluate(rl, prev, nowMs);
   if (!result) return null;
 
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    await Bun.write(path, `${JSON.stringify(result.marker)}\n`);
-  } catch {
-    return null;
+  // Below thresholds and within the same block the marker is unchanged, so skip
+  // the write. This keeps the hook near-zero cost on the common per-prompt path.
+  if (markerChanged(prev, result.marker)) {
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+      await Bun.write(path, `${JSON.stringify(result.marker)}\n`);
+    } catch {
+      return null;
+    }
   }
 
   if (result.messages.length === 0) return null;

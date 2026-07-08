@@ -11,13 +11,13 @@ import type {
   UserPromptSubmitHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
-  band,
+  crossedBand,
   evaluate,
-  FIVE_HOUR_THRESHOLDS,
+  FIVE_HOUR_BANDS,
   formatResetTime,
   type Marker,
   processInput,
-  SEVEN_DAY_THRESHOLDS,
+  SEVEN_DAY_BANDS,
 } from "./index";
 
 const FIVE_RESETS = 1783503000; // Wed 9:30 AM UTC
@@ -41,7 +41,7 @@ function marker(over: Partial<Marker> = {}): Marker {
   };
 }
 
-describe("band", () => {
+describe("crossedBand", () => {
   test.each([
     [89, 0],
     [90, 90],
@@ -50,7 +50,7 @@ describe("band", () => {
     [99, 95],
     [100, 100],
   ])("five-hour %i%% -> band %i", (pct, expected) => {
-    expect(band(pct, FIVE_HOUR_THRESHOLDS)).toBe(expected);
+    expect(crossedBand(pct, FIVE_HOUR_BANDS)?.threshold ?? 0).toBe(expected);
   });
 
   test.each([
@@ -58,7 +58,7 @@ describe("band", () => {
     [95, 95],
     [100, 95],
   ])("seven-day %i%% -> band %i", (pct, expected) => {
-    expect(band(pct, SEVEN_DAY_THRESHOLDS)).toBe(expected);
+    expect(crossedBand(pct, SEVEN_DAY_BANDS)?.threshold ?? 0).toBe(expected);
   });
 });
 

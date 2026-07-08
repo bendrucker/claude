@@ -9,6 +9,7 @@ describe("modelLetter", () => {
     ["claude-haiku-4-5-20251001", null, "H"],
     ["claude-fable-5", null, "F"],
     ["claude-newmodel-1", "NewModel 1", "N"],
+    ["claude-unknown-1", null, null],
     ["", "Opus", "O"],
     ["", "", null],
     ["", null, null],

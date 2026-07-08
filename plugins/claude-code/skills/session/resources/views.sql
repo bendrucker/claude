@@ -40,10 +40,16 @@ SELECT
   ANY_VALUE(attribution_skill)  AS attribution_skill,
   ANY_VALUE(attribution_plugin) AS attribution_plugin,
   ANY_VALUE(attribution_agent)  AS attribution_agent,
+  BOOL_OR(COALESCE(is_sidechain, FALSE)) AS is_sidechain,
+  ANY_VALUE(source_file)      AS source_file,
   MAX(input_tokens)           AS input_tokens,
   MAX(output_tokens)          AS output_tokens,
   MAX(cache_read_tokens)      AS cache_read_tokens,
   MAX(cache_creation_tokens)  AS cache_creation_tokens,
+  -- Cache writes bill by TTL: 1h at 2x the input rate, 5m at 1.25x. Split them so cost
+  -- estimates can weight each tier; both are subsets of cache_creation_tokens.
+  MAX(TRY_CAST(data->>'$.message.usage.cache_creation.ephemeral_1h_input_tokens' AS BIGINT)) AS cache_1h_tokens,
+  MAX(TRY_CAST(data->>'$.message.usage.cache_creation.ephemeral_5m_input_tokens' AS BIGINT)) AS cache_5m_tokens,
   COUNT(*)                    AS content_rows
 FROM messages
 WHERE type = 'assistant'

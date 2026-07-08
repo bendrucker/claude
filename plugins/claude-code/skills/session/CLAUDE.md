@@ -9,7 +9,7 @@ JSONL files in `~/.claude/projects/` are the canonical data. The DuckDB database
 `resources/schema/` runs on every startup:
 
 - `01_tables.sql`: `raw` with pinned columns (`host` first) plus a `data JSON` blob, `meta(host, last_import)` holding a per-host import watermark, and `index_meta(version)` holding the ingestion schema version. The full pinned column set is declared upfront so the table type is stable across imports.
-- `03_macros.sql`: filter macros for date ranges, project paths, and host, plus `project_id(host, path)`.
+- `03_macros.sql`: filter macros for date ranges, project paths, and host, `project_id(host, path)`, and the `model_input_rate`/`model_output_rate` cost-rate table the usage queries share. Macros must live here (the schema load path) to persist in the DB file for the read-only query CLI.
 
 ### Host enumeration
 

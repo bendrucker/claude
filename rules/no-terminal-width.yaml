@@ -1,0 +1,15 @@
+id: no-terminal-width
+language: TypeScript
+severity: error
+message: >-
+  Do not size CLI output to terminal width. Claude is usually a TTY but sometimes
+  runs piped, where the column count is zero or undefined. Even in a terminal the
+  output lands in context as text, so a fixed width reads the same in both cases.
+  Use a fixed default width with a flag override instead of process.stdout.columns
+  or an isTTY gate.
+rule:
+  any:
+    - pattern: process.stdout.columns
+    - pattern: process.stdout.isTTY
+ignores:
+  - "**/*.test.ts"

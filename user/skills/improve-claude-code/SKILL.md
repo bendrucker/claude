@@ -22,6 +22,8 @@ The backlog has two sources. The user files todos tagged `claude-code` by hand (
 
 **Watch mode** is the downstream follow-on. Once PRs exist, it tracks them under `/loop`, implements review feedback as it lands, and closes each backing todo on merge. See [Watch](#watch).
 
+**Sweep mode** is the destructive counterpart to Discover: it proposes stale or graduated memories for retirement and deletes only what you approve. It is interactive-only and never runs unattended. See [Sweep](#sweep).
+
 In every mode, the loop itself is in scope: this skill's own SKILL.md, the `claude-code:session` skill's queries and views, and the Things scripts the loop depends on. Findings in that class may be dispatched to background worktree agents immediately, even when everything else routes to planning or triage discussion.
 
 All Things interaction goes through the `things:jxa` and `things:url` skills (never inline JXA). PRs go through `pull-request:create` (never `gh pr create`).
@@ -187,3 +189,70 @@ Fetch reviewer threads with the `github:pr-comments` script (`--role reviewer --
 Auto-implement covers review changes and CI fixes only. A reviewer question or design objection pauses for you with the thread quoted, no edit.
 
 Every push re-runs CI, so a PR often carries across ticks rather than resolving in one pass. That is expected under `/loop`.
+
+## Sweep
+
+Retire memories that have graduated or gone stale. Sweep enumerates the memory store, classifies each memory by type, and proposes deletions for your approval. Invoke it as `/improve-claude-code sweep`.
+
+Sweep is the destructive counterpart to Discover. Discover only adds Things todos, so it can run unattended. Sweep removes files from a store that is **not under version control**, so every deletion is irreversible. Both classification signals are fuzzy heuristics: a merged PR does not prove a project is finished, and a nearby rule does not prove a lesson is enforced. So every verdict is a proposal, never an automatic delete. Sweep never runs in the `discover --scheduled` path and never deletes or files without asking.
+
+#### Enumerate
+
+List every `*.md` in this project's auto-memory store except `MEMORY.md` (the index, which Sweep edits but never deletes). The store is the `memory/` directory under `~/.claude/projects/<project-slug>/`, whose absolute path is given in your system context. Parse each file's YAML frontmatter and read its `type`, handling both shapes present in the store: the flat `type: feedback` and the nested `metadata: { type: ... }`. Branch on the type.
+
+#### Project Memories
+
+A project memory graduates once its work has shipped and left nothing live behind.
+
+- Extract cited PR numbers from the body with `#(\d+)`. The `#` is required so bare integers (list numbers, counts) are not read as PR references. No PR numbers means nothing to check against, so keep.
+- Check each cited PR with `gh pr view <n> --json state,mergedAt`. If any cited PR is not merged, keep.
+- All merged: scan the body for forward-looking state that outlives the merge, matching the keywords `unbuilt`, `not yet`, `follow-up`, `future`, `remaining`, `removal criteria`, `known issues`, `TODO`, and `still`. On a match, keep and note it as "merged but has open follow-ups" so the residual work stays visible.
+- Merged with no residual state: propose delete.
+
+#### Feedback Memories
+
+A feedback memory graduates once its lesson is enforced by a rule or hook, at which point the memory duplicates the enforcement.
+
+- Search for an encoding of the same lesson across `.claude/rules/`, `user/rules/`, the hooks blocks in `.claude/settings.json`, and the enforcement skills, matching the memory's title and description on keyword and concept rather than exact string. If enforced, propose delete: the rule now carries the lesson.
+- Not enforced but encodable (the lesson is expressible as a rule or hook): keep the memory and file an `encode` todo (see [Encode Todos](#encode-todos)). The memory stays until the enforcement exists.
+- Not encodable (taste or judgment that resists a mechanical rule): keep. There is nowhere for it to graduate to.
+
+#### User and Reference Memories
+
+Never touched. Sweep does not classify or propose `type: user` or `type: reference` memories.
+
+#### Encode Todos
+
+When a feedback memory is encodable but unenforced, file a Things todo via `things:url`, tagged `claude-code`, so the lesson can become a rule later:
+
+- **Title**: `[encode] <memory title>`
+- **Notes**: the lesson, then the candidate target (the rule file or hook that should carry it), then a `Discovery: <fingerprint>` line so [Dedup](#dedup) suppresses a duplicate on the next Discover or Sweep run. Compute the fingerprint per [Fingerprint](#fingerprint) with `finding_type` = `encode-lesson` and `normalized_target` = the memory's basename (for example `encode-lesson|feedback_prefer_headers`). This fixed slug keeps the identity stable across runs, so re-filing the same memory yields the same marker.
+
+Encode todos are filed independently of the deletion approval. The memory is kept, so filing does not wait on your selection.
+
+#### Propose and Approve
+
+Present the propose-delete candidates as a numbered table, mirroring [File the Keepers](#file-the-keepers):
+
+| # | File | Type | Signal | Reason |
+|---|------|------|--------|--------|
+
+The signal is what triggered the proposal (all cited PRs merged, or lesson enforced by `<rule>`). The reason is one line. Use `AskUserQuestion` to collect the selection (numbers, ranges like `1-3`, `all`, or `none`). Only selected files are deleted. List the kept-with-note memories (merged but with open follow-ups) below the table so nothing that looked done disappears silently, and keep them out of the deletable set.
+
+#### Delete
+
+Deletion runs only on approved files, as your own Edit and Bash actions in the flow, never a standalone unattended `rm` script. For each approved file, two coupled edits:
+
+- Before deleting, grep the store for inbound `[[wikilinks]]` to the file's basename. If another memory links to it, report the referrers so you can decide whether the link should survive the deletion.
+- Remove the memory file with `rm`.
+- Edit `MEMORY.md` to drop the memory's line, matching on the `(<basename>.md)` in its link target.
+
+Keep the file removal and the index edit together. A deleted memory whose `MEMORY.md` line lingers is a broken link.
+
+#### Summary
+
+Report the counts: N memories deleted, M encode todos filed, K kept with an open-follow-up note. List each so the outcome is auditable.
+
+#### Cadence
+
+Monthly and on-demand. Sweep is interactive only: it always prompts and never runs under `discover --scheduled` or any other unattended path. Run it at your terminal when the store has accumulated enough graduated memories to be worth a pass.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { readdir } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { cli } from "cleye";
 
@@ -28,6 +28,8 @@ const argv = cli({
 });
 
 const html = join(import.meta.dir, "index.html");
+
+await mkdir(argv.flags.feedback, { recursive: true });
 
 async function readAllFeedback(): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};

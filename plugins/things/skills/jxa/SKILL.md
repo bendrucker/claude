@@ -1,6 +1,6 @@
 ---
 name: things:jxa
-description: Read and query Things 3 data (lists, todos, projects, tags, logbook). Not for writes. Use things:url to create/update, things:inbox for quick captures.
+description: Read and query Things 3 data (lists, todos, projects, tags, logbook). Not for writes. Use things:url to create, update, or capture to the inbox.
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts:*)"
   - "Skill(mac:jxa-run)"

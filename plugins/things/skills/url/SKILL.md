@@ -1,9 +1,10 @@
 ---
 name: things:url
-description: Create, update, and manage Things 3 tasks and projects. Not for reads — use things:jxa to query data. For simple inbox captures, use things:inbox.
-argument-hint: "<add | update | show | search | json> [key=value ...]"
+description: Create, update, and manage Things 3 tasks and projects, including quick inbox captures. Not for reads. Use things:jxa to query data.
+argument-hint: "<add | update | show | search | json | capture> [key=value ...]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)"
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
   - Bash
   - Read
@@ -15,7 +16,7 @@ Write operations for Things 3 via the `things:///` URL scheme.
 
 ## Arguments
 
-`$0` is the command (`add`, `add-project`, `update`, `update-project`, `show`, `search`, `json`); the rest are its `key=value` params. Pass both straight to `url.ts` (see [Commands](#commands) and [Quick Start](#quick-start)). A command is required; with none, infer the operation from the request.
+`$0` is the command (`add`, `add-project`, `update`, `update-project`, `show`, `search`, `json`); the rest are its `key=value` params. Pass both straight to `url.ts` (see [Commands](#commands) and [Quick Start](#quick-start)). A command is required; with none, infer the operation from the request. `capture` routes to `inbox.ts` instead (see [Inbox Capture](#inbox-capture)).
 
 ## Quick Start
 
@@ -52,7 +53,25 @@ See [examples.md](examples.md) for detailed usage of each command.
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3> ...
 ```
 
-Items appear at the top of the list in the order specified. Default list is `today`. Also works for items within a project — use the `--list` value matching the items' current scheduling state.
+Items appear at the top of the list in the order specified. Default list is `today`. Also works for items within a project. Use the `--list` value matching the items' current scheduling state.
+
+## Inbox Capture
+
+For quick captures to the inbox, use `inbox.ts`. It tags each todo `Claude` and appends session attribution, so prefer it over `url.ts add` when delegating a task mid-session.
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
+```
+
+`title` captures one todo. `titles` (newline-separated) captures several at once. Add tags with `--tag` (repeatable). Other params: `notes` (max 10,000 chars), `tags` (comma-separated), `checklist-items` (newline-separated, max 100). The script handles URL encoding, session attribution, and the `Claude` tag.
+
+```bash
+# Multiple todos, each with the claude-code tag
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} --tag claude-code titles="Buy milk
+Walk dog"
+```
+
+On success it prints a confirmation. With the `x-callback-url` plugin, xcall returns the todo ID and the script prints `https://things.bendrucker.me/show?id=...`. Present that link to the user. Without xcall it prints `captured: <title>`.
 
 ## Callback
 
@@ -88,6 +107,16 @@ Things supports [Markdown in notes](https://culturedcode.com/things/support/arti
 - **Code**: backticks for inline, triple backticks for blocks
 - **Links**: `[title](url)`
 - **Lists**: `-` or `1.`
+
+## Gotchas
+
+#### Never retry on silent output
+
+The write scripts (`url.ts`, `inbox.ts`) print to stdout on success. No output means the call failed. Read stderr, surface the cause to the user, and only retry once you understand the root cause. Silent retries have created duplicate todos.
+
+#### Sandbox-blocked URL handoff
+
+If stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the macOS sandbox blocked the URL handoff to Things. `sandbox.allowAppleEvents` in `user/settings.json` covers Launch Services handoff. If it still happens, verify that key is set rather than disabling the sandbox manually.
 
 ## Documentation
 

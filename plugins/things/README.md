@@ -8,8 +8,7 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 
 ### Skills
 
-- **inbox** — Quick inbox capture for delegating tasks from a coding session
-- **url** — Full URL scheme operations (add, update, json, show, search, reorder) with xcall verification
+- **url** — URL scheme operations (add, update, json, show, search, reorder) plus quick inbox capture, with xcall verification
 - **jxa** — JXA/AppleScript read operations, queries, filtering, logbook analysis
 - **triage** — Today list triage: group, prioritize, defer, reorder
 

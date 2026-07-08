@@ -3,7 +3,6 @@ import * as path from "node:path";
 import { lintSkill } from "../index";
 import { parseSkill } from "../parse";
 import { bangExecutionMatcher } from "../rules/bang-execution";
-import { preferHeaders } from "../rules/headers";
 import {
   allowedToolsFormat,
   descriptionLength,
@@ -13,6 +12,7 @@ import {
   nameFormat,
   nameLength,
 } from "../rules/frontmatter";
+import { preferHeaders } from "../rules/headers";
 import { namespaceMismatch, namespaceStutter } from "../rules/namespace";
 import type { RuleResult, Severity } from "../types";
 

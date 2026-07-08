@@ -26,6 +26,12 @@ exports[`rendered output dial-exceeds-70 1`] = `"\x1B[91m󰪢\x1B[39m"`;
 
 exports[`rendered output no-dial 1`] = `""`;
 
+exports[`rendered output model-effort-leads 1`] = `"\x1B[2mF\x1B[22m \x1B[2m⠧\x1B[22m \x1B[32m󰪠\x1B[39m myrepo"`;
+
+exports[`rendered output model-only 1`] = `"\x1B[2mO\x1B[22m"`;
+
+exports[`rendered output effort-only 1`] = `"\x1B[2m⠿\x1B[22m"`;
+
 exports[`rendered output lines-added 1`] = `"\x1B[32m+5\x1B[39m"`;
 
 exports[`rendered output lines-removed 1`] = `"\x1B[31m-3\x1B[39m"`;

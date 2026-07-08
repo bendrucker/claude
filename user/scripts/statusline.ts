@@ -2,7 +2,9 @@
 import { mkdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { styleText } from "node:util";
+import { effortGlyph } from "./effort";
 import { dialGlyph } from "./glyphs";
+import { modelLetter } from "./model";
 import { expandTilde, type RateLimits } from "./rate-limits";
 
 interface CurrentUsage {
@@ -13,6 +15,8 @@ interface CurrentUsage {
 }
 
 interface StatusInput {
+  model?: { id?: string; display_name?: string } | null;
+  effort?: { level?: string } | null;
   context_window?: { used_percentage?: number | null; current_usage?: CurrentUsage | null };
   cost?: { total_lines_added?: number; total_lines_removed?: number };
   rate_limits?: RateLimits | null;
@@ -89,6 +93,20 @@ export function exceeds200k(input: StatusInput): boolean {
     (usage.cache_creation_input_tokens ?? 0) +
     (usage.cache_read_input_tokens ?? 0);
   return total > 200_000;
+}
+
+// A leading dim letter for the active model so Fable-vs-Opus reads at a glance.
+// Always shown: absence would be ambiguous once more than one model is in play.
+export function modelSegment(input: StatusInput): string | null {
+  const letter = modelLetter(input.model?.id, input.model?.display_name);
+  return letter ? styleText(["dim"], letter) : null;
+}
+
+// A braille dot-ramp for the reasoning effort, dim like the model letter so the
+// two session-config markers read alike. Absent when the model has no effort.
+export function effortSegment(input: StatusInput): string | null {
+  const glyph = effortGlyph(input.effort?.level);
+  return glyph ? styleText(["dim"], glyph) : null;
 }
 
 export function dialSegment(input: StatusInput): string | null {
@@ -223,6 +241,10 @@ export function buildStatusLine(
 ): string {
   const segments: string[] = [];
 
+  const model = modelSegment(input);
+  if (model) segments.push(model);
+  const effort = effortSegment(input);
+  if (effort) segments.push(effort);
   const dial = dialSegment(input);
   if (dial) segments.push(dial);
   const lines = linesSegment(input);

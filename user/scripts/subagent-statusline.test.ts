@@ -3,11 +3,13 @@ import { styleText } from "node:util";
 import { genericGlyph, purposeGlyphs } from "./glyphs";
 import {
   extractActivity,
+  extractModel,
   formatDescription,
   formatElapsed,
   formatTokens,
   humanizeTool,
   renderTask,
+  subagentModelLetter,
   type Task,
 } from "./subagent-statusline";
 
@@ -124,8 +126,57 @@ describe("extractActivity", () => {
   });
 });
 
+describe("extractModel", () => {
+  const withModel = (model?: string) => ({
+    message: { role: "assistant", content: [], ...(model ? { model } : {}) },
+  });
+
+  test("returns the newest assistant model", () => {
+    expect(extractModel([withModel("claude-opus-4-8"), withModel("claude-fable-5")])).toBe(
+      "claude-fable-5",
+    );
+  });
+
+  test("skips entries without a model", () => {
+    expect(extractModel([withModel("claude-opus-4-8"), withModel(undefined)])).toBe(
+      "claude-opus-4-8",
+    );
+  });
+
+  test("null when no entry carries a model", () => {
+    expect(extractModel([])).toBeNull();
+    expect(extractModel([withModel(undefined)])).toBeNull();
+  });
+});
+
+describe("subagentModelLetter", () => {
+  test.each<[string | null, string | null, string | null]>([
+    ["claude-fable-5", "claude-opus-4-8", "F"],
+    ["claude-opus-4-8", "claude-opus-4-8", null],
+    ["claude-opus-4-8[1m]", "claude-opus-4-8", null],
+    ["claude-opus-4-8", "claude-fable-5", "O"],
+    [null, "claude-opus-4-8", null],
+    ["claude-fable-5", null, null],
+  ])("sub %p / session %p -> %p", (sub, session, expected) => {
+    expect(subagentModelLetter(sub, session)).toBe(expected);
+  });
+});
+
 describe("renderTask", () => {
   const now = 65_000;
+
+  test("model letter joins the dim meta before the type name", () => {
+    const out = renderTask(
+      { id: "a", description: "search", startTime: 0, tokenCount: 1500 },
+      null,
+      now,
+      "Explore",
+      null,
+      null,
+      "F",
+    );
+    expect(strip(out.content)).toContain("· 1m 5s · 1.5k · F · Explore");
+  });
 
   test("activity wins over the description and is not sentence-cased", () => {
     const out = renderTask(

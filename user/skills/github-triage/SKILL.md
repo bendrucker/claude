@@ -2,7 +2,7 @@
 name: github-triage
 disable-model-invocation: true
 description: >-
-  Clear Dependabot and bot noise from your GitHub notification inbox: merge green dependency PRs in repos you maintain, dismiss low-value failing ones, and leave only real human threads behind.
+  Clear Dependabot and bot noise from your GitHub notification inbox: mark settled merged and closed PRs done, merge green dependency PRs in repos you maintain, dismiss low-value ones, and leave only real human threads behind.
 argument-hint: "[--dry-run]"
 allowed-tools:
   - AskUserQuestion
@@ -20,16 +20,18 @@ Default end state: every clearable notification marked done, and a summary of wh
 
 ## Inbox
 
-!`gh api notifications --paginate | jq -r '.[] | [.id, .reason, .repository.full_name, (.subject.url | sub(".*/pulls/";"#")), .subject.title] | @tsv' | column -t -s $'\t'`
+!`gh api "notifications?all=true&per_page=100" --paginate | jq -r '.[] | [.id, .reason, .subject.type, .repository.full_name, (.subject.url | sub(".*/pulls/";"#") | sub(".*/issues/";"issue#")), .subject.title] | @tsv' | column -t -s $'\t'`
 
-The first column is the thread id. It doubles as the PR-notification key for marking done. `reason` is why it's in the inbox: `mention` and `comment` almost always mean a human is involved.
+Pass `all=true`. The web and mobile Inbox shows read-but-not-done threads, and the default API call returns only unread ones, so the plain list hides most of the noise a person has already glanced at. See [`references/triage-rules.md`](references/triage-rules.md) for why the REST list can't be made to match the Inbox exactly.
+
+The first column is the thread id. It doubles as the key for marking done. `reason` is why it's in the inbox: `mention` and `comment` almost always mean a human is involved.
 
 ## Gather
 
-For every `PullRequest` notification, resolve the fields that decide its fate. Batch these:
+Most threads are settled the moment you read them: a merged or closed PR needs no action beyond clearing it. For every `PullRequest` notification still open, resolve the fields that decide its fate. Batch these:
 
-- Author and state: `gh pr view <n> --repo <r> --json author,state,title,isDraft`
-- Merge readiness: same call, add `mergeStateStatus`. `CLEAN` is the only green-light value. It already folds in "checks pass", "no conflict", and "not behind base", so gate on it instead of parsing individual checks.
+- Author, state, whether it merged: `gh api repos/<r>/pulls/<n> --jq '{author:.user.login, state, merged:(.merged_at!=null)}'`. Any closed or merged PR is settled; skip the rest and mark it done.
+- Merge readiness (open PRs only): `gh pr view <n> --repo <r> --json mergeStateStatus`. `CLEAN` is the only green-light value. It already folds in "checks pass", "no conflict", and "not behind base", so gate on it instead of parsing individual checks.
 - Your rights: `gh api repos/<r> --jq .permissions.push`. `true` means you can merge.
 
 `mergeStateStatus` is computed asynchronously and returns `UNKNOWN` for a few seconds after any push. On `UNKNOWN`, re-fetch once before deciding.
@@ -38,12 +40,14 @@ For every `PullRequest` notification, resolve the fields that decide its fate. B
 
 Apply in order. First match wins. Full matrix and edge cases: [`references/triage-rules.md`](references/triage-rules.md).
 
-- **Human thread.** `reason` is `mention` or `comment`, or the PR author is a person. Leave it. This is the whole point.
-- **Non-Dependabot bot** (e.g. `github-actions[bot]` generated-content PRs). Leave it. These change real content and want your eye.
-- **Dependabot, `mergeStateStatus == CLEAN`, you have push.** Merge, then mark done.
-- **Dependabot, not clean, low-importance dev tooling.** Dismiss the notification, leave the PR open. Low-importance means `deps-dev` bumps of linters, formatters, and build tooling (eslint, prettier, globals, ncc). A red build on these isn't worth your attention.
-- **Dependabot, not clean, runtime or production dependency.** Leave it. A failing bump on a shipped dependency is a real signal.
-- **Closed or merged PR, stale notification.** Mark done.
+- **Closed or merged PR.** Mark done, whatever the author or reason. It's settled. This is the largest category after a repo has been active, since every merge you make and every bump Dependabot lands leaves a read-but-not-done thread behind.
+- **Open human thread.** `reason` is `mention` or `comment`, or the PR author is a person. Leave it. This is the whole point. One exception: your own merged or closed PRs are settled, so they fall under the rule above.
+- **Open non-Dependabot bot** (e.g. `github-actions[bot]` generated-content PRs). Leave it. These change real content and want your eye.
+- **Open Dependabot, `mergeStateStatus == CLEAN`, you have push.** Merge, then mark done.
+- **Open Dependabot, not mergeable, low-importance dev or CI tooling.** Mark done, leave the PR open. Low-importance means `deps-dev` bumps of linters, formatters, and build tooling (eslint, prettier, globals, ncc) and routine CI-action bumps (`actions/checkout`, `actions/cache`). Neither a red build nor a pending review on these is worth inbox space.
+- **Open Dependabot, not mergeable, runtime or production dependency.** Leave it. A failing or blocked bump on a shipped dependency is a real decision for you to make.
+
+Non-PR notifications: subscribed `Release` threads are noise, mark them done. A `RepositoryAdvisory` is a security notice, leave it.
 
 When importance is genuinely ambiguous (a `deps-dev` bump of something that ships, a failing prod bump that looks flaky), ask with `AskUserQuestion` rather than guessing. Merges and dismissals are the user's call.
 
@@ -67,16 +71,12 @@ Mark a thread done:
 gh api --method DELETE notifications/threads/<id>
 ```
 
-`DELETE` marks a thread **done**, which removes it from the inbox UI. `PATCH` only marks it read, and it stays visible. Use `DELETE`. Only mark a merge-path thread done after its merge succeeds.
+`DELETE` marks a thread **done**, which removes it from the web and mobile Inbox. `PATCH` only marks it read, and it stays in the Inbox. Use `DELETE`. A `204` is success.
+
+Order matters on the merge path. Merging a PR fires a state-change event that can flip its thread back to unread, so mark done *after* the merge, and expect a merged PR to resurface once (see [`references/triage-rules.md`](references/triage-rules.md)). A second run of the whole skill catches those merge-generated threads under the closed-or-merged rule.
 
 ## Verify
 
-Re-list the inbox and confirm the threads you handled are gone:
+You cannot confirm a clean Inbox from the REST API. `all=true` keeps returning done threads, and `GET /notifications/threads/<id>` still answers `200` after a `DELETE`, so there is no read-back for done. Trust the `204`s and report against them.
 
-```
-gh api notifications --paginate | jq 'length'
-```
-
-A dismissed thread still returns `200` from `GET /notifications/threads/<id>` (done is not deleted), so don't verify by fetching the thread. Verify by its absence from the list.
-
-Report the count before and after, what was merged, what was dismissed without merging, and the remaining threads with a one-line reason each. The remaining list is the actual work left for a human.
+Report what you merged, what you marked done without merging, and the threads you left with a one-line reason each. Count the successful `DELETE`s so the total is concrete. The left-behind list is the actual work for a human. Tell the user to confirm in the app, since that's the only place the done state is observable.

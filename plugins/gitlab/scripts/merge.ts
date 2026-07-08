@@ -17,16 +17,22 @@ const MAX_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 2000;
 
 export function errorText(err: unknown): string {
+  // glab spreads a failure across both streams: `glab api` prints the HTTP error body
+  // (the JSON message) to stdout and a `glab: <message> (HTTP <code>)` line to stderr.
+  // Read both so the already-armed guard matches and callers see the full error text.
   const record = err as Record<string, unknown>;
-  if (record?.stderr != null) {
-    return String(record.stderr);
+  const streams = [record?.stdout, record?.stderr]
+    .map((stream) => (stream == null ? "" : String(stream).trim()))
+    .filter((text) => text.length > 0);
+  if (streams.length > 0) {
+    return streams.join("\n");
   }
   return err instanceof Error ? err.message : String(err);
 }
 
 export async function arm(
   run: () => Promise<unknown>,
-  sleep: (ms: number) => Promise<void> = (ms) => Bun.sleep(ms),
+  sleep: (ms: number) => Promise<void> = Bun.sleep,
 ): Promise<void> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {

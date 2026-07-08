@@ -142,4 +142,31 @@ describe("arm", () => {
 
     expect(run).toHaveBeenCalledTimes(1);
   });
+
+  test("reads the error body from stdout when stderr is empty", async () => {
+    const run = mock(() =>
+      Promise.reject({
+        stdout: Buffer.from('{"message":"Merge request is already set to Auto-Merge"}'),
+        stderr: Buffer.from(""),
+      }),
+    );
+    const sleep = mock(() => Promise.resolve());
+
+    await arm(run, sleep);
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  test("falls back to the Error message when both streams are empty", async () => {
+    const run = mock(() =>
+      Promise.reject(
+        Object.assign(new Error("glab exited with code 1"), { stderr: Buffer.from("") }),
+      ),
+    );
+    const sleep = mock(() => Promise.resolve());
+
+    await expect(arm(run, sleep)).rejects.toThrow("glab exited with code 1");
+    expect(run).toHaveBeenCalledTimes(1);
+  });
 });

@@ -51,7 +51,7 @@ For Things, query via `things:jxa` for every `claude-code`-tagged todo and recen
 For PR bodies, scan every PR on the config repo:
 
 ```bash
-gh pr list --repo bendrucker/claude --state all --limit 200 --json state,body \
+gh pr list --repo bendrucker/claude --state all --limit 1000 --json state,body \
   --jq '.[] | .state as $s | (.body // "") | scan("Discovery: [0-9a-f]{12}") | "\($s) \(.)"'
 ```
 

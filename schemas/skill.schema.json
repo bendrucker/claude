@@ -26,6 +26,11 @@
       "type": "string",
       "description": "Model to use when this skill is active (e.g., claude-sonnet-4-20250514). Defaults to the conversation's model."
     },
+    "effort": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "xhigh", "max"],
+      "description": "Reasoning effort to use when this skill is active. Lower effort is faster and cheaper; use it for mechanical skills. Defaults to the conversation's effort."
+    },
     "context": {
       "type": "string",
       "enum": ["fork"],

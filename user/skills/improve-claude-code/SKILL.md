@@ -187,13 +187,13 @@ Sweep is the destructive counterpart to Discover. Discover only adds Things todo
 
 #### Enumerate
 
-List every `*.md` under `/Users/ben/.claude/projects/-Users-ben-src-bendrucker-claude/memory/` except `MEMORY.md` (the index, which Sweep edits but never deletes). Parse each file's YAML frontmatter and read its `type`, handling both shapes present in the store: the flat `type: feedback` and the nested `metadata: { type: ... }`. Branch on the type.
+List every `*.md` in this project's auto-memory store except `MEMORY.md` (the index, which Sweep edits but never deletes). The store is the `memory/` directory under `~/.claude/projects/<project-slug>/`, whose absolute path is given in your system context. Parse each file's YAML frontmatter and read its `type`, handling both shapes present in the store: the flat `type: feedback` and the nested `metadata: { type: ... }`. Branch on the type.
 
 #### Project Memories
 
 A project memory graduates once its work has shipped and left nothing live behind.
 
-- Extract cited PR numbers from the body with `#?(\d+)`. No PR numbers means nothing to check against, so keep.
+- Extract cited PR numbers from the body with `#(\d+)`. The `#` is required so bare integers (list numbers, counts) are not read as PR references. No PR numbers means nothing to check against, so keep.
 - Check each cited PR with `gh pr view <n> --json state,mergedAt`. If any cited PR is not merged, keep.
 - All merged: scan the body for forward-looking state that outlives the merge, matching the keywords `unbuilt`, `not yet`, `follow-up`, `future`, `remaining`, `removal criteria`, `known issues`, `TODO`, and `still`. On a match, keep and note it as "merged but has open follow-ups" so the residual work stays visible.
 - Merged with no residual state: propose delete.
@@ -215,7 +215,7 @@ Never touched. Sweep does not classify or propose `type: user` or `type: referen
 When a feedback memory is encodable but unenforced, file a Things todo via `things:url`, tagged `claude-code`, so the lesson can become a rule later:
 
 - **Title**: `[encode] <memory title>`
-- **Notes**: the lesson, then the candidate target (the rule file or hook that should carry it), then a `Discovery: <fingerprint>` line (see [Fingerprint](#fingerprint)) so [Dedup](#dedup) suppresses a duplicate on the next Discover or Sweep run.
+- **Notes**: the lesson, then the candidate target (the rule file or hook that should carry it), then a `Discovery: <fingerprint>` line so [Dedup](#dedup) suppresses a duplicate on the next Discover or Sweep run. Compute the fingerprint per [Fingerprint](#fingerprint) with `finding_type` = `encode-lesson` and `normalized_target` = the memory's basename (for example `encode-lesson|feedback_prefer_headers`). This fixed slug keeps the identity stable across runs, so re-filing the same memory yields the same marker.
 
 Encode todos are filed independently of the deletion approval. The memory is kept, so filing does not wait on your selection.
 

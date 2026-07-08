@@ -2,6 +2,7 @@
 name: things:url
 description: Create, update, and manage Things 3 tasks and projects, including quick inbox captures. Not for reads. Use things:jxa to query data.
 argument-hint: "<add | update | show | search | json | capture> [key=value ...]"
+effort: low
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"

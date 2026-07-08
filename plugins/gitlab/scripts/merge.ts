@@ -3,9 +3,48 @@
 import { $ } from "bun";
 import { cli } from "cleye";
 
-// TODO: file upstream glab issue for merge trains 422
-// glab mr merge --auto-merge calls PUT /merge_requests/:iid/merge
-// instead of POST /merge_trains/merge_requests/:iid
+// glab has no merge-train command: `glab mr merge --auto-merge` hits the accept
+// endpoint (PUT .../merge). GitLab 19.1+ resolves that to the train server-side,
+// but we POST .../merge_trains/merge_requests/:iid directly so squash applies to
+// the train add and the outcome doesn't depend on the instance version.
+
+// Re-arming is idempotent: GitLab returns 409 "already set to Auto-Merge" when the
+// MR is already armed, which we treat as success. A push clears the arm and briefly
+// reports approvals_syncing before the arm can land, so retry through that window.
+const ALREADY_ARMED = "already set to Auto-Merge";
+const TRANSIENT = ["approvals_syncing"];
+const MAX_ATTEMPTS = 5;
+const RETRY_DELAY_MS = 2000;
+
+export function errorText(err: unknown): string {
+  const record = err as Record<string, unknown>;
+  if (record?.stderr != null) {
+    return String(record.stderr);
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+export async function arm(
+  run: () => Promise<unknown>,
+  sleep: (ms: number) => Promise<void> = (ms) => Bun.sleep(ms),
+): Promise<void> {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      await run();
+      return;
+    } catch (err) {
+      const message = errorText(err);
+      if (message.includes(ALREADY_ARMED)) {
+        return;
+      }
+      if (attempt < MAX_ATTEMPTS && TRANSIENT.some((t) => message.includes(t))) {
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+      throw err;
+    }
+  }
+}
 
 interface ProjectConfig {
   id: number;
@@ -43,12 +82,15 @@ export async function addToMergeTrain(opts: MergeTrainOptions): Promise<void> {
     fields.push("--raw-field squash=true");
   }
 
-  await $`glab api projects/${opts.projectId}/merge_trains/merge_requests/${opts.iid} -X POST ${{ raw: fields.join(" ") }}`;
+  await arm(
+    () =>
+      $`glab api projects/${opts.projectId}/merge_trains/merge_requests/${opts.iid} -X POST ${{ raw: fields.join(" ") }}`,
+  );
 }
 
 export async function mergeViaGlab(branch: string, autoMerge: boolean): Promise<void> {
   const flags = autoMerge ? "--auto-merge" : "";
-  await $`glab mr merge ${branch} ${{ raw: flags }} -y`;
+  await arm(() => $`glab mr merge ${branch} ${{ raw: flags }} -y`);
 }
 
 export interface MergeActions {
@@ -69,7 +111,7 @@ export async function merge(
 
   if (project.merge_trains_enabled && opts.autoMerge) {
     const iid = await actions.getMrIid(branch);
-    console.log(`Merge trains enabled — adding !${iid} (${branch}) to merge train`);
+    console.log(`Merge trains enabled: adding !${iid} (${branch}) to merge train`);
     await actions.addToMergeTrain({
       projectId: project.id,
       iid,

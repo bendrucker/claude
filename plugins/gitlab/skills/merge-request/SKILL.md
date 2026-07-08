@@ -45,6 +45,25 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge --squash
 ```
 
+### Re-Arm Auto-Merge After a Push
+
+Pushing new commits cancels queued auto-merge and drops the MR from the merge train. GitLab does this deliberately so the new commits get a fresh pipeline and review. To keep auto-merge, re-run `merge.ts --auto-merge` after every push that intends to stay armed. The script is idempotent: it treats an already-armed MR as success and retries through the brief `approvals_syncing` window that follows a push, so re-running it is always safe.
+
+A push also resets approvals when `reset_approvals_on_push` is on. Re-trigger review in the same pass, see [Re-request reviewers](#re-request-reviewers).
+
+### Inspect or Recover a Train
+
+`glab` has no merge-train command, so use the API directly:
+
+```bash
+# Active train for the project
+glab api "projects/:id/merge_trains?scope=active" | jq '.[] | {iid: .merge_request.iid, status, target_branch}'
+
+# Clear a stuck entry, then re-arm
+glab api --method DELETE "projects/:id/merge_trains/merge_requests/<iid>"
+glab api --method POST  "projects/:id/merge_trains/merge_requests/<iid>" --raw-field auto_merge=true
+```
+
 ## Patterns
 
 **Always push before creating:**

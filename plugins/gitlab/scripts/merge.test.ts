@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { MergeActions } from "./merge";
-import { merge } from "./merge";
+import { arm, merge } from "./merge";
 
 function createActions(overrides: Partial<MergeActions> = {}): MergeActions {
   return {
@@ -72,5 +72,74 @@ describe("merge", () => {
       iid: 10,
       squash: true,
     });
+  });
+});
+
+describe("arm", () => {
+  test("resolves on success without sleeping", async () => {
+    const run = mock(() => Promise.resolve());
+    const sleep = mock(() => Promise.resolve());
+
+    await arm(run, sleep);
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  test("treats already-armed 409 as success", async () => {
+    const run = mock(() =>
+      Promise.reject(new Error('{"message":"Merge request is already set to Auto-Merge"}')),
+    );
+    const sleep = mock(() => Promise.resolve());
+
+    await arm(run, sleep);
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  test("retries through approvals_syncing then succeeds", async () => {
+    let calls = 0;
+    const run = mock(() => {
+      calls++;
+      return calls < 3
+        ? Promise.reject(new Error("approvals_syncing, try again later"))
+        : Promise.resolve();
+    });
+    const sleep = mock(() => Promise.resolve());
+
+    await arm(run, sleep);
+
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+  });
+
+  test("throws after exhausting retries on a persistent transient", async () => {
+    const run = mock(() => Promise.reject(new Error("approvals_syncing")));
+    const sleep = mock(() => Promise.resolve());
+
+    await expect(arm(run, sleep)).rejects.toThrow("approvals_syncing");
+    expect(run).toHaveBeenCalledTimes(5);
+    expect(sleep).toHaveBeenCalledTimes(4);
+  });
+
+  test("rethrows a non-transient error immediately", async () => {
+    const run = mock(() => Promise.reject(new Error("404 Not Found")));
+    const sleep = mock(() => Promise.resolve());
+
+    await expect(arm(run, sleep)).rejects.toThrow("404 Not Found");
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  test("reads the message from a shell error's stderr", async () => {
+    const run = mock(() =>
+      Promise.reject({ stderr: Buffer.from("... already set to Auto-Merge ...") }),
+    );
+    const sleep = mock(() => Promise.resolve());
+
+    await arm(run, sleep);
+
+    expect(run).toHaveBeenCalledTimes(1);
   });
 });

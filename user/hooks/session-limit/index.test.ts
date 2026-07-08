@@ -5,7 +5,11 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  SyncHookJSONOutput,
+  UserPromptSubmitHookInput,
+  UserPromptSubmitHookSpecificOutput,
+} from "@anthropic-ai/claude-agent-sdk";
 import {
   band,
   evaluate,
@@ -189,10 +193,14 @@ describe("processInput", () => {
     await Bun.write(rlPath, JSON.stringify(limits(fivePct, sevenPct)));
   }
 
+  function context(output: SyncHookJSONOutput | null): string {
+    const specific = output?.hookSpecificOutput as UserPromptSubmitHookSpecificOutput | undefined;
+    return specific?.additionalContext ?? "";
+  }
+
   it("injects context when a band is crossed", async () => {
     await writeLimits(92);
-    const output = await processInput(input("s1"), 0);
-    const ctx = output?.hookSpecificOutput?.additionalContext ?? "";
+    const ctx = context(await processInput(input("s1"), 0));
     expect(ctx).toContain("90%");
     expect(ctx).toContain("Wed 9:30 AM");
   });
@@ -203,8 +211,7 @@ describe("processInput", () => {
     expect(await processInput(input("s2"), 0)).toBeNull();
 
     await writeLimits(96);
-    const escalated = await processInput(input("s2"), 0);
-    expect(escalated?.hookSpecificOutput?.additionalContext).toContain("95%");
+    expect(context(await processInput(input("s2"), 0))).toContain("95%");
   });
 
   it("resets the band after a block rollover", async () => {

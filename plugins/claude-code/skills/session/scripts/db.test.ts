@@ -1655,4 +1655,24 @@ describe("message_usage cost columns and usage queries", () => {
     expect(Number(mine?.msgs)).toBe(2);
     expect(mine?.cost_usd_est).toBe(0.1);
   });
+
+  it("top-sessions ranks the session by cost with host and repo", async () => {
+    await insertUsage("top-sessions-session");
+    const rows = await runQuery<{
+      session_id: string;
+      host: string;
+      repo: string;
+      msgs: bigint;
+      cost_usd_est: number;
+    }>(db, "top-sessions", {
+      after_date: null,
+      host: null,
+    });
+    const mine = rows.find((r) => r.session_id === "top-sessions-session");
+    expect(mine).toBeDefined();
+    expect(mine?.host).toBe("local");
+    expect(mine?.repo).toBe("usage-proj");
+    expect(Number(mine?.msgs)).toBe(2);
+    expect(mine?.cost_usd_est).toBe(0.1);
+  });
 });

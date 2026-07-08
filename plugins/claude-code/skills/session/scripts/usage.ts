@@ -74,47 +74,13 @@ interface SessionCost {
   last_activity: string;
 }
 
-// Cost weighting mirrors the query files: cache reads bill 0.1x the input rate, cache
-// writes 1.25x for the 5m TTL and 2x for the 1h TTL. Per-model rates come from the
-// shared macros so the rate table stays in one place.
-const TOP_SESSIONS_SQL = `
-WITH priced AS (
-  SELECT
-    mu.*,
-    model_input_rate(mu.model)  AS in_rate,
-    model_output_rate(mu.model) AS out_rate,
-    COALESCE(mu.cache_1h_tokens, 0) AS w1h,
-    COALESCE(mu.cache_5m_tokens,
-             COALESCE(mu.cache_creation_tokens, 0) - COALESCE(mu.cache_1h_tokens, 0)) AS w5m
-  FROM message_usage mu
-  WHERE date_filter(mu.timestamp, getvariable('after_date'), NULL)
-    AND host_filter(mu.host, getvariable('host'))
-)
-SELECT
-  session_id,
-  ANY_VALUE(host)                                   AS host,
-  regexp_extract(ANY_VALUE(project_path), '[^/]+$') AS repo,
-  COUNT(*)                                          AS msgs,
-  ROUND(SUM(
-    (COALESCE(input_tokens, 0) * in_rate
-     + w5m * 1.25 * in_rate
-     + w1h * 2.0  * in_rate
-     + COALESCE(cache_read_tokens, 0) * 0.1 * in_rate
-     + COALESCE(output_tokens, 0) * out_rate) / 1e6
-  ), 2)                                             AS cost_usd_est,
-  strftime(MAX(timestamp), '%Y-%m-%d %H:%M:%S')     AS last_activity
-FROM priced
-GROUP BY session_id
-ORDER BY cost_usd_est DESC NULLS LAST
-LIMIT 10;
-`;
-
 function daysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 }
 
 async function renderTopSessions(dbPath: string, host: string | undefined, days: number) {
-  const sql = setVariables({ after_date: daysAgo(days), host }) + TOP_SESSIONS_SQL;
+  const querySql = await Bun.file(path.join(QUERIES_DIR, "top-sessions.sql")).text();
+  const sql = setVariables({ after_date: daysAgo(days), host }) + querySql;
   const rows = await query<SessionCost>(dbPath, sql);
   if (rows.length === 0) {
     console.log(`No sessions with usage in the last ${days} days.`);

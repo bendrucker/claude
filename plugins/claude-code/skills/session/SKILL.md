@@ -44,6 +44,8 @@ duckdb -readonly "$DB_PATH" "SELECT model, SUM(output_tokens) FROM message_usage
 duckdb -readonly "$DB_PATH" < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
 ```
 
+`scripts/usage.ts` renders a session's token-burn timeline (`--session <id>`) in the terminal, or the top sessions by estimated cost (`--days <n>`) when no session is given. It opens the index read-only. Cost is an estimate from public API rates, useful as a relative weight rather than billed spend.
+
 ### Parallel Queries (Workflows)
 
 To investigate the corpus with a fan-out of agents (breadth search for leads, then a depth pass per lead), refresh once up front and have every agent open the index read-only:
@@ -108,6 +110,8 @@ Every query, grouped by category with a one-line gloss:
 - `repeat-read-waste`: repeat-Read context tax
 - `activity`: session interaction profile
 - `diagnostics`: recurring type/lint diagnostics
+- `usage-timeline`: one session's token burn per time bucket (estimated cost, cache-miss ratio)
+- `usage-spikes`: ranked (session, bucket) burn windows across the corpus
 
 #### Planning and Outcomes
 - `plans`: sessions using plan mode

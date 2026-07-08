@@ -1481,3 +1481,178 @@ describe("frontmatter query", () => {
     expect(rows[0]?.description).toContain("DuckDB index");
   });
 });
+
+describe("cost-rate macros", () => {
+  it.each<[string, number, number]>([
+    ["claude-fable-5", 10, 50],
+    ["claude-mythos-1", 10, 50],
+    ["claude-opus-4-8", 5, 25],
+    ["claude-sonnet-5", 3, 15],
+    ["claude-haiku-4", 1, 5],
+    ["some-unknown-model", 5, 25],
+  ])("rates %s at input %d / output %d per MTok", async (model, input, output) => {
+    const [row] = await db.query<{ i: number; o: number }>(
+      "SELECT model_input_rate($m) AS i, model_output_rate($m) AS o",
+      { m: model },
+    );
+    expect(Number(row?.i)).toBe(input);
+    expect(Number(row?.o)).toBe(output);
+  });
+});
+
+describe("message_usage cost columns and usage queries", () => {
+  const OPUS = "claude-opus-4-8";
+
+  // One assistant message with known usage. The cost math the queries apply:
+  // input*in_rate + cache_5m*1.25*in + cache_1h*2*in + cache_read*0.1*in + output*out_rate,
+  // all per MTok. For opus (in 5, out 25) with the values below that is
+  // (1000*5 + 2000*1.25*5 + 3000*2*5 + 10000*0.1*5 + 2000*25) / 1e6 = 0.1025 -> 0.10.
+  function assistantLine(opts: {
+    session: string;
+    id: string;
+    ts: string;
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    c1h: number;
+    c5m: number;
+  }): string {
+    return JSON.stringify({
+      type: "assistant",
+      sessionId: opts.session,
+      cwd: "/Users/test/usage-proj",
+      timestamp: `${opts.ts}.000Z`,
+      uuid: opts.id,
+      message: {
+        id: opts.id,
+        role: "assistant",
+        model: OPUS,
+        content: [{ type: "text", text: "x" }],
+        usage: {
+          input_tokens: opts.input,
+          output_tokens: opts.output,
+          cache_read_input_tokens: opts.cacheRead,
+          cache_creation_input_tokens: opts.cacheWrite,
+          cache_creation: {
+            ephemeral_1h_input_tokens: opts.c1h,
+            ephemeral_5m_input_tokens: opts.c5m,
+          },
+        },
+      },
+    });
+  }
+
+  async function insertUsage(session: string) {
+    const rows = [
+      {
+        id: `${session}-a`,
+        ts: "2026-03-01T10:00:00",
+        sidechain: false,
+        input: 1000,
+        output: 2000,
+        cacheRead: 10000,
+        cacheWrite: 5000,
+        c1h: 3000,
+        c5m: 2000,
+      },
+      // A sidechain message with no usage: it lifts msgs and sidechain_share but adds
+      // nothing to the bucket cost, keeping the expected total exact.
+      {
+        id: `${session}-b`,
+        ts: "2026-03-01T10:05:00",
+        sidechain: true,
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        c1h: 0,
+        c5m: 0,
+      },
+    ];
+    let line = 1;
+    for (const r of rows) {
+      await db.run(
+        `INSERT INTO raw
+           (host, session_id, type, project_path, is_sidechain, timestamp,
+            input_tokens, output_tokens, source_file, source_line, data)
+         VALUES ('local', $session, 'assistant', '/Users/test/usage-proj', $sidechain,
+                 $ts::TIMESTAMP, $input, $output, $source_file, $source_line, $line::JSON)`,
+        {
+          session,
+          sidechain: r.sidechain ? "true" : "false",
+          ts: r.ts,
+          input: String(r.input),
+          output: String(r.output),
+          source_file: `/Users/test/usage-proj/${session}.jsonl`,
+          source_line: String(line++),
+          line: assistantLine({ session, ...r }),
+        },
+      );
+    }
+    await db.run("DELETE FROM meta");
+    await rebuildViews(db);
+  }
+
+  it("exposes the TTL split and sidechain/source_file columns on message_usage", async () => {
+    await insertUsage("usage-cols-session");
+    const [row] = await db.query<{
+      cache_1h_tokens: bigint;
+      cache_5m_tokens: bigint;
+      is_sidechain: boolean;
+      source_file: string;
+    }>(
+      "SELECT cache_1h_tokens, cache_5m_tokens, is_sidechain, source_file FROM message_usage WHERE message_id = 'usage-cols-session-a'",
+    );
+    expect(Number(row?.cache_1h_tokens)).toBe(3000);
+    expect(Number(row?.cache_5m_tokens)).toBe(2000);
+    expect(row?.is_sidechain).toBe(false);
+    expect(row?.source_file).toContain("usage-cols-session.jsonl");
+  });
+
+  it("usage-timeline buckets the session with exact cost and shape signals", async () => {
+    await insertUsage("usage-timeline-session");
+    const rows = await runQuery<{
+      msgs: bigint;
+      cost_usd_est: number;
+      cache_miss_ratio: number;
+      max_context_tokens: bigint;
+      sidechain_share: number;
+      top_model: string;
+    }>(db, "usage-timeline", {
+      session: "usage-timeline-session",
+      host: null,
+      bucket_minutes: null,
+    });
+    expect(rows).toHaveLength(1);
+    const [b] = rows;
+    expect(Number(b?.msgs)).toBe(2);
+    expect(b?.cost_usd_est).toBe(0.1);
+    expect(b?.cache_miss_ratio).toBe(0.33);
+    expect(Number(b?.max_context_tokens)).toBe(16000);
+    expect(b?.sidechain_share).toBe(0.5);
+    expect(b?.top_model).toBe(OPUS);
+  });
+
+  it("usage-spikes ranks the burn window with its repo", async () => {
+    await insertUsage("usage-spikes-session");
+    const rows = await runQuery<{
+      session_id: string;
+      repo: string;
+      msgs: bigint;
+      cost_usd_est: number;
+    }>(db, "usage-spikes", {
+      after_date: null,
+      before_date: null,
+      project: null,
+      host: null,
+      bucket_minutes: null,
+      limit: null,
+    });
+    const mine = rows.find((r) => r.session_id === "usage-spikes-session");
+    expect(mine).toBeDefined();
+    expect(mine?.repo).toBe("usage-proj");
+    expect(Number(mine?.msgs)).toBe(2);
+    expect(mine?.cost_usd_est).toBe(0.1);
+  });
+});

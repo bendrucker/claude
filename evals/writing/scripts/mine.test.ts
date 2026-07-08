@@ -56,9 +56,7 @@ test.each<{ name: string; counts: Record<string, number>; limit: number; expecte
   },
 ])("selectSample $name", ({ counts, limit, expected }) => {
   const candidates = Object.entries(counts).flatMap(([category, n]) =>
-    Array.from({ length: n }, (_, i) =>
-      makeItem({ category, output: "x".repeat(10 * (i + 1)) }),
-    ),
+    Array.from({ length: n }, (_, i) => makeItem({ category, output: "x".repeat(10 * (i + 1)) })),
   );
   const selected = selectSample(candidates, limit);
   expect(selected.map((s) => s.category)).toEqual(expected);

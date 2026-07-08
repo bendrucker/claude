@@ -12,6 +12,7 @@ import {
   nameFormat,
   nameLength,
 } from "../rules/frontmatter";
+import { preferHeaders } from "../rules/headers";
 import { namespaceMismatch, namespaceStutter } from "../rules/namespace";
 import type { RuleResult, Severity } from "../types";
 
@@ -254,6 +255,43 @@ describe("bangExecutionMatcher", () => {
   });
 });
 
+describe("preferHeaders", () => {
+  const failing = (body: string) => {
+    const result = preferHeaders.check(parseSkill(body), "");
+    const results = Array.isArray(result) ? result : [result];
+    return results.filter((r) => !r.passed);
+  };
+
+  test.each<{ name: string; body: string; flagged: boolean }>([
+    { name: "flags a line-start bold label", body: "**Config**: value", flagged: true },
+    { name: "passes a hyphen list-item label", body: "- **Item**: value", flagged: false },
+    { name: "passes a numbered list-item label", body: "1. **Step**: value", flagged: false },
+    {
+      name: "passes mid-sentence bold",
+      body: "A line carrying **inline bold**: continues here",
+      flagged: false,
+    },
+    {
+      name: "passes a bold label inside a fenced block",
+      body: "```md\n**Fenced**: value\n```",
+      flagged: false,
+    },
+    {
+      name: "passes a label inside a block that nests a different fence marker",
+      body: "```md\n~~~\n**Inner**: value\n~~~\n```",
+      flagged: false,
+    },
+  ])("$name", ({ body, flagged }) => {
+    expect(failing(body).length > 0).toBe(flagged);
+  });
+
+  it("reports the offending line number and warn severity", () => {
+    const [offender] = failing("intro\n\n**Config**: value");
+    expect(offender?.severity).toBe("warn");
+    expect(offender?.line).toBe(3);
+  });
+});
+
 describe("namespace rules", () => {
   const pluginPath = (plugin: string) => `plugins/${plugin}/skills/some-skill`;
 
@@ -346,6 +384,14 @@ describe("lintSkill", () => {
     expect(result.errors).toBeGreaterThan(0);
     const descError = result.results.find((r) => r.rule === "description-required");
     expect(descError?.passed).toBe(false);
+  });
+
+  it("warns on line-start bold labels without failing", async () => {
+    const result = await lintSkill(path.join(fixturesDir, "prefer-headers"));
+    expect(result.errors).toBe(0);
+    const offenders = result.results.filter((r) => r.rule === "prefer-headers" && !r.passed);
+    expect(offenders).toHaveLength(1);
+    expect(offenders[0]?.line).toBe(8);
   });
 
   it("detects references", async () => {

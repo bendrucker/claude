@@ -10,7 +10,8 @@ function statusIcon(result: RuleResult): string {
 }
 
 function formatResult(result: RuleResult): string {
-  return `  [${statusIcon(result)}] ${result.rule}: ${result.message}`;
+  const location = result.line === undefined ? "" : ` (line ${result.line})`;
+  return `  [${statusIcon(result)}] ${result.rule}${location}: ${result.message}`;
 }
 
 function formatReference(ref: ReferenceResult): string {

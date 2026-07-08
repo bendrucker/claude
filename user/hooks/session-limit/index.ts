@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { SyncHookJSONOutput, UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
@@ -126,31 +126,31 @@ function markerPath(sessionId: string): string {
   return join(root, sessionId, "session-limit.json");
 }
 
-function readJson<T>(path: string): T | null {
+async function readJson<T>(path: string): Promise<T | null> {
   try {
-    return JSON.parse(readFileSync(path, "utf8")) as T;
+    return JSON.parse(await Bun.file(path).text()) as T;
   } catch {
     return null;
   }
 }
 
-export function processInput(
+export async function processInput(
   input: UserPromptSubmitHookInput,
   nowMs: number,
-): SyncHookJSONOutput | null {
+): Promise<SyncHookJSONOutput | null> {
   const sessionId = input.session_id;
   if (!sessionId) return null;
 
-  const rl = readJson<RateLimits>(rateLimitsPath());
+  const rl = await readJson<RateLimits>(rateLimitsPath());
   if (!rl) return null;
 
   const path = markerPath(sessionId);
-  const result = evaluate(rl, readJson<Marker>(path), nowMs);
+  const result = evaluate(rl, await readJson<Marker>(path), nowMs);
   if (!result) return null;
 
   try {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(result.marker)}\n`);
+    await Bun.write(path, `${JSON.stringify(result.marker)}\n`);
   } catch {
     return null;
   }
@@ -176,7 +176,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processInput(input, Date.now());
+  const output = await processInput(input, Date.now());
   if (output) {
     writeStdoutJson(output);
   }

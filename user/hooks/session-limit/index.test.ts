@@ -1,9 +1,10 @@
 process.env.TZ = "UTC";
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import type { UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
 import {
   band,
@@ -138,10 +139,14 @@ describe("message content", () => {
     expect(evaluate(limits(95), null, 0)?.messages[0]).toMatchInlineSnapshot(
       `"You are at 95% of the current 5-hour usage block (resets Wed 9:30 AM). Prefer finishing in-flight work over starting anything new, and batch tool calls."`,
     );
-    expect(evaluate(limits(100), null, FIVE_RESETS_MS - 10 * 60 * 1000)?.messages[0]).toMatchInlineSnapshot(
+    expect(
+      evaluate(limits(100), null, FIVE_RESETS_MS - 10 * 60 * 1000)?.messages[0],
+    ).toMatchInlineSnapshot(
       `"The 5-hour usage block is exhausted (resets Wed 9:30 AM). Every further request now spends overage credits. Finish only in-flight work, then schedule a wake-up for just after Wed 9:30 AM (no need to ask) so work resumes on a fresh block, and stop. Start no new work."`,
     );
-    expect(evaluate(limits(100), null, FIVE_RESETS_MS - 2 * 60 * 60 * 1000)?.messages[0]).toMatchInlineSnapshot(
+    expect(
+      evaluate(limits(100), null, FIVE_RESETS_MS - 2 * 60 * 60 * 1000)?.messages[0],
+    ).toMatchInlineSnapshot(
       `"The 5-hour usage block is exhausted (resets Wed 9:30 AM). Every further request now spends overage credits. Finish only in-flight work, then tell the user to return at Wed 9:30 AM to resume on a fresh block, and stop. Start no new work."`,
     );
   });
@@ -164,8 +169,8 @@ describe("processInput", () => {
     process.env.CLAUDE_SESSION_LIMIT_MARKER_ROOT = join(dir, "markers");
   });
 
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
     delete process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH;
     delete process.env.CLAUDE_SESSION_LIMIT_MARKER_ROOT;
   });
@@ -180,54 +185,54 @@ describe("processInput", () => {
     };
   }
 
-  function writeLimits(fivePct: number, sevenPct = 0) {
-    writeFileSync(rlPath, JSON.stringify(limits(fivePct, sevenPct)));
+  async function writeLimits(fivePct: number, sevenPct = 0) {
+    await Bun.write(rlPath, JSON.stringify(limits(fivePct, sevenPct)));
   }
 
-  it("injects context when a band is crossed", () => {
-    writeLimits(92);
-    const output = processInput(input("s1"), 0);
+  it("injects context when a band is crossed", async () => {
+    await writeLimits(92);
+    const output = await processInput(input("s1"), 0);
     const ctx = output?.hookSpecificOutput?.additionalContext ?? "";
     expect(ctx).toContain("90%");
     expect(ctx).toContain("Wed 9:30 AM");
   });
 
-  it("dedups across invocations and escalates on the next band", () => {
-    writeLimits(92);
-    expect(processInput(input("s2"), 0)).not.toBeNull();
-    expect(processInput(input("s2"), 0)).toBeNull();
+  it("dedups across invocations and escalates on the next band", async () => {
+    await writeLimits(92);
+    expect(await processInput(input("s2"), 0)).not.toBeNull();
+    expect(await processInput(input("s2"), 0)).toBeNull();
 
-    writeLimits(96);
-    const escalated = processInput(input("s2"), 0);
+    await writeLimits(96);
+    const escalated = await processInput(input("s2"), 0);
     expect(escalated?.hookSpecificOutput?.additionalContext).toContain("95%");
   });
 
-  it("resets the band after a block rollover", () => {
-    writeLimits(96);
-    expect(processInput(input("s3"), 0)).not.toBeNull();
+  it("resets the band after a block rollover", async () => {
+    await writeLimits(96);
+    expect(await processInput(input("s3"), 0)).not.toBeNull();
 
-    writeFileSync(
+    await Bun.write(
       rlPath,
       JSON.stringify({
         five_hour: { used_percentage: 30, resets_at: FIVE_RESETS + 18000 },
         seven_day: { used_percentage: 0, resets_at: SEVEN_RESETS },
       }),
     );
-    expect(processInput(input("s3"), 0)).toBeNull();
+    expect(await processInput(input("s3"), 0)).toBeNull();
 
-    const stored = JSON.parse(
-      readFileSync(join(dir, "markers", "s3", "session-limit.json"), "utf8"),
-    ) as Marker;
+    const stored = (await Bun.file(
+      join(dir, "markers", "s3", "session-limit.json"),
+    ).json()) as Marker;
     expect(stored.fiveHourBand).toBe(0);
     expect(stored.fiveHourResetsAt).toBe(FIVE_RESETS + 18000);
   });
 
-  it("emits nothing when the rate-limit file is missing", () => {
-    expect(processInput(input("s4"), 0)).toBeNull();
+  it("emits nothing when the rate-limit file is missing", async () => {
+    expect(await processInput(input("s4"), 0)).toBeNull();
   });
 
-  it("emits nothing when the rate-limit file is empty", () => {
-    writeFileSync(rlPath, "");
-    expect(processInput(input("s5"), 0)).toBeNull();
+  it("emits nothing when the rate-limit file is empty", async () => {
+    await Bun.write(rlPath, "");
+    expect(await processInput(input("s5"), 0)).toBeNull();
   });
 });

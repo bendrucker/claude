@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { styleText } from "node:util";
 import { genericGlyph, purposeGlyphs, remoteGlyph } from "./glyphs";
+import { modelLetter } from "./model";
 
 export interface Task {
   id: string;
@@ -92,6 +93,7 @@ export function renderTask(
   agentType: string | null,
   activity: string | null = null,
   description: string | null = null,
+  model: string | null = null,
 ): { id: string; content: string } {
   const icon = typeIcon(agentType, task.status ?? "running");
   const marker = remoteMarker(task.type);
@@ -99,6 +101,7 @@ export function renderTask(
   const metaParts: string[] = [];
   if (task.startTime != null) metaParts.push(formatElapsed(task.startTime, now));
   if ((task.tokenCount ?? 0) > 0) metaParts.push(formatTokens(task.tokenCount ?? 0));
+  if (model) metaParts.push(model);
 
   // The type name trails as dim text after the meta. The icon already conveys
   // the kind, so a narrow terminal can drop the name without losing it.
@@ -156,7 +159,7 @@ interface ContentBlock {
 }
 
 interface TranscriptEntry {
-  message?: { role?: string; content?: ContentBlock[] };
+  message?: { role?: string; content?: ContentBlock[]; model?: string };
 }
 
 const basename = (p: unknown): string =>
@@ -230,16 +233,42 @@ export function extractActivity(entries: TranscriptEntry[]): string | null {
   return null;
 }
 
+// The newest assistant model in a transcript tail. Both the subagent's own model
+// and its parent session's model come from here. Comparing the two decides
+// whether a subagent is running off-default and warrants a letter.
+export function extractModel(entries: TranscriptEntry[]): string | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const model = entries[i]?.message?.model;
+    if (typeof model === "string" && model) return model;
+  }
+  return null;
+}
+
+// A subagent's model letter, shown only when it differs from the session it was
+// spawned from. Same model (or either unknown) yields no letter, keeping the
+// line quiet unless a cheaper model is actually in play.
+export function subagentModelLetter(
+  subModel: string | null,
+  sessionModel: string | null,
+): string | null {
+  if (!subModel || !sessionModel) return null;
+  const sub = modelLetter(subModel);
+  if (!sub || sub === modelLetter(sessionModel)) return null;
+  return sub;
+}
+
 // Each task id keys a sidecar pair the harness writes next to the subagent
 // transcript, scoped to the current project's sessions (derived from cwd). The
-// path prefix locates both the `.meta.json` and the `.jsonl`. A miss yields no
-// glyph or activity (the prune signal if the harness changes this layout).
-function subagentBase(id: string, projectDir: string): string | null {
+// path prefix locates both the `.meta.json` and the `.jsonl`. Its first segment
+// is the parent session id. A miss yields no glyph or activity (the prune signal
+// if the harness changes this layout).
+function subagentBase(id: string, projectDir: string): { base: string; sessionId: string } | null {
   try {
     for (const rel of new Bun.Glob(`*/subagents/agent-${id}.meta.json`).scanSync({
       cwd: projectDir,
     })) {
-      return join(projectDir, rel).slice(0, -".meta.json".length);
+      const sessionId = rel.split("/")[0] ?? "";
+      return { base: join(projectDir, rel).slice(0, -".meta.json".length), sessionId };
     }
   } catch {
     // Project directory unreadable: skip enrichment.
@@ -255,14 +284,14 @@ async function readMeta(base: string): Promise<AgentMeta | null> {
   }
 }
 
-// Transcripts grow to megabytes; only the tail holds the latest events. Read a
-// bounded suffix and drop the first line, which a mid-file slice splits.
+// Transcripts grow to megabytes. Only the tail holds the latest events, so read
+// a bounded suffix and drop the first line, which a mid-file slice splits.
 const TAIL_BYTES = 65_536;
-async function readActivity(base: string): Promise<string | null> {
+async function readEntries(path: string): Promise<TranscriptEntry[]> {
   try {
-    const file = Bun.file(`${base}.jsonl`);
+    const file = Bun.file(path);
     const size = file.size;
-    if (!size) return null;
+    if (!size) return [];
     const start = Math.max(0, size - TAIL_BYTES);
     const lines = (await file.slice(start).text()).split("\n");
     if (start > 0) lines.shift();
@@ -275,9 +304,9 @@ async function readActivity(base: string): Promise<string | null> {
         // Skip malformed lines.
       }
     }
-    return extractActivity(entries);
+    return entries;
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -297,11 +326,25 @@ if (import.meta.main) {
   const projectDir = join(homedir(), ".claude", "projects", slug);
   const now = Date.now();
 
+  // All tasks on this line share one parent session, so its model is read once.
+  const sessionModels = new Map<string, string | null>();
+  const sessionModel = async (sessionId: string): Promise<string | null> => {
+    if (!sessionModels.has(sessionId)) {
+      const entries = await readEntries(join(projectDir, `${sessionId}.jsonl`));
+      sessionModels.set(sessionId, extractModel(entries));
+    }
+    return sessionModels.get(sessionId) ?? null;
+  };
+
   const lines: string[] = [];
   for (const task of input.tasks ?? []) {
-    const base = subagentBase(task.id, projectDir);
-    const meta = base ? await readMeta(base) : null;
-    const activity = base ? await readActivity(base) : null;
+    const located = subagentBase(task.id, projectDir);
+    const meta = located ? await readMeta(located.base) : null;
+    const entries = located ? await readEntries(`${located.base}.jsonl`) : [];
+    const activity = extractActivity(entries);
+    const model = located
+      ? subagentModelLetter(extractModel(entries), await sessionModel(located.sessionId))
+      : null;
     lines.push(
       JSON.stringify(
         renderTask(
@@ -311,6 +354,7 @@ if (import.meta.main) {
           meta?.agentType ?? null,
           activity,
           meta?.description ?? null,
+          model,
         ),
       ),
     );

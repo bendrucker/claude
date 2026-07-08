@@ -12,6 +12,7 @@ import {
   emitRateLimits,
   exceeds200k,
   formatWorktree,
+  modelSegment,
   type Span,
   type WorktreeData,
 } from "./statusline";
@@ -78,6 +79,21 @@ const cases: RenderCase[] = [
   })),
   { name: "no-dial", columns: 80, stdin: {}, worktree: null },
   {
+    name: "model-leads",
+    columns: 80,
+    stdin: {
+      model: { id: "claude-fable-5", display_name: "Fable" },
+      context_window: { used_percentage: 30 },
+    },
+    worktree: mainWt,
+  },
+  {
+    name: "model-only",
+    columns: 80,
+    stdin: { model: { id: "claude-opus-4-8", display_name: "Opus" } },
+    worktree: null,
+  },
+  {
     name: "lines-added",
     columns: 80,
     stdin: { cost: { total_lines_added: 5, total_lines_removed: 0 } },
@@ -124,6 +140,15 @@ const cases: RenderCase[] = [
 describe("rendered output", () => {
   test.each(cases)("$name", (c) => {
     expect(buildStatusLine(c.stdin, c.columns, c.worktree)).toMatchSnapshot();
+  });
+});
+
+describe("modelSegment", () => {
+  test("renders the family letter, null when absent", () => {
+    expect(strip(modelSegment({ model: { id: "claude-fable-5" } }) ?? "")).toBe("F");
+    expect(strip(modelSegment({ model: { id: "claude-opus-4-8[1m]" } }) ?? "")).toBe("O");
+    expect(modelSegment({})).toBeNull();
+    expect(modelSegment({ model: null })).toBeNull();
   });
 });
 

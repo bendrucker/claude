@@ -29,6 +29,20 @@ The thread id is the notification's `id` field, identical to the trailing segmen
 
 Marking a thread done is not durable if the thread gets new activity. Merging a PR is exactly that: the merge and Dependabot's post-merge comment fire fresh events that flip the thread back to unread, back into the Inbox. Mark done after the merge lands, not before, and even then a merged PR tends to resurface once. This isn't a bug to fix. It's why triage is idempotent: a second run sweeps the merge-generated threads under the closed-or-merged rule. When you clear a large batch that included merges, run the skill again to catch the echoes.
 
+## Your Own PRs in Your Own Namespace
+
+A PR you authored in a repo you own is a private feedback loop. Most threads it generates are noise you made yourself: your own review replies, plus the bots you wired into your own repos (Worktrunk, Greptile, Dependabot, `github-actions`). Your automation ran on your work. That is not news.
+
+Dismiss when three things hold:
+
+- The repo owner is you (`.repository.owner.login` equals your login).
+- The PR author is you (`.user.login` on the PR equals your login).
+- The latest actor is you or a bot. Read it from the thread's `subject.latest_comment_url`: dismiss when `.user.login` is your login or `.user.type` is `Bot`.
+
+Keep exactly one case: a different human as the latest actor. Someone else reviewing or commenting on your PR (a `User` whose login isn't yours) is real feedback, so it stays. That's why the rule turns on the latest actor rather than blanket-clearing every thread on your own PRs. One gap remains. A bot that posts after a human reads as bot-latest, so feedback buried under later automation can slip through, and a second look at the PR is what recovers it. The tradeoff buys a quieter inbox, and it's worth it.
+
+Scope this to your personal namespace. In a shared org you maintain, a bot comment on your PR can matter to co-maintainers, so the private-loop assumption breaks down.
+
 ## Merge Gate
 
 Gate merges on `mergeStateStatus`, not on the raw checks array. One field folds in everything that matters:

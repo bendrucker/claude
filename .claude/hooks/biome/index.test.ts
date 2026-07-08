@@ -187,6 +187,17 @@ describe("biome hook", () => {
       expect(files).toEqual([]);
     });
 
+    it("ignores generated workflow scripts", async () => {
+      const wfDir = join(tempDir, "workflows", "scripts");
+      const wfPath = join(wfDir, "sweep-wf_123.js");
+      await Bun.write(wfPath, "export const meta = {};\nreturn { done: true };\n");
+      const transcriptPath = join(tempDir, `transcript-wf-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: wfPath, tool: "Edit" }]));
+
+      const files = await parseTranscript(transcriptPath);
+      expect(files).toEqual([]);
+    });
+
     it("ignores non-Edit/Write tools", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-read-${Date.now()}.jsonl`);

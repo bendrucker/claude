@@ -14,6 +14,6 @@ export function modelLetter(id?: string | null, displayName?: string | null): st
   for (const [family, letter] of Object.entries(FAMILY_LETTERS)) {
     if (hay.includes(family)) return letter;
   }
-  const fallback = (displayName ?? id ?? "").match(/[a-z]/i);
+  const fallback = (displayName ?? "").match(/[a-z]/i);
   return fallback ? fallback[0].toUpperCase() : null;
 }

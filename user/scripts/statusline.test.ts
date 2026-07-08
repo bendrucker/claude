@@ -8,6 +8,7 @@ import {
   dialColor,
   dialIndex,
   dialSegment,
+  effortSegment,
   elideSpans,
   emitRateLimits,
   exceeds200k,
@@ -79,10 +80,11 @@ const cases: RenderCase[] = [
   })),
   { name: "no-dial", columns: 80, stdin: {}, worktree: null },
   {
-    name: "model-leads",
+    name: "model-effort-leads",
     columns: 80,
     stdin: {
       model: { id: "claude-fable-5", display_name: "Fable" },
+      effort: { level: "xhigh" },
       context_window: { used_percentage: 30 },
     },
     worktree: mainWt,
@@ -91,6 +93,12 @@ const cases: RenderCase[] = [
     name: "model-only",
     columns: 80,
     stdin: { model: { id: "claude-opus-4-8", display_name: "Opus" } },
+    worktree: null,
+  },
+  {
+    name: "effort-only",
+    columns: 80,
+    stdin: { effort: { level: "max" } },
     worktree: null,
   },
   {
@@ -149,6 +157,16 @@ describe("modelSegment", () => {
     expect(strip(modelSegment({ model: { id: "claude-opus-4-8[1m]" } }) ?? "")).toBe("O");
     expect(modelSegment({})).toBeNull();
     expect(modelSegment({ model: null })).toBeNull();
+  });
+});
+
+describe("effortSegment", () => {
+  test("renders the effort glyph, null when absent or unsupported", () => {
+    expect(strip(effortSegment({ effort: { level: "max" } }) ?? "")).toBe("⠿");
+    expect(strip(effortSegment({ effort: { level: "low" } }) ?? "")).toBe("⠂");
+    expect(effortSegment({ effort: { level: "bogus" } })).toBeNull();
+    expect(effortSegment({})).toBeNull();
+    expect(effortSegment({ effort: null })).toBeNull();
   });
 });
 

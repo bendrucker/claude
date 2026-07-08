@@ -122,6 +122,12 @@ describe("evaluate", () => {
     expect(result?.messages[0]).not.toContain("schedule a wake-up");
   });
 
+  it("defers rather than scheduling when a stale reset is already in the past", () => {
+    const result = evaluate(limits(100), null, FIVE_RESETS_MS + 60 * 1000);
+    expect(result?.messages[0]).toContain("tell the user to return");
+    expect(result?.messages[0]).not.toContain("schedule a wake-up");
+  });
+
   it("announces the seven-day band independently", () => {
     const result = evaluate(limits(50, 96), null, 0);
     expect(result?.messages).toHaveLength(1);

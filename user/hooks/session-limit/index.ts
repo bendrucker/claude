@@ -42,7 +42,11 @@ export const FIVE_HOUR_BANDS: Band[] = [
     threshold: 100,
     message: (resetsAt, nowMs) => {
       const reset = formatResetTime(resetsAt);
-      const withinHorizon = resetsAt * 1000 - nowMs <= WAKEUP_HORIZON_MS;
+      // A stale rl.json can hold a resets_at already in the past. A negative
+      // remaining time must not read as "within horizon" and schedule a
+      // wake-up for a moment that has elapsed.
+      const msUntilReset = resetsAt * 1000 - nowMs;
+      const withinHorizon = msUntilReset > 0 && msUntilReset <= WAKEUP_HORIZON_MS;
       const resume = withinHorizon
         ? `then schedule a wake-up for just after ${reset} (no need to ask) so work resumes on a fresh block, and stop`
         : `then tell the user to return at ${reset} to resume on a fresh block, and stop`;
@@ -81,6 +85,9 @@ export function evaluate(
   prev: Marker | null,
   nowMs: number,
 ): { marker: Marker; messages: string[] } | null {
+  // five_hour presence is the signal that this session exposes rate-limit data
+  // at all, so its absence skips both windows. A seven_day-only account would
+  // then go unwarned, but no such account is known to exist.
   const fivePct = rl.five_hour?.used_percentage;
   if (typeof fivePct !== "number") return null;
 

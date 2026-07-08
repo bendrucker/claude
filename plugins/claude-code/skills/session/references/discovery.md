@@ -14,7 +14,7 @@ Mirror the "Parallel Queries (Workflows)" pattern in [`SKILL.md`](../SKILL.md): 
 
 ## Dimension Cheat Sheet
 
-Each dimension maps to the named queries that answer it (Tier-1 listed in `SKILL.md`'s catalog, Tier-2 documented in [Tier-2 Catalog](#tier-2-catalog) below) plus the survey surfaces to start from. Simple `GROUP BY ... COUNT/SUM` rollups (tokens by host, turns by project, hook time by event) stay inline; an agent writes them in seconds.
+Each dimension maps to the named queries that answer it (Tier-1 listed in [`catalog.md`](catalog.md), Tier-2 documented in [Tier-2 Catalog](#tier-2-catalog) below) plus the survey surfaces to start from. Simple `GROUP BY ... COUNT/SUM` rollups (tokens by host, turns by project, hook time by event) stay inline; an agent writes them in seconds.
 
 | Dimension | Named queries | Survey surfaces |
 |-----------|---------------|-----------------|

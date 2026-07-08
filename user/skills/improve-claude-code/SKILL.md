@@ -44,13 +44,24 @@ Mandatory. Launch one or more grounding agents that re-check every candidate aga
 
 #### Dedup
 
-Fingerprint each candidate (see [Fingerprint](#fingerprint)). Then query Things via `things:jxa` for every `claude-code`-tagged todo and recently-completed (logbook) todo, and scan their notes for `Discovery: <fp>`. Mark each candidate:
+Fingerprint each candidate (see [Fingerprint](#fingerprint)), then check two ledgers for that fingerprint: Things todos and the config repo's PR bodies. Direct-Implementation PRs carry the marker only in the PR body, so the Things scan alone misses them.
 
-- `already-filed`: fingerprint found in an open `claude-code` todo.
-- `already-shipped`: fingerprint found in a completed todo (the annotate phase removes the `claude-code` tag on a shipped todo, so the marker persists in notes or the logbook).
-- `new`: fingerprint not found.
+For Things, query via `things:jxa` for every `claude-code`-tagged todo and recently-completed (logbook) todo, and scan their notes for `Discovery: <fp>`.
 
-Suppress `already-filed` and `already-shipped` from the actionable set; still count them in the digest tail. Things is the ledger: no separate dedup store.
+For PR bodies, scan every PR on the config repo:
+
+```bash
+gh pr list --repo bendrucker/claude --state all --limit 1000 --json state,body \
+  --jq '.[] | .state as $s | (.body // "") | scan("Discovery: [0-9a-f]{12}") | "\($s) \(.)"'
+```
+
+Each line is `<STATE> Discovery: <fp>`, where `STATE` is `OPEN`, `MERGED`, or `CLOSED`. Build a fingerprint-to-state map, strongest state wins (`MERGED` over `OPEN`). Then mark each candidate:
+
+- `already-shipped`: fingerprint in a `MERGED` PR body, or in a completed todo (the annotate phase removes the `claude-code` tag on a shipped todo, so the marker persists in notes or the logbook).
+- `already-filed`: fingerprint in an `OPEN` PR body, or in an open `claude-code` todo.
+- `new`: fingerprint not found. A `CLOSED` unmerged PR does not count, so a finding abandoned that way resurfaces as `new`.
+
+When one fingerprint lands in more than one place, `already-shipped` wins over `already-filed`. Suppress both from the actionable set. Still count them in the digest tail. Things and the PR history are the ledgers: no separate dedup store.
 
 #### Digest
 
@@ -73,7 +84,7 @@ Report how many todos landed. The existing triage, plan, implement, PR, CI, and 
 
 Implement-as-you-go is an opt-in alternative to filing, chosen explicitly by the user per run. When the user asks for direct implementation, dispatch one background `general-purpose` agent with `isolation: "worktree"` for each grounded finding as soon as it lands, while the rest of the run continues. Each agent folds grounding in: it verifies the finding against the live config first, and if the config already addresses it, reports "not grounded" and changes nothing. Otherwise it implements, tests, runs `/code-review`, and opens a PR via `pull-request:create`. Collect the PR links at the end for the user to review locally or on GitHub.
 
-These PRs have no backing Things todo, so skip the `Original Task` link. Instead the body carries an Evidence section (local-host evidence only, never content from an egress-blocked host) plus one `Discovery: <fingerprint>` line per finding. Dedup today scans only Things notes, so these markers stay invisible until that scan is extended to PR bodies. Until then, a finding implemented this way can resurface as `new` on the next run.
+These PRs have no backing Things todo, so skip the `Original Task` link. Instead the body carries an Evidence section (local-host evidence only, never content from an egress-blocked host) plus one `Discovery: <fingerprint>` line per finding. The Dedup step now scans open and merged PR bodies, so a finding shipped this way is suppressed instead of resurfacing as `new` on the next run.
 
 #### Scheduled
 
@@ -96,7 +107,7 @@ printf '%s' "hook-noop|team-workaround.ts" | shasum -a 256 | cut -c1-12
 - `finding_type` is a stable slug for the class of finding (`hook-noop`, `permission-allowlist-miss`, `repeat-read`, `sandbox-deny`).
 - `normalized_target` is the config object the finding is about (a hook script basename, a permission pattern, a skill name), **never** a count or a date, so re-runs of the same underlying finding collapse to one identity.
 
-Filed todos carry `Discovery: <fingerprint>` in notes. The dedup step extracts those markers from Things and suppresses matches. Suppressing *dismissed* findings (surfaced but not filed) is deferred: dismissed findings reappear as `new` until filed.
+Filed todos carry `Discovery: <fingerprint>` in notes, and Direct-Implementation PRs carry it in the PR body. The dedup step extracts those markers from both Things notes and PR bodies and suppresses matches. Suppressing *dismissed* findings (surfaced but not filed) is deferred: dismissed findings reappear as `new` until filed.
 
 ## Fetch and Triage
 

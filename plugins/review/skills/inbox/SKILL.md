@@ -5,6 +5,7 @@ description: >
   Use when reviewing multiple PRs, checking the review queue, batch reviews, or managing your review inbox.
   Pass --queue to spawn an already-ordered queue.
 argument-hint: "[--queue]"
+disable-model-invocation: true
 allowed-tools:
   - Monitor
   - TaskStop

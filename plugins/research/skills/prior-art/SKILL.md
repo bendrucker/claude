@@ -3,6 +3,7 @@ name: research:prior-art
 description: |
   Research existing solutions when exploring a new problem space. Use when the user mentions "prior art", "existing solutions", "what libraries exist for", or wants to understand the landscape before building.
 argument-hint: <topic>
+disable-model-invocation: true
 ---
 
 Research prior art for: $ARGUMENTS

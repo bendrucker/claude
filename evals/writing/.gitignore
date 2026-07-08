@@ -1,0 +1,4 @@
+# Generated and local-only. Mined pairs may reconstruct work-host draft text,
+# so the assembled sample and reviewer feedback never leave this machine.
+data/
+feedback/

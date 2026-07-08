@@ -1,15 +1,11 @@
-#!/usr/bin/env bun
-import { cli } from "cleye";
 import { table } from "table";
 import { extractComments } from "../../../detection/comments";
 import { isProseFile } from "../../../detection/paths";
 import { scanAll } from "../../../detection/scan";
 import { stripCode } from "../../../detection/tropes";
 import { compileStemmedWordlist, countWords } from "../../../detection/wordlists";
-import { readInput } from "../../../scripts/io";
-import { profilePath, resolveDataDir } from "../../analyze/scripts/data-dir";
 import { checkRegister, VOICE_DELTA_FEATURES } from "../../analyze/scripts/voice-delta";
-import { loadProfile, type VoiceProfile } from "../../analyze/scripts/voice-profile";
+import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
 
 export type CategoryScore = { category: string; hits: number; density: number };
 
@@ -24,7 +20,7 @@ export type ScoreReport = {
   groups: GroupScore[];
 };
 
-type ReportOptions = {
+export type ReportOptions = {
   comments: boolean;
   customMatch?: (text: string) => { count: number };
 };
@@ -88,7 +84,7 @@ export function scoreComments(
 // (including `.md`, whose fenced code blocks stripCode already removes) are
 // scored whole; non-prose source files get their comments pulled out. Explicit
 // flags win: --no-comments forces off, --comments forces on.
-function shouldScoreComments(
+export function shouldScoreComments(
   filePath: string | undefined,
   on: boolean | undefined,
   off: boolean,
@@ -133,7 +129,7 @@ export function renderTable(report: ScoreReport): string {
   return sections.join("\n\n");
 }
 
-async function loadCustomMatch(
+export async function loadCustomMatch(
   path: string | undefined,
 ): Promise<((text: string) => { count: number }) | undefined> {
   if (!path) return undefined;
@@ -189,73 +185,4 @@ export function renderVoiceDeltaTable(text: string, profile: VoiceProfile | null
 
   lines.push(table([headers, ...rows]).trimEnd());
   return lines.join("\n");
-}
-
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "score",
-    parameters: ["[input]"],
-    help: {
-      description:
-        "Score a single input (file path, inline text, or stdin) for AI writing patterns on a per-1000-word basis. Reports hit counts and density per category. Informational: always exits 0.",
-    },
-    flags: {
-      json: {
-        type: Boolean,
-        description: "Emit the report as JSON for comparing two runs",
-        default: false,
-      },
-      comments: {
-        type: Boolean,
-        description:
-          "Force comment extraction on (defaults on for non-prose source files, off for prose)",
-      },
-      noComments: {
-        type: Boolean,
-        description: "Force comment extraction off",
-        default: false,
-      },
-      wordlist: {
-        type: String,
-        description: "Score an extra stemmed vocabulary file as a 'custom vocabulary' category",
-      },
-      voiceDelta: {
-        type: Boolean,
-        description:
-          "Report voice-delta rate features alongside the baseline from the local voice profile. Skips baseline comparison when the input is out-of-register.",
-        default: false,
-      },
-      dataDir: {
-        type: String,
-        description:
-          "Local data dir for the voice baseline (default: CLAUDE_PLUGIN_DATA or ~/.claude/plugins/data/writing-bendrucker). Only used with --voice-delta.",
-      },
-    },
-  });
-
-  const { text, filePath } = await readInput(argv._.input);
-  const customMatch = await loadCustomMatch(argv.flags.wordlist);
-  const options: ReportOptions = {
-    comments: shouldScoreComments(filePath, argv.flags.comments, argv.flags.noComments),
-  };
-  if (customMatch) options.customMatch = customMatch;
-  const report = buildReport(text, filePath, options);
-
-  if (argv.flags.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(renderTable(report));
-  }
-
-  if (argv.flags.voiceDelta) {
-    const dataDir = resolveDataDir(argv.flags.dataDir);
-    const profileData = await loadProfile(profilePath(dataDir));
-    console.log(`\n${renderVoiceDeltaTable(text, profileData)}`);
-  }
-
-  process.exit(0);
-}
-
-if (import.meta.main) {
-  await main();
 }

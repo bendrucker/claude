@@ -103,6 +103,7 @@ Every query also takes an optional `host` param. Omit it to span every machine (
 - `plan-iterations`: one row per ExitPlanMode present, ordered within a session. Measures growth (`chars_delta`, `lines_added`), removal (`lines_removed`), and carry-over (`lines_carried`, `carry_over_ratio`) against the previous present via set comparison of normalized plan text, plus time to the first present (`secs_to_first_plan`) and the session's human-authored prompt count (`human_msgs`). High carry-over paired with growth and near-zero removal is the append-only re-present signature. Params: `min_plans` (default 2, since the query is about re-presents), `after_date`, `before_date`, `project`, `host`.
 - `outcomes`: session terminal states, the outcome side the activity-centric queries never measure. Classifies every session as shipped (pr-link or a ship-signal Bash command: `git push`, `gh pr create/merge`, `glab mr create/merge`), ongoing (too fresh to call), handed-off (last plan rejected, implement-elsewhere), abandoned-with-edits (edits but nothing shipped, the loss signal), or no-artifact (Q&A/analysis), plus distinct PRs opened and PRs that took multiple sessions. Shipped means opened or pushed, not merged; PR fate lives outside the index. Params: `after_date`, `before_date`, `project`, `host`, `ongoing_hours` (default 48).
 - `hook-config-vs-observed`: hooks CONFIGURED on disk (plugin `hooks.json`, `~/.claude/settings.json`, `.claude/settings.json`) left-joined against DISTINCT hooks OBSERVED in `hook_events`, surfacing `observed_fires = 0` rows: hooks that never left a trace, the blind spot every other hook query misses because a silently-succeeding hook produces no event at all. Params: `after_date`, `before_date`, `project`, `host` (scopes the observed side only), `hook` (glob on configured command), `hook_config_glob` (override the plugin-cache glob).
+- `index-health`: the index auditing itself; run it FIRST in any analysis pass. One row per issue (`check_name`, `status`, `subject`, `detail`), alerts before info: `stream-silent` (a record kind that posted regularly then went quiet longer than its own worst historical gap, the signature of an upstream rename/removal that leaves consumers returning confidently stale results), `stream-new` (kinds first seen recently, shipping unconsumed), `host-staleness` (an imported host whose newest record lags the corpus, so cross-host queries read it as idle), `null-timestamp-kinds` (rows date filters silently exclude), `disk-not-indexed`/`indexed-not-on-disk` (index vs `~/.claude/projects` drift), `corpus-window` (the span each host actually covers). Deliberately takes no date/project/host scoping: health is corpus-level. Params: `min_active_days` (default 5), `new_days` (default 14), `stale_days` (default 2), `projects_glob` (default `~/.claude/projects/**/*.jsonl`).
 
 ### Markdown and YAML on Disk
 
@@ -213,6 +214,17 @@ Every table and view carries a `host` column (`local` for this machine, the labe
 - `project_filter(path, pattern)`: match the last path component against a glob pattern.
 - `host_filter(host_col, host_val)`: pass through when `host_val` is NULL, else match the host column.
 - `project_id(host, path)`: `host || ':' || path`, a cross-host project identity.
+
+## Known Blind Spots
+
+The `index-health` query detects drift the corpus can show; these absences are structural, so no query can surface them. State them when an analysis depends on what they hide.
+
+- **Thinking text**: Claude Code persists thinking blocks as signature-only stubs. `content_items` rows with `type = 'thinking'` exist but carry no text; reasoning is unsearchable from transcripts and must be intercepted at runtime (hooks) if needed.
+- **Retention floor**: `cleanupPeriodDays` deletes old session files, and the index rebuilds from surviving JSONL on migration, so the corpus floor ratchets forward (see `corpus-window`). `~/.claude/history.jsonl` holds prompt-level history much further back but is not ingested.
+- **Cloud and mobile sessions**: claude.ai web/mobile chats and cloud routines write no local JSONL. A `bridge-session` record marks only that a cloud bridge existed; the cloud side's content stays remote.
+- **Approved permission prompts**: only rejections leave a trace (`"User rejected tool use"` results). A prompt the user approved is indistinguishable from a call that never prompted, so prompting friction is undercountable.
+- **Offloaded tool results**: large outputs are truncated to a `<persisted-output>` preview pointing at a sidecar file under `tool-results/`; the full output never enters the index.
+- **Other machines**: only imported hosts exist. A machine never imported, or one gone stale (see `host-staleness`), is invisible rather than empty.
 
 ## Discovery
 

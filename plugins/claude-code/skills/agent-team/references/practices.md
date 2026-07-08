@@ -72,6 +72,8 @@ Teams add coordination overhead. Use them when parallelism savings exceed that c
 
 Each agent consumes a full context window. Prefer fewer agents with well-scoped tasks over many agents with thin tasks.
 
+Each agent also runs a model, and teammates and Agent-tool subagents inherit the session model unless you set `model` explicitly. For mechanical, well-scoped work (fixes with clear specs, finders, verifiers, formatting passes), pass a cheaper model (`model: "sonnet"`, or `haiku` for trivial extraction) rather than billing fan-out at a premium session model's rate. Keep the premium tier for the orchestrator and judgment-heavy verification. In Workflow scripts, pin `model` on `agent()` calls or per-phase in `meta.phases` for the same reason.
+
 ## Task Decomposition
 
 Decompose by **independence**, not by phase or layer.

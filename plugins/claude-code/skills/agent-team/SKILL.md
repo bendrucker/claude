@@ -70,6 +70,6 @@ Teammates inherit the lead's permission settings at spawn. Each loads project co
 ## References
 
 - [references/hooks.md](references/hooks.md) — `TeammateIdle` and `TaskCompleted` quality gate hooks
-- [references/practices.md](references/practices.md) — task sizing, spawn prompts, file conflicts, team structures
+- [references/practices.md](references/practices.md) — task sizing, spawn prompts, file conflicts, team structures, model selection
 - [references/interaction.md](references/interaction.md) — display modes, keyboard shortcuts, direct teammate interaction
 - [Agent Teams Documentation](https://code.claude.com/docs/en/agent-teams)

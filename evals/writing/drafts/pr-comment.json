@@ -1,0 +1,6 @@
+{
+  "category": "pr-comment",
+  "note": "clean rewrite: strips filler and hedging, preserves the concrete ask and the file reference. A near-good baseline so labeling has a positive case.",
+  "input": "I think it might potentially be worth considering whether we should maybe extract this validation logic into its own function? It's currently duplicated in a couple of places (handleCreate and handleUpdate) and it feels like it could get out of sync over time. Just a thought, not a blocker or anything.",
+  "output": "This validation logic is duplicated in handleCreate and handleUpdate and could drift out of sync. Consider extracting it into a shared function. Not a blocker."
+}

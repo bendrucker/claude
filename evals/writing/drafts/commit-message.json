@@ -1,0 +1,6 @@
+{
+  "category": "commit-message",
+  "note": "output over-strips: drops the reason the retry cap exists (the input's 'because the API rate-limits us') and keeps residual hedging ('should').",
+  "input": "This commit basically leverages a brand new retry helper in order to robustly handle the flaky upstream calls that we were seeing. We cap retries at 3 because the API rate-limits us pretty aggressively after that. It should hopefully resolve the intermittent 429s that have been plaguing the nightly job.",
+  "output": "Add a retry helper for flaky upstream calls, capped at 3 attempts. This should resolve the intermittent 429s in the nightly job."
+}

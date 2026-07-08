@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>writing:rewrite review</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --panel: #171a21;
+        --panel2: #1f242d;
+        --border: #2a313c;
+        --text: #d8dee9;
+        --muted: #8a94a6;
+        --accent: #6aa6ff;
+        --critical: #ff5d5d;
+        --minor: #ffb454;
+        --praise: #4ec88a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        display: grid;
+        grid-template-columns: 290px 1fr;
+        height: 100vh;
+      }
+      a { color: var(--accent); }
+      /* Sidebar */
+      #sidebar { background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; }
+      #progress { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--muted); position: sticky; top: 0; background: var(--panel); }
+      #progress b { color: var(--text); }
+      .navitem { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+      .navitem:hover { background: var(--panel2); }
+      .navitem.active { background: var(--panel2); border-left: 3px solid var(--accent); padding-left: 11px; }
+      .navitem .row1 { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+      .navitem .title { color: var(--text); font-size: 13px; margin-top: 3px; }
+      .badge { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--border); color: #8fd6ff; }
+      .verdict-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-left: auto; background: #3a414c; }
+      .verdict-dot.good { background: var(--praise); }
+      .verdict-dot.ok { background: var(--minor); }
+      .verdict-dot.bad { background: var(--critical); }
+      .navitem .anncount { font-size: 11px; color: var(--muted); }
+      /* Main */
+      #main { overflow-y: auto; padding: 22px 30px 120px; }
+      .hd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .hd h1 { font-size: 19px; margin: 0; flex: 1 1 100%; }
+      .meta { color: var(--muted); font-size: 12px; }
+      .section-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 8px; }
+      .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      .doc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px 22px; }
+      .doc.input { opacity: .92; }
+      .doc h1, .doc h2 { font-size: 17px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+      .doc h3 { font-size: 14px; color: #c7d0dd; }
+      .doc code { background: #11151b; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+      .doc pre { background: #11151b; padding: 12px; border-radius: 6px; overflow-x: auto; }
+      .doc pre code { background: none; padding: 0; }
+      .doc a { word-break: break-all; }
+      ::highlight(critical) { background: rgba(255,93,93,.30); text-decoration: underline wavy var(--critical); }
+      ::highlight(minor) { background: rgba(255,180,84,.26); text-decoration: underline wavy var(--minor); }
+      ::highlight(praise) { background: rgba(78,200,138,.24); }
+      /* Selection popover */
+      #pop { position: absolute; z-index: 50; display: none; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.5); width: 280px; }
+      #pop textarea { width: 100%; height: 54px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px; font: inherit; resize: vertical; }
+      #pop .quote { font-size: 11px; color: var(--muted); margin-bottom: 6px; max-height: 40px; overflow: hidden; font-style: italic; }
+      .sevrow { display: flex; gap: 6px; margin: 6px 0; }
+      .sevbtn { flex: 1; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 6px; padding: 4px; font-size: 12px; }
+      .sevbtn[data-sev="critical"].on { background: var(--critical); color: #1a0000; border-color: var(--critical); }
+      .sevbtn[data-sev="minor"].on { background: var(--minor); color: #241500; border-color: var(--minor); }
+      .sevbtn[data-sev="praise"].on { background: var(--praise); color: #00200f; border-color: var(--praise); }
+      #pop .actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+      button.btn { cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 6px; padding: 5px 12px; font-size: 12px; }
+      button.btn.primary { background: var(--accent); color: #06121f; border-color: var(--accent); }
+      /* Right rail (verdict/tags/notes/annotations) */
+      .rail { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+      .card h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+      .verdicts { display: flex; gap: 8px; }
+      .verdicts button { flex: 1; }
+      .verdicts button.on[data-v="good"] { background: var(--praise); color: #00200f; border-color: var(--praise); }
+      .verdicts button.on[data-v="ok"] { background: var(--minor); color: #241500; border-color: var(--minor); }
+      .verdicts button.on[data-v="bad"] { background: var(--critical); color: #1a0000; border-color: var(--critical); }
+      .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+      .tag { cursor: pointer; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--muted); user-select: none; }
+      .tag.on { background: var(--accent); color: #06121f; border-color: var(--accent); }
+      #notes { width: 100%; min-height: 90px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font: inherit; resize: vertical; }
+      .annlist { grid-column: 1 / -1; }
+      .ann { border-left: 3px solid var(--border); padding: 6px 10px; margin-bottom: 8px; background: var(--bg); border-radius: 0 6px 6px 0; }
+      .ann.critical { border-color: var(--critical); }
+      .ann.minor { border-color: var(--minor); }
+      .ann.praise { border-color: var(--praise); }
+      .ann .fieldtag { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #8fd6ff; margin-right: 6px; }
+      .ann .q { font-style: italic; color: var(--muted); font-size: 12px; }
+      .ann .c { margin-top: 3px; }
+      .ann .del { float: right; cursor: pointer; color: var(--muted); }
+      .saved { font-size: 11px; color: var(--praise); }
+      .topbar { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; }
+      .topbar .spacer { flex: 1; }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar">
+      <div id="progress"></div>
+      <div id="nav"></div>
+    </div>
+    <div id="main"></div>
+    <div id="pop">
+      <div class="quote" id="popQuote"></div>
+      <div class="sevrow">
+        <button class="sevbtn on" data-sev="critical">critical</button>
+        <button class="sevbtn" data-sev="minor">minor</button>
+        <button class="sevbtn" data-sev="praise">praise</button>
+      </div>
+      <textarea id="popText" placeholder="What's wrong with this span? (optional)"></textarea>
+      <div class="actions">
+        <button class="btn" id="popCancel">cancel</button>
+        <button class="btn primary" id="popSave">comment</button>
+      </div>
+    </div>
+
+    <script>
+      // Two failure axes the rewrite transform can hit: over-stripping (meaning
+      // lost vs the input) and residual slop (trope survived into the output).
+      const TAGS = [
+        "over-stripping", "meaning-loss", "residual-slop", "hedging-remains",
+        "filler-remains", "vocabulary-remains", "voice-clean", "faithful", "good",
+      ];
+      let samples = [];
+      let feedback = {}; // id -> {verdict, tags[], notes, annotations[]}
+      let current = null;
+      let pending = null; // pending new annotation {field, start, end, quote}
+      let pendingSev = "critical";
+
+      const $ = (s, r = document) => r.querySelector(s);
+      const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+      const el = (t, props = {}, kids = []) => {
+        const n = Object.assign(document.createElement(t), props);
+        for (const k of [].concat(kids)) n.append(k);
+        return n;
+      };
+
+      async function boot() {
+        samples = await (await fetch("/api/samples")).json();
+        feedback = await (await fetch("/api/feedback")).json();
+        for (const s of samples) feedback[s.id] ??= { verdict: null, tags: [], notes: "", annotations: [] };
+        renderNav();
+        select(samples[0].id);
+        wirePopover();
+      }
+
+      function fb(id) { return feedback[id]; }
+
+      function renderNav() {
+        const done = samples.filter((s) => {
+          const f = fb(s.id);
+          return f.verdict || f.annotations.length || f.notes.trim() || f.tags.length;
+        }).length;
+        $("#progress").innerHTML = `<b>${done}</b> / ${samples.length} reviewed &nbsp;·&nbsp; <a href="#" id="exportLink">export</a>`;
+        $("#exportLink").onclick = (e) => { e.preventDefault(); exportAll(); };
+        const nav = $("#nav");
+        nav.innerHTML = "";
+        for (const s of samples) {
+          const f = fb(s.id);
+          const item = el("div", { className: "navitem" + (s.id === current ? " active" : "") });
+          item.onclick = () => select(s.id);
+          const dot = el("span", { className: "verdict-dot " + (f.verdict || "") });
+          item.append(
+            el("div", { className: "row1" }, [
+              el("span", { className: "badge", textContent: s.category }),
+              el("span", { textContent: s.id }),
+              dot,
+            ]),
+            el("div", { className: "title", textContent: s.input.slice(0, 70) }),
+            el("div", { className: "anncount", textContent: `${f.annotations.length} inline · ${f.tags.length} tags` }),
+          );
+          nav.append(item);
+        }
+      }
+
+      function select(id) {
+        current = id;
+        renderNav();
+        renderMain();
+      }
+
+      function renderMain() {
+        const s = samples.find((x) => x.id === current);
+        const f = fb(current);
+        const main = $("#main");
+        main.innerHTML = "";
+
+        const topbar = el("div", { className: "topbar" }, [
+          el("span", { className: "badge", textContent: s.category }),
+          el("span", { className: "meta" }, [
+            `${s.id} · ${s.source} · ${s.size} · in ${s.input.length} / out ${s.output.length} chars`,
+          ]),
+          el("span", { className: "spacer" }),
+          el("span", { className: "saved", id: "savedFlag" }),
+        ]);
+        main.append(topbar, el("div", { className: "hd" }, [
+          el("h1", { textContent: `${s.category} rewrite` }),
+        ]));
+
+        main.append(el("div", { className: "section-label", textContent: "Left: original draft · Right: rewrite. Select any span to comment." }));
+        const pair = el("div", { className: "pair" });
+        pair.append(renderDoc("input", s.input), renderDoc("output", s.output));
+        main.append(pair);
+
+        renderRail(main, s, f);
+        requestAnimationFrame(() => applyHighlights());
+      }
+
+      function renderDoc(field, text) {
+        const wrap = el("div");
+        wrap.append(el("div", {
+          className: "section-label",
+          textContent: field === "input" ? "Input (mark meaning that must survive)" : "Output (mark residual slop + lost meaning)",
+        }));
+        const doc = el("div", { className: `doc ${field}`, id: `doc-${field}` });
+        doc.innerHTML = marked.parse(text);
+        doc.dataset.field = field;
+        wrap.append(doc);
+        return wrap;
+      }
+
+      function renderRail(main, s, f) {
+        const rail = el("div", { className: "rail" });
+
+        const vCard = el("div", { className: "card" });
+        vCard.append(el("h3", { textContent: "Verdict" }));
+        const vrow = el("div", { className: "verdicts" });
+        for (const v of ["good", "ok", "bad"]) {
+          const b = el("button", { className: "btn" + (f.verdict === v ? " on" : ""), textContent: v });
+          b.dataset.v = v;
+          b.onclick = () => { f.verdict = f.verdict === v ? null : v; save(); renderMain(); renderNav(); };
+          vrow.append(b);
+        }
+        vCard.append(vrow);
+
+        const tCard = el("div", { className: "card" });
+        tCard.append(el("h3", { textContent: "Tags" }));
+        const tags = el("div", { className: "tags" });
+        for (const t of TAGS) {
+          const on = f.tags.includes(t);
+          const chip = el("span", { className: "tag" + (on ? " on" : ""), textContent: t });
+          chip.onclick = () => {
+            f.tags = on ? f.tags.filter((x) => x !== t) : [...f.tags, t];
+            save(); renderMain(); renderNav();
+          };
+          tags.append(chip);
+        }
+        tCard.append(tags);
+
+        const nCard = el("div", { className: "card", style: "grid-column: 1 / -1" });
+        nCard.append(el("h3", { textContent: "Notes" }));
+        const ta = el("textarea", { id: "notes", value: f.notes, placeholder: "Freeform: what meaning was lost, what slop survived, what the rewrite should have produced." });
+        ta.oninput = () => { f.notes = ta.value; save(); };
+        nCard.append(ta);
+
+        const aCard = el("div", { className: "card annlist" });
+        aCard.append(el("h3", { textContent: `Inline comments (${f.annotations.length})` }));
+        if (!f.annotations.length) aCard.append(el("div", { className: "meta", textContent: "Select text in either panel above to add one." }));
+        f.annotations.forEach((a, i) => {
+          const row = el("div", { className: "ann " + a.severity });
+          const del = el("span", { className: "del", textContent: "✕" });
+          del.onclick = () => { f.annotations.splice(i, 1); save(); renderMain(); renderNav(); };
+          row.append(
+            del,
+            el("div", { className: "q" }, [
+              el("span", { className: "fieldtag", textContent: a.field }),
+              `“${a.quote}”`,
+            ]),
+          );
+          if (a.comment) row.append(el("div", { className: "c", textContent: a.comment }));
+          aCard.append(row);
+        });
+
+        rail.append(vCard, tCard, nCard, aCard);
+        main.append(rail);
+      }
+
+      // ---- inline annotation engine (stable char offsets into rendered text) ----
+      function textNodes(container) {
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        let pos = 0, n;
+        while ((n = walker.nextNode())) {
+          nodes.push({ node: n, start: pos, len: n.nodeValue.length });
+          pos += n.nodeValue.length;
+        }
+        return nodes;
+      }
+      function globalOffset(nodes, node, offset) {
+        const e = nodes.find((x) => x.node === node);
+        return e ? e.start + offset : null;
+      }
+      function rangeFor(container, start, end) {
+        const nodes = textNodes(container);
+        const find = (off) => {
+          for (const e of nodes) if (off >= e.start && off <= e.start + e.len) return { node: e.node, offset: off - e.start };
+          return null;
+        };
+        const a = find(start), b = find(end);
+        if (!a || !b) return null;
+        const r = document.createRange();
+        r.setStart(a.node, a.offset);
+        r.setEnd(b.node, b.offset);
+        return r;
+      }
+      function applyHighlights() {
+        if (!window.Highlight || !CSS.highlights) return;
+        CSS.highlights.clear();
+        const buckets = { critical: [], minor: [], praise: [] };
+        for (const a of fb(current).annotations) {
+          const doc = $(`#doc-${a.field}`);
+          if (!doc) continue;
+          const r = rangeFor(doc, a.start, a.end);
+          if (r) buckets[a.severity]?.push(r);
+        }
+        for (const sev of Object.keys(buckets)) {
+          if (buckets[sev].length) CSS.highlights.set(sev, new Highlight(...buckets[sev]));
+        }
+      }
+
+      function wirePopover() {
+        const pop = $("#pop");
+        document.addEventListener("mouseup", (ev) => {
+          if (pop.contains(ev.target)) return;
+          const sel = window.getSelection();
+          if (!sel.rangeCount || sel.isCollapsed) return;
+          const r = sel.getRangeAt(0);
+          const doc = [$("#doc-input"), $("#doc-output")].find((d) => d && d.contains(r.commonAncestorContainer));
+          if (!doc) { pop.style.display = "none"; return; }
+          const nodes = textNodes(doc);
+          const start = globalOffset(nodes, r.startContainer, r.startOffset);
+          const end = globalOffset(nodes, r.endContainer, r.endOffset);
+          if (start == null || end == null || end <= start) return;
+          pending = { field: doc.dataset.field, start, end, quote: sel.toString().trim() };
+          pendingSev = "critical";
+          $("#popQuote").textContent = `“${pending.quote.slice(0, 140)}”`;
+          $("#popText").value = "";
+          setSev("critical");
+          const rect = r.getBoundingClientRect();
+          pop.style.display = "block";
+          pop.style.top = window.scrollY + rect.bottom + 8 + "px";
+          pop.style.left = Math.min(window.scrollX + rect.left, window.innerWidth - 300) + "px";
+          $("#popText").focus();
+        });
+        $$(".sevbtn").forEach((b) => (b.onclick = () => setSev(b.dataset.sev)));
+        $("#popCancel").onclick = () => { pop.style.display = "none"; window.getSelection().removeAllRanges(); };
+        $("#popSave").onclick = commitPending;
+        $("#popText").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) commitPending(); });
+      }
+      function setSev(s) { pendingSev = s; $$(".sevbtn").forEach((b) => b.classList.toggle("on", b.dataset.sev === s)); }
+      function commitPending() {
+        if (!pending) return;
+        fb(current).annotations.push({ ...pending, severity: pendingSev, comment: $("#popText").value.trim() });
+        fb(current).annotations.sort((a, b) => a.field.localeCompare(b.field) || a.start - b.start);
+        pending = null;
+        $("#pop").style.display = "none";
+        window.getSelection().removeAllRanges();
+        save(); renderMain(); renderNav();
+      }
+
+      let saveTimer = null;
+      function save() {
+        const id = current;
+        const flag = $("#savedFlag");
+        if (flag) flag.textContent = "saving…";
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(async () => {
+          await fetch("/api/feedback", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ id, feedback: fb(id) }),
+          });
+          const f2 = $("#savedFlag");
+          if (f2) { f2.textContent = "saved ✓"; setTimeout(() => { if ($("#savedFlag") === f2) f2.textContent = ""; }, 1200); }
+        }, 350);
+      }
+
+      function exportAll() {
+        const blob = new Blob([JSON.stringify(feedback, null, 2)], { type: "application/json" });
+        const a = el("a", { href: URL.createObjectURL(blob), download: "writing-rewrite-feedback.json" });
+        a.click();
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

@@ -27,7 +27,7 @@ Parse `$ARGUMENTS`:
 ## Workflow
 
 1. Identify type and read the corresponding guide. When `--type` is set, use it and skip identification.
-2. Gather context from code and related issues
+2. Gather context from code and related issues. Consolidate keyword variants into one or two broader searches per topic rather than a separate call per phrasing. Scan results by title and summary with a small result limit, and fetch full issue bodies only for the issues that will inform the refinement.
 3. Draft refinement following the type-specific structure. Under `--compact`, produce the tight output described in [Section Selection](#section-selection).
 4. Write `tmp/issue-<slug>.md`, output it for approval, then hand the file to the platform skill.
 

@@ -173,9 +173,9 @@ describe("renderTask", () => {
       "Explore",
       null,
       null,
-      "F",
+      "f",
     );
-    expect(strip(out.content)).toContain("· 1m 5s · 1.5k · F · Explore");
+    expect(strip(out.content)).toContain("· 1m 5s · 1.5k · f · Explore");
   });
 
   test("activity wins over the description and is not sentence-cased", () => {

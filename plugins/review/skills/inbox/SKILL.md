@@ -1,9 +1,10 @@
 ---
 name: review:inbox
 description: >
-  Live tmux inbox for reviewing inbound pull requests across GitHub and GitLab.
-  Use when reviewing multiple PRs, checking the review queue, batch reviews, or managing your review inbox.
-  Pass --queue to spawn an already-ordered queue.
+  Dispatch inbound pull request reviews as background sessions that collect in
+  `claude agents`. Use when reviewing multiple PRs, checking the review queue,
+  batch reviews, or managing your review inbox across GitHub and GitLab.
+  Pass --queue to dispatch an already-ordered queue.
 argument-hint: "[--queue]"
 disable-model-invocation: true
 allowed-tools:
@@ -11,30 +12,28 @@ allowed-tools:
   - TaskStop
   - Skill(gitlab:merge-request)
   - Bash(gh:*)
-  - Bash(tmux:*)
+  - Bash(claude:*)
   - Bash(jq:*)
   - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
-  - "Bash(cat ~/.claude/projects/:*)"
-  - Bash(ls:*)
 ---
 
 # Review Inbox
 
-Orchestrate live PR/MR reviews in tmux. You are the sidebar orchestrator: fetch pending reviews, spawn review sessions, and monitor their progress.
+Dispatch inbound PR/MR reviews as background sessions. Each review runs as its own `claude --bg --agent review <url>` session, collected in the `claude agents` view. You fetch the pending queue and dispatch. Monitoring, completion, and worktree isolation belong to the agent view and the harness, not to you.
 
 ## Arguments
 
-- `--queue`: spawn an already-triaged, ordered queue handed in by a caller, rather than fetching your own. Default: off, the interactive flow that fetches and presents the queue below.
+- `--queue`: dispatch an already-triaged, ordered queue handed in by a caller, rather than fetching your own. Default: off, the interactive flow that fetches and presents the queue below.
 
 ## Curated Queue
 
 When `--queue` is set, another skill has already gathered, triaged, and ordered the reviews.
 
-Skip [Fetch Pending Reviews](#fetch-pending-reviews) and [Present Results](#present-results). Take the queue from the invoking context as given: spawn each review in the order received, passing its triage summary as the `spawn.ts` `--context` so the session opens with the caller's framing. If the caller supplies a permission mode, forward it to `spawn.ts` via `--permission-mode`. Everything from [Spawn Review Sessions](#spawn-review-sessions) onward, the sidebar resize, layout, monitoring, and worktree reclamation, is unchanged.
+Skip [Fetch Pending Reviews](#fetch-pending-reviews) and [Present Results](#present-results). Take the queue from the invoking context as given and dispatch each review in the order received. If the caller supplies a permission mode, forward it to `spawn.ts` via `--permission-mode`. Everything from [Dispatch Review Sessions](#dispatch-review-sessions) onward is unchanged.
 
 ## Fetch Pending Reviews
 
-Both fetches return the `UNREVIEWED` bucket: PRs/MRs awaiting your first review. Approving, requesting changes, or starting a review drops an item; a re-request re-adds it.
+Both fetches return the `UNREVIEWED` bucket: PRs/MRs awaiting your first review. Approving, requesting changes, or starting a review drops an item. A re-request re-adds it.
 
 #### GitHub
 
@@ -52,75 +51,52 @@ Load `gitlab:merge-request` and run its `review-queue` command for the UNREVIEWE
 
 Combine results from both platforms into a summary table. Ask which reviews to start.
 
-## Spawn Review Sessions
+## Dispatch Review Sessions
 
 For each selected review:
 
 #### Resolve the Local Repo Path
 
-Ask the user where the repo is cloned locally. If it's not cloned, clone it first. The repo path is required for spawning.
+The `review` agent checks out the PR branch with `gh pr checkout`, so the session runs inside a local clone of the PR's repo. Ask where the repo is cloned. If it is not cloned, clone it first. The path is required to dispatch.
 
-#### Spawn
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/spawn.ts <pr-url> --repo-path <local-path> --data-dir ${CLAUDE_PLUGIN_DATA} --context "<PR metadata: title, author, description summary>"
-```
-
-`spawn.ts` handles `--worktree` for branch isolation, tmux layout computation, and state tracking. Pass `--context` with PR metadata (title, author, description summary) so the spawned review session has immediate context. Panes cycle in groups of 3: one horizontal split (new column at 70% width for the first, equal width after), then two vertical splits stacking in the column.
-
-Pass `--session <name>` to open reviews in a tmux session other than the one you orchestrate from. Without it, `spawn.ts` splits the orchestrator's own pane.
-
-Pass `--permission-mode <default|acceptEdits|plan|bypassPermissions>` to set the spawned Claude session's permission mode. Omit it to keep Claude's default mode.
-
-Resize the orchestrator to a sidebar before spawning the first pane, but only when the panes share your window. Skip the resize under `--session`, since the orchestrator does not share the panes' window.
+#### Dispatch
 
 ```bash
-tmux resize-pane -t $TMUX_PANE -x 30%
+bun ${CLAUDE_SKILL_DIR}/scripts/spawn.ts <pr-url> --repo-path <local-path> --data-dir ${CLAUDE_PLUGIN_DATA}
 ```
+
+`spawn.ts` runs `claude --bg --agent review <pr-url>` in the repo clone. The session collects in `claude agents`. On its first write (the review agent's `gh pr checkout`) the harness moves it into an isolated worktree, so parallel reviews never share a working tree. `spawn.ts` records the launched session in a dedup set and refuses a URL it has already dispatched, so a re-dispatch is a no-op.
+
+Pass `--permission-mode <default|acceptEdits|plan|bypassPermissions>` to set the dispatched session's permission mode. Omit it to keep Claude's default.
 
 ## Monitor
 
-#### Summary
+Reviews collect in the agent view. Manage them there, not here:
+
+- `claude agents` (or the `ca` alias) opens the live view, grouped into needs-input, working, and completed.
+- `claude agents --json` lists sessions for scripting.
+- `claude logs <id>`, `claude attach <id>`, and `claude stop <id>` inspect or control one session.
+
+To see what this inbox has dispatched and cross-reference session ids:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/state.ts list --data-dir ${CLAUDE_PLUGIN_DATA}
+bun ${CLAUDE_SKILL_DIR}/scripts/dispatched.ts list --data-dir ${CLAUDE_PLUGIN_DATA}
 ```
-
-#### Sync Completed Reviews
-
-Detect exited panes, mark them completed, and prune their worktrees:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/state.ts sync --data-dir ${CLAUDE_PLUGIN_DATA}
-```
-
-When a review transitions `active → completed`, `sync` reclaims its worktree through Worktrunk: `spawn.ts` created the worktree as `wt switch --create <paneName>`, so `sync` removes it by that same stored branch (`wt remove <paneName> --force`) with no lookup. `wt remove` deletes the worktree (including untracked files), fires your `pre-remove` hooks, and drops the branch when it has no unmerged commits. `sync` prints `N completed, M worktrees removed` and surfaces any removal failures on stderr. A `pre-remove` hook that needs approval fails the removal (it surfaces in the failure list) rather than removing unattended; pre-approve with `wt config approvals add` to let the inbox reclaim those worktrees on its own.
-
-#### Quick Glance
-
-```bash
-tmux capture-pane -t <pane_id> -p -S -50
-```
-
-#### Deep Inspection via JSONL
-
-Each session's logs are at `~/.claude/projects/<encoded-path>/<session-id>.jsonl`. The encoded path replaces non-alphanumeric characters with `-` and prefixes with `-`. Since review sessions run in a Worktrunk worktree, the CWD is the worktree path, not the repo root. Discover the JSONL path by globbing:
-
-```bash
-ls ~/.claude/projects/*/<session-id>.jsonl
-```
-
-Query with jq for latest activity, tool calls, or errors.
 
 ## Lifecycle
 
-Periodically run `state.ts sync` to detect completed reviews. When all reviews are done, present a summary of what was reviewed and any remaining items in the queue.
+A dispatched review runs to completion on its own and cleans up its own worktree. The inbox does not track or reclaim it. The dedup set only prevents double-dispatch. Manage it directly when needed:
+
+- `dispatched.ts --reset` clears the set at the start of a fresh inbox session, so a re-requested review can dispatch again.
+- `dispatched.ts remove --url <pr-url>` untracks a single review.
+
+When you have dispatched the selected queue, present a summary of what you sent and point at `claude agents` for progress.
 
 ## Monitor Loop (Hands-Off)
 
-The interactive flow above is the default: fetch once, present, ask, spawn. The loop is the opt-in hands-off mode. It polls the UNREVIEWED queues on an interval and spawns a session for each newly-arrived review without prompting, so the queue drains itself while you work elsewhere.
+The interactive flow above is the default: fetch once, present, ask, dispatch. The loop is the opt-in hands-off mode. It polls the UNREVIEWED queues on an interval and dispatches a session for each newly-arrived review without prompting, so the queue drains itself while you work elsewhere.
 
-The `Monitor` command does the polling and emits one line per newly-arrived review; you react to each event by spawning. `watch.ts` owns the loop: each interval it syncs completed reviews, then runs the fetch-and-diff (read tracked URLs from state, run each `--queue` source command, print the URLs not already tracked). `Monitor` is not a bare metronome.
+The `Monitor` command does the polling and emits one line per newly-arrived review. You react to each event by dispatching. `watch.ts` owns the loop: each interval it reads the dedup set, runs each `--queue` source command, and prints the URLs not already dispatched. `Monitor` is not a bare metronome.
 
 #### Wire the Review-Queue Sources
 
@@ -133,7 +109,7 @@ A platform plugin that owns its queue keeps the query; the inbox only runs the c
 
 #### Arm the Monitor
 
-Pass this command to `Monitor` with `persistent: true` and a descriptive label. `watch.ts` runs a single long-lived bun process: each iteration syncs completed reviews, fetches all `--queue` sources, and prints one URL per line per newly-arrived review. Each printed URL is one event.
+Pass this command to `Monitor` with `persistent: true` and a descriptive label. `watch.ts` runs a single long-lived bun process: each iteration fetches all `--queue` sources and prints one URL per line per newly-arrived review. Each printed URL is one event.
 
 `${CLAUDE_SKILL_DIR}` below is the inbox's own directory (where `watch.ts` lives). The GitLab `--queue` uses a full absolute path instead, since it points into a different skill:
 
@@ -145,18 +121,18 @@ bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts \
   --queue "bun <ABS>"
 ```
 
-A failed source emits a `{"type":"source-error",...}` line to stderr and contributes zero URLs, so one source's outage never stalls the loop. Sync errors go to stderr as `{"type":"sync-error",...}`. Neither is suppressed.
+A failed source emits a `{"type":"source-error",...}` line to stderr and contributes zero URLs, so one source's outage never stalls the loop. It is not suppressed.
 
 #### Monitor Reliability
 
 Two rules for any command you hand `Monitor`:
 
 - Pass a **single long-lived process** that sleeps internally via `setTimeout`, not a shell `while/sleep` loop. This is a temporary workaround for a macOS `Monitor` bug: the eval context strips `PATH` (so `sleep` and `date` are not found) and kills backgrounded children with `nice(5) failed: operation not permitted`. When that harness bug is fixed, shell loops work again.
-- **Never suppress poll output** with `>/dev/null` or `|| true`. A silent poll is indistinguishable from "nothing new"; emit a structured line on error so failures are visible.
+- **Never suppress poll output** with `>/dev/null` or `|| true`. A silent poll is indistinguishable from "nothing new". Emit a structured line on error so failures are visible.
 
 #### React to Each Event
 
-For each emitted URL, spawn a session without prompting, reusing [Resolve the Local Repo Path](#resolve-the-local-repo-path). If the caller supplied a permission mode, forward it to `spawn.ts` via `--permission-mode`. In unattended runs there is no one to answer the clone prompt, so skip any review whose repo is not cloned locally and report it rather than blocking the loop. `spawn.ts` refuses a URL already tracked, so a URL re-emitted before its `spawn.ts` lands is a no-op.
+For each emitted URL, dispatch a session without prompting, reusing [Resolve the Local Repo Path](#resolve-the-local-repo-path). If the caller supplied a permission mode, forward it to `spawn.ts` via `--permission-mode`. In unattended runs there is no one to answer the clone prompt, so skip any review whose repo is not cloned locally and report it rather than blocking the loop. `spawn.ts` refuses a URL already dispatched, so a URL re-emitted before its `spawn.ts` lands is a no-op.
 
 #### Pacing and Stopping
 

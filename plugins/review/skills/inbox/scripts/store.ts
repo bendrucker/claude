@@ -1,37 +1,19 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { derivePaneName, deriveRepo } from "./parse";
 
-export interface Review {
+// Inbox dedup state: the reviews this inbox has already dispatched a background
+// session for. Dispatch is fire-and-forget (each review lives in `claude
+// agents`, not here), so the inbox tracks its own dispatches to avoid launching
+// a second session for a PR it is already reviewing. State persists in the data
+// dir across sessions.
+export interface Dispatch {
   url: string;
-  title: string | null;
-  repo: string;
-  sessionId: string;
-  paneId: string;
-  paneName: string;
-  repoPath: string;
-  status: "active" | "completed";
-  startedAt: string;
+  sessionId: string | null;
+  dispatchedAt: string;
 }
 
-export interface DashboardState {
-  reviews: Review[];
-}
-
-export function createReview(params: {
-  url: string;
-  title: string | null;
-  sessionId: string;
-  paneId: string;
-  repoPath: string;
-}): Review {
-  return {
-    ...params,
-    repo: deriveRepo(params.url),
-    paneName: derivePaneName(params.url),
-    status: "active",
-    startedAt: new Date().toISOString(),
-  };
+export interface InboxState {
+  dispatched: Dispatch[];
 }
 
 function resolveDataDir(dataDir?: string): string {
@@ -50,10 +32,10 @@ function statePath(dataDir?: string): string {
   return join(stateDir(dataDir), "state.json");
 }
 
-export async function readState(dataDir?: string): Promise<DashboardState> {
+export async function readState(dataDir?: string): Promise<InboxState> {
   const file = Bun.file(statePath(dataDir));
   if (!(await file.exists())) {
-    return { reviews: [] };
+    return { dispatched: [] };
   }
   let data: unknown;
   try {
@@ -61,34 +43,30 @@ export async function readState(dataDir?: string): Promise<DashboardState> {
   } catch (cause) {
     throw new Error(`Failed to parse state file: ${file.name}`, { cause });
   }
-  if (!data || typeof data !== "object" || !Array.isArray((data as DashboardState).reviews)) {
+  if (!data || typeof data !== "object" || !Array.isArray((data as InboxState).dispatched)) {
     throw new Error(`Invalid state file: ${file.name}`);
   }
-  return data as DashboardState;
+  return data as InboxState;
 }
 
-export function addReview(state: DashboardState, review: Review): void {
-  if (state.reviews.some((r) => r.url === review.url)) {
-    throw new Error(`Review already tracked: ${review.url}`);
+export function isDispatched(state: InboxState, url: string): boolean {
+  return state.dispatched.some((d) => d.url === url);
+}
+
+export function addDispatch(state: InboxState, dispatch: Dispatch): void {
+  if (isDispatched(state, dispatch.url)) {
+    throw new Error(`Review already dispatched: ${dispatch.url}`);
   }
-  state.reviews.push(review);
+  state.dispatched.push(dispatch);
 }
 
-export function removeReview(state: DashboardState, url: string): number {
-  const before = state.reviews.length;
-  state.reviews = state.reviews.filter((r) => r.url !== url);
-  return before - state.reviews.length;
+export function removeDispatch(state: InboxState, url: string): number {
+  const before = state.dispatched.length;
+  state.dispatched = state.dispatched.filter((d) => d.url !== url);
+  return before - state.dispatched.length;
 }
 
-export function completeReview(state: DashboardState, paneId: string): boolean {
-  const review = state.reviews.find((r) => r.status === "active" && r.paneId === paneId);
-  if (!review) return false;
-  review.status = "completed";
-  return true;
-}
-
-export async function writeState(state: DashboardState, dataDir?: string): Promise<void> {
+export async function writeState(state: InboxState, dataDir?: string): Promise<void> {
   await mkdir(stateDir(dataDir), { recursive: true });
-  const path = statePath(dataDir);
-  await Bun.write(path, JSON.stringify(state, null, 2));
+  await Bun.write(statePath(dataDir), JSON.stringify(state, null, 2));
 }

@@ -4,27 +4,20 @@ import { readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  addReview,
-  completeReview,
-  createReview,
-  type DashboardState,
-  type Review,
+  addDispatch,
+  type Dispatch,
+  type InboxState,
+  isDispatched,
   readState,
-  removeReview,
+  removeDispatch,
   writeState,
 } from "./store";
 
-function makeReview(overrides: Partial<Review> = {}): Review {
+function makeDispatch(overrides: Partial<Dispatch> = {}): Dispatch {
   return {
     url: "https://github.com/owner/repo/pull/42",
-    title: "Fix bug",
-    repo: "owner/repo",
     sessionId: "sess-1",
-    paneId: "%1",
-    paneName: "review-owner-repo-42",
-    repoPath: "/tmp/repo",
-    status: "active",
-    startedAt: new Date().toISOString(),
+    dispatchedAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -41,12 +34,12 @@ describe("store", () => {
   });
 
   describe("readState", () => {
-    test("returns empty reviews when no file exists", async () => {
-      expect(await readState(tmpDir)).toEqual({ reviews: [] });
+    test("returns empty dispatched when no file exists", async () => {
+      expect(await readState(tmpDir)).toEqual({ dispatched: [] });
     });
 
     test("reads and parses valid state file", async () => {
-      const state: DashboardState = { reviews: [makeReview()] };
+      const state: InboxState = { dispatched: [makeDispatch()] };
       const dir = join(tmpDir, "review-inbox");
       mkdirSync(dir, { recursive: true });
       await Bun.write(join(dir, "state.json"), JSON.stringify(state));
@@ -54,7 +47,7 @@ describe("store", () => {
       expect(await readState(tmpDir)).toEqual(state);
     });
 
-    test("throws on malformed JSON missing reviews array", async () => {
+    test("throws on malformed JSON missing dispatched array", async () => {
       const dir = join(tmpDir, "review-inbox");
       mkdirSync(dir, { recursive: true });
       await Bun.write(join(dir, "state.json"), JSON.stringify({ something: "else" }));
@@ -65,13 +58,12 @@ describe("store", () => {
 
   describe("writeState + readState round-trip", () => {
     test("write then read returns equal state", async () => {
-      const state: DashboardState = {
-        reviews: [
-          makeReview(),
-          makeReview({
+      const state: InboxState = {
+        dispatched: [
+          makeDispatch(),
+          makeDispatch({
             url: "https://gitlab.com/org/proj/-/merge_requests/7",
-            repo: "org/proj",
-            paneName: "review-org-proj-7",
+            sessionId: null,
           }),
         ],
       };
@@ -79,104 +71,52 @@ describe("store", () => {
       await writeState(state, tmpDir);
       expect(await readState(tmpDir)).toEqual(state);
     });
-  });
 
-  describe("writeState", () => {
     test("creates directory if it does not exist", async () => {
       const dir = join(tmpDir, "review-inbox");
       await expect(readdir(dir)).rejects.toThrow();
 
-      await writeState({ reviews: [] }, tmpDir);
+      await writeState({ dispatched: [] }, tmpDir);
 
       await expect(readdir(dir)).resolves.toBeDefined();
     });
   });
 
-  describe("createReview", () => {
-    test("derives repo and paneName from URL", () => {
-      const review = createReview({
-        url: "https://github.com/acme/widgets/pull/99",
-        title: "Add feature",
-        sessionId: "sess-abc",
-        paneId: "%5",
-        repoPath: "/code/widgets",
-      });
-
-      expect(review.repo).toBe("acme/widgets");
-      expect(review.paneName).toBe("review-acme-widgets-99");
-    });
-
-    test("sets status to active and startedAt", () => {
-      const before = new Date();
-      const review = createReview({
-        url: "https://github.com/acme/widgets/pull/99",
-        title: null,
-        sessionId: "sess-abc",
-        paneId: "%5",
-        repoPath: "/code/widgets",
-      });
-
-      expect(review.status).toBe("active");
-      const startedAt = new Date(review.startedAt);
-      expect(startedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
-      expect(startedAt.getTime()).toBeLessThanOrEqual(Date.now());
+  describe("isDispatched", () => {
+    test.each<[string, string, boolean]>([
+      ["url present", "https://github.com/owner/repo/pull/42", true],
+      ["url absent", "https://github.com/other/repo/pull/1", false],
+    ])("%s", (_name, url, expected) => {
+      const state: InboxState = { dispatched: [makeDispatch()] };
+      expect(isDispatched(state, url)).toBe(expected);
     });
   });
 
-  describe("addReview", () => {
-    test("adds review to state", () => {
-      const state: DashboardState = { reviews: [] };
-      const review = makeReview();
-      addReview(state, review);
+  describe("addDispatch", () => {
+    test("adds dispatch to state", () => {
+      const state: InboxState = { dispatched: [] };
+      const dispatch = makeDispatch();
+      addDispatch(state, dispatch);
 
-      expect(state.reviews).toEqual([review]);
+      expect(state.dispatched).toEqual([dispatch]);
     });
 
     test("throws on duplicate URL", () => {
-      const state: DashboardState = { reviews: [makeReview()] };
-      const duplicate = makeReview();
+      const state: InboxState = { dispatched: [makeDispatch()] };
+      const duplicate = makeDispatch({ sessionId: "sess-other" });
 
-      expect(() => addReview(state, duplicate)).toThrow("Review already tracked");
+      expect(() => addDispatch(state, duplicate)).toThrow("Review already dispatched");
     });
   });
 
-  describe("removeReview", () => {
-    test("removes matching review and returns count", () => {
-      const state: DashboardState = { reviews: [makeReview()] };
-      const removed = removeReview(state, "https://github.com/owner/repo/pull/42");
-
-      expect(removed).toBe(1);
-      expect(state.reviews).toEqual([]);
-    });
-
-    test("returns 0 when URL not found", () => {
-      const state: DashboardState = { reviews: [makeReview()] };
-      const removed = removeReview(state, "https://github.com/other/repo/pull/1");
-
-      expect(removed).toBe(0);
-      expect(state.reviews).toHaveLength(1);
-    });
-  });
-
-  describe("completeReview", () => {
-    test("marks active review as completed", () => {
-      const state: DashboardState = { reviews: [makeReview({ paneId: "%3" })] };
-      const result = completeReview(state, "%3");
-
-      expect(result).toBe(true);
-      expect(state.reviews[0]?.status).toBe("completed");
-    });
-
-    test("returns false when pane not found", () => {
-      const state: DashboardState = { reviews: [makeReview()] };
-      expect(completeReview(state, "%99")).toBe(false);
-    });
-
-    test("skips already completed reviews", () => {
-      const state: DashboardState = {
-        reviews: [makeReview({ paneId: "%3", status: "completed" })],
-      };
-      expect(completeReview(state, "%3")).toBe(false);
+  describe("removeDispatch", () => {
+    test.each<[string, string, number, number]>([
+      ["removes matching url", "https://github.com/owner/repo/pull/42", 1, 0],
+      ["no match", "https://github.com/other/repo/pull/1", 0, 1],
+    ])("%s", (_name, url, removed, remaining) => {
+      const state: InboxState = { dispatched: [makeDispatch()] };
+      expect(removeDispatch(state, url)).toBe(removed);
+      expect(state.dispatched).toHaveLength(remaining);
     });
   });
 
@@ -200,7 +140,7 @@ describe("store", () => {
     });
 
     test("writeState throws", () => {
-      expect(writeState({ reviews: [] })).rejects.toThrow("dataDir is required");
+      expect(writeState({ dispatched: [] })).rejects.toThrow("dataDir is required");
     });
   });
 
@@ -220,7 +160,7 @@ describe("store", () => {
     });
 
     test("readState uses CLAUDE_PLUGIN_DATA when no dataDir provided", async () => {
-      expect(await readState()).toEqual({ reviews: [] });
+      expect(await readState()).toEqual({ dispatched: [] });
     });
   });
 });

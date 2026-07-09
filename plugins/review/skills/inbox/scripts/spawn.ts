@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { buildWtArgs, PERMISSION_MODES, type PermissionMode } from "./args";
-import { layoutArgs } from "./layout";
-import { derivePaneName } from "./parse";
-import { addReview, createReview, readState, writeState } from "./store";
+import {
+  buildDispatchArgs,
+  PERMISSION_MODES,
+  type PermissionMode,
+  parseBackgroundedId,
+} from "./args";
+import { addDispatch, isDispatched, readState, writeState } from "./store";
 
 const argv = cli({
   name: "spawn",
@@ -13,35 +16,26 @@ const argv = cli({
     repoPath: {
       type: String,
       alias: "C",
-      description: "Local path to the repository",
+      description:
+        "Local clone of the PR's repo; the background session's working directory (the review agent runs `gh pr checkout` here)",
     },
     dataDir: {
       type: String,
       description: "Data directory for persistent state (defaults to CLAUDE_PLUGIN_DATA)",
     },
-    context: {
-      type: String,
-      description: "Additional context to pass as the initial prompt to the spawned session",
-    },
-    session: {
-      type: String,
-      description:
-        "Target tmux session for review panes (defaults to splitting the current pane as a sidebar)",
-    },
     permissionMode: {
       type: String,
-      description: `Claude permission mode for the spawned session (one of ${PERMISSION_MODES.join(", ")}); omit to keep Claude's default`,
+      description: `Claude permission mode for the dispatched session (one of ${PERMISSION_MODES.join(", ")}); omit to keep Claude's default`,
     },
   },
 });
 
 const url = argv._.url;
-const repoPath = argv.flags.repoPath;
-const dataDir = argv.flags.dataDir;
+const { repoPath, dataDir } = argv.flags;
 const permissionModeFlag = argv.flags.permissionMode;
 
 if (!repoPath) {
-  console.error("--repo-path (-C) is required: local path to the repository");
+  console.error("--repo-path (-C) is required: local clone the review session runs in");
   process.exit(1);
 }
 
@@ -55,49 +49,34 @@ if (
 
 const permissionMode = permissionModeFlag as PermissionMode | undefined;
 
-const sessionId = crypto.randomUUID();
-const paneName = derivePaneName(url);
 const state = await readState(dataDir);
-const activeReviews = state.reviews.filter((r) => r.status === "active");
-const splitArgs = layoutArgs(
-  activeReviews.length,
-  activeReviews.at(-1)?.paneId,
-  argv.flags.session,
-);
+if (isDispatched(state, url)) {
+  console.error(`Already dispatched: ${url}`);
+  process.exit(0);
+}
 
-const prompt = argv.flags.context
-  ? `${argv.flags.context}\n\n/review:peer ${url}`
-  : `/review:peer ${url}`;
-
-// Create the review's worktree through Worktrunk and launch claude inside it.
-// `wt switch --create <paneName>` makes the branch (named for the review, so
-// `sync` removes it later by the same stored name), and `-x claude` execs the
-// review session in the new worktree. Args after `--` are shell-escaped by wt,
-// so the prompt passes through intact.
-const wtArgs = buildWtArgs({ paneName, sessionId, prompt, permissionMode });
-
-const wtCmd = wtArgs.map((arg) => Bun.$.escape(arg)).join(" ");
-
-const result = Bun.spawnSync(
-  ["tmux", "split-window", ...splitArgs, "-c", repoPath, "-P", "-F", "#{pane_id}", wtCmd],
-  { stdout: "pipe", stderr: "pipe" },
-);
+// Launch the review as a background session, collected in `claude agents`. The
+// harness moves the session into an isolated worktree on its first write (the
+// review agent's `gh pr checkout`), so parallel reviews never share a working
+// tree. Run from the repo clone so `gh` resolves the PR's repository.
+const result = Bun.spawnSync(["claude", ...buildDispatchArgs({ url, permissionMode })], {
+  cwd: repoPath,
+  stdout: "pipe",
+  stderr: "pipe",
+});
 
 if (result.exitCode !== 0) {
   const stderr = result.stderr.toString().trim();
-  console.error(`Failed to create tmux pane: ${stderr}`);
+  console.error(`Failed to launch background review: ${stderr}`);
   process.exit(1);
 }
 
-const paneId = result.stdout.toString().trim();
-
-const review = createReview({ url, title: null, sessionId, paneId, repoPath });
-try {
-  addReview(state, review);
-  await writeState(state, dataDir);
-} catch (error) {
-  Bun.spawnSync(["tmux", "kill-pane", "-t", paneId]);
-  throw error;
+const sessionId = parseBackgroundedId(result.stdout.toString());
+if (!sessionId) {
+  console.error("Warning: launched but could not read the session id from claude output");
 }
 
-console.log(JSON.stringify({ sessionId, paneId, paneName, url, repoPath }, null, 2));
+addDispatch(state, { url, sessionId, dispatchedAt: new Date().toISOString() });
+await writeState(state, dataDir);
+
+console.log(JSON.stringify({ sessionId, url, repoPath }, null, 2));

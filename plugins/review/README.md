@@ -10,7 +10,7 @@ Code review workflows for Claude Code.
 - **`peer`**: Review PRs when requested by a peer (GitHub or GitLab). Stages comments in tuicr for local revision, then maps and posts them as a batch.
 - **`self`**: Self-review your own changes in a live tuicr session before committing. Your inline comments come back to Claude as edits to apply.
 - **`follow-up`**: Follow up on a PR/MR you reviewed: check if your comments were addressed, find silent resolves, decide whether to re-approve
-- **`inbox`**: Live tmux inbox for reviewing inbound PRs across GitHub and GitLab
+- **`inbox`**: Dispatch inbound PR/MR reviews as background sessions that collect in `claude agents` (GitHub and GitLab)
 
 ## Testing
 

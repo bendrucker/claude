@@ -31,13 +31,13 @@ export async function fetchUrls(command: string): Promise<FetchResult> {
   }
 }
 
-// New reviews are the fetched URLs not already tracked, deduped across sources
-// and kept in fetch order.
-export function newUrls(fetched: string[], tracked: ReadonlySet<string>): string[] {
+// New reviews are the fetched URLs not already dispatched, deduped across
+// sources and kept in fetch order.
+export function newUrls(fetched: string[], dispatched: ReadonlySet<string>): string[] {
   const result: string[] = [];
   const seen = new Set<string>();
   for (const url of fetched) {
-    if (tracked.has(url) || seen.has(url)) continue;
+    if (dispatched.has(url) || seen.has(url)) continue;
     seen.add(url);
     result.push(url);
   }
@@ -57,9 +57,7 @@ if (import.meta.main) {
     },
   });
 
-  const tracked = new Set(
-    (await readState(argv.flags.dataDir)).reviews.map((review) => review.url),
-  );
+  const dispatched = new Set((await readState(argv.flags.dataDir)).dispatched.map((d) => d.url));
 
   const results = await Promise.all(argv.flags.queue.map(fetchUrls));
   for (let i = 0; i < results.length; i++) {
@@ -77,7 +75,7 @@ if (import.meta.main) {
   }
   const fetched = results.flatMap((r) => (r.ok ? r.urls : []));
 
-  for (const url of newUrls(fetched, tracked)) {
+  for (const url of newUrls(fetched, dispatched)) {
     console.log(url);
   }
 }

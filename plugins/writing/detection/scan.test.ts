@@ -111,6 +111,14 @@ describe("scanAll", () => {
     expect(categories).toContain("tricolon");
   });
 
+  it.each([
+    ["rides on", "The teardown rides on the normal end of a team."],
+    ["can bite", "A stale cache entry can bite at runtime."],
+    ["surface as verb", "The hook should surface the conflict to the user."],
+  ])("reports the skillOnly %s pattern", (category, text) => {
+    expect(scanAll(text, "doc.md").map((r) => r.category)).toContain(category);
+  });
+
   it("returns empty for clean prose", () => {
     expect(scanAll("The function reads input and writes output.")).toHaveLength(0);
   });

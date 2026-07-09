@@ -812,6 +812,16 @@ describe("scan", () => {
       ).toBeUndefined();
     });
   });
+
+  describe("skillOnly patterns stay out of the hook", () => {
+    it.each([
+      ["rides on", "The teardown rides on the normal end of a team."],
+      ["can bite", "A stale cache entry can bite at runtime."],
+      ["surface as verb", "The hook should surface the conflict to the user."],
+    ])("scan() does not report %s", (category, text) => {
+      expect(scan(text, "doc.md", "file").find((m) => m.category === category)).toBeUndefined();
+    });
+  });
 });
 
 describe("firstByTier", () => {

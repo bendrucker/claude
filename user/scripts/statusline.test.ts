@@ -151,22 +151,39 @@ describe("rendered output", () => {
   });
 });
 
+// SGR fragments the accent (magenta) and default (dim) styles emit, so tests can
+// assert which style a marker used without matching the whole escape sequence.
+const MAGENTA = "\x1b[35m";
+const DIM = "\x1b[2m";
+
 describe("modelSegment", () => {
-  test("renders the family letter, null when absent", () => {
-    expect(strip(modelSegment({ model: { id: "claude-fable-5" } }) ?? "")).toBe("F");
-    expect(strip(modelSegment({ model: { id: "claude-opus-4-8[1m]" } }) ?? "")).toBe("O");
+  test("renders the lowercase family letter, null when absent", () => {
+    expect(strip(modelSegment({ model: { id: "claude-fable-5" } }) ?? "")).toBe("f");
+    expect(strip(modelSegment({ model: { id: "claude-opus-4-8[1m]" } }) ?? "")).toBe("o");
     expect(modelSegment({})).toBeNull();
     expect(modelSegment({ model: null })).toBeNull();
+  });
+
+  test("accents non-default models, dims the default (opus)", () => {
+    expect(modelSegment({ model: { id: "claude-opus-4-8[1m]" } })).toContain(DIM);
+    expect(modelSegment({ model: { id: "claude-fable-5" } })).toContain(MAGENTA);
+    expect(modelSegment({ model: { id: "claude-sonnet-5" } })).toContain(MAGENTA);
   });
 });
 
 describe("effortSegment", () => {
   test("renders the effort glyph, null when absent or unsupported", () => {
-    expect(strip(effortSegment({ effort: { level: "max" } }) ?? "")).toBe("⠿");
-    expect(strip(effortSegment({ effort: { level: "low" } }) ?? "")).toBe("⠂");
+    expect(strip(effortSegment({ effort: { level: "max" } }) ?? "")).toBe("⁙");
+    expect(strip(effortSegment({ effort: { level: "low" } }) ?? "")).toBe("∙");
     expect(effortSegment({ effort: { level: "bogus" } })).toBeNull();
     expect(effortSegment({})).toBeNull();
     expect(effortSegment({ effort: null })).toBeNull();
+  });
+
+  test("accents non-default effort, dims the default (high)", () => {
+    expect(effortSegment({ effort: { level: "high" } })).toContain(DIM);
+    expect(effortSegment({ effort: { level: "max" } })).toContain(MAGENTA);
+    expect(effortSegment({ effort: { level: "low" } })).toContain(MAGENTA);
   });
 });
 

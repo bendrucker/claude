@@ -34,7 +34,7 @@ Triage covers the whole queue before any review begins. Reviews are session-leng
 For each of your open PRs/MRs, flag:
 
 - Failing or stuck CI. Retrying a flaky job is safe. A real failure becomes a candidate focus item. Before planning around a red pipeline, confirm the failure is yours to fix. A shared build break or an upstream outage is not work, and the same job failing identically across several of your MRs is the tell.
-- Reviewer threads awaiting your reply. Draft replies and include them in the brief.
+- Reviewer threads awaiting your reply. Judge first whether the thread needs a substantive response. Where a reaction or brief acknowledgement closes it, prefer that. Draft a reply only when it carries real content, keep it terse, and include it in the brief.
 - Ready for review but no reviewer assigned. Assigning per the config notes is safe.
 - Stale drafts. Recommend one of: finish today (focus item), send as-is (safe), or close (ask-first).
 
@@ -42,7 +42,9 @@ For each of your open PRs/MRs, flag:
 
 Triage each inbound item, whether a message, a tracker notification, or an email, into an action: a review handoff, a decision you owe someone, a question to answer, or a new task. An item often carries the only signal for a focus item, so a thread that names an MR or issue belongs with that work in the brief, not stranded in a separate inbox list. Map every item to the project it concerns, or to `Misc`.
 
-Inbox zero is the target. Each item leaves the day in a terminal state: handled, deferred to a tracked task, or archived. Drafting a reply the user has read is safe, as is archiving something already handled. Sending a reply without review is ask-first.
+Inbox zero is the target. Each item leaves the day in a terminal state: handled, reacted to or briefly acknowledged, deferred, or archived. Before drafting a reply, judge whether the thread needs a substantive response. Where a reaction or brief acknowledgement closes it, prefer that over filler. Draft a reply only when it carries real content, and keep it terse.
+
+Route what gets deferred by where it belongs. Work for the team backlog goes to the tracker, while personal next-steps and reminders go to the personal inbox when one is configured. "My inbox" means the personal inbox. When the destination is ambiguous, ask rather than defaulting to a tracker issue, and never create a tracker issue in place of a personal capture. Drafting a reply the user has read is safe, as is archiving something already handled. Sending a reply without review is ask-first.
 
 ## Today Plan
 

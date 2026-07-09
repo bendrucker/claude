@@ -33,9 +33,9 @@ Trailing arguments beyond the mode ($ARGUMENTS) pass through as `dir...` (group 
 
 ## Model
 
-Each group is a directory of YAML descriptors, one task per file: `label`, `schedule`, `mode` (only `headless` is backed today; `agent-view` and `cloud` are reserved, see [`user/scheduled/README.md`](../../scheduled/README.md)), `command`, and an optional `workdir`. The directory name is the group. A machine's config declares which group directories it manages: in-repo (`user/scheduled/<group>`, committed) or out-of-repo (`~/.config/claude-scheduled/<group>`, never committed) for a task set that must never reach the public repo.
+Each group is a directory of YAML descriptors, one task per file with fields `label`, `schedule`, `mode`, `command`, and an optional `workdir`, documented in [`user/scheduled/README.md`](../../scheduled/README.md). The directory name is the group. A machine's config declares which groups it manages, in-repo (`user/scheduled/<group>`, committed) or out-of-repo (`~/.config/claude-scheduled/<group>`, for a proprietary task set).
 
-`sync` renders every `headless` descriptor to a launchd plist, installs anything new or changed, and prunes any installed `me.bendrucker.claude.<group>.*` agent no longer declared. The group's label prefix scopes every install and prune, so a group's sync can never touch another group's agents or an unrelated agent like dotfiles' `com.user.*` ones.
+`sync` renders every `headless` descriptor to a launchd plist, installs anything new or changed, and prunes any `me.bendrucker.claude.<group>.*` agent no longer declared. The label prefix scopes every install and prune, so a group's sync never touches another group's agents or an unrelated `com.user.*` one.
 
 ## Gotchas
 

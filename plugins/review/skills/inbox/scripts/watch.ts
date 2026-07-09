@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { join } from "node:path";
 import { cli } from "cleye";
 import { fetchUrls, newUrls } from "./poll";
 import { readState } from "./store";
@@ -9,28 +8,9 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const stateScript = join(import.meta.dirname, "state.ts");
-
-async function runSync(dataDir: string | undefined): Promise<void> {
-  const args = ["bun", stateScript, "sync"];
-  if (dataDir) args.push("--data-dir", dataDir);
-  const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
-  const [exit, stderrText] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
-  if (exit !== 0) {
-    console.error(
-      JSON.stringify({
-        type: "sync-error",
-        detail: stderrText.trim() || `exited with code ${exit}`,
-      }),
-    );
-  }
-}
-
 async function iteration(queues: string[], dataDir: string | undefined): Promise<void> {
-  await runSync(dataDir);
-
   const state = await readState(dataDir);
-  const tracked = new Set(state.reviews.map((r) => r.url));
+  const dispatched = new Set(state.dispatched.map((d) => d.url));
   const results = await Promise.all(queues.map(fetchUrls));
 
   for (let i = 0; i < results.length; i++) {
@@ -44,7 +24,7 @@ async function iteration(queues: string[], dataDir: string | undefined): Promise
   }
 
   const fetched = results.flatMap((r) => (r.ok ? r.urls : []));
-  for (const url of newUrls(fetched, tracked)) {
+  for (const url of newUrls(fetched, dispatched)) {
     console.log(url);
   }
 }

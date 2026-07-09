@@ -48,7 +48,7 @@ The connector's `save_issue` creates or updates from a single tool, keyed on whe
 - **Create**: omit `id`. `title` is **required** (omitting it produces "title is required when creating an issue").
 - **Update**: pass `id` (from `get_issue`). `title` is optional; send only the fields you change.
 - Use flat top-level keys. No wrapper objects (`issue`, `input`, `parameters`), and the field is `id`, not `issueId`.
-- Relation params (`blocks`, `blockedBy`, `relatedTo`) are append-only. A save never removes relations you did not name. Pass `duplicateOf`, `parentId`, `project`, or `cycle` as `null` to clear them.
+- Relation params (`blocks`, `blockedBy`, `relatedTo`) are append-only. A save never removes relations you did not name. Pass `duplicateOf`, `parentId`, `project`, or `cycle` as `null` to clear them. `milestone` and `dueDate` take a value but have no `null` clear.
 
 Create (`id` absent, `title` present):
 

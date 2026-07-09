@@ -1,0 +1,5 @@
+label: discover
+schedule: { weekday: mon, at: "07:23" }
+mode: headless
+command: /improve-claude-code discover --scheduled
+workdir: ~/src/bendrucker/claude

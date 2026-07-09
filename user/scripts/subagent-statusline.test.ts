@@ -151,10 +151,10 @@ describe("extractModel", () => {
 
 describe("subagentModelLetter", () => {
   test.each<[string | null, string | null, string | null]>([
-    ["claude-fable-5", "claude-opus-4-8", "F"],
+    ["claude-fable-5", "claude-opus-4-8", "f"],
     ["claude-opus-4-8", "claude-opus-4-8", null],
     ["claude-opus-4-8[1m]", "claude-opus-4-8", null],
-    ["claude-opus-4-8", "claude-fable-5", "O"],
+    ["claude-opus-4-8", "claude-fable-5", "o"],
     [null, "claude-opus-4-8", null],
     ["claude-fable-5", null, null],
   ])("sub %p / session %p -> %p", (sub, session, expected) => {
@@ -173,9 +173,9 @@ describe("renderTask", () => {
       "Explore",
       null,
       null,
-      "F",
+      "f",
     );
-    expect(strip(out.content)).toContain("· 1m 5s · 1.5k · F · Explore");
+    expect(strip(out.content)).toContain("· 1m 5s · 1.5k · f · Explore");
   });
 
   test("activity wins over the description and is not sentence-cased", () => {

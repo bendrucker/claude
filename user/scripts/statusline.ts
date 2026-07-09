@@ -2,9 +2,9 @@
 import { mkdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { styleText } from "node:util";
-import { effortGlyph } from "./effort";
+import { effortMarker } from "./effort";
 import { dialGlyph } from "./glyphs";
-import { modelLetter } from "./model";
+import { modelMarker } from "./model";
 import { expandTilde, type RateLimits } from "./rate-limits";
 
 interface CurrentUsage {
@@ -95,18 +95,26 @@ export function exceeds200k(input: StatusInput): boolean {
   return total > 200_000;
 }
 
-// A leading dim letter for the active model so Fable-vs-Opus reads at a glance.
-// Always shown: absence would be ambiguous once more than one model is in play.
-export function modelSegment(input: StatusInput): string | null {
-  const letter = modelLetter(input.model?.id, input.model?.display_name);
-  return letter ? styleText(["dim"], letter) : null;
+// Session-config markers (model, effort) render dim at their default and switch
+// to this accent when off-default, so a non-standard session reads at a glance.
+const ACCENT: Parameters<typeof styleText>[0] = ["magenta", "bold"];
+
+function configMarker(text: string, isDefault: boolean): string {
+  return styleText(isDefault ? ["dim"] : ACCENT, text);
 }
 
-// A braille dot-ramp for the reasoning effort, dim like the model letter so the
-// two session-config markers read alike. Absent when the model has no effort.
+// A leading letter for the active model so Fable-vs-Opus reads at a glance.
+// Always shown: absence would be ambiguous once more than one model is in play.
+export function modelSegment(input: StatusInput): string | null {
+  const marker = modelMarker(input.model?.id, input.model?.display_name);
+  return marker ? configMarker(marker.letter, marker.isDefault) : null;
+}
+
+// A baseline dot-ramp for the reasoning effort, styled like the model letter so
+// the two session-config markers read alike. Absent when the model has no effort.
 export function effortSegment(input: StatusInput): string | null {
-  const glyph = effortGlyph(input.effort?.level);
-  return glyph ? styleText(["dim"], glyph) : null;
+  const marker = effortMarker(input.effort?.level);
+  return marker ? configMarker(marker.glyph, marker.isDefault) : null;
 }
 
 export function dialSegment(input: StatusInput): string | null {

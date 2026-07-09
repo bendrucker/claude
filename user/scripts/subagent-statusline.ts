@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { styleText } from "node:util";
 import { genericGlyph, purposeGlyphs, remoteGlyph } from "./glyphs";
-import { modelLetter } from "./model";
+import { modelMarker } from "./model";
 
 export interface Task {
   id: string;
@@ -252,8 +252,8 @@ export function subagentModelLetter(
   sessionModel: string | null,
 ): string | null {
   if (!subModel || !sessionModel) return null;
-  const sub = modelLetter(subModel);
-  if (!sub || sub === modelLetter(sessionModel)) return null;
+  const sub = modelMarker(subModel)?.letter ?? null;
+  if (!sub || sub === (modelMarker(sessionModel)?.letter ?? null)) return null;
   return sub;
 }
 

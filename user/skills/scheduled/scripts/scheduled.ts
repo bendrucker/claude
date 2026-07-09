@@ -22,8 +22,8 @@ const WEEKDAYS: Record<string, number> = {
 export type Mode = "headless" | "agent-view" | "cloud";
 
 export interface Schedule {
-  weekday?: string;
-  day?: number;
+  weekday?: string | undefined;
+  day?: number | undefined;
   at: string;
 }
 
@@ -32,8 +32,8 @@ export interface Descriptor {
   schedule: Schedule;
   mode: Mode;
   command: string;
-  workdir?: string;
-  permission_mode?: string;
+  workdir?: string | undefined;
+  permission_mode?: string | undefined;
 }
 
 export interface DescriptorFile {
@@ -237,7 +237,7 @@ async function listInstalledLabels(): Promise<string[]> {
   const labels: string[] = [];
   for await (const file of glob.scan({ cwd: LAUNCH_AGENTS_DIR })) {
     const match = file.match(pattern);
-    if (match) labels.push(shortLabel(match[1], match[2]));
+    if (match?.[1] && match[2]) labels.push(shortLabel(match[1], match[2]));
   }
   return labels;
 }
@@ -308,6 +308,7 @@ async function syncGroups(dirs: string[], dryRun: boolean): Promise<void> {
   const groups = await resolveGroups(dirs);
   const installedAll = await listInstalledLabels();
   const rows: string[][] = [["GROUP", "LABEL", "ACTION"]];
+  const failures: string[] = [];
 
   for (const { group, dir } of groups) {
     const entries = await listDescriptors(dir);
@@ -340,7 +341,9 @@ async function syncGroups(dirs: string[], dryRun: boolean): Promise<void> {
     if (!dryRun) {
       for (const label of [...install, ...update]) {
         const entry = byShortLabel.get(label);
-        if (entry) await installDescriptor(entry.descriptor, group);
+        if (entry && !(await installDescriptor(entry.descriptor, group))) {
+          failures.push(fullLabel(group, entry.descriptor.label));
+        }
       }
       for (const label of plan.prune) {
         await pruneAgent(group, label.slice(group.length + 1));
@@ -349,7 +352,16 @@ async function syncGroups(dirs: string[], dryRun: boolean): Promise<void> {
   }
 
   console.log(table(rows));
-  if (dryRun) console.log("dry run: no launchctl calls made");
+  if (dryRun) {
+    console.log("dry run: no launchctl calls made");
+    return;
+  }
+  if (failures.length > 0) {
+    for (const label of failures) {
+      console.error(`error: ${label} failed to bootstrap after retries`);
+    }
+    process.exit(1);
+  }
 }
 
 function scheduleSummary(schedule: Schedule): string {

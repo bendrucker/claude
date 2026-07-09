@@ -12,20 +12,10 @@ import {
   renderPlist,
 } from "./scheduled";
 
-function extractString(xml: string, key: string): string {
-  const match = xml.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`));
-  if (!match) throw new Error(`key not found in plist: ${key}`);
-  return match[1];
-}
-
-function extractCalendarInterval(xml: string): Record<string, number> {
-  const block = xml.match(/<key>StartCalendarInterval<\/key>\s*<dict>([\s\S]*?)<\/dict>/);
-  if (!block) throw new Error("StartCalendarInterval dict not found");
-  const entries: Record<string, number> = {};
-  for (const m of block[1].matchAll(/<key>(\w+)<\/key>\s*<integer>(-?\d+)<\/integer>/g)) {
-    entries[m[1]] = Number(m[2]);
-  }
-  return entries;
+// Home-relative paths render as absolute. Rewrite homedir() to $HOME so the
+// snapshot is stable across machines while still proving the ~ was expanded.
+function normalize(xml: string): string {
+  return xml.replaceAll(homedir(), "$HOME");
 }
 
 const discoverDescriptor: Descriptor = {
@@ -39,20 +29,41 @@ const discoverDescriptor: Descriptor = {
 describe("renderPlist", () => {
   test("renders the discover descriptor", () => {
     const xml = renderPlist(discoverDescriptor, "home");
-
-    expect(extractString(xml, "Label")).toBe("me.bendrucker.claude.home.discover");
-
-    const workdir = extractString(xml, "WorkingDirectory");
-    expect(workdir).toBe(join(homedir(), "src/bendrucker/claude"));
-    expect(workdir.startsWith("/")).toBe(true);
-    expect(workdir).not.toContain("~");
-    expect(workdir).not.toContain("$HOME");
-
-    expect(extractCalendarInterval(xml)).toEqual({ Weekday: 1, Hour: 7, Minute: 23 });
-
-    expect(xml).toContain(
-      'claude -p "/improve-claude-code discover --scheduled" --permission-mode acceptEdits',
-    );
+    expect(xml).not.toContain("~/");
+    expect(normalize(xml)).toMatchInlineSnapshot(`
+      "<?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+      	<key>Label</key>
+      	<string>me.bendrucker.claude.home.discover</string>
+      	<key>ProgramArguments</key>
+      	<array>
+      		<string>/bin/zsh</string>
+      		<string>-lc</string>
+      		<string>claude -p "/improve-claude-code discover --scheduled" --permission-mode acceptEdits</string>
+      	</array>
+      	<key>WorkingDirectory</key>
+      	<string>$HOME/src/bendrucker/claude</string>
+      	<key>StartCalendarInterval</key>
+      	<dict>
+      		<key>Weekday</key>
+      		<integer>1</integer>
+      		<key>Hour</key>
+      		<integer>7</integer>
+      		<key>Minute</key>
+      		<integer>23</integer>
+      	</dict>
+      	<key>StandardOutPath</key>
+      	<string>$HOME/Library/Logs/claude-home-discover.log</string>
+      	<key>StandardErrorPath</key>
+      	<string>$HOME/Library/Logs/claude-home-discover.err.log</string>
+      	<key>ProcessType</key>
+      	<string>Background</string>
+      </dict>
+      </plist>
+      "
+    `);
   });
 
   test("defaults permission_mode to acceptEdits", () => {

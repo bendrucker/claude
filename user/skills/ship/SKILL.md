@@ -1,6 +1,5 @@
 ---
 name: ship
-disable-model-invocation: true
 description: >-
   Finish a branch: infer which review passes the change warrants, run them, open the PR, babysit CI to green, triage bot comments, and refresh the body from a clean context.
 argument-hint: "[--merge] [--effort <level>] [--simplify] [--skip <pass>] [--base <ref>]"

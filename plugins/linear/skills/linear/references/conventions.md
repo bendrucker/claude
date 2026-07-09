@@ -50,7 +50,7 @@ Unassigned:
 }
 ```
 
-`hooks/save-issue.ts` injects this default only on the connector path, and only when creating without an explicit `state`. On the CLI/API path, set the state yourself.
+`hooks/save-issue.ts` injects this default on the MCP tool paths (the connector `save_issue` and the local or plugin `create_issue`), and only when creating without an explicit `state`. The CLI/API path is not hooked. Set the state yourself there.
 
 ## CLI Idioms
 

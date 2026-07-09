@@ -77,6 +77,16 @@ if (!sessionId) {
 }
 
 addDispatch(state, { url, sessionId, dispatchedAt: new Date().toISOString() });
-await writeState(state, dataDir);
+try {
+  await writeState(state, dataDir);
+} catch (error) {
+  // The session is already running but never got recorded. Stop it so the dedup
+  // set and the live sessions stay consistent. Otherwise the next dispatch sees
+  // an unrecorded URL and launches a duplicate review.
+  if (sessionId) {
+    Bun.spawnSync(["claude", "stop", sessionId], { stdout: "pipe", stderr: "pipe" });
+  }
+  throw error;
+}
 
 console.log(JSON.stringify({ sessionId, url, repoPath }, null, 2));

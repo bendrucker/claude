@@ -23,50 +23,6 @@
     "commit": "",
     "pr": ""
   },
-  "footerLinksRegexes": [
-    {
-      "type": "regex",
-      "pattern": "\\b(?<repo>[A-Za-z0-9][\\w.-]*/[A-Za-z0-9][\\w.-]*)#(?<number>\\d+)\\b",
-      "url": "https://github.com/{repo}/issues/{number}",
-      "label": "{repo}#{number}"
-    },
-    {
-      "type": "regex",
-      "pattern": "\\bPEP[ -]?(?<number>\\d{3,4})\\b",
-      "url": "https://peps.python.org/pep-{number}/",
-      "label": "PEP {number}"
-    },
-    {
-      "type": "regex",
-      "pattern": "\\bRFC[ -]?(?<number>\\d{3,5})\\b",
-      "url": "https://datatracker.ietf.org/doc/html/rfc{number}",
-      "label": "RFC {number}"
-    },
-    {
-      "type": "regex",
-      "pattern": "\\b(?<id>CVE-\\d{4}-\\d{4,})\\b",
-      "url": "https://nvd.nist.gov/vuln/detail/{id}",
-      "label": "{id}"
-    },
-    {
-      "type": "regex",
-      "pattern": "\\bCWE-(?<number>\\d+)\\b",
-      "url": "https://cwe.mitre.org/data/definitions/{number}.html",
-      "label": "CWE-{number}"
-    },
-    {
-      "type": "regex",
-      "pattern": "\\b(?<id>GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4})\\b",
-      "url": "https://github.com/advisories/{id}",
-      "label": "{id}"
-    },
-    {
-      "type": "regex",
-      "pattern": "\\b(?<id>GO-\\d{4}-\\d+)\\b",
-      "url": "https://pkg.go.dev/vuln/{id}",
-      "label": "{id}"
-    }
-  ],
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",

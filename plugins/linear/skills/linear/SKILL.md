@@ -35,11 +35,11 @@ Pick a tool path per [Tool Selection](#tool-selection).
 
 Three runtime paths reach Linear, in order of preference:
 
-1. **Claude.ai connector** (`mcp__claude_ai_Linear__save_issue`, `get_issue`) is the primary path. One tool, `save_issue`, handles both create and update. See [Creating vs Updating](#creating-vs-updating).
+1. **Claude.ai connector** (`mcp__claude_ai_Linear__save_issue`, `get_issue`) is the primary path. One tool, `save_issue`, handles both create and update. It also takes relations (`blocks`, `blockedBy`, `relatedTo`, `duplicateOf`), `parentId`, `project`, `milestone`, `cycle`, `estimate`, `dueDate`, and `links` as params. That covers most structured single-issue work end to end. See [Creating vs Updating](#creating-vs-updating).
 2. **Local or plugin MCP** (`create_issue`, `update_issue`, `list_issues`) exposes separate tools for create and update. Use it for simple single-issue operations when the connector is unavailable.
-3. **`linear` CLI and raw GraphQL** is the fallback for what the connector and MCP tools do not cover (complex queries, bulk operations, relations). Defer to the `linear-cli:linear-cli` skill for the CLI surface. See [GraphQL API](#graphql-api).
+3. **`linear` CLI and raw GraphQL** is the fallback for what the connector does not cover (complex queries, bulk operations) and for setting relations when the connector is unavailable. Defer to the `linear-cli:linear-cli` skill for the CLI surface. See [GraphQL API](#graphql-api).
 
-Turning a structured issue file (from issue refinement, project planning, or any skill that emits one) into an issue follows this order. The connector handles a simple save. The CLI path is required only when the file declares relations, which the connector and MCP tools cannot set. See [Saving a Structured Issue File](#saving-a-structured-issue-file).
+Turning a structured issue file (from issue refinement, project planning, or any skill that emits one) into an issue follows this order. The connector handles the whole file, relations included; the CLI is the fallback when the connector is unavailable. See [Saving a Structured Issue File](#saving-a-structured-issue-file).
 
 ## Creating vs Updating
 
@@ -48,7 +48,7 @@ The connector's `save_issue` creates or updates from a single tool, keyed on whe
 - **Create**: omit `id`. `title` is **required** (omitting it produces "title is required when creating an issue").
 - **Update**: pass `id` (from `get_issue`). `title` is optional; send only the fields you change.
 - Use flat top-level keys. No wrapper objects (`issue`, `input`, `parameters`), and the field is `id`, not `issueId`.
-- Omit relation fields the connector does not natively support.
+- Relation params (`blocks`, `blockedBy`, `relatedTo`) are append-only. A save never removes relations you did not name. Pass `duplicateOf`, `parentId`, `project`, or `cycle` as `null` to clear them.
 
 Create (`id` absent, `title` present):
 
@@ -72,13 +72,15 @@ Update (`id` present, change only what you need):
 
 The local and plugin MCP variants split these into `create_issue` and `update_issue` with the same flat field shapes. The create precondition (`title` required) applies to both paths.
 
+The `description` body is GFM and renders Linear's first-class constructs directly: mermaid diagrams, collapsibles, fenced code blocks, and check lists. Author them inline instead of using a workaround.
+
 ## Saving a Structured Issue File
 
-Skills that emit a Markdown file with YAML frontmatter (issue refinement, project planning) hand off here. [references/structured-file.md](references/structured-file.md) maps that frontmatter onto Linear fields, covers routing fields taken from the user at save time, and shows the `linear` CLI commands required when the file declares relations.
+Skills that emit a Markdown file with YAML frontmatter (issue refinement, project planning) hand off here. [references/structured-file.md](references/structured-file.md) maps that frontmatter onto connector `save_issue` params, relations included, covers routing fields taken from the user at save time, and keeps the `linear` CLI as the fallback when the connector is unavailable.
 
 ## Conventions
 
-[references/conventions.md](references/conventions.md) holds the house rules: reference issues by full URL (never bare `ENG-123`), default state from assignment (assigned to me is `Todo`, unassigned is `Backlog`), query with `assignee: "me"`, and pass label names directly (checking workspace then team when looking one up). Apply it whenever you create, update, comment, or query.
+[references/conventions.md](references/conventions.md) holds the house rules: reference issues by the form the write path chips (bare identifier for the connector, URL for the CLI/API, `@displayname` for users on both), default state from assignment (assigned to me is `Todo`, unassigned is `Backlog`), query with `assignee: "me"`, and pass label names directly (checking workspace then team when looking one up). Apply it whenever you create, update, comment, or query.
 
 ## GraphQL API
 

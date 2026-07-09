@@ -2,6 +2,8 @@
 
 Raw GraphQL through the `linear api` subcommand is the fallback for operations the Claude.ai connector and MCP tools do not cover. Use it only after [Tool Selection](SKILL.md#tool-selection) rules out those paths.
 
+Storage is GFM markdown. An issue's raw API `description` returns the portable markdown Linear stores. The CLI/API form is the durable interchange form when moving content between paths.
+
 The `linear-cli:linear-cli` skill is the canonical reference for the full CLI surface and GraphQL mechanics (`--description-file`, schema introspection to a temp file, pagination). It is the recommended companion for non-trivial GraphQL work. The `linear` binary installs via Homebrew:
 
 ```bash

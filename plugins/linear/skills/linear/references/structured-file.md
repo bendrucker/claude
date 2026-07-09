@@ -2,29 +2,41 @@
 
 Several skills hand off a Markdown file with YAML frontmatter for issue metadata and a body below the closing `---`. Issue refinement emits one, project planning emits a similar file, and others will follow. This document maps that shape to a Linear issue. The schema varies by producer, so read the file's frontmatter to see which keys it actually carries, extract them with whatever fits that file, and write the body to its own file so it passes by path and stays out of context.
 
-Map the metadata keys these files tend to carry onto the `linear` CLI:
+Map the metadata keys these files tend to carry onto the connector `save_issue` params:
 
-| Frontmatter | Linear |
-|-------------|--------|
-| `title` | `--title` |
-| body (below the closing `---`) | `--description-file <path>` |
-| `labels` | one `--label` per entry |
-| `priority` (`urgent`, `high`, `medium`, `low`) | `--priority` `1`..`4` |
-| `relations` (`blocks`, `blocked-by`, `related`, `duplicate-of`) | `linear issue relation add <id> <type> <relatedId>` |
+| Frontmatter | `save_issue` param |
+|-------------|--------------------|
+| `title` | `title` |
+| body (below the closing `---`) | `description` |
+| `labels` | `labels` (array of names) |
+| `priority` (`urgent`, `high`, `medium`, `low`) | `priority` `1`..`4` |
+| `relations.blocks` | `blocks` (array of identifiers) |
+| `relations.blocked-by` | `blockedBy` |
+| `relations.related` | `relatedTo` |
+| `relations.duplicate-of` | `duplicateOf` |
 
-A relation's `type` is the frontmatter key, except `duplicate-of` maps to `duplicate`. Its `relatedId` is the issue identifier in the relation's tracker URL. For keys the file omits, or ones this table does not name, map them when Linear has a matching field and ask when the mapping is unclear.
+Relation params take the issue identifier from each entry's tracker URL. `blocks`, `blockedBy`, and `relatedTo` accept arrays. `duplicateOf` takes a single identifier. Each is append-only. A save never removes relations you did not name. For keys the file omits, or ones this table does not name, map them when Linear has a matching field and ask when the mapping is unclear.
 
 Routing fields (team, assignee, state) are not in the file. Take them from the user at save time. Default the state from assignment as in [Issue Status](conventions.md#issue-status). `getDefaultState` in `hooks/save-issue.ts` encodes that rule.
 
-## Simple Saves
+## Saving
 
-When the file declares no relations, the connector `save_issue` is enough: pass the title, the body as `description`, the labels, and the routing fields, per [Creating vs Updating](../SKILL.md#creating-vs-updating). This is the default.
+The connector `save_issue` handles the whole file in one call, relations included. Pass the title, the body as `description`, the labels, the routing fields, and the relation params from the table above, per [Creating vs Updating](../SKILL.md#creating-vs-updating). This is the default.
 
-## Relations
+```json
+{
+  "team": "ENG",
+  "title": "Fix authentication bug",
+  "description": "…",
+  "state": "Todo",
+  "blockedBy": ["ENG-100"],
+  "relatedTo": ["ENG-42"]
+}
+```
 
-The connector and MCP tools cannot set relations, so a file that declares any needs the `linear` CLI. When the Environment block shows it is not installed, save through the connector and report the relation targets you skipped so the user can add them by hand.
+## CLI Fallback
 
-With the CLI present, create the issue with the body by file, then add one relation per entry from the parsed frontmatter:
+When the connector is unavailable and the Environment block shows the `linear` CLI installed, fall back to it: create the issue with the body by file, then add one relation per entry from the parsed frontmatter.
 
 ```bash
 new_id=$(linear issue create --title "$title" --description-file "$body_file" \
@@ -32,4 +44,4 @@ new_id=$(linear issue create --title "$title" --description-file "$body_file" \
 linear issue relation add "$new_id" blocked-by ENG-100
 ```
 
-Add `--label`, `--assignee`, and `--priority` when the file carries them. The `linear-cli:linear-cli` skill documents the full CLI surface.
+The CLI relation `type` is the frontmatter key, except `duplicate-of` maps to `duplicate`. Add `--label`, `--assignee`, and `--priority` when the file carries them. If neither path can set relations, save the issue and report the relation targets you skipped so the user can add them by hand. The `linear-cli:linear-cli` skill documents the full CLI surface.

@@ -87,8 +87,8 @@ bun ${CLAUDE_SKILL_DIR}/scripts/dispatched.ts list --data-dir ${CLAUDE_PLUGIN_DA
 
 A dispatched review runs to completion on its own and cleans up its own worktree. The inbox does not track or reclaim it. The dedup set only prevents double-dispatch. Manage it directly when needed:
 
-- `dispatched.ts --reset` clears the set at the start of a fresh inbox session, so a re-requested review can dispatch again.
-- `dispatched.ts remove --url <pr-url>` untracks a single review.
+- `dispatched.ts --reset --data-dir ${CLAUDE_PLUGIN_DATA}` clears the set at the start of a fresh inbox session, so a re-requested review can dispatch again.
+- `dispatched.ts remove --url <pr-url> --data-dir ${CLAUDE_PLUGIN_DATA}` untracks a single review.
 
 When you have dispatched the selected queue, present a summary of what you sent and point at `claude agents` for progress.
 

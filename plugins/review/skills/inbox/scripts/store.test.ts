@@ -54,6 +54,17 @@ describe("store", () => {
 
       expect(readState(tmpDir)).rejects.toThrow("Invalid state file");
     });
+
+    test("migrates the pre-background { reviews } schema to an empty dedup set", async () => {
+      const dir = join(tmpDir, "review-inbox");
+      mkdirSync(dir, { recursive: true });
+      await Bun.write(
+        join(dir, "state.json"),
+        JSON.stringify({ reviews: [{ url: "https://github.com/o/r/pull/1", paneId: "%1" }] }),
+      );
+
+      expect(await readState(tmpDir)).toEqual({ dispatched: [] });
+    });
   });
 
   describe("writeState + readState round-trip", () => {

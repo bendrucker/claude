@@ -43,10 +43,20 @@ export async function readState(dataDir?: string): Promise<InboxState> {
   } catch (cause) {
     throw new Error(`Failed to parse state file: ${file.name}`, { cause });
   }
-  if (!data || typeof data !== "object" || !Array.isArray((data as InboxState).dispatched)) {
+  if (!data || typeof data !== "object") {
     throw new Error(`Invalid state file: ${file.name}`);
   }
-  return data as InboxState;
+  const record = data as Record<string, unknown>;
+  if (Array.isArray(record.dispatched)) {
+    return { dispatched: record.dispatched as Dispatch[] };
+  }
+  // The pre-background inbox stored { reviews: [...] } of tmux-pane records.
+  // Those carry no meaning for the dispatch launcher, so migrate the old file to
+  // an empty dedup set rather than hard-erroring every caller on it.
+  if (Array.isArray(record.reviews)) {
+    return { dispatched: [] };
+  }
+  throw new Error(`Invalid state file: ${file.name}`);
 }
 
 export function isDispatched(state: InboxState, url: string): boolean {

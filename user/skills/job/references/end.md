@@ -28,7 +28,7 @@ Flag items that need collaboration lead time (a reviewer in another timezone, a 
 
 Review debt is inbound requests you did not reach today, unanswered threads on others' PRs/MRs, and any message, notification, or email still awaiting your reply or filing. Choose one path per item:
 
-- Reply now: draft the reply and include it in the brief. Posting a draft the user approved is safe.
+- Reply now: judge whether the thread needs a substantive response first. Where a reaction or brief acknowledgement closes it, prefer that. Draft a reply only when it carries real content, keep it terse, and include it in the brief. Posting a draft the user approved is safe.
 - Carry to tomorrow: record it explicitly so it appears in tomorrow's start brief.
 
 Never silently drop an item.
@@ -47,7 +47,7 @@ Offer per worktree: commit and push as WIP (safe on your own branch), or record 
 ## Tracker Hygiene and Tomorrow
 
 - Make states match reality: merged work marked done, in-progress only for what is actually in progress. Corrections are safe actions.
-- Capture next steps as issue comments or new issues, including monitor and follow-up intents like "when X merges, rebase Y", so tomorrow's start run has a starting point instead of a memory.
+- Capture next steps where they belong. Work for the team backlog lands as tracker comments or new issues, including monitor and follow-up intents like "when X merges, rebase Y", so tomorrow's start run has a starting point instead of a memory. Personal next-steps and reminders go to the personal inbox when one is configured. When the user says "my inbox" that means the personal inbox, so route there rather than opening a tracker issue in its place, and ask when the destination is unclear.
 
 ## Brief and Act
 

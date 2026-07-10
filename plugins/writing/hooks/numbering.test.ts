@@ -9,7 +9,7 @@ import type {
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { formatDecision } from "./io";
-import { checkCode, checkMarkdown, processInput } from "./numbering";
+import { checkCode, checkMarkdown, hasNumberingHint, processInput } from "./numbering";
 
 function hasSg(): boolean {
   try {
@@ -64,6 +64,30 @@ describe("formatDecision", () => {
         permissionDecisionReason: "Test reason",
       },
     });
+  });
+});
+
+// Ported from the retired hooks.json shell guard: every shape checkMarkdown or
+// a numbering.yml rule can flag must pass the hint, and content that cannot
+// match must short-circuit before the expensive checks.
+describe("hasNumberingHint", () => {
+  test.each<{ name: string; content: string; hinted: boolean }>([
+    { name: "markdown numbered heading", content: "## 1. Setup\n\nBody\n", hinted: true },
+    { name: "markdown Step heading", content: "# Step 1\n", hinted: true },
+    { name: "markdown Phase heading, wide gap", content: "# Phase    2\n", hinted: true },
+    { name: "tab after heading number", content: "## 3.\tSetup\n", hinted: true },
+    { name: "code identifier step1", content: "function step1() {}\n", hinted: true },
+    { name: "code identifier Phase2", content: "class Phase2:\n    pass\n", hinted: true },
+    {
+      name: "code identifier part3 in any language",
+      content: "part3 <- function(x) x\n",
+      hinted: true,
+    },
+    { name: "plain prose", content: "Descriptive names only.\n", hinted: false },
+    { name: "version string", content: "Bump to v1.2.3\n", hinted: false },
+    { name: "bare code", content: "const total = sum(items)\n", hinted: false },
+  ])("$name", ({ content, hinted }) => {
+    expect(hasNumberingHint(content)).toBe(hinted);
   });
 });
 
@@ -191,7 +215,7 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
       "deny",
       null,
     ],
-    ["Edit tool: asks instead of deny", "main.go", "func step1() {}", "edit", "ask", null],
+    ["Edit tool: denies like Write", "main.go", "func step1() {}", "edit", "deny", null],
     ["File type filtering: checks Go files", "main.go", "func step1() {}", "write", "deny", null],
     [
       "File type filtering: checks TypeScript files",
@@ -250,28 +274,33 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 });
 
 describe("processInput with markdown", () => {
-  test.each<[string, string, string, "ask" | null, string | null]>([
-    ['detects "# 1. Introduction"', "README.md", "# 1. Introduction", "ask", "1. Introduction"],
-    ['detects "## Step 2: Setup"', "docs.md", "## Step 2: Setup", "ask", "Step 2"],
-    ['detects "### Phase 3"', "guide.markdown", "### Phase 3", "ask", "Phase 3"],
-    ["allows descriptive headings", "README.md", "# Introduction", null, null],
+  test.each<[string, string, string, boolean, string | null]>([
+    ['detects "# 1. Introduction"', "README.md", "# 1. Introduction", true, "1. Introduction"],
+    ['detects "## Step 2: Setup"', "docs.md", "## Step 2: Setup", true, "Step 2"],
+    ['detects "### Phase 3"', "guide.markdown", "### Phase 3", true, "Phase 3"],
+    ["allows descriptive headings", "README.md", "# Introduction", false, null],
     [
       "allows headings with numbers mid-text",
       "README.md",
       "# Using OAuth2 for Authentication",
-      null,
+      false,
       null,
     ],
-  ])("%s", async (_name, filePath, content, expected, reasonContains) => {
+  ])("%s", async (_name, filePath, content, flagged, reasonContains) => {
     const output = await getOutput(mockWriteInput(filePath, content), "write");
-    if (expected === null) {
+    if (!flagged) {
       expect(output).toBeNull();
       return;
     }
-    expect(output?.permissionDecision).toBe(expected);
+    expect(output).not.toHaveProperty("permissionDecision");
     if (reasonContains) {
-      expect(output?.permissionDecisionReason).toContain(reasonContains);
+      expect(output?.additionalContext).toContain(reasonContains);
     }
+  });
+
+  it("prefixes the edit-mode reminder", async () => {
+    const output = await getOutput(mockEditInput("README.md", "# 1. Introduction"), "edit");
+    expect(output?.additionalContext).toContain("This edit introduces numbered sequences.");
   });
 });
 
@@ -303,60 +332,6 @@ describe("processInput edge cases", () => {
   });
 });
 
-describe("memory files", () => {
-  const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
-
-  it("skips Write to memory markdown with numbered heading", async () => {
-    const output = await getOutput(mockWriteInput(memoryPath, "# 1. Introduction"), "write");
-    expect(output).toBeNull();
-  });
-
-  it("skips Edit to memory markdown with numbered heading", async () => {
-    const output = await getOutput(mockEditInput(memoryPath, "# 1. Introduction"), "edit");
-    expect(output).toBeNull();
-  });
-
-  it("still asks on non-memory markdown with numbered heading", async () => {
-    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
-    expect(output?.permissionDecision).toBe("ask");
-  });
-});
-
-describe("plan files", () => {
-  const planPath = `${process.env.HOME}/.claude/plans/feature.md`;
-
-  it("skips Write to plan markdown with numbered heading", async () => {
-    const output = await getOutput(mockWriteInput(planPath, "# 1. Introduction"), "write");
-    expect(output).toBeNull();
-  });
-
-  it("skips Edit to plan markdown with numbered heading", async () => {
-    const output = await getOutput(mockEditInput(planPath, "# 1. Introduction"), "edit");
-    expect(output).toBeNull();
-  });
-
-  it("still asks on non-plan markdown with numbered heading", async () => {
-    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
-    expect(output?.permissionDecision).toBe("ask");
-  });
-});
-
-describe("plan mode", () => {
-  function mockPlanModeWrite(filePath: string, content: string): PreToolUseHookInput {
-    return { ...mockWriteInput(filePath, content), permission_mode: "plan" };
-  }
-
-  it("skips Write with numbered heading when permission_mode is plan", async () => {
-    const output = await getOutput(mockPlanModeWrite("README.md", "# 1. Introduction"), "write");
-    expect(output).toBeNull();
-  });
-
-  it("still asks when permission_mode is not plan", async () => {
-    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
-    expect(output?.permissionDecision).toBe("ask");
-  });
-});
-
 describe("already-numbered files", () => {
   let dir: string;
 
@@ -375,11 +350,11 @@ describe("already-numbered files", () => {
     expect(output).toBeNull();
   });
 
-  it("asks when Edit introduces numbering into a clean file", async () => {
+  it("reminds when Edit introduces numbering into a clean file", async () => {
     const filePath = join(dir, "clean.md");
     await Bun.write(filePath, "# Findings\n\nDetails.\n");
     const output = await getOutput(mockEditInput(filePath, "## 1. First issue"), "edit");
-    expect(output?.permissionDecision).toBe("ask");
+    expect(output?.additionalContext).toContain("numbered sequences");
   });
 
   it("allows non-numbered Edit to an already-numbered file", async () => {
@@ -399,10 +374,10 @@ describe("already-numbered files", () => {
     expect(output).toBeNull();
   });
 
-  it("asks when Write creates a new numbered file", async () => {
+  it("reminds when Write creates a new numbered file", async () => {
     const filePath = join(dir, "new.md");
     const output = await getOutput(mockWriteInput(filePath, "# 1. Introduction"), "write");
-    expect(output?.permissionDecision).toBe("ask");
+    expect(output?.additionalContext).toContain("numbered sequences");
   });
 
   describe.skipIf(!hasSg())("code files (requires sg)", () => {
@@ -413,18 +388,19 @@ describe("already-numbered files", () => {
       expect(output).toBeNull();
     });
 
-    it("asks when Edit introduces numbering into a clean code file", async () => {
+    it("denies when Edit introduces numbering into a clean code file", async () => {
       const filePath = join(dir, "main.go");
       await Bun.write(filePath, "package main\nfunc processItems() {}\n");
       const output = await getOutput(mockEditInput(filePath, "func step1() {}"), "edit");
-      expect(output?.permissionDecision).toBe("ask");
+      expect(output?.permissionDecision).toBe("deny");
     });
   });
 });
 
-describe("markdown ask tier", () => {
-  it("asks rather than denies on markdown Write", async () => {
+describe("markdown context tier", () => {
+  it("reminds rather than blocks on markdown Write", async () => {
     const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
-    expect(output?.permissionDecision).toBe("ask");
+    expect(output).not.toHaveProperty("permissionDecision");
+    expect(output?.additionalContext).toContain("numbered sequences");
   });
 });

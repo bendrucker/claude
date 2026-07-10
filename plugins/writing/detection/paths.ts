@@ -16,6 +16,21 @@ export function isPlanPath(filePath: string): boolean {
   return home !== "" && filePath.startsWith(`${home}/.claude/plans/`);
 }
 
+const JOBS_PATH_PATTERN = /\/\.claude\/jobs\//;
+
+// Scratch prose is internal handoff text (job scripts, worktree tmp/ notes,
+// $TMPDIR files) that no human reads at the write site. Content that matters
+// leaves through an egress surface (--body-file, --field key=@file), where the
+// Bash scan still runs. A bare `tmp` segment covers /tmp, /private/tmp, and any
+// working-tree tmp/ directory. TMPDIR and job dirs need explicit checks.
+export function isScratchPath(filePath: string): boolean {
+  const resolved = resolve(filePath);
+  const tmpDir = process.env.TMPDIR;
+  if (tmpDir && resolved.startsWith(`${resolve(tmpDir)}/`)) return true;
+  if (JOBS_PATH_PATTERN.test(resolved)) return true;
+  return resolved.split("/").includes("tmp");
+}
+
 export function isMarkdownFile(ext: string): boolean {
   return ext === "md" || ext === "markdown";
 }

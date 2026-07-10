@@ -1,17 +1,14 @@
-#!/usr/bin/env bun
-
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { apStyleTitleCase } from "ap-style-title-case";
 import type { Heading, Paragraph, Strong, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import { getExtension, isMarkdownFile, isMemoryPath, isPlanPath } from "../detection/paths";
+import { getExtension, isMarkdownFile } from "../detection/paths";
 import { classifyHeadingBaseline } from "../linguistics/heading";
 import {
   type EditInput,
   formatContext,
-  isPlanMode,
+  type HookResult,
   type SyncHookJSONOutput,
   type WriteInput,
 } from "./io";
@@ -134,7 +131,7 @@ export function checkSentenceHeading(content: string): string | null {
   return result;
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
+export function check(input: PreToolUseHookInput): HookResult | null {
   const toolName = input.tool_name;
 
   let content: string;
@@ -152,52 +149,37 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
     return null;
   }
 
-  if (isMemoryPath(filePath)) return null;
-  if (isPlanPath(filePath)) return null;
-  if (isPlanMode(input)) return null;
-
   const ext = getExtension(filePath);
   if (!isMarkdownFile(ext)) return null;
 
   const titleCase = checkTitleCase(content);
   if (titleCase) {
-    return formatContext(
-      `${titleCase}. Apply AP-style title case: capitalize major words, lowercase articles/prepositions (a, an, the, in, of, etc.) unless they start the heading.`,
-    );
+    return {
+      output: formatContext(
+        `${titleCase}. Apply AP-style title case: capitalize major words, lowercase articles/prepositions (a, an, the, in, of, etc.) unless they start the heading.`,
+      ),
+      category: "title case heading",
+    };
   }
 
   const boldHeading = checkBoldAsHeading(content);
   if (boldHeading) {
-    return formatContext(
-      `${boldHeading}. Replace the bold-colon pattern with a markdown heading (## ) at the appropriate level.`,
-    );
+    return {
+      output: formatContext(
+        `${boldHeading}. Replace the bold-colon pattern with a markdown heading (## ) at the appropriate level.`,
+      ),
+      category: "bold as heading",
+    };
   }
 
   const sentenceHeading = checkSentenceHeading(content);
   if (sentenceHeading) {
-    return formatContext(sentenceHeading);
+    return { output: formatContext(sentenceHeading), category: "sentence heading" };
   }
 
   return null;
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[style/headings] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
-if (import.meta.main) {
-  main().catch(console.error);
+export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
+  return check(input)?.output ?? null;
 }

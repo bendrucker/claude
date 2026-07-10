@@ -26,11 +26,15 @@ Used for openers and let-me-verbs where the match depends on position (line star
 
 The loader lives in [`detection/wordlists.ts`](detection/wordlists.ts). Compiled patterns are exposed via the `WORDLISTS` constant and consumed by `tropes.ts`.
 
-## Hook Commands
+## Hook Dispatcher
 
-Each hook command runs `bun install --cwd ${CLAUDE_PLUGIN_ROOT}` before the hook script. Installed plugins have no `node_modules`. Bun auto-installs dependencies from its global cache, but packages like `unist-util-visit-parents` use self-referencing subpath exports that fail without a local `node_modules`. `bun install` restores Node.js-style resolution and completes in ~50ms once installed.
+A single PreToolUse entry script, [`hooks/pretooluse.ts`](hooks/pretooluse.ts), reads stdin once and runs the numbering, headings, and tropes checkers in-process. It emits at most one output per tool call with fixed priority (deny > ask > context, earliest checker wins within a tier). Shared skips apply once up front: plan mode, plan and memory paths, and scratch paths (`tmp/` directories, `$TMPDIR`, background job dirs), where prose is internal handoff text that gets scanned later at the Bash egress surface (`--body-file`, `--body`, `gh api -F body=@file`) instead of at write time.
 
-The `check-tropes.ts` hook skips `bun install`: it has no dependencies requiring local resolution.
+Context-tier findings are suppressed when the same rule category already fired in the session within the last five minutes ([`hooks/session-state.ts`](hooks/session-state.ts)). Deny and ask tiers always fire.
+
+#### Run Log
+
+Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.jsonl` (rotated past 5 MB): timestamp, session, tool, extension, duration, outcome (`silent | context | ask | deny | skipped-scratch`), category, and suppression. This is the evidence surface for auditing the hooks' cost and precision. `WRITING_HOOKS_LOG=0` disables it, and a path value redirects it. Once two consecutive audits show stable behavior, flip the default off.
 
 ## Testing
 

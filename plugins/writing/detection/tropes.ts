@@ -522,8 +522,8 @@ export const PATTERNS: PatternDef[] = [
     layer: "cross-sentence",
     category: "test result reporting",
     test: testResultHits,
-    message: () =>
-      "Do not report test results, counts, or CI status. Describe what is covered instead.",
+    message: (matched) =>
+      `Do not report test results, counts, or CI status ("${matched}"). Describe what is covered instead.`,
     positives: ["All 8 tests pass. Now let me check the linter.", "3/3 passing on Sonnet 4.6."],
     negatives: [
       "The tests fail because processInput is now async.",

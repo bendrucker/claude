@@ -8,8 +8,7 @@ description: >
   model-invocable path to pick up comments already left in a running session and apply them. Use
   when reviewing through tuicr, or when the user says their review is done and comments need
   applying: "review in tuicr", "tuicr session", "open the diff in tuicr", "watch my comments", "I
-  left review comments", "I finished my review, apply them", "pick up my tuicr comments". For a
-  fresh self-review from scratch use review:self; to review a peer's PR use review:peer.
+  left review comments", "I finished my review, apply them", "pick up my tuicr comments".
 allowed-tools:
   - Bash(tuicr:*)
   - Bash(tmux:*)

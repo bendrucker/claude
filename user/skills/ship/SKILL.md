@@ -8,6 +8,8 @@ allowed-tools:
   - AskUserQuestion
   - Bash(git diff:*)
   - Bash(git status:*)
+  - Bash(git fetch:*)
+  - Bash(git rev-parse:*)
   - Skill(plan:review)
   - Skill(code-review)
   - Skill(simplify)
@@ -30,7 +32,7 @@ Default end state **green and ready**: CI green, bot comments triaged, body refr
 
 ## Decide What Applies
 
-Resolve the base: default `main`, or `--base <parent>` on a stack. Diff `git diff <base>...HEAD`, plus a plain `git diff` for uncommitted work. Gate each pass on the file set, its size, and the content behind any judgment call (new comments, refactor or new behavior). Full matrix and heuristics: [`references/passes.md`](references/passes.md).
+Resolve the base to a **remote** ref so ship's view matches what the PR merges against. From the base branch (default `main`, or `--base <parent>` on a stack), take its tracking ref via `git rev-parse --abbrev-ref --symbolic-full-name <base>@{u}`, falling back to `origin/<base>`. Fetch it first (`git fetch`) so a stale local `<base>` never inflates the diff with already-merged commits. Diff `git diff <resolved>...HEAD`, plus a plain `git diff` for uncommitted work, and thread the resolved ref as `--base` to every gated pass (including `code-review`). Gate each pass on the file set, its size, and the content behind any judgment call (new comments, refactor or new behavior). Full matrix and heuristics: [`references/passes.md`](references/passes.md).
 
 - **`plan:review`**: an approved plan is in context (Claude Code injects a `~/.claude/plans/` file). No plan, skip.
 - **Correctness and quality**: code changed. Exactly one of `code-review <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
@@ -46,7 +48,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 - `--effort <low|medium|high|max|ultra>`: override inferred `code-review` effort.
 - `--simplify`: force `simplify` over `code-review`.
 - `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `code-review`, `simplify`, `comments`, `writing`, `verify`.
-- `--base <ref>`: diff base for gating. Default `main`; on a stack, the parent branch.
+- `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
 
 ## Pre-PR Reviews
 

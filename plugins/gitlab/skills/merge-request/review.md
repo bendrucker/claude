@@ -2,9 +2,22 @@
 
 Submit review feedback as draft notes that accumulate before publishing. Comments stay private until bulk-published, mirroring GitHub's pending review workflow.
 
+## Determine the Review Base
+
+Review the MR's actual diff, not whatever a local branch name resolves to. GitLab diffs an MR against the merge-base of its source and target branches. A local `git diff main...HEAD` diverges from that whenever local `main` lags `origin/main`: commits already on `origin/main` but missing from your stale local `main` fall into the range, so the review picks up changes the MR never made (the "bundled changes" false positive).
+
+Fetch first, then diff against the remote tracking ref, never a bare branch name:
+
+```bash
+git fetch origin
+git diff origin/<target-branch>...HEAD   # three-dot diffs from the merge-base
+```
+
+Read `<target-branch>` from `glab mr view <iid>` (usually `main`). For the exact diff GitLab renders, use `glab mr diff <iid>` or the API-fetched refs the script below relies on.
+
 ## Draft Notes Script
 
-`${CLAUDE_SKILL_DIR}/scripts/draft-note.ts` handles JSON construction and `glab api` calls. It fetches diff refs automatically when creating positioned comments, avoiding manual SHA management.
+Always create and anchor inline draft notes through `${CLAUDE_SKILL_DIR}/scripts/draft-note.ts`, never raw `glab api .../draft_notes` calls. The script builds the JSON payload, sets the required `Content-Type`, and fetches diff refs so positioned comments anchor to the right SHAs. Hand-rolling drops the `position` object (the note lands as a summary comment instead of inline) and hits the failures in [API Pitfalls](#api-pitfalls).
 
 ### Create
 

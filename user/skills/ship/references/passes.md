@@ -4,7 +4,7 @@ Gating decisions for ship's pre-PR reviews: which pass runs, `code-review` effor
 
 ## Gating Matrix
 
-Most passes gate on the diff (against the base, plus the working tree). `plan:review` gates on whether an approved plan drove the session.
+Most passes gate on the diff (against the base, plus the working tree). The base is its upstream tracking ref (e.g. `origin/<base>`), not a bare local branch, so a stale local `main` never inflates the file set with already-merged commits. `plan:review` gates on whether an approved plan drove the session.
 
 | Trigger | Pass | Notes |
 |---|---|---|

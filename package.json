@@ -28,6 +28,7 @@
     "plugins/mac",
     "plugins/x-callback-url",
     "plugins/review",
+    "plugins/rate-limits",
     ".claude/skills/agent-ideas"
   ],
   "scripts": {

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "rate-limits",
+  "description": "Usage-limit burn-rate prediction: warn when the current pace will exhaust the 5-hour limit before it resets, plus a recorder, doctor, and status query",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

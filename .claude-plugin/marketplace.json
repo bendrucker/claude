@@ -178,6 +178,11 @@
       "name": "tmux",
       "description": "Tmux session awareness and pane interaction",
       "source": "./plugins/tmux"
+    },
+    {
+      "name": "rate-limits",
+      "description": "Predict usage-limit exhaustion from the burn rate and warn before the 5-hour limit runs out",
+      "source": "./plugins/rate-limits"
     }
   ]
 }

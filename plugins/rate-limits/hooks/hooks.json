@@ -1,0 +1,15 @@
+{
+  "description": "Predict when the current usage burn rate will exhaust the 5-hour limit and warn before it does",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "b=\"${CLAUDE_PLUGIN_ROOT}/bin/alert\"; [ -x \"$b\" ] && exec \"$b\" || exec bun \"${CLAUDE_PLUGIN_ROOT}/hooks/alert.ts\""
+          }
+        ]
+      }
+    ]
+  }
+}

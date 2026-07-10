@@ -48,7 +48,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 - `--effort <low|medium|high|max|ultra>`: override inferred `code-review` effort.
 - `--simplify`: force `simplify` over `code-review`.
 - `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `code-review`, `simplify`, `comments`, `writing`, `verify`.
-- `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its remote tracking ref (`origin/...`) before diffing.
+- `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
 
 ## Pre-PR Reviews
 

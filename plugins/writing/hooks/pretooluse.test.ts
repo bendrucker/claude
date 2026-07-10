@@ -58,11 +58,16 @@ describe("single output per tool call", () => {
     );
     expect(output).not.toBeNull();
     expect(contextOf(output)).toContain("numbered sequences");
-    expect(log.outcome).toBe("context");
-    expect(log.category).toBe("numbering");
-    expect(log.tool).toBe("Write");
-    expect(log.ext).toBe("md");
-    expect(typeof log.duration_ms).toBe("number");
+    const { ts, session_id, duration_ms, ...stable } = log;
+    expect(typeof duration_ms).toBe("number");
+    expect(stable).toMatchInlineSnapshot(`
+      {
+        "category": "numbering",
+        "ext": "md",
+        "outcome": "context",
+        "tool": "Write",
+      }
+    `);
   });
 
   it("falls through to later checkers when earlier ones are silent", async () => {

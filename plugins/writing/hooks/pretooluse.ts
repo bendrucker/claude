@@ -58,7 +58,7 @@ export async function dispatch(
   const mode: numbering.Mode = input.tool_name === "Edit" ? "edit" : "write";
   const checkers = [
     () => numbering.check(input, mode),
-    async () => headings.check(input),
+    () => headings.check(input),
     () => tropes.check(input),
   ];
 

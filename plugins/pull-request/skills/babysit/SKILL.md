@@ -129,7 +129,7 @@ Report the event (include `minutes`) and the work done since the start SHA, then
 
 ## Reviews Hand-off
 
-With `--reviews`, after the first green invoke `pull-request:follow-up --auto <pr-url>` to triage AI-reviewer threads (fix, reply, resolve, loop until the reviewer is satisfied). follow-up calls back into babysit for each post-push CI wait, so let it own the review loop.
+With `--reviews`, after the first green invoke `pull-request:follow-up --auto <pr-url>` to triage AI-reviewer threads (fix, reply, resolve, loop until the reviewer is satisfied). follow-up calls back into babysit for each post-push CI wait, so let it own the review loop. When a bot review is expected but hasn't landed at green, follow-up waits for its first pass rather than reporting nothing to do.
 
 When it returns satisfied, re-request the **human** reviewers whose approval a push (follow-up's fixes or babysit's own) invalidated. Don't re-request bots; follow-up owns the `@bot` re-trigger.
 

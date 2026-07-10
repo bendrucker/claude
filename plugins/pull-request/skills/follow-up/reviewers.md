@@ -4,12 +4,12 @@ Per-reviewer "satisfied" signals for the `--auto` loop, plus how to add a review
 
 ## Satisfaction Signals
 
-Third-party reviewers converge on one shape: each leaves a single summary comment, edited in place across review cycles, holding the satisfaction signal and sometimes actionable items that never become inline threads. Read the summary, not just the thread list:
+Third-party reviewers converge on one shape: each leaves a single summary comment, edited in place across review cycles, holding the satisfaction signal and sometimes actionable items that never become inline threads. These bots deliver the verdict by editing that comment in place and submit no native GitHub review, so the reviews list (`gh api .../pulls/N/reviews` filtered to the bot) never populates and polling it hangs until timeout. Read the summary, not just the thread list or the reviews list:
 
 - Select the summary comment by `updated_at`, not `created_at`. The current signal is an edit to a comment created rounds ago, so newest-created points at the wrong one.
 - Treat the summary body as a thread source. A thread-count check alone reads an unfinished review, with actionable items parked in the summary, as satisfied.
 
-A reviewer is done when its latest summary on the current HEAD reports nothing actionable and no unresolved bot threads remain. A stale signal from an earlier SHA does not count. Each vendor phrases "none left" differently; use the string as a fast path, fall back to the thread count:
+A reviewer is done when its latest summary on the current HEAD reports nothing actionable and no unresolved bot threads remain. A stale signal from an earlier SHA does not count. An **absent** summary on HEAD means the review is still pending, so when a review is expected, wait for the summary to land before reading it. Each vendor phrases "none left" differently; use the string as a fast path, fall back to the thread count:
 
 - **CodeRabbit** (GitHub `coderabbitai`, GitLab `group_<id>_bot_<hash>`): `Actionable comments posted: 0`. Nitpick and LGTM notes are noise unless obviously correct.
 - **Greptile** (GitHub `greptile-apps[bot]` / `greptileai`): top confidence score (e.g. `5/5`); actionable items live in its "fix all with AI" section.
@@ -18,7 +18,17 @@ A reviewer is done when its latest summary on the current HEAD reports nothing a
 
 #### Copilot
 
-GitHub Copilot (`copilot-pull-request-reviewer` / `github-copilot[bot]`) diverges: it posts a fresh native GitHub review each cycle instead of editing one comment in place, so take its latest review by submission, not `updated_at`. Satisfied when that review on the current HEAD adds no actionable threads ("reviewed N files and found no issues" / "no further comments").
+GitHub Copilot (`copilot-pull-request-reviewer` / `github-copilot[bot]`) diverges and is the one exception to the reviews-list warning above: it posts a fresh native GitHub review each cycle instead of editing one comment in place, so take its latest review by submission, not `updated_at`. Satisfied when that review on the current HEAD adds no actionable threads ("reviewed N files and found no issues" / "no further comments").
+
+## When a Review Is Expected
+
+Whether a review is expected decides how to read an absent summary: pending (keep waiting) versus nothing-to-do (stop). This is the one definition every entry path shares. A bot review is expected when any of these hold:
+
+- a review bot is assigned or already present as a reviewer,
+- a bot-review status check is pending on HEAD,
+- a reviewer in the list above is configured for the repo, shown by its app or webhook being installed or by recent review activity.
+
+The status-check signal only appears after the PR exists and the bot's webhook has fired, so a check made at creation time sees only the first and third. Re-evaluate against the live PR before merging, where the pending check has appeared. With none of these signals present, no review is expected: an empty result is nothing to do.
 
 ## Re-triggering an Idle Reviewer
 

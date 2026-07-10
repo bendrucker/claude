@@ -13,7 +13,7 @@ JSONL files in `~/.claude/projects/` are the canonical data. The DuckDB database
 
 ### Host Enumeration
 
-`db.ts` enumerates one entry per host: `local` (honoring `CLAUDE_PROJECTS_DIR` / the `projectsDir` option) plus one per `~/.claude/session-imports/*/manifest.json` (override the root with `CLAUDE_SESSION_IMPORTS_DIR` / the `importsDir` option). The filesystem is the registry; there is no host table. `ensureIndex` loops the hosts, scanning each host's root in TypeScript and importing per file. A host whose root directory is missing is skipped, never treated as all-files-deleted, so a typo'd `CLAUDE_PROJECTS_DIR` or unmounted dir cannot wipe a host's rows.
+`db.ts` enumerates one entry per host: `local` (honoring `CLAUDE_PROJECTS_DIR` / the `projectsDir` option) plus one per `~/.claude/session-imports/*/manifest.json` (override the root with `CLAUDE_SESSION_IMPORTS_DIR` / the `importsDir` option). The filesystem is the registry; there is no host table. `ensureIndex` loops the hosts, scanning each host's root in TypeScript and importing per file. A host whose root directory is missing is skipped, never treated as all-files-deleted, so a typo'd `CLAUDE_PROJECTS_DIR` or unmounted dir cannot wipe a host's rows. Any other scan failure (e.g. an unreadable subdirectory) aborts the refresh, because a partial listing is indistinguishable from mass deletion.
 
 ### Tables
 

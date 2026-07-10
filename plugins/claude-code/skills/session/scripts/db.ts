@@ -196,17 +196,13 @@ export interface ScannedFile {
   size: number;
 }
 
-function listEntries(root: string) {
-  try {
-    return readdirSync(root, { withFileTypes: true, recursive: true });
-  } catch {
-    return [];
-  }
-}
-
+// Scan errors must propagate, never degrade to an empty listing: ensureIndex
+// reads a missing path as a deleted file, so a swallowed error (e.g. an
+// unreadable subdirectory) would delete every indexed row for the host. The
+// missing-root case is handled by the dirExists guard before the scan.
 export function scanJsonlFiles(root: string): ScannedFile[] {
   const files: ScannedFile[] = [];
-  for (const entry of listEntries(root)) {
+  for (const entry of readdirSync(root, { withFileTypes: true, recursive: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
     const full = path.join(entry.parentPath, entry.name);
     const file = Bun.file(full);

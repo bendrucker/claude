@@ -25,15 +25,16 @@ It is read-only and writes nothing, so it runs as a background dispatch rather t
 ```mermaid
 flowchart TD
     S([ship start]) --> G{plan:review gated in?}
-    G -->|no| F[fix passes: comments-audit, code-review or simplify, writing, verify]
+    G -->|no| F1[fix passes: comments-audit, code-review or simplify, writing, verify]
+    F1 --> C([create PR])
     G -->|yes| D[dispatch plan:review in background]
-    D --> F
+    D --> F2[fix passes: comments-audit, code-review or simplify, writing, verify]
     D -. concurrent .-> R[plan:review reasons over plan + diff]
-    F --> J{join plan:review}
+    F2 --> J{join: findings?}
     R -.-> J
     J -->|fix-worthy drift| A[act before create]
-    J -->|no findings, common| C
-    A --> C([create PR])
+    J -->|none, common| C
+    A --> C
 ```
 
 ## Effort Inference

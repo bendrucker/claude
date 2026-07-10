@@ -3,7 +3,15 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { $ } from "bun";
-import { compactDatabase, type Database, dirExists, ensureIndex, getDb, rebuildViews, runQuery } from "./db";
+import {
+  compactDatabase,
+  type Database,
+  dirExists,
+  ensureIndex,
+  getDb,
+  rebuildViews,
+  runQuery,
+} from "./db";
 
 async function backdate(target: string) {
   // Bun's shell builtin touch lacks -t, so use the system binary.

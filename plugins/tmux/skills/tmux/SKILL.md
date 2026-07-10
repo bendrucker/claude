@@ -121,6 +121,8 @@ When collaborating on a file, open it in a sidebar pane so the user sees changes
 tmux split-window -h -d -l 40% -t $TMUX_PANE '<command> <file>'
 ```
 
+The inline form is safe only when both the command and the path are bare. A filename with a space, or a `$EDITOR` carrying flags (`code -w`), hits the same silent no-op. Split bare and `send-keys` the viewer line instead (see [Running a Command](#running-a-command)).
+
 #### Available Tools
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/tools.sh`

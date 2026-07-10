@@ -1070,7 +1070,7 @@ describe("view versioning", () => {
     await db.run("DROP VIEW tool_calls");
     await reindex();
 
-    expect(db.query("SELECT * FROM tool_calls LIMIT 1")).rejects.toThrow();
+    await expect(db.query("SELECT * FROM tool_calls LIMIT 1")).rejects.toThrow();
   });
 });
 

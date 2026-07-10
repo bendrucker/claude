@@ -21,7 +21,8 @@ attach to it rather than launching a new one.
 
 1. **Attach**: load `review:tuicr` Session Discovery and resolve the active session `slug`
    (`tuicr review list --repo .`). If none is active or the match is ambiguous, ask for the slug.
-2. **Run the inbound loop**: run `review:self` (collect, apply, reconcile) against that session,
-   skipping its launch step. Read back with `tuicr review comments`, apply each comment as an edit,
-   and record resolutions in the ledger by comment `id` (`ledger.ts`) rather than deleting.
+2. **Run the inbound loop**: run `review:self`'s apply loop (collect, apply, reconcile) against
+   that session, skipping its launch, self-critique, and hand-off steps since the comments already
+   exist. Read back with `tuicr review comments`, apply each comment as an edit, and record
+   resolutions in the ledger by comment `id` (`ledger.ts`) rather than deleting.
 3. **Report** what changed and what stays open (`ledger.ts list --open`).

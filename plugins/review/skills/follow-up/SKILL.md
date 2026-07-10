@@ -1,9 +1,11 @@
 ---
 name: review:follow-up
 description: >
-  Follow up on a PR/MR you reviewed: assess whether the author's fixes actually grasped each
-  concern, find silently resolved or mechanically-fixed threads, and get a graded re-review call.
-  Use after leaving review feedback to see if the author acted on it.
+  Follow up as the reviewer on a PR/MR you reviewed: did the author's fixes actually grasp
+  each concern you raised, or just go through the motions? Finds silently resolved or
+  mechanically-fixed threads and returns a graded re-review call. Use when you left review
+  comments and want to verify the author acted on them before re-approving. Triggers: "did they
+  fix my review comments", "re-review this PR", "check whether the author addressed my feedback".
 argument-hint: "[pr-url] [--on-behalf-of <reviewer>]"
 allowed-tools:
   - Bash(gh:*)

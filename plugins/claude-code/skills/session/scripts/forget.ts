@@ -1,15 +1,7 @@
 #!/usr/bin/env bun
 import { rm } from "node:fs/promises";
 import { cli } from "cleye";
-import {
-  dirExists,
-  ensureSchema,
-  getDataDir,
-  getDb,
-  importRoot,
-  LOCAL_HOST,
-  rebuildViews,
-} from "./db";
+import { dirExists, ensureSchema, getDataDir, getDb, importRoot, LOCAL_HOST } from "./db";
 
 const argv = cli({
   name: "forget",
@@ -43,8 +35,10 @@ try {
   });
   deleted = Number(row?.n ?? 0n);
   await db.run("DELETE FROM raw WHERE host = $host", { host: label });
+  await db.run("DELETE FROM content_items WHERE host = $host", { host: label });
+  await db.run("DELETE FROM indexed_files WHERE host = $host", { host: label });
   await db.run("DELETE FROM meta WHERE host = $host", { host: label });
-  await rebuildViews(db);
+  await db.run("CHECKPOINT");
 } finally {
   db.close();
 }

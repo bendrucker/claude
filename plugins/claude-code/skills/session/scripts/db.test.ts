@@ -3,7 +3,12 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { $ } from "bun";
-import { type Database, dirExists, ensureIndex, getDb, rebuildViews, runQuery } from "./db";
+import { compactDatabase, type Database, dirExists, ensureIndex, getDb, runQuery } from "./db";
+
+async function backdate(target: string) {
+  // Bun's shell builtin touch lacks -t, so use the system binary.
+  await $`/usr/bin/touch -t 200001010000 ${target}`.quiet();
+}
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -35,7 +40,7 @@ async function importFixtureHost(label: string, opts: { source?: string } = {}) 
 }
 
 async function reindex() {
-  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir, force: true });
+  await ensureIndex(db, { projectsDir: fixturesDir, importsDir });
 }
 
 beforeEach(async () => {
@@ -43,7 +48,7 @@ beforeEach(async () => {
   importsDir = path.join(tmpDir, "imports");
   mkdirSync(importsDir, { recursive: true });
   db = await getDb(tmpDir);
-  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir });
+  await reindex();
 });
 
 afterEach(async () => {
@@ -281,7 +286,7 @@ describe("incremental refresh", () => {
     const before = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
-    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir });
+    await reindex();
     const after = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
@@ -332,9 +337,9 @@ describe("type drift across imports", () => {
         line: drifted,
       },
     );
-    await db.run("DELETE FROM meta");
+    await db.run("DELETE FROM indexed_files");
 
-    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir, force: true });
+    await reindex();
 
     const [typeRow] = await db.query<{ data_type: string }>(
       "SELECT data_type FROM information_schema.columns WHERE table_name = 'raw' AND column_name = 'data'",
@@ -612,12 +617,14 @@ describe("cross-machine history", () => {
     expect(Number(allStats[0]?.total_sessions)).toBe(Number(scopedStats[0]?.total_sessions) * 2);
   });
 
-  it("indexes a host whose files predate the local import (per-host watermark)", async () => {
-    // Push local's watermark past the imported files so they "predate" the local
-    // import. Only a per-host watermark (epoch for a new host) lets archive index;
-    // a shared watermark would skip its now-older files.
-    await db.run("UPDATE meta SET last_import = '2099-01-01'::TIMESTAMP WHERE host = 'local'");
+  it("indexes a host whose files predate the local import", async () => {
+    // Imported files can carry mtimes far older than anything already indexed
+    // (rsync -a preserves source mtimes). The per-file catalog keys on path +
+    // (mtime, size), so an old-mtime file on a new host is still a new path.
     await importFixtureHost("archive");
+    for (const rel of ["-Users-test-project/basic.jsonl", "-Users-test-webapp/webapp.jsonl"]) {
+      await backdate(path.join(importsDir, "archive", "projects", rel));
+    }
     await reindex();
 
     const [row] = await db.query<{ n: bigint }>(
@@ -635,8 +642,9 @@ describe("cross-machine history", () => {
     expect(Number(before?.n)).toBeGreaterThan(0);
 
     await db.run("DELETE FROM raw WHERE host = $host", { host: "gone" });
+    await db.run("DELETE FROM content_items WHERE host = $host", { host: "gone" });
+    await db.run("DELETE FROM indexed_files WHERE host = $host", { host: "gone" });
     await db.run("DELETE FROM meta WHERE host = $host", { host: "gone" });
-    await rebuildViews(db);
     await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
 
     const [after] = await db.query<{ n: bigint }>(
@@ -853,6 +861,149 @@ describe("pr_links view", () => {
     );
     expect(Number(row?.pr_number)).toBe(42);
     expect(row?.repository).toBe("test/project");
+  });
+});
+
+describe("change catalog", () => {
+  it("indexes a file rsynced in with an old mtime after the host was imported", async () => {
+    await importFixtureHost("work");
+    await reindex();
+
+    // rsync -a re-syncs deliver new files with preserved (old) source mtimes.
+    const late = path.join(importsDir, "work", "projects", "-Users-test-project", "late.jsonl");
+    await Bun.write(
+      late,
+      `${JSON.stringify({
+        type: "user",
+        sessionId: "late-session",
+        cwd: "/Users/test/project",
+        timestamp: "2024-01-15T10:00:00.000Z",
+        message: { role: "user", content: "hello from the past" },
+      })}\n`,
+    );
+    await backdate(late);
+    await reindex();
+
+    const rows = await db.query<{ session_id: string }>(
+      "SELECT session_id FROM raw WHERE session_id = 'late-session'",
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("reimports a file whose content changed and drops its stale rows", async () => {
+    await importFixtureHost("edited");
+    await reindex();
+    const target = path.join(importsDir, "edited", "projects", "-Users-test-project", "basic.jsonl");
+    const original = await Bun.file(target).text();
+    await Bun.write(
+      target,
+      `${original}${JSON.stringify({
+        type: "user",
+        sessionId: "basic-session",
+        cwd: "/Users/test/project",
+        timestamp: "2024-01-15T11:00:00.000Z",
+        message: { role: "user", content: "appended line" },
+      })}\n`,
+    );
+    await reindex();
+
+    const [row] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'edited' AND source_file = $path",
+      { path: target },
+    );
+    const originalLines = original.trim().split("\n").length;
+    expect(Number(row?.n)).toBe(originalLines + 1);
+  });
+
+  it("drops rows for files that disappear", async () => {
+    await importFixtureHost("shrinking");
+    await reindex();
+    const target = path.join(
+      importsDir,
+      "shrinking",
+      "projects",
+      "-Users-test-project",
+      "basic.jsonl",
+    );
+    const [before] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'shrinking' AND source_file = $path",
+      { path: target },
+    );
+    expect(Number(before?.n)).toBeGreaterThan(0);
+
+    await rm(target);
+    await reindex();
+
+    for (const table of ["raw", "content_items", "indexed_files"]) {
+      const column = table === "indexed_files" ? "path" : "source_file";
+      const [after] = await db.query<{ n: bigint }>(
+        `SELECT COUNT(*) AS n FROM ${table} WHERE host = 'shrinking' AND ${column} = $path`,
+        { path: target },
+      );
+      expect(Number(after?.n)).toBe(0);
+    }
+  });
+
+  it("keeps a host's rows when its root directory is missing", async () => {
+    await importFixtureHost("unmounted");
+    await reindex();
+    await rm(path.join(importsDir, "unmounted", "projects"), { recursive: true, force: true });
+    await reindex();
+
+    const [row] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'unmounted'",
+    );
+    expect(Number(row?.n)).toBeGreaterThan(0);
+  });
+});
+
+describe("view versioning", () => {
+  it("rebuilds views when the stored fingerprint is stale, even with no file changes", async () => {
+    await db.run("DROP VIEW tool_calls");
+    await db.run("UPDATE index_meta SET views_hash = 'stale'");
+    await reindex();
+
+    const rows = await db.query<{ tool_name: string }>("SELECT tool_name FROM tool_calls LIMIT 1");
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("skips the rebuild when the fingerprint matches and no files changed", async () => {
+    await db.run("DROP VIEW tool_calls");
+    await reindex();
+
+    expect(db.query("SELECT * FROM tool_calls LIMIT 1")).rejects.toThrow();
+  });
+});
+
+describe("compactDatabase", () => {
+  it("rewrites the file preserving tables, views, and macros", async () => {
+    const [before] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM raw");
+    db.close();
+
+    await compactDatabase(tmpDir);
+
+    db = await getDb(tmpDir);
+    const [after] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM raw");
+    expect(after?.n).toBe(before?.n);
+    // sessions exercises both a view and the project_id macro.
+    const sessions = await db.query<{ session_id: string }>("SELECT session_id FROM sessions");
+    expect(sessions.length).toBeGreaterThan(0);
+  });
+});
+
+describe("source_line", () => {
+  it("numbers ingested rows 1..N per file", async () => {
+    const rows = await db.query<{ source_file: string; n: bigint; lo: bigint; hi: bigint; d: bigint }>(
+      `SELECT source_file, COUNT(*) AS n, MIN(source_line) AS lo,
+              MAX(source_line) AS hi, COUNT(DISTINCT source_line) AS d
+       FROM raw WHERE host = 'local' GROUP BY source_file`,
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(Number(row.lo)).toBe(1);
+      expect(Number(row.hi)).toBe(Number(row.n));
+      expect(Number(row.d)).toBe(Number(row.n));
+    }
   });
 });
 

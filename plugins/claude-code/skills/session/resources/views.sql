@@ -49,46 +49,6 @@ FROM messages
 WHERE type = 'assistant'
 GROUP BY host, session_id, message_id;
 
-CREATE OR REPLACE TABLE content_items AS
-WITH src AS (
-  SELECT
-    r.host,
-    r.session_id,
-    r.timestamp,
-    r.project_path,
-    r.source_file,
-    r.source_line,
-    r.data->'$.message.content' AS message_content,
-    r.data->'$.toolUseResult'   AS tool_use_result,
-    r.data->>'$.attributionSkill'  AS attribution_skill,
-    r.data->>'$.attributionPlugin' AS attribution_plugin,
-    r.data->>'$.attributionAgent'  AS attribution_agent
-  FROM raw r
-  WHERE r.type IN ('user', 'assistant')
-)
-SELECT
-  s.host,
-  s.session_id,
-  s.timestamp,
-  s.project_path,
-  s.source_file,
-  s.source_line,
-  (item->>'$.type')        AS type,
-  (item->>'$.name')        AS name,
-  (item->>'$.id')          AS id,
-  (item->>'$.tool_use_id') AS tool_use_id,
-  (item->>'$.text')        AS text,
-  (item->>'$.content')     AS content,
-  TRY_CAST(item->>'$.is_error' AS BOOLEAN) AS is_error,
-  item AS data,
-  s.tool_use_result,
-  s.attribution_skill,
-  s.attribution_plugin,
-  s.attribution_agent
-FROM src s,
-LATERAL (SELECT unnest(json_extract(s.message_content, '$[*]')) AS item) t
-WHERE json_type(s.message_content) = 'ARRAY';
-
 CREATE OR REPLACE VIEW tool_calls AS
 SELECT
   name AS tool_name,

@@ -6,8 +6,8 @@ Fan out read-only analysts over the session index to mine config-change candidat
 
 Mirror the "Parallel Queries (Workflows)" pattern in [`SKILL.md`](../SKILL.md): refresh once, then every agent opens the index read-only.
 
-1. Refresh once, alone. `scripts/refresh.ts --refresh` takes an exclusive write lock, so it must finish before any agent starts. Capture the printed `$DB` path and hand it to the agents. Never let a fanned-out agent call `refresh.ts`.
-2. Fan out one agent per dimension below. Each runs its named queries (`duckdb -readonly "$DB" < resources/queries/<name>.sql`, scoped with `SET VARIABLE`) plus any inline rollups, all read-only, all against the one shared file. Read-only opens take no lock, so the agents never contend.
+1. Refresh once, alone. `scripts/refresh.ts --refresh` opens the database read-write, which needs exclusive access, so it must finish before any agent starts. Never let a fanned-out agent call `refresh.ts`.
+2. Fan out one agent per dimension below. Each runs its named queries (`duckdb -readonly <db-path> < resources/queries/<name>.sql`, scoped with `SET VARIABLE`) plus any inline rollups, all read-only, all against the one shared file at the stable path in `SKILL.md`. Read-only opens share the lock, so the agents never contend with each other.
 3. Each agent returns structured candidate findings plus the exact SQL it ran. The SQL travels with the finding so the grounding pass and the digest can both cite it.
 4. One or more grounding agents re-check every candidate against the live config (see [Grounding](#grounding)). Drop or downgrade anything that does not hold.
 

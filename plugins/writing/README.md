@@ -34,7 +34,7 @@ Context-tier findings are suppressed when the same rule category already fired i
 
 #### Run Log
 
-Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.jsonl` (rotated past 5 MB): timestamp, session, tool, extension, duration, outcome (`silent | context | ask | deny | skipped-scratch`), category, and suppression. This is the evidence surface for auditing the hooks' cost and precision. `WRITING_HOOKS_LOG=0` disables it, and a path value redirects it. Once two consecutive audits show stable behavior, flip the default off.
+Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.jsonl` (rotated past 5 MB): timestamp, session, tool, extension, duration, outcome (`silent | context | ask | deny | skipped-scratch`), category, and suppression. This is the evidence surface for auditing the hooks' cost and precision. `WRITING_HOOKS_LOG=0` disables it, and a path value redirects it. The `writing:analyze` skill reads it through [`skills/analyze/scripts/hook-health.ts`](skills/analyze/scripts/hook-health.ts), which summarizes volume, latency, and per-rule fire/suppress counts and raises fix opportunities. Once two consecutive health checks come back stable, flip the default off.
 
 ## Testing
 

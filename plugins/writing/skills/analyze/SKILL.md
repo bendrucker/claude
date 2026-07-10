@@ -80,6 +80,29 @@ bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts headings tmp/heading-labels.tsv
 
 See the "Meaning-Layer Judge" section of [references/methodology.md](references/methodology.md) for the rubric, prompt versioning, gate, and calibration protocol.
 
+## Hook Health
+
+The PreToolUse dispatcher (`hooks/pretooluse.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see the plugin README). That log is the runtime half of this skill's audit: the wordlist analysis judges rule precision from session history, and the health check judges hook behavior from what the dispatcher actually did.
+
+Run it before or alongside the wordlist audit:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts
+bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --since 2026-07-01 --json
+bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --log /path/to/log.jsonl
+```
+
+It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, and per-category fire/suppress counts. The report ends with an opportunities list, each naming a concrete fix:
+
+- a category dominating injections points at a precision audit of that rule (sample its firings from session history, then demote, narrow, or retire)
+- a category suppressed as often as it fires means the reminder is not changing behavior within sessions
+- any `ask` outcome is a regression (the numbering demotion expected zero) and names a rule to demote
+- silent-run p95 over budget points at the dispatcher's checker order and prefilters
+- a high `skipped-scratch` share warrants checking recent Write paths against `isScratchPath` for swallowed durable prose
+- a clean report is itself the signal: after two consecutive stable audits, flip the `WRITING_HOOKS_LOG` default to off
+
+Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
+
 ## Metrics
 
 **Lift**: how distinctive a phrase is to assistant output vs. user text. `lift = rate_assistant / rate_user_smoothed`, where rates are per-million-token frequencies. A lift of 10.0 means the assistant uses the phrase 10x more per token than the user. The `--min-lift` threshold (default 5.0) gates new candidate phrases only. Rule keep/remove uses a direct rate comparison plus `--min-count`, not lift (see methodology).

@@ -107,7 +107,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a normal PR/MR that is rea
 
 - `--draft`: open the PR/MR as a draft. Default: ready for review.
 - `--auto`: after creating, enable auto-merge so it merges once checks pass and required approvals land. Default: off.
-- `--watch`: after creating, spawn `pull-request:babysit` to actively shepherd the PR/MR (fix trivial red CI, drive the merge). When a bot review should gate the merge (asked to wait for a reviewer, or one is expected), add `--reviews` so babysit hands the wait to `follow-up --auto`, which reads each reviewer's documented signal before merging. Distinct from `--auto`, which only flips on the platform's passive auto-merge. Default: off.
+- `--watch`: after creating, spawn `pull-request:babysit` to actively shepherd the PR/MR (fix trivial red CI, drive the merge). When a bot review should gate the merge (asked to wait for a reviewer, or a review bot is configured on the repo), add `--reviews` so babysit hands the wait to `follow-up --auto`, which reads each reviewer's documented signal before merging. At creation time the pending-status-check signal does not exist yet, so lean on the configured-reviewer signal here and let follow-up re-check the live PR; a needless `--reviews` costs only one no-op hand-off. Distinct from `--auto`, which only flips on the platform's passive auto-merge. Default: off.
 - `--dry-run` (alias `--body-only`): produce the body without creating anything. See [Dry Run](#dry-run). Default: off.
 
 ## Dry Run

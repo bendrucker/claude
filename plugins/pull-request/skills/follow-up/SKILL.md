@@ -57,7 +57,7 @@ Then run each round:
 
 Loop until: the reviewer's satisfaction signal hits on HEAD ([reviewers.md](reviewers.md)); no new bot threads for two rounds after a green push; max 4 rounds (oscillation guard); the idle timeout outlasts the re-trigger; or the PR closes/merges.
 
-When a bot review is **expected** (a reviewer bot assigned or already commenting, a pending bot-review status check, a configured reviewer per [reviewers.md](reviewers.md), or a bot that auto-reviews this repo) but no summary has landed on HEAD, an empty thread list means the review is still pending. The two-round satisfied exit above doesn't apply yet: wait through the same wake and re-trigger for the first summary. The idle-timeout backstop still bounds that wait, so a review that never runs times out instead of looping past the round cap. With no bot reviewer expected, an empty result is nothing to do: stop.
+When a bot review is **expected** ([reviewers.md](reviewers.md) defines the signals) but no summary has landed on HEAD, an empty thread list means the review is still pending. The two-round satisfied exit above doesn't apply yet: wait through the same wake and re-trigger for the first summary. The idle-timeout backstop still bounds that wait, so a review that never runs times out instead of looping past the round cap. With no bot reviewer expected, an empty result is nothing to do: stop.
 
 babysit and follow-up compose both directions: `babysit --reviews` hands off to this loop after its first green, and this loop calls babysit between rounds. The entry point is the outer one. "Wait for a bot review before merging" is exactly this pairing (`babysit --reviews --merge`, or this loop then merge), keyed on each reviewer's signal ([reviewers.md](reviewers.md)).
 

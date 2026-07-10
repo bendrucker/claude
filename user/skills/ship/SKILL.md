@@ -84,7 +84,7 @@ The commit sits on `HEAD`, so the fast-forward is clean. It runs in the Agent to
 - `--reviews` (default on): after first green, hand bot comments to `pull-request:follow-up --auto`.
 - `--merge`: only when `/ship --merge` was passed; else stop at green.
 
-A bot review often lands after the green push with no CI event to key off. `--reviews` covers this: follow-up waits for an expected review's first pass, then triages it. A review is expected when a review bot is configured on the repo, assigned or present as a reviewer, a bot-review status check is pending, or the repo shows recent bot review activity. With none of these, the hand-off returns at once and ship stops at green.
+A bot review often lands after the green push with no CI event to key off. `--reviews` covers this: follow-up waits for an expected review's first pass, then triages it. Follow-up owns which reviews are expected, keyed on the signals in its `reviewers.md`, so ship never restates them. With none expected, the hand-off returns at once and ship stops at green.
 
 Babysit owns the CI waits. Follow-up owns the wait for an expected review and its per-reviewer signal. Ship delegates the review wait and never hand-rolls a reviews-API poll.
 

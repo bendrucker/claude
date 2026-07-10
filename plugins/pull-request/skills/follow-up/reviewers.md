@@ -20,6 +20,16 @@ A reviewer is done when its latest summary on the current HEAD reports nothing a
 
 GitHub Copilot (`copilot-pull-request-reviewer` / `github-copilot[bot]`) diverges and is the one exception to the reviews-list warning above: it posts a fresh native GitHub review each cycle instead of editing one comment in place, so take its latest review by submission, not `updated_at`. Satisfied when that review on the current HEAD adds no actionable threads ("reviewed N files and found no issues" / "no further comments").
 
+## When a Review Is Expected
+
+Whether a review is expected decides how to read an absent summary: pending (keep waiting) versus nothing-to-do (stop). This is the one definition every entry path shares. A bot review is expected when any of these hold:
+
+- a review bot is assigned or already present as a reviewer,
+- a bot-review status check is pending on HEAD,
+- a reviewer in the list above is configured for the repo, shown by its app or webhook being installed or by recent review activity.
+
+The status-check signal only appears after the PR exists and the bot's webhook has fired, so a check made at creation time sees only the first and third. Re-evaluate against the live PR before merging, where the pending check has appeared. With none of these signals present, no review is expected: an empty result is nothing to do.
+
 ## Re-triggering an Idle Reviewer
 
 If a reviewer doesn't re-review within ~5 minutes of a green push, post **one** top-level comment mentioning it to re-trigger, then reset the idle timer:

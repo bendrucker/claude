@@ -1,6 +1,8 @@
 import { readdirSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
+import { $ } from "bun";
 
 const RESOURCES_DIR = path.join(import.meta.dirname, "..", "resources");
 const SCHEMA_DIR = path.join(RESOURCES_DIR, "schema");
@@ -11,7 +13,8 @@ export const LOCAL_HOST = "local";
 // Bump when the ingestion logic changes in a way that requires re-reading every
 // JSONL line (not just newly-modified files). migrateIfNeeded drops the cache when
 // the stored version is older. v2: raw ingests all record types, not just chat.
-export const INDEX_VERSION = 2;
+// v3: per-file change catalog (indexed_files), incremental content_items.
+export const INDEX_VERSION = 3;
 
 export interface Database {
   run(sql: string, params?: Record<string, string | null>): Promise<void>;
@@ -32,7 +35,7 @@ export interface Manifest {
 
 export interface HostEntry {
   host: string;
-  glob: string;
+  root: string;
   policy: HostPolicy;
 }
 
@@ -50,11 +53,18 @@ async function createDatabase(dbPath: string): Promise<Database> {
       return reader.getRowObjectsJS() as T[];
     },
 
+    // Closing the instance (not just the connection) lets DuckDB run its shutdown
+    // checkpoint, without which freed blocks from DELETE+INSERT stay unreclaimed.
     close() {
       try {
         connection.closeSync();
       } catch (err) {
         console.error("Failed to close DuckDB connection:", err);
+      }
+      try {
+        instance.closeSync();
+      } catch (err) {
+        console.error("Failed to close DuckDB instance:", err);
       }
     },
   };
@@ -64,14 +74,14 @@ async function readSql(dir: string, name: string): Promise<string> {
   return Bun.file(path.join(dir, `${name}.sql`)).text();
 }
 
-function getLocalGlob(projectsDir?: string): string {
+function getLocalRoot(projectsDir?: string): string {
   const dir = projectsDir || process.env.CLAUDE_PROJECTS_DIR;
-  if (dir) return path.join(dir, "**", "*.jsonl");
+  if (dir) return dir;
 
   if (!process.env.HOME) {
     throw new Error("Cannot locate projects directory: set CLAUDE_PROJECTS_DIR or HOME");
   }
-  return path.join(process.env.HOME, ".claude", "projects", "**", "*.jsonl");
+  return path.join(process.env.HOME, ".claude", "projects");
 }
 
 export function getImportsDir(importsDir?: string): string {
@@ -88,9 +98,25 @@ export function importRoot(label: string, importsDir?: string): string {
   return path.join(getImportsDir(importsDir), label);
 }
 
+// The ${CLAUDE_PLUGIN_DATA} template expands only in skill text and hook/MCP
+// subprocesses, never in Bash tool shells, so the scripts resolve the dir from
+// their own installed location: cache/<marketplace>/<plugin>/<hash>/... maps to
+// data/<plugin>-<marketplace>/. The env var remains as an override (tests,
+// hooks, dev checkouts).
 export function getDataDir(): string {
-  return (
-    process.env.CLAUDE_PLUGIN_DATA || path.join(process.env.TMPDIR || "/tmp", "claude-session")
+  if (process.env.CLAUDE_PLUGIN_DATA) return process.env.CLAUDE_PLUGIN_DATA;
+
+  const segments = import.meta.dirname.split(path.sep);
+  const cacheIdx = segments.lastIndexOf("cache");
+  if (cacheIdx > 0 && segments[cacheIdx - 1] === "plugins" && segments.length > cacheIdx + 2) {
+    const marketplace = segments[cacheIdx + 1];
+    const plugin = segments[cacheIdx + 2];
+    const pluginsDir = segments.slice(0, cacheIdx).join(path.sep);
+    return path.join(pluginsDir, "data", `${plugin}-${marketplace}`);
+  }
+
+  throw new Error(
+    "Cannot locate plugin data directory: not running from an installed plugin. Set CLAUDE_PLUGIN_DATA.",
   );
 }
 
@@ -148,7 +174,7 @@ export async function enumerateHosts(
   options: { projectsDir?: string; importsDir?: string } = {},
 ): Promise<HostEntry[]> {
   const hosts: HostEntry[] = [
-    { host: LOCAL_HOST, glob: getLocalGlob(options.projectsDir), policy: {} },
+    { host: LOCAL_HOST, root: getLocalRoot(options.projectsDir), policy: {} },
   ];
 
   for (const imported of await listImportedHosts(options.importsDir)) {
@@ -156,12 +182,37 @@ export async function enumerateHosts(
     // key on it); the manifest's host field is informational and may be hand-edited.
     hosts.push({
       host: imported.label,
-      glob: path.join(imported.root, "projects", "**", "*.jsonl"),
+      root: path.join(imported.root, "projects"),
       policy: imported.manifest.policy ?? {},
     });
   }
 
   return hosts;
+}
+
+export interface ScannedFile {
+  path: string;
+  mtime: number;
+  size: number;
+}
+
+function listEntries(root: string) {
+  try {
+    return readdirSync(root, { withFileTypes: true, recursive: true });
+  } catch {
+    return [];
+  }
+}
+
+export function scanJsonlFiles(root: string): ScannedFile[] {
+  const files: ScannedFile[] = [];
+  for (const entry of listEntries(root)) {
+    if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+    const full = path.join(entry.parentPath, entry.name);
+    const file = Bun.file(full);
+    files.push({ path: full, mtime: Math.trunc(file.lastModified), size: file.size });
+  }
+  return files;
 }
 
 async function applySchema(db: Database): Promise<void> {
@@ -177,6 +228,7 @@ async function applySchema(db: Database): Promise<void> {
 async function dropCache(db: Database): Promise<void> {
   await db.run("DROP TABLE IF EXISTS content_items");
   await db.run("DROP TABLE IF EXISTS raw");
+  await db.run("DROP TABLE IF EXISTS indexed_files");
   await db.run("DROP TABLE IF EXISTS meta");
   await db.run("DROP TABLE IF EXISTS index_meta");
 }
@@ -220,53 +272,139 @@ export async function getDb(dataDir: string): Promise<Database> {
 export async function ensureSchema(db: Database): Promise<void> {
   await migrateIfNeeded(db);
   await applySchema(db);
-  await db.run("DELETE FROM index_meta");
-  await db.run(`INSERT INTO index_meta VALUES (${INDEX_VERSION})`);
+  const [row] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM index_meta");
+  if (!row || row.n === 0n) {
+    await db.run(`INSERT INTO index_meta VALUES (${INDEX_VERSION}, NULL)`);
+  }
 }
 
 export async function rebuildViews(db: Database): Promise<void> {
   await db.run(await readSql(RESOURCES_DIR, "views"));
 }
 
+async function viewsFingerprint(): Promise<string> {
+  const sql = await readSql(RESOURCES_DIR, "views");
+  return new Bun.CryptoHasher("sha256").update(sql).digest("hex");
+}
+
+async function removeFile(db: Database, host: string, file: string): Promise<void> {
+  await db.run("BEGIN");
+  await db.run("DELETE FROM raw WHERE host = $host AND source_file = $path", {
+    host,
+    path: file,
+  });
+  await db.run("DELETE FROM indexed_files WHERE host = $host AND path = $path", {
+    host,
+    path: file,
+  });
+  await db.run("COMMIT");
+}
+
+export interface IndexResult {
+  corpusBytes: number;
+  changedFiles: number;
+  removedFiles: number;
+}
+
 export async function ensureIndex(
   db: Database,
-  options: { projectsDir?: string; importsDir?: string; force?: boolean; dataDir?: string } = {},
-): Promise<void> {
-  const sessionId = process.env.CLAUDE_SESSION_ID;
-  const marker =
-    options.dataDir && sessionId
-      ? path.join(options.dataDir, `.refreshed-${sessionId}`)
-      : undefined;
-
-  if (!options.force && marker && (await Bun.file(marker).exists())) return;
-
+  options: { projectsDir?: string; importsDir?: string } = {},
+): Promise<IndexResult> {
   await ensureSchema(db);
 
-  let imported = false;
+  const importSql = await readSql(RESOURCES_DIR, "import");
+  let corpusBytes = 0;
+  let changedFiles = 0;
+  let removedFiles = 0;
+
   for (const entry of await enumerateHosts(options)) {
+    // A missing root is a transient or misconfigured mount (or a typo'd
+    // CLAUDE_PROJECTS_DIR), never "every file was deleted": skip the host
+    // rather than dropping all its rows. forget.ts deletes rows explicitly.
+    if (!dirExists(entry.root)) continue;
+    const scanned = scanJsonlFiles(entry.root);
+    corpusBytes += scanned.reduce((sum, f) => sum + f.size, 0);
+
+    const indexed = await db.query<{ path: string; mtime: bigint; size: bigint }>(
+      "SELECT path, mtime, size FROM indexed_files WHERE host = $host",
+      { host: entry.host },
+    );
+    const indexedByPath = new Map(indexed.map((r) => [r.path, r]));
+    const scannedPaths = new Set(scanned.map((f) => f.path));
+
+    const changed = scanned.filter((f) => {
+      const prev = indexedByPath.get(f.path);
+      return !prev || Number(prev.mtime) !== f.mtime || Number(prev.size) !== f.size;
+    });
+    const removed = indexed.filter((r) => !scannedPaths.has(r.path));
+
     await db.run("SET VARIABLE host = $host", { host: entry.host });
-    await db.run("SET VARIABLE projects_glob = $glob", { glob: entry.glob });
-    await db.run(await readSql(RESOURCES_DIR, "refresh"));
+    for (const file of changed) {
+      await db.run("SET VARIABLE source_path = $path", { path: file.path });
+      await db.run("SET VARIABLE source_mtime = $mtime", { mtime: String(file.mtime) });
+      await db.run("SET VARIABLE source_size = $size", { size: String(file.size) });
+      await db.run(importSql);
+    }
+    for (const file of removed) {
+      await removeFile(db, entry.host, file.path);
+    }
 
-    const [row] = await db.query<{ n: bigint }>("SELECT LEN(getvariable('changed_files')) as n");
-    if (!row || row.n === 0n) continue;
-
-    await db.run("SET VARIABLE source = getvariable('changed_files')");
-    await db.run(await readSql(RESOURCES_DIR, "import"));
-    imported = true;
+    if (changed.length > 0 || removed.length > 0) {
+      await db.run("DELETE FROM meta WHERE host = $host", { host: entry.host });
+      await db.run("INSERT INTO meta VALUES ($host, CURRENT_TIMESTAMP)", { host: entry.host });
+    }
+    changedFiles += changed.length;
+    removedFiles += removed.length;
   }
 
-  if (imported) {
+  // Rebuild when raw changed (views.sql rebuilds the content_items table, whose
+  // cross-file dedup cannot be maintained per-file) or when views.sql itself was
+  // edited, so a definition change applies even on a no-change refresh.
+  const wrote = changedFiles > 0 || removedFiles > 0;
+  const fingerprint = await viewsFingerprint();
+  const [metaRow] = await db.query<{ views_hash: string | null }>(
+    "SELECT views_hash FROM index_meta",
+  );
+  const viewsChanged = metaRow?.views_hash !== fingerprint;
+  if (wrote || viewsChanged) {
     await rebuildViews(db);
+    await db.run("UPDATE index_meta SET views_hash = $hash", { hash: fingerprint });
   }
 
   // Clear the per-host indexing variable so a query reusing this connection without
   // an explicit host param spans all hosts rather than inheriting the last one.
   await db.run("SET VARIABLE host = NULL");
 
-  if (marker) {
-    await Bun.write(marker, "");
+  // Without an explicit CHECKPOINT the blocks freed by DELETE+INSERT and the
+  // content_items rebuild are never reused and the file grows on every import.
+  if (wrote || viewsChanged) {
+    await db.run("CHECKPOINT");
   }
+
+  return { corpusBytes, changedFiles, removedFiles };
+}
+
+// Rewrites the database into a fresh file and swaps it in place. DuckDB never
+// returns file space to the OS, so a file bloated by past full-table rewrites
+// only shrinks via a copy into a new file.
+export async function compactDatabase(dataDir: string): Promise<void> {
+  const dbPath = sessionDbPath(dataDir);
+  const newPath = `${dbPath}.new`;
+  await rm(newPath, { force: true });
+  await rm(`${newPath}.wal`, { force: true });
+
+  const db = await createDatabase(dbPath);
+  try {
+    await db.run(`ATTACH '${newPath.replaceAll("'", "''")}' AS compacted`);
+    await db.run("COPY FROM DATABASE session TO compacted");
+    await db.run("DETACH compacted");
+  } finally {
+    db.close();
+  }
+
+  await $`mv ${newPath} ${dbPath}`.quiet();
+  await rm(`${dbPath}.wal`, { force: true });
+  await rm(`${newPath}.wal`, { force: true });
 }
 
 export async function runQuery<T>(

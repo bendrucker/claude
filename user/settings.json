@@ -320,6 +320,7 @@
     "filesystem": {
       "allowWrite": [
         "/tmp",
+        "~/.claude/plugins/data",
         "~/.tmux",
         "~/.terraform.d/plugin-cache",
         "~/.cache",

@@ -17,17 +17,17 @@ Search and analyze Claude Code conversation history via a DuckDB index over JSON
 
 Map any arguments to the mechanisms below:
 
-- `--refresh`: force a full rescan via `refresh.ts --refresh` before querying. Default: incremental refresh keyed on file mtime.
+- `--refresh`: force a rescan via `refresh.ts --refresh` before querying. Default: incremental refresh keyed on a per-file (mtime, size) catalog, skipped entirely while the freshness stamp is younger than `--max-age`.
 - `--host <label>`: scope queries to one imported machine through the `host` param. Default: span every host, including `local`. See [Cross-Machine History](#cross-machine-history).
 - `--since <date>`: pass as the `after_date` param to scope queries from that date forward. Default: the full index.
 
 ## Database
 
-The session index is a DuckDB database at `$CLAUDE_PLUGIN_DATA/session.duckdb`. The refresh script ensures it is current before querying.
+The session index is a DuckDB database at `${CLAUDE_PLUGIN_DATA}/session.duckdb`. That path is stable: use it directly in every query and agent prompt. `refresh.ts` prints the same path, resolved, for callers outside this skill.
 
 ### Refresh
 
-Run `refresh.ts` to scan `~/.claude/projects/**/*.jsonl` and update the index. Pass `--refresh` to force a rescan when the user asks for the latest data. The script prints the resolved DB path to stdout.
+Run `refresh.ts` before querying. It scans `~/.claude/projects/**/*.jsonl` plus any imported hosts, imports files whose mtime or size changed, drops rows for deleted files, and prints the DB path. When a prior refresh finished within `--max-age` (default 300 seconds), it prints the path and exits without opening the database, so calling it before every query is cheap. Pass `--refresh` to rescan regardless when the user asks for the latest data.
 
 ```bash
 ${CLAUDE_SKILL_DIR}/scripts/refresh.ts
@@ -36,31 +36,34 @@ ${CLAUDE_SKILL_DIR}/scripts/refresh.ts --refresh
 
 ### Querying
 
-After refresh, query the DB with the `duckdb` CLI or any DuckDB client. Querying never writes, so open `-readonly`: it takes no lock, so it never contends with a refresh or another query. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works; `getvariable('limit')` is unaffected.
+After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`: querying never writes, and a read-write open would block refreshes and other readers. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works; `getvariable('limit')` is unaffected.
 
 ```bash
-DB_PATH=$(${CLAUDE_SKILL_DIR}/scripts/refresh.ts)
-duckdb -readonly "$DB_PATH" "SELECT model, SUM(output_tokens) FROM message_usage GROUP BY model"
-duckdb -readonly "$DB_PATH" < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
+duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb "SELECT model, SUM(output_tokens) FROM message_usage GROUP BY model"
+duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
 ```
 
 `scripts/usage.ts` renders a session's token-burn timeline (`--session <id>`) in the terminal, or the top sessions by estimated cost (`--days <n>`) when no session is given. It opens the index read-only. Cost is an estimate from public API rates, useful as a relative weight rather than billed spend.
 
+### Locking
+
+DuckDB locks the database file per process. Read-only opens take a shared lock, and any number of them coexist. A write open (a refresh that has work to do) needs exclusive access: it cannot start while readers hold the file, and a reader cannot open mid-refresh. Either collision fails with `Could not set lock`; retry after the other side finishes. `refresh.ts` retries briefly on its own, and when a concurrent refresh holds the lock it prints the path and exits 0, since the other run is doing the same work.
+
 ### Parallel Queries (Workflows)
 
-To investigate the corpus with a fan-out of agents (breadth search for leads, then a depth pass per lead), refresh once up front and have every agent open the index read-only:
+To investigate the corpus with a fan-out of agents (breadth search for leads, then a depth pass per lead), refresh once up front, then have every agent open `${CLAUDE_PLUGIN_DATA}/session.duckdb` read-only. The path is stable, so agent prompts need no path threading.
 
 ```bash
-DB=$(${CLAUDE_SKILL_DIR}/scripts/refresh.ts --refresh)        # orchestrator, once
-duckdb -readonly "$DB" < ${CLAUDE_SKILL_DIR}/resources/queries/activity.sql   # agents, in parallel
+${CLAUDE_SKILL_DIR}/scripts/refresh.ts --refresh                # orchestrator, once
+duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/activity.sql   # agents, in parallel
 ```
 
-`refresh.ts` takes an exclusive write lock, so it must run alone; two refreshes (or any two read-write opens) at once fail with a lock conflict. A read-only open takes no lock, so any number of agents query the same file concurrently. Hand the resolved `$DB` path to the agents and never let a fanned-out agent call `refresh.ts`. Queries read a shared file, so the agents need no worktree.
+Read-only opens coexist, so agents never contend with each other. Never let a fanned-out agent call `refresh.ts`: past the stamp's `--max-age` it opens read-write, which collides with every reader. Queries read a shared file, so the agents need no worktree.
 
-Params work the same from the CLI: `getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare `duckdb -readonly "$DB" < query.sql` runs unfiltered. Prepend `SET VARIABLE` lines to scope it:
+Params work the same from the CLI: `getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare read-only run of a query file runs unfiltered. Prepend `SET VARIABLE` lines to scope it:
 
 ```bash
-duckdb -readonly "$DB" <<'SQL'
+duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb <<'SQL'
 SET VARIABLE after_date = '2026-05-01';
 SET VARIABLE hook = '*tropes*';
 .read ${CLAUDE_SKILL_DIR}/resources/queries/hook-blocks.sql
@@ -131,7 +134,7 @@ Full params and descriptions in [`references/catalog.md`](references/catalog.md)
 Two queries read files on disk through community extensions instead of the index. They need `markdown`/`yaml` loaded, so run them with `-init resources/extensions.sql`, which loads both in the same process before the piped query and runs under `-readonly`. The common-path queries above omit `-init` and pay nothing.
 
 ```bash
-duckdb -readonly -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql "$DB" \
+duckdb -readonly -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql ${CLAUDE_PLUGIN_DATA}/session.duckdb \
   < ${CLAUDE_SKILL_DIR}/resources/queries/plan-sections.sql
 ```
 
@@ -143,45 +146,13 @@ The reusable pattern for markdown/YAML on disk: a self-defaulting glob (`~` expa
 
 Session history copied from another machine is queryable alongside this machine's. Each machine is a `host`: this one is always `local`, and every imported machine gets a label you choose. With nothing imported, the index behaves exactly as the single-machine case.
 
-### Listing hosts
+### Listing Hosts
 
 ```bash
 ${CLAUDE_SKILL_DIR}/scripts/hosts.ts
 ```
 
-Shows each host with its import time, egress policy, last index, rsync source, and a ready-to-run re-sync command.
-
-### Importing a machine
-
-Copy the source machine's `~/.claude/projects/` into the import root, then register it. The `!` prefix runs the commands in your own shell, so SSH host-key trust and any 2FA stay in your hands.
-
-```bash
-mkdir -p ~/.claude/session-imports/<label>/projects
-rsync -avn --update <user@host>:.claude/projects/ ~/.claude/session-imports/<label>/projects/   # dry run
-rsync -av  --update <user@host>:.claude/projects/ ~/.claude/session-imports/<label>/projects/   # real copy
-${CLAUDE_SKILL_DIR}/scripts/import.ts --host <label> --source '<user@host>:.claude/projects/'
-```
-
-`import.ts` writes a manifest (dirs `0700`, manifest `0600`) recording the label, `--source`, and egress policy, then re-indexes. The whole `projects/` tree is copied even though only `*.jsonl` is indexed, because that tree is also the re-sync unit.
-
-### Re-syncing
-
-The source stored in the manifest doubles as the re-sync input, so refreshing is the same rsync line followed by `import.ts`:
-
-```bash
-rsync -av --update <source> ~/.claude/session-imports/<label>/projects/
-${CLAUDE_SKILL_DIR}/scripts/import.ts --host <label>
-```
-
-Re-running `import.ts` on a registered host leaves its manifest intact and re-indexes only the files whose mtime advanced (the watermark is per-host, so `rsync -a` preserving source mtimes is not a problem). `hosts.ts` prints the exact line per host.
-
-### Forgetting a machine
-
-```bash
-${CLAUDE_SKILL_DIR}/scripts/forget.ts --host <label>
-```
-
-Deletes the host's rows from the index and removes its synced files. `local` cannot be forgotten.
+Shows each host with its import time, egress policy, last index, rsync source, and a ready-to-run re-sync command. The import, re-sync, and forget procedures live in [`references/cross-machine.md`](references/cross-machine.md); read it when the user asks to import, re-sync, or remove a machine.
 
 ### Privacy
 
@@ -233,8 +204,8 @@ To retrieve the full JSONL line for a message:
 sed -n '<source_line>p' <source_file>
 ```
 
-`source_line` is 1-based and per-file (partitioned by `source_file`).
+`source_line` is 1-based and per-file, with two caveats. It reflects a single-file scan's row order, which DuckDB preserves in practice but does not formally guarantee for window functions. And unparseable lines are skipped at import (`ignore_errors`), so in a file containing malformed lines it can trail the physical line number. When exactness matters, verify the fetched line's `uuid` or `timestamp` against the row.
 
 ## Session File Structure
 
-Session logs live in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`. The index lives at `$CLAUDE_PLUGIN_DATA/session.duckdb`, refreshed incrementally based on file mtime.
+Session logs live in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`. The index lives at `${CLAUDE_PLUGIN_DATA}/session.duckdb`, refreshed incrementally from a per-file catalog of (mtime, size).

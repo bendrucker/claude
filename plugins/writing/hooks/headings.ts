@@ -5,13 +5,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { getExtension, isMarkdownFile } from "../detection/paths";
 import { classifyHeadingBaseline } from "../linguistics/heading";
-import {
-  type EditInput,
-  formatContext,
-  type HookResult,
-  type SyncHookJSONOutput,
-  type WriteInput,
-} from "./io";
+import { type EditInput, formatContext, type HookResult, type WriteInput } from "./io";
 
 const PLACEHOLDER = "\0";
 
@@ -178,8 +172,4 @@ export function check(input: PreToolUseHookInput): HookResult | null {
   }
 
   return null;
-}
-
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  return check(input)?.output ?? null;
 }

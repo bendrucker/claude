@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qE -- '--(body|message|description|title)[-= ]|(-F|--field)[= ][^ ]*=@'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\"; fi"
+            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qE -- '--(body|message|description|title)[-= ]|(-F|--field)[= ][^ ]*=@|git (commit|tag).* (-F|--file)[= ]'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\"; fi"
           }
         ]
       }

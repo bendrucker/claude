@@ -14,15 +14,13 @@ import {
   formatContext,
   formatDecision,
   type HookResult,
-  type SyncHookJSONOutput,
   type WriteInput,
 } from "./io";
 
 export type Mode = "write" | "edit";
 
 // Cheap prefilter covering every shape checkMarkdown or a numbering.yml rule
-// can flag. It gates the expensive path (mdast parse, sg spawn) in-process,
-// replacing the shell grep guard that hooks.json used to carry.
+// can flag. It gates the expensive path (mdast parse, sg spawn) in-process.
 const NUMBER_HINT = /(step|phase|part).{0,8}[0-9]|[0-9]\.( |\t)/i;
 
 export function hasNumberingHint(content: string): boolean {
@@ -178,11 +176,4 @@ Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
   }
 
   return { output: formatDecision("deny", reason), category: "numbering" };
-}
-
-export async function processInput(
-  input: PreToolUseHookInput,
-  mode: Mode,
-): Promise<SyncHookJSONOutput | null> {
-  return (await check(input, mode))?.output ?? null;
 }

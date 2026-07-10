@@ -9,7 +9,7 @@ import type {
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { formatDecision } from "./io";
-import { checkCode, checkMarkdown, hasNumberingHint, processInput } from "./numbering";
+import { check, checkCode, checkMarkdown, hasNumberingHint } from "./numbering";
 
 function hasSg(): boolean {
   try {
@@ -49,9 +49,9 @@ async function getOutput(
   input: PreToolUseHookInput,
   mode: "write" | "edit" = "write",
 ): Promise<PreToolUseHookSpecificOutput | null> {
-  const result = await processInput(input, mode);
+  const result = await check(input, mode);
   if (!result) return null;
-  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+  return result.output.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
 
 describe("formatDecision", () => {
@@ -67,9 +67,9 @@ describe("formatDecision", () => {
   });
 });
 
-// Ported from the retired hooks.json shell guard: every shape checkMarkdown or
-// a numbering.yml rule can flag must pass the hint, and content that cannot
-// match must short-circuit before the expensive checks.
+// Every shape checkMarkdown or a numbering.yml rule can flag must pass the
+// hint. Content that cannot match must short-circuit before the expensive
+// checks.
 describe("hasNumberingHint", () => {
   test.each<{ name: string; content: string; hinted: boolean }>([
     { name: "markdown numbered heading", content: "## 1. Setup\n\nBody\n", hinted: true },

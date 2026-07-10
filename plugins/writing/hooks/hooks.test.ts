@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BODY_FILE_FLAG, FIELD_FILE_GUARD, PROSE_FLAGS } from "./check-tropes";
+import {
+  BODY_FILE_FLAG,
+  FIELD_FILE_GUARD,
+  GIT_MESSAGE_FILE_GUARD,
+  PROSE_FLAGS,
+} from "./check-tropes";
 import config from "./hooks.json";
 
 type HookCommand = { type: string; command: string; if?: string };
@@ -45,6 +50,7 @@ describe("PreToolUse gating", () => {
     const alternation = `--(${PROSE_FLAGS.map((flag) => flag.slice(2)).join("|")})[-= ]`;
     expect(command).toContain(alternation);
     expect(command).toContain(FIELD_FILE_GUARD);
+    expect(command).toContain(GIT_MESSAGE_FILE_GUARD);
     expect(`${BODY_FILE_FLAG} `).toMatch(new RegExp(alternation));
   });
 });
@@ -104,7 +110,15 @@ describe("inline guard behavior", () => {
       command: "glab api projects/x/merge_requests --field description=@tmp/mr.md",
       runs: true,
     },
+    {
+      name: "quoted field file",
+      command: "gh api repos/x/y/issues -F 'body=@tmp/body.md'",
+      runs: true,
+    },
+    { name: "git commit message file", command: "git commit -F tmp/msg.txt", runs: true },
+    { name: "git tag long file flag", command: "git tag -a v1 --file tmp/tag.txt", runs: true },
     { name: "field with inline value", command: "gh api repos/x -F state=closed", runs: false },
+    { name: "git commit inline message", command: "git commit -m 'fix: parser'", runs: false },
     { name: "flag-free long command", command: "ls -la && bun test plugins/writing", runs: false },
   ])("dispatcher bash: $name", async ({ command, runs }) => {
     const hookCommand = findCommand("Bash", "pretooluse");

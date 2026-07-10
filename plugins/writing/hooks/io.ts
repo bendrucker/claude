@@ -7,7 +7,9 @@ export type EditInput = { file_path: string; new_string: string };
 
 // A checker's finding: the formatted hook output plus the rule category the
 // dispatcher uses for session-scoped repeat suppression and the run log.
-export type HookResult = { output: SyncHookJSONOutput; category: string };
+// suppressible: false exempts a context-shaped output from repeat suppression
+// (deny-tier findings reformatted as per-file fix-it reminders).
+export type HookResult = { output: SyncHookJSONOutput; category: string; suppressible?: boolean };
 
 export type PermissionTier = "deny" | "ask" | "context";
 

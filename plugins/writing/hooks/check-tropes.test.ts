@@ -3,8 +3,12 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { collectText, processInput } from "./check-tropes";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { check, collectText } from "./check-tropes";
+
+async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  return (await check(input))?.output ?? null;
+}
 
 function mockWrite(content: string): PreToolUseHookInput {
   return {
@@ -334,6 +338,29 @@ describe("collectText", () => {
         mockBash(`glab api projects/x/merge_requests --field description=@${tmpFile}`),
       );
       expect(texts).toContain("MR description");
+    });
+
+    it("reads shell-quoted field file paths", async () => {
+      await Bun.write(tmpFile, "Quoted body");
+      const texts = await collectText(mockBash(`gh api repos/x/y/issues -F 'body=@${tmpFile}'`));
+      expect(texts).toContain("Quoted body");
+    });
+
+    it("reads git commit -F message files", async () => {
+      await Bun.write(tmpFile, "Commit message body");
+      const texts = await collectText(mockBash(`git commit -F ${tmpFile}`));
+      expect(texts).toContain("Commit message body");
+    });
+
+    it("reads git tag --file message files", async () => {
+      await Bun.write(tmpFile, "Tag annotation");
+      const texts = await collectText(mockBash(`git tag -a v1.0.0 --file ${tmpFile}`));
+      expect(texts).toContain("Tag annotation");
+    });
+
+    it("ignores bare -F outside git commands", async () => {
+      const texts = await collectText(mockBash("curl -F upload=/tmp/data.bin https://x"));
+      expect(texts).toHaveLength(0);
     });
 
     it("ignores field flags with inline values", async () => {

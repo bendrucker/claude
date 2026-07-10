@@ -26,6 +26,20 @@ describe("isScratchPath", () => {
     expect(isScratchPath(filePath)).toBe(scratch);
   });
 
+  test("a repo checked out under a tmp-named ancestor is not scratch", () => {
+    expect(isScratchPath("/Users/x/tmp/myproject/README.md", "/Users/x/tmp/myproject")).toBe(false);
+  });
+
+  test("a tmp dir below such a repo still is", () => {
+    expect(isScratchPath("/Users/x/tmp/myproject/tmp/note.md", "/Users/x/tmp/myproject")).toBe(
+      true,
+    );
+  });
+
+  test("paths outside the working tree are not scratch by segment", () => {
+    expect(isScratchPath("/Users/x/other/tmp/doc.md", "/Users/x/myproject")).toBe(false);
+  });
+
   test("TMPDIR contents are scratch", () => {
     const tmpDir = process.env.TMPDIR;
     if (!tmpDir) return;

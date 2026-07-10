@@ -1,0 +1,12 @@
+{
+  "id": "tropes-test-weight-threshold-keep",
+  "path": "plugins/writing/detection/tropes.test.ts",
+  "language": "typescript",
+  "kind": "line",
+  "comment": "// Two occurrences of empower (2.5 each) = 5.0, well above 3.0.",
+  "context": "667:     });\n668: \n669:     it(\"flags repeated high-weight hits\", () => {\n670:       // Two occurrences of empower (2.5 each) = 5.0, well above 3.0.\n671:       const text = \"This empowers teams. That empowers customers.\";\n672:       expect(firstByTier(scan(text), \"context\")?.category).toBe(\"marketing verbs\");\n673:     });",
+  "action": "keep",
+  "category": null,
+  "source": "comment-skill tropes.test.ts:670",
+  "note": "Resolves the label-vs-rubric clash the plan flagged. The comment carries the per-hit weight (2.5) and the threshold (3.0) that justify the test's magic numbers and appear nowhere in the adjacent test code. That is the 'test rationale is good' carve-out. It must stay keep; pins that arithmetic which documents the assertion's constants is not restatement."
+}

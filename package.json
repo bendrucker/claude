@@ -21,40 +21,47 @@
     "plugins/issue",
     "plugins/ui-design",
     "plugins/gitlab",
-    "plugins/vscode",
     "packages/validate",
     "packages/marketplace",
+    "plugins/plan",
     "plugins/tmux",
     "plugins/mac",
     "plugins/x-callback-url",
     "plugins/review",
+    "plugins/comments",
+    "plugins/meme",
     ".claude/skills/agent-ideas"
   ],
   "scripts": {
     "build": "tsc --noEmit",
     "check": "biome check",
+    "coverage": "bun scripts/coverage/index.ts",
     "format": "biome format --write",
     "format:check": "biome format",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
+    "schemas": "bun scripts/schemas/index.ts",
     "skill-lint": "bun ./packages/skill-lint/cli.ts",
     "test": "bun test",
     "test:unit": "bun test"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.25",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.0",
     "@biomejs/biome": "^2.3.13",
     "@constellos/claude-code-kit": "^0.4.0",
     "@types/bun": "^1.3.12",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
+    "fast-check": "^4.8.0",
     "gray-matter": "^4.0.3"
   },
   "dependencies": {
-    "typescript": "^5.9.3",
+    "cleye": "^2.2.1",
+    "table": "^6.9.0",
+    "typescript": "^6.0.0",
     "url-pattern": "^1.0.3"
   },
   "overrides": {
-    "@apidevtools/json-schema-ref-parser": "^11.2.0"
+    "@apidevtools/json-schema-ref-parser": "^15.0.0"
   }
 }

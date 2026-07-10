@@ -1,0 +1,75 @@
+[
+  {
+    "op": "add",
+    "path": "/properties/sandbox/properties/allowAppleEvents",
+    "value": {
+      "type": "boolean",
+      "description": "Allow sandboxed commands to send macOS Apple Events (osascript, open)"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/properties/sandbox/properties/network/properties/allowMachLookup",
+    "value": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "macOS mach services the sandbox may look up (e.g. com.apple.trustd.agent for Go/Security.framework TLS)"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/properties/theme",
+    "value": {
+      "type": "string",
+      "description": "Color theme. \"auto\" follows the OS appearance."
+    }
+  },
+  {
+    "op": "add",
+    "path": "/properties/autoCompactEnabled",
+    "value": {
+      "type": "boolean",
+      "description": "Automatically compact the conversation when context grows large"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/properties/skipAutoPermissionPrompt",
+    "value": {
+      "type": "boolean",
+      "description": "Skip the automatic permission prompt when a tool requests access"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/properties/skipWorkflowUsageWarning",
+    "value": {
+      "type": "boolean",
+      "description": "Suppress the warning shown when workflow usage limits are approached"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/properties/agentPushNotifEnabled",
+    "value": {
+      "type": "boolean",
+      "description": "Send push notifications for background agent activity"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/properties/inputNeededNotifEnabled",
+    "value": {
+      "type": "boolean",
+      "description": "Send a notification when Claude is waiting for input"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/properties/preferredNotifChannel",
+    "value": {
+      "type": "string",
+      "description": "Channel used to deliver notifications (e.g. terminal_bell, iterm2)"
+    }
+  }
+]

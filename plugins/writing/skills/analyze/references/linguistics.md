@@ -9,9 +9,9 @@ Numbers are aggregates over private session corpora. Example headings are invent
 A writing check belongs to one of four layers, and the layer decides the right tool before any code is written:
 
 - **Vocabulary** (`delve`, `boasts`, "it's worth noting"): a wordlist. Linguistics adds nothing here. The analyze skill already measures word frequency and lift.
-- **Grammar** (sentence-shaped headings, passive voice, "not X but Y"): patterns over part-of-speech sequences that a wordlist cannot express and a plain regex gets wrong. This is the only layer a tagger helps with.
+- **Grammar** (sentence-shaped headings, passive voice, "not X but Y"): patterns over part-of-speech sequences that a wordlist cannot express and a plain regex gets wrong. The only layer a tagger helps with.
 - **Cross-sentence** (negation flips, escalating triads): structure spanning sentences, which a tagger alone cannot see.
-- **Meaning** (vacuous specificity, motivation absence, marketing tone, hedging density): no grammar captures it. This is the LLM judge's layer (`skills/analyze/scripts/judge.ts`, batch-only). See the "Meaning-Layer Judge" section of `methodology.md`.
+- **Meaning** (vacuous specificity, motivation absence, marketing tone, hedging density): no grammar captures it. The LLM judge's layer (`skills/analyze/scripts/judge.ts`, batch-only). See the "Meaning-Layer Judge" section of `methodology.md`.
 
 Before building a grammar rule, check whether a wordlist, a regex, or an LLM judge does the job as well. The tagger is not the default.
 
@@ -32,7 +32,7 @@ Hook promotion turns on interval width. A sample with few positives carries inte
 - `tagger.ts`, `compromise.ts`, `natural.ts`: adapters mapping each tagger to one coarse tag set, so grammar rules stay tagger-neutral.
 - `classifiers.ts`: eval-only. It imports the tagger adapters, including `natural`, a devDependency the plugin cache omits.
 
-Hooks must never import a tagger adapter. The plugin cache skips devDependencies, so a hook that imports one works locally and breaks for every install.
+Hooks must never import a tagger adapter. The plugin cache skips devDependencies, so a hook importing one works locally and breaks for every install.
 
 ## Tagger Failures
 
@@ -100,7 +100,7 @@ bun skills/analyze/scripts/headings-eval.ts --session-db "$DB_PATH" --labels tmp
 
 ## Synthetic Corpus
 
-The session corpus is private and cannot be committed, so it measures precision but cannot serve as a regression gate. Generate a corpus that is safe to commit (model output, never from a session):
+The session corpus is private and cannot be committed, so it measures precision but cannot serve as a regression gate. Generate a corpus safe to commit (model output, never from a session):
 
 ```bash
 claude -p --no-session-persistence --setting-sources project \
@@ -118,7 +118,7 @@ Vary the document type (design doc, postmortem, rollout plan) so heading styles 
 bun skills/analyze/scripts/headings-eval.ts --docs tmp/synthetic-corpus --out tmp/synthetic
 ```
 
-Ten generated documents produced 114 headings, none of them real sentence headings, so the synthetic corpus measures false positives. With no real positives in the sample, it says nothing about recall. The baseline flagged none. Candidates produced 1-15 each, all on conventional shapes that are now committed regression fixtures:
+Ten generated documents produced 114 headings, none of them real sentence headings, so the synthetic corpus measures false positives. With no real positives in the sample, it says nothing about recall. The baseline flagged none. Candidates produced 1-15 each, all on conventional shapes now committed as regression fixtures:
 
 - Numbered headings ("3.1 Unit Tests"): a plural head noun reads as a verb with the number as its subject.
 - Trailing participles ("Lessons Learned"): the participle fails the noun-phrase parse.
@@ -132,7 +132,7 @@ The upper-reference run this eval calls for: the same LLM judge that scores the 
 bun skills/analyze/scripts/judge-run.ts headings tmp/heading-labels.tsv
 ```
 
-The runner scores the judge against the existing labels with the same Wilson protocol and prints the full-set and random-subset aggregates. The comparison has not been run yet (it needs an API key and the labeled file, and sits behind the #791 calibration checkpoint). Record the resulting aggregate here, next to the classifier table, when it runs.
+The runner scores the judge against the existing labels with the same Wilson protocol and prints the full-set and random-subset aggregates. The comparison has not run yet (it needs an API key and the labeled file, and sits behind the #791 calibration checkpoint). Record the resulting aggregate here, next to the classifier table, when it runs.
 
 ## Verdict
 

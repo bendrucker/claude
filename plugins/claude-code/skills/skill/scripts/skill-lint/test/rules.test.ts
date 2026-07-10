@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import * as path from "node:path";
 import { lintSkill } from "../index";
 import { parseSkill } from "../parse";
@@ -12,8 +12,9 @@ import {
   nameFormat,
   nameLength,
 } from "../rules/frontmatter";
+import { preferHeaders } from "../rules/headers";
 import { namespaceMismatch, namespaceStutter } from "../rules/namespace";
-import type { RuleResult } from "../types";
+import type { RuleResult, Severity } from "../types";
 
 const fixturesDir = path.join(import.meta.dirname, "fixtures");
 
@@ -49,170 +50,150 @@ Content here.`);
 });
 
 describe("frontmatter rules", () => {
-  describe("nameFormat", () => {
-    it("passes for valid names", () => {
-      const content = parseSkill("---\nname: valid-name\n---\n");
-      const result = single(nameFormat.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("fails for uppercase", () => {
-      const content = parseSkill("---\nname: Invalid\n---\n");
-      const result = single(nameFormat.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
-
-    it("fails for underscores", () => {
-      const content = parseSkill("---\nname: invalid_name\n---\n");
-      const result = single(nameFormat.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
-
-    it("allows numbers", () => {
-      const content = parseSkill("---\nname: skill123\n---\n");
-      const result = single(nameFormat.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("allows namespaced names", () => {
-      const content = parseSkill("---\nname: github:actions\n---\n");
-      const result = single(nameFormat.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("allows same-name namespace", () => {
-      const content = parseSkill("---\nname: git:git\n---\n");
-      const result = single(nameFormat.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
+  test.each<{ name: string; frontmatter: string; passed: boolean }>([
+    { name: "passes for valid names", frontmatter: "---\nname: valid-name\n---\n", passed: true },
+    { name: "fails for uppercase", frontmatter: "---\nname: Invalid\n---\n", passed: false },
+    {
+      name: "fails for underscores",
+      frontmatter: "---\nname: invalid_name\n---\n",
+      passed: false,
+    },
+    { name: "allows numbers", frontmatter: "---\nname: skill123\n---\n", passed: true },
+    {
+      name: "allows namespaced names",
+      frontmatter: "---\nname: github:actions\n---\n",
+      passed: true,
+    },
+    { name: "allows same-name namespace", frontmatter: "---\nname: git:git\n---\n", passed: true },
+  ])("nameFormat: $name", ({ frontmatter, passed }) => {
+    const content = parseSkill(frontmatter);
+    const result = single(nameFormat.check(content, ""));
+    expect(result.passed).toBe(passed);
   });
 
-  describe("nameLength", () => {
-    it("passes for short names", () => {
-      const content = parseSkill("---\nname: short\n---\n");
-      const result = single(nameLength.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("fails for names over 64 chars", () => {
-      const longName = "a".repeat(65);
-      const content = parseSkill(`---\nname: ${longName}\n---\n`);
-      const result = single(nameLength.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
+  test.each<{ name: string; frontmatter: string; passed: boolean }>([
+    { name: "passes for short names", frontmatter: "---\nname: short\n---\n", passed: true },
+    {
+      name: "fails for names over 64 chars",
+      frontmatter: `---\nname: ${"a".repeat(65)}\n---\n`,
+      passed: false,
+    },
+  ])("nameLength: $name", ({ frontmatter, passed }) => {
+    const content = parseSkill(frontmatter);
+    const result = single(nameLength.check(content, ""));
+    expect(result.passed).toBe(passed);
   });
 
-  describe("nameEdgeHyphens", () => {
-    it("passes for valid names", () => {
-      const content = parseSkill("---\nname: valid-name\n---\n");
-      const result = single(nameEdgeHyphens.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("fails for leading hyphen", () => {
-      const content = parseSkill("---\nname: -invalid\n---\n");
-      const result = single(nameEdgeHyphens.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
-
-    it("fails for trailing hyphen", () => {
-      const content = parseSkill("---\nname: invalid-\n---\n");
-      const result = single(nameEdgeHyphens.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
-
-    it("fails for leading hyphen in namespace prefix", () => {
-      const content = parseSkill("---\nname: -github:actions\n---\n");
-      const result = single(nameEdgeHyphens.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
-
-    it("fails for trailing hyphen in namespaced part", () => {
-      const content = parseSkill("---\nname: github:actions-\n---\n");
-      const result = single(nameEdgeHyphens.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
-
-    it("passes for valid namespaced names", () => {
-      const content = parseSkill("---\nname: github:actions\n---\n");
-      const result = single(nameEdgeHyphens.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
+  test.each<{ name: string; frontmatter: string; passed: boolean }>([
+    { name: "passes for valid names", frontmatter: "---\nname: valid-name\n---\n", passed: true },
+    { name: "fails for leading hyphen", frontmatter: "---\nname: -invalid\n---\n", passed: false },
+    {
+      name: "fails for trailing hyphen",
+      frontmatter: "---\nname: invalid-\n---\n",
+      passed: false,
+    },
+    {
+      name: "fails for leading hyphen in namespace prefix",
+      frontmatter: "---\nname: -github:actions\n---\n",
+      passed: false,
+    },
+    {
+      name: "fails for trailing hyphen in namespaced part",
+      frontmatter: "---\nname: github:actions-\n---\n",
+      passed: false,
+    },
+    {
+      name: "passes for valid namespaced names",
+      frontmatter: "---\nname: github:actions\n---\n",
+      passed: true,
+    },
+  ])("nameEdgeHyphens: $name", ({ frontmatter, passed }) => {
+    const content = parseSkill(frontmatter);
+    const result = single(nameEdgeHyphens.check(content, ""));
+    expect(result.passed).toBe(passed);
   });
 
-  describe("nameConsecutiveHyphens", () => {
-    it("passes for single hyphens", () => {
-      const content = parseSkill("---\nname: valid-name\n---\n");
-      const result = single(nameConsecutiveHyphens.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("fails for consecutive hyphens", () => {
-      const content = parseSkill("---\nname: invalid--name\n---\n");
-      const result = single(nameConsecutiveHyphens.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
+  test.each<{ name: string; frontmatter: string; passed: boolean }>([
+    {
+      name: "passes for single hyphens",
+      frontmatter: "---\nname: valid-name\n---\n",
+      passed: true,
+    },
+    {
+      name: "fails for consecutive hyphens",
+      frontmatter: "---\nname: invalid--name\n---\n",
+      passed: false,
+    },
+  ])("nameConsecutiveHyphens: $name", ({ frontmatter, passed }) => {
+    const content = parseSkill(frontmatter);
+    const result = single(nameConsecutiveHyphens.check(content, ""));
+    expect(result.passed).toBe(passed);
   });
 
-  describe("descriptionRequired", () => {
-    it("passes when description exists", () => {
-      const content = parseSkill("---\ndescription: Some description\n---\n");
-      const result = single(descriptionRequired.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("fails when description is missing", () => {
-      const content = parseSkill("---\nname: test\n---\n");
-      const result = single(descriptionRequired.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
-
-    it("fails when description is empty", () => {
-      const content = parseSkill("---\ndescription: ''\n---\n");
-      const result = single(descriptionRequired.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
+  test.each<{ name: string; frontmatter: string; passed: boolean }>([
+    {
+      name: "passes when description exists",
+      frontmatter: "---\ndescription: Some description\n---\n",
+      passed: true,
+    },
+    {
+      name: "fails when description is missing",
+      frontmatter: "---\nname: test\n---\n",
+      passed: false,
+    },
+    {
+      name: "fails when description is empty",
+      frontmatter: "---\ndescription: ''\n---\n",
+      passed: false,
+    },
+  ])("descriptionRequired: $name", ({ frontmatter, passed }) => {
+    const content = parseSkill(frontmatter);
+    const result = single(descriptionRequired.check(content, ""));
+    expect(result.passed).toBe(passed);
   });
 
-  describe("descriptionLength", () => {
-    it("passes for short descriptions", () => {
-      const content = parseSkill("---\ndescription: Short\n---\n");
-      const result = single(descriptionLength.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("fails for descriptions over 1024 chars", () => {
-      const longDesc = "a".repeat(1025);
-      const content = parseSkill(`---\ndescription: ${longDesc}\n---\n`);
-      const result = single(descriptionLength.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
+  test.each<{ name: string; frontmatter: string; passed: boolean }>([
+    {
+      name: "passes for short descriptions",
+      frontmatter: "---\ndescription: Short\n---\n",
+      passed: true,
+    },
+    {
+      name: "fails for descriptions over 1024 chars",
+      frontmatter: `---\ndescription: ${"a".repeat(1025)}\n---\n`,
+      passed: false,
+    },
+  ])("descriptionLength: $name", ({ frontmatter, passed }) => {
+    const content = parseSkill(frontmatter);
+    const result = single(descriptionLength.check(content, ""));
+    expect(result.passed).toBe(passed);
   });
 
-  describe("allowedToolsFormat", () => {
-    it("passes when allowed-tools is not set", () => {
-      const content = parseSkill("---\nname: test\n---\n");
-      const result = single(allowedToolsFormat.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("passes when allowed-tools is an array", () => {
-      const content = parseSkill("---\nallowed-tools:\n  - Bash\n  - Read\n---\n");
-      const result = single(allowedToolsFormat.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("passes when allowed-tools is an inline array", () => {
-      const content = parseSkill("---\nallowed-tools: [Bash, Read]\n---\n");
-      const result = single(allowedToolsFormat.check(content, ""));
-      expect(result.passed).toBe(true);
-    });
-
-    it("fails when allowed-tools is a comma-separated string", () => {
-      const content = parseSkill("---\nallowed-tools: Bash(gh:*), mcp__github\n---\n");
-      const result = single(allowedToolsFormat.check(content, ""));
-      expect(result.passed).toBe(false);
-    });
+  test.each<{ name: string; frontmatter: string; passed: boolean }>([
+    {
+      name: "passes when allowed-tools is not set",
+      frontmatter: "---\nname: test\n---\n",
+      passed: true,
+    },
+    {
+      name: "passes when allowed-tools is an array",
+      frontmatter: "---\nallowed-tools:\n  - Bash\n  - Read\n---\n",
+      passed: true,
+    },
+    {
+      name: "passes when allowed-tools is an inline array",
+      frontmatter: "---\nallowed-tools: [Bash, Read]\n---\n",
+      passed: true,
+    },
+    {
+      name: "fails when allowed-tools is a comma-separated string",
+      frontmatter: "---\nallowed-tools: Bash(gh:*), mcp__github\n---\n",
+      passed: false,
+    },
+  ])("allowedToolsFormat: $name", ({ frontmatter, passed }) => {
+    const content = parseSkill(frontmatter);
+    const result = single(allowedToolsFormat.check(content, ""));
+    expect(result.passed).toBe(passed);
   });
 });
 
@@ -221,115 +202,166 @@ describe("bangExecutionMatcher", () => {
   const skill = (allowedTools: string, body: string) =>
     parseSkill(`---\nname: test\nallowed-tools:\n${allowedTools}\n---\n\n${body}\n`);
 
-  it("passes when the open-glob shape matches a bang command", () => {
-    const content = skill(
-      `  - "Bash(bun ${root}/scripts/*)"`,
-      `- Out: !\`bun ${root}/scripts/context.ts\``,
-    );
+  test.each<{
+    name: string;
+    allowedTools: string;
+    body: string;
+    passed: boolean;
+    severity?: Severity;
+    message?: string;
+  }>([
+    {
+      name: "passes when the open-glob shape matches a bang command",
+      allowedTools: `  - "Bash(bun ${root}/scripts/*)"`,
+      body: `- Out: !\`bun ${root}/scripts/context.ts\``,
+      passed: true,
+    },
+    {
+      name: "warns when a :* glob matcher matches a bang command",
+      allowedTools: `  - "Bash(bun ${root}/scripts/*:*)"`,
+      body: `- Out: !\`bun ${root}/scripts/context.ts\``,
+      passed: false,
+      severity: "warn",
+      message: `Bash(bun ${root}/scripts/*:*)`,
+    },
+    {
+      name: "passes when there is no bang execution",
+      allowedTools: `  - "Bash(bun ${root}/scripts/*:*)"`,
+      body: "Run the script when needed.",
+      passed: true,
+    },
+    {
+      name: "ignores a :* glob matcher that no bang command uses",
+      allowedTools: '  - "Bash(git show :*:*)"\n  - "Bash(jq:*)"',
+      body: "- List: !`tuicr review list`",
+      passed: true,
+    },
+    {
+      name: "passes when a bang command is matched by a command-prefix matcher",
+      allowedTools: '  - "Bash(uname:*)"',
+      body: "- OS: !`uname -s`",
+      passed: true,
+    },
+  ])("$name", ({ allowedTools, body, passed, severity, message }) => {
+    const content = skill(allowedTools, body);
     const result = single(bangExecutionMatcher.check(content, ""));
-    expect(result.passed).toBe(true);
+    expect(result.passed).toBe(passed);
+    if (severity) {
+      expect(result.severity).toBe(severity);
+    }
+    if (message) {
+      expect(result.message).toContain(message);
+    }
+  });
+});
+
+describe("preferHeaders", () => {
+  const failing = (body: string) => {
+    const result = preferHeaders.check(parseSkill(body), "");
+    const results = Array.isArray(result) ? result : [result];
+    return results.filter((r) => !r.passed);
+  };
+
+  test.each<{ name: string; body: string; flagged: boolean }>([
+    { name: "flags a line-start bold label", body: "**Config**: value", flagged: true },
+    { name: "passes a hyphen list-item label", body: "- **Item**: value", flagged: false },
+    { name: "passes a numbered list-item label", body: "1. **Step**: value", flagged: false },
+    {
+      name: "passes mid-sentence bold",
+      body: "A line carrying **inline bold**: continues here",
+      flagged: false,
+    },
+    {
+      name: "passes a bold label inside a fenced block",
+      body: "```md\n**Fenced**: value\n```",
+      flagged: false,
+    },
+    {
+      name: "passes a label inside a block that nests a different fence marker",
+      body: "```md\n~~~\n**Inner**: value\n~~~\n```",
+      flagged: false,
+    },
+  ])("$name", ({ body, flagged }) => {
+    expect(failing(body).length > 0).toBe(flagged);
   });
 
-  it("warns when a :* glob matcher matches a bang command", () => {
-    const content = skill(
-      `  - "Bash(bun ${root}/scripts/*:*)"`,
-      `- Out: !\`bun ${root}/scripts/context.ts\``,
-    );
-    const result = single(bangExecutionMatcher.check(content, ""));
-    expect(result.passed).toBe(false);
-    expect(result.severity).toBe("warn");
-    expect(result.message).toContain(`Bash(bun ${root}/scripts/*:*)`);
-  });
-
-  it("passes when there is no bang execution", () => {
-    const content = skill(`  - "Bash(bun ${root}/scripts/*:*)"`, "Run the script when needed.");
-    const result = single(bangExecutionMatcher.check(content, ""));
-    expect(result.passed).toBe(true);
-  });
-
-  it("ignores a :* glob matcher that no bang command uses", () => {
-    const content = skill(
-      '  - "Bash(git show :*:*)"\n  - "Bash(jq:*)"',
-      "- List: !`hunk session list`",
-    );
-    const result = single(bangExecutionMatcher.check(content, ""));
-    expect(result.passed).toBe(true);
-  });
-
-  it("passes when a bang command is matched by a command-prefix matcher", () => {
-    const content = skill('  - "Bash(uname:*)"', "- OS: !`uname -s`");
-    const result = single(bangExecutionMatcher.check(content, ""));
-    expect(result.passed).toBe(true);
+  it("reports the offending line number and warn severity", () => {
+    const [offender] = failing("intro\n\n**Config**: value");
+    expect(offender?.severity).toBe("warn");
+    expect(offender?.line).toBe(3);
   });
 });
 
 describe("namespace rules", () => {
   const pluginPath = (plugin: string) => `plugins/${plugin}/skills/some-skill`;
 
-  describe("namespaceMismatch", () => {
-    it("passes when prefix matches plugin", () => {
-      const content = parseSkill("---\nname: github:actions\n---\n");
-      const result = single(namespaceMismatch.check(content, pluginPath("github")));
-      expect(result.passed).toBe(true);
-    });
-
-    it("passes when no prefix", () => {
-      const content = parseSkill("---\nname: actions\n---\n");
-      const result = single(namespaceMismatch.check(content, pluginPath("github")));
-      expect(result.passed).toBe(true);
-    });
-
-    it("fails when prefix mismatches plugin", () => {
-      const content = parseSkill("---\nname: gitlab:foo\n---\n");
-      const result = single(namespaceMismatch.check(content, pluginPath("github")));
-      expect(result.passed).toBe(false);
-    });
-
-    it("skips when not in a plugin directory", () => {
-      const content = parseSkill("---\nname: gitlab:foo\n---\n");
-      const result = single(namespaceMismatch.check(content, "/some/other/path"));
-      expect(result.passed).toBe(true);
-    });
+  test.each<{ name: string; skillName: string; plugin: string; passed: boolean }>([
+    {
+      name: "passes when prefix matches plugin",
+      skillName: "github:actions",
+      plugin: "github",
+      passed: true,
+    },
+    { name: "passes when no prefix", skillName: "actions", plugin: "github", passed: true },
+    {
+      name: "fails when prefix mismatches plugin",
+      skillName: "gitlab:foo",
+      plugin: "github",
+      passed: false,
+    },
+  ])("namespaceMismatch: $name", ({ skillName, plugin, passed }) => {
+    const content = parseSkill(`---\nname: ${skillName}\n---\n`);
+    const result = single(namespaceMismatch.check(content, pluginPath(plugin)));
+    expect(result.passed).toBe(passed);
   });
 
-  describe("namespaceStutter", () => {
-    it("passes for non-stuttering names", () => {
-      const content = parseSkill("---\nname: gitlab:ci\n---\n");
-      const result = single(namespaceStutter.check(content, pluginPath("gitlab")));
-      expect(result.passed).toBe(true);
-    });
+  it("namespaceMismatch: skips when not in a plugin directory", () => {
+    const content = parseSkill("---\nname: gitlab:foo\n---\n");
+    const result = single(namespaceMismatch.check(content, "/some/other/path"));
+    expect(result.passed).toBe(true);
+  });
 
-    it("warns on stuttering suffix", () => {
-      const content = parseSkill("---\nname: gitlab:gitlab-ci\n---\n");
-      const result = single(namespaceStutter.check(content, pluginPath("gitlab")));
-      expect(result.passed).toBe(false);
+  test.each<{ name: string; skillName: string; plugin: string; passed: boolean; warn?: boolean }>([
+    {
+      name: "passes for non-stuttering names",
+      skillName: "gitlab:ci",
+      plugin: "gitlab",
+      passed: true,
+    },
+    {
+      name: "warns on stuttering suffix",
+      skillName: "gitlab:gitlab-ci",
+      plugin: "gitlab",
+      passed: false,
+      warn: true,
+    },
+    {
+      name: "passes when suffix equals plugin name",
+      skillName: "git:git",
+      plugin: "git",
+      passed: true,
+    },
+    {
+      name: "permits the entry-skill convention (plugin:plugin)",
+      skillName: "writing:writing",
+      plugin: "writing",
+      passed: true,
+    },
+    {
+      name: "warns on redundant-suffix stutter (plugin:plugin-foo)",
+      skillName: "writing:writing-analyze",
+      plugin: "writing",
+      passed: false,
+      warn: true,
+    },
+    { name: "passes when no prefix", skillName: "actions", plugin: "github", passed: true },
+  ])("namespaceStutter: $name", ({ skillName, plugin, passed, warn }) => {
+    const content = parseSkill(`---\nname: ${skillName}\n---\n`);
+    const result = single(namespaceStutter.check(content, pluginPath(plugin)));
+    expect(result.passed).toBe(passed);
+    if (warn) {
       expect(result.severity).toBe("warn");
-    });
-
-    it("passes when suffix equals plugin name", () => {
-      const content = parseSkill("---\nname: git:git\n---\n");
-      const result = single(namespaceStutter.check(content, pluginPath("git")));
-      expect(result.passed).toBe(true);
-    });
-
-    it("permits the entry-skill convention (plugin:plugin)", () => {
-      const content = parseSkill("---\nname: writing:writing\n---\n");
-      const result = single(namespaceStutter.check(content, pluginPath("writing")));
-      expect(result.passed).toBe(true);
-    });
-
-    it("warns on redundant-suffix stutter (plugin:plugin-foo)", () => {
-      const content = parseSkill("---\nname: writing:writing-analyze\n---\n");
-      const result = single(namespaceStutter.check(content, pluginPath("writing")));
-      expect(result.passed).toBe(false);
-      expect(result.severity).toBe("warn");
-    });
-
-    it("passes when no prefix", () => {
-      const content = parseSkill("---\nname: actions\n---\n");
-      const result = single(namespaceStutter.check(content, pluginPath("github")));
-      expect(result.passed).toBe(true);
-    });
+    }
   });
 });
 
@@ -352,6 +384,14 @@ describe("lintSkill", () => {
     expect(result.errors).toBeGreaterThan(0);
     const descError = result.results.find((r) => r.rule === "description-required");
     expect(descError?.passed).toBe(false);
+  });
+
+  it("warns on line-start bold labels without failing", async () => {
+    const result = await lintSkill(path.join(fixturesDir, "prefer-headers"));
+    expect(result.errors).toBe(0);
+    const offenders = result.results.filter((r) => r.rule === "prefer-headers" && !r.passed);
+    expect(offenders).toHaveLength(1);
+    expect(offenders[0]?.line).toBe(8);
   });
 
   it("detects references", async () => {

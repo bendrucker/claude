@@ -1,5 +1,13 @@
-import { describe, expect, it } from "bun:test";
-import { firstByTier, type PatternMatch, regexCatalog, scan, stripCode } from "./tropes";
+import { describe, expect, it, test } from "bun:test";
+import fc from "fast-check";
+import {
+  firstByTier,
+  type PatternMatch,
+  regexCatalog,
+  scan,
+  semicolonSpliceHits,
+  stripCode,
+} from "./tropes";
 
 describe("regexCatalog", () => {
   it("returns globalized regex patterns for counting", () => {
@@ -32,6 +40,31 @@ describe("stripCode", () => {
 
   it("preserves non-code text", () => {
     expect(stripCode("This is plain text")).toBe("This is plain text");
+  });
+
+  // Text whose backticks only form single-line inline spans or well-formed
+  // fenced blocks. That is stripCode's intended domain: inline code that spans
+  // a newline is replaced by equal-width spaces, which drops the newline and
+  // collapses the line count.
+  const plainSegment = fc.string().map((s) => s.replace(/[`\n]/g, ""));
+  const inlineCodeLine = fc
+    .tuple(
+      plainSegment,
+      fc.string().map((s) => s.replace(/[`\n]/g, "") || "x"),
+      plainSegment,
+    )
+    .map(([pre, code, post]) => `${pre}\`${code}\`${post}`);
+  const fencedBlock = fc.array(plainSegment).map((lines) => `\`\`\`\n${lines.join("\n")}\n\`\`\``);
+  const codeSafeText = fc
+    .array(fc.oneof(plainSegment, inlineCodeLine, fencedBlock))
+    .map((blocks) => blocks.join("\n"));
+
+  it("preserves line count for well-formed code spans", () => {
+    fc.assert(
+      fc.property(codeSafeText, (text) => {
+        expect(stripCode(text).split("\n")).toHaveLength(text.split("\n").length);
+      }),
+    );
   });
 });
 
@@ -172,6 +205,38 @@ describe("scan", () => {
     for (const text of flag) {
       it(`flags: "${text}"`, () => {
         expect(firstByTier(scan(text), "context")?.category).toBe("promotional language");
+      });
+    }
+  });
+
+  describe("no X needed brag", () => {
+    // The flag side is open-ended: these artifact nouns are not enumerated
+    // anywhere in the detector, proving it generalizes past a fixed list.
+    const flag = [
+      "Handlers are auto-discovered, no config needed.",
+      "It runs inline (no wrapper needed).",
+      "Spin it up with no docker needed.",
+      "Drop the file in place, no namespace required.",
+      "It reads the token directly, no auth needed.",
+    ];
+    const allow = [
+      "Reviewed the helper, no change needed.",
+      "No further action needed here.",
+      "Patch-ids matched, no rebase needed.",
+      "No adjustment needed, it scales on its own.",
+      "It is no longer needed.",
+      "There is no way the runtime needed that much memory.",
+    ];
+
+    for (const text of flag) {
+      it(`flags: "${text}"`, () => {
+        expect(firstByTier(scan(text), "context")?.category).toBe("no X needed brag");
+      });
+    }
+
+    for (const text of allow) {
+      it(`allows: ${JSON.stringify(text)}`, () => {
+        expect(scan(text).find((m) => m.category === "no X needed brag")).toBeUndefined();
       });
     }
   });
@@ -343,6 +408,67 @@ describe("scan", () => {
     }
   });
 
+  describe("semicolon splice", () => {
+    const twoSplices =
+      "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.";
+    const oneSplice =
+      "The cache starts cold; the first request fills it. The retry logic backs off.";
+
+    test.each<{ name: string; text: string; min: number; count: number }>([
+      { name: "two splices counted at the prose threshold", text: twoSplices, min: 2, count: 2 },
+      { name: "one splice silent at the prose threshold", text: oneSplice, min: 2, count: 0 },
+      { name: "one splice counted at the comment threshold", text: oneSplice, min: 1, count: 1 },
+      {
+        name: "list-item semicolons skipped",
+        text: "- compile the sources; link the objects\n- package the build; ship the artifact",
+        min: 1,
+        count: 0,
+      },
+      {
+        name: "digit before the semicolon is not a splice",
+        text: "The count was 2; see below. The limit was 3; see above.",
+        min: 1,
+        count: 0,
+      },
+      {
+        name: "commented-out code is not a splice",
+        text: "foo(); bar()",
+        min: 1,
+        count: 0,
+      },
+      {
+        name: "uppercase clauses still splice",
+        text: "The cache starts cold; The first request fills it. It retries; It succeeds.",
+        min: 2,
+        count: 2,
+      },
+    ])("$name", ({ text, min, count }) => {
+      expect(semicolonSpliceHits(text, min).count).toBe(count);
+    });
+
+    it("flags two splices in short prose below the density gate", () => {
+      expect(scan(twoSplices).find((m) => m.category === "semicolon splice")).toBeDefined();
+    });
+
+    it("stays silent on a single splice in prose", () => {
+      expect(scan(oneSplice).find((m) => m.category === "semicolon splice")).toBeUndefined();
+    });
+
+    it("detects in prose files", () => {
+      expect(
+        scan(twoSplices, "doc.md").find((m) => m.category === "semicolon splice"),
+      ).toBeDefined();
+    });
+
+    for (const path of ["script.sh", "index.ts"]) {
+      it(`skips in ${path}`, () => {
+        expect(
+          scan(twoSplices, path).find((m) => m.category === "semicolon splice"),
+        ).toBeUndefined();
+      });
+    }
+  });
+
   it("returns all matches per tier", () => {
     const denyMatches = scan("This delve serves as a testament").filter((m) => m.tier === "deny");
     const categories = denyMatches.map((m) => m.category);
@@ -367,16 +493,11 @@ describe("scan", () => {
   });
 
   describe("sycophantic acknowledgment", () => {
-    it("flags: You're right", () => {
-      expect(firstByTier(scan("You're right, that was wrong."), "deny")?.category).toBe(
-        "sycophantic acknowledgment",
-      );
-    });
-
-    it("flags: You're absolutely right", () => {
-      expect(firstByTier(scan("You're absolutely right about that."), "deny")?.category).toBe(
-        "sycophantic acknowledgment",
-      );
+    it.each([
+      "You're right, that was wrong.",
+      "You're absolutely right about that.",
+    ])("flags: %j", (text) => {
+      expect(firstByTier(scan(text), "deny")?.category).toBe("sycophantic acknowledgment");
     });
 
     it("allows: turn right", () => {
@@ -533,44 +654,34 @@ describe("scan", () => {
   });
 
   describe("dig into", () => {
-    it("flags: 'dig into the codebase'", () => {
-      expect(firstByTier(scan("Let's dig into the codebase."), "context")?.category).toBe(
-        "dig into",
-      );
+    it.each([
+      "Let's dig into the codebase.",
+      "We'll dive into the data later.",
+      "I dug into the parser internals.",
+      "She dove into the schema migration.",
+      "We're digging into the root cause.",
+      "The audit dives into each subsystem.",
+    ])("flags: %j", (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("dig into");
     });
 
-    it("flags: 'dive into the data'", () => {
-      expect(firstByTier(scan("We'll dive into the data later."), "context")?.category).toBe(
-        "dig into",
-      );
+    it.each(["She dug a trench.", "Water drains into the basin."])("allows: %j", (text) => {
+      expect(scan(text).find((m) => m.category === "dig into")).toBeUndefined();
     });
   });
 
   describe("hedging observation", () => {
-    it("flags: looks like", () => {
-      expect(firstByTier(scan("This looks like a regression."), "context")?.category).toBe(
-        "hedging observation",
-      );
-    });
-
-    it("flags: appears to", () => {
-      expect(firstByTier(scan("The fix appears to hold."), "context")?.category).toBe(
-        "hedging observation",
-      );
+    it.each(["This looks like a regression.", "The fix appears to hold."])("flags: %j", (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("hedging observation");
     });
   });
 
   describe("filler", () => {
-    it("flags: 'it's worth noting that'", () => {
-      expect(
-        firstByTier(scan("It's worth noting that the cache is cold."), "context")?.category,
-      ).toBe("filler");
-    });
-
-    it("flags: 'in terms of'", () => {
-      expect(firstByTier(scan("In terms of latency, it improved."), "context")?.category).toBe(
-        "filler",
-      );
+    it.each([
+      "It's worth noting that the cache is cold.",
+      "In terms of latency, it improved.",
+    ])("flags: %j", (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("filler");
     });
 
     it("allows prose without filler markers", () => {
@@ -699,6 +810,16 @@ describe("scan", () => {
       expect(
         scan(text, "module.ts", "file").find((m) => m.category === "soft phrasing"),
       ).toBeUndefined();
+    });
+  });
+
+  describe("skillOnly patterns stay out of the hook", () => {
+    it.each([
+      ["rides on", "The teardown rides on the normal end of a team."],
+      ["can bite", "A stale cache entry can bite at runtime."],
+      ["surface as verb", "The hook should surface the conflict to the user."],
+    ])("scan() does not report %s", (category, text) => {
+      expect(scan(text, "doc.md", "file").find((m) => m.category === category)).toBeUndefined();
     });
   });
 });

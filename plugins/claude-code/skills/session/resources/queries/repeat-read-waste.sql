@@ -12,6 +12,13 @@
 -- Only `true_repeats` (and arguably `after_own_edit`) is actionable waste; a headline
 -- repeat percentage without this split mostly measures pagination and fan-out
 -- architecture.
+-- Token estimate: text results use the chars/4 proxy, but an image Read returns the file
+-- as a base64 image content block, whose real cost is the model's fixed image tokenization
+-- (~1,600 tokens/image), not a quarter of the base64 length. Left uncapped the proxy
+-- overstates image reads by orders of magnitude: one session's 31 image reads scored ~2.2M
+-- tokens on base64 length vs ~50K real. So image results are capped at a flat per-image
+-- budget: a re-read image still costs those ~1,600 tokens, so it stays in the estimate at
+-- that bounded rate.
 -- Params: after_date, before_date, project, host.
 WITH reads AS (
   SELECT
@@ -21,7 +28,15 @@ WITH reads AS (
     ((tc.data->'$.input.offset') IS NOT NULL
       OR (tc.data->'$.input.limit') IS NOT NULL) AS paginated,
     COALESCE(m.is_sidechain, FALSE) AS is_sidechain,
-    length(tr.content)              AS chars,
+    CASE
+      WHEN tr.content LIKE '%"type":"image"%'
+      -- flat 1,600 tokens per image content block in the result (count the blocks by
+      -- how many times the marker drops out of the string), so a base64 payload can't
+      -- masquerade as millions of text tokens
+      THEN 1600 * (length(tr.content) - length(replace(tr.content, '"type":"image"', '')))
+                  / length('"type":"image"')
+      ELSE length(tr.content) / 4.0
+    END                             AS est_tokens,
     tc.timestamp,
     tc.source_line
   FROM content_items tc
@@ -81,9 +96,9 @@ SELECT
     AS after_own_edit,
   COUNT(*) FILTER (WHERE prior_main_reads >= 1 AND NOT paginated AND NOT is_sidechain AND NOT after_own_edit)
     AS true_repeats,
-  ROUND(SUM(chars) FILTER (WHERE prior_main_reads >= 1 AND NOT paginated AND NOT is_sidechain AND NOT after_own_edit) / 4.0 / 1000.0, 1)
+  ROUND(SUM(est_tokens) FILTER (WHERE prior_main_reads >= 1 AND NOT paginated AND NOT is_sidechain AND NOT after_own_edit) / 1000.0, 1)
     AS true_repeat_ktokens,
-  ROUND(SUM(chars) FILTER (WHERE rn > 1) / 4.0 / 1000.0, 1) AS repeat_ktokens
+  ROUND(SUM(est_tokens) FILTER (WHERE rn > 1) / 1000.0, 1) AS repeat_ktokens
 FROM classified
 GROUP BY host
 ORDER BY host;

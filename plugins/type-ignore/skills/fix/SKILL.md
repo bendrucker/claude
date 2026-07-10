@@ -32,4 +32,4 @@ If no scope provided, scan the entire codebase.
 2. Run type checking to verify fixes
 3. Report summary: files fixed, ignores resolved, issues remaining
 
-Spawn agents in parallel using multiple Task tool calls in a single message.
+Spawn agents in parallel via multiple Task calls in a single message.

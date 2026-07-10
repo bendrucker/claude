@@ -1,6 +1,6 @@
 # Things URL Scheme Examples
 
-Detailed usage examples for the `url.ts` wrapper and raw URL scheme commands.
+Usage examples for the `url.ts` wrapper and raw URL scheme commands.
 
 ## Creating Todos
 
@@ -104,7 +104,7 @@ Item 2"
 
 ## Bulk Updating Todos
 
-Pass multiple `id=` params to batch updates into a single JSON command:
+Pass multiple `id=` params to batch updates into a single JSON command.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts update id=ABC-123 id=DEF-456 id=GHI-789 when=tomorrow

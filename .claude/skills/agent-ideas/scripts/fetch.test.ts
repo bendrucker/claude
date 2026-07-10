@@ -33,26 +33,35 @@ const rss = `<?xml version="1.0"?>
 
 describe("parseFeed", () => {
   test("parses Atom entries with alternate links and HTML-stripped excerpts", () => {
-    const posts = parseFeed(atom);
-    expect(posts).toHaveLength(2);
-    expect(posts[0]).toMatchObject({
-      title: "Agentic coding with Claude",
-      url: "https://example.com/post-1",
-      date: "2026-05-28T12:00:00.000Z",
-    });
-    expect(posts[0]?.excerpt).toBe("A post about & MCP tooling.");
-    expect(posts[1]?.url).toBe("https://example.com/post-2");
+    expect(parseFeed(atom)).toMatchInlineSnapshot(`
+      [
+        {
+          "date": "2026-05-28T12:00:00.000Z",
+          "excerpt": "A post about & MCP tooling.",
+          "title": "Agentic coding with Claude",
+          "url": "https://example.com/post-1",
+        },
+        {
+          "date": "2026-05-20T08:00:00.000Z",
+          "excerpt": "Body content here.",
+          "title": "Second post",
+          "url": "https://example.com/post-2",
+        },
+      ]
+    `);
   });
 
   test("parses RSS items and normalizes pubDate to ISO", () => {
-    const posts = parseFeed(rss);
-    expect(posts).toHaveLength(1);
-    expect(posts[0]).toMatchObject({
-      title: "RSS item one",
-      url: "https://example.com/rss-1",
-      date: "2026-05-28T12:00:00.000Z",
-    });
-    expect(posts[0]?.excerpt).toBe("HTML stripped description.");
+    expect(parseFeed(rss)).toMatchInlineSnapshot(`
+      [
+        {
+          "date": "2026-05-28T12:00:00.000Z",
+          "excerpt": "HTML stripped description.",
+          "title": "RSS item one",
+          "url": "https://example.com/rss-1",
+        },
+      ]
+    `);
   });
 
   test("returns no posts for an unrecognized document", () => {

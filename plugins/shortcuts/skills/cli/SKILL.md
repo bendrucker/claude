@@ -41,7 +41,7 @@ Shortcuts with GUI actions (alerts, menus, input prompts) fail with "Running was
 
 ### Permissions
 
-First-time actions (notifications, location, contacts, etc.) trigger a macOS permission dialog. The shortcut pauses until the user approves. Inform the user when running a shortcut that may trigger permission prompts.
+First-time actions (notifications, location, contacts, etc.) trigger a macOS permission dialog. The shortcut pauses until the user approves. Inform the user when running a shortcut that may trigger prompts.
 
 ## List
 
@@ -54,7 +54,7 @@ shortcuts list --folders
 
 ## View
 
-Opens a shortcut in the Shortcuts app editor:
+Opens a shortcut in the Shortcuts app editor.
 
 ```bash
 shortcuts view "My Shortcut"
@@ -69,11 +69,11 @@ mkdir -p out
 shortcuts sign -i "My Shortcut.shortcut" -o "out/My Shortcut.shortcut"
 ```
 
-Sign into an output directory to preserve the unsigned binary. The filename (minus `.shortcut`) becomes the shortcut name on import — do not add suffixes.
+Sign into an output directory to preserve the unsigned binary. The filename (minus `.shortcut`) becomes the shortcut name on import — don't add suffixes.
 
 ## Import
 
-There is no `shortcuts import` command. Open the signed file to trigger import:
+There is no `shortcuts import` command. Open the signed file to trigger import.
 
 ```bash
 open "out/My Shortcut.shortcut"

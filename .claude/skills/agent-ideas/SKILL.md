@@ -10,7 +10,7 @@ allowed-tools:
   - WebFetch
   - Task
   - Write
-  - Skill(things:inbox)
+  - Skill(things:url)
   - mcp__claude_ai_Zapier__things_create_to-do
   - mcp__claude-in-chrome__tabs_context_mcp
   - mcp__claude-in-chrome__tabs_create_mcp
@@ -73,7 +73,7 @@ For the weekly routine, create exactly one Things inbox item. It is the routine'
 
 Pick the delivery path by environment:
 
-- **Local** (Things reachable on this Mac): use the `things:inbox` skill. Leave it untagged, since the local phase adds `claude-code` per keeper later.
+- **Local** (Things reachable on this Mac): use the `things:url` skill's inbox capture. Leave it untagged, since the local phase adds `claude-code` per keeper later.
 - **Remote** (headless routine, no local MCPs): use the Zapier connector tool `mcp__claude_ai_Zapier__things_create_to-do`. It reaches Things through Anthropic's proxy. Tags aren't available remotely, which is fine: the doorway item is intentionally untagged.
 
 Do not tag the doorway item `claude-code`. Tagging happens per keeper in the local phase, so the whole digest doesn't land in the `improve-claude-code` backlog as one blob.
@@ -90,7 +90,7 @@ The digest is already in this session's context. After a teleport into a fresh t
 
 ## Capture Keepers
 
-For each keeper card, create one Things todo via the `things:inbox` skill, tagged `claude-code` so `improve-claude-code` picks it up:
+For each keeper card, create one Things todo via the `things:url` skill's inbox capture, tagged `claude-code` so `improve-claude-code` picks it up:
 
 - **Title**: `[agent-idea] <card title>`
 - **Notes**: the pitch, then the source URL, then the suggested `artifactType`. This is the shape `improve-claude-code` consumes (short title, full notes).

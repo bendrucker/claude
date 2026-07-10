@@ -2,7 +2,7 @@
 
 ## Standard Personas
 
-Always consider these perspectives:
+Always consider these:
 
 | Persona | Focus Areas |
 |---------|-------------|
@@ -15,7 +15,7 @@ Always consider these perspectives:
 
 ## Dynamic Personas
 
-Generate additional personas based on spec content:
+Generate additional personas from spec content:
 
 | Persona | When to Include |
 |---------|-----------------|

@@ -22,7 +22,7 @@ When repositories are provided, consult code to verify:
 - Referenced files and structures exist
 - Implementation assumptions are accurate
 
-Explore on demand during review rather than upfront.
+Explore on demand during review, not upfront.
 
 ## Review Process
 
@@ -35,7 +35,7 @@ Select relevant personas from [references/experts.md](references/experts.md):
 
 ### Conduct Review
 
-For each relevant persona:
+For each persona:
 
 1. Scan the spec for areas within their expertise
 2. Identify findings: gaps, risks, unclear decisions, missing considerations
@@ -58,7 +58,7 @@ For findings with meaningful trade-offs:
 
 ### Update Spec
 
-Apply agreed changes directly to the spec file:
+Apply agreed changes to the spec file:
 - Add missing sections or considerations
 - Expand the Design Decisions table
 - Clarify ambiguous areas

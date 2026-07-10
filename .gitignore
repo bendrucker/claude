@@ -4,3 +4,14 @@
 node_modules/
 .DS_Store
 **/fixtures/
+# The comments plugin's eval corpus is committed labeled data. Re-include it
+# against the global `fixtures` ignore.
+!plugins/comments/evals/fixtures/
+
+# Generated coverage output (bun test --coverage)
+/coverage/
+# The coverage tooling lives in directories named `coverage`. Re-include them
+# against a global `coverage` ignore so the source stays tracked.
+!scripts/coverage/
+!.claude/hooks/coverage/
+!.claude/skills/coverage/

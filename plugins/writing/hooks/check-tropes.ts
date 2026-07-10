@@ -2,84 +2,33 @@
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-import { isMemoryPath, isPlanPath } from "../detection/paths";
-import { firstByTier, type PatternMatch, scan, scanIntroduced } from "../detection/tropes";
-import { formatContext, formatDecision, type SyncHookJSONOutput } from "./io";
+import { extractComments } from "../detection/comments";
+import { isMemoryPath, isPlanPath, isProseFile } from "../detection/paths";
+import {
+  firstByTier,
+  type PatternMatch,
+  scan,
+  scanIntroduced,
+  semicolonSpliceHits,
+} from "../detection/tropes";
+import { formatContext, formatDecision, isPlanMode, type SyncHookJSONOutput } from "./io";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
-const MIN_PROSE_LENGTH = 20;
+// The full set of Bash prose surfaces this hook scans. The hooks.json Bash
+// guard is derived from these; hooks.test.ts enforces the sync.
+export const PROSE_FLAGS = ["--body", "--message", "--description", "--title"] as const;
+export const BODY_FILE_FLAG = "--body-file";
 
-const SKIPPED_KEYS = new Set([
-  "old_string",
-  "oldstring",
-  "old_str",
-  "pattern",
-  "match",
-  "search",
-  "search_query",
-  "query",
-]);
-
-function shouldSkipKey(key: string | undefined): boolean {
-  if (!key) return false;
-  const lower = key.toLowerCase();
-  if (SKIPPED_KEYS.has(lower)) return true;
-  return lower.startsWith("old_");
-}
-
-function isProse(value: string): boolean {
-  if (value.length < MIN_PROSE_LENGTH) return false;
-  if (/^https?:\/\//.test(value)) return false;
-  if (/^[A-Za-z0-9_-]+$/.test(value)) return false;
-  return /\s/.test(value);
-}
-
-type ProseEntry = { key: string | undefined; value: string };
-
-function extractProseEntries(value: unknown, key?: string): ProseEntry[] {
-  if (shouldSkipKey(key)) return [];
-  if (typeof value === "string") return isProse(value) ? [{ key, value }] : [];
-  if (Array.isArray(value)) return value.flatMap((item) => extractProseEntries(item, key));
-  if (typeof value === "object" && value !== null) {
-    return Object.entries(value).flatMap(([childKey, childValue]) =>
-      extractProseEntries(childValue, childKey),
-    );
-  }
-  return [];
-}
-
-function extractProse(value: unknown, key?: string): string[] {
-  return extractProseEntries(value, key).map((entry) => entry.value);
-}
-
-const PROSE_TOOL_PATTERN =
-  /\b(?:issue|ticket|story|epic|document|doc|page|wiki|note|comment|message|post|reply|thread|discussion|review|article|memo)\b/;
-
-const PROSE_KEY_PATTERN =
-  /\b(?:description|body|content|text|title|summary|comment|message|note|details)\b/;
-
-function tokenize(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ");
-}
-
-function isProseTool(toolName: string): boolean {
-  return PROSE_TOOL_PATTERN.test(tokenize(toolName));
-}
-
-function isProseKey(key: string | undefined): boolean {
-  return key !== undefined && PROSE_KEY_PATTERN.test(tokenize(key));
-}
+const BODY_FILE_PATTERN = new RegExp(`${BODY_FILE_FLAG}[=\\s](\\S+)`);
 
 function extractBodyFilePath(command: string): string | null {
-  const match = command.match(/--body-file[=\s](\S+)/);
+  const match = command.match(BODY_FILE_PATTERN);
   return match?.[1] ?? null;
 }
 
-const INLINE_ARG_PATTERNS = new Map(
-  ["--body", "--message", "--description", "--title"].map(
-    (flag) => [flag, new RegExp(`${flag}[= ](?:"([^"]+)"|'([^']+)')`)] as const,
-  ),
+const INLINE_ARG_PATTERNS = new Map<string, RegExp>(
+  PROSE_FLAGS.map((flag) => [flag, new RegExp(`${flag}[= ](?:"([^"]+)"|'([^']+)')`)]),
 );
 
 function extractInlineArg(command: string, flag: string): string | null {
@@ -155,25 +104,14 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     if (bodyFile && (await Bun.file(bodyFile).exists())) {
       texts.push(await Bun.file(bodyFile).text());
     }
-    for (const flag of ["--body", "--message", "--description", "--title"]) {
+    for (const flag of PROSE_FLAGS) {
       const value = extractInlineArg(toolInput.command, flag);
       if (value) texts.push(value);
     }
     return texts;
   }
 
-  return extractProse(toolInput);
-}
-
-async function collectLexicalText(input: PreToolUseHookInput): Promise<string[]> {
-  const toolName = input.tool_name;
-
-  if (toolName === "Bash") return collectText(input);
-
-  const toolInput = input.tool_input as Record<string, unknown>;
-  const entries = extractProseEntries(toolInput);
-  if (isProseTool(toolName)) return entries.map((entry) => entry.value);
-  return entries.filter((entry) => isProseKey(entry.key)).map((entry) => entry.value);
+  return [];
 }
 
 function isPlanFile(input: PreToolUseHookInput): boolean {
@@ -208,6 +146,23 @@ function buildFileOpReminder(
   return `${deny.message} You introduced this in your edit to ${target}. Issue a follow-up Edit that targets only the text you just changed. Do not modify unrelated parts of the file, including other pre-existing tropes.`;
 }
 
+// Comments are short, so density gates cannot work there: a single introduced
+// splice fires. Diff-aware like scanIntroduced, comparing splice counts across
+// the old and new comment text.
+const COMMENT_SPLICE_MIN = 1;
+
+function commentSplice(
+  pair: { newText: string; oldText: string },
+  filePath: string | undefined,
+): string | null {
+  if (!filePath || isProseFile(filePath)) return null;
+  const newHits = semicolonSpliceHits(extractComments(pair.newText), COMMENT_SPLICE_MIN);
+  if (newHits.count === 0) return null;
+  const oldHits = semicolonSpliceHits(extractComments(pair.oldText), COMMENT_SPLICE_MIN);
+  if (newHits.count <= oldHits.count) return null;
+  return `A code comment splices clauses with a semicolon ("${newHits.sample}"). Comments can be fragments. Use a period or drop a word.`;
+}
+
 async function processFileOp(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   const pair = await collectFileOpPair(input);
   if (!pair) return null;
@@ -222,6 +177,9 @@ async function processFileOp(input: PreToolUseHookInput): Promise<SyncHookJSONOu
   const context = firstByTier(matches, "context");
   if (context) return formatContext(context.message);
 
+  const splice = commentSplice(pair, filePath);
+  if (splice) return formatContext(splice);
+
   return null;
 }
 
@@ -229,13 +187,11 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<SyncHookJS
   const texts = await collectText(input);
   if (texts.length === 0) return null;
 
-  const structural = firstByTier(scan(texts.join("\n"), undefined, "sideEffect"), "deny");
-  if (structural?.structural) return formatDecision("deny", structural.message);
+  const matches = scan(texts.join("\n"), undefined, "sideEffect");
+  const deny = firstByTier(matches, "deny");
+  if (deny?.structural) return formatDecision("deny", deny.message);
 
-  const lexical = await collectLexicalText(input);
-  if (lexical.length === 0) return null;
-  const matches = scan(lexical.join("\n"), undefined, "sideEffect");
-  const match = firstByTier(matches, "deny") ?? firstByTier(matches, "context");
+  const match = deny ?? firstByTier(matches, "context");
   if (match) return formatContext(match.message);
 
   return null;
@@ -245,6 +201,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   if (isPlanFile(input)) return null;
   if (isMemoryFile(input)) return null;
   if (isWordlistFile(input)) return null;
+  if (isPlanMode(input)) return null;
 
   if (FILE_OP_TOOLS.has(input.tool_name)) return processFileOp(input);
   return processSideEffect(input);

@@ -1,6 +1,7 @@
 ---
 name: gitlab:merge-request
 description: Working with GitLab merge requests via glab. Use when creating, updating, reviewing, or merging MRs.
+argument-hint: "[create | merge | review | discussions | block] [--draft] [--auto] [--role author|reviewer]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/*:*)
   - Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts:*)
@@ -10,6 +11,18 @@ allowed-tools:
 # Merge Requests
 
 Working with GitLab merge requests via `glab mr`.
+
+## Arguments
+
+`$0` (optional verb) routes to a section below. With no verb, infer the operation from the request.
+
+- `create`: open an MR. See [Patterns](#patterns). `--draft` opens it as a draft (`glab mr create --draft`).
+- `merge`: merge the MR. See [Merging](#merging). `--auto` enables auto-merge (`merge.ts --auto-merge`).
+- `review`: review MRs. See [Reviews](#reviews). `--role reviewer` (default) fetches MRs awaiting your review; `--role author` triages threads on MRs you authored.
+- `discussions`: work MR discussion threads. See [Discussions](#discussions).
+- `block`: block an MR until another merges. See [Blocking](#blocking).
+
+Flag defaults: `--draft` off, `--auto` off, `--role reviewer`.
 
 ## Key Commands
 
@@ -24,12 +37,31 @@ Use `glab mr --help` and `glab mr <command> --help` for full options.
 
 ## Merging
 
-Always use `merge.ts` to merge. It handles merge trains, auto-merge, and squash automatically, falling back to `glab mr merge` internally when appropriate.
+Always use `merge.ts` to merge. It handles merge trains, auto-merge, and squash, falling back to `glab mr merge` internally when appropriate.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge --squash
+```
+
+### Re-Arm Auto-Merge After a Push
+
+Pushing new commits cancels queued auto-merge and drops the MR from the merge train. GitLab does this deliberately so the new commits get a fresh pipeline and review. To keep auto-merge, re-run `merge.ts --auto-merge` after every push that intends to stay armed. The script is idempotent: it treats an already-armed MR as success and retries through the brief `approvals_syncing` window that follows a push, so re-running it is always safe.
+
+A push also resets approvals when `reset_approvals_on_push` is on. Re-trigger review in the same pass, see [Re-request reviewers](#re-request-reviewers).
+
+### Inspect or Recover a Train
+
+`glab` has no merge-train command, so use the API directly:
+
+```bash
+# Active train for the project
+glab api "projects/:id/merge_trains?scope=active" | jq '.[] | {iid: .merge_request.iid, status, target_branch}'
+
+# Clear a stuck entry, then re-arm
+glab api --method DELETE "projects/:id/merge_trains/merge_requests/<iid>"
+glab api --method POST  "projects/:id/merge_trains/merge_requests/<iid>" --raw-field auto_merge=true
 ```
 
 ## Patterns
@@ -45,7 +77,7 @@ git push -u origin feature-branch && glab mr create --fill
 
 **Body from file:** No `--body-file` flag; use `--description "$(cat file.md)"`.
 
-**Username resolution:** Flags like `--reviewer` and `--assignee` require exact usernames. Invalid names are silently ignored. Look up users first:
+**Username resolution:** Flags like `--reviewer` and `--assignee` require exact usernames; invalid names are silently ignored. Look up users first:
 
 ```bash
 glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<name>"; "i")) | {name, username}'
@@ -53,7 +85,7 @@ glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<n
 
 ## Blocking
 
-Prevent an MR from merging until another MR merges first. Uses the REST API directly since `glab mr` has no blocking subcommand.
+Prevent an MR from merging until another MR merges first. Uses the REST API since `glab mr` has no blocking subcommand.
 
 ```bash
 # Block MR !10 until MR !5 merges
@@ -70,7 +102,7 @@ glab api projects/:id/merge_requests/10/blocks/<block-id> -X DELETE
 
 Submit review feedback as draft notes that accumulate before publishing. See [review.md](review.md) for the draft notes workflow, code suggestions, and approvals.
 
-Fetch the MRs awaiting your first review across all projects (the `UNREVIEWED` bucket; REST's `scope=reviews_for_me` cannot filter by review state). Emits `[{ url, reference, title }]` as JSON:
+Fetch MRs awaiting your first review across all projects (the `UNREVIEWED` bucket; REST's `scope=reviews_for_me` cannot filter by review state). Emits `[{ url, reference, title }]` as JSON:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
@@ -80,13 +112,17 @@ See [review-state.md](review-state.md) for the underlying GraphQL query and filt
 
 To group all your review-requested MRs by next actor (not just the `UNREVIEWED` slice), see [Review Inbox (Next-Actor Triage)](review-state.md#review-inbox-next-actor-triage) in review-state.md.
 
+## Re-request reviewers
+
+Re-trigger a review after a push reset approvals. The `mergeRequestReviewerRereview` mutation flips the target's `reviewState` back to `UNREVIEWED` and re-surfaces the MR. The reviewer must already be assigned. See [Re-Request Review](review-state.md#re-request-review) for the user-ID lookup and exact mutation.
+
 ## Discussions
 
 Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md](discussions.md) for the discussions script, resolution workflow, and pagination pitfalls.
 
 ## Stacking
 
-`glab stack` manages stacked diffs—small changes that build on each other. See [stack.md](stack.md).
+`glab stack` manages stacked diffs — small changes that build on each other. See [stack.md](stack.md).
 
 ## Reference Files
 

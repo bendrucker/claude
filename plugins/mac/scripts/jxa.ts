@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: osascript hands off to LaunchServices/Apple Events, which the command sandbox blocks
 
 import * as acorn from "acorn";
 
@@ -79,6 +78,68 @@ export function validateAppScope(source: string, app: string): ValidationResult 
   return { valid: violations.length === 0, violations };
 }
 
+export interface RunResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+// AppleEvents error codes that are safe to retry. They surface as transient XPC
+// dispatcher hiccups on the first event after a cold session: errAEPrivilegeError
+// (-10004) and errAEEventNotHandled / "application isn't running" (-600). Retries
+// clear the transient case; a persistent failure (e.g. a sandbox deny) still
+// surfaces after the final attempt.
+const RETRIABLE_APPLE_EVENTS_CODES = [-10004, -600];
+
+export function isRetriableAppleEventsError(exitCode: number, stderr: string): boolean {
+  if (stderr.includes("Connection Invalid")) return true;
+  return RETRIABLE_APPLE_EVENTS_CODES.some(
+    (code) => exitCode === code || stderr.includes(`(${code})`),
+  );
+}
+
+async function runOsascript(args: string[]): Promise<RunResult> {
+  const proc = Bun.spawn(["osascript", ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  const code = await proc.exited;
+  return { code, stdout, stderr };
+}
+
+const RETRY_DELAYS_MS = [300, 900];
+
+export async function runWithRetry(
+  args: string[],
+  run: (args: string[]) => Promise<RunResult>,
+  sleep: (ms: number) => Promise<void> = Bun.sleep,
+): Promise<RunResult> {
+  let result = await run(args);
+  for (const delay of RETRY_DELAYS_MS) {
+    if (result.code === 0 || !isRetriableAppleEventsError(result.code, result.stderr)) {
+      return result;
+    }
+    await sleep(delay);
+    result = await run(args);
+  }
+  return result;
+}
+
+// Forward osascript's output on the process streams. Bun.write(Bun.stdout, ...)
+// is unsafe here: BunFile writes replace file contents, so when stdout and
+// stderr share one capture file (`2>&1`) the stderr write truncates everything
+// stdout just wrote. process.*.write appends at the fd offset, and setting
+// exitCode instead of calling process.exit lets pending pipe writes flush.
+export function emitResult({ code, stdout, stderr }: RunResult): void {
+  process.stdout.write(stdout);
+  process.stderr.write(stderr);
+  process.exitCode = code;
+}
+
 if (import.meta.main) {
   const { cli } = await import("cleye");
 
@@ -122,10 +183,5 @@ if (import.meta.main) {
     process.exit(1);
   }
 
-  const proc = Bun.spawn(["osascript", ...osascriptArgs], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await proc.exited;
-  process.exit(code);
+  emitResult(await runWithRetry(osascriptArgs, runOsascript));
 }

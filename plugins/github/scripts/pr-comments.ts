@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: shells out to gh (Go binary) for TLS-bearing API calls
 
 import { cli } from "cleye";
 import { type Author, isBot, isReviewTarget, loadExtraReviewers } from "./reviewers";
@@ -103,9 +102,10 @@ export function filterThreads(
     since?: Date | undefined;
     bots?: boolean | undefined;
     extra?: Set<string> | undefined;
+    includeResolved?: boolean | undefined;
   },
 ): Thread[] {
-  let filtered = threads.filter((t) => !t.isResolved);
+  let filtered = options.includeResolved ? [...threads] : threads.filter((t) => !t.isResolved);
 
   if (options.bots) {
     // Review targets (API bots plus opted-in reviewers) open their own threads,
@@ -141,12 +141,17 @@ export function findLastReviewDate(reviews: Review[], viewer: string, role: Role
 export function formatThreads(
   threads: Thread[],
   totalCount: number,
-  options: { title: string; role: Role; viewer: string; bots?: boolean },
+  options: { title: string; role: Role; viewer: string; bots?: boolean; includeResolved?: boolean },
 ): string {
   const lines: string[] = [];
   lines.push(`# ${options.title}`);
   lines.push("");
-  lines.push(`${threads.length} unresolved of ${totalCount} total threads`);
+  if (options.includeResolved) {
+    const resolvedCount = threads.filter((t) => t.isResolved).length;
+    lines.push(`${threads.length} of ${totalCount} total threads (${resolvedCount} resolved)`);
+  } else {
+    lines.push(`${threads.length} unresolved of ${totalCount} total threads`);
+  }
   if (options.bots) {
     lines.push("Showing review-bot and opted-in reviewer threads");
   } else if (options.role === "reviewer") {
@@ -155,7 +160,7 @@ export function formatThreads(
   lines.push("");
 
   if (threads.length === 0) {
-    lines.push("No unresolved threads found.");
+    lines.push(options.includeResolved ? "No threads found." : "No unresolved threads found.");
     return lines.join("\n");
   }
 
@@ -182,7 +187,8 @@ export function formatThreads(
 
       const outdated = thread.isOutdated ? " (outdated)" : "";
       const botTag = isBotThread(thread) ? " (bot)" : "";
-      lines.push(`### ${lineInfo}${outdated}${botTag}`);
+      const resolvedTag = options.includeResolved && thread.isResolved ? " (resolved)" : "";
+      lines.push(`### ${lineInfo}${outdated}${botTag}${resolvedTag}`);
       lines.push(`\`${thread.id}\``);
       lines.push("");
 
@@ -273,6 +279,11 @@ async function main(): Promise<void> {
         description: "Only review-bot threads (plus logins in $CLAUDE_PLUGIN_DATA/reviewers.txt)",
         default: false,
       },
+      includeResolved: {
+        type: Boolean,
+        description: "Include resolved threads (excluded by default)",
+        default: false,
+      },
     },
   });
 
@@ -338,12 +349,14 @@ async function main(): Promise<void> {
     since,
     bots: argv.flags.bots,
     extra: argv.flags.bots ? await loadExtraReviewers() : undefined,
+    includeResolved: argv.flags.includeResolved,
   });
   const output = formatThreads(filtered, totalCount, {
     title: prTitle,
     role,
     viewer,
     bots: argv.flags.bots,
+    includeResolved: argv.flags.includeResolved,
   });
 
   console.log(output);

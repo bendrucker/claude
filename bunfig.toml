@@ -1,0 +1,11 @@
+[test]
+# Coverage stays opt-in via the --coverage flag so plain `bun test` runs fast.
+# These only pin the shape of the report when coverage is requested.
+coverageReporter = ["text", "lcov"]
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = [
+  "**/*.test.ts",
+  "**/*.integration.ts",
+  "**/fixtures/**",
+  "**/node_modules/**",
+]

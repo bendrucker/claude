@@ -1,16 +1,17 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type Ajv from "ajv";
 import {
   createValidator,
   loadSchema,
   reportAndExit,
+  type SchemaRef,
   type ValidationResult,
   validateFile,
 } from "./validate";
 
 export interface ValidationTarget {
   files: string[];
-  schema: string;
+  schema: SchemaRef;
   warnAdditional?: boolean;
   extraSchemas?: { schema: string; key: string }[];
   successMessage?: string;
@@ -31,6 +32,10 @@ export async function runValidation(target: ValidationTarget): Promise<void> {
 
   const result: ValidationResult = { errors: [], warnings: [] };
   for (const file of target.files) {
+    if (!(await Bun.file(resolve(file)).exists())) {
+      console.log(`• ${file} (not found, skipped)`);
+      continue;
+    }
     console.log(`• ${file}`);
     const r = await validateFile(file, target.schema, options);
     result.errors.push(...r.errors);

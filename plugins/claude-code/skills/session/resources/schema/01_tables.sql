@@ -16,30 +16,6 @@ CREATE TABLE IF NOT EXISTS raw (
   data            JSON
 );
 
--- One row per element of a chat message's content array, maintained incrementally
--- by import.sql alongside raw (delete-by-file + insert) so an import only touches
--- the changed files' rows.
-CREATE TABLE IF NOT EXISTS content_items (
-  host                VARCHAR,
-  session_id          VARCHAR,
-  timestamp           TIMESTAMP,
-  project_path        VARCHAR,
-  source_file         VARCHAR,
-  source_line         BIGINT,
-  type                VARCHAR,
-  name                VARCHAR,
-  id                  VARCHAR,
-  tool_use_id         VARCHAR,
-  text                VARCHAR,
-  content             VARCHAR,
-  is_error            BOOLEAN,
-  data                JSON,
-  tool_use_result     JSON,
-  attribution_skill   VARCHAR,
-  attribution_plugin  VARCHAR,
-  attribution_agent   VARCHAR
-);
-
 -- Per-file change catalog: one row per indexed JSONL file with the mtime (ms) and
 -- size observed at import. A file is re-imported when either differs, and its rows
 -- are dropped when the path disappears. Immune to the watermark race (a write landing

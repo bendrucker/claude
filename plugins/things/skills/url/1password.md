@@ -16,7 +16,7 @@ AUTH_TOKEN=$(security find-generic-password -a "$USER" -s "things-auth-token" -w
 
 - **No approval prompts**: Works unattended for background processes
 - **Secure**: Token stored in macOS Keychain, not filesystem
-- **1Password source of truth**: Manual updates sync from 1Password item `5iene5gxngiqrxknafb7gslm4q`
+- **1Password source of truth**: Updates sync from 1Password item `5iene5gxngiqrxknafb7gslm4q`
 
 ## Update Token
 

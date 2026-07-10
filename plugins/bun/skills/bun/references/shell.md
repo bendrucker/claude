@@ -44,7 +44,7 @@ const { exitCode, stdout } = await $`cmd`.nothrow().quiet();
 
 ## Piping
 
-Pipe output between commands:
+Pipe between commands:
 
 ```ts
 const text = await $`echo hello | tr a-z A-Z`.text();

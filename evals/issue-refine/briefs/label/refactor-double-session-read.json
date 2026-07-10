@@ -1,0 +1,13 @@
+{
+  "id": "L-refactor-session",
+  "type": "refactor",
+  "size": "compact",
+  "project": "synthetic",
+  "brief": "The auth middleware reads the session store twice on every request: once to validate the token and once to load the user record. Collapse it to a single read and pass the result through. No behavior change.",
+  "context": {
+    "files": [
+      "auth/middleware.py (AuthMiddleware.__call__ calls validate_token then load_user, each hitting the session store)"
+    ],
+    "related_issues": []
+  }
+}

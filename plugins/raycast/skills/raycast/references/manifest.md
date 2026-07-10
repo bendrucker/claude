@@ -85,7 +85,7 @@ Each tool maps to `src/tools/<name>.ts`.
 }
 ```
 
-Move lengthy AI config to a separate `ai.yaml` or `ai.json5` file alongside `package.json`.
+Move lengthy AI config to a separate `ai.yaml` or `ai.json5` alongside `package.json`.
 
 ## Complete Example
 

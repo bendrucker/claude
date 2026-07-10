@@ -67,6 +67,21 @@ describe("runValidation", () => {
     expect(lines.some((line) => typeof line === "string" && line.includes("extra"))).toBe(true);
   });
 
+  it("skips a missing file with a one-line report instead of throwing", async () => {
+    const present = await writeFixture("valid-present", { name: "ok" });
+    const missing = join(tempDir, "does-not-exist/.claude-plugin/plugin.json");
+
+    await runValidation({ files: [missing, present], schema: schemaPath });
+
+    const lines = logSpy.mock.calls.map((call) => call[0]);
+    expect(lines).toEqual([
+      `• ${missing} (not found, skipped)`,
+      `• ${present}`,
+      "",
+      "Validation passed.",
+    ]);
+  });
+
   it("exits non-zero on validation errors", async () => {
     const file = await writeFixture("invalid", { name: 123 });
     const exitSpy = spyOn(process, "exit").mockImplementation((() => {

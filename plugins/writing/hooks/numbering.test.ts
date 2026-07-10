@@ -1,5 +1,9 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { execSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
@@ -51,23 +55,12 @@ async function getOutput(
 }
 
 describe("formatDecision", () => {
-  it("formats deny decision", async () => {
-    const output = formatDecision("deny", "Test reason");
+  test.each<["deny" | "ask"]>([["deny"], ["ask"]])("formats %s decision", (decision) => {
+    const output = formatDecision(decision, "Test reason");
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason: "Test reason",
-      },
-    });
-  });
-
-  it("formats ask decision", async () => {
-    const output = formatDecision("ask", "Test reason");
-    expect(output).toEqual({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "ask",
+        permissionDecision: decision,
         permissionDecisionReason: "Test reason",
       },
     });
@@ -75,248 +68,210 @@ describe("formatDecision", () => {
 });
 
 describe("checkMarkdown", () => {
-  it('detects "# 1. Introduction"', async () => {
-    const match = checkMarkdown("# 1. Introduction");
-    expect(match).toContain("1. Introduction");
-  });
-
-  it('detects "## Step 2: Setup"', async () => {
-    const match = checkMarkdown("## Step 2: Setup");
-    expect(match).toContain("Step 2");
-  });
-
-  it('detects "### Phase 3"', async () => {
-    const match = checkMarkdown("### Phase 3");
-    expect(match).toContain("Phase 3");
-  });
-
-  it("allows descriptive headings", async () => {
-    const match = checkMarkdown("# Introduction");
-    expect(match).toBeNull();
-  });
-
-  it("allows headings with numbers mid-text", async () => {
-    const match = checkMarkdown("# Using OAuth2 for Authentication");
-    expect(match).toBeNull();
+  test.each<[string, string, string | null]>([
+    ['detects "# 1. Introduction"', "# 1. Introduction", "1. Introduction"],
+    ['detects "## Step 2: Setup"', "## Step 2: Setup", "Step 2"],
+    ['detects "### Phase 3"', "### Phase 3", "Phase 3"],
+    ["allows descriptive headings", "# Introduction", null],
+    ["allows headings with numbers mid-text", "# Using OAuth2 for Authentication", null],
+  ])("%s", (_name, content, expected) => {
+    const match = checkMarkdown(content);
+    expected === null ? expect(match).toBeNull() : expect(match).toContain(expected);
   });
 });
 
 describe.skipIf(!hasSg())("checkCode (requires sg)", () => {
-  it("detects Go func step1()", async () => {
-    const match = await checkCode('package main\nfunc step1() { fmt.Println("test") }', "go");
-    expect(match).toContain("step1");
-  });
-
-  it("detects Go func phase2()", async () => {
-    const match = await checkCode("package main\nfunc phase2() {}", "go");
-    expect(match).toContain("phase2");
-  });
-
-  it("allows descriptive Go function names", async () => {
-    const match = await checkCode(
+  test.each<[string, string, string, string | null]>([
+    [
+      "detects Go func step1()",
+      'package main\nfunc step1() { fmt.Println("test") }',
+      "go",
+      "step1",
+    ],
+    ["detects Go func phase2()", "package main\nfunc phase2() {}", "go", "phase2"],
+    [
+      "allows descriptive Go function names",
       'package main\nfunc processItems() { fmt.Println("test") }',
       "go",
-    );
-    expect(match).toBeNull();
+      null,
+    ],
+    [
+      "detects JavaScript function step1()",
+      'function step1() { console.log("test"); }',
+      "js",
+      "step1",
+    ],
+    ["detects JavaScript const part3", "const part3 = () => {};", "js", "part3"],
+    [
+      "allows descriptive JavaScript names",
+      'function handleSubmit() { console.log("test"); }',
+      "js",
+      null,
+    ],
+    ["detects Python def step1()", "def step1():\n    pass", "py", "step1"],
+    ["detects Python class Phase2", "class Phase2:\n    pass", "py", "Phase2"],
+    ["allows descriptive Python names", "def process_items():\n    pass", "py", null],
+    ["detects TypeScript function step1()", "function step1() {}", "ts", "step1"],
+    ["detects TSX function step1()", "function step1() {}", "tsx", "step1"],
+  ])("%s", async (_name, content, lang, expected) => {
+    const match = await checkCode(content, lang);
+    expected === null ? expect(match).toBeNull() : expect(match).toContain(expected);
   });
+});
 
-  it("detects JavaScript function step1()", async () => {
-    const match = await checkCode('function step1() { console.log("test"); }', "js");
-    expect(match).toContain("step1");
-  });
-
-  it("detects JavaScript const part3", async () => {
-    const match = await checkCode("const part3 = () => {};", "js");
-    expect(match).toContain("part3");
-  });
-
-  it("allows descriptive JavaScript names", async () => {
-    const match = await checkCode('function handleSubmit() { console.log("test"); }', "js");
-    expect(match).toBeNull();
-  });
-
-  it("detects Python def step1()", async () => {
-    const match = await checkCode("def step1():\n    pass", "py");
-    expect(match).toContain("step1");
-  });
-
-  it("detects Python class Phase2", async () => {
-    const match = await checkCode("class Phase2:\n    pass", "py");
-    expect(match).toContain("Phase2");
-  });
-
-  it("allows descriptive Python names", async () => {
-    const match = await checkCode("def process_items():\n    pass", "py");
-    expect(match).toBeNull();
-  });
-
-  it("detects TypeScript function step1()", async () => {
-    const match = await checkCode("function step1() {}", "ts");
-    expect(match).toContain("step1");
+describe.skipIf(!hasSg())("checkCode uncovered languages (requires sg)", () => {
+  test.each<[string]>([
+    ["sh"],
+    ["json"],
+    ["yml"],
+    ["sql"],
+  ])("returns null for extension %p with no numbering.yml rules", async (ext) => {
+    expect(await checkCode("function step1() {}", ext)).toBeNull();
   });
 });
 
 describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
-  describe("Go numbered identifiers", () => {
-    it("detects func step1()", async () => {
-      const output = await getOutput(
-        mockWriteInput("main.go", 'package main\nfunc step1() { fmt.Println("test") }'),
-        "write",
-      );
-      expect(output?.permissionDecision).toBe("deny");
-      expect(output?.permissionDecisionReason).toContain("step1");
-    });
-
-    it("detects func phase2()", async () => {
-      const output = await getOutput(
-        mockWriteInput("main.go", "package main\nfunc phase2() {}"),
-        "write",
-      );
-      expect(output?.permissionDecision).toBe("deny");
-      expect(output?.permissionDecisionReason).toContain("phase2");
-    });
-
-    it("allows descriptive function names", async () => {
-      const output = await getOutput(
-        mockWriteInput("main.go", 'package main\nfunc processItems() { fmt.Println("test") }'),
-        "write",
-      );
+  test.each<[string, string, string, "write" | "edit", "deny" | "ask" | null, string | null]>([
+    [
+      "Go: detects func step1()",
+      "main.go",
+      'package main\nfunc step1() { fmt.Println("test") }',
+      "write",
+      "deny",
+      "step1",
+    ],
+    [
+      "Go: detects func phase2()",
+      "main.go",
+      "package main\nfunc phase2() {}",
+      "write",
+      "deny",
+      "phase2",
+    ],
+    [
+      "Go: allows descriptive function names",
+      "main.go",
+      'package main\nfunc processItems() { fmt.Println("test") }',
+      "write",
+      null,
+      null,
+    ],
+    [
+      "JavaScript: detects function step1()",
+      "app.js",
+      'function step1() { console.log("test"); }',
+      "write",
+      "deny",
+      null,
+    ],
+    ["JavaScript: detects const part3", "app.js", "const part3 = () => {};", "write", "deny", null],
+    [
+      "JavaScript: allows descriptive names",
+      "app.js",
+      'function handleSubmit() { console.log("test"); }',
+      "write",
+      null,
+      null,
+    ],
+    ["Python: detects def step1()", "script.py", "def step1():\n    pass", "write", "deny", null],
+    ["Python: detects class Phase2", "script.py", "class Phase2:\n    pass", "write", "deny", null],
+    [
+      "Python: allows descriptive names",
+      "script.py",
+      "def process_items():\n    pass",
+      "write",
+      null,
+      null,
+    ],
+    [
+      "Write tool: blocks with deny",
+      "main.go",
+      "package main\nfunc step1() {}",
+      "write",
+      "deny",
+      null,
+    ],
+    ["Edit tool: asks instead of deny", "main.go", "func step1() {}", "edit", "ask", null],
+    ["File type filtering: checks Go files", "main.go", "func step1() {}", "write", "deny", null],
+    [
+      "File type filtering: checks TypeScript files",
+      "app.ts",
+      "function step1() {}",
+      "write",
+      "deny",
+      null,
+    ],
+    [
+      "File type filtering: skips unsupported file types (JSON)",
+      "config.json",
+      '{"step1": "value"}',
+      "write",
+      null,
+      null,
+    ],
+    [
+      "Test files are NOT excluded: checks *_test.go files",
+      "main_test.go",
+      "func step1() {}",
+      "write",
+      "deny",
+      null,
+    ],
+    [
+      "Test files are NOT excluded: checks *.spec.ts files",
+      "app.spec.ts",
+      "function step1() {}",
+      "write",
+      "deny",
+      null,
+    ],
+    [
+      "Test files are NOT excluded: checks test_*.py files",
+      "test_utils.py",
+      "def step1():\n    pass",
+      "write",
+      "deny",
+      null,
+    ],
+  ])("%s", async (_name, filePath, content, mode, expected, reasonContains) => {
+    const output = await getOutput(
+      mode === "write" ? mockWriteInput(filePath, content) : mockEditInput(filePath, content),
+      mode,
+    );
+    if (expected === null) {
       expect(output).toBeNull();
-    });
-  });
-
-  describe("JavaScript numbered identifiers", () => {
-    it("detects function step1()", async () => {
-      const output = await getOutput(
-        mockWriteInput("app.js", 'function step1() { console.log("test"); }'),
-        "write",
-      );
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("detects const part3", async () => {
-      const output = await getOutput(mockWriteInput("app.js", "const part3 = () => {};"), "write");
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("allows descriptive names", async () => {
-      const output = await getOutput(
-        mockWriteInput("app.js", 'function handleSubmit() { console.log("test"); }'),
-        "write",
-      );
-      expect(output).toBeNull();
-    });
-  });
-
-  describe("Python numbered identifiers", () => {
-    it("detects def step1()", async () => {
-      const output = await getOutput(
-        mockWriteInput("script.py", "def step1():\n    pass"),
-        "write",
-      );
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("detects class Phase2", async () => {
-      const output = await getOutput(
-        mockWriteInput("script.py", "class Phase2:\n    pass"),
-        "write",
-      );
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("allows descriptive names", async () => {
-      const output = await getOutput(
-        mockWriteInput("script.py", "def process_items():\n    pass"),
-        "write",
-      );
-      expect(output).toBeNull();
-    });
-  });
-
-  describe("Write vs Edit mode", () => {
-    it("blocks Write tool with deny", async () => {
-      const output = await getOutput(
-        mockWriteInput("main.go", "package main\nfunc step1() {}"),
-        "write",
-      );
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("asks for Edit tool instead of deny", async () => {
-      const output = await getOutput(mockEditInput("main.go", "func step1() {}"), "edit");
-      expect(output?.permissionDecision).toBe("ask");
-    });
-  });
-
-  describe("File type filtering", () => {
-    it("checks Go files", async () => {
-      const output = await getOutput(mockWriteInput("main.go", "func step1() {}"), "write");
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("checks TypeScript files", async () => {
-      const output = await getOutput(mockWriteInput("app.ts", "function step1() {}"), "write");
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("skips unsupported file types (JSON)", async () => {
-      const output = await getOutput(mockWriteInput("config.json", '{"step1": "value"}'), "write");
-      expect(output).toBeNull();
-    });
-  });
-
-  describe("Test files are NOT excluded", () => {
-    it("checks *_test.go files", async () => {
-      const output = await getOutput(mockWriteInput("main_test.go", "func step1() {}"), "write");
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("checks *.spec.ts files", async () => {
-      const output = await getOutput(mockWriteInput("app.spec.ts", "function step1() {}"), "write");
-      expect(output?.permissionDecision).toBe("deny");
-    });
-
-    it("checks test_*.py files", async () => {
-      const output = await getOutput(
-        mockWriteInput("test_utils.py", "def step1():\n    pass"),
-        "write",
-      );
-      expect(output?.permissionDecision).toBe("deny");
-    });
+      return;
+    }
+    expect(output?.permissionDecision).toBe(expected);
+    if (reasonContains !== null) {
+      expect(output?.permissionDecisionReason).toContain(reasonContains);
+    }
   });
 });
 
 describe("processInput with markdown", () => {
-  it('detects "# 1. Introduction"', async () => {
-    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
-    expect(output?.permissionDecision).toBe("ask");
-    expect(output?.permissionDecisionReason).toContain("1. Introduction");
-  });
-
-  it('detects "## Step 2: Setup"', async () => {
-    const output = await getOutput(mockWriteInput("docs.md", "## Step 2: Setup"), "write");
-    expect(output?.permissionDecision).toBe("ask");
-    expect(output?.permissionDecisionReason).toContain("Step 2");
-  });
-
-  it('detects "### Phase 3"', async () => {
-    const output = await getOutput(mockWriteInput("guide.markdown", "### Phase 3"), "write");
-    expect(output?.permissionDecision).toBe("ask");
-    expect(output?.permissionDecisionReason).toContain("Phase 3");
-  });
-
-  it("allows descriptive headings", async () => {
-    const output = await getOutput(mockWriteInput("README.md", "# Introduction"), "write");
-    expect(output).toBeNull();
-  });
-
-  it("allows headings with numbers mid-text", async () => {
-    const output = await getOutput(
-      mockWriteInput("README.md", "# Using OAuth2 for Authentication"),
-      "write",
-    );
-    expect(output).toBeNull();
+  test.each<[string, string, string, "ask" | null, string | null]>([
+    ['detects "# 1. Introduction"', "README.md", "# 1. Introduction", "ask", "1. Introduction"],
+    ['detects "## Step 2: Setup"', "docs.md", "## Step 2: Setup", "ask", "Step 2"],
+    ['detects "### Phase 3"', "guide.markdown", "### Phase 3", "ask", "Phase 3"],
+    ["allows descriptive headings", "README.md", "# Introduction", null, null],
+    [
+      "allows headings with numbers mid-text",
+      "README.md",
+      "# Using OAuth2 for Authentication",
+      null,
+      null,
+    ],
+  ])("%s", async (_name, filePath, content, expected, reasonContains) => {
+    const output = await getOutput(mockWriteInput(filePath, content), "write");
+    if (expected === null) {
+      expect(output).toBeNull();
+      return;
+    }
+    expect(output?.permissionDecision).toBe(expected);
+    if (reasonContains) {
+      expect(output?.permissionDecisionReason).toContain(reasonContains);
+    }
   });
 });
 
@@ -399,6 +354,71 @@ describe("plan mode", () => {
   it("still asks when permission_mode is not plan", async () => {
     const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
     expect(output?.permissionDecision).toBe("ask");
+  });
+});
+
+describe("already-numbered files", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "numbering-test-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("allows Edit when the file already has numbered headings", async () => {
+    const filePath = join(dir, "review.md");
+    await Bun.write(filePath, "# Findings\n\n## 1. First issue\n\nDetails.\n");
+    const output = await getOutput(mockEditInput(filePath, "## 2. Second issue"), "edit");
+    expect(output).toBeNull();
+  });
+
+  it("asks when Edit introduces numbering into a clean file", async () => {
+    const filePath = join(dir, "clean.md");
+    await Bun.write(filePath, "# Findings\n\nDetails.\n");
+    const output = await getOutput(mockEditInput(filePath, "## 1. First issue"), "edit");
+    expect(output?.permissionDecision).toBe("ask");
+  });
+
+  it("allows non-numbered Edit to an already-numbered file", async () => {
+    const filePath = join(dir, "review.md");
+    await Bun.write(filePath, "# Findings\n\n## 1. First issue\n");
+    const output = await getOutput(mockEditInput(filePath, "More details."), "edit");
+    expect(output).toBeNull();
+  });
+
+  it("allows Write overwriting a file that already has numbered headings", async () => {
+    const filePath = join(dir, "review.md");
+    await Bun.write(filePath, "## 1. First issue\n");
+    const output = await getOutput(
+      mockWriteInput(filePath, "## 1. First issue\n\n## 2. Second issue\n"),
+      "write",
+    );
+    expect(output).toBeNull();
+  });
+
+  it("asks when Write creates a new numbered file", async () => {
+    const filePath = join(dir, "new.md");
+    const output = await getOutput(mockWriteInput(filePath, "# 1. Introduction"), "write");
+    expect(output?.permissionDecision).toBe("ask");
+  });
+
+  describe.skipIf(!hasSg())("code files (requires sg)", () => {
+    it("allows Edit when the file already has numbered identifiers", async () => {
+      const filePath = join(dir, "main.go");
+      await Bun.write(filePath, "package main\nfunc step1() {}\n");
+      const output = await getOutput(mockEditInput(filePath, "func step2() {}"), "edit");
+      expect(output).toBeNull();
+    });
+
+    it("asks when Edit introduces numbering into a clean code file", async () => {
+      const filePath = join(dir, "main.go");
+      await Bun.write(filePath, "package main\nfunc processItems() {}\n");
+      const output = await getOutput(mockEditInput(filePath, "func step1() {}"), "edit");
+      expect(output?.permissionDecision).toBe("ask");
+    });
   });
 });
 

@@ -1,7 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
+import { exec } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import type {
   PostToolUseHookInput,
   PreToolUseHookInput,
@@ -16,6 +18,8 @@ import {
   runBiomeCheck,
   runBiomeFix,
 } from ".";
+
+const execAsync = promisify(exec);
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures");
 
@@ -86,6 +90,23 @@ async function copyFixture(name: string, destDir: string): Promise<string> {
   return dest;
 }
 
+// A git repo whose Biome config excludes ignored.ts. Checking that file makes
+// Biome report "no files were processed", which must not read as a lint
+// failure. The git init matters: runBiomeCheck resolves its cwd from the
+// file's git toplevel, which is where Biome discovers this config.
+async function createIgnoredFixture(baseDir: string): Promise<string> {
+  const repoDir = await mkdtemp(join(baseDir, "ignored-repo-"));
+  await execAsync("git init", { cwd: repoDir });
+  await Bun.write(
+    join(repoDir, "biome.json"),
+    JSON.stringify({ files: { includes: ["**", "!**/ignored.ts"] } }),
+  );
+  const filePath = join(repoDir, "ignored.ts");
+  const content = await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text();
+  await Bun.write(filePath, content);
+  return filePath;
+}
+
 describe("biome hook", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "biome-test-"));
@@ -96,39 +117,49 @@ describe("biome hook", () => {
   });
 
   describe("runBiomeCheck", () => {
-    it("returns null for valid files", async () => {
-      const filePath = await copyFixture("valid.ts", tempDir);
+    test.each<{ name: string; fixture: string; expected: string | null }>([
+      { name: "returns null for valid files", fixture: "valid.ts", expected: null },
+      {
+        name: "returns errors for files with fixable issues",
+        fixture: "fixable.ts",
+        expected: "format",
+      },
+      {
+        name: "returns errors for files with unfixable issues",
+        fixture: "unfixable.ts",
+        expected: "noDuplicateObjectKeys",
+      },
+    ])("$name", async ({ fixture, expected }) => {
+      const filePath = await copyFixture(fixture, tempDir);
+      const result = await runBiomeCheck(filePath);
+      if (expected === null) {
+        expect(result).toBeNull();
+      } else {
+        expect(result).not.toBeNull();
+        expect(result).toContain(expected);
+      }
+    });
+
+    it("returns null for files the Biome config ignores", async () => {
+      const filePath = await createIgnoredFixture(tempDir);
       expect(await runBiomeCheck(filePath)).toBeNull();
-    });
-
-    it("returns errors for files with fixable issues", async () => {
-      const filePath = await copyFixture("fixable.ts", tempDir);
-      const result = await runBiomeCheck(filePath);
-      expect(result).not.toBeNull();
-      expect(result).toContain("format");
-    });
-
-    it("returns errors for files with unfixable issues", async () => {
-      const filePath = await copyFixture("unfixable.ts", tempDir);
-      const result = await runBiomeCheck(filePath);
-      expect(result).not.toBeNull();
-      expect(result).toContain("noDuplicateObjectKeys");
     });
   });
 
   describe("runBiomeFix", () => {
-    it("fixes auto-fixable issues", async () => {
-      const filePath = await copyFixture("fixable.ts", tempDir);
+    test.each<{ name: string; fixture: string; fixedAfter: boolean }>([
+      { name: "fixes auto-fixable issues", fixture: "fixable.ts", fixedAfter: true },
+      { name: "does not fix unsafe issues", fixture: "unfixable.ts", fixedAfter: false },
+    ])("$name", async ({ fixture, fixedAfter }) => {
+      const filePath = await copyFixture(fixture, tempDir);
       expect(await runBiomeCheck(filePath)).not.toBeNull();
       await runBiomeFix(filePath);
-      expect(await runBiomeCheck(filePath)).toBeNull();
-    });
-
-    it("does not fix unsafe issues", async () => {
-      const filePath = await copyFixture("unfixable.ts", tempDir);
-      expect(await runBiomeCheck(filePath)).not.toBeNull();
-      await runBiomeFix(filePath);
-      expect(await runBiomeCheck(filePath)).not.toBeNull();
+      const result = await runBiomeCheck(filePath);
+      if (fixedAfter) {
+        expect(result).toBeNull();
+      } else {
+        expect(result).not.toBeNull();
+      }
     });
   });
 
@@ -137,19 +168,10 @@ describe("biome hook", () => {
       expect(await parseTranscript("/nonexistent/path.jsonl")).toEqual([]);
     });
 
-    it("extracts file paths from Edit tool uses", async () => {
+    test.each(["Edit", "Write"])("extracts file paths from %s tool uses", async (tool) => {
       const filePath = await copyFixture("valid.ts", tempDir);
-      const transcriptPath = join(tempDir, `transcript-edit-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
-
-      const files = await parseTranscript(transcriptPath);
-      expect(files).toContain(filePath);
-    });
-
-    it("extracts file paths from Write tool uses", async () => {
-      const filePath = await copyFixture("valid.ts", tempDir);
-      const transcriptPath = join(tempDir, `transcript-write-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+      const transcriptPath = join(tempDir, `transcript-${tool}-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool }]));
 
       const files = await parseTranscript(transcriptPath);
       expect(files).toContain(filePath);
@@ -160,6 +182,17 @@ describe("biome hook", () => {
       await Bun.write(mdPath, "# Test");
       const transcriptPath = join(tempDir, `transcript-md-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: mdPath, tool: "Write" }]));
+
+      const files = await parseTranscript(transcriptPath);
+      expect(files).toEqual([]);
+    });
+
+    it("ignores generated workflow scripts", async () => {
+      const wfDir = join(tempDir, "workflows", "scripts");
+      const wfPath = join(wfDir, "sweep-wf_123.js");
+      await Bun.write(wfPath, "export const meta = {};\nreturn { done: true };\n");
+      const transcriptPath = join(tempDir, `transcript-wf-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: wfPath, tool: "Edit" }]));
 
       const files = await parseTranscript(transcriptPath);
       expect(files).toEqual([]);
@@ -219,9 +252,22 @@ describe("biome hook", () => {
       expect(await processPostToolUse(input)).toBeNull();
     });
 
-    it("returns additionalContext for fixable issues", async () => {
-      const filePath = await copyFixture("fixable.ts", tempDir);
-      const input = mockPostToolUseInput("Write", { file_path: filePath });
+    test.each<{ name: string; fixture: string; tool: string; expected: string }>([
+      {
+        name: "returns additionalContext for fixable issues",
+        fixture: "fixable.ts",
+        tool: "Write",
+        expected: "Biome found issues",
+      },
+      {
+        name: "returns additionalContext for unfixable issues",
+        fixture: "unfixable.ts",
+        tool: "Edit",
+        expected: "noDuplicateObjectKeys",
+      },
+    ])("$name", async ({ fixture, tool, expected }) => {
+      const filePath = await copyFixture(fixture, tempDir);
+      const input = mockPostToolUseInput(tool, { file_path: filePath });
       const result = await processPostToolUse(input);
 
       expect(result).not.toBeNull();
@@ -231,18 +277,7 @@ describe("biome hook", () => {
 
       const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
         .additionalContext;
-      expect(additionalContext).toContain("Biome found issues");
-    });
-
-    it("returns additionalContext for unfixable issues", async () => {
-      const filePath = await copyFixture("unfixable.ts", tempDir);
-      const input = mockPostToolUseInput("Edit", { file_path: filePath });
-      const result = await processPostToolUse(input);
-
-      expect(result).not.toBeNull();
-      const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
-        .additionalContext;
-      expect(additionalContext).toContain("noDuplicateObjectKeys");
+      expect(additionalContext).toContain(expected);
     });
   });
 
@@ -297,6 +332,15 @@ describe("biome hook", () => {
       expect(result?.decision).toBe("block");
       expect(result?.reason).toContain("Biome check failed");
       expect(result?.reason).toContain("noDuplicateObjectKeys");
+    });
+
+    it("returns null when the only modified file is ignored by Biome config", async () => {
+      const filePath = await createIgnoredFixture(tempDir);
+      const transcriptPath = join(tempDir, `transcript-ignored-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+      const input = mockStopHookInput(transcriptPath);
+      expect(await processStop(input)).toBeNull();
     });
 
     it("processes multiple files in parallel", async () => {

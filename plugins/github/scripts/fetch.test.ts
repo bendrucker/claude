@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
@@ -24,102 +24,64 @@ function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | n
 }
 
 describe("isGitHubUrl", () => {
-  it("returns true for GitHub URLs", () => {
-    expect(isGitHubUrl("https://github.com/owner/repo")).toBe(true);
-    expect(isGitHubUrl("https://github.com/bendrucker/deployments")).toBe(true);
-  });
-
-  it("returns false for non-GitHub URLs", () => {
-    expect(isGitHubUrl("https://example.com")).toBe(false);
-    expect(isGitHubUrl("https://gitlab.com/owner/repo")).toBe(false);
-    expect(isGitHubUrl("http://github.com/owner/repo")).toBe(false);
+  test.each<[string, boolean]>([
+    ["https://github.com/owner/repo", true],
+    ["https://github.com/bendrucker/deployments", true],
+    ["https://example.com", false],
+    ["https://gitlab.com/owner/repo", false],
+    ["http://github.com/owner/repo", false],
+  ])("isGitHubUrl(%p) -> %p", (url, expected) => {
+    expect(isGitHubUrl(url)).toBe(expected);
   });
 });
 
 describe("parseGitHubUrl", () => {
-  it("returns null for non-repo GitHub URLs", () => {
-    expect(parseGitHubUrl("https://github.com/explore")).toBeNull();
-    expect(parseGitHubUrl("https://github.com/settings")).toBeNull();
+  test.each([
+    "https://github.com/explore",
+    "https://github.com/settings",
+  ])("returns null for %p", (url) => {
+    expect(parseGitHubUrl(url)).toBeNull();
   });
 
-  it("detects repo root", () => {
-    const result = parseGitHubUrl("https://github.com/bendrucker/deployments");
-    expect(result?.type).toBe("repo");
-    expect(result?.suggestion).toContain("gh repo view");
+  test.each<[string, string, string]>([
+    ["https://github.com/bendrucker/deployments", "repo", "gh repo view"],
+    ["https://github.com/bendrucker/deployments/", "repo", "gh repo view"],
+    ["https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts", "file", "gh api"],
+    ["https://github.com/owner/repo/tree/main/src", "file", "gh api"],
+    ["https://github.com/owner/repo/tree/main", "file", "gh api"],
+  ])("detects %p -> type %p", (url, type, suggestionContains) => {
+    const result = parseGitHubUrl(url);
+    expect(result?.type).toBe(type);
+    expect(result?.suggestion).toContain(suggestionContains);
   });
 
-  it("handles repo root with trailing slash", () => {
-    const result = parseGitHubUrl("https://github.com/bendrucker/deployments/");
-    expect(result?.type).toBe("repo");
-    expect(result?.suggestion).toContain("gh repo view");
-  });
-
-  it("detects file content (blob URL)", () => {
-    const result = parseGitHubUrl(
-      "https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts",
-    );
-    expect(result?.type).toBe("file");
-    expect(result?.suggestion).toContain("gh api");
-  });
-
-  it("detects directory (tree URL)", () => {
-    const result = parseGitHubUrl("https://github.com/owner/repo/tree/main/src");
-    expect(result?.type).toBe("file");
-    expect(result?.suggestion).toContain("gh api");
-  });
-
-  it("handles root directory tree", () => {
-    const result = parseGitHubUrl("https://github.com/owner/repo/tree/main");
-    expect(result?.type).toBe("file");
-    expect(result?.suggestion).toContain("gh api");
-  });
-
-  it("detects issues", () => {
-    const result = parseGitHubUrl("https://github.com/owner/repo/issues/123");
-    expect(result?.type).toBe("issue");
-    expect(result?.suggestion).toBe("Use: gh issue view 123.");
-  });
-
-  it("detects PRs", () => {
-    const result = parseGitHubUrl("https://github.com/owner/repo/pull/456");
-    expect(result?.type).toBe("pr");
-    expect(result?.suggestion).toBe("Use: gh pr view 456.");
-  });
-
-  it("detects Actions run", () => {
-    const result = parseGitHubUrl("https://github.com/owner/repo/actions/runs/12345");
-    expect(result?.type).toBe("run");
-    expect(result?.suggestion).toBe("Use: gh run view 12345.");
-  });
-
-  it("detects Actions job", () => {
-    const result = parseGitHubUrl(
+  test.each<[string, string, string]>([
+    ["https://github.com/owner/repo/issues/123", "issue", "Use: gh issue view 123."],
+    ["https://github.com/owner/repo/pull/456", "pr", "Use: gh pr view 456."],
+    ["https://github.com/owner/repo/actions/runs/12345", "run", "Use: gh run view 12345."],
+    [
       "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490",
-    );
-    expect(result?.type).toBe("job");
-    expect(result?.suggestion).toBe("Use: gh run view --job 57098829490 --log.");
+      "job",
+      "Use: gh run view --job 57098829490 --log.",
+    ],
+  ])("detects %p -> type %p", (url, type, suggestion) => {
+    const result = parseGitHubUrl(url);
+    expect(result?.type).toBe(type);
+    expect(result?.suggestion).toBe(suggestion);
   });
 });
 
 describe("formatOutput", () => {
-  it("formats deny decision", () => {
-    const output = formatOutput("deny", "Use gh instead");
+  test.each<["deny" | "ask", string]>([
+    ["deny", "Use gh instead"],
+    ["ask", "Unknown pattern"],
+  ])("formats %p decision", (decision, reason) => {
+    const output = formatOutput(decision, reason);
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason: "Use gh instead",
-      },
-    });
-  });
-
-  it("formats ask decision", () => {
-    const output = formatOutput("ask", "Unknown pattern");
-    expect(output).toEqual({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "ask",
-        permissionDecisionReason: "Unknown pattern",
+        permissionDecision: decision,
+        permissionDecisionReason: reason,
       },
     });
   });
@@ -130,68 +92,30 @@ describe("processInput", () => {
     expect(processInput(mockInput("https://example.com"))).toBeNull();
   });
 
-  it("denies repo root with gh repo view suggestion", () => {
-    const output = getOutput(mockInput("https://github.com/bendrucker/deployments"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh repo view [<repository>].");
-  });
-
-  it("handles repository URL with trailing slash", () => {
-    const output = getOutput(mockInput("https://github.com/bendrucker/deployments/"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh repo view [<repository>].");
-  });
-
-  it("denies file content with gh api suggestion", () => {
-    const output = getOutput(
-      mockInput("https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts"),
-    );
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh api to fetch file contents.");
-  });
-
-  it("denies directory with gh api suggestion", () => {
-    const output = getOutput(mockInput("https://github.com/owner/repo/tree/main/src"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh api to fetch file contents.");
-  });
-
-  it("handles root directory tree", () => {
-    const output = getOutput(mockInput("https://github.com/owner/repo/tree/main"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh api to fetch file contents.");
-  });
-
-  it("denies issues with gh issue view suggestion", () => {
-    const output = getOutput(mockInput("https://github.com/owner/repo/issues/123"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh issue view 123.");
-  });
-
-  it("denies PRs with gh pr view suggestion", () => {
-    const output = getOutput(mockInput("https://github.com/owner/repo/pull/456"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh pr view 456.");
-  });
-
-  it("denies Actions run with gh run view suggestion", () => {
-    const output = getOutput(mockInput("https://github.com/owner/repo/actions/runs/12345"));
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh run view 12345.");
-  });
-
-  it("denies Actions job with gh run view --job suggestion", () => {
-    const output = getOutput(
-      mockInput(
-        "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490",
-      ),
-    );
-    expect(output?.permissionDecision).toBe("deny");
-    expect(output?.permissionDecisionReason).toBe("Use: gh run view --job 57098829490 --log.");
-  });
-
   it("passes through unknown GitHub URL patterns", () => {
     const output = getOutput(mockInput("https://github.com/explore"));
     expect(output).toBeNull();
+  });
+
+  test.each<[string, string]>([
+    ["https://github.com/bendrucker/deployments", "Use: gh repo view [<repository>]."],
+    ["https://github.com/bendrucker/deployments/", "Use: gh repo view [<repository>]."],
+    [
+      "https://github.com/bendrucker/bendrucker.me/blob/master/astro.config.ts",
+      "Use: gh api to fetch file contents.",
+    ],
+    ["https://github.com/owner/repo/tree/main/src", "Use: gh api to fetch file contents."],
+    ["https://github.com/owner/repo/tree/main", "Use: gh api to fetch file contents."],
+    ["https://github.com/owner/repo/issues/123", "Use: gh issue view 123."],
+    ["https://github.com/owner/repo/pull/456", "Use: gh pr view 456."],
+    ["https://github.com/owner/repo/actions/runs/12345", "Use: gh run view 12345."],
+    [
+      "https://github.com/terraform-linters/tflint/actions/runs/19917285716/job/57098829490",
+      "Use: gh run view --job 57098829490 --log.",
+    ],
+  ])("denies %p", (url, reason) => {
+    const output = getOutput(mockInput(url));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toBe(reason);
   });
 });

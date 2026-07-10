@@ -41,7 +41,7 @@ console.log(file.type); // "image/png"
 
 ## Bun.write()
 
-`Bun.write()` writes content to a file, creating it if it doesn't exist:
+`Bun.write()` writes content to a file, creating it if absent:
 
 ```ts
 await Bun.write("output.txt", "content");

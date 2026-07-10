@@ -1,0 +1,13 @@
+{
+  "id": "migration-add-server-defaults",
+  "path": "migrations/versions/ece562436709_add_missing_server_defaults_to_messages_.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# Add missing server defaults to messages table timestamps",
+  "context": "21: def upgrade() -> None:\n22:     \"\"\"Upgrade schema.\"\"\"\n23:     # Add missing server defaults to messages table timestamps\n24:     op.alter_column(\"messages\", \"created_at\", server_default=sa.text(\"now()\"))\n25:     op.alter_column(\"messages\", \"updated_at\", server_default=sa.text(\"now()\"))\n26: \n27: \n28: def downgrade() -> None:\n29:     \"\"\"Downgrade schema.\"\"\"\n30:     # Remove server defaults from messages table timestamps\n31:     op.alter_column(\"messages\", \"created_at\", server_default=None)\n32:     op.alter_column(\"messages\", \"updated_at\", server_default=None)",
+  "action": "trim",
+  "category": "restate-the-what",
+  "trimToLines": null,
+  "source": "main migrations/ece562436709:23",
+  "note": "Restates two alter_column calls that set server_default on created_at/updated_at. The migration's own filename and revision message already say this; the line just narrates the code below it."
+}

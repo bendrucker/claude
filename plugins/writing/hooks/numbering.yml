@@ -47,6 +47,23 @@ constraints:
     regex: "(?i)(step|phase|part)[0-9]+"
 ---
 id: numbering
+language: tsx
+severity: error
+message: "Numbered identifier creates tight coupling: $NAME"
+note: "Use descriptive names instead. See CLAUDE.md Organization guidelines."
+rule:
+  any:
+    - pattern: "function $NAME($$$) { $$$ }"
+    - pattern: "const $NAME = $$$"
+    - pattern: "let $NAME = $$$"
+    - pattern: "var $NAME = $$$"
+    - pattern: "type $NAME = $$$"
+    - pattern: "interface $NAME { $$$ }"
+constraints:
+  NAME:
+    regex: "(?i)(step|phase|part)[0-9]+"
+---
+id: numbering
 language: python
 severity: error
 message: "Numbered identifier creates tight coupling: $NAME"

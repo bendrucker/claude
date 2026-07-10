@@ -80,7 +80,7 @@ afterAll(() => {
 
 ## Mocking
 
-Use `mock()` to create function mocks:
+Create function mocks with `mock()`:
 
 ```ts
 import { mock } from "bun:test";

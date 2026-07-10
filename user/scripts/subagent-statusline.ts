@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { styleText } from "node:util";
 import { genericGlyph, purposeGlyphs, remoteGlyph } from "./glyphs";
+import { modelMarker } from "./model";
 
 export interface Task {
   id: string;
@@ -90,6 +91,9 @@ export function renderTask(
   columns: number | null,
   now: number,
   agentType: string | null,
+  activity: string | null = null,
+  description: string | null = null,
+  model: string | null = null,
 ): { id: string; content: string } {
   const icon = typeIcon(agentType, task.status ?? "running");
   const marker = remoteMarker(task.type);
@@ -97,6 +101,7 @@ export function renderTask(
   const metaParts: string[] = [];
   if (task.startTime != null) metaParts.push(formatElapsed(task.startTime, now));
   if ((task.tokenCount ?? 0) > 0) metaParts.push(formatTokens(task.tokenCount ?? 0));
+  if (model) metaParts.push(model);
 
   // The type name trails as dim text after the meta. The icon already conveys
   // the kind, so a narrow terminal can drop the name without losing it.
@@ -112,9 +117,16 @@ export function renderTask(
     return body;
   };
 
-  let text = task.description
-    ? formatDescription(task.description, agentType)
-    : task.name || "agent";
+  // Live activity from the transcript wins: it answers "what is it doing now"
+  // where the static spawn prompt only repeats "You are implementing …" across
+  // every teammate. The clean meta description (or stdin description) covers the
+  // gap before the teammate's first action; the name is the last resort.
+  const fallback = description ?? task.description ?? null;
+  let text = activity
+    ? activity
+    : fallback
+      ? formatDescription(fallback, agentType)
+      : task.name || "agent";
   let content = build(text, true);
 
   if (columns != null && Bun.stringWidth(content) > columns) {
@@ -134,21 +146,168 @@ export function renderTask(
   return { id: task.id, content };
 }
 
-// Each task id keys a sidecar the harness writes next to the subagent
-// transcript, scoped to the current project's sessions (derived from cwd). A
-// miss yields no glyph (the prune signal if the harness changes this layout).
-async function agentTypeFor(id: string, projectDir: string): Promise<string | null> {
+interface AgentMeta {
+  agentType?: string;
+  description?: string;
+}
+
+interface ContentBlock {
+  type?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  text?: string;
+}
+
+interface TranscriptEntry {
+  message?: { role?: string; content?: ContentBlock[]; model?: string };
+}
+
+const basename = (p: unknown): string =>
+  String(p ?? "")
+    .split("/")
+    .pop() ?? "";
+const firstWord = (cmd: unknown): string =>
+  String(cmd ?? "")
+    .trim()
+    .split(/\s+/)[0] ?? "";
+const oneLine = (s: string): string => s.replace(/\s+/g, " ").trim();
+
+// A tool call renders as a verb plus its most telling argument: the file for
+// file tools, the leading command word for Bash (ssh, grep, sed), the message
+// summary for a teammate handoff. The harness truncates to the column budget,
+// so these stay short and let the kind read at a glance.
+export function humanizeTool(name: string, input: Record<string, unknown> = {}): string {
+  switch (name) {
+    case "Read":
+      return `Reading ${basename(input.file_path)}`;
+    case "Edit":
+    case "MultiEdit":
+    case "NotebookEdit":
+      return `Editing ${basename(input.file_path)}`;
+    case "Write":
+      return `Writing ${basename(input.file_path)}`;
+    case "Bash":
+      return `Running ${firstWord(input.command)}`;
+    case "Grep":
+    case "WebSearch":
+      return oneLine(`Searching ${String(input.pattern ?? input.query ?? "")}`);
+    case "Glob":
+      return oneLine(`Globbing ${String(input.pattern ?? "")}`);
+    case "ToolSearch":
+      return "Searching tools";
+    case "WebFetch":
+      return `Fetching ${basename(input.url)}`;
+    case "SendMessage":
+      return `→ ${String(input.summary ?? "message")}`;
+    case "Task":
+    case "Agent":
+      return `Spawning ${String(input.description ?? "agent")}`;
+    case "TodoWrite":
+      return "Updating todos";
+    case "Skill":
+      return oneLine(`Running /${String(input.skill ?? input.command ?? "")}`);
+    default:
+      return name || "working";
+  }
+}
+
+// The newest tool call or assistant line, whichever is later. A finished
+// teammate's last entry is a text summary; a working one's last assistant entry
+// ends in the tool it is mid-call on (the trailing tool_result is a separate
+// user entry). Scanning content blocks back-to-front returns whichever the
+// teammate did last. Thinking and tool results are not events here.
+export function extractActivity(entries: TranscriptEntry[]): string | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const msg = entries[i]?.message;
+    if (msg?.role !== "assistant" || !Array.isArray(msg.content)) continue;
+    for (let j = msg.content.length - 1; j >= 0; j--) {
+      const block = msg.content[j];
+      if (block?.type === "tool_use" && typeof block.name === "string") {
+        return humanizeTool(block.name, block.input ?? {});
+      }
+      if (block?.type === "text" && typeof block.text === "string" && block.text.trim()) {
+        return oneLine(block.text);
+      }
+    }
+  }
+  return null;
+}
+
+// The newest assistant model in a transcript tail. Both the subagent's own model
+// and its parent session's model come from here. Comparing the two decides
+// whether a subagent is running off-default and warrants a letter.
+export function extractModel(entries: TranscriptEntry[]): string | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const model = entries[i]?.message?.model;
+    if (typeof model === "string" && model) return model;
+  }
+  return null;
+}
+
+// A subagent's model letter, shown only when it differs from the session it was
+// spawned from. Same model (or either unknown) yields no letter, keeping the
+// line quiet unless a cheaper model is actually in play.
+export function subagentModelLetter(
+  subModel: string | null,
+  sessionModel: string | null,
+): string | null {
+  if (!subModel || !sessionModel) return null;
+  const sub = modelMarker(subModel)?.letter ?? null;
+  if (!sub || sub === (modelMarker(sessionModel)?.letter ?? null)) return null;
+  return sub;
+}
+
+// Each task id keys a sidecar pair the harness writes next to the subagent
+// transcript, scoped to the current project's sessions (derived from cwd). The
+// path prefix locates both the `.meta.json` and the `.jsonl`. Its first segment
+// is the parent session id. A miss yields no glyph or activity (the prune signal
+// if the harness changes this layout).
+function subagentBase(id: string, projectDir: string): { base: string; sessionId: string } | null {
   try {
     for (const rel of new Bun.Glob(`*/subagents/agent-${id}.meta.json`).scanSync({
       cwd: projectDir,
     })) {
-      const meta = (await Bun.file(join(projectDir, rel)).json()) as { agentType?: string };
-      return meta.agentType ?? null;
+      const sessionId = rel.split("/")[0] ?? "";
+      return { base: join(projectDir, rel).slice(0, -".meta.json".length), sessionId };
     }
   } catch {
-    // Sidecar missing or unreadable: skip the purpose glyph.
+    // Project directory unreadable: skip enrichment.
   }
   return null;
+}
+
+async function readMeta(base: string): Promise<AgentMeta | null> {
+  try {
+    return (await Bun.file(`${base}.meta.json`).json()) as AgentMeta;
+  } catch {
+    return null;
+  }
+}
+
+// Transcripts grow to megabytes. Only the tail holds the latest events, so read
+// a bounded suffix and drop the first line, which a mid-file slice splits.
+const TAIL_BYTES = 65_536;
+async function readEntries(path: string): Promise<TranscriptEntry[]> {
+  try {
+    const file = Bun.file(path);
+    const size = file.size;
+    if (!size) return [];
+    const start = Math.max(0, size - TAIL_BYTES);
+    const lines = (await file.slice(start).text()).split("\n");
+    if (start > 0) lines.shift();
+    const entries: TranscriptEntry[] = [];
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        entries.push(JSON.parse(line) as TranscriptEntry);
+      } catch {
+        // Skip malformed lines.
+      }
+    }
+    return entries;
+  } catch {
+    return [];
+  }
 }
 
 if (import.meta.main) {
@@ -167,10 +326,38 @@ if (import.meta.main) {
   const projectDir = join(homedir(), ".claude", "projects", slug);
   const now = Date.now();
 
+  // All tasks on this line share one parent session, so its model is read once.
+  const sessionModels = new Map<string, string | null>();
+  const sessionModel = async (sessionId: string): Promise<string | null> => {
+    if (!sessionModels.has(sessionId)) {
+      const entries = await readEntries(join(projectDir, `${sessionId}.jsonl`));
+      sessionModels.set(sessionId, extractModel(entries));
+    }
+    return sessionModels.get(sessionId) ?? null;
+  };
+
   const lines: string[] = [];
   for (const task of input.tasks ?? []) {
-    const agentType = await agentTypeFor(task.id, projectDir);
-    lines.push(JSON.stringify(renderTask(task, input.columns ?? null, now, agentType)));
+    const located = subagentBase(task.id, projectDir);
+    const meta = located ? await readMeta(located.base) : null;
+    const entries = located ? await readEntries(`${located.base}.jsonl`) : [];
+    const activity = extractActivity(entries);
+    const model = located
+      ? subagentModelLetter(extractModel(entries), await sessionModel(located.sessionId))
+      : null;
+    lines.push(
+      JSON.stringify(
+        renderTask(
+          task,
+          input.columns ?? null,
+          now,
+          meta?.agentType ?? null,
+          activity,
+          meta?.description ?? null,
+          model,
+        ),
+      ),
+    );
   }
   if (lines.length) process.stdout.write(`${lines.join("\n")}\n`);
 }

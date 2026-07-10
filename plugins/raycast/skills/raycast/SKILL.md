@@ -33,7 +33,7 @@ See [references/hooks.md](references/hooks.md)
 
 ## AI Tools
 
-Tools export a default async function with a typed `Input` parameter. JSDoc comments on the `Input` type teach the AI how to use the tool. Export a `confirmation` function for destructive operations. Configure `ai.instructions` in `package.json` for extension-level guidance.
+Tools export a default async function with a typed `Input` parameter. JSDoc comments on the `Input` type teach the AI to use the tool. Export a `confirmation` function for destructive operations. Configure `ai.instructions` in `package.json` for extension-level guidance.
 
 See [references/ai-tools.md](references/ai-tools.md)
 

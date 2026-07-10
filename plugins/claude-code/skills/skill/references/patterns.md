@@ -28,7 +28,7 @@ bigquery-skill/
     └── product.md (API usage)
 ```
 
-When user asks about sales, Claude only reads `sales.md`.
+When the user asks about sales, Claude reads only `sales.md`.
 
 ### Pattern 3: Conditional details
 
@@ -52,7 +52,7 @@ The bang-backtick syntax runs shell commands as preprocessing before Claude sees
 - Recent commits: !`git log --oneline -5`
 ```
 
-When the skill runs, each bang-backtick expression executes immediately and its stdout replaces the placeholder. Claude never sees the command — only the output.
+Each bang-backtick expression executes immediately and its stdout replaces the placeholder. Claude never sees the command — only the output.
 
 ### When to Use
 
@@ -138,7 +138,7 @@ Dynamic context works alongside other skill features:
 
 ### Gotchas
 
-- Commands run in the **project root**, not the skill directory. For plugin skills, use `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` to reference skill-local scripts. `${CLAUDE_SKILL_DIR}` works in hooks and allowed-tools but NOT in `!` context.
+- Commands run in the **project root**, not the skill directory. For plugin skills, use `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` to reference skill-local scripts. `${CLAUDE_SKILL_DIR}` also expands in `!` context, the body, and `allowed-tools`, but NOT in the frontmatter `hooks:` block (there it resolves to empty; reference bundled scripts by `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` in hook commands).
 - **stderr is discarded** — only stdout replaces the placeholder.
 - Failed commands produce empty output. Handle this in the command itself with a fallback (e.g., `some-cmd 2>/dev/null || echo "unavailable"`).
 - Commands run **synchronously and sequentially**. Avoid slow commands that would delay skill loading.
@@ -261,11 +261,11 @@ agent: Explore
 ---
 ```
 
-The sub-agent starts with a **clean context** — it does not inherit the parent conversation. It only sees the skill content (with `!`shell`` injections expanded) and `CLAUDE.md`. Results are summarized and returned to the main conversation.
+The sub-agent starts with a **clean context** — it does not inherit the parent conversation. It sees only the skill content (with `!`shell`` injections expanded) and `CLAUDE.md`. Results are summarized and returned to the main conversation.
 
 ### When Not to Fork
 
-`context: fork` loses all conversation history. If the skill needs awareness of what the user has been working on, run it inline instead and use Task agents to offload verbose work. The inline skill retains full context while keeping the heavy lifting out of the main conversation.
+`context: fork` loses all conversation history. If the skill needs awareness of what the user has been working on, run it inline and use Task agents to offload verbose work. The inline skill retains full context while keeping the heavy lifting out of the main conversation.
 
 ## Skill-Scoped Hooks
 
@@ -336,7 +336,7 @@ hooks:
 
 ### Tool Overlap Confuses the Model
 
-Exposing several near-duplicate tools makes Claude pick the wrong one. Three "fetch" variants or two "search" tools force a choice the model often gets wrong. Consolidate overlapping capabilities into a single parameterized tool, where an argument selects behavior.
+Exposing several near-duplicate tools makes Claude pick the wrong one. Three "fetch" variants or two "search" tools force a choice the model often gets wrong. Consolidate overlapping capabilities into a single parameterized tool where an argument selects behavior.
 
 ```yaml
 # Avoid: near-duplicate tools competing for the same job
@@ -352,7 +352,7 @@ The same overlap appears at the skill level. Two near-duplicate skills whose `de
 
 ### Over-Prescription Lowers Quality
 
-Prompts that micromanage the exact sequence of tool calls degrade output and become brittle. Spelling out every call ties the skill to one path, so any change upstream breaks it. Prefer high-level guidance that states the goal and the constraints, then trust the model to sequence the work.
+Prompts that micromanage the exact sequence of tool calls degrade output and become brittle. Spelling out every call ties the skill to one path, so any upstream change breaks it. Prefer high-level guidance that states the goal and constraints, then trust the model to sequence the work.
 
 This is the operational elaboration of [Don't Railroad Claude](../SKILL.md) and the appropriate-freedom principle: give Claude the outcome and let it choose the steps. When a skill keeps accreting prescriptive steps to patch failures, the fix is usually a clearer goal or a helper script, not more steps.
 

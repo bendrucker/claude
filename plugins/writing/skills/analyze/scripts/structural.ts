@@ -91,10 +91,8 @@ export function auditStructuralPatterns(
 //   3. Extend ReportInput with the findings type.
 //   4. Render findings in report.ts under the appropriate section.
 //
-// The meaning layer is the first expected user of this seam (#791). Grammar
 // and cross-sentence detectors may follow as they graduate from the hook.
 export interface DetectorModule<TFinding> {
   layer: DetectorLayer;
-  /** Run the detector over corpus rows and return per-row findings. */
   detect(rows: Array<{ session_id: string; text?: string }>): Promise<TFinding[]>;
 }

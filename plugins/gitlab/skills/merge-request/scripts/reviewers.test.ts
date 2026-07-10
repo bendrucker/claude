@@ -4,6 +4,8 @@ import { isBotUsername, isReviewTarget, parseReviewers } from "./reviewers";
 describe("isBotUsername", () => {
   test.each([
     "group_1234_bot",
+    "group_108656794_bot_52b7e4c7a732080fa3b51efe36863e09",
+    "project_42_bot_abc123def456",
     "my-reviewer-bot",
     "greptile_bot",
     "Project-Bot",
@@ -16,6 +18,8 @@ describe("isBotUsername", () => {
     "jacob",
     "coderabbitai",
     "robotnik",
+    "group_bot_user",
+    "my_bot_friend",
   ])("rejects %s (no bot suffix)", (username) => {
     expect(isBotUsername(username)).toBe(false);
   });

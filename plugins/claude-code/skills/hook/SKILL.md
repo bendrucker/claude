@@ -13,7 +13,7 @@ allowed-tools:
 
 # Claude Code Hooks
 
-Reference for creating and configuring Claude Code hooks. When uncertain about syntax or features, use the Task tool with `subagent_type='claude-code-guide'` to consult official documentation.
+Reference for creating and configuring Claude Code hooks. When uncertain about syntax or features, use the Task tool with `subagent_type='claude-code-guide'` to consult official docs.
 
 ## Hook Types
 

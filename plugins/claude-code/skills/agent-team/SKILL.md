@@ -1,6 +1,7 @@
 ---
 name: claude-code:agent-team
 description: Orchestrating Claude Code agent teams. Use when creating teams, spawning teammates, assigning tasks, configuring teammate modes, or setting up team quality gate hooks.
+argument-hint: "[--plan-approval] [--delegate] [--shutdown]"
 allowed-tools:
   - Read
   - Write
@@ -12,6 +13,14 @@ allowed-tools:
 ---
 
 # Agent Teams
+
+## Arguments
+
+These select a team mode up front instead of toggling it interactively (see [Team Lifecycle](#team-lifecycle)):
+
+- `--delegate`: start the lead in delegate mode, coordination-only with no direct implementation. Default: the lead can implement.
+- `--plan-approval`: require teammates to plan before implementing, read-only until the lead approves. Default: off.
+- `--shutdown`: shut the current team down, teammates first and then the team, then stop. Default: create or operate a team.
 
 ## Team Lifecycle
 
@@ -45,7 +54,7 @@ Teams are stored locally:
 
 The config contains a `members` array with each teammate's name, agent ID, and type. Teammates read this file to discover each other.
 
-Teammates inherit the lead's permission settings at spawn. Each teammate loads project context (CLAUDE.md, MCP servers, skills) plus the spawn prompt — the lead's conversation history does not carry over.
+Teammates inherit the lead's permission settings at spawn. Each loads project context (CLAUDE.md, MCP servers, skills) plus the spawn prompt — the lead's conversation history does not carry over.
 
 ## Limitations
 
@@ -61,6 +70,6 @@ Teammates inherit the lead's permission settings at spawn. Each teammate loads p
 ## References
 
 - [references/hooks.md](references/hooks.md) — `TeammateIdle` and `TaskCompleted` quality gate hooks
-- [references/practices.md](references/practices.md) — task sizing, spawn prompts, file conflicts, team structures
+- [references/practices.md](references/practices.md) — task sizing, spawn prompts, file conflicts, team structures, model selection
 - [references/interaction.md](references/interaction.md) — display modes, keyboard shortcuts, direct teammate interaction
 - [Agent Teams Documentation](https://code.claude.com/docs/en/agent-teams)

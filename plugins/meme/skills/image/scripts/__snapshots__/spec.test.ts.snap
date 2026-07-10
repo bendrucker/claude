@@ -1,0 +1,25 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`validateSpec rejects not an object 1`] = `"spec: expected an object with boxes and/or captions"`;
+
+exports[`validateSpec rejects empty object 1`] = `"spec: requires at least one of boxes or captions"`;
+
+exports[`validateSpec rejects empty arrays 1`] = `"spec: requires at least one box or caption"`;
+
+exports[`validateSpec rejects box missing text 1`] = `"spec.boxes[0].text: required non-empty string"`;
+
+exports[`validateSpec rejects bad preset 1`] = `"spec.boxes[0].preset: expected one of classic, label, subtitle"`;
+
+exports[`validateSpec rejects anchor and region together 1`] = `"spec.boxes[0]: anchor and region are mutually exclusive"`;
+
+exports[`validateSpec rejects region out of range 1`] = `"spec.boxes[0].region.w: expected a number between 0 and 1, got 2"`;
+
+exports[`validateSpec rejects bad fontSize override 1`] = `"spec.boxes[0].style.fontSize: expected a number between 0 and 1, got 40"`;
+
+exports[`validateSpec rejects bad caption position 1`] = `"spec.captions[0].position: expected one of top, bottom"`;
+
+exports[`specFromFlags rejects no flags 1`] = `"flags: requires at least one of --top, --bottom, --subtitle, --caption, or --spec"`;
+
+exports[`specFromFlags rejects bad caption position 1`] = `"--caption-position: expected top or bottom"`;
+
+exports[`validateSpec rejects non-boolean linkFontSizes 1`] = `"spec.linkFontSizes: expected a boolean"`;

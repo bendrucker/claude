@@ -7,11 +7,10 @@ Managing Linear issues, projects, and teams for Claude Code.
 ### Skills
 
 - **linear** — Workflows, issue management, and API usage
-- **notifications** — Notifications inbox triage
 
 ### Hooks
 
-- Sets default state for new issues based on assignee
+- Guards `save_issue` calls: normalizes input shape, enforces the create/update preconditions, and sets a default state for new issues
 
 ## Testing
 

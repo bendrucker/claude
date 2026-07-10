@@ -15,14 +15,6 @@
   "has",
   "select-pane",
   "selectp",
-  "select-window",
-  "selectw",
-  "last-window",
-  "last",
-  "next-window",
-  "next",
-  "previous-window",
-  "prev",
   "swap-pane",
   "swapp",
   "swap-window",
@@ -38,7 +30,5 @@
   "rename-window",
   "renamew",
   "rename-session",
-  "rename",
-  "switch-client",
-  "switchc"
+  "rename"
 ]

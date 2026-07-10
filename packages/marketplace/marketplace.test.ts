@@ -6,6 +6,7 @@ import {
   enabledPluginNames,
   hookCommands,
   loadPlugins,
+  type MatcherEntryContext,
   matcherEntries,
   type Plugin,
 } from "./index";
@@ -68,42 +69,37 @@ async function catalog(): Promise<Map<string, Plugin>> {
   return new Map(plugins.map((p) => [p.name, p]));
 }
 
+/**
+ * Normalizes a plugin for snapshotting: strips the mkdtemp-based `dir` prefix
+ * and flattens the nested hooks file down to the one matcher tests care about.
+ */
+function forSnapshot(plugin?: Plugin) {
+  if (!plugin) return plugin;
+  const { hooks, ...rest } = plugin;
+  return {
+    ...rest,
+    dir: plugin.dir?.replace(root, "<root>"),
+    hookMatcher: hooks?.hooks.PreToolUse?.[0]?.matcher,
+  };
+}
+
 describe("loadPlugins", () => {
   test("returns one record per plugin across all sources, sorted by name", async () => {
     const plugins = await loadPlugins({ root });
     expect(plugins.map((p) => p.name)).toEqual(["alpha", "beta", "orphan", "remote-only"]);
   });
 
-  test("joins a fully-present local plugin", async () => {
-    const alpha = (await catalog()).get("alpha");
-    expect(alpha?.dir).toBe(join(root, "plugins", "alpha"));
-    expect(alpha?.listing?.local).toBe(true);
-    expect(alpha?.listing?.description).toBe("Alpha plugin");
-    expect(alpha?.enabled).toBe(true);
-    expect(alpha?.manifest?.name).toBe("alpha");
-    expect(alpha?.hooks?.hooks.PreToolUse?.[0]?.matcher).toBe("Bash");
-    expect(alpha?.mcpServers).toEqual(["alpha-server"]);
-  });
-
-  test("listed local plugin that is disabled", async () => {
-    const beta = (await catalog()).get("beta");
-    expect(beta?.dir).toBeDefined();
-    expect(beta?.listing?.local).toBe(true);
-    expect(beta?.enabled).toBe(false);
-    expect(beta?.mcpServers).toEqual([]);
-  });
-
-  test("on-disk plugin missing from the marketplace keeps dir without listing", async () => {
-    const orphan = (await catalog()).get("orphan");
-    expect(orphan?.dir).toBeDefined();
-    expect(orphan?.listing).toBeUndefined();
-  });
-
-  test("remote-sourced listing has no dir and is not local", async () => {
-    const remote = (await catalog()).get("remote-only");
-    expect(remote?.dir).toBeUndefined();
-    expect(remote?.listing?.local).toBe(false);
-    expect(remote?.listing?.source).toEqual({ source: "github", repo: "owner/remote-only" });
+  test.each<{ name: string; title: string }>([
+    { name: "alpha", title: "joins a fully-present local plugin" },
+    { name: "beta", title: "listed local plugin that is disabled" },
+    {
+      name: "orphan",
+      title: "on-disk plugin missing from the marketplace keeps dir without listing",
+    },
+    { name: "remote-only", title: "remote-sourced listing has no dir and is not local" },
+  ])("$title", async ({ name }) => {
+    const plugin = forSnapshot((await catalog()).get(name));
+    expect(plugin).toMatchSnapshot();
   });
 
   test("set differences the check scripts depend on", async () => {
@@ -125,35 +121,28 @@ describe("loadPlugins", () => {
   });
 });
 
-describe("hookCommands", () => {
-  test("yields one item for alpha plugin", async () => {
+describe.each<{ name: string; fn: (plugin: Plugin) => Generator<MatcherEntryContext> }>([
+  { name: "hookCommands", fn: hookCommands },
+  { name: "matcherEntries", fn: matcherEntries },
+])("$name", ({ fn }) => {
+  test("yields one entry for alpha plugin", async () => {
     const alpha = (await catalog()).get("alpha")!;
-    const items = [...hookCommands(alpha)];
+    const items = [...fn(alpha)];
     expect(items).toHaveLength(1);
     expect(items[0]?.file).toBe("plugins/alpha/hooks/hooks.json");
     expect(items[0]?.entry.matcher).toBe("Bash");
-    expect(items[0]?.command.command).toBe("bun x.ts");
   });
 
   test("yields nothing for plugin without hooks", async () => {
     const beta = (await catalog()).get("beta")!;
-    expect([...hookCommands(beta)]).toHaveLength(0);
+    expect([...fn(beta)]).toHaveLength(0);
   });
 });
 
-describe("matcherEntries", () => {
-  test("yields one entry for alpha plugin", async () => {
-    const alpha = (await catalog()).get("alpha")!;
-    const items = [...matcherEntries(alpha)];
-    expect(items).toHaveLength(1);
-    expect(items[0]?.file).toBe("plugins/alpha/hooks/hooks.json");
-    expect(items[0]?.entry.matcher).toBe("Bash");
-  });
-
-  test("yields nothing for plugin without hooks", async () => {
-    const beta = (await catalog()).get("beta")!;
-    expect([...matcherEntries(beta)]).toHaveLength(0);
-  });
+test("hookCommands includes the matched hook command", async () => {
+  const alpha = (await catalog()).get("alpha")!;
+  const [item] = [...hookCommands(alpha)];
+  expect(item?.command.command).toBe("bun x.ts");
 });
 
 describe("enabledPluginNames", () => {

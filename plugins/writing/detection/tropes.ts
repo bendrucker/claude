@@ -72,6 +72,93 @@ const RESULT_SENTENCES = [
   /^(?:\w+\s+){0,3}pass(?:es|ed|ing)?(?:\s|$)/im,
 ];
 
+// "no X needed" is a marketing brag when X is an artifact the design lacks
+// ("no config needed"), but a legitimate status report when X is an action that
+// was not required ("no change needed"). The artifact side is open-ended, so we
+// flag the construction and carve out the status side, whose vocabulary is
+// concentrated: function words, deverbal nouns (-tion/-sion/-ment), and dev
+// actions. A determiner in the gap marks a clause boundary ("no way the runtime
+// needed ..."), not an intervening adjective.
+const NO_X_CONSTRUCTION = /\bno\s+((?:\w+\s+){0,3}?)(\w+)\s+(?:needed|required|necessary)\b/gi;
+const NO_X_FUNCTION_WORDS = new Set([
+  "longer",
+  "more",
+  "further",
+  "additional",
+  "extra",
+  "fewer",
+  "less",
+  "other",
+]);
+const NO_X_ACTION_WORDS = new Set([
+  "change",
+  "changes",
+  "fix",
+  "fixes",
+  "edit",
+  "edits",
+  "work",
+  "move",
+  "moves",
+  "update",
+  "updates",
+  "override",
+  "overrides",
+  "touch",
+  "tweak",
+  "tweaks",
+  "patch",
+  "patches",
+  "bump",
+  "bumps",
+  "swap",
+  "swaps",
+  "merge",
+  "merges",
+  "sync",
+  "run",
+  "runs",
+  "check",
+  "checks",
+  "review",
+  "reviews",
+  "test",
+  "tests",
+  "cleanup",
+  "dedup",
+  "retry",
+  "retries",
+  "rebuild",
+  "rebase",
+  "restack",
+  "restart",
+  "reload",
+  "resize",
+  "reorder",
+  "recompile",
+  "redeploy",
+  "reinstall",
+  "rerun",
+  "refactor",
+]);
+const DEVERBAL_NOUN = /(?:tion|sion|ment)s?$/i;
+
+function isStatusHead(head: string): boolean {
+  const word = head.toLowerCase();
+  return NO_X_FUNCTION_WORDS.has(word) || NO_X_ACTION_WORDS.has(word) || DEVERBAL_NOUN.test(word);
+}
+
+function noXNeededHits(text: string): Hits {
+  for (const match of text.matchAll(NO_X_CONSTRUCTION)) {
+    const gap = match[1] ?? "";
+    const head = match[2] ?? "";
+    if (gap.split(/\s+/).some((token) => DETERMINERS.test(token))) continue;
+    if (isStatusHead(head)) continue;
+    return { count: 1, sample: match[0].trim() };
+  }
+  return { count: 0, sample: "" };
+}
+
 function testResultHits(text: string): Hits {
   for (const sentence of text.split(/[.!?\n]+/)) {
     const s = sentence.trim();
@@ -109,6 +196,24 @@ function connectorDensityHits(text: string): Hits {
   const first = connected[0] as string;
   const i = CLAUSE_CONNECTOR.exec(first)?.index ?? 0;
   return { count: connected.length, sample: first.slice(Math.max(0, i - 20), i + 24).trim() };
+}
+
+// A splice joins clauses with "; " where letters flank the boundary. The
+// letter guards keep commented-out code (`foo(); bar()`), digit-led references
+// ("2; see below"), and bare separators from counting as clause joins. List
+// items are skipped: their semicolons usually separate enumerated fragments,
+// and connector density already covers dense list semicolons.
+const SEMICOLON_SPLICE = /[a-z]; [a-z]/i;
+const PROSE_SPLICE_MIN = 2;
+
+export function semicolonSpliceHits(text: string, minSplices: number): Hits {
+  const spliced = splitSentences(text).filter(
+    (s) => !LIST_ITEM.test(s) && SEMICOLON_SPLICE.test(s),
+  );
+  if (spliced.length < minSplices) return { count: 0, sample: "" };
+  const first = spliced[0] as string;
+  const i = SEMICOLON_SPLICE.exec(first)?.index ?? 0;
+  return { count: spliced.length, sample: first.slice(Math.max(0, i - 20), i + 24).trim() };
 }
 
 const openerPatterns: PatternDef[] = WORDLISTS.openers
@@ -393,6 +498,28 @@ export const PATTERNS: PatternDef[] = [
   {
     tier: "context",
     layer: "cross-sentence",
+    category: "semicolon splice",
+    test: (text) => semicolonSpliceHits(text, PROSE_SPLICE_MIN),
+    fileOnly: true,
+    message: (matched) =>
+      `Semicolons join independent clauses here (e.g. "${matched}"). This is the em-dash run-on respelled. Split each into two sentences rather than swapping connectors.`,
+    positives: [
+      "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.",
+      "The hook fires on every edit; the scan runs first. The reminder never blocks; it only nudges.",
+    ],
+    negatives: [
+      "The cache starts cold; the first request fills it. The retry logic backs off.",
+      "- compile the sources; link the objects\n- package the build; ship the artifact",
+      "The count was 2; see below. The limit was 3; see above.",
+    ],
+    evidence:
+      "2026-07 session-history analysis found semicolon clause-joins at high rate in assistant deliverables after the em dash ban. Substitution drift relocated the run-on habit instead of fixing sentence structure. Short texts (PR bodies, commit messages) sit below the connector-density gate (5+ sentences, 30% density), so a two-splice floor covers them. An occasional single semicolon never fires.",
+    retire:
+      "Remove when the deliverable corpus shows the splice rate at or below the hand-written baseline for a 30-day window, or when a labeling pass shows precision below the hook bar. The claude-code:session semicolons-per-1000-words query is the evidence stream.",
+  },
+  {
+    tier: "context",
+    layer: "cross-sentence",
     category: "test result reporting",
     test: testResultHits,
     message: () =>
@@ -423,6 +550,28 @@ export const PATTERNS: PatternDef[] = [
       "Pre-dates the curation principle; no corpus evidence recorded. Each word in this list was identified as promotional AI vocabulary, but none has a per-entry corpus audit. Candidates for migration to vocabulary.txt once audited.",
     retire:
       "Migrate each entry to vocabulary.txt after a corpus audit confirms lift. Remove entries that fail the audit (not distinctive or dead).",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "no X needed brag",
+    test: noXNeededHits,
+    message: (matched) =>
+      `"${matched}" advertises what the design avoids. Describe what it does instead.`,
+    positives: [
+      "Handlers are auto-discovered, no config needed.",
+      "It runs inline (no wrapper needed).",
+      "Spin it up with no docker needed.",
+    ],
+    negatives: [
+      "Reviewed the helper, no change needed.",
+      "No further action needed here.",
+      "There is no way the runtime needed that much memory.",
+    ],
+    evidence:
+      'User flagged this trope directly; the working branch was named for it. The brag advertises an absent artifact ("no config/wrapper/docker needed") and its noun space is open-ended, so the detector flags the construction and carves out legitimate status reports instead. The assistant corpus shows why: status reports concentrate in a small set (change, action, fix, deverbal -tion/-sion/-ment nouns, re- dev verbs) while brags scatter across an unbounded artifact vocabulary. An allowlist of brag nouns goes stale; a status carve-out fails toward a visible, prunable over-nudge. A clean distinctiveness audit against the hand-written PR baseline is outstanding: user-role session text is contaminated because it contains pasted assistant output.',
+    retire:
+      "Add a word to the status carve-out (NO_X_ACTION_WORDS) when writing:scan shows it producing a false-positive nudge. Remove the pattern when the construction stops appearing in assistant deliverables or in corrective-feedback moments.",
   },
   {
     tier: "context",
@@ -556,15 +705,75 @@ export const PATTERNS: PatternDef[] = [
     tier: "context",
     layer: "vocabulary",
     category: "dig into",
-    test: /\b(?:dig|dive|wade)\s+into\b/gi,
+    test: /\b(?:dig|digs|digging|dug|dive|dives|diving|dove|dived|wade|wades|wading|waded)\s+into\b/gi,
     message: (matched) =>
       `"${matched}" is exploration filler. Describe what you're actually looking at.`,
-    positives: ["Let's dig into the codebase.", "We'll dive into the data later."],
-    negatives: ["She dug a trench.", "The code dives into the network stack."],
+    positives: [
+      "Let's dig into the codebase.",
+      "I dug into the parser internals.",
+      "She dove into the schema migration.",
+      "We're digging into the root cause.",
+    ],
+    negatives: ["She dug a trench.", "Water drains into the basin."],
     evidence:
-      "Pre-dates the curation principle; no corpus evidence recorded. Retained as a vocabulary-level filler marker.",
+      "Corpus audit of assistant output found exploration-filler 'into' constructions in inflected forms the base-form regex missed, including the irregular past tenses 'dug into' and 'dove into'. Porter stemming cannot unify irregular verbs ('dug' stems to 'dug', not 'dig'), so each inflection is enumerated explicitly.",
     retire:
-      "Remove if corpus analysis shows the phrase is no longer distinctive, or migrate to vocabulary.txt after a per-entry audit.",
+      "Remove if corpus analysis shows the construction is no longer distinctive. Drop individual inflections that stop appearing in assistant output.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "rides on",
+    test: /\brid(?:e|es|ing)\s+(?:on|atop|alongside)\b/gi,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" is figurative dependency language. State the relationship plainly: "X depends on Y", "X reuses Y", or "X piggybacks on Y".`,
+    positives: [
+      "The teardown rides on the normal end of a team.",
+      "The new reader rides atop the existing httpfs layer.",
+      "The sync loop rides alongside the existing poll cycle.",
+    ],
+    negatives: ["The cyclists ride for charity.", "She takes the early train to work."],
+    evidence:
+      "User-flagged 2026-06 as a recurring figurative construction for dependency or coupling ('X rides on Y'). It appears mostly in conversational reasoning, which neither the hook nor the additions miner reads, so it ships skillOnly pending a chat-voice calibration decision.",
+    retire:
+      "Remove if a chat-voice corpus pass shows the construction is not distinctive versus the user baseline. Promote to hook (drop skillOnly) only after a deliverable-corpus pass clears it at the hook precision bar.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "can bite",
+    test: /\b(?:can|could|will|may|might)\s+bite\b/gi,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" is figurative risk language for a latent bug. Name the failure: what breaks, and under what condition.`,
+    positives: [
+      "A stale cache entry can bite at runtime.",
+      "That assumption could bite once the schema changes.",
+    ],
+    negatives: ["The dog will bark at strangers.", "This could break under load."],
+    evidence:
+      "User-flagged 2026-06 as a recurring figurative construction for latent-bug risk ('this can bite later'). It lives almost entirely in conversational reasoning, so it ships skillOnly pending a chat-voice calibration decision.",
+    retire:
+      "Remove if a chat-voice corpus pass shows the construction is not distinctive versus the user baseline. Promote to hook only after a deliverable-corpus pass clears it at the hook precision bar.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "surface as verb",
+    test: /\bsurfac(?:e|es|ed|ing)\s+(?:the|a|an|that|this|these|those|any|all|each|its|their|every)\b/gi,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" uses "surface" as a verb meaning reveal or report. Say "show", "report", or "expose".`,
+    positives: [
+      "The hook should surface the conflict to the user.",
+      "The report surfaces these gaps automatically.",
+    ],
+    negatives: ["The attack surface is large.", "Reduce the API surface area."],
+    evidence:
+      "User-flagged 2026-06 as the highest-frequency tell, but 'surface' is polysemous: it is a load-bearing domain noun in this plugin ('chat surface', 'deliverable surface') and a word the user writes legitimately ('surface area'). The determiner lookahead targets the verb-with-object sense and spares the noun sense. Ships skillOnly because the verb sense itself appears in the user's own writing, so distinctiveness is unverified.",
+    retire:
+      "Remove if a sense-aware corpus pass shows the verb usage is not distinctive versus the user baseline. Do not promote to hook or add 'surface' to vocabulary.txt: a stem match cannot separate the verb from the domain noun.",
   },
   {
     tier: "context",

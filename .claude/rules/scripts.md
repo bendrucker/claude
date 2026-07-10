@@ -18,7 +18,8 @@ Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` cod
 When writing scripts (hooks, skill CLIs, etc.) that accept arguments:
 
 - **Argument parsing**: Use [cleye](https://github.com/privatenumber/cleye) for type-safe argument parsing with automatic `--help` generation. Load the `cleye` skill for usage patterns (parameters, flags, subcommands) instead of reading existing scripts.
-- **Table output**: Use the `table` package for formatted terminal table output. Do not use `markdown-table` or similar GFM-oriented packages, script output is displayed in a terminal, not rendered as markdown.
+- **Table output**: Use the `table` package for terminal table output. Do not use `markdown-table` or similar GFM-oriented packages, script output is displayed in a terminal, not rendered as markdown.
+- **Output width**: Use a fixed default width with a flag override (e.g. `--truncate <n>`) for truncation or layout. Do not read `process.stdout.columns` or gate on `process.stdout.isTTY`. The column count is undefined when piped, and even in a terminal the output lands in Claude's context as text, so a fixed width stays predictable across both. The `no-terminal-width` prek hook enforces this.
 - **Ancestor paths**: Use `join(import.meta.dirname, "..")` to resolve parent directories. Avoid chaining `dirname()` calls; explicit `".."` is clearer.
 
 # Terminal Colors
@@ -29,13 +30,4 @@ Use ANSI colors (0-15) in scripts that produce terminal output. These are remapp
 
 `excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls.
 
-`${CLAUDE_PLUGIN_ROOT}` does NOT expand in hook `matcher` fields (it only expands in `command` strings). A matcher like `Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)` is compared literally against the resolved cache path (`bun /Users/.../plugins/cache/.../scripts/foo.ts`), never matches, and the hook never fires. Do not use `${CLAUDE_PLUGIN_ROOT}` in matchers.
-
-The working mechanism is the `mac` plugin's marker-based sandbox hook. It uses a broad `Bash|Monitor` matcher and reads the head of the invoked `bun`/`node` script for the comment `claude:dangerouslyDisableSandbox`. When present, it injects `dangerouslyDisableSandbox: true`. This is layout-independent, so it works regardless of the cache `<hash>` path. Add the marker after the shebang of any top-level script that hands off to Launch Services:
-
-```ts
-#!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: <reason>
-```
-
-The marker requires the `mac` plugin installed and only fires for interpreters in its `SCRIPT_INTERPRETERS` set (`bun`, `node`). See [`plugins/mac/README.md`](../../plugins/mac/README.md) for canonical docs.
+Scripts that shell out to Go CLIs (`gh`, `glab`, `terraform`) or hand off to Launch Services (`open`, URL schemes) run sandboxed. The `sandbox.network.allowMachLookup` and `sandbox.allowAppleEvents` keys in `user/settings.json` cover both cases profile-wide. See [`plugins/mac/README.md`](../../plugins/mac/README.md).

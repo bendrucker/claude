@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import {
   clearApiErrors,
   computeInterval,
@@ -8,6 +8,7 @@ import {
   type Event,
   type ExecFn,
   type ExecResult,
+  type InternalState,
   initialState,
   type Probe,
   parsePrUrl,
@@ -110,77 +111,73 @@ describe("parsePrUrl", () => {
 //   - queued (action):   { state: "QUEUED",      bucket: "pending" }
 //   - pending (status):  { state: "PENDING",     bucket: "pending" }
 describe("deriveChecksState", () => {
-  it("returns running on empty checks", () => {
-    expect(deriveChecksState([])).toBe("running");
-  });
-
-  it("returns failing when any check is in fail bucket", () => {
-    expect(
-      deriveChecksState([
+  test.each<[string, Array<{ state: string; bucket: string; name: string }>, InternalState]>([
+    ["empty checks", [], "running"],
+    [
+      "any check in fail bucket",
+      [
         { state: "SUCCESS", bucket: "pass", name: "a" },
         { state: "FAILURE", bucket: "fail", name: "b" },
-      ]),
-    ).toBe("failing");
-  });
-
-  it("returns failing when any check is in cancel bucket", () => {
-    expect(
-      deriveChecksState([
+      ],
+      "failing",
+    ],
+    [
+      "any check in cancel bucket",
+      [
         { state: "SUCCESS", bucket: "pass", name: "a" },
         { state: "CANCELLED", bucket: "cancel", name: "b" },
-      ]),
-    ).toBe("failing");
-  });
-
-  it("returns running when any check is IN_PROGRESS", () => {
-    expect(
-      deriveChecksState([
+      ],
+      "failing",
+    ],
+    [
+      "any check is IN_PROGRESS",
+      [
         { state: "IN_PROGRESS", bucket: "pending", name: "a" },
         { state: "QUEUED", bucket: "pending", name: "b" },
-      ]),
-    ).toBe("running");
-  });
-
-  it("returns queued when all checks are queued", () => {
-    expect(
-      deriveChecksState([
+      ],
+      "running",
+    ],
+    [
+      "all checks are queued",
+      [
         { state: "QUEUED", bucket: "pending", name: "a" },
         { state: "QUEUED", bucket: "pending", name: "b" },
-      ]),
-    ).toBe("queued");
-  });
-
-  it("returns running when some checks are queued and others have completed", () => {
-    expect(
-      deriveChecksState([
+      ],
+      "queued",
+    ],
+    [
+      "some checks queued and others have completed",
+      [
         { state: "QUEUED", bucket: "pending", name: "a" },
         { state: "SUCCESS", bucket: "pass", name: "b" },
-      ]),
-    ).toBe("running");
-  });
-
-  it("returns success when all checks pass or skip", () => {
-    expect(
-      deriveChecksState([
+      ],
+      "running",
+    ],
+    [
+      "all checks pass or skip",
+      [
         { state: "SUCCESS", bucket: "pass", name: "a" },
         { state: "SKIPPED", bucket: "skipping", name: "b" },
-      ]),
-    ).toBe("success");
-  });
-
-  it("returns success on the canonical all-green payload (regression: bucket+state schema)", () => {
+      ],
+      "success",
+    ],
     // Exact shape captured from `gh pr checks <num> --json state,bucket,name`
     // against a fully-green PR. If this assertion ever flips back to "running"
     // it means deriveChecksState has drifted from gh's actual JSON schema —
     // the same drift that caused the silent-hang on initial-green PRs.
-    const allGreen = [
-      { bucket: "pass", name: "plugins", state: "SUCCESS" },
-      { bucket: "pass", name: "lint", state: "SUCCESS" },
-      { bucket: "pass", name: "build", state: "SUCCESS" },
-      { bucket: "pass", name: "hooks", state: "SUCCESS" },
-      { bucket: "pass", name: "validate", state: "SUCCESS" },
-    ];
-    expect(deriveChecksState(allGreen)).toBe("success");
+    [
+      "canonical all-green payload (regression: bucket+state schema)",
+      [
+        { bucket: "pass", name: "plugins", state: "SUCCESS" },
+        { bucket: "pass", name: "lint", state: "SUCCESS" },
+        { bucket: "pass", name: "build", state: "SUCCESS" },
+        { bucket: "pass", name: "hooks", state: "SUCCESS" },
+        { bucket: "pass", name: "validate", state: "SUCCESS" },
+      ],
+      "success",
+    ],
+  ])("%s -> %s", (_name, checks, expected) => {
+    expect(deriveChecksState(checks)).toBe(expected);
   });
 });
 
@@ -455,114 +452,51 @@ describe("pr-closed", () => {
 });
 
 describe("computeInterval", () => {
-  it("returns fast poll floor when no durations (first PR on branch)", () => {
-    expect(computeInterval([])).toBe(30);
-  });
-
-  it("adds buffer and clamps to minimum", () => {
-    expect(computeInterval([10, 10, 10])).toBe(40);
-  });
-
-  it("clamps to maximum", () => {
-    expect(computeInterval([1000, 1000, 1000])).toBe(600);
+  test.each<[number[], number]>([
+    [[], 30],
+    [[10, 10, 10], 40],
+    [[1000, 1000, 1000], 600],
+  ])("computeInterval(%p) -> %p", (durations, expected) => {
+    expect(computeInterval(durations)).toBe(expected);
   });
 });
 
 describe("parseRepo", () => {
-  it("parses HTTPS URLs", () => {
-    expect(parseRepo("https://github.com/bendrucker/deployments")).toEqual({
-      owner: "bendrucker",
-      repo: "deployments",
-    });
-  });
-
-  it("parses HTTPS URLs with .git suffix", () => {
-    expect(parseRepo("https://github.com/bendrucker/deployments.git")).toEqual({
-      owner: "bendrucker",
-      repo: "deployments",
-    });
-  });
-
-  it("parses scp-style SSH URLs", () => {
-    expect(parseRepo("git@github.com:bendrucker/deployments.git")).toEqual({
-      owner: "bendrucker",
-      repo: "deployments",
-    });
-  });
-
-  it("parses scp-style SSH URLs without .git", () => {
-    expect(parseRepo("git@github.com:bendrucker/deployments")).toEqual({
-      owner: "bendrucker",
-      repo: "deployments",
-    });
-  });
-
-  it("parses ssh:// protocol URLs", () => {
-    expect(parseRepo("ssh://git@github.com/bendrucker/deployments.git")).toEqual({
-      owner: "bendrucker",
-      repo: "deployments",
-    });
-  });
-
-  it("trims surrounding whitespace", () => {
-    expect(parseRepo("  https://github.com/owner/repo.git\n")).toEqual({
-      owner: "owner",
-      repo: "repo",
-    });
-  });
-
-  it("returns null on an unknown URL", () => {
-    expect(parseRepo("https://gitlab.com/owner/repo")).toBeNull();
-  });
-
-  it("returns null on empty input", () => {
-    expect(parseRepo("")).toBeNull();
+  test.each<[string, { owner: string; repo: string } | null]>([
+    ["https://github.com/bendrucker/deployments", { owner: "bendrucker", repo: "deployments" }],
+    ["https://github.com/bendrucker/deployments.git", { owner: "bendrucker", repo: "deployments" }],
+    ["git@github.com:bendrucker/deployments.git", { owner: "bendrucker", repo: "deployments" }],
+    ["git@github.com:bendrucker/deployments", { owner: "bendrucker", repo: "deployments" }],
+    [
+      "ssh://git@github.com/bendrucker/deployments.git",
+      { owner: "bendrucker", repo: "deployments" },
+    ],
+    ["  https://github.com/owner/repo.git\n", { owner: "owner", repo: "repo" }],
+    ["https://gitlab.com/owner/repo", null],
+    ["", null],
+  ])("parses %p", (url, expected) => {
+    expect(parseRepo(url)).toEqual(expected);
   });
 });
 
 describe("deriveRunListState", () => {
-  it("maps conclusion=failure to failing", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "failure" })).toBe("failing");
+  test.each<[string, string, InternalState]>([
+    ["completed", "failure", "failing"],
+    ["completed", "cancelled", "failing"],
+    ["completed", "timed_out", "failing"],
+    ["completed", "success", "success"],
+    ["completed", "neutral", "success"],
+    ["completed", "skipped", "success"],
+    ["in_progress", "", "running"],
+    ["queued", "", "queued"],
+    ["waiting", "", "queued"],
+    ["pending", "", "queued"],
+    ["wat", "", "running"],
+  ])("maps status=%p conclusion=%p to %p", (status, conclusion, expected) => {
+    expect(deriveRunListState({ status, conclusion })).toBe(expected);
   });
 
-  it("maps conclusion=cancelled to failing", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "cancelled" })).toBe("failing");
-  });
-
-  it("maps conclusion=timed_out to failing", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "timed_out" })).toBe("failing");
-  });
-
-  it("maps conclusion=success to success", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "success" })).toBe("success");
-  });
-
-  it("maps conclusion=neutral to success", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "neutral" })).toBe("success");
-  });
-
-  it("maps conclusion=skipped to success", () => {
-    expect(deriveRunListState({ status: "completed", conclusion: "skipped" })).toBe("success");
-  });
-
-  it("maps status=in_progress (no conclusion) to running", () => {
-    expect(deriveRunListState({ status: "in_progress", conclusion: "" })).toBe("running");
-  });
-
-  it("maps status=queued to queued", () => {
-    expect(deriveRunListState({ status: "queued", conclusion: "" })).toBe("queued");
-  });
-
-  it("maps status=waiting to queued", () => {
-    expect(deriveRunListState({ status: "waiting", conclusion: "" })).toBe("queued");
-  });
-
-  it("maps status=pending to queued", () => {
-    expect(deriveRunListState({ status: "pending", conclusion: "" })).toBe("queued");
-  });
-
-  it("falls back to running on unknown inputs", () => {
-    expect(deriveRunListState({ status: "wat", conclusion: "" })).toBe("running");
+  it("falls back to running on empty input", () => {
     expect(deriveRunListState({})).toBe("running");
   });
 });

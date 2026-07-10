@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,46 +12,28 @@ import {
   getResourceType,
   processHookInput,
 } from "./check-namespace";
+import { makePostToolUseInput } from "./test-support";
 
 function mockWriteInput(filePath: string): PostToolUseInput {
-  return {
-    session_id: "test",
-    transcript_path: "/tmp/transcript.jsonl",
-    cwd: "/tmp",
-    permission_mode: "default",
-    hook_event_name: "PostToolUse",
-    tool_use_id: "test-id",
-    tool_name: "Write",
-    tool_input: { file_path: filePath, content: "" },
-    tool_response: { message: "ok", bytes_written: 0 },
-  };
+  return makePostToolUseInput({ tool_input: { file_path: filePath, content: "" } });
 }
 
-describe("extractPluginName", () => {
-  it("extracts plugin name from path", () => {
-    expect(extractPluginName("/path/to/plugins/gitlab/skills/ci/SKILL.md")).toBe("gitlab");
-    expect(extractPluginName("/plugins/claude-code/agents/foo.md")).toBe("claude-code");
-  });
-
-  it("returns null for non-plugin paths", () => {
-    expect(extractPluginName("/path/to/src/file.ts")).toBeNull();
-    expect(extractPluginName("/Users/ben/project/SKILL.md")).toBeNull();
-  });
+test.each<[string, string | null]>([
+  ["/path/to/plugins/gitlab/skills/ci/SKILL.md", "gitlab"],
+  ["/plugins/claude-code/agents/foo.md", "claude-code"],
+  ["/path/to/src/file.ts", null],
+  ["/Users/ben/project/SKILL.md", null],
+])("extractPluginName(%p) -> %p", (path, expected) => {
+  expect(extractPluginName(path)).toBe(expected);
 });
 
-describe("getResourceType", () => {
-  it("identifies agents", () => {
-    expect(getResourceType("/plugins/gitlab/agents/reviewer.md")).toBe("agent");
-  });
-
-  it("identifies commands", () => {
-    expect(getResourceType("/plugins/gitlab/commands/merge.md")).toBe("command");
-  });
-
-  it("defaults to skill", () => {
-    expect(getResourceType("/plugins/gitlab/skills/ci/SKILL.md")).toBe("skill");
-    expect(getResourceType("/plugins/gitlab/foo.md")).toBe("skill");
-  });
+test.each<[string, "agent" | "command" | "skill"]>([
+  ["/plugins/gitlab/agents/reviewer.md", "agent"],
+  ["/plugins/gitlab/commands/merge.md", "command"],
+  ["/plugins/gitlab/skills/ci/SKILL.md", "skill"],
+  ["/plugins/gitlab/foo.md", "skill"],
+])("getResourceType(%p) -> %p", (path, expected) => {
+  expect(getResourceType(path)).toBe(expected);
 });
 
 describe("getResourceName", () => {
@@ -87,62 +69,76 @@ describe("getResourceName", () => {
   });
 });
 
-describe("checkStuttering", () => {
-  it("detects prefix stuttering", () => {
-    expect(checkStuttering("gitlab-ci", "gitlab")).toContain("stutters");
-    expect(checkStuttering("github-actions", "github")).toContain("stutters");
-  });
-
-  it("detects suffix stuttering", () => {
-    expect(checkStuttering("ci-gitlab", "gitlab")).toContain("stutters");
-  });
-
-  it("detects exact match", () => {
-    expect(checkStuttering("gitlab", "gitlab")).toContain("stutters");
-  });
-
-  it("handles hyphenated plugin names", () => {
-    expect(checkStuttering("claude-code-helper", "claude-code")).toContain("stutters");
-    expect(checkStuttering("claude_code_helper", "claude-code")).toContain("stutters");
-  });
-
-  it("allows proper names", () => {
-    expect(checkStuttering("ci", "gitlab")).toBeNull();
-    expect(checkStuttering("actions", "github")).toBeNull();
-    expect(checkStuttering("hooks", "claude-code")).toBeNull();
-  });
+test.each<[string, string, string | null]>([
+  ["gitlab-ci", "gitlab", "stutters"],
+  ["github-actions", "github", "stutters"],
+  ["ci-gitlab", "gitlab", "stutters"],
+  ["gitlab", "gitlab", "stutters"],
+  ["claude-code-helper", "claude-code", "stutters"],
+  ["claude_code_helper", "claude-code", "stutters"],
+  ["ci", "gitlab", null],
+  ["actions", "github", null],
+  ["hooks", "claude-code", null],
+])("checkStuttering(%p, %p) -> %p", (name, plugin, expected) => {
+  if (expected === null) {
+    expect(checkStuttering(name, plugin)).toBeNull();
+  } else {
+    expect(checkStuttering(name, plugin)).toContain(expected);
+  }
 });
 
-describe("checkSkillNamespace", () => {
-  it("allows name matching plugin name (primary skill)", () => {
-    expect(checkSkillNamespace("git", "git")).toEqual([]);
-  });
-
-  it("allows properly prefixed names", () => {
-    expect(checkSkillNamespace("gitlab:ci", "gitlab")).toEqual([]);
-    expect(checkSkillNamespace("claude-code:hook", "claude-code")).toEqual([]);
-  });
-
-  it("allows plugin:plugin (primary skill with prefix)", () => {
-    expect(checkSkillNamespace("git:git", "git")).toEqual([]);
-  });
-
-  it("warns on missing prefix", () => {
-    const warnings = checkSkillNamespace("ci", "gitlab");
-    expect(warnings.length).toBeGreaterThan(0);
-    expect(warnings[0]).toContain("should be prefixed");
-    expect(warnings[1]).toContain("gitlab:ci");
-  });
-
-  it("detects stuttering after prefix", () => {
-    const warnings = checkSkillNamespace("gitlab:gitlab-ci", "gitlab");
-    expect(warnings.length).toBeGreaterThan(0);
-    expect(warnings[0]).toContain("stutters");
-  });
-
-  it("allows plugin:plugin without stuttering warning", () => {
-    expect(checkSkillNamespace("gitlab:gitlab", "gitlab")).toEqual([]);
-  });
+test.each<{ name: string; skillName: string; plugin: string; substrings: string[] }>([
+  {
+    name: "allows name matching plugin name (primary skill)",
+    skillName: "git",
+    plugin: "git",
+    substrings: [],
+  },
+  {
+    name: "allows properly prefixed names (gitlab:ci)",
+    skillName: "gitlab:ci",
+    plugin: "gitlab",
+    substrings: [],
+  },
+  {
+    name: "allows properly prefixed names (claude-code:hook)",
+    skillName: "claude-code:hook",
+    plugin: "claude-code",
+    substrings: [],
+  },
+  {
+    name: "allows plugin:plugin (primary skill with prefix)",
+    skillName: "git:git",
+    plugin: "git",
+    substrings: [],
+  },
+  {
+    name: "warns on missing prefix",
+    skillName: "ci",
+    plugin: "gitlab",
+    substrings: ["should be prefixed", "gitlab:ci"],
+  },
+  {
+    name: "detects stuttering after prefix",
+    skillName: "gitlab:gitlab-ci",
+    plugin: "gitlab",
+    substrings: ["stutters"],
+  },
+  {
+    name: "allows plugin:plugin without stuttering warning",
+    skillName: "gitlab:gitlab",
+    plugin: "gitlab",
+    substrings: [],
+  },
+])("checkSkillNamespace: $name", ({ skillName, plugin, substrings }) => {
+  const warnings = checkSkillNamespace(skillName, plugin);
+  if (substrings.length === 0) {
+    expect(warnings).toEqual([]);
+  } else {
+    substrings.forEach((substring, i) => {
+      expect(warnings[i]).toContain(substring);
+    });
+  }
 });
 
 describe("processHookInput", () => {
@@ -218,17 +214,11 @@ describe("processHookInput", () => {
   });
 
   it("returns empty for non-file tools", async () => {
-    const input: PostToolUseInput = {
-      session_id: "test",
-      transcript_path: "/tmp/transcript.jsonl",
-      cwd: "/tmp",
-      permission_mode: "default",
-      hook_event_name: "PostToolUse",
-      tool_use_id: "test-id",
+    const input = makePostToolUseInput({
       tool_name: "Bash",
       tool_input: { command: "ls" },
       tool_response: { output: "", exit_code: 0 },
-    };
+    });
     const warnings = await processHookInput(input);
     expect(warnings).toEqual([]);
   });

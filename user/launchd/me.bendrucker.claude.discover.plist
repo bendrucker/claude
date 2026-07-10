@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>me.bendrucker.claude.discover</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/zsh</string>
+		<string>-lc</string>
+		<string>claude -p "/improve-claude-code discover --scheduled" --permission-mode acceptEdits</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/Users/ben/src/bendrucker/claude</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Weekday</key>
+		<integer>1</integer>
+		<key>Hour</key>
+		<integer>7</integer>
+		<key>Minute</key>
+		<integer>23</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/Users/ben/Library/Logs/claude-discover.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/ben/Library/Logs/claude-discover.err.log</string>
+	<key>ProcessType</key>
+	<string>Background</string>
+</dict>
+</plist>

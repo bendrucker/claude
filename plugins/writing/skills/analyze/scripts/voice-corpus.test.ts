@@ -1,5 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { mergeDocuments, parseCorpus, serializeCorpus } from "./voice-corpus";
+import fc from "fast-check";
+import { mergeDocuments, parseCorpus, serializeCorpus, type VoiceDocument } from "./voice-corpus";
+
+// A document that survives serialize/parse: the source is a single non-empty
+// token (the delimiter captures \S+), meta carries no ")" or newline (it sits
+// inside the (...) group on the single-line delimiter), and body lines never
+// open with "=" so none masquerade as a delimiter after trimming.
+const voiceDocument = fc.record<VoiceDocument>({
+  source: fc.string({ minLength: 1 }).map((s) => s.replace(/\s/g, "") || "x"),
+  meta: fc.string().map((s) => s.replace(/[)\r\n]/g, "")),
+  body: fc
+    .array(fc.string().map((s) => s.replace(/[\r\n]/g, " ").replace(/^[\s=]+/, "")))
+    .map((lines) => lines.join("\n").trim()),
+});
 
 const sample = `===== https://github.com/o/r/pull/1 (2020-01-01T00:00:00Z, +10/-2) =====
 First PR body.
@@ -31,6 +44,17 @@ describe("serializeCorpus", () => {
     const reparsed = parseCorpus(serializeCorpus(docs));
     expect(reparsed.map((d) => d.source)).toEqual(docs.map((d) => d.source));
     expect(reparsed.map((d) => d.body)).toEqual(docs.map((d) => d.body));
+  });
+
+  test("round-trip preserves source and body for any documents", () => {
+    fc.assert(
+      fc.property(fc.array(voiceDocument), (docs) => {
+        const reparsed = parseCorpus(serializeCorpus(docs));
+        const project = (list: VoiceDocument[]) =>
+          list.map((d) => ({ source: d.source, body: d.body }));
+        expect(project(reparsed)).toEqual(project(docs));
+      }),
+    );
   });
 });
 

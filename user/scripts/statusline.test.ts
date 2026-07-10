@@ -8,10 +8,12 @@ import {
   dialColor,
   dialIndex,
   dialSegment,
+  effortSegment,
   elideSpans,
   emitRateLimits,
   exceeds200k,
   formatWorktree,
+  modelSegment,
   type Span,
   type WorktreeData,
 } from "./statusline";
@@ -78,6 +80,28 @@ const cases: RenderCase[] = [
   })),
   { name: "no-dial", columns: 80, stdin: {}, worktree: null },
   {
+    name: "model-effort-leads",
+    columns: 80,
+    stdin: {
+      model: { id: "claude-fable-5", display_name: "Fable" },
+      effort: { level: "xhigh" },
+      context_window: { used_percentage: 30 },
+    },
+    worktree: mainWt,
+  },
+  {
+    name: "model-only",
+    columns: 80,
+    stdin: { model: { id: "claude-opus-4-8", display_name: "Opus" } },
+    worktree: null,
+  },
+  {
+    name: "effort-only",
+    columns: 80,
+    stdin: { effort: { level: "max" } },
+    worktree: null,
+  },
+  {
     name: "lines-added",
     columns: 80,
     stdin: { cost: { total_lines_added: 5, total_lines_removed: 0 } },
@@ -122,11 +146,45 @@ const cases: RenderCase[] = [
 ];
 
 describe("rendered output", () => {
-  for (const c of cases) {
-    test(c.name, () => {
-      expect(buildStatusLine(c.stdin, c.columns, c.worktree)).toMatchSnapshot();
-    });
-  }
+  test.each(cases)("$name", (c) => {
+    expect(buildStatusLine(c.stdin, c.columns, c.worktree)).toMatchSnapshot();
+  });
+});
+
+// SGR fragments the accent (magenta) and default (dim) styles emit, so tests can
+// assert which style a marker used without matching the whole escape sequence.
+const MAGENTA = "\x1b[35m";
+const DIM = "\x1b[2m";
+
+describe("modelSegment", () => {
+  test("renders the lowercase family letter, null when absent", () => {
+    expect(strip(modelSegment({ model: { id: "claude-fable-5" } }) ?? "")).toBe("f");
+    expect(strip(modelSegment({ model: { id: "claude-opus-4-8[1m]" } }) ?? "")).toBe("o");
+    expect(modelSegment({})).toBeNull();
+    expect(modelSegment({ model: null })).toBeNull();
+  });
+
+  test("accents non-default models, dims the default (opus)", () => {
+    expect(modelSegment({ model: { id: "claude-opus-4-8[1m]" } })).toContain(DIM);
+    expect(modelSegment({ model: { id: "claude-fable-5" } })).toContain(MAGENTA);
+    expect(modelSegment({ model: { id: "claude-sonnet-5" } })).toContain(MAGENTA);
+  });
+});
+
+describe("effortSegment", () => {
+  test("renders the effort glyph, null when absent or unsupported", () => {
+    expect(strip(effortSegment({ effort: { level: "max" } }) ?? "")).toBe("⁙");
+    expect(strip(effortSegment({ effort: { level: "low" } }) ?? "")).toBe("∙");
+    expect(effortSegment({ effort: { level: "bogus" } })).toBeNull();
+    expect(effortSegment({})).toBeNull();
+    expect(effortSegment({ effort: null })).toBeNull();
+  });
+
+  test("accents non-default effort, dims the default (high)", () => {
+    expect(effortSegment({ effort: { level: "high" } })).toContain(DIM);
+    expect(effortSegment({ effort: { level: "max" } })).toContain(MAGENTA);
+    expect(effortSegment({ effort: { level: "low" } })).toContain(MAGENTA);
+  });
 });
 
 describe("dialColor", () => {

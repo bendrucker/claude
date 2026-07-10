@@ -10,7 +10,7 @@ repos:
       - id: plugin-validate
         name: Plugin validation
         language: system
-        files: \.claude-plugin/plugin\.json$
+        files: ^plugins/[^/]+/\.claude-plugin/plugin\.json$
         entry: scripts/prek-check.sh plugin-validate
 
       - id: hooks-validate
@@ -37,7 +37,7 @@ repos:
         language: system
         files: ^(\.claude/settings\.json|user/settings\.json)$
         pass_filenames: false
-        entry: bun .claude/hooks/settings/cli.ts
+        entry: bun packages/validate/settings.ts
 
       - id: no-double-assertion
         name: No double type assertions
@@ -46,6 +46,14 @@ repos:
         exclude: \.test\.ts$
         pass_filenames: false
         entry: ast-grep scan --rule rules/no-double-assertion.yaml
+
+      - id: no-terminal-width
+        name: No terminal-width output sizing
+        language: system
+        files: \.ts$
+        exclude: \.test\.ts$
+        pass_filenames: false
+        entry: ast-grep scan --rule rules/no-terminal-width.yaml
 
       - id: marketplace-check
         name: Marketplace completeness

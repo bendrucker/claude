@@ -1,12 +1,21 @@
 #!/usr/bin/env bun
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cli } from "cleye";
+import { cli, command } from "cleye";
 import { table } from "table";
 import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
 import { type ScanResult, scanAll } from "../../../detection/scan";
-
 import { readInput } from "../../../scripts/io";
+import { profilePath, resolveDataDir } from "../../analyze/scripts/data-dir";
+import { loadProfile } from "../../analyze/scripts/voice-profile";
+import {
+  buildReport,
+  loadCustomMatch,
+  type ReportOptions,
+  renderTable,
+  renderVoiceDeltaTable,
+  shouldScoreComments,
+} from "./score";
 
 const SKIP_SEGMENTS = ["node_modules", ".git"];
 const WORDLIST_PATH = /(?:^|\/)wordlists\/[^/]+\.txt$/;
@@ -107,49 +116,140 @@ function printSummary(results: FileViolations[]): void {
   console.error(`${total} violations across ${results.length} files.`);
 }
 
-async function main(): Promise<void> {
-  const argv = cli({
-    name: "scan",
-    parameters: ["[path]"],
+async function collectAcross(paths: string[]): Promise<string[]> {
+  const files = new Set<string>();
+  for (const path of paths) {
+    for (const file of await collectFiles(path)) files.add(file);
+  }
+  return [...files].sort();
+}
+
+const auditCmd = command(
+  {
+    name: "audit",
+    parameters: ["[path...]"],
     help: {
       description:
-        "Scan existing repository prose for AI writing tropes. Pass a directory or a glob; reports every match per file with a summary. With --input, scan a single file, inline text, or stdin and report matches as line:col without a path prefix.",
+        "Walk a directory or glob and report every trope with its file, line, and column. Exits non-zero on any finding, so it gates in CI or pre-commit checks.",
     },
     flags: {
-      input: {
-        type: Boolean,
-        description:
-          "Scan a single input (file path, inline text, or stdin) instead of walking a directory",
-        default: false,
-      },
       noSummary: {
         type: Boolean,
         description: "Suppress the trailing summary table",
         default: false,
       },
     },
-  });
+  },
+  async (argv) => {
+    const paths = argv._.path;
+    if (paths.length === 0) {
+      argv.showHelp();
+      process.exit(1);
+    }
 
-  if (argv.flags.input) {
-    const { text, filePath } = await readInput(argv._.path);
-    process.exit(scanInput(text, filePath));
-  }
+    const results = await scanFiles(await collectAcross(paths));
+    printViolations(results);
 
-  if (!argv._.path) {
-    argv.showHelp();
-    process.exit(1);
-  }
+    if (results.length > 0 && !argv.flags.noSummary) {
+      printSummary(results);
+    }
 
-  const results = await scanFiles(await collectFiles(argv._.path));
-  printViolations(results);
+    process.exit(results.length > 0 ? 1 : 0);
+  },
+);
 
-  if (results.length > 0 && !argv.flags.noSummary) {
-    printSummary(results);
-  }
+const scoreCmd = command(
+  {
+    name: "score",
+    parameters: ["[input]"],
+    help: {
+      description:
+        "Score one input (file path, inline text, or stdin) for trope density per 1000 words. Informational: always exits 0.",
+    },
+    flags: {
+      json: {
+        type: Boolean,
+        description: "Emit the report as JSON for comparing two runs",
+        default: false,
+      },
+      comments: {
+        type: Boolean,
+        description:
+          "Force comment extraction on (defaults on for non-prose source files, off for prose)",
+      },
+      noComments: {
+        type: Boolean,
+        description: "Force comment extraction off",
+        default: false,
+      },
+      wordlist: {
+        type: String,
+        description: "Score an extra stemmed vocabulary file as a 'custom vocabulary' category",
+      },
+      voiceDelta: {
+        type: Boolean,
+        description:
+          "Report voice-delta rate features alongside the baseline from the local voice profile. Skips baseline comparison when the input is out-of-register.",
+        default: false,
+      },
+      dataDir: {
+        type: String,
+        description:
+          "Local data dir for the voice baseline (default: CLAUDE_PLUGIN_DATA or ~/.claude/plugins/data/writing-bendrucker). Only used with --voice-delta.",
+      },
+    },
+  },
+  async (argv) => {
+    const { text, filePath } = await readInput(argv._.input);
+    const customMatch = await loadCustomMatch(argv.flags.wordlist);
+    const options: ReportOptions = {
+      comments: shouldScoreComments(filePath, argv.flags.comments, argv.flags.noComments),
+    };
+    if (customMatch) options.customMatch = customMatch;
+    const report = buildReport(text, filePath, options);
 
-  process.exit(results.length > 0 ? 1 : 0);
-}
+    if (argv.flags.json) {
+      console.log(JSON.stringify(report, null, 2));
+    } else {
+      console.log(renderTable(report));
+    }
+
+    if (argv.flags.voiceDelta) {
+      const dataDir = resolveDataDir(argv.flags.dataDir);
+      const profileData = await loadProfile(profilePath(dataDir));
+      console.log(`\n${renderVoiceDeltaTable(text, profileData)}`);
+    }
+
+    process.exit(0);
+  },
+);
 
 if (import.meta.main) {
-  await main();
+  cli(
+    {
+      name: "scan",
+      commands: [auditCmd, scoreCmd],
+      parameters: ["[path]"],
+      help: {
+        description:
+          "Detect AI writing tropes in repository prose. `audit` walks a path and gates non-zero on findings; `score` measures trope density of one input and always exits 0.",
+      },
+      flags: {
+        input: {
+          type: Boolean,
+          description:
+            "Scan a single input (file path, inline text, or stdin) and report matches as line:col without a path prefix. Exits non-zero on any finding.",
+          default: false,
+        },
+      },
+    },
+    async (argv) => {
+      if (argv.flags.input) {
+        const { text, filePath } = await readInput(argv._.path);
+        process.exit(scanInput(text, filePath));
+      }
+      argv.showHelp();
+      process.exit(1);
+    },
+  );
 }

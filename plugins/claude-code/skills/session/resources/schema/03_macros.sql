@@ -9,3 +9,24 @@ CREATE OR REPLACE MACRO host_filter(host_col, host_val) AS
   (host_val IS NULL OR host_col = host_val::VARCHAR);
 
 CREATE OR REPLACE MACRO project_id(host, path) AS host || ':' || path;
+
+-- Cost-rate table for token spend estimates, per-MTok USD from public API rates. Kept
+-- here so every cost query shares one source; the per-tier weighting (cache read 0.1x
+-- input, cache write 1.25x for 5m / 2x for 1h) lives in the queries that call these.
+CREATE OR REPLACE MACRO model_input_rate(model) AS
+  CASE
+    WHEN model ILIKE '%fable%' OR model ILIKE '%mythos%' THEN 10.0
+    WHEN model ILIKE '%opus%'   THEN 5.0
+    WHEN model ILIKE '%sonnet%' THEN 3.0
+    WHEN model ILIKE '%haiku%'  THEN 1.0
+    ELSE 5.0
+  END;
+
+CREATE OR REPLACE MACRO model_output_rate(model) AS
+  CASE
+    WHEN model ILIKE '%fable%' OR model ILIKE '%mythos%' THEN 50.0
+    WHEN model ILIKE '%opus%'   THEN 25.0
+    WHEN model ILIKE '%sonnet%' THEN 15.0
+    WHEN model ILIKE '%haiku%'  THEN 5.0
+    ELSE 25.0
+  END;

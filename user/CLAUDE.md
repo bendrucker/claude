@@ -4,7 +4,7 @@
 
 - Prefer concise, direct responses.
 - Minimize unnecessary explanations unless requested.
-- Don't join clauses with semicolons or em dashes. Write two short sentences.
+- Don't join independent clauses with semicolons or em dashes. End the clause with a period. Swapping one connector for another is not a fix. Semicolons only at rare, normal-English cadence.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
 - Use natural line breaks unless the surrounding code is wrapped at a specific column.
 - Include a trailing newline in all new files.
@@ -27,20 +27,29 @@ Every customization costs tokens on every session. Before adding one, define how
 
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.
 - For questions about Claude Code features or usage, use the Task tool with `subagent_type='claude-code-guide'` to consult official documentation.
-- Always use the `pull-request:create` skill to create pull requests. If the skill is unavailable, create the PR with an empty body.
+- Finish a branch with `/ship`: it runs the warranted review passes, opens the PR, babysits CI to green, triages bot comments, and refreshes the body. Don't hand-chain `EnterWorktree` + `pull-request:create` for a branch finish.
+- `pull-request:create` remains the skill for opening a PR directly (it is what `/ship` calls). If it's unavailable, create the PR with an empty body.
+- Open PRs ready for review by default. Reserve `--draft` for speculative changes that need deep human review before merge. Draft status can suppress bot review.
 - When executing build commands, output to `/dev/null` to avoid creating binaries.
 - Store temporary files in `tmp/` directory.
+- The sandbox can write `/tmp`, `$TMPDIR`, and the repo. Never disable the sandbox for file writes; only bypass after a sandboxed run of that command actually failed.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
 
 ### Bash `!` Escaping Bug
 
-The Bash tool escapes `!` to `\!`, breaking `jq !=`, `awk !~`, and similar operators ([#2941](https://github.com/anthropics/claude-code/issues/2941), [#10335](https://github.com/anthropics/claude-code/issues/10335)). For `jq`, use `| not` instead of `!=`. For any script, pass it via heredoc to bypass inline escaping.
+The Bash tool escapes `!` to `\!` on every path, including single quotes and heredocs, breaking `jq !=`, `awk !~`, and similar operators ([#2941](https://github.com/anthropics/claude-code/issues/2941), [#10335](https://github.com/anthropics/claude-code/issues/10335)). For `jq`, use `| not` instead of `!=`. For anything else, author the content with the Write tool, then run it. No shell quoting or heredoc bypasses the escape.
+
+## Git
+
+- Never `git push` to the default branch (usually `main` or `master`) unless I explicitly instruct you.
+- Always work on a topic branch with a short hyphenated name.
+- For commit messages, use multiple `-m` flags for a simple subject and body. Each `-m` is a separate paragraph. For complex messages, pass the message through a heredoc.
 
 ## Worktrees
 
 I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 
-- For creating or entering a worktree, use the `worktrunk:wt-switch-create` skill. It re-roots the session into a new worktree (optionally in another repo), runs an optional task, and acts as a targeted command for the common case. Prefer it over the generic skill whenever the task is worktree creation, including anywhere you would otherwise delegate worktree creation to Worktrunk.
+- For creating or entering a worktree, use the `worktrunk:wt-switch-create` skill. It re-roots the session into a new worktree (optionally in another repo), runs an optional task, and acts as a targeted command for the common case. Prefer it over the generic skill whenever the task is worktree creation, including anywhere you would otherwise delegate worktree creation to Worktrunk. This preference holds even when a background-job or harness context suggests the generic `EnterWorktree` tool for isolation.
 - For everything else (pruning, listing, removing, running hooks, editing config, and general `wt` questions), use the generic `worktrunk:worktrunk` skill.
 - Disposable verification worktrees may be created with `git worktree add tmp/<name>`; everything persistent goes through the worktrunk skills.
 

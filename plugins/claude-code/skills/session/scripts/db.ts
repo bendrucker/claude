@@ -293,10 +293,6 @@ async function removeFile(db: Database, host: string, file: string): Promise<voi
     host,
     path: file,
   });
-  await db.run("DELETE FROM content_items WHERE host = $host AND source_file = $path", {
-    host,
-    path: file,
-  });
   await db.run("DELETE FROM indexed_files WHERE host = $host AND path = $path", {
     host,
     path: file,
@@ -361,14 +357,16 @@ export async function ensureIndex(
     removedFiles += removed.length;
   }
 
-  // Views rebuild only when their definition changes: content_items is maintained
-  // incrementally above, so imports alone never require a rebuild.
+  // Rebuild when raw changed (views.sql rebuilds the content_items table, whose
+  // cross-file dedup cannot be maintained per-file) or when views.sql itself was
+  // edited, so a definition change applies even on a no-change refresh.
+  const wrote = changedFiles > 0 || removedFiles > 0;
   const fingerprint = await viewsFingerprint();
   const [metaRow] = await db.query<{ views_hash: string | null }>(
     "SELECT views_hash FROM index_meta",
   );
   const viewsChanged = metaRow?.views_hash !== fingerprint;
-  if (viewsChanged) {
+  if (wrote || viewsChanged) {
     await rebuildViews(db);
     await db.run("UPDATE index_meta SET views_hash = $hash", { hash: fingerprint });
   }
@@ -377,9 +375,9 @@ export async function ensureIndex(
   // an explicit host param spans all hosts rather than inheriting the last one.
   await db.run("SET VARIABLE host = NULL");
 
-  // Without an explicit CHECKPOINT the blocks freed by DELETE+INSERT are never
-  // reused and the file grows on every import.
-  if (changedFiles > 0 || removedFiles > 0 || viewsChanged) {
+  // Without an explicit CHECKPOINT the blocks freed by DELETE+INSERT and the
+  // content_items rebuild are never reused and the file grows on every import.
+  if (wrote || viewsChanged) {
     await db.run("CHECKPOINT");
   }
 

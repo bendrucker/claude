@@ -34,7 +34,16 @@ function getExtension(filePath: string): string {
   return parts.length > 1 ? (parts.at(-1) ?? "") : "";
 }
 
+// Workflow scripts persisted under session state (<transcript dir>/workflows/
+// scripts/) are generated runtime artifacts: the workflow runner wraps them in
+// an async function body, so their top-level `return` is valid at runtime but
+// can never parse as a standalone module.
+const WORKFLOW_SCRIPT_SEGMENT = "/workflows/scripts/";
+
 function isBiomeFile(filePath: string): boolean {
+  if (filePath.includes(WORKFLOW_SCRIPT_SEGMENT)) {
+    return false;
+  }
   const ext = getExtension(filePath);
   return BIOME_EXTENSIONS.has(ext);
 }
@@ -127,6 +136,9 @@ async function biomeWorkingTree(filePath: string): Promise<string | undefined> {
   }
 }
 
+// --no-errors-on-unmatched keeps Biome from exiting non-zero on files its
+// config ignores (gitignored paths, fixtures). Without it, edits to excluded
+// files read as lint failures and block Stop.
 export async function runBiomeCheck(filePath: string): Promise<string | null> {
   const command = await biomeCommand();
   if (!command) {
@@ -134,7 +146,10 @@ export async function runBiomeCheck(filePath: string): Promise<string | null> {
   }
   const cwd = await biomeWorkingTree(filePath);
   try {
-    await execAsync(`${command} check "${filePath}"`, cwd ? { cwd } : undefined);
+    await execAsync(
+      `${command} check --no-errors-on-unmatched "${filePath}"`,
+      cwd ? { cwd } : undefined,
+    );
     return null;
   } catch (error) {
     const execError = error as { stdout?: string; stderr?: string };
@@ -150,7 +165,10 @@ export async function runBiomeFix(filePath: string): Promise<void> {
   }
   const cwd = await biomeWorkingTree(filePath);
   try {
-    await execAsync(`${command} check --write "${filePath}"`, cwd ? { cwd } : undefined);
+    await execAsync(
+      `${command} check --write --no-errors-on-unmatched "${filePath}"`,
+      cwd ? { cwd } : undefined,
+    );
   } catch {
     // biome check --write exits non-zero if there are unfixable issues
   }

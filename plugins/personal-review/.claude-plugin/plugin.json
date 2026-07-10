@@ -1,9 +1,0 @@
-{
-  "name": "personal-review",
-  "description": "Cross-tool daily review workflow",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  },
-  "dependencies": ["things"]
-}

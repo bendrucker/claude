@@ -1,0 +1,9 @@
+{"type":"attachment","attachment":{"type":"health-quiet","note":"daily stream that stops"},"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-16T09:00:00.000Z","uuid":"hq-1"}
+{"type":"attachment","attachment":{"type":"health-quiet","note":"daily stream that stops"},"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-17T09:00:00.000Z","uuid":"hq-2"}
+{"type":"attachment","attachment":{"type":"health-quiet","note":"daily stream that stops"},"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-18T09:00:00.000Z","uuid":"hq-3"}
+{"type":"attachment","attachment":{"type":"health-quiet","note":"daily stream that stops"},"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-19T09:00:00.000Z","uuid":"hq-4"}
+{"type":"attachment","attachment":{"type":"health-quiet","note":"daily stream that stops"},"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-20T09:00:00.000Z","uuid":"hq-5"}
+{"type":"attachment","attachment":{"type":"health-quiet","note":"daily stream that stops"},"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-21T09:00:00.000Z","uuid":"hq-6"}
+{"type":"attachment","attachment":{"type":"health-fresh","note":"kind that appears late in the corpus"},"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-31T09:00:00.000Z","uuid":"hf-1"}
+{"type":"health-marker","sessionId":"health-session","cwd":"/Users/test/health","uuid":"hm-1"}
+{"type":"health-marker","sessionId":"health-session","cwd":"/Users/test/health","uuid":"hm-2"}

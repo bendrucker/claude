@@ -1,0 +1,13 @@
+{
+  "id": "get-records-reference-varchar-why",
+  "path": "src/agents/whirl/integrations/salesforce/duckdb/get_records.py",
+  "language": "python",
+  "kind": "block",
+  "comment": "# referenceTo is contracted as VARCHAR[]. A scalar/None/empty means we\n        # cannot say what it points at, so skip rather than iterate a string\n        # into character \"targets\" and mis-classify it as polymorphic.",
+  "context": "657:     refmap: dict[str, _Ref] = {}\n658:     for r in rows:\n659:         field_name = str(r[\"field_name\"])\n660:         raw_targets = r[\"targets\"]\n661:         # referenceTo is contracted as VARCHAR[]. A scalar/None/empty means we\n662:         # cannot say what it points at, so skip rather than iterate a string\n663:         # into character \"targets\" and mis-classify it as polymorphic.\n664:         if not isinstance(raw_targets, (list, tuple)) or not raw_targets:\n665:             continue\n666:         ref = _Ref(field_name=field_name, targets=tuple(str(t) for t in raw_targets))",
+  "action": "keep",
+  "category": null,
+  "trimToLines": null,
+  "source": "main get_records.py:661",
+  "note": "Must-pass. Why-on-non-obvious: the isinstance guard looks like defensive boilerplate, but the comment explains the real failure it prevents (iterating a stray string character-by-character and mislabeling the field polymorphic). The intent is not inferable from the type check alone."
+}

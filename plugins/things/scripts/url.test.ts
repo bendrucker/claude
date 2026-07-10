@@ -44,118 +44,102 @@ describe("buildJsonPayload", () => {
     expect(() => buildJsonPayload(["ABC"], {})).toThrow("At least one attribute is required");
   });
 
-  test("coerces boolean attributes to actual booleans", () => {
-    const result = JSON.parse(buildJsonPayload(["ABC"], { completed: "true", canceled: "false" }));
-    expect(result[0].attributes).toEqual({ completed: true, canceled: false });
-  });
-
-  test("leaves non-boolean attributes as strings", () => {
-    const result = JSON.parse(buildJsonPayload(["ABC"], { when: "today", completed: "true" }));
-    expect(result[0].attributes).toEqual({ when: "today", completed: true });
-  });
-
-  test("coerces tags to string array", () => {
-    const result = JSON.parse(buildJsonPayload(["ABC"], { tags: "work,personal" }));
-    expect(result[0].attributes).toEqual({ tags: ["work", "personal"] });
-  });
-
-  test("coerces checklist-items to structured objects", () => {
-    const result = JSON.parse(
-      buildJsonPayload(["ABC"], { "checklist-items": "Buy milk\nWalk dog" }),
-    );
-    expect(result[0].attributes).toEqual({
-      "checklist-items": [
-        { type: "checklist-item", attributes: { title: "Buy milk" } },
-        { type: "checklist-item", attributes: { title: "Walk dog" } },
-      ],
-    });
+  test.each<[string, Record<string, string>, Record<string, unknown>]>([
+    [
+      "coerces boolean attributes to actual booleans",
+      { completed: "true", canceled: "false" },
+      { completed: true, canceled: false },
+    ],
+    [
+      "leaves non-boolean attributes as strings",
+      { when: "today", completed: "true" },
+      { when: "today", completed: true },
+    ],
+    ["coerces tags to string array", { tags: "work,personal" }, { tags: ["work", "personal"] }],
+    [
+      "coerces checklist-items to structured objects",
+      { "checklist-items": "Buy milk\nWalk dog" },
+      {
+        "checklist-items": [
+          { type: "checklist-item", attributes: { title: "Buy milk" } },
+          { type: "checklist-item", attributes: { title: "Walk dog" } },
+        ],
+      },
+    ],
+  ])("%s", (_name, attrs, expected) => {
+    const result = JSON.parse(buildJsonPayload(["ABC"], attrs));
+    expect(result[0].attributes).toEqual(expected);
   });
 });
 
 describe("coerceAttributes", () => {
-  test("coerces all known boolean attributes", () => {
-    const result = coerceAttributes({
-      completed: "true",
-      canceled: "false",
-      reveal: "true",
-      duplicate: "false",
-    });
-    expect(result).toEqual({
-      completed: true,
-      canceled: false,
-      reveal: true,
-      duplicate: false,
-    });
-  });
-
-  test("passes through string attributes unchanged", () => {
-    const result = coerceAttributes({ when: "today" });
-    expect(result).toEqual({ when: "today" });
-  });
-
-  test("does not coerce non-boolean values for boolean attributes", () => {
-    const result = coerceAttributes({ completed: "yes" });
-    expect(result).toEqual({ completed: "yes" });
-  });
-
-  test("coerces tags to string array", () => {
-    const result = coerceAttributes({ tags: "tag1, tag2, tag3" });
-    expect(result).toEqual({ tags: ["tag1", "tag2", "tag3"] });
-  });
-
-  test("coerces add-tags to string array", () => {
-    const result = coerceAttributes({ "add-tags": "Urgent" });
-    expect(result).toEqual({ "add-tags": ["Urgent"] });
-  });
-
-  test("coerces checklist-items to structured objects", () => {
-    const result = coerceAttributes({ "checklist-items": "Item 1\nItem 2" });
-    expect(result).toEqual({
-      "checklist-items": [
-        { type: "checklist-item", attributes: { title: "Item 1" } },
-        { type: "checklist-item", attributes: { title: "Item 2" } },
-      ],
-    });
+  test.each<[string, Record<string, string>, ReturnType<typeof coerceAttributes>]>([
+    [
+      "coerces all known boolean attributes",
+      { completed: "true", canceled: "false", reveal: "true", duplicate: "false" },
+      { completed: true, canceled: false, reveal: true, duplicate: false },
+    ],
+    ["passes through string attributes unchanged", { when: "today" }, { when: "today" }],
+    [
+      "does not coerce non-boolean values for boolean attributes",
+      { completed: "yes" },
+      { completed: "yes" },
+    ],
+    [
+      "coerces tags to string array",
+      { tags: "tag1, tag2, tag3" },
+      { tags: ["tag1", "tag2", "tag3"] },
+    ],
+    ["coerces add-tags to string array", { "add-tags": "Urgent" }, { "add-tags": ["Urgent"] }],
+    [
+      "coerces checklist-items to structured objects",
+      { "checklist-items": "Item 1\nItem 2" },
+      {
+        "checklist-items": [
+          { type: "checklist-item", attributes: { title: "Item 1" } },
+          { type: "checklist-item", attributes: { title: "Item 2" } },
+        ],
+      },
+    ],
+  ])("%s", (_name, attrs, expected) => {
+    expect(coerceAttributes(attrs)).toEqual(expected);
   });
 });
 
 describe("isSandboxBlockedHandoff", () => {
-  test("matches procNotFound message", () => {
-    expect(
-      isSandboxBlockedHandoff(
-        "LSOpenURLsWithRole() failed for the application /Applications/Things3.app with error -10810.\nprocNotFound: no eligible process with specified descriptor",
-      ),
-    ).toBe(true);
-  });
-
-  test("matches bare -10810 code", () => {
-    expect(isSandboxBlockedHandoff("kLSApplicationNotFoundErr (-10810)")).toBe(true);
-  });
-
-  test("matches bare -10673 code", () => {
-    expect(isSandboxBlockedHandoff("NSOSStatusErrorDomain error -10673")).toBe(true);
-  });
-
-  test("matches LSOpenURLsWithRole line on its own", () => {
-    expect(isSandboxBlockedHandoff("LSOpenURLsWithRole failed")).toBe(true);
-  });
-
-  test("does not match unrelated stderr", () => {
-    expect(isSandboxBlockedHandoff("some other error from open")).toBe(false);
-  });
-
-  test("does not match empty stderr", () => {
-    expect(isSandboxBlockedHandoff("")).toBe(false);
-  });
-
-  test("does not match -10810 embedded in a larger number", () => {
-    expect(isSandboxBlockedHandoff("some unrelated number 999-108100 here")).toBe(false);
-    expect(isSandboxBlockedHandoff("error -108101 something else")).toBe(false);
-  });
-
-  test("does not match -10673 embedded in a larger number", () => {
-    expect(isSandboxBlockedHandoff("some unrelated number 999-106730 here")).toBe(false);
-    expect(isSandboxBlockedHandoff("error -106731 something else")).toBe(false);
+  test.each<[string, string, boolean]>([
+    [
+      "matches procNotFound message",
+      "LSOpenURLsWithRole() failed for the application /Applications/Things3.app with error -10810.\nprocNotFound: no eligible process with specified descriptor",
+      true,
+    ],
+    ["matches bare -10810 code", "kLSApplicationNotFoundErr (-10810)", true],
+    ["matches bare -10673 code", "NSOSStatusErrorDomain error -10673", true],
+    ["matches LSOpenURLsWithRole line on its own", "LSOpenURLsWithRole failed", true],
+    ["does not match unrelated stderr", "some other error from open", false],
+    ["does not match empty stderr", "", false],
+    [
+      "does not match -10810 embedded in a larger number (leading digit)",
+      "some unrelated number 999-108100 here",
+      false,
+    ],
+    [
+      "does not match -10810 embedded in a larger number (trailing digit)",
+      "error -108101 something else",
+      false,
+    ],
+    [
+      "does not match -10673 embedded in a larger number (leading digit)",
+      "some unrelated number 999-106730 here",
+      false,
+    ],
+    [
+      "does not match -10673 embedded in a larger number (trailing digit)",
+      "error -106731 something else",
+      false,
+    ],
+  ])("%s", (_name, stderr, expected) => {
+    expect(isSandboxBlockedHandoff(stderr)).toBe(expected);
   });
 });
 

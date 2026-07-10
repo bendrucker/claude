@@ -1,19 +1,22 @@
 ---
 name: review:tuicr
 argument-hint: "[-w | -r <range> | pr <N> | mr <N>]"
-disable-model-invocation: true
 description: >
-  Drive tuicr, the terminal code-review TUI, as a live local review surface in tmux. Use when
-  reviewing changes through tuicr: launching a session, seeding agent comments, collecting inline
-  comments to act on, or watching comments arrive live. The shared core that review:self
-  (inbound) and review:peer (outbound) delegate to. Triggers on "review in tuicr", "tuicr
-  session", "open the diff in tuicr", "watch my comments".
+  Drive tuicr, the terminal code-review TUI, as a live local review surface in tmux: launch a
+  session, seed agent comments, collect inline comments to act on, or watch comments arrive live.
+  The shared core that review:self (inbound) and review:peer (outbound) delegate to, and the
+  model-invocable path to pick up comments already left in a running session and apply them. Use
+  when reviewing through tuicr, or when the user says their review is done and comments need
+  applying: "review in tuicr", "tuicr session", "open the diff in tuicr", "watch my comments", "I
+  left review comments", "I finished my review, apply them", "pick up my tuicr comments".
 allowed-tools:
   - Bash(tuicr:*)
   - Bash(tmux:*)
   - Bash(jq:*)
   - Bash(git:*)
   - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
+  - Read
+  - Edit
 ---
 
 # tuicr Review Surface
@@ -95,6 +98,18 @@ silently. `id` is stable across reloads, so track state by it. tuicr exposes `li
 each comment, but it has no CLI write to resolve or change that state (the only writes are
 `review add`), so inbound resolution lives in the ledger keyed by `id`. Outbound, resolve
 natively on the platform.
+
+## Picking Up Left Comments
+
+When the user has already left comments in a running session and wants them applied ("I finished
+my review", "pick up my comments"), attach rather than launch:
+
+1. Resolve the active session `slug` (Session Discovery). If none is active or the match is
+   ambiguous, ask for the slug.
+2. Read the comments back (Reading Back) and apply each as an edit in file order, asking before any
+   change that is ambiguous or that you would push back on.
+3. Record resolutions in the ledger by comment `id` (Reconciliation) rather than deleting, then
+   report what changed and what stays open (`ledger.ts list --open`).
 
 ## Monitor Mode
 

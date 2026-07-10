@@ -79,6 +79,11 @@ clean fixes look unaddressed. Never assess local state without syncing.
   them over the local worktree.
 - If a sub-agent must read the local worktree, it has to `git fetch` first and compare against
   `origin/<branch>`, never the local checkout.
+- **Behind is not divergent.** A local branch that differs from the PR head is not automatically your
+  own in-progress rework. A matching git user and commit-message style can mislead. Check authorship
+  and merge-base direction before assuming. `git merge-base --is-ancestor HEAD origin/<branch>`
+  succeeding means you are simply behind origin. If it fails, the local branch has left the PR's
+  history and you are looking at a real divergence.
 
 Establish the **review baseline**: the commit/version at which you last reviewed, plus current head.
 The fix assessment diffs that range, not the whole MR.
@@ -97,7 +102,7 @@ status.
 
 Use the `github:pr-comments` skill's script with `--role reviewer --include-resolved` to get every thread you started, resolved and unresolved, each with its full comment chain so silent resolves are visible. Do not pass `--since`. Follow-up needs the whole history.
 
-If a query ever needs hand-authoring, write it to a file with the Write tool and pass `gh api graphql -F query=@file`. Never use an inline shell heredoc. A `!` in a GraphQL type marker breaks under the Bash tool's escaping.
+If a query ever needs hand-authoring (fetching `reviewThreads` is the usual case), write it to a `.graphql` file with the Write tool and pass `gh api graphql -F query=@query.graphql`. Capital `-F` reads the query from a file. An inline `-f query=...` or a shell heredoc breaks because a `!` in a GraphQL non-null marker gets mangled by the Bash tool's escaping.
 
 #### GitLab
 
@@ -202,6 +207,22 @@ After I decide on next steps, use platform-appropriate commands:
 - Approve: `gh pr review --approve`
 - Comment: `gh pr comment`
 - Resolve thread: `gh api graphql` with `resolveReviewThread` mutation
+
+##### Draft a Pending Review
+
+Often the end goal is a set of draft inline comments I submit myself from the GitHub UI. Create a
+pending review: write a `payload.json` with `commit_id`, a top-level `body`, and a `comments[]` array,
+then `gh api --method POST repos/{owner}/{repo}/pulls/{n}/reviews --input payload.json`. Each comment
+object carries `path`, `line`, `side` (`RIGHT`), and `body`. Omit the `event` key entirely. Its
+absence is what keeps the review pending for me to finish and submit from the GitHub UI.
+
+- **Anchor lines to the cumulative diff.** Every `line` must exist in `gh pr diff <n>` (cumulative),
+  not `gh pr diff --patch` (per-commit patches give wrong offsets). GitHub rejects any line outside
+  the diff. Listing a pending review's comments reports `line` as null until the review is submitted,
+  so don't read that as a failed anchor.
+- **No draft replies onto existing threads.** A pending review can't thread a reply onto an existing
+  review thread through the API. When a resolved thread was only partially addressed, re-raise the
+  remaining point as a new inline comment at the same `file:line` inside the pending review.
 
 #### GitLab
 

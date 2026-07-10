@@ -1,10 +1,12 @@
 ---
 name: pull-request:follow-up
 description: >
-  Follow up on review feedback you received on a PR/MR: check what review comments need
-  responses, investigate how threads were resolved (including silent resolves), and draft
-  replies. With --auto, autonomously triage AI-reviewer (bot) threads and loop until the
-  reviewer is satisfied, clearing a bot review hands-off.
+  Follow up as the author on review feedback left on your own PR/MR: check which reviewer
+  comments still need a response, investigate how threads were resolved (including silent
+  resolves), and draft replies. With --auto, autonomously triage AI-reviewer (bot) threads and
+  loop until the reviewer is satisfied, clearing a bot review hands-off. Use when reviewers
+  commented on your PR and you need to respond or satisfy them. Triggers: "respond to review
+  comments on my PR", "address reviewer feedback", "make the bot reviewer pass".
 argument-hint: "[pr-url] [--auto] [--include-human-nits]"
 allowed-tools:
   - Bash(git:*)

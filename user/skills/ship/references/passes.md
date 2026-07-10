@@ -4,17 +4,38 @@ Gating decisions for ship's pre-PR reviews: which pass runs, `code-review` effor
 
 ## Gating Matrix
 
-Most passes gate on the diff (against the base, plus the working tree). The base is its upstream tracking ref (e.g. `origin/<base>`), not a bare local branch, so a stale local `main` never inflates the file set with already-merged commits. `plan:review` gates on whether an approved plan drove the session.
+Most passes gate on the diff (against the base, plus the working tree). The base is its upstream tracking ref (e.g. `origin/<base>`), not a bare local branch, so a stale local `main` never inflates the file set with already-merged commits. `plan:review` gates on the plan and the session, not the diff (see [Plan Review](#plan-review)).
 
 | Trigger | Pass | Notes |
 |---|---|---|
-| An approved plan in context (`~/.claude/plans/` file) | `plan:review` | Read-only, runs first |
+| A substantial plan in context (`~/.claude/plans/` file) and a long or redirected session | `plan:review` | Read-only, non-blocking: background dispatch, joined before create |
 | Code changes | `code-review <effort> --fix` or `simplify` | Exactly one. Skip on docs/config-only |
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
 | A runtime surface | `verify` | Declines tests-only and docs-only itself |
 
 Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `code-review`, `simplify`, `comments`, `writing`, `verify`).
+
+## Plan Review
+
+`plan:review` is the one pass whose trigger is the plan, not the diff, and whose value (an outside-view read of how the implementation drifted from what was approved) only materializes when the session could actually have drifted. So it gates on two things together: a **substantial** approved plan in context, and a session that **ran long or redirected** enough for the diff to wander from it. A small plan executed in a short, direct session is cost without signal, so it skips.
+
+It is read-only and writes nothing, so it runs as a background dispatch rather than a serial pass. The DAG below is the ordering. Its point is to catch fix-worthy drift while the branch is still local, so findings are acted on before create and deferred follow-ups go to the report. No findings is the common outcome, and the join usually adds no wall-clock.
+
+```mermaid
+flowchart TD
+    S([ship start]) --> G{plan:review gated in?}
+    G -->|no| F1[fix passes: comments-audit, code-review or simplify, writing, verify]
+    F1 --> C([create PR])
+    G -->|yes| D[dispatch plan:review in background]
+    D --> F2[fix passes: comments-audit, code-review or simplify, writing, verify]
+    D -. concurrent .-> R[plan:review reasons over plan + diff]
+    F2 --> J{join: findings?}
+    R -.-> J
+    J -->|fix-worthy drift| A[act before create]
+    J -->|none, common| C
+    A --> C
+```
 
 ## Effort Inference
 

@@ -34,7 +34,7 @@ Default end state **green and ready**: CI green, bot comments triaged, body refr
 
 Resolve the base to a **remote** ref so ship's view matches what the PR merges against. From the base branch (default `main`, or `--base <parent>` on a stack), take its tracking ref via `git rev-parse --abbrev-ref --symbolic-full-name <base>@{u}`, falling back to `origin/<base>`. Fetch it first (`git fetch`) so a stale local `<base>` never inflates the diff with already-merged commits. Diff `git diff <resolved>...HEAD`, plus a plain `git diff` for uncommitted work, and thread the resolved ref as `--base` to every gated pass (including `code-review`). Gate each pass on the file set, its size, and the content behind any judgment call (new comments, refactor or new behavior). Full matrix and heuristics: [`references/passes.md`](references/passes.md).
 
-- **`plan:review`**: an approved plan is in context (Claude Code injects a `~/.claude/plans/` file). No plan, skip.
+- **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) *and* the session ran long or redirected enough that the diff could have drifted from it. Dispatched in the background alongside the fix passes, joined before create. A small plan in a tight session doesn't warrant it. No plan, skip.
 - **Correctness and quality**: code changed. Exactly one of `code-review <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
 - **`comments:audit`**: diff adds code comments.
 - **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
@@ -52,13 +52,12 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 
 ## Pre-PR Reviews
 
-Serialized before create: `code-review --fix`, `simplify`, and comment trims all write to the branch.
+Serialized before create: `code-review --fix`, `simplify`, and comment trims all write to the branch. `plan:review`, when gated in, is read-only, so it runs as a background dispatch alongside these and joins before create rather than gating them. Its findings, if any, are acted on before the PR exists. [`references/passes.md`](references/passes.md) has the DAG.
 
-1. **`plan:review`** (if gated in). Read-only, so it runs first. Surface its findings; handle fix-before-merge drift now, so the passes below cover the resulting fixes.
-2. **`comments:audit`**: needs a clean tree (the fix passes dirty it), lands trims via fast-forward (see [Comment Trims](#comment-trims)). Pauses at preflight for an agent-count approval.
-3. **Correctness and quality**: `code-review <effort> --fix` or `simplify`.
-4. **`writing:review`** over touched prose. Address salient findings before the body is written.
-5. **`verify`** end to end.
+1. **`comments:audit`**: needs a clean tree (the fix passes dirty it), lands trims via fast-forward (see [Comment Trims](#comment-trims)). Pauses at preflight for an agent-count approval.
+2. **Correctness and quality**: `code-review <effort> --fix` or `simplify`.
+3. **`writing:review`** over touched prose. Address salient findings before the body is written.
+4. **`verify`** end to end.
 
 Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 
@@ -75,7 +74,7 @@ The commit sits on `HEAD`, so the fast-forward is clean. It runs in the Agent to
 
 ## Create
 
-`pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
+Join the background `plan:review` first if it was gated in. Act on fix-worthy drift before the PR exists, and carry any deferred follow-ups into the report. Then `pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
 
 ## Babysit
 

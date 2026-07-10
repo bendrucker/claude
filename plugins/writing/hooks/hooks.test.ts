@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BODY_FILE_FLAG, PROSE_FLAGS } from "./check-tropes";
+import {
+  BODY_FILE_FLAG,
+  FIELD_FILE_GUARD,
+  GIT_MESSAGE_FILE_GUARD,
+  PROSE_FLAGS,
+} from "./check-tropes";
 import config from "./hooks.json";
 
 type HookCommand = { type: string; command: string; if?: string };
@@ -22,42 +27,30 @@ function findCommand(matcher: string, script: string): string {
 }
 
 describe("PreToolUse gating", () => {
-  test("matchers, guards, and if conditions", () => {
+  test("every matcher routes to the single dispatcher", () => {
     const view = Object.fromEntries(
       preToolUse.map((entry) => [
         entry.matcher,
-        Object.fromEntries(
-          entry.hooks.map((hook) => [
-            scriptName(hook.command),
-            { guarded: hook.command.startsWith("in=$(cat);"), if: hook.if ?? null },
-          ]),
-        ),
+        entry.hooks.map((hook) => ({
+          script: scriptName(hook.command),
+          guarded: hook.command.startsWith("in=$(cat);"),
+        })),
       ]),
     );
     expect(view).toEqual({
-      Write: {
-        numbering: { guarded: true, if: null },
-        headings: { guarded: false, if: "Write(**/*.md)" },
-        "check-tropes": { guarded: false, if: null },
-      },
-      Edit: {
-        numbering: { guarded: true, if: null },
-        headings: { guarded: false, if: "Edit(**/*.md)" },
-        "check-tropes": { guarded: false, if: null },
-      },
-      MultiEdit: {
-        "check-tropes": { guarded: false, if: null },
-      },
-      Bash: {
-        "check-tropes": { guarded: true, if: null },
-      },
+      Write: [{ script: "pretooluse", guarded: false }],
+      Edit: [{ script: "pretooluse", guarded: false }],
+      MultiEdit: [{ script: "pretooluse", guarded: false }],
+      Bash: [{ script: "pretooluse", guarded: true }],
     });
   });
 
   test("Bash guard alternation is derived from the flags check-tropes extracts", () => {
-    const command = findCommand("Bash", "check-tropes");
+    const command = findCommand("Bash", "pretooluse");
     const alternation = `--(${PROSE_FLAGS.map((flag) => flag.slice(2)).join("|")})[-= ]`;
     expect(command).toContain(alternation);
+    expect(command).toContain(FIELD_FILE_GUARD);
+    expect(command).toContain(GIT_MESSAGE_FILE_GUARD);
     expect(`${BODY_FILE_FLAG} `).toMatch(new RegExp(alternation));
   });
 });
@@ -94,33 +87,6 @@ describe("inline guard behavior", () => {
     return { exitCode: proc.exitCode, calls };
   }
 
-  // Every shape checkMarkdown or a numbering.yml rule can flag must launch the
-  // full check; content that cannot match must skip the bun spawn.
-  test.each<{ name: string; content: string; runs: boolean }>([
-    { name: "markdown numbered heading", content: "## 1. Setup\n\nBody\n", runs: true },
-    { name: "markdown Step heading", content: "# Step 1\n", runs: true },
-    { name: "markdown Phase heading, wide gap", content: "# Phase    2\n", runs: true },
-    { name: "tab after heading number", content: "## 3.\tSetup\n", runs: true },
-    { name: "code identifier step1", content: "function step1() {}\n", runs: true },
-    { name: "code identifier Phase2", content: "class Phase2:\n    pass\n", runs: true },
-    {
-      name: "code identifier part3 in any language",
-      content: "part3 <- function(x) x\n",
-      runs: true,
-    },
-    { name: "plain prose", content: "Descriptive names only.\n", runs: false },
-    { name: "version string", content: "Bump to v1.2.3\n", runs: false },
-    { name: "bare code", content: "const total = sum(items)\n", runs: false },
-  ])("numbering: $name", async ({ content, runs }) => {
-    const command = findCommand("Write", "numbering");
-    const result = await runGuard(command, {
-      tool_name: "Write",
-      tool_input: { file_path: "/repo/example.R", content },
-    });
-    expect(result.exitCode).toBe(0);
-    expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/numbering.ts write"] : []);
-  });
-
   test.each<{ name: string; command: string; runs: boolean }>([
     { name: "no prose flags", command: "git status", runs: false },
     {
@@ -134,14 +100,33 @@ describe("inline guard behavior", () => {
       runs: true,
     },
     { name: "body file", command: "jira update --body-file /tmp/x.md", runs: true },
+    {
+      name: "gh api short field file",
+      command: "gh api repos/x/issues -F body=@tmp/reply.md",
+      runs: true,
+    },
+    {
+      name: "glab api long field file",
+      command: "glab api projects/x/merge_requests --field description=@tmp/mr.md",
+      runs: true,
+    },
+    {
+      name: "quoted field file",
+      command: "gh api repos/x/y/issues -F 'body=@tmp/body.md'",
+      runs: true,
+    },
+    { name: "git commit message file", command: "git commit -F tmp/msg.txt", runs: true },
+    { name: "git tag long file flag", command: "git tag -a v1 --file tmp/tag.txt", runs: true },
+    { name: "field with inline value", command: "gh api repos/x -F state=closed", runs: false },
+    { name: "git commit inline message", command: "git commit -m 'fix: parser'", runs: false },
     { name: "flag-free long command", command: "ls -la && bun test plugins/writing", runs: false },
-  ])("check-tropes bash: $name", async ({ command, runs }) => {
-    const hookCommand = findCommand("Bash", "check-tropes");
+  ])("dispatcher bash: $name", async ({ command, runs }) => {
+    const hookCommand = findCommand("Bash", "pretooluse");
     const result = await runGuard(hookCommand, {
       tool_name: "Bash",
       tool_input: { command },
     });
     expect(result.exitCode).toBe(0);
-    expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/check-tropes.ts"] : []);
+    expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/pretooluse.ts"] : []);
   });
 });

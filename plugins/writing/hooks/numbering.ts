@@ -1,5 +1,3 @@
-#!/usr/bin/env bun
-
 import { execSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
@@ -7,20 +5,27 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import type { Heading, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import { getExtension, isMarkdownFile, isMemoryPath, isPlanPath } from "../detection/paths";
+import { getExtension, isMarkdownFile } from "../detection/paths";
 import {
   type EditInput,
+  formatContext,
   formatDecision,
-  isPlanMode,
-  type SyncHookJSONOutput,
+  type HookResult,
   type WriteInput,
 } from "./io";
 
-type Mode = "write" | "edit";
+export type Mode = "write" | "edit";
+
+// Cheap prefilter covering every shape checkMarkdown or a numbering.yml rule
+// can flag. It gates the expensive path (mdast parse, sg spawn) in-process.
+const NUMBER_HINT = /(step|phase|part).{0,8}[0-9]|[0-9]\.( |\t)/i;
+
+export function hasNumberingHint(content: string): boolean {
+  return NUMBER_HINT.test(content);
+}
 
 type MarkdownMatch = {
   text: string;
@@ -117,10 +122,7 @@ async function fileAlreadyNumbered(filePath: string, ext: string): Promise<boole
   return match !== null;
 }
 
-export async function processInput(
-  input: PreToolUseHookInput,
-  mode: Mode,
-): Promise<SyncHookJSONOutput | null> {
+export async function check(input: PreToolUseHookInput, mode: Mode): Promise<HookResult | null> {
   const toolName = input.tool_name;
 
   let content: string;
@@ -138,9 +140,7 @@ export async function processInput(
     return null;
   }
 
-  if (isMemoryPath(filePath)) return null;
-  if (isPlanPath(filePath)) return null;
-  if (isPlanMode(input)) return null;
+  if (typeof content !== "string" || !hasNumberingHint(content)) return null;
 
   const ext = getExtension(filePath);
   let match: string | null = null;
@@ -167,33 +167,13 @@ ${match}
 
 Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
 
-  if (mode === "edit") {
-    return formatDecision("ask", `This edit introduces numbered sequences. ${reason}`);
+  // Markdown numbering is advice, not a gate: the ask tier collected 52
+  // prompts and 0 rejections, and an ask stalls background jobs. Code keeps
+  // deny because blocking before the write is cheap and effective.
+  if (isMarkdownFile(ext)) {
+    const message = mode === "edit" ? `This edit introduces numbered sequences. ${reason}` : reason;
+    return { output: formatContext(message), category: "numbering" };
   }
 
-  const decision = isMarkdownFile(ext) ? "ask" : "deny";
-  return formatDecision(decision, reason);
-}
-
-async function main(): Promise<void> {
-  const mode = (process.argv[2] || "write") as Mode;
-
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[style/numbering] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = await processInput(input, mode);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
-if (import.meta.main) {
-  main().catch(console.error);
+  return { output: formatDecision("deny", reason), category: "numbering" };
 }

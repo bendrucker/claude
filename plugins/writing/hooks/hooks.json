@@ -7,16 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qiE '(step|phase|part).{0,8}[0-9]|[0-9]\\.( |\\\\t)'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts\" write; fi"
-          },
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts\"",
-            "if": "Write(**/*.md)"
-          },
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\""
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\""
           }
         ]
       },
@@ -25,16 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qiE '(step|phase|part).{0,8}[0-9]|[0-9]\\.( |\\\\t)'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/numbering.ts\" edit; fi"
-          },
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/headings.ts\"",
-            "if": "Edit(**/*.md)"
-          },
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\""
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\""
           }
         ]
       },
@@ -43,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\""
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\""
           }
         ]
       },
@@ -52,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qE -- '--(body|message|description|title)[-= ]'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/check-tropes.ts\"; fi"
+            "command": "in=$(cat); if printf '%s' \"$in\" | grep -qE -- '--(body|message|description|title)[-= ]|(-F|--field)[= ][^ ]*=@|git (commit|tag).* (-F|--file)[= ]'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\"; fi"
           }
         ]
       }

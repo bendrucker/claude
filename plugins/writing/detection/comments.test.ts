@@ -14,6 +14,26 @@ describe("extractComments", () => {
   it("does not treat URLs as comments", () => {
     expect(extractComments('fetch("https://example.com/path")')).toBe("");
   });
+
+  it("pulls block comments including JSDoc gutters", () => {
+    const src =
+      "/**\n * Returns the parsed config.\n * Callers own validation.\n */\nfunction parse() {}";
+    const comments = extractComments(src);
+    expect(comments).toContain("Returns the parsed config.");
+    expect(comments).toContain("Callers own validation.");
+    expect(comments).not.toContain("function parse");
+    expect(comments).not.toContain("*");
+  });
+
+  it("pulls HTML comments", () => {
+    const comments = extractComments("<div></div>\n<!-- rendered only on mobile -->");
+    expect(comments).toBe("rendered only on mobile");
+  });
+
+  it("pulls triple-quoted Python docstrings", () => {
+    const src = 'def parse():\n    """Parse the config file."""\n    return 1';
+    expect(extractComments(src)).toContain("Parse the config file.");
+  });
 });
 
 describe("comment splices", () => {

@@ -3,8 +3,12 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { collectText, processInput } from "./check-tropes";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { check, collectText } from "./check-tropes";
+
+async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  return (await check(input))?.output ?? null;
+}
 
 function mockWrite(content: string): PreToolUseHookInput {
   return {
@@ -60,62 +64,6 @@ function mockBash(command: string): PreToolUseHookInput {
     tool_use_id: "test",
   };
 }
-
-describe("plan files", () => {
-  const planPath = `${process.env.HOME}/.claude/plans/my-plan.md`;
-
-  test.each<["Write" | "Edit"]>([
-    ["Write"],
-    ["Edit"],
-  ])("skips %s to plan file with spaced em dash", async (tool) => {
-    const input =
-      tool === "Write" ? mockWrite("This \u2014 is bad") : mockEdit("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = planPath;
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("returns reminder for non-plan files with spaced em dash", async () => {
-    const result = await processInput(mockWrite("This \u2014 is bad"));
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-});
-
-describe("plan mode", () => {
-  it("skips Write in plan mode with spaced em dash", async () => {
-    const input: PreToolUseHookInput = {
-      ...mockWrite("This \u2014 is bad"),
-      permission_mode: "plan",
-    };
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("skips Edit in plan mode with trope", async () => {
-    const input: PreToolUseHookInput = {
-      ...mockEdit("This \u2014 is bad"),
-      permission_mode: "plan",
-    };
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("still flags trope in normal mode outside plan path", async () => {
-    const result = await processInput(mockWrite("This \u2014 is bad"));
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-});
-
-describe("memory files", () => {
-  const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
-
-  test.each<["Write" | "Edit"]>([
-    ["Write"],
-    ["Edit"],
-  ])("skips %s to memory file with spaced em dash", async (tool) => {
-    const input =
-      tool === "Write" ? mockWrite("This \u2014 is bad") : mockEdit("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = memoryPath;
-    expect(await processInput(input)).toBeNull();
-  });
-});
 
 describe("wordlist files", () => {
   const wordlistPath = "/Users/test/plugins/writing/wordlists/vocabulary.txt";
@@ -374,6 +322,55 @@ describe("collectText", () => {
     it("extracts inline --title", async () => {
       const texts = await collectText(mockBash('gh issue create --title "My title"'));
       expect(texts).toContain("My title");
+    });
+
+    it("reads gh api -F body=@file content", async () => {
+      await Bun.write(tmpFile, "Reply body");
+      const texts = await collectText(
+        mockBash(`gh api repos/x/issues/1/comments -F body=@${tmpFile}`),
+      );
+      expect(texts).toContain("Reply body");
+    });
+
+    it("reads glab api --field description=@file content", async () => {
+      await Bun.write(tmpFile, "MR description");
+      const texts = await collectText(
+        mockBash(`glab api projects/x/merge_requests --field description=@${tmpFile}`),
+      );
+      expect(texts).toContain("MR description");
+    });
+
+    it("reads shell-quoted field file paths", async () => {
+      await Bun.write(tmpFile, "Quoted body");
+      const texts = await collectText(mockBash(`gh api repos/x/y/issues -F 'body=@${tmpFile}'`));
+      expect(texts).toContain("Quoted body");
+    });
+
+    it("reads git commit -F message files", async () => {
+      await Bun.write(tmpFile, "Commit message body");
+      const texts = await collectText(mockBash(`git commit -F ${tmpFile}`));
+      expect(texts).toContain("Commit message body");
+    });
+
+    it("reads git tag --file message files", async () => {
+      await Bun.write(tmpFile, "Tag annotation");
+      const texts = await collectText(mockBash(`git tag -a v1.0.0 --file ${tmpFile}`));
+      expect(texts).toContain("Tag annotation");
+    });
+
+    it("ignores bare -F outside git commands", async () => {
+      const texts = await collectText(mockBash("curl -F upload=/tmp/data.bin https://x"));
+      expect(texts).toHaveLength(0);
+    });
+
+    it("ignores field flags with inline values", async () => {
+      const texts = await collectText(mockBash("gh api repos/x -F state=closed"));
+      expect(texts).toHaveLength(0);
+    });
+
+    it("ignores stdin field files", async () => {
+      const texts = await collectText(mockBash("gh api repos/x -F body=@-"));
+      expect(texts).toHaveLength(0);
     });
 
     it("returns empty for commands without text args", async () => {

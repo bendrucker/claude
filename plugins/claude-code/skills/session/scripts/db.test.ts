@@ -1055,27 +1055,31 @@ describe("change catalog", () => {
     expect(Number(row?.n)).toBeGreaterThan(0);
   });
 
-  it("aborts and keeps a host's rows when the scan fails mid-walk", async () => {
-    await importFixtureHost("guarded");
-    await reindex();
-    const [before] = await db.query<{ n: bigint }>(
-      "SELECT COUNT(*) AS n FROM raw WHERE host = 'guarded'",
-    );
-    expect(Number(before?.n)).toBeGreaterThan(0);
+  // chmod 000 does not restrict root, so the walk would succeed there
+  it.skipIf(process.getuid?.() === 0)(
+    "aborts and keeps a host's rows when the scan fails mid-walk",
+    async () => {
+      await importFixtureHost("guarded");
+      await reindex();
+      const [before] = await db.query<{ n: bigint }>(
+        "SELECT COUNT(*) AS n FROM raw WHERE host = 'guarded'",
+      );
+      expect(Number(before?.n)).toBeGreaterThan(0);
 
-    const subdir = path.join(importsDir, "guarded", "projects", "-Users-test-project");
-    await $`chmod 000 ${subdir}`.quiet();
-    try {
-      await expect(reindex()).rejects.toThrow();
-    } finally {
-      await $`chmod 755 ${subdir}`.quiet();
-    }
+      const subdir = path.join(importsDir, "guarded", "projects", "-Users-test-project");
+      await $`chmod 000 ${subdir}`.quiet();
+      try {
+        await expect(reindex()).rejects.toThrow();
+      } finally {
+        await $`chmod 755 ${subdir}`.quiet();
+      }
 
-    const [after] = await db.query<{ n: bigint }>(
-      "SELECT COUNT(*) AS n FROM raw WHERE host = 'guarded'",
-    );
-    expect(Number(after?.n)).toBe(Number(before?.n));
-  });
+      const [after] = await db.query<{ n: bigint }>(
+        "SELECT COUNT(*) AS n FROM raw WHERE host = 'guarded'",
+      );
+      expect(Number(after?.n)).toBe(Number(before?.n));
+    },
+  );
 });
 
 describe("view versioning", () => {

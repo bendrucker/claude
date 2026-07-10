@@ -3,7 +3,14 @@ import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { cli } from "cleye";
-import { compactDatabase, type Database, ensureIndex, getDataDir, getDb, sessionDbPath } from "./db";
+import {
+  compactDatabase,
+  type Database,
+  ensureIndex,
+  getDataDir,
+  getDb,
+  sessionDbPath,
+} from "./db";
 
 const argv = cli({
   name: "refresh",

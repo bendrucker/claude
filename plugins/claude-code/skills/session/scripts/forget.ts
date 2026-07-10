@@ -34,10 +34,15 @@ try {
     host: label,
   });
   deleted = Number(row?.n ?? 0n);
+  // One transaction: a partial forget that kept indexed_files rows would make a
+  // later re-import of the same label skip every unchanged file while raw stays
+  // empty. CHECKPOINT cannot run inside a transaction.
+  await db.run("BEGIN");
   await db.run("DELETE FROM raw WHERE host = $host", { host: label });
   await db.run("DELETE FROM content_items WHERE host = $host", { host: label });
   await db.run("DELETE FROM indexed_files WHERE host = $host", { host: label });
   await db.run("DELETE FROM meta WHERE host = $host", { host: label });
+  await db.run("COMMIT");
   await db.run("CHECKPOINT");
 } finally {
   db.close();

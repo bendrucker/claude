@@ -893,7 +893,13 @@ describe("change catalog", () => {
   it("reimports a file whose content changed and drops its stale rows", async () => {
     await importFixtureHost("edited");
     await reindex();
-    const target = path.join(importsDir, "edited", "projects", "-Users-test-project", "basic.jsonl");
+    const target = path.join(
+      importsDir,
+      "edited",
+      "projects",
+      "-Users-test-project",
+      "basic.jsonl",
+    );
     const original = await Bun.file(target).text();
     await Bun.write(
       target,
@@ -993,7 +999,13 @@ describe("compactDatabase", () => {
 
 describe("source_line", () => {
   it("numbers ingested rows 1..N per file", async () => {
-    const rows = await db.query<{ source_file: string; n: bigint; lo: bigint; hi: bigint; d: bigint }>(
+    const rows = await db.query<{
+      source_file: string;
+      n: bigint;
+      lo: bigint;
+      hi: bigint;
+      d: bigint;
+    }>(
       `SELECT source_file, COUNT(*) AS n, MIN(source_line) AS lo,
               MAX(source_line) AS hi, COUNT(DISTINCT source_line) AS d
        FROM raw WHERE host = 'local' GROUP BY source_file`,

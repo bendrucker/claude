@@ -88,11 +88,20 @@ Use `split-window` with `-t $TMUX_PANE` so new panes open relative to Claude's p
 
 ### Running a Command
 
+Inline a command string only for a single bare command:
+
 ```bash
 tmux split-window -h -d -t $TMUX_PANE 'tail -f logs/dev.log'
 ```
 
 The command runs in the new pane's shell. When it exits, the pane closes. Use `$SHELL` or omit the command to open an interactive shell.
+
+Anything past a bare command can make `split-window` silently fail: a `;`, quotes, an `exec` fallback, or other shell metacharacters. The failure is quiet: no pane opens, no error prints, and `-P -F '#{pane_id}'` returns nothing. It reads as the pane never appearing, not as the pane opening then disappearing. Split bare and `send-keys` the command instead. The new pane's shell runs the keys verbatim, past tmux's own parsing of the inline string:
+
+```bash
+pane=$(tmux split-window -h -d -t $TMUX_PANE -P -F '#{pane_id}')
+tmux send-keys -t "$pane" 'cd repo; exec zsh' Enter
+```
 
 ### Starting Claude Sessions
 
@@ -102,7 +111,7 @@ Pass the initial prompt as a CLI argument rather than using `send-keys`:
 tmux split-window -h -d -t $TMUX_PANE 'claude "analyze the test failures"'
 ```
 
-Use `send-keys` only for follow-up messages to an already-running session.
+A prompt with a `;`, nested quotes, or other metacharacters hits the same silent inline-parsing failure. Split bare and `send-keys` the whole `claude '...'` line instead (see [Running a Command](#running-a-command)). Use `send-keys` only for follow-up messages to an already-running session.
 
 ## Collaborative File Viewing
 
@@ -111,6 +120,8 @@ When collaborating on a file, open it in a sidebar pane so the user sees changes
 ```bash
 tmux split-window -h -d -l 40% -t $TMUX_PANE '<command> <file>'
 ```
+
+The inline form is safe only when both the command and the path are bare. A filename with a space, or a `$EDITOR` carrying flags (`code -w`), hits the same silent no-op. Split bare and `send-keys` the viewer line instead (see [Running a Command](#running-a-command)).
 
 #### Available Tools
 
@@ -156,4 +167,5 @@ tmux capture-pane -t $TARGET -p -S -100
 
 - Always use `-P -F '#{pane_id}'` to capture pane IDs at creation time
 - Always use `-d` on `split-window` to avoid switching Claude's pane
+- `split-window` with an inline command containing `;`, quotes, or metacharacters can silently no-op (no pane, no error). Split bare, then `send-keys` the command
 - Use `$TMUX_PANE` (set by tmux natively and injected by context hook) to target the current pane

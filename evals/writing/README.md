@@ -1,9 +1,8 @@
 # `writing:writing` Rubric
 
-A local harness for evaluating the writing style rules, following the structure
-of [`evals/pr-body`](../pr-body). The aim is a rubric: a concrete list of what
-makes a rewrite good or bad, derived from labeling real outputs, then used to
-score the rules before and after edits.
+A local harness for evaluating the writing style rules. The aim is a rubric: a
+concrete list of what makes a rewrite good or bad, derived from labeling real
+outputs, then used to score the rules before and after edits.
 
 The eval unit is the [`writing:rewrite`](../../plugins/writing/skills/rewrite)
 transform. `writing:writing` only injects the style rules into context and emits
@@ -80,9 +79,7 @@ item you can:
 
 Everything autosaves to `feedback/<id>.json`.
 
-The UI is copied from `evals/pr-body/label/` and adapted for the paired view.
-Copying is the current convention across `evals/`; extracting a shared harness
-package is a known deferred refactor.
+The UI is a single-file labeling server serving the paired view.
 
 ### 3. Derive the rubric (after labeling)
 

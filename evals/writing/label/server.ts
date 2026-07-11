@@ -6,9 +6,6 @@ import { cli } from "cleye";
 // Local labeling server. Serves the review UI, hands the browser the assembled
 // (input, output) pairs, and persists reviewer feedback to feedback/<id>.json so
 // a later analysis pass can read it back off disk.
-//
-// Copied from evals/pr-body/label/server.ts; a shared harness package is a known
-// deferred refactor (see README).
 
 const argv = cli({
   name: "label-server",

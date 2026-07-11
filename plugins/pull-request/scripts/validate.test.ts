@@ -10,8 +10,10 @@ import {
   extractBodyFilePath,
   findBacktickedCommits,
   hasBacktickedRef,
+  hasCiStatusRollCall,
   hasFileTourBullets,
   hasReflexiveScaffold,
+  hasRunOnProse,
   processInput,
   validateBody,
 } from "./validate-body";
@@ -32,11 +34,13 @@ function getAdditionalContext(result: Awaited<ReturnType<typeof validateBody>>) 
   return undefined;
 }
 
-const LONG_PROSE = Array(40)
+// Long enough to clear SMALL_BODY_WORD_LIMIT, but shaped as short paragraphs so
+// it doesn't itself trip the run-on detector when a test needs a large body.
+const LONG_PROSE = Array(6)
   .fill(
-    "The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL.",
+    "The cache stores frequently accessed records in memory. It evicts the oldest entry when full. A configurable TTL bounds staleness. Reads fall back to the database on a miss.",
   )
-  .join(" ");
+  .join("\n\n");
 
 describe("extractBodyFilePath", () => {
   test.each<[string, string | null]>([
@@ -63,10 +67,21 @@ describe("validateBody", () => {
     ["'Added N integration tests' pattern", "## Test plan\nAdded 2 integration tests"],
     ["'N tests' pattern", "## Test plan\n5 tests verify the behavior"],
     ["lowercase 'added' pattern", "## Test plan\nadded 10 tests"],
+    ["assertion count", "## Testing\nThe suite runs 1165 assertions."],
+    ["pass/fail count", "## Testing\n`bun test`: 193 pass, 0 fail."],
   ])("denies body with %s", (_name, body) => {
     const result = validateBody(body);
     expect(result).not.toBeNull();
     expect(getPermissionDecision(result)).toBe("deny");
+  });
+
+  it("warns on a CI-status roll-call", () => {
+    const result = validateBody(
+      "Adds an LRU cache to the resolver.\n\nLint passes and the build is green.\n\nFixes #1",
+    );
+    expect(result).not.toBeNull();
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("status checks");
   });
 
   it("warns (does not deny) on a reflexive scaffold in a small body", () => {
@@ -85,6 +100,15 @@ describe("validateBody", () => {
     expect(result).not.toBeNull();
     expect(getPermissionDecision(result)).toBeUndefined();
     expect(getAdditionalContext(result)).toContain("file tour");
+  });
+
+  it("warns on a run-on prose paragraph", () => {
+    const result = validateBody(
+      "Reshapes the resolver. It reads the cache first. It falls back to the database. It then tries the network. It retries once before giving up.\n\nFixes #1",
+    );
+    expect(result).not.toBeNull();
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("runs long");
   });
 
   it("combines both structural warnings into one message", () => {
@@ -114,6 +138,56 @@ describe("validateBody", () => {
       "## Changes\n\n- **Caching**: stores records in memory\n- **Eviction**: drops the oldest entry",
     );
     expect(result).toBeNull();
+  });
+});
+
+describe("hasCiStatusRollCall", () => {
+  test.each<[string, string]>([
+    ["all green", "Everything is all green."],
+    ["zero errors/warnings", "skill-lint: 0 errors, 0 warnings"],
+    ["lint passes", "Lint passes on all six skills."],
+    ["build green", "The build is green."],
+    ["tests pass", "The unit tests pass."],
+    ["types clean", "Types clean after the change."],
+  ])("flags %s", (_name, body) => {
+    expect(hasCiStatusRollCall(body)).toBe(true);
+  });
+
+  test.each<[string, string]>([
+    ["pass as a verb", "The existing section tests already pass VARCHAR literals."],
+    ["callers passing an argument", "All four sites now pass `env.KV`."],
+    ["falsification with fail", "Reverting the fix makes `TestX` fail with exit 2."],
+    ["green as a color noun", "The status badge renders green for the healthy state."],
+    ["clean describing code", "The teardown leaves a clean working tree."],
+  ])("does not flag %s", (_name, body) => {
+    expect(hasCiStatusRollCall(body)).toBe(false);
+  });
+});
+
+describe("hasRunOnProse", () => {
+  const commaSplice = `Reshapes the resolver so it reads ${"the cache, then the database, then the network, then the stale fallback, ".repeat(3)}before it finally gives up on the request.`;
+
+  test.each<[string, string]>([
+    [
+      "a paragraph over four sentences",
+      "It reads. It falls back. It retries. It logs. It gives up.",
+    ],
+    [
+      "a sentence past the run-on length",
+      `Reshapes the resolver ${"and threads the request through another layer ".repeat(7)}now.`,
+    ],
+    ["a comma-stacked enumeration", commaSplice],
+  ])("flags %s", (_name, body) => {
+    expect(hasRunOnProse(body)).toBe(true);
+  });
+
+  test.each<[string, string]>([
+    ["a tight paragraph", "Reshapes the resolver. It reads the cache before the database."],
+    ["four short sentences", "One. Two. Three. Four."],
+    ["sentences buried in fenced code", "```\nlong. run. on. wall. of. code.\n```"],
+    ["a list of many items", "- one\n- two\n- three\n- four\n- five\n- six"],
+  ])("does not flag %s", (_name, body) => {
+    expect(hasRunOnProse(body)).toBe(false);
   });
 });
 

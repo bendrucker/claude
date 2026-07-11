@@ -10,7 +10,22 @@ function hasBashCommand(input: unknown): input is { command: string } {
 }
 
 const TEST_COUNT_PATTERN =
-  /[Aa]dded [0-9]+ (unit |integration )?tests|[0-9]+ (unit |integration )?tests/;
+  /[Aa]dded [0-9]+ (unit |integration )?tests|[0-9]+ (unit |integration )?tests|[0-9]+ assertions|[0-9]+ pass(?:ed|es)?,\s*[0-9]+ fail/;
+
+// A roll-call of green status checks (`all green`, `0 errors, 0 warnings`,
+// `lint passes`, `npm run build` green) restates what the PR's status checks
+// already show. This warns rather than denies: whether a check is in CI is a
+// judgment the hook can't make, and a genuinely non-CI signal (a manual run, an
+// intentional exclusion, a pre-existing warning) is worth keeping.
+// Adjacency (only an adverb may sit between the check and its status word) keeps
+// these off prose where the same words carry a different sense, e.g. "the tests
+// already pass VARCHAR literals" (pass = the verb, not a status).
+const CI_STATUS_PATTERNS: RegExp[] = [
+  /\ball (?:checks? (?:pass|green)|green)\b/i,
+  /\b0 errors?,?\s*0 warnings?\b/i,
+  /\b(?:lint|types?|typecheck|type checking|build|tests?|checks?)\s+(?:all |also |now |is |are |was |were )?(?:pass(?:es|ed)?|green|clean)\b/i,
+  /\b(?:pass(?:es|ed|ing)?|green|clean)\s+(?:in )?ci\b/i,
+];
 
 // Mirrors the writing plugin's "template on small document" detector: a full
 // `## Changes` + `## Testing` scaffold on a body under this many words is
@@ -54,6 +69,64 @@ export function hasFileTourBullets(body: string): boolean {
   for (const match of body.matchAll(BOLD_LABEL_BULLET_PATTERN)) {
     const label = match[1];
     if (label && looksLikeFilePath(label)) return true;
+  }
+  return false;
+}
+
+export function hasCiStatusRollCall(body: string): boolean {
+  return CI_STATUS_PATTERNS.some((pattern) => pattern.test(body));
+}
+
+// Prose density thresholds. A paragraph past MAX_SENTENCES_PER_PARAGRAPH runs
+// more than one thread. A sentence past RUN_ON_CHARS is a wall. A sentence with
+// COMMA_SPLICE_MIN_COMMAS commas past COMMA_SPLICE_MIN_CHARS is an enumeration
+// that belongs in a list.
+const RUN_ON_CHARS = 280;
+const COMMA_SPLICE_MIN_COMMAS = 3;
+const COMMA_SPLICE_MIN_CHARS = 220;
+const MAX_SENTENCES_PER_PARAGRAPH = 4;
+
+// Join the body into prose paragraphs, dropping fenced code, tables, headings,
+// list items, and blockquotes so density is measured on prose alone.
+function proseParagraphs(body: string): string[] {
+  const paras: string[] = [];
+  let buf: string[] = [];
+  let inFence = false;
+  const flush = () => {
+    if (buf.length > 0) paras.push(buf.join(" ").trim());
+    buf = [];
+  };
+  for (const line of body.split("\n")) {
+    if (/^\s*```/.test(line)) {
+      flush();
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    if (line.trim() === "" || /^\s*(#{1,6}\s|[-*]\s|\d+[.)]\s|\||>)/.test(line)) {
+      flush();
+      continue;
+    }
+    buf.push(line.trim());
+  }
+  flush();
+  return paras.filter((p) => p.length > 0);
+}
+
+function splitSentences(text: string): string[] {
+  return text.split(/(?<=[.!?])\s+(?=[A-Z`(])/).filter((s) => s.trim().length > 0);
+}
+
+export function hasRunOnProse(body: string): boolean {
+  for (const para of proseParagraphs(body)) {
+    const sentences = splitSentences(para);
+    if (sentences.length > MAX_SENTENCES_PER_PARAGRAPH) return true;
+    for (const sentence of sentences) {
+      if (sentence.length > RUN_ON_CHARS) return true;
+      const commas = (sentence.match(/,/g) ?? []).length;
+      if (commas >= COMMA_SPLICE_MIN_COMMAS && sentence.length > COMMA_SPLICE_MIN_CHARS)
+        return true;
+    }
   }
   return false;
 }
@@ -144,6 +217,16 @@ function structuralReasons(body: string): string[] {
   if (hasFileTourBullets(body)) {
     reasons.push(
       "Bullets shaped like `- **path/to/file**: ...` narrate a file tour. Describe the conceptual change instead of walking the diff file by file.",
+    );
+  }
+  if (hasCiStatusRollCall(body)) {
+    reasons.push(
+      "The body states that lint, types, tests, or a build passed. The PR's status checks already show that. Drop it, unless the result is one CI won't post: a manual check CI doesn't run, an intentional exclusion, or a pre-existing warning you're leaving in place.",
+    );
+  }
+  if (hasRunOnProse(body)) {
+    reasons.push(
+      "A prose paragraph runs long: over four sentences, a sentence past 280 characters, or several clauses stacked behind commas. Split the thread, or move an enumeration into a list.",
     );
   }
   if (hasBacktickedRef(body)) {

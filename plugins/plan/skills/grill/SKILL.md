@@ -1,8 +1,7 @@
 ---
 name: plan:grill
-disable-model-invocation: true
 description: |
-  Relentless design-tree interview. Walks the dependency tree one question at a time via AskUserQuestion, drilling into whatever the prior answer opens up, until you and the user share understanding of the design. Ends with a decisions digest. User-invoked only ("Grill Me") — reserve for a change that warrants being pushed past a first answer.
+  Relentless design-tree interview. Walks the dependency tree one question at a time via AskUserQuestion, drilling into whatever the prior answer opens up, until you and the user share understanding of the design, then ends with a decisions digest. Use when the user asks to be grilled, interviewed, or pushed on a design or plan ("grill me", "interview me on this", "pressure-test this design"), or when another skill hands off its planning interview. Reserve for a change that warrants being pushed past a first answer.
 context: fork
 agent: Plan
 ---

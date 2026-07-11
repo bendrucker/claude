@@ -68,6 +68,6 @@ Do NOT propose interfaces yet. After the file is written, ask the user: "Which o
 
 ### 3. Refine the chosen candidate
 
-Once the user picks a candidate, walk the design tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive. Drive it through `AskUserQuestion`, one question at a time. The user can run `plan:grill` for a relentless standalone version.
+Once the user picks a candidate, invoke `plan:grill` to walk the design tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
 
 If they want to explore alternative interfaces for the deepened module, see [INTERFACE-DESIGN.md](INTERFACE-DESIGN.md).

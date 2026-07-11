@@ -36,7 +36,7 @@ Scan for:
 
 ### Planning Interview
 
-Clarify requirements through `AskUserQuestion`, sketching options and challenging assumptions. For a deeper standalone pass the user can run `plan:grill`. Guide the interview toward:
+Clarify requirements through `AskUserQuestion`, sketching options and challenging assumptions, or invoke `plan:grill` for a relentless pass. Guide the interview toward:
 
 - Requirements clarification
 - Scope boundaries (what's in, what's out)

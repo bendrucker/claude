@@ -173,6 +173,11 @@
       "name": "meme",
       "description": "Generate memes from images: classic Impact macros, labels, and TV-subtitle captions",
       "source": "./plugins/meme"
+    },
+    {
+      "name": "activitywatch",
+      "description": "Query local ActivityWatch usage data: per-app time, window titles, and active vs idle spans",
+      "source": "./plugins/activitywatch"
     }
   ]
 }

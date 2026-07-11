@@ -88,6 +88,50 @@ describe("unchanged re-present", () => {
   });
 });
 
+describe("append-only re-present", () => {
+  const basePlan = [
+    "# Add retry to the fetch client",
+    "## Approach",
+    "- Wrap the fetch call in a retry loop",
+    "- Back off exponentially between attempts",
+    "- Cap retries at 3",
+    "## Files",
+    "- src/client.ts",
+    "- src/client.test.ts",
+    "## Testing",
+    "- Add a test for the backoff schedule",
+  ].join("\n");
+
+  it("asks when the re-present keeps nearly all prior lines and only adds new ones", async () => {
+    await decision(basePlan);
+    const grown = `${basePlan}\n## Rollout\n- Ship behind a flag\n- Monitor error rates`;
+    expect(await decision(grown)).toEqual({
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: expect.stringContaining("append-only growth"),
+    });
+  });
+
+  it("allows a genuine revision that rewrites most of the plan", async () => {
+    await decision(basePlan);
+    const rewritten = [
+      "# Add retry to the fetch client",
+      "## Approach",
+      "- Use a circuit breaker instead of unbounded retries",
+      "- Fail fast after 2 consecutive errors",
+      "## Files",
+      "- src/circuit-breaker.ts",
+      "## Testing",
+      "- Add a test for the open/closed transitions",
+    ].join("\n");
+    expect(await decision(rewritten)).toBeNull();
+  });
+
+  it("does not ask on the first presentation of a plan that would otherwise qualify", async () => {
+    expect(await decision(basePlan)).toBeNull();
+  });
+});
+
 describe("size advisory", () => {
   const bigPlan = (seed: string) => seed + "x".repeat(12_001);
 

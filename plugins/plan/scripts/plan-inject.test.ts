@@ -57,6 +57,11 @@ test("stays silent outside plan mode", async () => {
   expect(stdout).toBe("");
 });
 
+test("stays silent without a session_id, since a high-frequency hook cannot dedup", async () => {
+  const stdout = await run({ permission_mode: "plan" });
+  expect(stdout).toBe("");
+});
+
 test("re-injects for a different session id", async () => {
   await run({ permission_mode: "plan", session_id: "t1" });
   const stdout = await run({ permission_mode: "plan", session_id: "t2" });

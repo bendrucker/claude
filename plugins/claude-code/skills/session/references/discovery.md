@@ -23,7 +23,7 @@ Each dimension maps to the named queries that answer it (Tier-1 listed in [`cata
 | Hook coverage | `hook-config-vs-observed` | `hooks` |
 | Permissions and sandbox | `sandbox-bypass-effective-command`, `already-allowed-still-prompting`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox` |
 | Context tax | `catalog-reinjection-thrash-sessions` | `activity`, `hooks` (additionalContext) |
-| Tokens | `repeat-read-waste`, `top-sessions-by-output` | `stats`, `model-summary`, `skill-activity` |
+| Tokens | `repeat-read-waste`, `top-sessions-by-output`, `delegation` | `stats`, `model-summary`, `skill-activity` |
 | Turns and compaction | `stop-hook-noop-detector` | `activity` (compactions, API errors) |
 | Skill economy | `skill-auto-vs-explicit` | `skills`, `skill-activity` |
 | Planning | `plans` | `plan_sessions`, `plan_calls` |

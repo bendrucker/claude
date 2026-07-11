@@ -120,6 +120,7 @@ Every query, grouped by category with a one-line gloss:
 - `plans`: sessions using plan mode
 - `plan-iterations`: per-plan growth and carry-over
 - `outcomes`: session terminal states
+- `delegation`: subagent spawn model mix against the parent's main model, generic vs pinned-agent split
 
 #### Schema and Index
 - `schema`: list every column

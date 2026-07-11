@@ -30,3 +30,16 @@ CREATE OR REPLACE MACRO model_output_rate(model) AS
     WHEN model ILIKE '%haiku%'  THEN 5.0
     ELSE 25.0
   END;
+
+-- Collapses a concrete model id or a Task-tool `model` override (both full ids like
+-- `claude-opus-4-8[1m]` and short names like `opus`) to a family label. Shares the
+-- same ILIKE patterns as the rate macros above so family and cost stay consistent.
+CREATE OR REPLACE MACRO model_family(model) AS
+  CASE
+    WHEN model IS NULL THEN NULL
+    WHEN model ILIKE '%fable%' OR model ILIKE '%mythos%' THEN 'fable'
+    WHEN model ILIKE '%opus%'   THEN 'opus'
+    WHEN model ILIKE '%sonnet%' THEN 'sonnet'
+    WHEN model ILIKE '%haiku%'  THEN 'haiku'
+    ELSE 'other'
+  END;

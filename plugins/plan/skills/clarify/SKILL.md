@@ -2,7 +2,7 @@
 name: plan:clarify
 disable-model-invocation: true
 description: |
-  Targeted interview for execution-time clarification. Use when you hit an ambiguity or decision point during implementation that needs user input before proceeding.
+  Targeted interview for resolving a single execution-time ambiguity. Run it to unblock an implementation decision with focused input.
 context: fork
 ---
 

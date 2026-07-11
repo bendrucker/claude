@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// claude:dangerouslyDisableSandbox: hands off to osascript for JXA Apple Events, which the command sandbox blocks
 
 import * as acorn from "acorn";
 

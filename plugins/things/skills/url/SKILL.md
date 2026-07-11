@@ -117,7 +117,7 @@ The write scripts (`url.ts`, `inbox.ts`) print to stdout on success. No output m
 
 #### Sandbox-blocked URL handoff
 
-If stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the macOS sandbox blocked the URL handoff to Things. `sandbox.allowAppleEvents` in `user/settings.json` covers Launch Services handoff. If it still happens, verify that key is set rather than disabling the sandbox manually.
+If stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the macOS sandbox blocked the URL handoff to Things. `url.ts` and `inbox.ts` carry the `claude:dangerouslyDisableSandbox` marker so the `mac` plugin's sandbox hook runs them outside the sandbox. If it still happens, verify the `mac` plugin is installed so that hook is active.
 
 ## Documentation
 

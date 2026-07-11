@@ -1,0 +1,16 @@
+{
+  "description": "Disables the command sandbox for plugin scripts that hand off to macOS automation (Apple Events, Launch Services)",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Monitor",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts\""
+          }
+        ]
+      }
+    ]
+  }
+}

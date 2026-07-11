@@ -10,5 +10,4 @@ Create and review technical specifications through interactive planning and expe
 
 ## Dependencies
 
-- `interview`: Planning interview via `interview:plan`
 - `mermaid`: Architecture diagrams via `mermaid:diagram`

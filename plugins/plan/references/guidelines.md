@@ -24,7 +24,7 @@ Investigate to convergence first. Plan mode transcribes findings that are alread
 
 When the request names a vague noun ("a skill", "a few rules", "a workflow"), state the smallest change that satisfies the literal ask, then offer heavier work as named tiers. A guard, rule, or test that catches zero existing cases is speculative: ask before adding it.
 
-This relaxes when the user asked for thorough upfront planning (`interview:plan`). There, depth is the point.
+This relaxes when the user asked for thorough upfront planning (`plan:grill`). There, depth is the point.
 
 ## Direction Before Detail
 

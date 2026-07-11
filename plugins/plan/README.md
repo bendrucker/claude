@@ -5,6 +5,8 @@ Planning mode guidelines and context injection for Claude Code.
 ## Contents
 
 - **Skill** `plan:review`: reviews how an implementation diverged from its approved plan, forking a clean-context agent over the plan and the diff to surface drift and follow-ups
+- **Skill** `plan:grill`: user-invoked ("Grill Me") relentless design-tree interview, drilling one `AskUserQuestion` at a time into whatever the prior answer opens up, ending in a decisions digest
+- **Skill** `plan:clarify`: user-invoked targeted interview for resolving a single execution-time ambiguity
 - **Hook**: Injects planning guidelines the first time a session is in plan mode, whether that first signal is a prompt or a tool call, and appends delegation guidance when the orchestrator runs on an expensive model
 - **Hook**: Gates `ExitPlanMode`, denying byte-identical plan re-presents and asking once per session before presenting a plan over 12k characters
 
@@ -17,6 +19,8 @@ Both paths call `scripts/injection-content.sh` to assemble the content. It emits
 The `PreToolUse` gate hook hashes each presented plan under `/tmp/claude/<session_id>/` and denies a resubmission whose text is unchanged since the last presentation, with instructions to revise instead of regrow. Plans over 12k characters trigger a one-time confirmation prompt. Infrastructure weirdness (missing session id, unreadable state) fails open.
 
 `plan:review` reads the approved plan from the file Claude Code writes under `~/.claude/plans/` and injects into the session on plan exit. It forks a clean-context agent that diffs the plan against the branch's base (resolved from the open PR, not assumed to be `main`) using the rubric in `skills/review/references/divergence.md`.
+
+`plan:grill` and `plan:clarify` are both `disable-model-invocation`: a skill can't invoke them programmatically, only the user can run them (`/plan:grill`, `/plan:clarify`). `plan:grill` has no batch or call limit. It chains `AskUserQuestion` calls until the design is settled, challenging conflicting answers rather than proceeding past them. `plan:clarify` is scoped to one blocker with a 4-question cap.
 
 ## Testing
 

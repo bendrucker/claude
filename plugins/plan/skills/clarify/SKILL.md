@@ -1,10 +1,12 @@
 ---
-name: interview:clarify
+name: plan:clarify
 disable-model-invocation: true
 description: |
   Targeted interview for execution-time clarification. Use when you hit an ambiguity or decision point during implementation that needs user input before proceeding.
 context: fork
 ---
+
+<!-- Deathwatch: 2 lifetime uses as of the plan:grill split. Delete at the next review if still unused. -->
 
 # Clarification Interview
 

@@ -35,7 +35,8 @@ export async function runQuery(script: string, args: string[]): Promise<unknown>
   }
 
   const scriptPath = join(PLUGIN_ROOT, "scripts", "jxa", script);
-  const proc = Bun.spawn(["bun", runner, "Things3", scriptPath, ...args], {
+  // process.execPath, not "bun": under launchd, PATH lacks /opt/homebrew/bin.
+  const proc = Bun.spawn([process.execPath, runner, "Things3", scriptPath, ...args], {
     stdout: "pipe",
     stderr: "pipe",
   });

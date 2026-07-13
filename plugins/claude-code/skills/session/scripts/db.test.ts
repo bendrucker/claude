@@ -934,7 +934,7 @@ describe("outcomes query", () => {
       "sessions: ongoing": 1,
       "sessions: handed-off": 1,
       "sessions: abandoned-with-edits": 2,
-      "sessions: no-artifact": 11,
+      "sessions: no-artifact": 12,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -950,10 +950,95 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 15,
+      "sessions: ongoing": 16,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
+  });
+});
+
+describe("delegation query", () => {
+  // delegation-session (opus main model) spawns five Agent calls: a generic
+  // general-purpose call left to inherit (actual model opus, via its subagent
+  // transcript), a generic call with an explicit `model: haiku` override (actual
+  // haiku, a cheaper override), a pinned Explore call (actual haiku, no override
+  // needed), a fork (must be excluded entirely), and a generic call with an
+  // explicit `model: sonnet` override resolved via the tool result's
+  // `resolvedModel` rather than a transcript join (actual sonnet, cheaper override).
+  type DelegationRow = {
+    parent_family: string;
+    path: string;
+    actual_family: string;
+    spawns: bigint;
+    path_spawns: bigint;
+    pct_of_path: number;
+    override_rate_pct: number;
+    cheaper_override_rate_pct: number;
+    expensive_output_tokens: bigint;
+    expensive_cache_creation_tokens: bigint;
+  };
+
+  async function delegationRows() {
+    return runQuery<DelegationRow>(db, "delegation", filterParams());
+  }
+
+  it("excludes fork spawns entirely", async () => {
+    const rows = await delegationRows();
+    const total = rows
+      .filter((r) => r.parent_family === "opus")
+      .reduce((sum, r) => sum + Number(r.spawns), 0);
+    // 5 calls minus the excluded fork leaves 4 counted spawns.
+    expect(total).toBe(4);
+  });
+
+  it("separates the generic path from the pinned-agent path", async () => {
+    const rows = await delegationRows();
+    const generic = rows.filter((r) => r.parent_family === "opus" && r.path === "generic");
+    const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
+    expect(Number(generic[0]?.path_spawns)).toBe(3);
+    expect(Number(pinned[0]?.path_spawns)).toBe(1);
+    expect(pinned.map((r) => r.actual_family)).toEqual(["haiku"]);
+  });
+
+  it("resolves the actual model from the subagent transcript when the tool result carries no resolvedModel", async () => {
+    const rows = await delegationRows();
+    const inherited = rows.find(
+      (r) => r.parent_family === "opus" && r.path === "generic" && r.actual_family === "opus",
+    );
+    expect(Number(inherited?.spawns)).toBe(1);
+  });
+
+  it("resolves the actual model from resolvedModel when the tool result carries it", async () => {
+    const rows = await delegationRows();
+    const resolved = rows.find(
+      (r) => r.parent_family === "opus" && r.path === "generic" && r.actual_family === "sonnet",
+    );
+    expect(Number(resolved?.spawns)).toBe(1);
+  });
+
+  it("computes override and cheaper-override rates as a fraction of every spawn in the group", async () => {
+    const rows = await delegationRows();
+    const generic = rows.filter((r) => r.parent_family === "opus" && r.path === "generic");
+    // 2 of 3 generic spawns carried an explicit override (haiku, sonnet), and
+    // both were cheaper than the opus main model.
+    expect(generic[0]?.override_rate_pct).toBeCloseTo(66.7, 1);
+    expect(generic[0]?.cheaper_override_rate_pct).toBeCloseTo(66.7, 1);
+    const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
+    expect(pinned[0]?.override_rate_pct).toBe(0);
+  });
+
+  it("sums expensive-model spend only from spawns whose actual family is opus/fable", async () => {
+    const rows = await delegationRows();
+    const generic = rows.filter((r) => r.parent_family === "opus" && r.path === "generic");
+    // Only the inherited (actual opus) spawn's subagent transcript counts.
+    for (const row of generic) {
+      expect(Number(row.expensive_output_tokens)).toBe(500);
+      expect(Number(row.expensive_cache_creation_tokens)).toBe(200);
+    }
+    const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
+    for (const row of pinned) {
+      expect(Number(row.expensive_output_tokens)).toBe(0);
+    }
   });
 });
 

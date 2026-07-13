@@ -10,7 +10,7 @@ Reads run the existing JXA query scripts through the mac plugin's runner (`plugi
 - `auth.ts`: RFC 9728 protected-resource metadata, RFC 7662 introspection verifier with caching.
 - `tools.ts`: MCP tool registrations wrapping the plugin's read scripts and write modules.
 - `jxa.ts`: locates and spawns the mac plugin's JXA runner (AST scope validation and Apple Events retry included).
-- `launchd/`: LaunchAgent plists for tsidp and this server.
+- `install.ts`: renders and installs the LaunchAgents for tsidp and this server, discovering the tailnet host, bun path, and repo path at install time. Nothing machine-specific is committed.
 
 ## Running Locally
 
@@ -44,14 +44,18 @@ One-time tailnet setup, in the Tailscale admin console:
 Then on the Mac:
 
 ```bash
+# Build tsidp from its dedicated repo. The frozen copy at
+# tailscale.com/cmd/tsidp lacks introspection and DCR.
+go install github.com/tailscale/tsidp@latest
+
 # tsidp joins the tailnet as its own node named "idp".
 # First run is interactive: it prints a login URL to authorize the node.
 TAILSCALE_USE_WIP_CODE=1 ~/src/go/bin/tsidp -funnel -hostname idp -dir ~/.local/state/tsidp
 
-# Once authorized, install both LaunchAgents.
-cp launchd/*.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/me.bendrucker.tsidp.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/me.bendrucker.things-mcp.plist
+# Once authorized, render and install both LaunchAgents. The script discovers
+# the tailnet host and MagicDNS suffix from `tailscale status`; use --dry-run
+# to inspect the plists first, --skip-tsidp to install only the MCP server.
+bun src/mcp/install.ts
 
 # Publish the server. Funnel exposes it to the public internet, which the
 # claude.ai connector requires. Use `serve` instead for tailnet-only access.

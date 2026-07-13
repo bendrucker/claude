@@ -1,0 +1,6 @@
+{
+  "category": "doc-paragraph",
+  "note": "output over-strips: drops the '5 minute' default and the env-var override name, both functional facts a reader needs. Voice is clean, so this isolates meaning loss from residual slop.",
+  "input": "The cache is designed to significantly improve performance by storing computed results. By default, entries live for 5 minutes, but you can override this by setting the CACHE_TTL environment variable to a number of seconds. When an entry expires, the next request recomputes it and repopulates the cache seamlessly.",
+  "output": "The cache stores computed results to improve performance. Entries expire after a timeout, and the next request recomputes and repopulates them."
+}

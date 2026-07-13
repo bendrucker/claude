@@ -1,85 +1,59 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import type { PostToolUseInput } from "@constellos/claude-code-kit";
 import { extractSkillRoot, processHookInput, validateSkillPath } from "./check-structure";
+import { makePostToolUseInput } from "./test-support";
 
 function mockWriteInput(filePath: string): PostToolUseInput {
-  return {
-    session_id: "test",
-    transcript_path: "/tmp/transcript.jsonl",
-    cwd: "/tmp",
-    permission_mode: "default",
-    hook_event_name: "PostToolUse",
-    tool_use_id: "test-id",
-    tool_name: "Write",
-    tool_input: { file_path: filePath, content: "" },
-    tool_response: { message: "ok", bytes_written: 0 },
-  };
+  return makePostToolUseInput({ tool_input: { file_path: filePath, content: "" } });
 }
 
-describe("extractSkillRoot", () => {
-  it("extracts root from plugin skill paths", () => {
-    expect(extractSkillRoot("/path/to/plugins/gitlab/skills/ci/SKILL.md")).toBe(
-      "/path/to/plugins/gitlab/skills/ci",
-    );
-  });
-
-  it("extracts root from personal skill paths", () => {
-    expect(extractSkillRoot("/Users/ben/.claude/skills/my-skill/SKILL.md")).toBe(
-      "/Users/ben/.claude/skills/my-skill",
-    );
-  });
-
-  it("extracts root from project skill paths", () => {
-    expect(extractSkillRoot("/project/.claude/skills/review/scripts/lint.sh")).toBe(
-      "/project/.claude/skills/review",
-    );
-  });
-
-  it("returns null for non-skill paths", () => {
-    expect(extractSkillRoot("/path/to/src/file.ts")).toBeNull();
-    expect(extractSkillRoot("/Users/ben/project/README.md")).toBeNull();
-  });
+test.each<[string, string | null]>([
+  ["/path/to/plugins/gitlab/skills/ci/SKILL.md", "/path/to/plugins/gitlab/skills/ci"],
+  ["/Users/ben/.claude/skills/my-skill/SKILL.md", "/Users/ben/.claude/skills/my-skill"],
+  ["/project/.claude/skills/review/scripts/lint.sh", "/project/.claude/skills/review"],
+  ["/path/to/src/file.ts", null],
+  ["/Users/ben/project/README.md", null],
+])("extractSkillRoot(%p) -> %p", (path, expected) => {
+  expect(extractSkillRoot(path)).toBe(expected);
 });
 
 describe("validateSkillPath", () => {
   const root = "/plugins/gitlab/skills/ci";
 
-  it("allows SKILL.md", () => {
-    expect(validateSkillPath(`${root}/SKILL.md`, root)).toBeNull();
-  });
-
-  it("allows files in scripts/", () => {
-    expect(validateSkillPath(`${root}/scripts/run.sh`, root)).toBeNull();
-  });
-
-  it("allows files in references/", () => {
-    expect(validateSkillPath(`${root}/references/api.md`, root)).toBeNull();
-  });
-
-  it("allows files in assets/", () => {
-    expect(validateSkillPath(`${root}/assets/template.html`, root)).toBeNull();
-  });
-
-  it("allows nested files within allowed directories", () => {
-    expect(validateSkillPath(`${root}/scripts/lib/helpers.ts`, root)).toBeNull();
-  });
-
-  it("rejects files in non-standard directories", () => {
-    const result = validateSkillPath(`${root}/utils/helper.ts`, root);
-    expect(result).toContain("utils/helper.ts");
-    expect(result).toContain("outside the standard skill structure");
-    expect(result).toContain("agentskills.io");
-  });
-
-  it("rejects top-level files other than SKILL.md", () => {
-    const result = validateSkillPath(`${root}/README.md`, root);
-    expect(result).toContain("README.md");
-    expect(result).toContain("outside the standard skill structure");
-  });
-
-  it("rejects src/ directory", () => {
-    const result = validateSkillPath(`${root}/src/index.ts`, root);
-    expect(result).toContain("src/index.ts");
+  test.each<{ name: string; path: string; substrings: string[] }>([
+    { name: "allows SKILL.md", path: `${root}/SKILL.md`, substrings: [] },
+    { name: "allows files in scripts/", path: `${root}/scripts/run.sh`, substrings: [] },
+    { name: "allows files in references/", path: `${root}/references/api.md`, substrings: [] },
+    { name: "allows files in assets/", path: `${root}/assets/template.html`, substrings: [] },
+    {
+      name: "allows nested files within allowed directories",
+      path: `${root}/scripts/lib/helpers.ts`,
+      substrings: [],
+    },
+    {
+      name: "rejects files in non-standard directories",
+      path: `${root}/utils/helper.ts`,
+      substrings: ["utils/helper.ts", "outside the standard skill structure", "agentskills.io"],
+    },
+    {
+      name: "rejects top-level files other than SKILL.md",
+      path: `${root}/README.md`,
+      substrings: ["README.md", "outside the standard skill structure"],
+    },
+    {
+      name: "rejects src/ directory",
+      path: `${root}/src/index.ts`,
+      substrings: ["src/index.ts"],
+    },
+  ])("$name", ({ path, substrings }) => {
+    const result = validateSkillPath(path, root);
+    if (substrings.length === 0) {
+      expect(result).toBeNull();
+    } else {
+      for (const substring of substrings) {
+        expect(result).toContain(substring);
+      }
+    }
   });
 });
 
@@ -113,17 +87,11 @@ describe("processHookInput", () => {
   });
 
   it("ignores non-file tools", () => {
-    const input: PostToolUseInput = {
-      session_id: "test",
-      transcript_path: "/tmp/transcript.jsonl",
-      cwd: "/tmp",
-      permission_mode: "default",
-      hook_event_name: "PostToolUse",
-      tool_use_id: "test-id",
+    const input = makePostToolUseInput({
       tool_name: "Bash",
       tool_input: { command: "ls" },
       tool_response: { output: "", exit_code: 0 },
-    };
+    });
     expect(processHookInput(input)).toEqual([]);
   });
 });

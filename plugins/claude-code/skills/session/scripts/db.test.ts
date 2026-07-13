@@ -1,11 +1,30 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { $ } from "bun";
-import { type Database, dirExists, ensureIndex, getDb, rebuildViews, runQuery } from "./db";
+import {
+  compactDatabase,
+  type Database,
+  dirExists,
+  ensureIndex,
+  getDb,
+  rebuildViews,
+  runQuery,
+} from "./db";
+
+async function backdate(target: string) {
+  // Bun's shell builtin touch lacks -t, so use the system binary.
+  await $`/usr/bin/touch -t 200001010000 ${target}`.quiet();
+}
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
+const resourcesDir = path.join(import.meta.dirname, "..", "resources");
+const plansFixtureDir = path.join(import.meta.dirname, "..", "fixtures", "plans");
+
+async function loadExtensions(database: Database) {
+  await database.run(await Bun.file(path.join(resourcesDir, "extensions.sql")).text());
+}
 
 function filterParams(overrides: Record<string, string | null> = {}) {
   return { after_date: null, before_date: null, project: null, host: null, ...overrides };
@@ -18,6 +37,20 @@ function queryParams(overrides: Record<string, string | null> = {}) {
 let db: Database;
 let tmpDir: string;
 let importsDir: string;
+
+// The first `INSTALL ... FROM community` downloads the markdown/yaml extensions over
+// the network, which can exceed the default per-test timeout on a cold CI runner.
+// Warm the shared extension cache once so the per-test LOAD reads from disk.
+beforeAll(async () => {
+  const warmDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-warm-"));
+  const warm = await getDb(warmDir);
+  try {
+    await loadExtensions(warm);
+  } finally {
+    warm.close();
+    await rm(warmDir, { recursive: true, force: true });
+  }
+}, 120_000);
 
 async function importFixtureHost(label: string, opts: { source?: string } = {}) {
   const projects = path.join(importsDir, label, "projects");
@@ -35,7 +68,7 @@ async function importFixtureHost(label: string, opts: { source?: string } = {}) 
 }
 
 async function reindex() {
-  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir, force: true });
+  await ensureIndex(db, { projectsDir: fixturesDir, importsDir });
 }
 
 beforeEach(async () => {
@@ -43,7 +76,7 @@ beforeEach(async () => {
   importsDir = path.join(tmpDir, "imports");
   mkdirSync(importsDir, { recursive: true });
   db = await getDb(tmpDir);
-  await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir });
+  await reindex();
 });
 
 afterEach(async () => {
@@ -281,7 +314,7 @@ describe("incremental refresh", () => {
     const before = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
-    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir });
+    await reindex();
     const after = await db.query<{ session_id: string }>(
       "SELECT * FROM sessions ORDER BY session_id",
     );
@@ -332,9 +365,9 @@ describe("type drift across imports", () => {
         line: drifted,
       },
     );
-    await db.run("DELETE FROM meta");
+    await db.run("DELETE FROM indexed_files");
 
-    await ensureIndex(db, { projectsDir: fixturesDir, dataDir: tmpDir, importsDir, force: true });
+    await reindex();
 
     const [typeRow] = await db.query<{ data_type: string }>(
       "SELECT data_type FROM information_schema.columns WHERE table_name = 'raw' AND column_name = 'data'",
@@ -612,12 +645,14 @@ describe("cross-machine history", () => {
     expect(Number(allStats[0]?.total_sessions)).toBe(Number(scopedStats[0]?.total_sessions) * 2);
   });
 
-  it("indexes a host whose files predate the local import (per-host watermark)", async () => {
-    // Push local's watermark past the imported files so they "predate" the local
-    // import. Only a per-host watermark (epoch for a new host) lets archive index;
-    // a shared watermark would skip its now-older files.
-    await db.run("UPDATE meta SET last_import = '2099-01-01'::TIMESTAMP WHERE host = 'local'");
+  it("indexes a host whose files predate the local import", async () => {
+    // Imported files can carry mtimes far older than anything already indexed
+    // (rsync -a preserves source mtimes). The per-file catalog keys on path +
+    // (mtime, size), so an old-mtime file on a new host is still a new path.
     await importFixtureHost("archive");
+    for (const rel of ["-Users-test-project/basic.jsonl", "-Users-test-webapp/webapp.jsonl"]) {
+      await backdate(path.join(importsDir, "archive", "projects", rel));
+    }
     await reindex();
 
     const [row] = await db.query<{ n: bigint }>(
@@ -635,8 +670,9 @@ describe("cross-machine history", () => {
     expect(Number(before?.n)).toBeGreaterThan(0);
 
     await db.run("DELETE FROM raw WHERE host = $host", { host: "gone" });
+    await db.run("DELETE FROM content_items WHERE host = $host", { host: "gone" });
+    await db.run("DELETE FROM indexed_files WHERE host = $host", { host: "gone" });
     await db.run("DELETE FROM meta WHERE host = $host", { host: "gone" });
-    await rebuildViews(db);
     await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
 
     const [after] = await db.query<{ n: bigint }>(
@@ -708,7 +744,7 @@ describe("hook_events", () => {
 
   it("unwraps the message from a hook_blocking_error", async () => {
     const [row] = await db.query<{ reason: string; blocked: boolean }>(
-      "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error'",
+      "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error' AND session_id = 'hooks-session'",
     );
     expect(row?.reason).toBe("Biome check failed. Auto-fix was attempted but issues remain.");
     expect(row?.blocked).toBe(true);
@@ -798,7 +834,30 @@ describe("activity query", () => {
     expect(bySignal.get("auto-continuations")).toBe(1);
     expect(bySignal.get("compactions")).toBe(1);
     expect(bySignal.get("mode: auto")).toBe(1);
-    expect(bySignal.get("mode: plan")).toBe(1);
+    // hooks-session contributes one, plan-iterations-session (added for the
+    // plan-iterations query) contributes a second.
+    expect(bySignal.get("mode: plan")).toBe(2);
+    // one system:api_error plus one assistant isApiErrorMessage marker, the
+    // surface that replaced it in newer CLI versions
+    expect(bySignal.get("api errors/retries")).toBe(2);
+  });
+
+  it("scopes timestamp-less signals by their session's last activity", async () => {
+    const windowed = await runQuery<{ signal: string; count: bigint }>(
+      db,
+      "activity",
+      filterParams({ after_date: "2024-01-01", before_date: "2024-02-15" }),
+    );
+    const inWindow = new Map(windowed.map((r) => [r.signal, Number(r.count)]));
+    expect(inWindow.get("prompts submitted")).toBe(2);
+
+    const later = await runQuery<{ signal: string; count: bigint }>(
+      db,
+      "activity",
+      filterParams({ after_date: "2025-01-01" }),
+    );
+    const outOfWindow = new Map(later.map((r) => [r.signal, Number(r.count)]));
+    expect(outOfWindow.get("prompts submitted")).toBe(0);
   });
 });
 
@@ -847,12 +906,320 @@ describe("file_operations view and files query", () => {
 });
 
 describe("pr_links view", () => {
-  it("links a session to the PR it produced", async () => {
-    const [row] = await db.query<{ pr_number: bigint; repository: string; session_id: string }>(
-      "SELECT pr_number, repository, session_id FROM pr_links WHERE session_id = 'hooks-session'",
+  it("dedupes re-emitted links to one row keeping the first emission's timestamp", async () => {
+    const rows = await db.query<{ pr_number: bigint; repository: string; ts: string }>(
+      "SELECT pr_number, repository, timestamp::VARCHAR AS ts FROM pr_links WHERE session_id = 'hooks-session'",
     );
-    expect(Number(row?.pr_number)).toBe(42);
-    expect(row?.repository).toBe("test/project");
+    expect(rows).toHaveLength(1);
+    expect(Number(rows[0]?.pr_number)).toBe(42);
+    expect(rows[0]?.repository).toBe("test/project");
+    expect(rows[0]?.ts).toStartWith("2024-01-19 10:08:30");
+  });
+});
+
+describe("outcomes query", () => {
+  const metrics = (rows: { metric: string; count: bigint }[]) =>
+    Object.fromEntries(rows.map((r) => [r.metric, Number(r.count)]));
+
+  it("classifies every session's terminal state", async () => {
+    const rows = await runQuery<{ metric: string; count: bigint }>(
+      db,
+      "outcomes",
+      filterParams({ ongoing_hours: null }),
+    );
+    // shipped covers both signals: hooks-session via its pr-link record,
+    // ship-session via a git push Bash command with no pr-link
+    expect(metrics(rows)).toEqual({
+      "sessions: shipped": 2,
+      "sessions: ongoing": 1,
+      "sessions: handed-off": 1,
+      "sessions: abandoned-with-edits": 2,
+      "sessions: no-artifact": 12,
+      "prs opened (distinct urls)": 1,
+      "prs needing multiple sessions": 0,
+    });
+  });
+
+  it("widens the ongoing window via ongoing_hours without reclassifying shipped work", async () => {
+    const rows = await runQuery<{ metric: string; count: bigint }>(
+      db,
+      "outcomes",
+      filterParams({ ongoing_hours: "1000" }),
+    );
+    // 1000 hours reaches past the corpus start, so every unshipped session
+    // reads as ongoing; the shipped ones keep their state
+    expect(metrics(rows)).toEqual({
+      "sessions: shipped": 2,
+      "sessions: ongoing": 16,
+      "prs opened (distinct urls)": 1,
+      "prs needing multiple sessions": 0,
+    });
+  });
+});
+
+describe("delegation query", () => {
+  // delegation-session (opus main model) spawns five Agent calls: a generic
+  // general-purpose call left to inherit (actual model opus, via its subagent
+  // transcript), a generic call with an explicit `model: haiku` override (actual
+  // haiku, a cheaper override), a pinned Explore call (actual haiku, no override
+  // needed), a fork (must be excluded entirely), and a generic call with an
+  // explicit `model: sonnet` override resolved via the tool result's
+  // `resolvedModel` rather than a transcript join (actual sonnet, cheaper override).
+  type DelegationRow = {
+    parent_family: string;
+    path: string;
+    actual_family: string;
+    spawns: bigint;
+    path_spawns: bigint;
+    pct_of_path: number;
+    override_rate_pct: number;
+    cheaper_override_rate_pct: number;
+    expensive_output_tokens: bigint;
+    expensive_cache_creation_tokens: bigint;
+  };
+
+  async function delegationRows() {
+    return runQuery<DelegationRow>(db, "delegation", filterParams());
+  }
+
+  it("excludes fork spawns entirely", async () => {
+    const rows = await delegationRows();
+    const total = rows
+      .filter((r) => r.parent_family === "opus")
+      .reduce((sum, r) => sum + Number(r.spawns), 0);
+    // 5 calls minus the excluded fork leaves 4 counted spawns.
+    expect(total).toBe(4);
+  });
+
+  it("separates the generic path from the pinned-agent path", async () => {
+    const rows = await delegationRows();
+    const generic = rows.filter((r) => r.parent_family === "opus" && r.path === "generic");
+    const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
+    expect(Number(generic[0]?.path_spawns)).toBe(3);
+    expect(Number(pinned[0]?.path_spawns)).toBe(1);
+    expect(pinned.map((r) => r.actual_family)).toEqual(["haiku"]);
+  });
+
+  it("resolves the actual model from the subagent transcript when the tool result carries no resolvedModel", async () => {
+    const rows = await delegationRows();
+    const inherited = rows.find(
+      (r) => r.parent_family === "opus" && r.path === "generic" && r.actual_family === "opus",
+    );
+    expect(Number(inherited?.spawns)).toBe(1);
+  });
+
+  it("resolves the actual model from resolvedModel when the tool result carries it", async () => {
+    const rows = await delegationRows();
+    const resolved = rows.find(
+      (r) => r.parent_family === "opus" && r.path === "generic" && r.actual_family === "sonnet",
+    );
+    expect(Number(resolved?.spawns)).toBe(1);
+  });
+
+  it("computes override and cheaper-override rates as a fraction of every spawn in the group", async () => {
+    const rows = await delegationRows();
+    const generic = rows.filter((r) => r.parent_family === "opus" && r.path === "generic");
+    // 2 of 3 generic spawns carried an explicit override (haiku, sonnet), and
+    // both were cheaper than the opus main model.
+    expect(generic[0]?.override_rate_pct).toBeCloseTo(66.7, 1);
+    expect(generic[0]?.cheaper_override_rate_pct).toBeCloseTo(66.7, 1);
+    const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
+    expect(pinned[0]?.override_rate_pct).toBe(0);
+  });
+
+  it("sums expensive-model spend only from spawns whose actual family is opus/fable", async () => {
+    const rows = await delegationRows();
+    const generic = rows.filter((r) => r.parent_family === "opus" && r.path === "generic");
+    // Only the inherited (actual opus) spawn's subagent transcript counts.
+    for (const row of generic) {
+      expect(Number(row.expensive_output_tokens)).toBe(500);
+      expect(Number(row.expensive_cache_creation_tokens)).toBe(200);
+    }
+    const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
+    for (const row of pinned) {
+      expect(Number(row.expensive_output_tokens)).toBe(0);
+    }
+  });
+});
+
+describe("change catalog", () => {
+  it("indexes a file rsynced in with an old mtime after the host was imported", async () => {
+    await importFixtureHost("work");
+    await reindex();
+
+    // rsync -a re-syncs deliver new files with preserved (old) source mtimes.
+    const late = path.join(importsDir, "work", "projects", "-Users-test-project", "late.jsonl");
+    await Bun.write(
+      late,
+      `${JSON.stringify({
+        type: "user",
+        sessionId: "late-session",
+        cwd: "/Users/test/project",
+        timestamp: "2024-01-15T10:00:00.000Z",
+        message: { role: "user", content: "hello from the past" },
+      })}\n`,
+    );
+    await backdate(late);
+    await reindex();
+
+    const rows = await db.query<{ session_id: string }>(
+      "SELECT session_id FROM raw WHERE session_id = 'late-session'",
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("reimports a file whose content changed and drops its stale rows", async () => {
+    await importFixtureHost("edited");
+    await reindex();
+    const target = path.join(
+      importsDir,
+      "edited",
+      "projects",
+      "-Users-test-project",
+      "basic.jsonl",
+    );
+    const original = await Bun.file(target).text();
+    await Bun.write(
+      target,
+      `${original}${JSON.stringify({
+        type: "user",
+        sessionId: "basic-session",
+        cwd: "/Users/test/project",
+        timestamp: "2024-01-15T11:00:00.000Z",
+        message: { role: "user", content: "appended line" },
+      })}\n`,
+    );
+    await reindex();
+
+    const [row] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'edited' AND source_file = $path",
+      { path: target },
+    );
+    const originalLines = original.trim().split("\n").length;
+    expect(Number(row?.n)).toBe(originalLines + 1);
+  });
+
+  it("drops rows for files that disappear", async () => {
+    await importFixtureHost("shrinking");
+    await reindex();
+    const target = path.join(
+      importsDir,
+      "shrinking",
+      "projects",
+      "-Users-test-project",
+      "basic.jsonl",
+    );
+    const [before] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'shrinking' AND source_file = $path",
+      { path: target },
+    );
+    expect(Number(before?.n)).toBeGreaterThan(0);
+
+    await rm(target);
+    await reindex();
+
+    for (const table of ["raw", "content_items", "indexed_files"]) {
+      const column = table === "indexed_files" ? "path" : "source_file";
+      const [after] = await db.query<{ n: bigint }>(
+        `SELECT COUNT(*) AS n FROM ${table} WHERE host = 'shrinking' AND ${column} = $path`,
+        { path: target },
+      );
+      expect(Number(after?.n)).toBe(0);
+    }
+  });
+
+  it("keeps a host's rows when its root directory is missing", async () => {
+    await importFixtureHost("unmounted");
+    await reindex();
+    await rm(path.join(importsDir, "unmounted", "projects"), { recursive: true, force: true });
+    await reindex();
+
+    const [row] = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'unmounted'",
+    );
+    expect(Number(row?.n)).toBeGreaterThan(0);
+  });
+
+  // chmod 000 does not restrict root, so the walk would succeed there
+  it.skipIf(process.getuid?.() === 0)(
+    "aborts and keeps a host's rows when the scan fails mid-walk",
+    async () => {
+      await importFixtureHost("guarded");
+      await reindex();
+      const [before] = await db.query<{ n: bigint }>(
+        "SELECT COUNT(*) AS n FROM raw WHERE host = 'guarded'",
+      );
+      expect(Number(before?.n)).toBeGreaterThan(0);
+
+      const subdir = path.join(importsDir, "guarded", "projects", "-Users-test-project");
+      await $`chmod 000 ${subdir}`.quiet();
+      try {
+        await expect(reindex()).rejects.toThrow();
+      } finally {
+        await $`chmod 755 ${subdir}`.quiet();
+      }
+
+      const [after] = await db.query<{ n: bigint }>(
+        "SELECT COUNT(*) AS n FROM raw WHERE host = 'guarded'",
+      );
+      expect(Number(after?.n)).toBe(Number(before?.n));
+    },
+  );
+});
+
+describe("view versioning", () => {
+  it("rebuilds views when the stored fingerprint is stale, even with no file changes", async () => {
+    await db.run("DROP VIEW tool_calls");
+    await db.run("UPDATE index_meta SET views_hash = 'stale'");
+    await reindex();
+
+    const rows = await db.query<{ tool_name: string }>("SELECT tool_name FROM tool_calls LIMIT 1");
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("skips the rebuild when the fingerprint matches and no files changed", async () => {
+    await db.run("DROP VIEW tool_calls");
+    await reindex();
+
+    await expect(db.query("SELECT * FROM tool_calls LIMIT 1")).rejects.toThrow();
+  });
+});
+
+describe("compactDatabase", () => {
+  it("rewrites the file preserving tables, views, and macros", async () => {
+    const [before] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM raw");
+    db.close();
+
+    await compactDatabase(tmpDir);
+
+    db = await getDb(tmpDir);
+    const [after] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM raw");
+    expect(after?.n).toBe(before?.n);
+    // sessions exercises both a view and the project_id macro.
+    const sessions = await db.query<{ session_id: string }>("SELECT session_id FROM sessions");
+    expect(sessions.length).toBeGreaterThan(0);
+  });
+});
+
+describe("source_line", () => {
+  it("numbers ingested rows 1..N per file", async () => {
+    const rows = await db.query<{
+      source_file: string;
+      n: bigint;
+      lo: bigint;
+      hi: bigint;
+      d: bigint;
+    }>(
+      `SELECT source_file, COUNT(*) AS n, MIN(source_line) AS lo,
+              MAX(source_line) AS hi, COUNT(DISTINCT source_line) AS d
+       FROM raw WHERE host = 'local' GROUP BY source_file`,
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(Number(row.lo)).toBe(1);
+      expect(Number(row.hi)).toBe(Number(row.n));
+      expect(Number(row.d)).toBe(Number(row.n));
+    }
   });
 });
 
@@ -872,5 +1239,722 @@ describe("attribution and skill-activity query", () => {
     );
     const writing = rows.find((r) => r.skill === "writing:writing");
     expect(Number(writing?.assistant_turns)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("plan_calls view and plans query", () => {
+  it("classifies a redirected plan as outcome=redirected with plan_seq=1", async () => {
+    const rows = await db.query<{
+      session_id: string;
+      outcome: string;
+      plan_seq: bigint;
+      plan_chars: bigint;
+      plan_file: string;
+    }>(
+      "SELECT session_id, outcome, plan_seq, plan_chars, plan_file FROM plan_calls WHERE session_id = 'plan-session' ORDER BY plan_seq",
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.outcome).toBe("redirected");
+    expect(Number(rows[0]?.plan_seq)).toBe(1);
+    expect(Number(rows[0]?.plan_chars)).toBeGreaterThan(0);
+    expect(rows[0]?.plan_file).toContain("plan-session");
+  });
+
+  it("classifies the second plan (after approval) as outcome=approved with plan_seq=2", async () => {
+    const rows = await db.query<{ outcome: string; plan_seq: bigint }>(
+      "SELECT outcome, plan_seq FROM plan_calls WHERE session_id = 'plan-session' ORDER BY plan_seq",
+    );
+    expect(rows[1]?.outcome).toBe("approved");
+    expect(Number(rows[1]?.plan_seq)).toBe(2);
+  });
+
+  it("aggregates plan_sessions with correct counts and replan tier", async () => {
+    const [row] = await db.query<{
+      plan_count: bigint;
+      redirect_count: bigint;
+      approved_count: bigint;
+    }>(
+      "SELECT plan_count, redirect_count, approved_count FROM plan_sessions WHERE session_id = 'plan-session'",
+    );
+    expect(Number(row?.plan_count)).toBe(2);
+    expect(Number(row?.redirect_count)).toBe(1);
+    expect(Number(row?.approved_count)).toBe(1);
+  });
+
+  it("reports the session via the plans query with replan_tier=replan", async () => {
+    const rows = await runQuery<{ session_id: string; replan_tier: string; plan_count: bigint }>(
+      db,
+      "plans",
+      { after_date: null, before_date: null, project: null, host: null, min_plans: null },
+    );
+    const row = rows.find((r) => r.session_id === "plan-session");
+    expect(row).toBeDefined();
+    expect(row?.replan_tier).toBe("replan");
+    expect(Number(row?.plan_count)).toBe(2);
+  });
+
+  it("excludes sessions below min_plans threshold", async () => {
+    const rows = await runQuery<{ session_id: string }>(db, "plans", {
+      after_date: null,
+      before_date: null,
+      project: null,
+      host: null,
+      min_plans: "3",
+    });
+    expect(rows.find((r) => r.session_id === "plan-session")).toBeUndefined();
+  });
+
+  it("classifies a terminal rejection with no edits after as outcome=handoff", async () => {
+    // handoff-session ends on a rejected plan followed only by a Read, the
+    // reject-and-handoff workflow (implement from the plan file in a fresh session).
+    const rows = await db.query<{ outcome: string }>(
+      "SELECT outcome FROM plan_calls WHERE session_id = 'handoff-session'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.outcome).toBe("handoff");
+  });
+
+  it("keeps a terminal rejection followed by file edits as outcome=redirected", async () => {
+    const rows = await db.query<{ outcome: string }>(
+      "SELECT outcome FROM plan_calls WHERE session_id = 'plan-abandon-session'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.outcome).toBe("redirected");
+  });
+
+  it("counts handoffs separately from redirects in plan_sessions", async () => {
+    const [row] = await db.query<{ redirect_count: bigint; handoff_count: bigint }>(
+      "SELECT redirect_count, handoff_count FROM plan_sessions WHERE session_id = 'handoff-session'",
+    );
+    expect(Number(row?.redirect_count)).toBe(0);
+    expect(Number(row?.handoff_count)).toBe(1);
+  });
+
+  it("tiers a handoff-only session as single, keyed on mid-session redirects", async () => {
+    const rows = await runQuery<{ session_id: string; replan_tier: string; handoff_count: bigint }>(
+      db,
+      "plans",
+      { after_date: null, before_date: null, project: null, host: null, min_plans: null },
+    );
+    const handoff = rows.find((r) => r.session_id === "handoff-session");
+    expect(handoff?.replan_tier).toBe("single");
+    expect(Number(handoff?.handoff_count)).toBe(1);
+  });
+});
+
+describe("plan-iterations query", () => {
+  // plan-iterations-session presents three plans: A,B,C (rejected) -> A,B,C,D,E
+  // (rejected, append-only) -> A,D,F (approved, a real prune). Exercises growth,
+  // carry-over, and removal in the same session.
+  type PlanIterationRow = {
+    sid: string;
+    plan_seq: bigint;
+    outcome: string;
+    lines_added: bigint | null;
+    lines_removed: bigint | null;
+    lines_carried: bigint | null;
+    carry_over_ratio: number | null;
+    secs_since_prev: bigint | null;
+    secs_to_first_plan: bigint | null;
+    human_msgs: bigint;
+  };
+
+  async function planIterationRows() {
+    const rows = await runQuery<PlanIterationRow>(db, "plan-iterations", {
+      after_date: null,
+      before_date: null,
+      project: null,
+      host: null,
+      min_plans: "1",
+    });
+    return rows
+      .filter((r) => r.sid === "plan-ite")
+      .sort((a, b) => Number(a.plan_seq) - Number(b.plan_seq));
+  }
+
+  it("leaves growth/removal/carry-over and secs_since_prev null on the first present", async () => {
+    const rows = await planIterationRows();
+    expect(rows).toHaveLength(3);
+    const first = rows[0];
+    expect(first?.outcome).toBe("redirected");
+    expect(first?.lines_added).toBeNull();
+    expect(first?.lines_removed).toBeNull();
+    expect(first?.lines_carried).toBeNull();
+    expect(first?.carry_over_ratio).toBeNull();
+    expect(first?.secs_since_prev).toBeNull();
+  });
+
+  it("measures append-only growth on the second present: added 2, removed 0, carried 3, ratio 0.60", async () => {
+    const rows = await planIterationRows();
+    const second = rows[1];
+    expect(second?.outcome).toBe("redirected");
+    expect(Number(second?.lines_added)).toBe(2);
+    expect(Number(second?.lines_removed)).toBe(0);
+    expect(Number(second?.lines_carried)).toBe(3);
+    expect(second?.carry_over_ratio).toBe(0.6);
+    expect(Number(second?.secs_since_prev)).toBe(300);
+  });
+
+  it("measures a real prune on the third present: added 1, removed 3, carried 2", async () => {
+    const rows = await planIterationRows();
+    const third = rows[2];
+    expect(third?.outcome).toBe("approved");
+    expect(Number(third?.lines_added)).toBe(1);
+    expect(Number(third?.lines_removed)).toBe(3);
+    expect(Number(third?.lines_carried)).toBe(2);
+    expect(Number(third?.secs_since_prev)).toBe(300);
+  });
+
+  it("reports secs_to_first_plan from the plan-mode record and human_msgs from last-prompt records, repeated on every row", async () => {
+    const rows = await planIterationRows();
+    for (const row of rows) {
+      expect(Number(row.secs_to_first_plan)).toBe(300);
+      expect(Number(row.human_msgs)).toBe(2);
+    }
+  });
+
+  it("excludes sessions below min_plans threshold", async () => {
+    const rows = await runQuery<PlanIterationRow>(db, "plan-iterations", {
+      after_date: null,
+      before_date: null,
+      project: null,
+      host: null,
+      min_plans: "4",
+    });
+    expect(rows.find((r) => r.sid === "plan-ite")).toBeUndefined();
+  });
+});
+
+describe("replayed line dedupe", () => {
+  // replay.jsonl duplicates its tool_use, tool_result, and hook attachment lines
+  // verbatim (same uuid) further down the file, the rewind/resume replay shape.
+  it("keeps one content_items row per replayed tool_use and tool_result", async () => {
+    const uses = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM content_items WHERE type = 'tool_use' AND id = 'rp-tool-1'",
+    );
+    expect(Number(uses[0]?.n)).toBe(1);
+    const results = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM content_items WHERE type = 'tool_result' AND tool_use_id = 'rp-tool-1'",
+    );
+    expect(Number(results[0]?.n)).toBe(1);
+  });
+
+  it("keeps one tool_calls row per replayed tool_use", async () => {
+    const rows = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM tool_calls WHERE tool_id = 'rp-tool-1'",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+
+  it("keeps one hook_events row per replayed hook attachment", async () => {
+    const rows = await db.query<{ n: bigint }>(
+      "SELECT COUNT(*) AS n FROM hook_events WHERE session_id = 'replay-session' AND kind = 'hook_blocking_error'",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+});
+
+describe("stop-hook-noop-detector query", () => {
+  it("counts blocking errors so a Stop gate is not a noop candidate", async () => {
+    const rows = await runQuery<{
+      command: string;
+      fires: bigint;
+      with_stdout: bigint;
+      with_decision: bigint;
+      nonzero_exit: bigint;
+      blocks: bigint;
+    }>(db, "stop-hook-noop-detector", filterParams());
+    // Blocking errors carry no command, so they group under the bare hook name.
+    const gate = rows.find((r) => r.command === "Stop");
+    expect(gate).toBeDefined();
+    expect(Number(gate?.blocks)).toBe(Number(gate?.fires));
+    expect(Number(gate?.blocks)).toBeGreaterThan(0);
+  });
+});
+
+describe("plan-sections query", () => {
+  const plansGlob = path.join(plansFixtureDir, "*.md");
+  const featurePlan = path.join(plansFixtureDir, "feature-plan.md");
+
+  type Section = {
+    session_id: string | null;
+    outcome: string | null;
+    title: string;
+    level: number;
+    file_path: string;
+  };
+
+  beforeEach(async () => {
+    await loadExtensions(db);
+  });
+
+  async function insertDiskPlan() {
+    // A plan_calls row whose planFilePath points at an on-disk fixture, so its
+    // sections join to session context. content_items rebuilds from raw on rebuildViews.
+    const assistant = JSON.stringify({
+      type: "assistant",
+      sessionId: "disk-plan-session",
+      cwd: "/Users/test/project",
+      timestamp: "2026-02-01T10:00:00.000Z",
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id: "disk-plan-1",
+            name: "ExitPlanMode",
+            input: { plan: "# Feature Plan", planFilePath: featurePlan },
+          },
+        ],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
+    });
+    const result = JSON.stringify({
+      type: "user",
+      sessionId: "disk-plan-session",
+      timestamp: "2026-02-01T10:01:00.000Z",
+      message: {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: "disk-plan-1",
+            content: "User has approved your plan. You can now start coding.",
+          },
+        ],
+      },
+    });
+    for (const [type, line, ts] of [
+      ["assistant", assistant, "2026-02-01T10:00:00"],
+      ["user", result, "2026-02-01T10:01:00"],
+    ] as const) {
+      await db.run(
+        `INSERT INTO raw (host, session_id, type, project_path, timestamp, data)
+         VALUES ('local', 'disk-plan-session', $type, '/Users/test/project',
+                 $ts::TIMESTAMP, $line::JSON)`,
+        { type, ts, line },
+      );
+    }
+    await rebuildViews(db);
+  }
+
+  it("parses one row per section with level and title", async () => {
+    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    const feature = rows.filter((r) => r.file_path === featurePlan);
+    expect(feature.map((r) => r.title)).toEqual([
+      "Feature Plan",
+      "Context",
+      "Plan",
+      "Queue Sizing",
+      "Verification",
+    ]);
+    expect(feature.find((r) => r.title === "Queue Sizing")?.level).toBe(3);
+  });
+
+  it("finds plans whose sections lack a Verification heading", async () => {
+    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    const byFile = new Map<string, Set<string>>();
+    for (const r of rows) {
+      if (!byFile.has(r.file_path)) byFile.set(r.file_path, new Set());
+      byFile.get(r.file_path)!.add(r.title);
+    }
+    const missing = [...byFile.entries()]
+      .filter(([, titles]) => !titles.has("Verification"))
+      .map(([file]) => file);
+    expect(missing).toContain(path.join(plansFixtureDir, "quick-plan.md"));
+    expect(missing).not.toContain(featurePlan);
+  });
+
+  it("joins sections to the session that produced the plan", async () => {
+    await insertDiskPlan();
+    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+
+    const feature = rows.filter((r) => r.file_path === featurePlan);
+    expect(feature.length).toBeGreaterThan(0);
+    for (const r of feature) {
+      expect(r.session_id).toBe("disk-plan-session");
+      expect(r.outcome).toBe("approved");
+    }
+
+    // quick-plan.md has no matching plan_calls row, so the LEFT JOIN leaves it null.
+    const quick = rows.filter((r) => r.file_path === path.join(plansFixtureDir, "quick-plan.md"));
+    expect(quick.length).toBeGreaterThan(0);
+    for (const r of quick) expect(r.session_id).toBeNull();
+  });
+
+  it("omits a plan whose planFilePath does not exist on disk (cross-host/deleted)", async () => {
+    // The plan-session fixture's planFilePath is /Users/test/.claude/plans/plan-session.md,
+    // outside the glob. The LEFT JOIN from sections means that plan yields no section rows.
+    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    expect(rows.some((r) => r.session_id === "plan-session")).toBe(false);
+  });
+});
+
+describe("skill-config-vs-observed query", () => {
+  const skillsFixtureDir = path.join(import.meta.dirname, "..", "fixtures", "skills");
+
+  type SkillRow = {
+    source: string;
+    skill_name: string;
+    description_chars: bigint;
+    disable_model_invocation: boolean;
+    calls: bigint;
+    sessions: bigint;
+    last_seen: Date | null;
+  };
+
+  beforeEach(async () => {
+    await loadExtensions(db);
+  });
+
+  async function skillRows(overrides: Record<string, string | null> = {}) {
+    return runQuery<SkillRow>(
+      db,
+      "skill-config-vs-observed",
+      filterParams({
+        skill: null,
+        plugin_skill_glob: path.join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
+        user_skill_glob: path.join(skillsFixtureDir, "user/*/SKILL.md"),
+        project_skill_glob: path.join(skillsFixtureDir, "project/*/SKILL.md"),
+        ...overrides,
+      }),
+    );
+  }
+
+  it("counts observed calls for a plugin skill, pinning one cache copy", async () => {
+    const rows = await skillRows();
+    const peer = rows.filter((r) => r.skill_name === "review:peer");
+    expect(peer).toHaveLength(1);
+    expect(peer[0]?.source).toBe("plugin:test-marketplace/review");
+    expect(Number(peer[0]?.calls)).toBe(2);
+    expect(Number(peer[0]?.sessions)).toBe(1);
+    expect(peer[0]?.last_seen).not.toBeNull();
+  });
+
+  it("matches bare observed calls to an entry skill (plugin = skill)", async () => {
+    const rows = await skillRows();
+    const solo = rows.find((r) => r.skill_name === "solo:solo");
+    expect(Number(solo?.calls)).toBe(1);
+  });
+
+  it("sorts zero-fire skills first across all three sources", async () => {
+    const rows = await skillRows();
+    const zero = rows.filter((r) => Number(r.calls) === 0).map((r) => r.skill_name);
+    expect(zero).toEqual(expect.arrayContaining(["review:inbox", "never-used", "scratch"]));
+    expect(rows.slice(0, zero.length).every((r) => Number(r.calls) === 0)).toBe(true);
+
+    const never = rows.find((r) => r.skill_name === "never-used");
+    expect(never?.source).toBe("user:~/.claude/skills");
+    expect(never?.disable_model_invocation).toBe(true);
+    expect(never?.last_seen).toBeNull();
+    expect(Number(never?.sessions)).toBe(0);
+    expect(Number(never?.description_chars)).toBeGreaterThan(0);
+  });
+
+  it("filters configured names by skill glob", async () => {
+    const rows = await skillRows({ skill: "review:*" });
+    expect(rows.map((r) => r.skill_name).sort()).toEqual(["review:inbox", "review:peer"]);
+  });
+});
+
+describe("index-health query", () => {
+  const projectsGlob = path.join(fixturesDir, "**", "*.jsonl");
+
+  type Health = { check_name: string; status: string; subject: string; detail: string };
+
+  function healthParams(overrides: Record<string, string | null> = {}) {
+    return {
+      projects_glob: projectsGlob,
+      min_active_days: null,
+      new_days: null,
+      stale_days: null,
+      ...overrides,
+    };
+  }
+
+  it("flags a kind that went silent beyond its own historical gap", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const silent = rows.filter((r) => r.check_name === "stream-silent");
+    expect(silent.map((r) => r.subject)).toEqual(["attachment:health-quiet"]);
+    expect(silent[0]?.status).toBe("alert");
+    expect(silent[0]?.detail).toContain("worst historical gap 1");
+  });
+
+  it("reports a kind first seen late in the corpus as new, not kinds as old as the index", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const fresh = rows.filter((r) => r.check_name === "stream-new");
+    expect(fresh.map((r) => r.subject)).toEqual(["attachment:health-fresh"]);
+    expect(fresh[0]?.status).toBe("info");
+  });
+
+  it("summarizes kinds whose rows carry no timestamp", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const nullTs = rows.find((r) => r.check_name === "null-timestamp-kinds");
+    expect(nullTs?.status).toBe("info");
+    expect(nullTs?.detail).toContain("health-marker (2)");
+  });
+
+  it("reports the corpus window per host and no disk gap when the glob matches", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const windows = rows.filter((r) => r.check_name === "corpus-window");
+    expect(windows.map((r) => r.subject)).toEqual(["local"]);
+    expect(rows.some((r) => r.check_name === "disk-not-indexed")).toBe(false);
+    expect(rows.some((r) => r.check_name === "indexed-not-on-disk")).toBe(false);
+  });
+
+  it("alerts on disk files missing from the index", async () => {
+    const extraDir = path.join(tmpDir, "extra-projects", "-Users-test-extra");
+    mkdirSync(extraDir, { recursive: true });
+    await Bun.write(
+      path.join(extraDir, "unindexed.jsonl"),
+      '{"type":"user","message":{"role":"user","content":"hi"},"sessionId":"extra","timestamp":"2024-02-01T00:00:00.000Z","uuid":"ex-1"}\n',
+    );
+    const rows = await runQuery<Health>(
+      db,
+      "index-health",
+      healthParams({ projects_glob: path.join(tmpDir, "extra-projects", "**", "*.jsonl") }),
+    );
+    const missing = rows.find((r) => r.check_name === "disk-not-indexed");
+    expect(missing?.status).toBe("alert");
+    expect(missing?.subject).toBe("1 files");
+    expect(missing?.detail).toContain("unindexed.jsonl");
+    // With the glob pointed away from the fixtures, every indexed file reads as deleted.
+    expect(rows.find((r) => r.check_name === "indexed-not-on-disk")?.status).toBe("info");
+  });
+
+  it("alerts on an imported host whose newest record lags the corpus", async () => {
+    const staleProjects = path.join(importsDir, "stale", "projects", "-Users-test-stale");
+    mkdirSync(staleProjects, { recursive: true });
+    await Bun.write(
+      path.join(staleProjects, "old.jsonl"),
+      '{"type":"user","message":{"role":"user","content":"old work"},"sessionId":"stale-session","timestamp":"2023-12-01T00:00:00.000Z","uuid":"st-1"}\n',
+    );
+    await Bun.write(
+      path.join(importsDir, "stale", "manifest.json"),
+      `${JSON.stringify({
+        host: "stale",
+        source: "stale:.claude/projects/",
+        imported_at: "2024-01-01T00:00:00Z",
+        policy: { block_egress: true },
+      })}\n`,
+    );
+    await reindex();
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const staleness = rows.filter((r) => r.check_name === "host-staleness");
+    // exactly the imported host: local never alerts, its remediation (re-sync)
+    // does not apply
+    expect(staleness.map((r) => r.subject)).toEqual(["stale"]);
+    expect(staleness[0]?.status).toBe("alert");
+    expect(staleness[0]?.detail).toContain("days behind the corpus");
+  });
+});
+
+describe("frontmatter query", () => {
+  it("parses name and description from a SKILL.md frontmatter", async () => {
+    await loadExtensions(db);
+    const skill = path.join(import.meta.dirname, "..", "SKILL.md");
+    const rows = await runQuery<{ file_path: string; name: string; description: string }>(
+      db,
+      "frontmatter",
+      { frontmatter_glob: skill },
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.name).toBe("claude-code:session");
+    expect(rows[0]?.description).toContain("DuckDB index");
+  });
+});
+
+describe("cost-rate macros", () => {
+  it.each<[string, number, number]>([
+    ["claude-fable-5", 10, 50],
+    ["claude-mythos-1", 10, 50],
+    ["claude-opus-4-8", 5, 25],
+    ["claude-sonnet-5", 3, 15],
+    ["claude-haiku-4", 1, 5],
+    ["some-unknown-model", 5, 25],
+  ])("rates %s at input %d / output %d per MTok", async (model, input, output) => {
+    const [row] = await db.query<{ i: number; o: number }>(
+      "SELECT model_input_rate($m) AS i, model_output_rate($m) AS o",
+      { m: model },
+    );
+    expect(Number(row?.i)).toBe(input);
+    expect(Number(row?.o)).toBe(output);
+  });
+});
+
+describe("message_usage cost columns and usage queries", () => {
+  const OPUS = "claude-opus-4-8";
+
+  // One assistant message with known usage. The cost math the queries apply:
+  // input*in_rate + cache_5m*1.25*in + cache_1h*2*in + cache_read*0.1*in + output*out_rate,
+  // all per MTok. For opus (in 5, out 25) with the values below that is
+  // (1000*5 + 2000*1.25*5 + 3000*2*5 + 10000*0.1*5 + 2000*25) / 1e6 = 0.1025 -> 0.10.
+  function assistantLine(opts: {
+    session: string;
+    id: string;
+    ts: string;
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    c1h: number;
+    c5m: number;
+  }): string {
+    return JSON.stringify({
+      type: "assistant",
+      sessionId: opts.session,
+      cwd: "/Users/test/usage-proj",
+      timestamp: `${opts.ts}.000Z`,
+      uuid: opts.id,
+      message: {
+        id: opts.id,
+        role: "assistant",
+        model: OPUS,
+        content: [{ type: "text", text: "x" }],
+        usage: {
+          input_tokens: opts.input,
+          output_tokens: opts.output,
+          cache_read_input_tokens: opts.cacheRead,
+          cache_creation_input_tokens: opts.cacheWrite,
+          cache_creation: {
+            ephemeral_1h_input_tokens: opts.c1h,
+            ephemeral_5m_input_tokens: opts.c5m,
+          },
+        },
+      },
+    });
+  }
+
+  async function insertUsage(session: string) {
+    const rows = [
+      {
+        id: `${session}-a`,
+        ts: "2026-03-01T10:00:00",
+        sidechain: false,
+        input: 1000,
+        output: 2000,
+        cacheRead: 10000,
+        cacheWrite: 5000,
+        c1h: 3000,
+        c5m: 2000,
+      },
+      // A sidechain message with no usage: it lifts msgs and sidechain_share but adds
+      // nothing to the bucket cost, keeping the expected total exact.
+      {
+        id: `${session}-b`,
+        ts: "2026-03-01T10:05:00",
+        sidechain: true,
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        c1h: 0,
+        c5m: 0,
+      },
+    ];
+    let line = 1;
+    for (const r of rows) {
+      await db.run(
+        `INSERT INTO raw
+           (host, session_id, type, project_path, is_sidechain, timestamp,
+            input_tokens, output_tokens, source_file, source_line, data)
+         VALUES ('local', $session, 'assistant', '/Users/test/usage-proj', $sidechain,
+                 $ts::TIMESTAMP, $input, $output, $source_file, $source_line, $line::JSON)`,
+        {
+          session,
+          sidechain: r.sidechain ? "true" : "false",
+          ts: r.ts,
+          input: String(r.input),
+          output: String(r.output),
+          source_file: `/Users/test/usage-proj/${session}.jsonl`,
+          source_line: String(line++),
+          line: assistantLine({ session, ...r }),
+        },
+      );
+    }
+    await db.run("DELETE FROM meta");
+    await rebuildViews(db);
+  }
+
+  it("exposes the TTL split and sidechain/source_file columns on message_usage", async () => {
+    await insertUsage("usage-cols-session");
+    const [row] = await db.query<{
+      cache_1h_tokens: bigint;
+      cache_5m_tokens: bigint;
+      is_sidechain: boolean;
+      source_file: string;
+    }>(
+      "SELECT cache_1h_tokens, cache_5m_tokens, is_sidechain, source_file FROM message_usage WHERE message_id = 'usage-cols-session-a'",
+    );
+    expect(Number(row?.cache_1h_tokens)).toBe(3000);
+    expect(Number(row?.cache_5m_tokens)).toBe(2000);
+    expect(row?.is_sidechain).toBe(false);
+    expect(row?.source_file).toContain("usage-cols-session.jsonl");
+  });
+
+  it("usage-timeline buckets the session with exact cost and shape signals", async () => {
+    await insertUsage("usage-timeline-session");
+    const rows = await runQuery<{
+      msgs: bigint;
+      cost_usd_est: number;
+      cache_miss_ratio: number;
+      max_context_tokens: bigint;
+      sidechain_share: number;
+      top_model: string;
+    }>(db, "usage-timeline", {
+      session: "usage-timeline-session",
+      host: null,
+      bucket_minutes: null,
+    });
+    expect(rows).toHaveLength(1);
+    const [b] = rows;
+    expect(Number(b?.msgs)).toBe(2);
+    expect(b?.cost_usd_est).toBe(0.1);
+    expect(b?.cache_miss_ratio).toBe(0.33);
+    expect(Number(b?.max_context_tokens)).toBe(16000);
+    expect(b?.sidechain_share).toBe(0.5);
+    expect(b?.top_model).toBe(OPUS);
+  });
+
+  it("usage-spikes ranks the burn window with its repo", async () => {
+    await insertUsage("usage-spikes-session");
+    const rows = await runQuery<{
+      session_id: string;
+      repo: string;
+      msgs: bigint;
+      cost_usd_est: number;
+    }>(db, "usage-spikes", {
+      after_date: null,
+      before_date: null,
+      project: null,
+      host: null,
+      bucket_minutes: null,
+      limit: null,
+    });
+    const mine = rows.find((r) => r.session_id === "usage-spikes-session");
+    expect(mine).toBeDefined();
+    expect(mine?.repo).toBe("usage-proj");
+    expect(Number(mine?.msgs)).toBe(2);
+    expect(mine?.cost_usd_est).toBe(0.1);
+  });
+
+  it("top-sessions ranks the session by cost with host and repo", async () => {
+    await insertUsage("top-sessions-session");
+    const rows = await runQuery<{
+      session_id: string;
+      host: string;
+      repo: string;
+      msgs: bigint;
+      cost_usd_est: number;
+    }>(db, "top-sessions", {
+      after_date: null,
+      host: null,
+    });
+    const mine = rows.find((r) => r.session_id === "top-sessions-session");
+    expect(mine).toBeDefined();
+    expect(mine?.host).toBe("local");
+    expect(mine?.repo).toBe("usage-proj");
+    expect(Number(mine?.msgs)).toBe(2);
+    expect(mine?.cost_usd_est).toBe(0.1);
   });
 });

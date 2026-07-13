@@ -1,7 +1,8 @@
 ---
 name: pull-request:babysit
 description: Monitor a PR's CI, fix trivial failures, and self-cancel when green; --merge drives to merged, --reviews hands off to AI-review triage.
-argument-hint: "[--merge] [--reviews]"
+argument-hint: "[pr-url] [--merge] [--reviews]"
+effort: low
 allowed-tools:
   - Monitor
   - TaskStop
@@ -12,6 +13,7 @@ allowed-tools:
   - Bash(gh:*)
   - Skill(pull-request:follow-up)
   - Skill(gitlab:merge-request)
+  - Skill(git:conflicts)
   - mcp__github
 ---
 
@@ -30,10 +32,11 @@ Delegate CI monitoring to a provider-specific watcher and react to its events wi
 
 Inspect the remote URL. For a `github.com` remote, invoke the `github:actions-monitor` skill. For a `gitlab.com` remote, invoke the `gitlab:ci-monitor` skill. Each provider skill owns the watcher process (via the `Monitor` tool) and emits a structured JSON event stream describing CI state changes.
 
-Babysit consumes that event stream and reacts with the handlers below. The watcher handles polling, deduping by `(sha, state)`, rate limits, timeouts, and session-scoped lifecycle. Babysit handles fixes, pushes, and reporting. Remember the start SHA captured above so the success handler can summarize work done during the session.
+Babysit consumes that event stream and reacts with the handlers below. The watcher handles polling, deduping by `(sha, state)`, rate limits, timeouts, and session-scoped lifecycle. Babysit handles fixes, pushes, and reporting. Remember the start SHA above so the success handler can summarize work done in the session.
 
-Parse `$ARGUMENTS` for two optional flags, both off by default so plain babysit stays CI-only:
+Parse `$ARGUMENTS` for an optional PR positional and two optional flags, both flags off by default so plain babysit stays CI-only:
 
+- `$0` (pr-url): the PR to babysit, given as a URL or number. Pass it through to `follow-up` and the merge commands below. Default: resolve the PR from the branch in Context.
 - `--reviews`: after the first green, triage AI-reviewer threads. See [Reviews Hand-off](#reviews-hand-off).
 - `--merge`: don't stop at green; drive the PR to merged. See [Merge Mode](#merge-mode).
 
@@ -53,7 +56,7 @@ Compare `git rev-parse HEAD` against the event's `sha`. If HEAD is newer, a fix 
 
 The monitor skill's flow has already invoked the provider's logs agent (`github:logs` or `gitlab:logs`) and produced a summary plus a log-file path. Read the summary to decide triviality.
 
-Check whether the start SHA's CI run had the same failure. If so, the failure is pre-existing, not a regression from this branch. Report it and call `TaskStop`.
+Check whether the start SHA's CI run had the same failure. If so, it's pre-existing, not a regression from this branch. Report it and call `TaskStop`.
 
 For trivial failures (lint, type, format, lockfile), attempt a fix. Reproduce the CI step locally to verify (skip reproduction for lockfile-only changes). Commit, push. The watcher picks up the new SHA on its next poll.
 
@@ -65,7 +68,7 @@ Green on a conflicting PR is stale: if a `conflicts` or unresolved `mergeable-un
 
 Summarize the session: run `git log ${start-sha}..HEAD --oneline` for the commits pushed while babysitting.
 
-Then branch on the flags parsed from `$ARGUMENTS`:
+Then branch on the `$ARGUMENTS` flags:
 
 - **`--reviews`**: hand off to AI-review triage before finishing. See [Reviews Hand-off](#reviews-hand-off).
 - **`--merge`**: don't stop here. Drive the PR to merged. See [Merge Mode](#merge-mode).
@@ -73,7 +76,7 @@ Then branch on the flags parsed from `$ARGUMENTS`:
 
 #### conflicts
 
-Reproduce the conflict locally to identify which files conflict:
+Reproduce the conflict locally to identify the conflicting files:
 
 ```
 git merge origin/<base> --no-commit --no-ff
@@ -81,9 +84,11 @@ git diff --name-only --diff-filter=U
 git merge --abort
 ```
 
-If the conflicting paths are only lockfiles (`bun.lock`, etc.) or generated files, regenerate per project convention (e.g. `rm bun.lock && bun install`), commit the result, and push. The watcher picks up the new SHA.
+Lockfiles or generated files (`bun.lock`, etc.): regenerate per project convention (e.g. `rm bun.lock && bun install`), commit, push.
 
-Otherwise, report the conflicting file list and call `TaskStop`. Do not invoke `gh` or `glab` here; git alone is enough.
+Real source conflicts: rebase on `origin/<base>` and delegate to the `git:conflicts` skill. Resolve, commit, and push where mechanically clear. Where ambiguous or semantic, report the conflicting hunks and call `TaskStop` (this runs unattended, so never guess a merge).
+
+In Merge Mode, after any push here, [re-arm](#re-arm) and count it as a submit attempt.
 
 #### mergeable-unknown
 
@@ -96,7 +101,7 @@ git diff --name-only --diff-filter=U
 git merge --abort
 ```
 
-If the dry-run surfaces conflicting paths, route them through the [conflicts](#conflicts) logic (lockfiles or generated files → regenerate, commit, push; source → report and `TaskStop`). If the merge is clean, report that the PR is mergeable and keep watching.
+If the dry-run surfaces conflicting paths, route them through the [conflicts](#conflicts) handler: lockfiles and generated files regenerate, commit, and push; real source conflicts go to `git:conflicts`, resolving where mechanical and stopping where ambiguous. If the merge is clean, report that the PR is mergeable and keep watching.
 
 #### queued-timeout
 
@@ -124,29 +129,40 @@ Report the event (include `minutes`) and the work done since the start SHA, then
 
 ## Reviews Hand-off
 
-With `--reviews`, after the first green invoke `pull-request:follow-up --auto <pr-url>` to triage AI-reviewer threads (fix, reply, resolve, looping until the reviewer is satisfied). follow-up calls back into babysit for each post-push CI wait, so let it own the review loop. When it returns:
+With `--reviews`, after the first green invoke `pull-request:follow-up --auto <pr-url>` to triage AI-reviewer threads (fix, reply, resolve, loop until the reviewer is satisfied). follow-up calls back into babysit for each post-push CI wait, so let it own the review loop. When a bot review is expected but hasn't landed at green, follow-up waits for its first pass rather than reporting nothing to do.
+
+When it returns satisfied, re-request the **human** reviewers whose approval a push (follow-up's fixes or babysit's own) invalidated. Don't re-request bots; follow-up owns the `@bot` re-trigger.
+
+- **GitHub**: `gh pr edit <pr-url> --add-reviewer <user>`.
+- **GitLab**: delegate to `gitlab:merge-request` ([Re-request reviewers](../../../gitlab/skills/merge-request/SKILL.md#re-request-reviewers)).
+
+Then branch:
 
 - If `--merge` is also set, proceed to [Merge Mode](#merge-mode).
 - Otherwise report what was addressed and call `TaskStop`.
 
-Human review threads are out of scope here: follow-up lists them and leaves them for you.
+This human re-request happens only in the `--reviews` flow. Review *threads* stay out of scope: follow-up lists them and leaves them for you.
 
 ## Merge Mode
 
-With `--merge`, don't stop at green; drive the PR to **merged**. CI green is the entry condition; from here, submit to the repo's merge mechanism and recover from kickouts until it lands. GitHub merges run through `gh` directly; delegate all GitLab merge behavior (trains, endpoint, squash) to the `gitlab:merge-request` skill.
+With `--merge`, don't stop at green; drive the PR to **merged**. CI green is the entry condition; from here, submit to the repo's merge mechanism and recover from kickouts until it lands. GitHub merges run through `gh` directly; delegate all GitLab merge behavior (trains, endpoint, squash) to `gitlab:merge-request`.
 
-First confirm the PR can merge on its own. Don't bypass blocks you can't resolve: missing **human** approval (you can't self-approve; if a bot was the blocker and `--reviews` ran, it's already handled), branch protection, draft state, or requested changes. Report and `TaskStop`. Read state via `gh pr view --json mergeable,mergeStateStatus,reviewDecision,state` (GitLab: `gitlab:merge-request`).
+First confirm the PR can merge on its own. Don't bypass blocks you can't resolve: missing **human** approval (you can't self-approve; if a bot was the blocker and `--reviews` ran, it's already handled), branch protection, draft state, or requested changes; report and `TaskStop`. Read state via `gh pr view --json mergeable,mergeStateStatus,reviewDecision,state` (GitLab: `gitlab:merge-request`).
 
 Submit by the most automated path the repo allows (merge queue/train, else auto-merge, else direct, valid since CI is green):
 
 - **GitHub**: `gh pr merge <pr-url> --auto --squash` enables auto-merge or queues the PR. If `--auto` is rejected, merge directly: `gh pr merge <pr-url> --squash`. Prefer squash → merge → rebase per `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
 - **GitLab**: delegate to the `gitlab:merge-request` skill.
 
+### Re-arm
+
+A push drops the PR from the merge mechanism (GitLab: off the train; GitHub: clears queued auto-merge) and fires **no monitor event**. So in Merge Mode, after **every** push, re-submit by the same path as the initial submit above instead of waiting. Each re-arm counts toward the 3-attempt oscillation guard below.
+
 Then watch the merge through the monitor rather than polling by hand: invoke the provider's monitor skill again on the PR and react to its events. The watcher enforces the interval and the wall clock, so this phase stays bounded like the CI wait (see [Bounds](#bounds)) and babysit owns no loop here. React to:
 
 - `merged`: the PR landed. Report success and `TaskStop`.
-- `conflicts`: route through the [conflicts](#conflicts) handler, then re-submit. Counts as a submit attempt.
-- `status: failing`: route through the [status: failing](#status-failing) handler; the pushed fix produces a new SHA, then re-submit. Counts as a submit attempt.
+- `conflicts`: route through the [conflicts](#conflicts) handler, then [re-arm](#re-arm). Counts as a submit attempt.
+- `status: failing`: route through the [status: failing](#status-failing) handler; the pushed fix produces a new SHA, then [re-arm](#re-arm). Counts as a submit attempt.
 - `pr-closed`: the PR closed without merging. Report and `TaskStop`.
 - `max-time-reached`: report and `TaskStop`; do not re-arm.
 
@@ -156,10 +172,10 @@ Stop re-submitting after 3 attempts (re-submits included, an oscillation guard) 
 
 The monitor script delivers structured JSON events. Do not pipe CLI output to `python3 -c`, `bun -e`, `node -e`, or any inline interpreter for parsing.
 
-CI may run on synthetic merge commits whose SHA never matches the branch tip. The watcher already reports the source branch SHA in each event; compare against `git rev-parse HEAD`.
+CI may run on synthetic merge commits whose SHA never matches the branch tip. The watcher reports the source branch SHA in each event; compare against `git rev-parse HEAD`.
 
 The Bash tool escapes `!` to `\!`. Use `| not` in jq filters (e.g. `select(.x == null | not)`), or pass filters via heredoc.
 
 The watcher dedupes by `(sha, state)`. A `failing` event for a SHA older than `git rev-parse HEAD` means a fix was already pushed; ignore it.
 
-Babysit is session-scoped. If the session ends, the watcher process ends with it. Re-invoke this skill from a new session to resume monitoring.
+Babysit is session-scoped. If the session ends, the watcher process ends with it. Re-invoke this skill from a new session to resume.

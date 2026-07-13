@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import fc from "fast-check";
 import { powerFromCurrentSample, requiredPositiveCount } from "./power";
 
 describe("requiredPositiveCount", () => {
@@ -35,6 +36,29 @@ describe("requiredPositiveCount", () => {
   it("rejects out-of-range inputs", () => {
     expect(() => requiredPositiveCount({ targetLiftPP: 10, precision: -0.1 })).toThrow("precision");
     expect(() => requiredPositiveCount({ targetLiftPP: 0 })).toThrow("targetLiftPP");
+  });
+
+  it("is non-increasing in lift, non-decreasing in z, and maximal at precision 0.5", () => {
+    const lift = fc.double({ min: 0.1, max: 100, noNaN: true });
+    const zScore = fc.double({ min: 0.1, max: 5, noNaN: true });
+    const prec = fc.double({ min: 0, max: 1, noNaN: true });
+    const count = (inputs: Parameters<typeof requiredPositiveCount>[0]) =>
+      requiredPositiveCount(inputs).requiredPositives;
+    fc.assert(
+      fc.property(lift, lift, zScore, zScore, prec, (lA, lB, zA, zB, precision) => {
+        const [loLift, hiLift] = lA <= lB ? [lA, lB] : [lB, lA];
+        const [loZ, hiZ] = zA <= zB ? [zA, zB] : [zB, zA];
+        expect(count({ targetLiftPP: hiLift })).toBeLessThanOrEqual(
+          count({ targetLiftPP: loLift }),
+        );
+        expect(count({ targetLiftPP: loLift, z: hiZ })).toBeGreaterThanOrEqual(
+          count({ targetLiftPP: loLift, z: loZ }),
+        );
+        expect(count({ targetLiftPP: loLift, precision })).toBeLessThanOrEqual(
+          count({ targetLiftPP: loLift, precision: 0.5 }),
+        );
+      }),
+    );
   });
 });
 

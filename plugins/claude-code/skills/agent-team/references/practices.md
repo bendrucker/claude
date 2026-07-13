@@ -12,7 +12,7 @@ Teammates don't inherit the lead's conversation history. Include task-specific d
 |---|---|
 | Too small | Coordination overhead exceeds the benefit |
 | Too large | Teammates work too long without check-ins, risking wasted effort |
-| Right | Self-contained units producing a clear deliverable (a function, test file, or review) |
+| Right | Self-contained units producing a clear deliverable (function, test file, or review) |
 
 Aim for 5-6 tasks per teammate.
 
@@ -71,6 +71,8 @@ Teams add coordination overhead. Use them when parallelism savings exceed that c
 - **6+**: diminishing returns, coordination overhead dominates
 
 Each agent consumes a full context window. Prefer fewer agents with well-scoped tasks over many agents with thin tasks.
+
+Each agent also runs a model, and teammates and Agent-tool subagents inherit the session model unless you set `model` explicitly. For mechanical, well-scoped work (fixes with clear specs, finders, verifiers, formatting passes), pass a cheaper model (`model: "sonnet"`, or `haiku` for trivial extraction) rather than billing fan-out at a premium session model's rate. Keep the premium tier for the orchestrator and judgment-heavy verification. The `model` value is a bare tier alias (`opus`, `sonnet`, `haiku`, `fable`), not a full model ID like `claude-sonnet-4-5`. Both the Agent tool and Workflow `agent()` accept these shorthands as-is. In Workflow scripts, pin `model` on `agent()` calls or per-phase in `meta.phases` for the same reason.
 
 ## Task Decomposition
 

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/bendrucker/claude/main/schemas/marketplace.schema.json",
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
   "name": "bendrucker",
   "version": "1.0.0",
   "description": "Claude Code plugins for language support, workflows, and integrations",
@@ -84,11 +84,6 @@
       "source": "./plugins/bun"
     },
     {
-      "name": "calendar",
-      "description": "Reading and managing macOS Calendar events",
-      "source": "./plugins/calendar"
-    },
-    {
       "name": "research",
       "description": "Research existing solutions when exploring a new problem space",
       "source": "./plugins/research"
@@ -112,11 +107,6 @@
       }
     },
     {
-      "name": "personal-review",
-      "description": "Cross-tool daily review workflow",
-      "source": "./plugins/personal-review"
-    },
-    {
       "name": "x-callback-url",
       "description": "Call x-callback-url schemes from the CLI and receive responses",
       "source": "./plugins/x-callback-url"
@@ -135,11 +125,6 @@
       "name": "tech-spec",
       "description": "Create and review technical specifications",
       "source": "./plugins/tech-spec"
-    },
-    {
-      "name": "vscode",
-      "description": "VS Code editor integration for interactive content editing",
-      "source": "./plugins/vscode"
     },
     {
       "name": "plan",
@@ -183,6 +168,21 @@
       "name": "rate-limits",
       "description": "Predict usage-limit exhaustion from the burn rate and warn before the 5-hour limit runs out",
       "source": "./plugins/rate-limits"
+    },
+    {
+      "name": "comments",
+      "description": "Detect AI slop code comments in a diff and steer clean comment generation",
+      "source": "./plugins/comments"
+    },
+    {
+      "name": "meme",
+      "description": "Generate memes from images: classic Impact macros, labels, and TV-subtitle captions",
+      "source": "./plugins/meme"
+    },
+    {
+      "name": "activitywatch",
+      "description": "Query local ActivityWatch usage data: per-app time, window titles, and active vs idle spans",
+      "source": "./plugins/activitywatch"
     }
   ]
 }

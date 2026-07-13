@@ -18,7 +18,8 @@ Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` cod
 When writing scripts (hooks, skill CLIs, etc.) that accept arguments:
 
 - **Argument parsing**: Use [cleye](https://github.com/privatenumber/cleye) for type-safe argument parsing with automatic `--help` generation. Load the `cleye` skill for usage patterns (parameters, flags, subcommands) instead of reading existing scripts.
-- **Table output**: Use the `table` package for formatted terminal table output. Do not use `markdown-table` or similar GFM-oriented packages, script output is displayed in a terminal, not rendered as markdown.
+- **Table output**: Use the `table` package for terminal table output. Do not use `markdown-table` or similar GFM-oriented packages, script output is displayed in a terminal, not rendered as markdown.
+- **Output width**: Use a fixed default width with a flag override (e.g. `--truncate <n>`) for truncation or layout. Do not read `process.stdout.columns` or gate on `process.stdout.isTTY`. The column count is undefined when piped, and even in a terminal the output lands in Claude's context as text, so a fixed width stays predictable across both. The `no-terminal-width` prek hook enforces this.
 - **Ancestor paths**: Use `join(import.meta.dirname, "..")` to resolve parent directories. Avoid chaining `dirname()` calls; explicit `".."` is clearer.
 
 # Terminal Colors
@@ -29,9 +30,13 @@ Use ANSI colors (0-15) in scripts that produce terminal output. These are remapp
 
 `excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls.
 
+Go CLIs (`gh`, `glab`, `terraform`, `kubectl`, `go`) run fine sandboxed: `sandbox.network.allowMachLookup: ["com.apple.trustd.agent"]` in `user/settings.json` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification profile-wide.
+
+Apple Events and Launch Services handoff (`osascript`, `open`, URL schemes) does not survive the sandbox even with `sandbox.allowAppleEvents`, because the child process's TCC attribution changes under the Seatbelt container. These wrappers need a full sandbox skip, provided by the `mac` plugin's marker-based hook.
+
 `${CLAUDE_PLUGIN_ROOT}` does NOT expand in hook `matcher` fields (it only expands in `command` strings). A matcher like `Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)` is compared literally against the resolved cache path (`bun /Users/.../plugins/cache/.../scripts/foo.ts`), never matches, and the hook never fires. Do not use `${CLAUDE_PLUGIN_ROOT}` in matchers.
 
-The working mechanism is the `mac` plugin's marker-based sandbox hook. It uses a broad `Bash|Monitor` matcher and reads the head of the invoked `bun`/`node` script for the comment `claude:dangerouslyDisableSandbox`. When present, it injects `dangerouslyDisableSandbox: true`. This is layout-independent, so it works regardless of the cache `<hash>` path. Add the marker after the shebang of any top-level script that hands off to Launch Services:
+The marker hook sidesteps this: it uses a broad `Bash|Monitor` matcher and reads the head of the invoked `bun`/`node` script for the comment `claude:dangerouslyDisableSandbox`. When present, it injects `dangerouslyDisableSandbox: true`, running that command fully outside the sandbox. This is layout-independent, so it works regardless of the cache `<hash>` path. Add the marker after the shebang of any top-level script that hands off to Apple Events or Launch Services:
 
 ```ts
 #!/usr/bin/env bun

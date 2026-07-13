@@ -1,0 +1,13 @@
+{
+  "id": "migration-update-partial-index",
+  "path": "migrations/versions/9f1891b12937_refactor_message_parts_to_use_pydantic_.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# Update partial index to match new type values",
+  "context": "69:     \"\"\")\n70: \n71:     # Update partial index to match new type values\n72:     op.drop_index(\"idx_parts_tool_name\", table_name=\"message_parts\")\n73:     op.create_index(\n74:         \"idx_parts_tool_name\",\n75:         \"message_parts\",\n76:         [\"tool_name\"],\n77:         unique=False,\n78:         postgresql_where=sa.text(\"type IN ('tool_call', 'tool_return')\"),\n79:     )",
+  "action": "trim",
+  "category": "restate-the-what",
+  "trimToLines": null,
+  "source": "main migrations/9f1891b12937:71",
+  "note": "Restates the drop_index/create_index pair below it. The new postgresql_where literal already shows the index is being updated to the new type values."
+}

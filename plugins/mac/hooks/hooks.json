@@ -1,5 +1,5 @@
 {
-  "description": "Disables sandbox for Go binaries (TLS cert verification) and for plugin scripts that invoke macOS automation",
+  "description": "Disables the command sandbox for plugin scripts that hand off to macOS automation (Apple Events, Launch Services)",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,15 +8,6 @@
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/open-url.ts:*)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/disable-sandbox.ts\""
           }
         ]
       }

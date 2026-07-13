@@ -3,6 +3,16 @@ import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
 export type { ErrorObject } from "ajv";
 
 import addFormats from "ajv-formats";
+import { loadOverlaySchema, type Schema } from "./overlay";
+
+/** A schema to validate against: a file path, an http(s) URL, or an in-memory overlay merge. */
+export type SchemaRef = string | { overlay: string };
+
+const SCHEMAS_DIR = "schemas";
+
+function cacheKey(ref: SchemaRef): string {
+  return typeof ref === "string" ? ref : `overlay:${ref.overlay}`;
+}
 
 function isCI(): boolean {
   return process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
@@ -45,47 +55,31 @@ function formatWarning(file: string, key: string): string {
   return `  ⚠ ${file}: ${message}`;
 }
 
-export async function loadSchema(schemaPath: string): Promise<Record<string, unknown>> {
-  let schema: Record<string, unknown>;
-  if (schemaPath.startsWith("http")) {
-    const response = await fetch(schemaPath);
-    schema = await response.json();
-  } else {
-    schema = await Bun.file(schemaPath).json();
+export async function loadSchema(ref: SchemaRef): Promise<Schema> {
+  if (typeof ref !== "string") {
+    return loadOverlaySchema(SCHEMAS_DIR, ref.overlay);
   }
-  patchHookSchema(schema);
-  return schema;
-}
-
-function patchHookSchema(schema: Record<string, unknown>): void {
-  const defs = schema.$defs as Record<string, Record<string, unknown>> | undefined;
-  const hookCommand = defs?.hookCommand as { anyOf?: Array<Record<string, unknown>> } | undefined;
-  if (!hookCommand?.anyOf) return;
-
-  for (const variant of hookCommand.anyOf) {
-    const props = variant.properties as Record<string, unknown> | undefined;
-    if (props) {
-      props.if = {
-        type: "string",
-        description: "Permission rule pattern to filter when this hook fires",
-      };
-    }
+  if (ref.startsWith("http")) {
+    const response = await fetch(ref);
+    return response.json();
   }
+  return Bun.file(ref).json();
 }
 
 export async function validateFile(
   file: string,
-  schemaPath: string,
+  schema: SchemaRef,
   options?: { ajv?: Ajv; warnAdditional?: boolean },
 ): Promise<ValidationResult> {
   const instance = options?.ajv ?? createValidator();
 
-  let entry = validatorCache.get(schemaPath);
+  const key = cacheKey(schema);
+  let entry = validatorCache.get(key);
   if (!entry) {
-    const schema = await loadSchema(schemaPath);
-    const validate = instance.compile(schema);
-    entry = { validate, schema };
-    validatorCache.set(schemaPath, entry);
+    const loaded = await loadSchema(schema);
+    const validate = instance.compile(loaded);
+    entry = { validate, schema: loaded };
+    validatorCache.set(key, entry);
   }
 
   const data = await Bun.file(file).json();

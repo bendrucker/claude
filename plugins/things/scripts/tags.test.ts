@@ -2,53 +2,42 @@ import { describe, expect, test } from "bun:test";
 import { mergeTags, parseTags } from "./tags";
 
 describe("parseTags", () => {
-  test("returns empty array for undefined", () => {
-    expect(parseTags(undefined)).toEqual([]);
-  });
-
-  test("returns empty array for empty string", () => {
-    expect(parseTags("")).toEqual([]);
-  });
-
-  test("parses single tag", () => {
-    expect(parseTags("claude-code")).toEqual(["claude-code"]);
-  });
-
-  test("parses comma-separated tags", () => {
-    expect(parseTags("claude-code,work")).toEqual(["claude-code", "work"]);
-  });
-
-  test("trims whitespace", () => {
-    expect(parseTags(" claude-code , work ")).toEqual(["claude-code", "work"]);
-  });
-
-  test("filters empty segments", () => {
-    expect(parseTags("claude-code,,work")).toEqual(["claude-code", "work"]);
+  test.each<{ name: string; input: string | undefined; expected: string[] }>([
+    { name: "undefined", input: undefined, expected: [] },
+    { name: "empty string", input: "", expected: [] },
+    { name: "single tag", input: "claude-code", expected: ["claude-code"] },
+    { name: "comma-separated tags", input: "claude-code,work", expected: ["claude-code", "work"] },
+    { name: "trims whitespace", input: " claude-code , work ", expected: ["claude-code", "work"] },
+    {
+      name: "filters empty segments",
+      input: "claude-code,,work",
+      expected: ["claude-code", "work"],
+    },
+  ])("$name", ({ input, expected }) => {
+    expect(parseTags(input)).toEqual(expected);
   });
 });
 
 describe("mergeTags", () => {
-  test("returns single source as-is", () => {
-    expect(mergeTags(["Claude"])).toEqual(["Claude"]);
-  });
-
-  test("combines multiple sources", () => {
-    expect(mergeTags(["Claude"], ["work"])).toEqual(["Claude", "work"]);
-  });
-
-  test("deduplicates across sources", () => {
-    expect(mergeTags(["Claude"], ["Claude", "work"])).toEqual(["Claude", "work"]);
-  });
-
-  test("preserves insertion order", () => {
-    expect(mergeTags(["Claude", "claude-code"], ["work"])).toEqual([
-      "Claude",
-      "claude-code",
-      "work",
-    ]);
-  });
-
-  test("handles empty sources", () => {
-    expect(mergeTags([], ["Claude"])).toEqual(["Claude"]);
+  test.each<{ name: string; sources: string[][]; expected: string[] }>([
+    { name: "returns single source as-is", sources: [["Claude"]], expected: ["Claude"] },
+    {
+      name: "combines multiple sources",
+      sources: [["Claude"], ["work"]],
+      expected: ["Claude", "work"],
+    },
+    {
+      name: "deduplicates across sources",
+      sources: [["Claude"], ["Claude", "work"]],
+      expected: ["Claude", "work"],
+    },
+    {
+      name: "preserves insertion order",
+      sources: [["Claude", "claude-code"], ["work"]],
+      expected: ["Claude", "claude-code", "work"],
+    },
+    { name: "handles empty sources", sources: [[], ["Claude"]], expected: ["Claude"] },
+  ])("$name", ({ sources, expected }) => {
+    expect(mergeTags(...sources)).toEqual(expected);
   });
 });

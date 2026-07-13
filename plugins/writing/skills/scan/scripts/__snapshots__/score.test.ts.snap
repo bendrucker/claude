@@ -1,0 +1,110 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renderVoiceDeltaTable rate, baseline, and delta columns for in-register text 1`] = `
+"Voice Delta Features
+╔═════════════════════════════════════════════════╤══════════════════╤═══════╤═══════════╤════════╗
+║ Feature                                         │ Provenance       │ Rate  │ Baseline  │ Delta  ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ First-person voice (I/we per 1k)                │ skill-encouraged │ 52.63 │ 9.50      │ +43.13 ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Causal language (since/because per 1k)          │ skill-encouraged │ 0.00  │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Body length (words)                             │ skill-encouraged │ 19    │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ URL cross-references (per 1k words)             │ ungoverned       │ 0.00  │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Sentence length median (words)                  │ ungoverned       │ 6.0   │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Sentence length p90 (words)                     │ ungoverned       │ 8.0   │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Question marks (per 1k words)                   │ ungoverned       │ 0.00  │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Template presence (## Changes + ## Testing)     │ skill-prescribed │ 0%    │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Unique heading texts (count)                    │ skill-prescribed │ 0     │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Has any heading (fraction of documents)         │ skill-prescribed │ 0%    │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Action-verb opener lines (fraction of lines)    │ skill-prescribed │ 0.0%  │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Backtick density (per 1k words)                 │ skill-prescribed │ 0.00  │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Backtick-manifest bullets (fraction of bullets) │ ungoverned       │ 0.0%  │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Consequence chains (, so <det>) per 1k words    │ ungoverned       │ 0.00  │ (no stat) │ -      ║
+╚═════════════════════════════════════════════════╧══════════════════╧═══════╧═══════════╧════════╝"
+`;
+
+exports[`renderVoiceDeltaTable skips the baseline comparison for out-of-register input 1`] = `
+"Voice Delta Features
+Register check: skipping baseline comparison (too short (1 sentence(s); need 3+)).
+
+╔═════════════════════════════════════════════════╤══════════════════╤══════╗
+║ Feature                                         │ Provenance       │ Rate ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ First-person voice (I/we per 1k)                │ skill-encouraged │ 0.00 ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Causal language (since/because per 1k)          │ skill-encouraged │ 0.00 ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Body length (words)                             │ skill-encouraged │ 2    ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ URL cross-references (per 1k words)             │ ungoverned       │ 0.00 ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Sentence length median (words)                  │ ungoverned       │ 2.0  ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Sentence length p90 (words)                     │ ungoverned       │ 2.0  ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Question marks (per 1k words)                   │ ungoverned       │ 0.00 ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Template presence (## Changes + ## Testing)     │ skill-prescribed │ 0%   ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Unique heading texts (count)                    │ skill-prescribed │ 0    ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Has any heading (fraction of documents)         │ skill-prescribed │ 0%   ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Action-verb opener lines (fraction of lines)    │ skill-prescribed │ 0.0% ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Backtick density (per 1k words)                 │ skill-prescribed │ 0.00 ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Backtick-manifest bullets (fraction of bullets) │ ungoverned       │ 0.0% ║
+╟─────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Consequence chains (, so <det>) per 1k words    │ ungoverned       │ 0.00 ║
+╚═════════════════════════════════════════════════╧══════════════════╧══════╝"
+`;
+
+exports[`renderVoiceDeltaTable missing baseline still renders rates 1`] = `
+"Voice Delta Features
+No baseline loaded. Run ingest-voice.ts then voice-profile.ts to build one.
+
+╔═════════════════════════════════════════════════╤══════════════════╤═══════╗
+║ Feature                                         │ Provenance       │ Rate  ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ First-person voice (I/we per 1k)                │ skill-encouraged │ 52.63 ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Causal language (since/because per 1k)          │ skill-encouraged │ 0.00  ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Body length (words)                             │ skill-encouraged │ 19    ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ URL cross-references (per 1k words)             │ ungoverned       │ 0.00  ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Sentence length median (words)                  │ ungoverned       │ 6.0   ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Sentence length p90 (words)                     │ ungoverned       │ 8.0   ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Question marks (per 1k words)                   │ ungoverned       │ 0.00  ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Template presence (## Changes + ## Testing)     │ skill-prescribed │ 0%    ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Unique heading texts (count)                    │ skill-prescribed │ 0     ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Has any heading (fraction of documents)         │ skill-prescribed │ 0%    ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Action-verb opener lines (fraction of lines)    │ skill-prescribed │ 0.0%  ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Backtick density (per 1k words)                 │ skill-prescribed │ 0.00  ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Backtick-manifest bullets (fraction of bullets) │ ungoverned       │ 0.0%  ║
+╟─────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Consequence chains (, so <det>) per 1k words    │ ungoverned       │ 0.00  ║
+╚═════════════════════════════════════════════════╧══════════════════╧═══════╝"
+`;

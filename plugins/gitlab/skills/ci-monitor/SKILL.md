@@ -1,7 +1,8 @@
 ---
 name: gitlab:ci-monitor
 description: Investigate GitLab CI pipeline failures and extract diagnostics. Use when watching MR CI, branch builds, or specific pipelines.
-argument-hint: "[mr-url | branch | pipeline-id]"
+argument-hint: "[mr-url | branch | pipeline-id] [--max-minutes N] [--project group/project]"
+effort: low
 allowed-tools:
   - Monitor
   - TaskStop
@@ -27,7 +28,7 @@ Accepts an MR URL, a branch name, a pipeline ID, or derives one from the current
 - MR mode: pass a URL like `https://gitlab.com/group/project/-/merge_requests/123`.
 - Branch mode: pass a branch name (e.g. `main`, a release branch). Project path `group/project` is inferred from `git remote get-url origin` in the current directory; pass `--project <group/project>` to override.
 - Pipeline-id mode: pass a pipeline ID (e.g. from a manually-triggered pipeline or a re-run). Project is inferred from the git remote; override with `--project <group/project>`.
-- If no argument is given, derive an MR URL from the current branch: `glab mr view --output json | jq -r '.web_url'`.
+- No argument: derive an MR URL from the current branch: `glab mr view --output json | jq -r '.web_url'`.
 
 ## Workflow
 
@@ -42,7 +43,7 @@ Launch the watch script via the `Monitor` tool with `persistent: true`:
 
 Exactly one of `--mr`, `--branch`, or `--pipeline-id` is required. In branch and pipeline-id modes, `--project` is inferred from the current git remote when omitted. Pipeline-id mode queries `glab api projects/:id/pipelines/:pid` directly; if the pipeline does not exist the watcher exits non-zero on the first call.
 
-The script emits one JSON object per line on stdout. When the first probe is already green, it emits a single `status: success` event and exits, so there is no separate initial-green path to handle. In pipeline-id mode the script also exits after emitting `status: failing`, because a specific pipeline has a finite lifetime and will not restart on its own.
+The script emits one JSON object per line on stdout. When the first probe is already green, it emits a single `status: success` event and exits, so there is no separate initial-green path. In pipeline-id mode it also exits after emitting `status: failing`, because a specific pipeline has a finite lifetime and will not restart on its own.
 
 #### Event schema
 
@@ -64,7 +65,7 @@ The script exits on `status: success` in every mode. In pipeline-id mode it also
 
 #### React to events
 
-On `status: failing`, invoke the `gitlab:logs` agent via the `Agent` tool with the pipeline ID from `run_id`. This applies to all three modes; the logs agent accepts a pipeline ID, so pipeline-id mode fits naturally:
+On `status: failing`, invoke the `gitlab:logs` agent via the `Agent` tool with the pipeline ID from `run_id`. This applies to all three modes; the logs agent accepts a pipeline ID, so pipeline-id mode fits:
 
 ```
 Agent(
@@ -80,13 +81,13 @@ On `conflicts`, report the SHA with conflicts and stop watching; conflict resolu
 
 On `mergeable-unknown`, report the SHA; the caller decides whether to run an authoritative local check.
 
-On `queued-timeout`, `api-error`, or `rate-limited`, surface the event once and keep the monitor running. Consecutive rate-limit or api-error events indicate the monitor should be stopped manually.
+On `queued-timeout`, `api-error`, or `rate-limited`, surface the event once and keep the monitor running. Consecutive rate-limit or api-error events mean the monitor should be stopped manually.
 
 On `merged`, `pr-closed`, or `max-time-reached`, the monitor has already exited. Report and finish.
 
 #### Stopping
 
-The monitor exits on its own for `status: success`, `merged`, `pr-closed`, and `max-time-reached`. In pipeline-id mode it also exits on `status: failing`. To stop earlier (for example after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
+The monitor exits on its own for `status: success`, `merged`, `pr-closed`, and `max-time-reached`. In pipeline-id mode it also exits on `status: failing`. To stop earlier (e.g. after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
 
 ## Reference
 

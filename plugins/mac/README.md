@@ -1,6 +1,6 @@
 # Mac
 
-macOS-specific automation, sandbox workarounds, and system integration.
+macOS-specific automation and system integration.
 
 ## Contents
 
@@ -11,28 +11,31 @@ macOS-specific automation, sandbox workarounds, and system integration.
 
 ### Hooks
 
-- **sandbox** — Detects Go binaries and disables sandbox for TLS cert verification. Matches both `Bash` and `Monitor` tool calls.
+- **sandbox** — Reads the invoked `bun`/`node` script for the `claude:dangerouslyDisableSandbox` marker and disables the command sandbox when present. Matches both `Bash` and `Monitor` tool calls.
 
 ### Scripts
 
 - `scripts/jxa.ts` — App-scoped JXA runner with AST-based `Application()` validation
 - `scripts/open-url.ts` — Scheme-scoped URL opener with scheme validation
 
-## Sandbox bypass marker
+## Sandbox
 
-The sandbox hook auto-disables Seatbelt for two cases:
+Go-based CLIs run fine sandboxed: `sandbox.network.allowMachLookup: ["com.apple.trustd.agent"]` in `user/settings.json` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification (`gh`, `glab`, `terraform`, `kubectl`, `go`) profile-wide.
 
-1. The invoked executable is a Go binary (detected by the `__go_buildinfo` byte marker in the first 64KB of the binary).
-2. A `bun <script>` or `node <script>` invocation, where the script's first 64KB contains the literal string `claude:dangerouslyDisableSandbox`.
+Apple Events and Launch Services handoff is different. Scripts that shell out to `osascript` (JXA) or `open` (URL schemes) do not survive the sandbox even with `sandbox.allowAppleEvents`, so they need a full skip.
 
-The second mechanism is opt-in. Plugins that ship a wrapper script which shells out to Go binaries (`gh`, `glab`, `terraform`, etc.) can add a comment near the top of the script:
+### Sandbox bypass marker
+
+The `sandbox` hook disables the command sandbox for a `bun <script>` or `node <script>` invocation when the script's first 64KB contains the literal string `claude:dangerouslyDisableSandbox`. Add the marker after the shebang of any top-level wrapper that hands off to Apple Events or Launch Services:
 
 ```ts
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: shells out to gh for TLS-bearing API calls
+// claude:dangerouslyDisableSandbox: hands off to osascript for JXA Apple Events
 ```
 
-The marker is inert on Linux and inert when the `mac` plugin is not installed. It only activates when this hook is running on macOS.
+The marker goes on the top-level entrypoint script only. The hook inspects the `bun`/`node` script argument, not imported modules, so a helper like `things/scripts/ensure-running.ts` carries no marker of its own; its callers do.
+
+The marker is inert on Linux and inert when the `mac` plugin is not installed. It only activates when this hook runs on macOS.
 
 ## Testing
 

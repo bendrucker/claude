@@ -56,4 +56,4 @@ The `src/` directory contains TypeScript type definitions for reference:
 - **`Things3.d.ts`**: Generated from Things.app AppleScript dictionary. Covers Application, List, ToDo, Project, Area, Tag, Contact.
 - **`jxa-globals.d.ts`**: Global JXA functions like `Application()`.
 
-These provide API documentation even when writing plain JXA.
+These document the API even when writing plain JXA.

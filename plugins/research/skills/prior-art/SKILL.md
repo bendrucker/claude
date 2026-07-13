@@ -3,6 +3,7 @@ name: research:prior-art
 description: |
   Research existing solutions when exploring a new problem space. Use when the user mentions "prior art", "existing solutions", "what libraries exist for", or wants to understand the landscape before building.
 argument-hint: <topic>
+disable-model-invocation: true
 ---
 
 Research prior art for: $ARGUMENTS
@@ -25,10 +26,10 @@ Run searches in parallel. Infer the ecosystem from:
 
 Start with 2-3 most promising projects:
 1. Read README and high-level docs to assess relevance
-2. Only examine code when relevance is confirmed AND implementation details matter
-3. Dispatch parallel Task agents for each project, with explicit focus areas
+2. Examine code only when relevance is confirmed AND implementation details matter
+3. Dispatch parallel Task agents per project, with explicit focus areas
 
-If initial results don't satisfy the query, expand to additional projects.
+If results don't satisfy the query, expand to more projects.
 
 **Agent dispatch example:**
 ```
@@ -43,13 +44,13 @@ Investigate [project] for prior art on [topic]:
 Gather findings and produce a recommendation:
 - Identify common patterns across solutions
 - Note meaningful variations in approach
-- Infer user intent:
+- Infer intent:
   - "build X" → learn patterns, inform implementation
   - "library for X" → find dependencies to use directly
 
 ## Output Format
 
-Respond in the conversation with structured markdown (not files):
+Respond in the conversation with structured markdown, not files:
 
 ```markdown
 ## Prior Art: [Topic]
@@ -78,4 +79,4 @@ Respond in the conversation with structured markdown (not files):
 - **Honest reporting**: Acknowledge when prior art is sparse—don't force results
 - **Research only**: Don't offer to integrate dependencies or modify the project
 - **Ecosystem inference**: Derive from context, don't require explicit specification
-- **Adaptive depth**: Investigate more projects if initial batch is insufficient
+- **Adaptive depth**: Investigate more projects if the initial batch is insufficient

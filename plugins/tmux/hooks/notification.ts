@@ -68,15 +68,17 @@ function updateSummary(): void {
     text += ` (+${entries.length - 1})`;
   }
 
-  const color = "#d97757";
-  const crust = "#11111b";
-  const fg = "#cdd6f4";
-  const surface = "#313244";
+  // ANSI colours 0-15 are remapped by the terminal's Catppuccin theme, so the
+  // status segment adapts to light and dark mode (see scripts.md).
+  const accent = "colour3";
+  const crust = "colour0";
+  const fg = "colour7";
+  const surface = "colour8";
   const sep = "\uE0B6";
 
   const styled = [
-    `#[fg=${color}]${sep}`,
-    `#[fg=${crust},bg=${color}]󰂞 `,
+    `#[fg=${accent}]${sep}`,
+    `#[fg=${crust},bg=${accent}]󰂞 `,
     `#[fg=${fg},bg=${surface}] ${text}`,
     `#[fg=${surface}] `,
   ].join("");
@@ -107,6 +109,9 @@ async function main(): Promise<void> {
   const pane = process.env.TMUX_PANE ?? tmuxQuery("display-message", "-p", "#{pane_id}");
   if (!pane) return;
 
+  // hooks.json wraps the --clear invocation in an inline shell guard that
+  // skips the bun startup entirely when this pane has no notification marker,
+  // so this arm only runs when there is actually something to clear.
   if (argv.flags.clear) {
     tmux("set-option", "-gu", paneOptionKey(pane));
     updateSummary();

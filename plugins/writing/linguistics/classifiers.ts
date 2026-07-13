@@ -53,8 +53,8 @@ function clauseVerdict(tokens: TaggedToken[], index: number): HeadingVerdict {
 }
 
 /**
- * The clean signal from #744: flag only when a finite verb follows a
- * subject candidate. Misses imperatives by design.
+ * Flag only when a finite verb follows a subject candidate. Misses
+ * imperatives by design.
  */
 export function finiteVerbClassifier(tagger: Tagger): HeadingClassifier {
   return {

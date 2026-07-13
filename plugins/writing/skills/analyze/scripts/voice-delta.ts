@@ -21,20 +21,16 @@ export interface VoiceDeltaFeature {
   id: string;
   label: string;
   provenance: Provenance;
-  // Human-readable description of the provenance source. Matches the spec table.
+  // Human-readable description of the provenance source.
   source: string;
   // Compute the feature rate from raw text. Rates are per-1000 words unless
   // isFraction is true. Returns 0 when no content is present.
   compute: (text: string) => number;
-  // Format a rate value for display. Most features show 2 decimal places.
   format?: (rate: number) => string;
   // When true, the rate is a fraction (0–1) rather than per-1000 words.
   isFraction?: boolean;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-// Count raw words (whitespace-separated tokens, strip punctuation).
 function wordCount(text: string): number {
   return (text.match(/\b[a-zA-Z'-]+\b/g) ?? []).length;
 }
@@ -48,7 +44,6 @@ export function sentenceSplit(text: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-// Count non-empty lines.
 function nonEmptyLines(text: string): string[] {
   return text.split("\n").filter((l) => l.trim().length > 0);
 }
@@ -75,14 +70,12 @@ function strippedWordCount(text: string): number {
   return wordCount(stripCode(text));
 }
 
-// Count backtick characters in the original text (raw inline code fences).
 function countBackticks(text: string): number {
   // Remove fenced blocks first to avoid double-counting their delimiters.
   const nofence = text.replace(/```[\s\S]*?```/g, "");
   return (nofence.match(/`/g) ?? []).length;
 }
 
-// Collect bullet lines: lines starting with `- ` or `* ` (possibly indented).
 function bulletLines(text: string): string[] {
   return nonEmptyLines(text).filter((l) => /^\s*[-*]\s/.test(l));
 }
@@ -91,8 +84,6 @@ function bulletLines(text: string): string[] {
 function countBacktickManifestBullets(text: string): number {
   return bulletLines(text).filter((l) => /^\s*[-*]\s+`[^`]+`\s*:/.test(l)).length;
 }
-
-// ─── Feature definitions ──────────────────────────────────────────────────────
 
 function per1k(count: number, words: number): number {
   if (words === 0) return 0;
@@ -198,7 +189,6 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     provenance: "skill-prescribed",
     source:
       'SKILL.md Body: "Use `##` sections for larger changes". Aggregate template rate is an analyze trend only',
-    // Returns 1 if both template sections are present, 0 otherwise.
     compute: (text) => {
       const prose = stripFencedBlocks(text);
       const hasChanges = /^##\s+(Changes|What Changed)\b/im.test(prose);
@@ -214,7 +204,6 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     provenance: "skill-prescribed",
     source:
       "sections.md fixes the section vocabulary (Issue/Changes/Testing/References). Aggregate uniformity metric only, never per-document",
-    // Returns the count of unique heading texts (lowercased) in this document.
     compute: (text) => {
       const headings = [...stripFencedBlocks(text).matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) =>
         (m[1] ?? "").toLowerCase().trim(),
@@ -228,7 +217,6 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     label: "Has any heading (fraction of documents)",
     provenance: "skill-prescribed",
     source: 'Same "larger changes" clause as template presence. Report as a trend',
-    // Returns 1 if the document contains any markdown heading, 0 otherwise.
     compute: (text) => (/^#{1,6}\s+/m.test(stripFencedBlocks(text)) ? 1 : 0),
     isFraction: true,
     format: (rate) => `${(rate * 100).toFixed(0)}%`,
@@ -295,8 +283,6 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
   },
 ];
 
-// ─── Register check ───────────────────────────────────────────────────────────
-
 // Minimum sentences to attempt baseline comparison. Too-short inputs produce
 // meaningless rate stats.
 const MIN_SENTENCES = 3;
@@ -335,15 +321,12 @@ export function checkRegister(text: string): RegisterCheck {
   return { inRegister: true, reason: null };
 }
 
-// ─── Corpus aggregation ───────────────────────────────────────────────────────
-
 export interface FeatureRate {
   featureId: string;
   rate: number;
   documentCount: number;
 }
 
-// Compute per-feature mean rates across a corpus of document texts.
 // The register check applies to single-document scoring only. Corpus
 // aggregation runs over all documents regardless of individual length.
 export function computeCorpusRates(texts: string[]): Map<string, FeatureRate> {
@@ -370,8 +353,6 @@ export function computeCorpusRates(texts: string[]): Map<string, FeatureRate> {
   }
   return result;
 }
-
-// ─── Baseline stats from profile ─────────────────────────────────────────────
 
 // The additional aggregate stats that voice-profile.ts stores for voice-delta
 // comparison. Computed during profile build from the baseline corpus.

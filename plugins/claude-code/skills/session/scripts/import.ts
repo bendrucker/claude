@@ -86,7 +86,7 @@ await mkdir(dataDir, { recursive: true });
 
 const db = await getDb(dataDir);
 try {
-  await ensureIndex(db, { dataDir, force: true });
+  await ensureIndex(db);
 } finally {
   db.close();
 }

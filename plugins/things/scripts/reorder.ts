@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: hands off to Launch Services (open) for Things URL schemes
+// claude:dangerouslyDisableSandbox: hands off to osascript via ensure-running, which the command sandbox blocks
 
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";

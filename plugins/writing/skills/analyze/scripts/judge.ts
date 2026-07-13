@@ -41,7 +41,6 @@ export interface JudgeCriterion {
   id: string;
   /** JSON key in the judge's structured output. */
   key: CriterionKey;
-  /** Every judge criterion sits in the meaning layer of the detector model. */
   layer: "meaning";
   /** The rubric question, summarized for reports. */
   question: string;
@@ -477,9 +476,8 @@ export const DEFAULT_JUDGE_LIMIT = 100;
 export const DEFAULT_MIN_WORDS = 30;
 
 /**
- * Batch detector for the analyze pipeline, following the structural.ts
- * template: rows in, typed findings out, wired in runAnalysis, rendered via
- * ReportInput. Prints the cost estimate before any API call.
+ * Batch detector for the analyze pipeline. Prints the cost estimate before
+ * any API call.
  */
 export function meaningDetector(options: MeaningDetectorOptions = {}): MeaningDetector {
   return async (rows: DeliverableRow[]) => {
@@ -509,9 +507,8 @@ export function meaningDetector(options: MeaningDetectorOptions = {}): MeaningDe
 }
 
 /**
- * Heading reference baseline for #769: the same judge pointed at headings,
- * "is this heading sentence-shaped?". Headings are batched per call; the
- * verdict is one boolean per heading, by index.
+ * Schema for the heading baseline: one boolean per heading, by index, marking
+ * whether the heading is sentence-shaped.
  */
 export function headingBatchSchema(): Record<string, unknown> {
   return {

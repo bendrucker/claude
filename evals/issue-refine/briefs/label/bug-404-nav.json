@@ -1,0 +1,11 @@
+{
+  "id": "L-bug-404nav",
+  "type": "bug",
+  "size": "trivial",
+  "project": "synthetic",
+  "brief": "The 404 page is missing the top nav bar. Every other page has it. The error template doesn't extend the base layout.",
+  "context": {
+    "files": ["templates/404.html", "templates/base.html (defines the nav header block)"],
+    "related_issues": []
+  }
+}

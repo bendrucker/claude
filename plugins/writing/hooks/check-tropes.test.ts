@@ -1,10 +1,14 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { collectText, processInput } from "./check-tropes";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { check, collectText } from "./check-tropes";
+
+async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
+  return (await check(input))?.output ?? null;
+}
 
 function mockWrite(content: string): PreToolUseHookInput {
   return {
@@ -61,67 +65,19 @@ function mockBash(command: string): PreToolUseHookInput {
   };
 }
 
-function mockMcp(toolName: string, toolInput: Record<string, unknown>): PreToolUseHookInput {
-  return {
-    hook_event_name: "PreToolUse",
-    session_id: "test",
-    transcript_path: "/tmp/test",
-    cwd: "/tmp",
-    tool_name: toolName,
-    tool_input: toolInput,
-    tool_use_id: "test",
-  };
-}
-
-describe("plan files", () => {
-  it("skips Write to plan file with spaced em dash", async () => {
-    const input = mockWrite("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path =
-      `${process.env.HOME}/.claude/plans/my-plan.md`;
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("skips Edit to plan file with spaced em dash", async () => {
-    const input = mockEdit("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path =
-      `${process.env.HOME}/.claude/plans/my-plan.md`;
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("returns reminder for non-plan files with spaced em dash", async () => {
-    const result = await processInput(mockWrite("This \u2014 is bad"));
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-});
-
-describe("memory files", () => {
-  const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
-
-  it("skips Write to memory file with spaced em dash", async () => {
-    const input = mockWrite("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = memoryPath;
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("skips Edit to memory file with spaced em dash", async () => {
-    const input = mockEdit("This \u2014 is bad");
-    (input.tool_input as Record<string, unknown>).file_path = memoryPath;
-    expect(await processInput(input)).toBeNull();
-  });
-});
-
 describe("wordlist files", () => {
-  it("skips Write to wordlist file containing flagged vocabulary", async () => {
-    const input = mockWrite("delve\ntapestry\nbolstered\n");
-    (input.tool_input as Record<string, unknown>).file_path =
-      "/Users/test/plugins/writing/wordlists/vocabulary.txt";
-    expect(await processInput(input)).toBeNull();
-  });
+  const wordlistPath = "/Users/test/plugins/writing/wordlists/vocabulary.txt";
 
-  it("skips Edit to wordlist file", async () => {
-    const input = mockEdit("delve\nadded entry\n");
-    (input.tool_input as Record<string, unknown>).file_path =
-      "/Users/test/plugins/writing/wordlists/vocabulary.txt";
+  test.each<[string, string, string]>([
+    [
+      "skips Write to wordlist file containing flagged vocabulary",
+      "Write",
+      "delve\ntapestry\nbolstered\n",
+    ],
+    ["skips Edit to wordlist file", "Edit", "delve\nadded entry\n"],
+  ])("%s", async (_name, tool, content) => {
+    const input = tool === "Write" ? mockWrite(content) : mockEdit(content);
+    (input.tool_input as Record<string, unknown>).file_path = wordlistPath;
     expect(await processInput(input)).toBeNull();
   });
 
@@ -253,6 +209,60 @@ describe("diff-aware filtering", () => {
   });
 });
 
+describe("semicolon splices", () => {
+  function codeEdit(newString: string, oldString: string): PreToolUseHookInput {
+    const input = mockEdit(newString, oldString);
+    (input.tool_input as Record<string, unknown>).file_path = "index.ts";
+    return input;
+  }
+
+  it("flags a code-file edit introducing a spliced comment", async () => {
+    const result = await processInput(
+      codeEdit("// keep sorted; callers rely on order\nconst x = 1;", "const x = 1;"),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+    const ctx = (result?.hookSpecificOutput as { additionalContext: string }).additionalContext;
+    expect(ctx).toContain("semicolon");
+  });
+
+  it("ignores a pre-existing spliced comment untouched by the edit", async () => {
+    const result = await processInput(
+      codeEdit(
+        "// keep sorted; callers rely on order\nconst x = 2;",
+        "// keep sorted; callers rely on order\nconst x = 1;",
+      ),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("ignores commented-out code in a code file", async () => {
+    expect(
+      await processInput(codeEdit("// foo(); bar()\nconst x = 1;", "const x = 1;")),
+    ).toBeNull();
+  });
+
+  it("ignores splices in code outside comments", async () => {
+    expect(
+      await processInput(codeEdit('const label = "cold start; warm later";', "const label = 1;")),
+    ).toBeNull();
+  });
+
+  it("flags two splices in a short prose file", async () => {
+    const result = await processInput(
+      mockWrite(
+        "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.",
+      ),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
+  });
+
+  it("stays silent on a single semicolon in prose", async () => {
+    expect(
+      await processInput(mockWrite("The cache starts cold; the first request fills it.")),
+    ).toBeNull();
+  });
+});
+
 describe("MultiEdit", () => {
   it("returns null when all old_string values are flagged but new_string values are clean", async () => {
     const input = mockMultiEdit([
@@ -314,60 +324,68 @@ describe("collectText", () => {
       expect(texts).toContain("My title");
     });
 
+    it("reads gh api -F body=@file content", async () => {
+      await Bun.write(tmpFile, "Reply body");
+      const texts = await collectText(
+        mockBash(`gh api repos/x/issues/1/comments -F body=@${tmpFile}`),
+      );
+      expect(texts).toContain("Reply body");
+    });
+
+    it("reads glab api --field description=@file content", async () => {
+      await Bun.write(tmpFile, "MR description");
+      const texts = await collectText(
+        mockBash(`glab api projects/x/merge_requests --field description=@${tmpFile}`),
+      );
+      expect(texts).toContain("MR description");
+    });
+
+    it("reads shell-quoted field file paths", async () => {
+      await Bun.write(tmpFile, "Quoted body");
+      const texts = await collectText(mockBash(`gh api repos/x/y/issues -F 'body=@${tmpFile}'`));
+      expect(texts).toContain("Quoted body");
+    });
+
+    it("reads git commit -F message files", async () => {
+      await Bun.write(tmpFile, "Commit message body");
+      const texts = await collectText(mockBash(`git commit -F ${tmpFile}`));
+      expect(texts).toContain("Commit message body");
+    });
+
+    it("reads git tag --file message files", async () => {
+      await Bun.write(tmpFile, "Tag annotation");
+      const texts = await collectText(mockBash(`git tag -a v1.0.0 --file ${tmpFile}`));
+      expect(texts).toContain("Tag annotation");
+    });
+
+    it("ignores bare -F outside git commands", async () => {
+      const texts = await collectText(mockBash("curl -F upload=/tmp/data.bin https://x"));
+      expect(texts).toHaveLength(0);
+    });
+
+    it("ignores field flags with inline values", async () => {
+      const texts = await collectText(mockBash("gh api repos/x -F state=closed"));
+      expect(texts).toHaveLength(0);
+    });
+
+    it("ignores stdin field files", async () => {
+      const texts = await collectText(mockBash("gh api repos/x -F body=@-"));
+      expect(texts).toHaveLength(0);
+    });
+
     it("returns empty for commands without text args", async () => {
       const texts = await collectText(mockBash("git status"));
       expect(texts).toHaveLength(0);
     });
   });
-
-  describe("MCP tools", () => {
-    it("extracts prose strings, skipping short values", async () => {
-      const texts = await collectText(
-        mockMcp("mcp__linear__save_issue", {
-          title: "Fix the bug in authentication flow",
-          description: "Users are unable to log in when using SSO",
-          team: "ENG",
-        }),
-      );
-      expect(texts).toContain("Fix the bug in authentication flow");
-      expect(texts).toContain("Users are unable to log in when using SSO");
-      expect(texts).not.toContain("ENG");
-    });
-
-    it("skips URLs and identifiers", async () => {
-      const texts = await collectText(
-        mockMcp("mcp__claude_ai_Slack__slack_send_message", {
-          channel_id: "C123ABC456",
-          text: "The deploy finished successfully and all tests pass",
-        }),
-      );
-      expect(texts).toContain("The deploy finished successfully and all tests pass");
-      expect(texts).not.toContain("C123ABC456");
-    });
-
-    it("handles empty input", async () => {
-      const texts = await collectText(mockMcp("mcp__test", {}));
-      expect(texts).toHaveLength(0);
-    });
-  });
 });
 
-describe("Bash/MCP processInput", () => {
-  it("denies MCP tool input with spaced em dash", async () => {
+describe("Bash processInput", () => {
+  it("denies Bash inline arg with spaced em dash", async () => {
     const result = await processInput(
-      mockMcp("mcp__linear__save_issue", {
-        title: "Fix the bug",
-        description: "This feature \u2014 which was added last week \u2014 is broken",
-      }),
-    );
-    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
-  });
-
-  it("denies a spaced em dash even on a non-prose tool", async () => {
-    const result = await processInput(
-      mockMcp("mcp__db__execute", {
-        statement: "Filter the rows \u2014 the pending ones \u2014 before the update runs",
-      }),
+      mockBash(
+        'gh pr create --body "This feature \u2014 which was added last week \u2014 is broken"',
+      ),
     );
     expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
   });
@@ -389,77 +407,7 @@ describe("Bash/MCP processInput", () => {
     }
   });
 
-  it("flags AI vocabulary on a prose-bearing tool as context", async () => {
-    const result = await processInput(
-      mockMcp("mcp__linear__save_issue", {
-        title: "Login fails",
-        summary: "We delve into the intricacies of the auth flow here",
-      }),
-    );
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
-  });
-
-  it("ignores AI vocabulary on a non-prose tool with a non-prose key", async () => {
-    const result = await processInput(
-      mockMcp("mcp__db__execute", {
-        statement: "We delve into the rows and underscore the totals here",
-      }),
-    );
-    expect(result).toBeNull();
-  });
-
-  it("flags AI vocabulary on a non-prose tool with a prose key", async () => {
-    const result = await processInput(
-      mockMcp("mcp__db__execute", {
-        description: "We delve into the rows and underscore the totals here",
-      }),
-    );
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
-  });
-
-  it("returns null for clean MCP input", async () => {
-    const result = await processInput(
-      mockMcp("mcp__claude_ai_Slack__slack_send_message", {
-        text: "The deploy finished successfully.",
-      }),
-    );
-    expect(result).toBeNull();
-  });
-
   it("returns null for non-text Bash commands", async () => {
     expect(await processInput(mockBash("git push origin main"))).toBeNull();
-  });
-
-  it("ignores flagged content in nested old_str fields", async () => {
-    const flagged = "We should delve into the codebase to understand it.";
-    const result = await processInput(
-      mockMcp("mcp__example_tool", {
-        command: "update_content",
-        content_updates: [{ old_str: flagged, new_str: "Clean replacement text here." }],
-      }),
-    );
-    expect(result).toBeNull();
-  });
-
-  it("ignores blocklisted query fields but scans remaining prose", async () => {
-    const result = await processInput(
-      mockMcp("mcp__search_tool", {
-        query: "delve into the codebase and find issues",
-        result_description: "A straightforward summary of the findings.",
-      }),
-    );
-    expect(result).toBeNull();
-  });
-
-  it("still flags nested prose in non-blocklisted keys", async () => {
-    const result = await processInput(
-      mockMcp("mcp__some_tool", {
-        payload: { body: "We delve into the system for a while longer" },
-      }),
-    );
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-    expect(result?.hookSpecificOutput).not.toHaveProperty("permissionDecision");
   });
 });

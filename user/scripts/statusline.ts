@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname } from "node:path";
 import { styleText } from "node:util";
+import { effortMarker } from "./effort";
 import { dialGlyph } from "./glyphs";
+import { modelMarker } from "./model";
+import { expandTilde, type RateLimits } from "./rate-limits";
 
 interface CurrentUsage {
   input_tokens?: number;
@@ -12,17 +14,9 @@ interface CurrentUsage {
   cache_read_input_tokens?: number;
 }
 
-interface RateLimitWindow {
-  used_percentage?: number;
-  resets_at?: number;
-}
-
-interface RateLimits {
-  five_hour?: RateLimitWindow;
-  seven_day?: RateLimitWindow;
-}
-
 interface StatusInput {
+  model?: { id?: string; display_name?: string } | null;
+  effort?: { level?: string } | null;
   context_window?: { used_percentage?: number | null; current_usage?: CurrentUsage | null };
   cost?: { total_lines_added?: number; total_lines_removed?: number };
   rate_limits?: RateLimits | null;
@@ -99,6 +93,28 @@ export function exceeds200k(input: StatusInput): boolean {
     (usage.cache_creation_input_tokens ?? 0) +
     (usage.cache_read_input_tokens ?? 0);
   return total > 200_000;
+}
+
+// Session-config markers (model, effort) render dim at their default and switch
+// to this accent when off-default, so a non-standard session reads at a glance.
+const ACCENT: Parameters<typeof styleText>[0] = ["magenta", "bold"];
+
+function configMarker(text: string, isDefault: boolean): string {
+  return styleText(isDefault ? ["dim"] : ACCENT, text);
+}
+
+// A leading letter for the active model so Fable-vs-Opus reads at a glance.
+// Always shown: absence would be ambiguous once more than one model is in play.
+export function modelSegment(input: StatusInput): string | null {
+  const marker = modelMarker(input.model?.id, input.model?.display_name);
+  return marker ? configMarker(marker.letter, marker.isDefault) : null;
+}
+
+// A baseline dot-ramp for the reasoning effort, styled like the model letter so
+// the two session-config markers read alike. Absent when the model has no effort.
+export function effortSegment(input: StatusInput): string | null {
+  const marker = effortMarker(input.effort?.level);
+  return marker ? configMarker(marker.glyph, marker.isDefault) : null;
 }
 
 export function dialSegment(input: StatusInput): string | null {
@@ -221,7 +237,7 @@ export async function emitRateLimits(input: StatusInput, target: string): Promis
   const limits = input.rate_limits;
   if (!limits) return;
 
-  const path = target.startsWith("~/") ? join(homedir(), target.slice(2)) : target;
+  const path = expandTilde(target);
   mkdirSync(dirname(path), { recursive: true });
   await Bun.write(path, `${JSON.stringify(limits)}\n`);
 }
@@ -233,6 +249,10 @@ export function buildStatusLine(
 ): string {
   const segments: string[] = [];
 
+  const model = modelSegment(input);
+  if (model) segments.push(model);
+  const effort = effortSegment(input);
+  if (effort) segments.push(effort);
   const dial = dialSegment(input);
   if (dial) segments.push(dial);
   const lines = linesSegment(input);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import {
   type Comment,
   detectRole,
@@ -45,14 +45,14 @@ function makeReview(login: string, date: string, state = "CHANGES_REQUESTED"): R
 }
 
 describe("parseUrl", () => {
-  it("parses a valid GitHub PR URL", () => {
-    const result = parseUrl("https://github.com/pydantic/pydantic-ai/pull/3772");
-    expect(result).toEqual({ owner: "pydantic", repo: "pydantic-ai", number: 3772 });
-  });
-
-  it("parses PR URL with trailing path segments", () => {
-    const result = parseUrl("https://github.com/owner/repo/pull/123/files");
-    expect(result).toEqual({ owner: "owner", repo: "repo", number: 123 });
+  test.each<[string, { owner: string; repo: string; number: number }]>([
+    [
+      "https://github.com/pydantic/pydantic-ai/pull/3772",
+      { owner: "pydantic", repo: "pydantic-ai", number: 3772 },
+    ],
+    ["https://github.com/owner/repo/pull/123/files", { owner: "owner", repo: "repo", number: 123 }],
+  ])("parses %p", (url, expected) => {
+    expect(parseUrl(url)).toEqual(expected);
   });
 
   it("throws on non-PR GitHub URL", () => {
@@ -65,12 +65,11 @@ describe("parseUrl", () => {
 });
 
 describe("detectRole", () => {
-  it("returns author when viewer is the PR author", () => {
-    expect(detectRole("bendrucker", "bendrucker")).toBe("author");
-  });
-
-  it("returns reviewer when viewer is not the PR author", () => {
-    expect(detectRole("DouweM", "bendrucker")).toBe("reviewer");
+  test.each<[string, string, Role]>([
+    ["bendrucker", "bendrucker", "author"],
+    ["DouweM", "bendrucker", "reviewer"],
+  ])("detectRole(viewer=%p, author=%p) -> %p", (viewer, author, expected) => {
+    expect(detectRole(viewer, author)).toBe(expected);
   });
 });
 
@@ -199,6 +198,32 @@ describe("filterThreads", () => {
     expect(result[0]!.comments.nodes[0]!.author?.login).toBe("jacob");
   });
 
+  it("keeps the viewer's resolved threads with includeResolved in reviewer role", () => {
+    const threads = [
+      makeThread({ isResolved: true, comments: [makeComment("DouweM", "2025-01-15")] }),
+      makeThread({ isResolved: true, comments: [makeComment("bendrucker", "2025-01-15")] }),
+    ];
+    const result = filterThreads(threads, {
+      role: "reviewer",
+      viewer: "DouweM",
+      includeResolved: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.comments.nodes[0]!.author?.login).toBe("DouweM");
+    expect(result[0]!.isResolved).toBe(true);
+  });
+
+  it("drops resolved threads by default when the flag is unset", () => {
+    const threads = [
+      makeThread({ isResolved: true, comments: [makeComment("DouweM", "2025-01-15")] }),
+    ];
+    const result = filterThreads(threads, {
+      role: "reviewer",
+      viewer: "DouweM",
+    });
+    expect(result).toHaveLength(0);
+  });
+
   it("keeps review-target threads in reviewer role (bots overrides opener filter)", () => {
     const threads = [
       makeThread({ comments: [makeComment("copilot", "2025-01-15", "comment", "Bot")] }),
@@ -304,103 +329,133 @@ describe("formatThreads", () => {
     viewer: "bendrucker",
   };
 
-  it("formats empty result", () => {
-    const output = formatThreads([], 10, baseOptions);
-    expect(output).toContain("0 unresolved of 10 total threads");
-    expect(output).toContain("No unresolved threads found.");
+  const cases: Array<{
+    name: string;
+    threads: Thread[];
+    total: number;
+    options: Parameters<typeof formatThreads>[2];
+  }> = [
+    { name: "empty result", threads: [], total: 10, options: baseOptions },
+    {
+      name: "reviewer-opener header",
+      threads: [],
+      total: 10,
+      options: { ...baseOptions, role: "reviewer", viewer: "DouweM" },
+    },
+    {
+      name: "bot header",
+      threads: [],
+      total: 10,
+      options: { ...baseOptions, role: "reviewer", viewer: "DouweM", bots: true },
+    },
+    {
+      name: "grouped by file",
+      threads: [
+        makeThread({ path: "src/a.ts", line: 10 }),
+        makeThread({ path: "src/b.ts", line: 20 }),
+        makeThread({ path: "src/a.ts", line: 30 }),
+      ],
+      total: 10,
+      options: baseOptions,
+    },
+    {
+      name: "line range",
+      threads: [makeThread({ startLine: 10, line: 20 })],
+      total: 1,
+      options: baseOptions,
+    },
+    {
+      name: "outdated thread",
+      threads: [makeThread({ isOutdated: true })],
+      total: 1,
+      options: baseOptions,
+    },
+    {
+      name: "thread id",
+      threads: [makeThread({ id: "PRRT_abc123" })],
+      total: 1,
+      options: baseOptions,
+    },
+    {
+      name: "bot-opened thread",
+      threads: [
+        makeThread({ comments: [makeComment("coderabbitai", "2025-01-15", "comment", "Bot")] }),
+      ],
+      total: 1,
+      options: baseOptions,
+    },
+    {
+      name: "multi-line blockquote body",
+      threads: [
+        makeThread({ comments: [makeComment("DouweM", "2025-01-15", "Fix this\nand that")] }),
+      ],
+      total: 1,
+      options: baseOptions,
+    },
+    {
+      name: "file-level thread",
+      threads: [makeThread({ line: null, startLine: null })],
+      total: 1,
+      options: baseOptions,
+    },
+    {
+      name: "ghost author",
+      threads: [
+        makeThread({
+          comments: [{ author: null, body: "feedback", createdAt: "2025-01-15T00:00:00Z" }],
+        }),
+      ],
+      total: 1,
+      options: baseOptions,
+    },
+    {
+      name: "author and date",
+      threads: [makeThread({ comments: [makeComment("DouweM", "2025-01-15", "looks good")] })],
+      total: 1,
+      options: baseOptions,
+    },
+  ];
+
+  it.each(cases)("$name", ({ threads, total, options }) => {
+    expect(formatThreads(threads, total, options)).toMatchSnapshot();
   });
 
-  it("shows reviewer filter for reviewer role", () => {
-    const output = formatThreads([], 10, {
-      ...baseOptions,
-      role: "reviewer",
-      viewer: "DouweM",
-    });
-    expect(output).toContain("Showing threads started by @DouweM");
-  });
-
-  it("shows the bot header for bots, not the reviewer-opener header", () => {
+  it("suppresses the reviewer-opener header when showing bot threads", () => {
     const output = formatThreads([], 10, {
       ...baseOptions,
       role: "reviewer",
       viewer: "DouweM",
       bots: true,
     });
-    expect(output).toContain("Showing review-bot and opted-in reviewer threads");
     expect(output).not.toContain("Showing threads started by");
   });
 
-  it("groups threads by file", () => {
-    const threads = [
-      makeThread({ path: "src/a.ts", line: 10 }),
-      makeThread({ path: "src/b.ts", line: 20 }),
-      makeThread({ path: "src/a.ts", line: 30 }),
-    ];
-    const output = formatThreads(threads, 10, baseOptions);
-    const aMatches = output.match(/## src\/a\.ts/g);
-    expect(aMatches).toHaveLength(1);
-    expect(output).toContain("## src/b.ts");
+  it("tags resolved threads and counts them with includeResolved", () => {
+    const output = formatThreads(
+      [makeThread({ isResolved: true }), makeThread({ isResolved: false })],
+      2,
+      { ...baseOptions, includeResolved: true },
+    );
+    expect(output).toContain("(resolved)");
+    expect(output).toContain("2 of 2 total threads (1 resolved)");
   });
 
-  it("formats line ranges", () => {
-    const threads = [makeThread({ startLine: 10, line: 20 })];
-    const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("Lines 10–20");
+  it("omits the resolved tag and count without includeResolved", () => {
+    const output = formatThreads([makeThread({ isResolved: false })], 2, baseOptions);
+    expect(output).not.toContain("(resolved)");
+    expect(output).toContain("1 unresolved of 2 total threads");
   });
 
-  it("marks outdated threads", () => {
-    const threads = [makeThread({ isOutdated: true })];
-    const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("(outdated)");
-  });
-
-  it("includes the thread id", () => {
-    const threads = [makeThread({ id: "PRRT_abc123" })];
-    const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("`PRRT_abc123`");
-  });
-
-  it("marks bot-opened threads", () => {
-    const threads = [
-      makeThread({ comments: [makeComment("coderabbitai", "2025-01-15", "comment", "Bot")] }),
-    ];
-    const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("(bot)");
-  });
-
-  it("formats comment bodies as blockquotes", () => {
-    const threads = [
-      makeThread({
-        comments: [makeComment("DouweM", "2025-01-15", "Fix this\nand that")],
-      }),
-    ];
-    const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("> Fix this\n> and that");
-  });
-
-  it("renders file-level thread", () => {
-    const threads = [makeThread({ line: null, startLine: null })];
-    const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("### File-level");
-  });
-
-  it("renders null author as ghost", () => {
-    const threads = [
-      makeThread({
-        comments: [{ author: null, body: "feedback", createdAt: "2025-01-15T00:00:00Z" }],
-      }),
-    ];
-    const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("**@ghost**");
-  });
-
-  it("includes author and date on comments", () => {
-    const threads = [
-      makeThread({
-        comments: [makeComment("DouweM", "2025-01-15", "looks good")],
-      }),
-    ];
-    const output = formatThreads(threads, 1, baseOptions);
-    expect(output).toContain("**@DouweM** (2025-01-15):");
+  it("collapses repeated files under a single header", () => {
+    const output = formatThreads(
+      [
+        makeThread({ path: "src/a.ts", line: 10 }),
+        makeThread({ path: "src/b.ts", line: 20 }),
+        makeThread({ path: "src/a.ts", line: 30 }),
+      ],
+      10,
+      baseOptions,
+    );
+    expect(output.match(/## src\/a\.ts/g)).toHaveLength(1);
   });
 });

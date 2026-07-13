@@ -5,3 +5,5 @@
 {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"skill-2","content":"Skill loaded"}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:04:00.000Z","uuid":"uuid-s5"}
 {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"skill-3","name":"Skill","input":{"skill":"review:peer","args":"456"}}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:05:00.000Z","uuid":"uuid-s6"}
 {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"skill-3","content":"Skill loaded"}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:06:00.000Z","uuid":"uuid-s7"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"skill-4","name":"Skill","input":{"skill":"solo"}}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:07:00.000Z","uuid":"uuid-s8"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"skill-4","content":"Skill loaded"}]},"sessionId":"skills-session","timestamp":"2024-01-18T09:08:00.000Z","uuid":"uuid-s9"}

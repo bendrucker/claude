@@ -115,4 +115,4 @@ flowchart LR
 - Minimize edge crossings by ordering nodes logically
 - Use subgraphs to reduce visual complexity
 - Keep labels short—expand in surrounding text
-- For wide diagrams, consider `TB` instead of `LR`
+- For wide diagrams, prefer `TB` over `LR`

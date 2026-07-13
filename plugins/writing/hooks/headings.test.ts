@@ -3,7 +3,7 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { checkBoldAsHeading, checkSentenceHeading, checkTitleCase, processInput } from "./headings";
+import { check, checkBoldAsHeading, checkSentenceHeading, checkTitleCase } from "./headings";
 
 function mockWriteInput(filePath: string, content: string): PreToolUseHookInput {
   return {
@@ -18,9 +18,9 @@ function mockWriteInput(filePath: string, content: string): PreToolUseHookInput 
 }
 
 function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = processInput(input);
+  const result = check(input);
   if (!result) return null;
-  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+  return result.output.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
 
 const titleCaseCases: { description: string; content: string; match: boolean }[] = [
@@ -259,10 +259,5 @@ describe("processInput", () => {
       tool_use_id: "test",
     };
     expect(getOutput(input)).toBeNull();
-  });
-
-  it("skips memory markdown files", () => {
-    const memoryPath = `${process.env.HOME}/.claude/projects/-Users-ben-test/memory/MEMORY.md`;
-    expect(getOutput(mockWriteInput(memoryPath, "# introduction"))).toBeNull();
   });
 });

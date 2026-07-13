@@ -3,11 +3,25 @@
 -- signals (prompts, interruptions) from automated ones (auto-continuations, scheduled
 -- fires, queued goals), and reports compactions, API retries, hook friction, and the
 -- distribution of permission modes. One labeled row per signal.
+-- Several signal kinds (last-prompt, queue-operation, permission-mode) carry no
+-- timestamp of their own, which date_filter would silently exclude (NULL >= x is
+-- NULL); those rows borrow their session's last timestamp so a date window scopes
+-- them by when the session ran instead of dropping them.
 -- Params: after_date, before_date, project, host.
-WITH base AS (
-  SELECT *
+WITH session_ts AS (
+  SELECT host, session_id, MAX(timestamp) AS last_ts
   FROM records
-  WHERE date_filter(timestamp, getvariable('after_date'), getvariable('before_date'))
+  WHERE timestamp IS NOT NULL
+  GROUP BY host, session_id
+),
+base AS (
+  SELECT *
+  FROM (
+    SELECT r.*, COALESCE(r.timestamp, s.last_ts) AS effective_ts
+    FROM records r
+    LEFT JOIN session_ts s ON s.host = r.host AND s.session_id = r.session_id
+  )
+  WHERE date_filter(effective_ts, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(project_path, getvariable('project'))
     AND host_filter(host, getvariable('host'))
 )
@@ -41,9 +55,13 @@ FROM (
          COUNT(*), 6
     FROM base WHERE kind = 'system:compact_boundary'
   UNION ALL
+  -- system:api_error stopped being emitted around CLI 2.1.179; newer versions mark
+  -- the synthetic assistant message instead, so count both surfaces.
   SELECT 'api errors/retries',
          COUNT(*), 7
-    FROM base WHERE kind = 'system:api_error'
+    FROM base
+   WHERE kind = 'system:api_error'
+      OR (type = 'assistant' AND (data->>'$.isApiErrorMessage') = 'true')
   UNION ALL
   SELECT 'hook blocks/asks',
          COUNT(*), 8

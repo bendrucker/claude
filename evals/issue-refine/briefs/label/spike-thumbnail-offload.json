@@ -1,0 +1,14 @@
+{
+  "id": "L-spike-thumbnails",
+  "type": "spike",
+  "size": "full",
+  "project": "synthetic",
+  "brief": "Uploads feel slow and a chunk of the latency is thumbnail generation happening inline in the request. Figure out whether we can move thumbnailing off the request path (a queue, a background worker, something else) and what that would cost us in complexity and in time-to-first-thumbnail. Come back with a recommendation before we commit to building anything.",
+  "context": {
+    "files": [
+      "uploads/handler.py (UploadHandler.process generates thumbnails inline before returning)",
+      "media/thumbnails.py (generate_thumbnail does the resize work, ~300-800ms per image)"
+    ],
+    "related_issues": ["TEAM-512: Job queue infrastructure for async media work (open, scoping)"]
+  }
+}

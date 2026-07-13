@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "rfc6902": "^5.2.0"
   }
 }

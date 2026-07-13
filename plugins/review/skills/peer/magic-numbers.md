@@ -27,7 +27,7 @@ const maxRetries = 3;
 if (retries > maxRetries) { ... }
 ```
 
-For Go, suggest package-level constants. For Python, suggest module-level constants. Match the project's existing naming convention.
+For Go, suggest package-level constants. For Python, module-level constants. Match the project's existing naming convention.
 
 ## Severity
 

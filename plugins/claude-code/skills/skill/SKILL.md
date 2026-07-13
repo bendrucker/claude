@@ -1,6 +1,7 @@
 ---
 name: claude-code:skill
 description: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows. Use when creating new skills, converting memory files to skills, debugging skill activation, or understanding skill architecture and best practices.
+argument-hint: "[--validate] [--structure]"
 allowed-tools:
   - Read
   - Write
@@ -25,6 +26,15 @@ hooks:
 
 Reference for developing effective skills. The context window is a public good - only include information Claude doesn't already possess.
 
+## Arguments
+
+Run a check against a skill path in `$ARGUMENTS`, defaulting to the skill you just edited:
+
+- `--validate`: run `skill-lint` (`bun run skill-lint <path>`) for frontmatter, naming, and reference-depth validation.
+- `--structure`: run the directory-structure check (`${CLAUDE_SKILL_DIR}/scripts/check-structure.ts`) for the SKILL.md, `scripts/`, `references/`, `assets/` layout.
+
+With neither flag, use the skill as an authoring reference. See [Validation](#validation).
+
 ## Core Principles
 
 - **Conciseness**: Keep `SKILL.md` under 500 lines. Use progressive disclosure.
@@ -37,6 +47,7 @@ Reference for developing effective skills. The context window is a public good -
 ---
 name: plugin-name:skill-name
 description: Third-person capability description with trigger terms
+argument-hint: "[--flag] [<positional>]"  # Optional: arguments shown in slash menu
 allowed-tools: [Read, Grep, Glob]         # Optional: tool restrictions
 model: claude-sonnet-4-20250514           # Optional: override model
 context: fork                             # Optional: run in isolated subagent
@@ -57,15 +68,16 @@ hooks:                                    # Optional: skill-scoped hooks
 - `description`: Third-person, includes trigger terms and use cases (max 1024 chars).
 
 **Optional Fields**:
+- `argument-hint`: Arguments the skill accepts, shown in the slash menu after the skill name. See [Argument Hints](#argument-hints).
 - `allowed-tools`: Tools Claude can use without permission when skill is active
 - `model`: Override the conversation's model
 - `context`: Set to `fork` to run in isolated subagent context
 - `agent`: Agent type when `context: fork` (`Explore`, `Plan`, `general-purpose`, or custom)
 - `user-invocable`: Hide from slash menu when `false` (default: `true`)
-- `disable-model-invocation`: Block programmatic invocation via Skill tool
+- `disable-model-invocation`: Block model (Skill-tool) invocation and drop the skill's name and description from the always-on catalog (zero recurring context cost); still slash-invocable. Opposite of `user-invocable: false`, which hides the slash menu but keeps the description loaded for the model.
 - `hooks`: Skill-scoped hooks (`PreToolUse`, `PostToolUse`, `Stop`)
 
-**Naming**: Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab:ci`, `things:inbox`). The part after the colon should not repeat the plugin name. For standalone skills, use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`. Avoid vague names like `helper`, `utils`.
+**Naming**: Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab:ci`, `things:url`). The part after the colon should not repeat the plugin name. For standalone skills, use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`. Avoid vague names like `helper`, `utils`.
 
 **Storage**: `~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
 
@@ -73,7 +85,7 @@ hooks:                                    # Optional: skill-scoped hooks
 
 #### Description Is a Trigger
 
-The description field is not a summary. It's what Claude scans to decide whether to activate the skill. Write it for the model: include trigger terms, use cases, and "Use when..." phrasing. Make it slightly pushy to combat under-triggering.
+The description field is not a summary. It's what Claude scans to decide whether to activate the skill. Write it for the model: trigger terms, use cases, and "Use when..." phrasing. Make it slightly pushy to combat under-triggering.
 
 #### Skip the Obvious
 
@@ -85,7 +97,7 @@ The highest-signal content in any skill is a `## Gotchas` section documenting fa
 
 #### Progressive Disclosure
 
-A skill is a folder, not just a markdown file. Keep `SKILL.md` concise (~30 lines for the hub) and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. It will load them at appropriate times.
+A skill is a folder, not just a markdown file. Keep `SKILL.md` concise (~30 lines for the hub) and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them; it loads them at the right times.
 
 #### Don't Railroad Claude
 
@@ -120,9 +132,25 @@ Skill-scoped hooks activate only when the skill is invoked and last for the sess
 
 These substitutions apply to skill content, not the frontmatter `hooks:` block. The hooks engine expands only `${CLAUDE_PROJECT_DIR}`, `${CLAUDE_PLUGIN_ROOT}`, and `${CLAUDE_PLUGIN_DATA}` ([hooks reference](https://code.claude.com/docs/en/hooks)); `${CLAUDE_SKILL_DIR}` there resolves to an empty string. In a hook command, reference a bundled script by plugin root instead: `${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/check.ts`.
 
+### Argument Hints
+
+`argument-hint` declares the arguments a skill accepts. It renders in the slash menu after the skill name and reminds the user which flags exist. Give every directable skill a hint, even when it usually runs with none. A skill that branches internally ("if the user wants X") should expose that branch as a flag.
+
+#### Notation
+
+- Required tokens use angle brackets, optional tokens use square brackets: `<doc-path> [--draft]`.
+- Mutually-exclusive alternatives are pipe-separated with surrounding spaces: `[staged | <range> | HEAD]`.
+- Boolean flags are `[--flag]`. Value flags are `[--flag value]`. Enumerated values pipe-join without inner spaces: `[--role author|reviewer]`.
+- Order tokens as required positionals, then optional positionals, then flags.
+- Keep the hint compact and push parsing heuristics into the body. The hint reminds the user which flags exist; the body documents them.
+
+#### Parsing
+
+A skill that declares an `argument-hint` must parse `$ARGUMENTS` (or `$0`/`$1` for positionals) and act on what it finds. Add an `## Arguments` section to the body mapping each token to its behavior and stating the default when the token is absent. Every flag needs a stated default so the no-argument invocation stays well-defined.
+
 ### Dynamic Context Injection
 
-The bang-backtick syntax runs shell commands **before** the skill content is sent to Claude. The command output replaces the placeholder — Claude only sees the final result, not the command. This is preprocessing, not something Claude executes. Use this to inject live data (git state, CLI output, file contents) so the application harness extracts and runs the commands without waiting on the model.
+The bang-backtick syntax runs shell commands **before** the skill content is sent to Claude. The output replaces the placeholder — Claude sees only the result, not the command. This is preprocessing, not something Claude executes. Use it to inject live data (git state, CLI output, file contents) so the harness extracts and runs the commands without waiting on the model.
 
 See [references/patterns.md](references/patterns.md) for syntax, examples, and gotchas.
 
@@ -155,10 +183,6 @@ Static resources: templates, images, diagrams, lookup tables, schemas.
 ### File Naming
 
 Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use lowercase for all other files. Keep references one level deep. For files >100 lines, include a table of contents.
-
-## Development Process
-
-Use the `skill-creator` skill for interactive skill creation workflows — it drives the full lifecycle of drafting, testing with parallel subagents, benchmarking, and iterating. This skill provides the plugin-specific constraints (namespacing, structure, validation) that skill-creator applies during creation.
 
 ## Validation
 

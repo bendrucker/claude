@@ -99,15 +99,42 @@ describe("runAnalysis", () => {
   test("assembles a well-formed ReportInput over the fixture DB", async () => {
     const result = await runAnalysis(db, baseConfig(wordlistsDir));
 
-    // Config-derived fields pass through unchanged.
-    expect(result.generatedAt).toBe("2026-05-24");
-    expect(result.since).toBe("2026-05-01");
-    expect(result.until).toBe("2026-05-31");
-    expect(result.modelFilter).toBe("*opus*");
-    expect(result.projectFilter).toBeNull();
-    expect(result.minLift).toBe(5);
-    expect(result.minCount).toBe(5);
-    expect(result.topN).toBe(10);
+    // Config-derived fields, model summary, and rule-health coverage pass
+    // through deterministically.
+    expect({
+      generatedAt: result.generatedAt,
+      since: result.since,
+      until: result.until,
+      modelFilter: result.modelFilter,
+      projectFilter: result.projectFilter,
+      minLift: result.minLift,
+      minCount: result.minCount,
+      topN: result.topN,
+      modelSummaryLength: result.modelSummary.length,
+      model: result.modelSummary[0]?.model,
+      voiceProfile: result.voiceProfile,
+      ruleHealthLength: result.ruleHealth.length,
+      surfaces: [...new Set(result.ruleHealth.map((r) => r.surface))].sort(),
+    }).toMatchInlineSnapshot(`
+      {
+        "generatedAt": "2026-05-24",
+        "minCount": 5,
+        "minLift": 5,
+        "model": "claude-opus-4",
+        "modelFilter": "*opus*",
+        "modelSummaryLength": 1,
+        "projectFilter": null,
+        "ruleHealthLength": 3,
+        "since": "2026-05-01",
+        "surfaces": [
+          "chat",
+          "deliverable",
+        ],
+        "topN": 10,
+        "until": "2026-05-31",
+        "voiceProfile": null,
+      }
+    `);
 
     // Corpus character totals come from the seeded rows, routed by role and
     // deliverable extraction.
@@ -115,29 +142,14 @@ describe("runAnalysis", () => {
     expect(result.deliverableTotalChars).toBeGreaterThan(0);
     expect(result.userTotalChars).toBeGreaterThan(0);
 
-    // One assistant model in window.
-    expect(result.modelSummary).toHaveLength(1);
-    expect(result.modelSummary[0]?.model).toBe("claude-opus-4");
-
-    // No profile on disk: voice baseline is absent.
-    expect(result.voiceProfile).toBeNull();
-
-    // Rule health covers every fixture wordlist entry (one per surface kind).
-    expect(result.ruleHealth).toHaveLength(3);
-    const surfaces = new Set(result.ruleHealth.map((r) => r.surface));
-    expect(surfaces.has("chat")).toBe(true);
-    expect(surfaces.has("deliverable")).toBe(true);
-
     // The corrective-feedback query matched the frustration lexicon on the
     // seeded user reply.
     expect(result.corrective.length).toBeGreaterThan(0);
     expect(result.corrective[0]?.matched_term.length).toBeGreaterThan(0);
 
-    // Rate trends are present with a non-negative document count.
     expect(typeof result.rateTrends).toBe("object");
     expect(result.rateTrends.documentCount).toBeGreaterThanOrEqual(0);
 
-    // The remaining sections are present and typed as arrays.
     expect(Array.isArray(result.candidatePhrases)).toBe(true);
     expect(Array.isArray(result.structuralSignatures)).toBe(true);
     expect(Array.isArray(result.structuralAudit)).toBe(true);

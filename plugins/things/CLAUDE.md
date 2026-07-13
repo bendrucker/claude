@@ -10,7 +10,7 @@ JXA scripts run via `osascript`, which requires Apple Events mach-lookup service
 - Formatter (`scripts/format-output.ts`): reads JSON from stdin, outputs tables or passes through `--json`
 - JXA execution: invoke the `mac:jxa-run` skill, which validates `Application("Things3")` scope via AST
 
-Sandbox bypass is handled by the `mac` plugin's marker-based sandbox hook. Top-level scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`) carry a `// claude:dangerouslyDisableSandbox` comment after the shebang. The mac hook reads the invoked script's head and injects `dangerouslyDisableSandbox: true`. `${CLAUDE_PLUGIN_ROOT}` does NOT expand in hook matcher fields, so a per-plugin `Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)` matcher never fires. See [`plugins/mac/README.md`](../mac/README.md).
+Scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`) carry the `claude:dangerouslyDisableSandbox` marker so the `mac` plugin's sandbox hook runs them fully outside the command sandbox. `sandbox.allowAppleEvents` alone does not survive the handoff. See [`plugins/mac/README.md`](../mac/README.md).
 
 ## JXA Script Conventions
 
@@ -29,7 +29,7 @@ Biome linting is disabled for `scripts/jxa/` files via the root `biome.json` ove
 
 `scripts/url.ts` owns the URL handoff. `dispatch(command, params)` builds the Things URL, runs it through the x-callback-url runner when available, and falls back to a Launch Services `open` on any xcall failure, returning the parsed todo id when xcall surfaces one. `inbox.ts`, `reorder.ts`, and `url.ts`'s own CLI call `dispatch` rather than re-implementing the runner-selection and fallback. `buildUrl`, `openUrl`, `xcall`, and `findXcallRunner` are internal to `url.ts`. Inject a `DispatchActions` to test runner selection and fallback without real Launch Services or keychain access, mirroring `plugins/gitlab/scripts/merge.ts`.
 
-`reorder.ts` and `inbox.ts` are bun TypeScript scripts (not `osascript`). Sandbox bypass comes from the `mac` plugin's marker hook, which detects the `claude:dangerouslyDisableSandbox` comment in the script head.
+`reorder.ts` and `inbox.ts` are bun TypeScript scripts (not `osascript`). Their Launch Services handoff runs outside the command sandbox via the `claude:dangerouslyDisableSandbox` marker.
 
 ## What NOT to Do
 

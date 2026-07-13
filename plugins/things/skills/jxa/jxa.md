@@ -1,6 +1,6 @@
 # Things 3 AppleScript/JXA Reference
 
-Complete documentation for Things 3 automation via AppleScript and JavaScript for Automation (JXA).
+Things 3 automation via AppleScript and JavaScript for Automation (JXA).
 
 **Source**: Things3.sdef (AppleScript dictionary from Things.app)
 
@@ -26,7 +26,7 @@ sdef /Applications/Things3.app > Things3.sdef
 
 ## Overview
 
-Things 3 provides full AppleScript support. Use JXA (JavaScript for Automation) for JSON-friendly output.
+Things 3 provides full AppleScript support. Use JXA for JSON-friendly output.
 
 **Basic JXA Pattern:**
 ```bash
@@ -40,7 +40,7 @@ const app = Application("Things3");
 
 ## Application Object
 
-The top-level scripting object representing the Things application.
+The top-level scripting object.
 
 **Properties:**
 - `name` (text, read-only) - Application name
@@ -70,7 +70,7 @@ app.lists().length; // Number of lists
 
 ## List Object
 
-Represents a Things list (Inbox, Today, Anytime, etc.).
+A Things list (Inbox, Today, Anytime, etc.).
 
 **Properties:**
 - `id` (text, read-only) - Unique identifier
@@ -117,7 +117,7 @@ const today = app.lists.byId("TMTodayListSource");
 
 ## To Do Object
 
-Represents a Things to-do item.
+A Things to-do item.
 
 **Properties:**
 - `id` (text, read-only) - Unique identifier
@@ -300,7 +300,7 @@ if (home) {
 
 ## Tag Object
 
-Represents a Things tag.
+A Things tag.
 
 **Properties:**
 - `id` (text, read-only) - Unique identifier
@@ -372,7 +372,7 @@ JSON.stringify(contacts, null, 2);
 
 ## Status Enumeration
 
-Represents the status of a to-do or project.
+The status of a to-do or project.
 
 **Values:**
 - `open` - To-do is open/active
@@ -448,7 +448,7 @@ const workTodos = app.toDos.whose({tagNames: "Work"});
 
 ### Iterate with Map
 
-Map todos to JSON-friendly objects:
+Map todos to JSON-friendly objects.
 
 ```javascript
 const todos = app.lists.byId("TMTodayListSource")
@@ -465,7 +465,7 @@ JSON.stringify(todos, null, 2);
 
 ### Filter Arrays
 
-Use standard JavaScript array methods:
+Use standard JavaScript array methods.
 
 ```javascript
 const todos = today.toDos();
@@ -484,7 +484,7 @@ const overdue = todos.filter(todo => {
 
 ### Handle Dates
 
-Dates require conversion to/from JavaScript Date objects:
+Convert to/from JavaScript Date objects.
 
 ```javascript
 // Read date
@@ -504,7 +504,7 @@ todo.dueDate = null;
 
 ### Batch Operations
 
-Process multiple todos efficiently:
+Process multiple todos efficiently.
 
 ```javascript
 const app = Application("Things3");
@@ -524,7 +524,7 @@ inbox.toDos().forEach(todo => {
 
 ### Error Handling
 
-Wrap queries in try-catch for safety:
+Wrap queries in try-catch.
 
 ```javascript
 try {
@@ -579,13 +579,13 @@ JSON.stringify({
 
 ## Detecting Repeating Tasks
 
-Things does not expose repeating task configuration through JXA. However, repeating task instances can be reliably detected using a simple heuristic.
+Things does not expose repeating task configuration through JXA, but repeating instances can be detected with a heuristic.
 
 ### Detection Rule
 
 **A task is a repeating instance if `creationDate` is at midnight local time (00:00:00 in the local timezone).**
 
-When Things auto-generates a task from a repeating template, it sets the `creationDate` to midnight on the day the task is created. This is the reliable indicator that distinguishes repeating instances from manually created tasks, which have creation timestamps reflecting the actual time they were created.
+When Things auto-generates a task from a repeating template, it sets `creationDate` to midnight on the day created. This distinguishes repeating instances from manually created tasks, whose timestamps reflect the actual creation time.
 
 ### How Repeating Tasks Work
 

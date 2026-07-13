@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
@@ -24,55 +24,46 @@ function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | n
 }
 
 describe("processInput", () => {
-  it("returns null for non-open commands", () => {
-    expect(processInput(mockInput('shortcuts run "My Shortcut"'))).toBeNull();
-    expect(processInput(mockInput("ls -la"))).toBeNull();
-    expect(processInput(mockInput("echo open"))).toBeNull();
+  test.each<{ name: string; command: string; expected: "allow" | "deny" | null }>([
+    {
+      name: "non-open command: shortcuts run",
+      command: 'shortcuts run "My Shortcut"',
+      expected: null,
+    },
+    { name: "non-open command: ls", command: "ls -la", expected: null },
+    { name: "non-open command: echo open", command: "echo open", expected: null },
+    {
+      name: "opens a .shortcut file",
+      command: 'open "out/My Shortcut.shortcut"',
+      expected: "allow",
+    },
+    {
+      name: "single-quoted .shortcut path",
+      command: "open 'out/My Shortcut.shortcut'",
+      expected: "allow",
+    },
+    { name: "unquoted .shortcut path", command: "open out/MyShortcut.shortcut", expected: "allow" },
+    {
+      name: ".shortcut file with flags",
+      command: 'open -W "out/My Shortcut.shortcut"',
+      expected: "allow",
+    },
+    { name: "non-shortcut file", command: 'open "document.pdf"', expected: "deny" },
+    { name: "a URL", command: "open https://example.com", expected: "deny" },
+    { name: "an application", command: "open /Applications/Safari.app", expected: "deny" },
+    { name: "chained with semicolons", command: "open foo.shortcut; echo pwned", expected: "deny" },
+    { name: "chained with &&", command: "open foo.shortcut && rm -rf /", expected: "deny" },
+  ])("$name", ({ command, expected }) => {
+    const output = getOutput(mockInput(command));
+    if (expected === null) {
+      expect(output).toBeNull();
+    } else {
+      expect(output?.permissionDecision).toBe(expected);
+    }
   });
 
-  it("allows opening a .shortcut file", () => {
+  it("disables the sandbox when allowing a .shortcut file", () => {
     const output = getOutput(mockInput('open "out/My Shortcut.shortcut"'));
-    expect(output?.permissionDecision).toBe("allow");
     expect(output?.updatedInput).toEqual({ dangerouslyDisableSandbox: true });
-  });
-
-  it("allows single-quoted .shortcut path", () => {
-    const output = getOutput(mockInput("open 'out/My Shortcut.shortcut'"));
-    expect(output?.permissionDecision).toBe("allow");
-  });
-
-  it("allows unquoted .shortcut path", () => {
-    const output = getOutput(mockInput("open out/MyShortcut.shortcut"));
-    expect(output?.permissionDecision).toBe("allow");
-  });
-
-  it("denies opening non-shortcut files", () => {
-    const output = getOutput(mockInput('open "document.pdf"'));
-    expect(output?.permissionDecision).toBe("deny");
-  });
-
-  it("denies opening a URL", () => {
-    const output = getOutput(mockInput("open https://example.com"));
-    expect(output?.permissionDecision).toBe("deny");
-  });
-
-  it("denies opening an application", () => {
-    const output = getOutput(mockInput("open /Applications/Safari.app"));
-    expect(output?.permissionDecision).toBe("deny");
-  });
-
-  it("allows .shortcut file with flags", () => {
-    const output = getOutput(mockInput('open -W "out/My Shortcut.shortcut"'));
-    expect(output?.permissionDecision).toBe("allow");
-  });
-
-  it("denies when command is chained with semicolons", () => {
-    const output = getOutput(mockInput("open foo.shortcut; echo pwned"));
-    expect(output?.permissionDecision).toBe("deny");
-  });
-
-  it("denies when command is chained with &&", () => {
-    const output = getOutput(mockInput("open foo.shortcut && rm -rf /"));
-    expect(output?.permissionDecision).toBe("deny");
   });
 });

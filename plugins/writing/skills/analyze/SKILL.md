@@ -5,6 +5,7 @@ description: >-
   session history and surfacing candidate phrases. Use when refreshing trope
   detection, reviewing wordlist health, or mining sessions for new AI-writing
   patterns to add or stale rules to remove.
+argument-hint: "[--since date] [--model glob] [--judge]"
 disable-model-invocation: true
 allowed-tools:
   - Bash
@@ -16,9 +17,17 @@ allowed-tools:
 
 Mine the session DuckDB index for assistant writing patterns, compare against the user's voice, and propose a diff to `plugins/writing/wordlists/*.txt`.
 
+## Arguments
+
+Forward these from `$ARGUMENTS` to `analyze.ts` (see [Run](#run)):
+
+- `--since <date>`: restrict the corpus to sessions on or after the date. Default: the full index.
+- `--model <glob>`: restrict to matching model IDs (e.g. `*opus*`). Default: all models.
+- `--judge`: add the LLM-judge pass over the deliverable corpus. See [Meaning-Layer Judge](#meaning-layer-judge). Default: off.
+
 ## Prerequisites
 
-Activate the `claude-code:session` skill first. Run its refresh script to ensure the index is current and capture the DB path:
+Activate the `claude-code:session` skill first. Run its refresh script to update the index and capture the DB path:
 
 ```bash
 DB_PATH=$(<session-skill-dir>/scripts/refresh.ts --refresh)
@@ -26,7 +35,7 @@ DB_PATH=$(<session-skill-dir>/scripts/refresh.ts --refresh)
 
 The refresh script prints the resolved DB path to stdout.
 
-Build the local voice baseline once (and refresh it as new writing accumulates). It is the comparison surface for deliverable-aware rule health. The baseline is local-only and never committed. It is stored in the plugin data directory (`CLAUDE_PLUGIN_DATA`, else `~/.claude/plugins/data/writing-bendrucker`).
+Build the local voice baseline once, and refresh it as new writing accumulates. It is the comparison surface for deliverable-aware rule health, local-only and never committed, stored in the plugin data directory (`CLAUDE_PLUGIN_DATA`, else `~/.claude/plugins/data/writing-bendrucker`).
 
 ```bash
 # Seed from the already-present delimited corpus (no re-fetch needed)
@@ -37,7 +46,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/ingest-voice.ts --source github --author <user> 
 bun ${CLAUDE_SKILL_DIR}/scripts/voice-profile.ts
 ```
 
-Both scripts write to the plugin data directory. That path is outside the default sandbox allowlist, so run them with `dangerouslyDisableSandbox: true` (or via a terminal outside Claude Code).
+Both scripts write to the plugin data directory, outside the default sandbox allowlist, so run them with `dangerouslyDisableSandbox: true` (or via a terminal outside Claude Code).
 
 If no profile exists, analyze still runs: deliverable-surface rules fall back to the chat audit and the report flags the baseline as not loaded.
 
@@ -55,7 +64,7 @@ Run with `--help` for all flags. `--data-dir` overrides where the voice baseline
 
 ## Meaning-Layer Judge
 
-`--judge` adds an LLM-judge pass over the deliverable corpus (six binary criteria, information-density first). It requires `ANTHROPIC_API_KEY`, prints a cost estimate before any call, and caps documents with `--judge-limit` (default 100, roughly cents per run on the default Haiku-class model):
+`--judge` adds an LLM-judge pass over the deliverable corpus (six binary criteria, information-density first). It requires `ANTHROPIC_API_KEY`, prints a cost estimate before any call, and caps documents with `--judge-limit` (default 100, cents per run on the default Haiku-class model):
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --judge
@@ -71,11 +80,34 @@ bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts headings tmp/heading-labels.tsv
 
 See the "Meaning-Layer Judge" section of [references/methodology.md](references/methodology.md) for the rubric, prompt versioning, gate, and calibration protocol.
 
+## Hook Health
+
+The PreToolUse dispatcher (`hooks/pretooluse.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see the plugin README). That log is the runtime half of this skill's audit: the wordlist analysis judges rule precision from session history, and the health check judges hook behavior from what the dispatcher actually did.
+
+Run it before or alongside the wordlist audit:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts
+bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --since 2026-07-01 --json
+bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --log /path/to/log.jsonl
+```
+
+It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, and per-category fire/suppress counts. The report ends with an opportunities list, each naming a concrete fix:
+
+- a category dominating injections points at a precision audit of that rule (sample its firings from session history, then demote, narrow, or retire)
+- a category suppressed as often as it fires means the reminder is not changing behavior within sessions
+- any `ask` outcome is a regression (the numbering demotion expected zero) and names a rule to demote
+- silent-run p95 over budget points at the dispatcher's checker order and prefilters
+- a high `skipped-scratch` share warrants checking recent Write paths against `isScratchPath` for swallowed durable prose
+- a clean report is itself the signal: after two consecutive stable audits, flip the `WRITING_HOOKS_LOG` default to off
+
+Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
+
 ## Metrics
 
-**Lift**: how distinctive a phrase is to assistant output vs. user text. `lift = rate_assistant / rate_user_smoothed`, where rates are per-million-token frequencies. A lift of 10.0 means the assistant uses the phrase 10x more per token than the user. The `--min-lift` threshold (default 5.0) gates new candidate phrases only. Rule keep/remove uses a direct rate comparison plus `--min-count`, not lift (see methodology for why).
+**Lift**: how distinctive a phrase is to assistant output vs. user text. `lift = rate_assistant / rate_user_smoothed`, where rates are per-million-token frequencies. A lift of 10.0 means the assistant uses the phrase 10x more per token than the user. The `--min-lift` threshold (default 5.0) gates new candidate phrases only. Rule keep/remove uses a direct rate comparison plus `--min-count`, not lift (see methodology).
 
-**Session count**: number of distinct sessions containing a phrase. Candidates require session count >= 3 to filter project-specific jargon that dominates a single session.
+**Session count**: distinct sessions containing a phrase. Candidates require session count >= 3 to filter project-specific jargon that dominates a single session.
 
 ## Output
 
@@ -90,13 +122,13 @@ See the "Meaning-Layer Judge" section of [references/methodology.md](references/
 - Corrective feedback (short human messages naming a writing problem, with the preceding model output)
 - Correction candidates (long-assistant, short-user pairs suggesting prose pushback)
 
-Each rule is judged on the surface where the hook fires it. Chat-surface rules (openers, sycophantic patterns, conversational vocabulary) compare the model's chat against the user's chat. Deliverable-surface rules (`flowery-phrases.txt`, `soft-phrasing.txt`) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as **keep**, not dead. A rule the model uses far more than the baseline is kept even when its lift reads low. Lift is not used for removal decisions because the smoothed user baseline (see methodology) compresses it for any word the user never types, which would flag the model's strongest tells (`delve`, `comprehensive`, `robust`) for removal.
+Each rule is judged on the surface where the hook fires it. Chat-surface rules (openers, sycophantic patterns, conversational vocabulary) compare the model's chat against the user's chat. Deliverable-surface rules (`flowery-phrases.txt`, `soft-phrasing.txt`) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as **keep**, not dead. A rule the model uses far more than the baseline is kept even when its lift reads low. Lift is not used for removal: the smoothed user baseline (see methodology) compresses it for any word the user never types, which would flag the model's strongest tells (`delve`, `comprehensive`, `robust`) for removal.
 
 ## Corpora
 
 Four corpora, each serving a different purpose:
 
-- **All model-generated text**: conversational assistant text (`text-export`, role=assistant) combined with deliverable prose (`deliverable-prose.sql`). The session DB's `text_content` view only captures conversational text blocks, not tool inputs (Write/Edit/Bash). The deliverable query fills this gap. The combined corpus is used for n-gram candidates.
+- **All model-generated text**: conversational assistant text (`text-export`, role=assistant) combined with deliverable prose (`deliverable-prose.sql`). The session DB's `text_content` view captures only conversational text blocks, not tool inputs (Write/Edit/Bash); the deliverable query fills this gap. Used for n-gram candidates.
 - **Deliverable prose** (`deliverable-prose.sql`): Write/Edit to prose files, Bash commands with `--body`/`--message`/`-m`. The candidate-mining corpus and the model side of the deliverable-aware rule audit.
 - **Human-only user text** (`text-export`, role=user, filtered): the baseline for lift calculation. Filters out system-injected content (skill injections, context compaction summaries, task notifications, system reminders) and pasted model output (see methodology) that arrives as user-role messages but is machine-generated.
 - **Voice baseline** (local-only, `voice-profile.ts`): the user's hand-written, pre-AI pull requests. The baseline side of the deliverable-aware rule audit and the "absent from my baseline" signal for additions.
@@ -105,7 +137,7 @@ The FTS rule health audit uses `text_content` (a view covering both roles) with 
 
 ## Workflow
 
-Review the report. Edit `plugins/writing/wordlists/*.txt` by hand, then re-run to confirm. The skill never edits wordlists itself.
+Review the report. Edit `plugins/writing/wordlists/*.txt` by hand, then re-run to confirm. The skill never edits wordlists.
 
 ## Methodology
 

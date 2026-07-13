@@ -9,7 +9,7 @@ Generate a fresh UUID for each control flow block.
 
 ## If / Otherwise / End If
 
-Three actions sharing a `GroupingIdentifier`:
+Three actions sharing a `GroupingIdentifier`.
 
 ```xml
 <!-- If -->

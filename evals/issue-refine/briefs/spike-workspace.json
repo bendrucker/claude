@@ -1,0 +1,14 @@
+{
+  "id": "spike-workspace",
+  "type": null,
+  "brief": "We need to decide whether per-chat database state should be file-backed in object storage or kept in-memory per request. Timebox about a week. The output is a recommendation backed by benchmark numbers on a real environment, plus a follow-up implementation issue if we go ahead. This is an investigation, not a committed build.",
+  "context": {
+    "files": [
+      "agent/db/connection.py (today opens a fresh in-memory database per request in connect_loaded)",
+      "agent/db/workspace.py (does not exist yet; would hold the file-backed workspace)"
+    ],
+    "related_issues": [
+      "TEAM-970 — Per-request connection lifecycle hooks — https://tracker.example.com/issue/TEAM-970"
+    ]
+  }
+}

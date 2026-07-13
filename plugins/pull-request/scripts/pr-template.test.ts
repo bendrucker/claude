@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { execSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { findTemplate } from "./pr-template";
+
+type TemplateFile = [path: string, content: string];
 
 describe("findTemplate", () => {
   let tempDir: string;
@@ -22,55 +24,63 @@ describe("findTemplate", () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it("finds .github/PULL_REQUEST_TEMPLATE.md", async () => {
-    const dir = path.join(tempDir, ".github");
-    mkdirSync(dir);
-    await Bun.write(path.join(dir, "PULL_REQUEST_TEMPLATE.md"), "## Description\n");
-    expect(await findTemplate("github", tempDir)).toBe("## Description\n");
-  });
+  async function writeFiles(files: TemplateFile[]) {
+    for (const [file, content] of files) {
+      const dest = path.join(tempDir, file);
+      mkdirSync(path.dirname(dest), { recursive: true });
+      await Bun.write(dest, content);
+    }
+  }
 
-  it("finds lowercase pull_request_template.md", async () => {
-    await Bun.write(path.join(tempDir, "pull_request_template.md"), "## Summary\n");
-    expect(await findTemplate("github", tempDir)).toBe("## Summary\n");
-  });
-
-  it("finds docs/pull_request_template.md", async () => {
-    const dir = path.join(tempDir, "docs");
-    mkdirSync(dir);
-    await Bun.write(path.join(dir, "pull_request_template.md"), "## Changes\n");
-    expect(await findTemplate("github", tempDir)).toBe("## Changes\n");
-  });
-
-  it("prefers .github/ over root", async () => {
-    const dir = path.join(tempDir, ".github");
-    mkdirSync(dir);
-    await Bun.write(path.join(dir, "PULL_REQUEST_TEMPLATE.md"), "preferred\n");
-    await Bun.write(path.join(tempDir, "PULL_REQUEST_TEMPLATE.md"), "fallback\n");
-    expect(await findTemplate("github", tempDir)).toBe("preferred\n");
-  });
-
-  it("returns null when no template exists", async () => {
-    expect(await findTemplate("github", tempDir)).toBeNull();
-  });
-
-  it("finds gitlab default template", async () => {
-    const dir = path.join(tempDir, ".gitlab", "merge_request_templates");
-    mkdirSync(dir, { recursive: true });
-    await Bun.write(path.join(dir, "Default.md"), "## MR\n");
-    expect(await findTemplate("gitlab", tempDir)).toBe("## MR\n");
-  });
-
-  it("does not search github paths for gitlab provider", async () => {
-    const dir = path.join(tempDir, ".github");
-    mkdirSync(dir);
-    await Bun.write(path.join(dir, "PULL_REQUEST_TEMPLATE.md"), "github template\n");
-    expect(await findTemplate("gitlab", tempDir)).toBeNull();
-  });
-
-  it("does not search gitlab paths for github provider", async () => {
-    const dir = path.join(tempDir, ".gitlab", "merge_request_templates");
-    mkdirSync(dir, { recursive: true });
-    await Bun.write(path.join(dir, "Default.md"), "gitlab template\n");
-    expect(await findTemplate("github", tempDir)).toBeNull();
+  test.each<[string, TemplateFile[], "github" | "gitlab", string | null]>([
+    [
+      "finds .github/PULL_REQUEST_TEMPLATE.md",
+      [[".github/PULL_REQUEST_TEMPLATE.md", "## Description\n"]],
+      "github",
+      "## Description\n",
+    ],
+    [
+      "finds lowercase pull_request_template.md",
+      [["pull_request_template.md", "## Summary\n"]],
+      "github",
+      "## Summary\n",
+    ],
+    [
+      "finds docs/pull_request_template.md",
+      [["docs/pull_request_template.md", "## Changes\n"]],
+      "github",
+      "## Changes\n",
+    ],
+    [
+      "prefers .github/ over root",
+      [
+        [".github/PULL_REQUEST_TEMPLATE.md", "preferred\n"],
+        ["PULL_REQUEST_TEMPLATE.md", "fallback\n"],
+      ],
+      "github",
+      "preferred\n",
+    ],
+    ["returns null when no template exists", [], "github", null],
+    [
+      "finds gitlab default template",
+      [[".gitlab/merge_request_templates/Default.md", "## MR\n"]],
+      "gitlab",
+      "## MR\n",
+    ],
+    [
+      "does not search github paths for gitlab provider",
+      [[".github/PULL_REQUEST_TEMPLATE.md", "github template\n"]],
+      "gitlab",
+      null,
+    ],
+    [
+      "does not search gitlab paths for github provider",
+      [[".gitlab/merge_request_templates/Default.md", "gitlab template\n"]],
+      "github",
+      null,
+    ],
+  ])("%s", async (_name, files, provider, expected) => {
+    await writeFiles(files);
+    expect(await findTemplate(provider, tempDir)).toBe(expected);
   });
 });

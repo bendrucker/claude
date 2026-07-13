@@ -33,7 +33,7 @@ Generate Apple Shortcuts as XML property list files.
 - **OS**: !`uname -s`
 - **shortcuts CLI**: !`which shortcuts 2>/dev/null && echo "available" || echo "not available"`
 
-If the OS is **Darwin** (macOS), use the discovery CLI and the full deployment pipeline (convert, sign, import, run). If **Linux**, generate XML only — signing and import are unavailable. Inform the user.
+If the OS is **Darwin** (macOS), use the discovery CLI and the full deployment pipeline (convert, sign, import, run). If **Linux**, generate XML only — signing and import are unavailable; inform the user.
 
 ## Discovery
 
@@ -43,7 +43,7 @@ If the OS is **Darwin** (macOS), use the discovery CLI and the full deployment p
 
 ## Generation
 
-Write the shortcut as an XML plist. Load references as needed:
+Write the shortcut as an XML plist. Load references as needed.
 
 - **Starting a shortcut?** See [references/plist-structure.md](references/plist-structure.md) for top-level keys, icon, types
 - **Writing control flow?** See [references/control-flow.md](references/control-flow.md) for if/else, repeat, menu XML

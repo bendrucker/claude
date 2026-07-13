@@ -1,0 +1,55 @@
+{
+  "skill_name": "pull-request:create",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Open a PR for this fix. The session above traced the bug to a wrong theory first (we thought the exit code was lost) before finding the real cause, and we dropped a unit test because the test runner couldn't make it fail.",
+      "expected_output": "A prose-led body that leads with the real cause, names the disproven theory, and notes the dropped test with its reason. No reflexive section scaffold on a small fix.",
+      "files": [],
+      "expectations": [
+        "The body leads with intent or the real root cause, not a file-by-file summary",
+        "It surfaces the overturned theory that was discussed in the session, not just the final fix",
+        "It notes the dropped test and the concrete reason it was dropped",
+        "A small fix is a tight paragraph with no reflexive ## Changes plus ## Testing scaffold",
+        "No test counts and no 'all tests pass' phrasing"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a PR for this skill change. We deviated from the plan: an extra allowed-tools entry was added beyond what the plan listed, and you renamed the two modes mid-session at my request.",
+      "expected_output": "A body that surfaces the added scope and the user-driven rename as the self-contained decisions they were, organized by concept, without framing them as a delta against a plan the reader can't see.",
+      "files": [],
+      "expectations": [
+        "The body states the added scope (the extra allowed-tools entry) as a decision with its reason, rather than smoothing it over",
+        "It does not reference 'the plan', 'as planned', or any unseen spec or conversation; the scope change reads as a self-contained decision",
+        "It does not make a false claim that contradicts the diff (e.g. naming the wrong set of additions)",
+        "The user-driven naming decision is surfaced as a decision, not presented as obvious",
+        "Changes are organized by concept, never as **path**: description bullets"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write the PR body. I verified this manually against the live tool since it couldn't be unit tested, and I benchmarked the slow path.",
+      "expected_output": "A body whose testing notes state what was observed and what could not be automated, with the concrete reason, not a coverage inventory.",
+      "files": [],
+      "expectations": [
+        "Testing notes state what manual verification showed or what breaks without the fix, not that tests exist",
+        "What could not be tested is named with a concrete reason",
+        "Benchmark or observed numbers from the session appear in the body",
+        "No test counts, no 'all tests pass', no listing of test file names without coverage detail"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Open a PR for this multi-part change. It refactors the auth callback handler, narrows the 401/403 error matching, and persists the DCR client ID. I deferred the token-refresh rework and left the existing retry behavior unchanged.",
+      "expected_output": "A sectioned body whose headings are Title-Cased noun phrases naming each topic, with deferred and unchanged work named as topics rather than as meta-headings.",
+      "files": [],
+      "expectations": [
+        "Section headings are Title-Cased noun phrases, not sentences, fragments, or questions",
+        "No heading carries a qualifying tail, a trailing clause, or a parenthetical that belongs in the body",
+        "Deferred and unchanged work is named by topic (e.g. Deferred Work, Unchanged Behavior), not as a What Changed or What I Didn't Do meta-heading",
+        "No Why/What/How question headings and no sentence-case headings"
+      ]
+    }
+  ]
+}

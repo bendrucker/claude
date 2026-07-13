@@ -27,7 +27,7 @@ for (var i = 0; i < windows.length; i++) {
 
 ## Script Files
 
-Script files define a `function run(argv)` entry point. `osascript` calls it automatically and prints the return value. The function must be named `run`, not `_run`.
+Script files define a `function run(argv)` entry point. `osascript` calls it and prints the return value. The function must be named `run`, not `_run`.
 
 ```javascript
 #!/usr/bin/env osascript -l JavaScript

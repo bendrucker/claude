@@ -1,0 +1,13 @@
+{
+  "id": "get-records-asserted-count-why",
+  "path": "src/agents/whirl/integrations/salesforce/duckdb/get_records.py",
+  "language": "python",
+  "kind": "block",
+  "comment": "# asserted != 0 covers both a positive count (rows claimed but absent here)\n    # and a NULL/missing count (emptiness unverifiable); only an explicit 0 is\n    # genuinely empty. A materialized object never reaches here.",
+  "context": "1241:     if coverage.get(\"status\") != _COVERAGE_STATUS_OK:\n1242:         return CoverageBoundary(\n1243:             complete=False,\n1244:             incomplete=[resolved.display_name],\n1245:             reason=f\"status {coverage.get('status')!r}, not '{_COVERAGE_STATUS_OK}'\",\n1246:         )\n1247:     # asserted != 0 covers both a positive count (rows claimed but absent here)\n1248:     # and a NULL/missing count (emptiness unverifiable); only an explicit 0 is\n1249:     # genuinely empty. A materialized object never reaches here.\n1250:     asserted = coverage.get(\"asserted_row_count\")\n1251:     if not resolved.materialized and asserted != 0:",
+  "action": "keep",
+  "category": null,
+  "trimToLines": null,
+  "source": "main get_records.py:1247",
+  "note": "Must-pass. Explains why the predicate is asserted != 0 rather than a positive-count test: it folds the unverifiable NULL/missing case in with the rows-claimed case, treating only an explicit 0 as empty. The boolean alone does not show that intent."
+}

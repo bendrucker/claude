@@ -4,7 +4,7 @@ Common issues, solutions, and best practices for Things automation.
 
 ## Things App Not Running
 
-JXA commands require Things 3 to be running. If not running, you'll see errors like:
+JXA commands require Things 3 to be running. If not, you'll see errors like:
 
 ```
 Error: Application can't be found.
@@ -20,14 +20,15 @@ The `-g` flag opens in background without stealing focus.
 
 ### Sandbox Errors vs App Not Running
 
-**Important**: Sandbox permission errors can look similar to "app not running" errors. If you see errors about file access or permissions, the issue is likely sandbox restrictions, not Things being closed.
+Sandbox permission errors can look similar to "app not running" errors. If you see errors about file access or permissions, the issue is likely sandbox restrictions, not Things being closed.
 
 Sandbox errors typically mention:
 - `Operation not permitted`
 - `Sandbox: deny`
 - File path access errors
+- `A privilege violation occurred. (-10004)`
 
-The skill's inline hook automatically runs wrapper commands outside the sandbox. If you still see sandbox errors, verify the hook is active or run the command with `dangerouslyDisableSandbox: true`.
+Sandboxed `osascript` Apple Events to Things3 fail with `-10004` even with `sandbox.allowAppleEvents` set (that key covers Launch Services `open`/URL handoff, not `osascript`). The `mac:jxa-run` skill's inline hook runs the JXA runner outside the sandbox for this reason. If you see `-10004`, verify that hook is active or run the command with `dangerouslyDisableSandbox: true`.
 
 ## Updates Not Working
 
@@ -87,7 +88,7 @@ open "things:///update?id=TODO_ID&auth-token=$auth_token&list-id=AREA_ID"
 
 ## Filtering Repeating Tasks
 
-Things doesn't expose repeating task configuration through JXA, but you can detect repeating instances using a reliable heuristic.
+Things doesn't expose repeating task configuration through JXA, but you can detect repeating instances with a heuristic.
 
 ### Detection Rule
 
@@ -115,7 +116,7 @@ isRepeating ? "Repeating instance" : "Manual task"
 
 ### Filter Out Repeating Tasks
 
-Exclude repeating instances from processing:
+Exclude repeating instances from processing.
 
 ```bash
 osascript -l JavaScript -e '
@@ -136,7 +137,7 @@ JSON.stringify(result, null, 2)
 
 ### Finding Repeating Templates
 
-Templates are todos with `activationDate: null`:
+Templates are todos with `activationDate: null`.
 
 ```bash
 osascript -l JavaScript -e '
@@ -155,7 +156,7 @@ JSON.stringify(templates, null, 2)
 
 ### Matching Instances to Templates
 
-Find the template for a specific instance:
+Find the template for a specific instance.
 
 ```bash
 osascript -l JavaScript -e '
@@ -198,7 +199,7 @@ osascript -l JavaScript -e 'var app = Application("Things3"); app.toDos.byId("AB
 
 ### Retrieve Auth Token Per Session
 
-Don't hardcode tokens; retrieve from keychain when needed:
+Don't hardcode tokens; retrieve from keychain when needed.
 
 ```bash
 # At start of automation session
@@ -211,7 +212,7 @@ open "things:///update?id=DEF-456&auth-token=$AUTH_TOKEN&..."
 
 ### URL Encode Properly
 
-Use `jq` for reliable URL encoding:
+Use `jq` for URL encoding.
 
 ```bash
 # Encode notes
@@ -224,7 +225,7 @@ open "things:///update?id=ABC-123&auth-token=$auth_token&append-notes=$encoded"
 
 ### Handle Missing Values
 
-Use optional chaining in JXA for properties that might be null:
+Use optional chaining in JXA for properties that might be null.
 
 ```javascript
 const todo = app.toDos.byId("ABC-123");
@@ -244,7 +245,7 @@ const todos = today.toDos().map(todo => ({
 
 ### Batch Operations Carefully
 
-Respect rate limits (250 operations per 10 seconds):
+Respect rate limits (250 operations per 10 seconds).
 
 ```bash
 # Add small delays between operations
@@ -256,7 +257,7 @@ done
 
 ## Reorder Script Issues
 
-The `scripts/reorder.ts` script requires running outside the sandbox to access the keychain for auth tokens. The `things:url` skill's inline hook automatically handles this.
+`scripts/reorder.ts` requires running outside the sandbox to access the keychain for auth tokens. The `things:url` skill's inline hook handles this.
 
 If reorder fails with permission errors:
 1. Verify the hook is active (check skill frontmatter)

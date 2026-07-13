@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: hands off to Launch Services (open/xcall) for Things URL schemes
+// claude:dangerouslyDisableSandbox: hands off to open/xcall for Things URL schemes and osascript via ensure-running, which the command sandbox blocks
 
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -95,7 +95,7 @@ async function openUrl(
       const stderr = error.stderr.toString();
       if (isSandboxBlockedHandoff(stderr)) {
         throw new Error(
-          `Things URL handoff was blocked by the Claude Code sandbox (LaunchServices procNotFound / -10810 / -10673). The mac plugin's sandbox hook should disable the sandbox when this script carries the claude:dangerouslyDisableSandbox marker; verify the mac plugin is installed, or rerun the calling tool with sandbox disabled. Original stderr: ${stderr.trim()}`,
+          `Things URL handoff was blocked by the Claude Code sandbox (LaunchServices procNotFound / -10810 / -10673). Launch Services handoff requires sandbox.allowAppleEvents in user/settings.json. Original stderr: ${stderr.trim()}`,
         );
       }
     }

@@ -34,17 +34,27 @@ describe("type-ignore detection hook", () => {
 
   describe("isCleanupAgentActive", () => {
     it("returns false when no marker exists", async () => {
-      expect(await isCleanupAgentActive()).toBe(false);
+      expect(await isCleanupAgentActive("test-session")).toBe(false);
     });
 
     it("returns true when recent marker exists", async () => {
-      const sessionId = process.env.CLAUDE_SESSION_ID || "unknown";
+      const sessionId = "test-session";
       const markerPath = path.join(MARKER_DIR, sessionId);
 
       mkdirSync(MARKER_DIR, { recursive: true });
       await Bun.write(markerPath, String(Date.now()));
 
-      expect(await isCleanupAgentActive()).toBe(true);
+      expect(await isCleanupAgentActive(sessionId)).toBe(true);
+    });
+
+    it("keeps markers independent across session ids", async () => {
+      const markerPath = path.join(MARKER_DIR, "session-a");
+
+      mkdirSync(MARKER_DIR, { recursive: true });
+      await Bun.write(markerPath, String(Date.now()));
+
+      expect(await isCleanupAgentActive("session-a")).toBe(true);
+      expect(await isCleanupAgentActive("session-b")).toBe(false);
     });
   });
 
@@ -102,9 +112,8 @@ describe("type-ignore detection hook", () => {
       expect(result).toBeNull();
     });
 
-    it("suppresses when cleanup agent is active", async () => {
-      const sessionId = process.env.CLAUDE_SESSION_ID || "unknown";
-      const markerPath = path.join(MARKER_DIR, sessionId);
+    it("suppresses when cleanup agent is active for the same session", async () => {
+      const markerPath = path.join(MARKER_DIR, "test-session");
 
       mkdirSync(MARKER_DIR, { recursive: true });
       await Bun.write(markerPath, String(Date.now()));
@@ -117,6 +126,22 @@ describe("type-ignore detection hook", () => {
 
       const result = await processInput(input);
       expect(result).toBeNull();
+    });
+
+    it("does not suppress when cleanup agent is active for a different session", async () => {
+      const markerPath = path.join(MARKER_DIR, "other-session");
+
+      mkdirSync(MARKER_DIR, { recursive: true });
+      await Bun.write(markerPath, String(Date.now()));
+
+      const input = mockPostToolUseInput("Edit", {
+        file_path: "/path/to/file.ts",
+        old_string: "const x = bad();",
+        new_string: "// @ts-ignore\nconst x = bad();",
+      });
+
+      const result = await processInput(input);
+      expect(result).not.toBeNull();
     });
 
     it("returns null when no new ignore added", async () => {

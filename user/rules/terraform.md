@@ -8,7 +8,7 @@ paths:
 
 ## Version-Specific Guidance
 
-**CRITICAL**: Before providing any language syntax or CLI advice, run `terraform version` to determine the project's Terraform version.
+**CRITICAL**: Before providing any language syntax or CLI advice, run `terraform version` to determine the project's version.
 
 ```bash
 terraform version

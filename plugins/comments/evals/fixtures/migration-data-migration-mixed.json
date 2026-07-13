@@ -1,0 +1,15 @@
+{
+  "id": "migration-data-migration-mixed",
+  "path": "migrations/versions/9f1891b12937_refactor_message_parts_to_use_pydantic_.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# Data migration: Convert tool-{name} types to tool_call/tool_return\n    # Tool calls have tool_args, tool returns have tool_content",
+  "context": "59: \n60:     # Data migration: Convert tool-{name} types to tool_call/tool_return\n61:     # Tool calls have tool_args, tool returns have tool_content\n62:     op.execute(\"\"\"\n63:         UPDATE message_parts\n64:         SET type = CASE\n65:             WHEN tool_content IS NOT NULL THEN 'tool_return'\n66:             ELSE 'tool_call'\n67:         END\n68:         WHERE type LIKE 'tool-%'\n69:     \"\"\")",
+  "action": "trim",
+  "category": "restate-the-what",
+  "trimToLines": [
+    2
+  ],
+  "source": "main migrations/9f1891b12937:60",
+  "note": "Mixed block. Line 1 restates the UPDATE ... SET type = CASE below it. Line 2 (tool calls have tool_args, tool returns have tool_content) is the genuine why: it explains the tool_content-is-not-null heuristic the CASE keys on, which the SQL alone does not motivate."
+}

@@ -70,16 +70,12 @@ export function findLineNumber(content: string, pattern: string): number {
   return 1;
 }
 
-function getSessionId(): string {
-  return process.env.CLAUDE_SESSION_ID || "unknown";
+function getMarkerPath(sessionId: string): string {
+  return path.join(MARKER_DIR, sessionId || "unknown");
 }
 
-function getMarkerPath(): string {
-  return path.join(MARKER_DIR, getSessionId());
-}
-
-export async function isCleanupAgentActive(): Promise<boolean> {
-  const markerPath = getMarkerPath();
+export async function isCleanupAgentActive(sessionId: string): Promise<boolean> {
+  const markerPath = getMarkerPath(sessionId);
   const file = Bun.file(markerPath);
   if (!(await file.exists())) return false;
   const age = Date.now() - file.lastModified;
@@ -90,9 +86,9 @@ export async function isCleanupAgentActive(): Promise<boolean> {
   return true;
 }
 
-async function setMarker(): Promise<void> {
+async function setMarker(sessionId: string): Promise<void> {
   mkdirSync(MARKER_DIR, { recursive: true });
-  await Bun.write(getMarkerPath(), String(Date.now()));
+  await Bun.write(getMarkerPath(sessionId), String(Date.now()));
 }
 
 export function formatOutput(
@@ -139,7 +135,7 @@ export async function processInput(
     return null;
   }
 
-  if (await isCleanupAgentActive()) {
+  if (await isCleanupAgentActive(input.session_id)) {
     return null;
   }
 
@@ -150,7 +146,7 @@ export async function processInput(
 
   const lineNumber = findLineNumber(newContent, pattern.match);
 
-  await setMarker();
+  await setMarker(input.session_id);
 
   return formatOutput(filePath, lineNumber, pattern.label);
 }

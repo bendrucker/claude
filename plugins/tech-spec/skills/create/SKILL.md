@@ -46,11 +46,9 @@ Invoke `interview:plan` to clarify requirements. Guide the interview toward:
 
 ### Write Initial Draft
 
-Write incrementally to the output file. Use the template structure from [references/template.md](references/template.md).
+Write incrementally to the output file, section by section. Use the template structure from [references/template.md](references/template.md).
 
-For architecture diagrams, always use `mermaid:diagram` to ensure proper syntax and rendering.
-
-Write sections incrementally.
+For architecture diagrams, always use `mermaid:diagram` for correct syntax and rendering.
 
 ### Expert Review
 
@@ -58,7 +56,7 @@ Invoke `tech-spec:review` on the draft spec.
 
 ### Iterate
 
-Continue refining until the user is satisfied. Long sessions with incremental changes create drift—validate consistency before concluding:
+Refine until the user is satisfied. Long sessions with incremental changes create drift—validate consistency before concluding:
 
 - **Stale references**: Scope changes in one section may leave dangling references elsewhere
 - **Contradictions**: Later decisions may conflict with earlier sections
@@ -78,7 +76,7 @@ Captures architecture trade-offs:
 |----------|--------|--------------|-----------|-------|
 | Brief description | What we chose | What we didn't | Why this choice | Caveats, follow-ups |
 
-Populate this table throughout the process as decisions emerge. Focus on:
+Populate as decisions emerge. Focus on:
 - Choices that required deliberation
 - Trade-offs between valid alternatives
 - Decisions that future readers would question

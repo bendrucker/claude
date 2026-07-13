@@ -3,7 +3,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { $ } from "bun";
-import { merge } from "./merge";
+import { errorText, merge } from "./merge";
 
 interface StackRef {
   prev: string;
@@ -72,7 +72,7 @@ for (const ref of refs) {
   try {
     await merge(ref.branch, { autoMerge: true });
     console.log(`auto-merge enabled: ${ref.branch}`);
-  } catch {
-    console.error(`failed: ${ref.branch}`);
+  } catch (err) {
+    console.error(`failed: ${ref.branch}: ${errorText(err)}`);
   }
 }

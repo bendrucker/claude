@@ -12,24 +12,18 @@
       "Bash(brew info:*)",
       "Skill(bun:bun)",
       "Skill(claude-code:agent-team)",
-      "Skill(claude-code:changelog)",
       "Skill(claude-code:hook)",
       "Skill(claude-code:session)",
       "Skill(claude-code:skill)",
-      "Skill(claude-code:skill-creator)",
       "Skill(code-review)",
       "Skill(git:conflicts)",
-      "Skill(git:fix-conflicts)",
-      "Skill(git:git)",
       "Skill(github:actions-monitor)",
-      "Skill(github:notifications)",
       "Skill(github:pr-comments)",
-      "Skill(plan:guidelines)",
       "Skill(pull-request:babysit)",
       "Skill(pull-request:create)",
       "Skill(pull-request:follow-up)",
       "Skill(pull-request:update)",
-      "Skill(review:dashboard)",
+      "Skill(review:inbox)",
       "Skill(review:follow-up)",
       "Skill(review:peer)",
       "Skill(review:self)",
@@ -58,6 +52,11 @@
             "type": "command",
             "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\"",
             "if": "Edit(**/*.ts)|Edit(**/*.tsx)|Edit(**/*.js)|Edit(**/*.jsx)|Edit(**/*.json)|Edit(**/*.jsonc)|Write(**/*.ts)|Write(**/*.tsx)|Write(**/*.js)|Write(**/*.jsx)|Write(**/*.json)|Write(**/*.jsonc)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/coverage\"",
+            "if": "Edit(**/*.ts)|Write(**/*.ts)"
           }
         ]
       }
@@ -72,6 +71,10 @@
           {
             "type": "command",
             "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/plugin-imports\""
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/plugin-deps\""
           },
           {
             "type": "command",

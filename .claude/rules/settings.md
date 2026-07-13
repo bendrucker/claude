@@ -17,7 +17,7 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 
 ## Sandbox and Nested Commands
 
-`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. The working mechanism is the `mac` plugin's marker-based sandbox hook, which reads a `claude:dangerouslyDisableSandbox` comment from the invoked script. See [`scripts.md`](scripts.md) for the mechanism and canonical examples.
+`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. Go CLIs run sandboxed via `sandbox.network.allowMachLookup`; wrappers that hand off to Apple Events or Launch Services need a full skip via the `mac` plugin's `claude:dangerouslyDisableSandbox` marker hook. See [`scripts.md`](scripts.md).
 
 ## Sandbox Trust Model
 
@@ -25,7 +25,7 @@ The sandbox is egress control, not filesystem lockdown. Credentials stay outside
 
 ### Hosts (`WebFetch(domain:...)` Permissions)
 
-- Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`.
+- Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `community-extensions.duckdb.org` (DuckDB community extensions `markdown`/`yaml`, fetched on first `INSTALL ... FROM community`).
 - Docs and source: `docs.anthropic.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`.
 - Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`. Trusted only because each secret lives outside the sandbox.
 
@@ -43,7 +43,7 @@ Treat this section as a trust model, not an exhaustive mirror of `settings.json`
 
 Run outside the sandbox; only the top-level command matches (see [Sandbox and Nested Commands](#sandbox-and-nested-commands)).
 
-- Self-authenticating network tools: `git`, `gh`, `linear`, `aws`, `gcloud`, `az`, `ssh`, `scp`, `rsync`, `docker`. Each carries its own auth and already reaches the network.
+- Self-authenticating network tools: `git`, `linear`, `aws`, `gcloud`, `az`, `ssh`, `scp`, `rsync`, `docker`. Each carries its own auth and already reaches the network.
 - macOS host integration (`mac` plugin): `open`, `osascript`, `shortcuts`, `pbcopy`, `pbpaste`, `security`, `defaults`, `screencapture`, `say`, `afplay`, `diskutil`, `networksetup`, `dscl`. Host APIs the sandbox cannot model.
 - Local session tooling: `wt`, `claude`, `agent-browser`, `code`. Worktree, session, and editor control that stays local.
 

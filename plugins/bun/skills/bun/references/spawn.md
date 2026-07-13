@@ -44,7 +44,7 @@ console.log(proc.exitCode); // 1
 
 ## Bun.spawnSync
 
-For synchronous execution, use `Bun.spawnSync`:
+For synchronous execution:
 
 ```ts
 const result = Bun.spawnSync(["echo", "hello"]);

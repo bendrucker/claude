@@ -20,88 +20,55 @@ function findViolation(violations: Violation[], issue: string): Violation | unde
 
 describe("validate", () => {
   describe("example assets", () => {
-    it("accepts a well-formed login screen", async () => {
-      const svg = await loadAsset("login-screen");
-      const violations = validate(svg);
-      expect(violations).toHaveLength(0);
-    });
-
-    it("accepts nested groups within bounds", async () => {
-      const svg = await loadAsset("nested-groups");
-      const violations = validate(svg);
-      expect(violations).toHaveLength(0);
-    });
-
-    it("accepts a two-column layout", async () => {
-      const svg = await loadAsset("two-column");
-      const violations = validate(svg);
-      expect(violations).toHaveLength(0);
-    });
-
-    it("accepts a grid layout", async () => {
-      const svg = await loadAsset("grid");
-      const violations = validate(svg);
-      expect(violations).toHaveLength(0);
-    });
-
-    it("accepts a table layout", async () => {
-      const svg = await loadAsset("table");
-      const violations = validate(svg);
-      expect(violations).toHaveLength(0);
-    });
-
-    it("accepts a form layout", async () => {
-      const svg = await loadAsset("form");
-      const violations = validate(svg);
-      expect(violations).toHaveLength(0);
-    });
-
-    it("accepts a modal dialog", async () => {
-      const svg = await loadAsset("modal");
+    it.each([
+      "login-screen",
+      "nested-groups",
+      "two-column",
+      "grid",
+      "table",
+      "form",
+      "modal",
+    ])("accepts %s", async (name) => {
+      const svg = await loadAsset(name);
       const violations = validate(svg);
       expect(violations).toHaveLength(0);
     });
   });
 
   describe("invalid fixtures", () => {
-    it("rejects SVG without width/height attributes", async () => {
-      const svg = await loadFixture("missing-dimensions");
+    it.each<{ name: string; fixture: string; issue: string; exactCount?: number }>([
+      {
+        name: "missing width/height attributes",
+        fixture: "missing-dimensions",
+        issue: "missing-dimensions",
+        exactCount: 1,
+      },
+      {
+        name: "element extending outside canvas",
+        fixture: "element-out-of-bounds",
+        issue: "out-of-bounds",
+      },
+      { name: "overlapping sibling elements", fixture: "overlapping-elements", issue: "overlap" },
+      {
+        name: "text extending outside container",
+        fixture: "text-outside-container",
+        issue: "out-of-bounds",
+      },
+      {
+        name: "group extending outside canvas",
+        fixture: "group-out-of-bounds",
+        issue: "out-of-bounds",
+      },
+    ])("detects $name", async ({ fixture, issue, exactCount }) => {
+      const svg = await loadFixture(fixture);
       const violations = validate(svg);
 
-      expect(violations).toHaveLength(1);
-      expect(findViolation(violations, "missing-dimensions")).toBeDefined();
-    });
-
-    it("detects elements extending outside canvas", async () => {
-      const svg = await loadFixture("element-out-of-bounds");
-      const violations = validate(svg);
-
-      expect(violations.length).toBeGreaterThan(0);
-      expect(findViolation(violations, "out-of-bounds")).toBeDefined();
-    });
-
-    it("detects overlapping sibling elements", async () => {
-      const svg = await loadFixture("overlapping-elements");
-      const violations = validate(svg);
-
-      expect(violations.length).toBeGreaterThan(0);
-      expect(findViolation(violations, "overlap")).toBeDefined();
-    });
-
-    it("detects text extending outside container", async () => {
-      const svg = await loadFixture("text-outside-container");
-      const violations = validate(svg);
-
-      expect(violations.length).toBeGreaterThan(0);
-      expect(findViolation(violations, "out-of-bounds")).toBeDefined();
-    });
-
-    it("detects group extending outside canvas", async () => {
-      const svg = await loadFixture("group-out-of-bounds");
-      const violations = validate(svg);
-
-      expect(violations.length).toBeGreaterThan(0);
-      expect(findViolation(violations, "out-of-bounds")).toBeDefined();
+      if (exactCount !== undefined) {
+        expect(violations).toHaveLength(exactCount);
+      } else {
+        expect(violations.length).toBeGreaterThan(0);
+      }
+      expect(findViolation(violations, issue)).toBeDefined();
     });
   });
 });
@@ -128,35 +95,41 @@ describe("validateFiles", () => {
 });
 
 describe("circle and ellipse elements", () => {
-  it("accepts circle within bounds", () => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  it.each<{ name: string; svg: string; expectViolation: boolean }>([
+    {
+      name: "circle within bounds",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
       <circle cx="50" cy="50" r="40" fill="none" stroke="black"/>
-    </svg>`;
-    const violations = validate(svg);
-    expect(violations).toHaveLength(0);
-  });
-
-  it("detects circle out of bounds", () => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+    </svg>`,
+      expectViolation: false,
+    },
+    {
+      name: "circle out of bounds",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
       <circle cx="50" cy="50" r="60" fill="none" stroke="black"/>
-    </svg>`;
-    const violations = validate(svg);
-    expect(findViolation(violations, "out-of-bounds")).toBeDefined();
-  });
-
-  it("accepts ellipse within bounds", () => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+    </svg>`,
+      expectViolation: true,
+    },
+    {
+      name: "ellipse within bounds",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
       <ellipse cx="50" cy="50" rx="40" ry="30" fill="none" stroke="black"/>
-    </svg>`;
-    const violations = validate(svg);
-    expect(violations).toHaveLength(0);
-  });
-
-  it("detects ellipse out of bounds", () => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+    </svg>`,
+      expectViolation: false,
+    },
+    {
+      name: "ellipse out of bounds",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
       <ellipse cx="50" cy="50" rx="60" ry="30" fill="none" stroke="black"/>
-    </svg>`;
+    </svg>`,
+      expectViolation: true,
+    },
+  ])("$name", ({ svg, expectViolation }) => {
     const violations = validate(svg);
-    expect(findViolation(violations, "out-of-bounds")).toBeDefined();
+    if (expectViolation) {
+      expect(findViolation(violations, "out-of-bounds")).toBeDefined();
+    } else {
+      expect(violations).toHaveLength(0);
+    }
   });
 });

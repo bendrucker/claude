@@ -1,0 +1,8 @@
+{
+  "name": "activitywatch",
+  "description": "Query local ActivityWatch usage data: per-app time, window titles, and active vs idle spans",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

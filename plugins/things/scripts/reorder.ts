@@ -26,22 +26,26 @@ async function updateWhen(ids: string[], when: string): Promise<void> {
   await dispatch("json", params);
 }
 
-async function reorder(targetList: string, ids: string[]): Promise<void> {
+export interface ReorderResult {
+  success: true;
+  list: string;
+  reordered: number;
+}
+
+export async function reorder(targetList: string, ids: string[]): Promise<ReorderResult> {
   if (ids.length === 0) {
-    console.error("No IDs provided");
-    process.exit(1);
+    throw new Error("No IDs provided");
   }
 
   const intermediate = INTERMEDIATE_LIST[targetList];
   if (!intermediate) {
-    console.error(`Invalid list: ${targetList}`);
-    process.exit(1);
+    throw new Error(`Invalid list: ${targetList}`);
   }
 
   await updateWhen(ids, intermediate);
   await updateWhen(ids, targetList);
 
-  console.log(JSON.stringify({ success: true, list: targetList, reordered: ids.length }));
+  return { success: true, list: targetList, reordered: ids.length };
 }
 
 if (import.meta.main) {
@@ -58,5 +62,11 @@ if (import.meta.main) {
   });
 
   await ensureThingsRunning();
-  await reorder(argv.flags.list, argv._.ids);
+  try {
+    const result = await reorder(argv.flags.list, argv._.ids);
+    console.log(JSON.stringify(result));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }

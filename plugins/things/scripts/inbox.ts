@@ -7,8 +7,7 @@ import { dispatch } from "./url";
 
 const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-items"]);
 
-function buildAttribution(sessionId: string): string {
-  const dir = process.cwd();
+export function buildAttribution(sessionId: string, dir: string = process.cwd()): string {
   return `---\n\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\ncd ${dir} && claude --resume ${sessionId}\n\`\`\``;
 }
 

@@ -19,6 +19,10 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 - `scripts/url.ts` — URL scheme wrapper with auth token, encoding, and bulk update via JSON command
 - `scripts/reorder.ts` — List reordering via URL scheme (bun TypeScript, reuses `url.ts` exports)
 
+### MCP Server
+
+- `src/mcp/`: remote MCP server (Streamable HTTP, OAuth via tsidp) wrapping the read scripts and write modules above. See [`src/mcp/README.md`](src/mcp/README.md) for deployment.
+
 Write verification uses the `x-callback-url` plugin's `xcall` skill.
 
 ## Testing

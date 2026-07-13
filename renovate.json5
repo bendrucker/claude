@@ -40,5 +40,14 @@
       semanticCommits: "disabled",
       automerge: false,
     },
+    {
+      // Digest bumps track a moving branch, so Renovate's version-delta changelog
+      // engine has no release range to render. Link the GitHub compare view instead
+      // so the commit list between the old and new SHA is one click away.
+      matchDatasources: ["git-refs"],
+      prBodyNotes: [
+        "📜 **Changelog**: [`{{{currentDigestShort}}}` → `{{{newDigestShort}}}`](https://github.com/{{{depName}}}/compare/{{{currentDigest}}}...{{{newDigest}}})",
+      ],
+    },
   ],
 }

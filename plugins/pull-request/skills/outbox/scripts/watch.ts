@@ -34,9 +34,18 @@ const { queue: queues, interval, staleDays } = argv.flags;
 // macOS due to PATH-stripped eval and nice(5) restrictions. Each printed URL is
 // one newly-actionable PR/MR not yet dispatched a babysit watcher; that is the
 // event the orchestrator reacts to.
+//
+// A transient I/O failure in a single pass (disk full, NFS hiccup, corrupt
+// state file) must not end the session-long watch. Report it to stderr and keep
+// looping so the next pass can recover.
 while (true) {
-  for (const url of await pollOnce(queues, dataDir, staleDays, new Date())) {
-    console.log(url);
+  try {
+    for (const url of await pollOnce(queues, dataDir, staleDays, new Date())) {
+      console.log(url);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ type: "poll-error", detail: message }));
   }
   await sleep(interval * 1000);
 }

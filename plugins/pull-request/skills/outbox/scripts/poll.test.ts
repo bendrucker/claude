@@ -30,12 +30,14 @@ describe("renderNeedsAction", () => {
         },
       ]),
     );
-    expect(md).toBe(
-      "# Needs action\n\n" +
-        "| Needs | CI | Review | Updated | PR |\n" +
-        "| --- | --- | --- | --- | --- |\n" +
-        "| CI failing | red | none | 2026-06-18 | https://github.com/o/r/pull/1 |\n",
-    );
+    expect(md).toMatchInlineSnapshot(`
+      "# Needs action
+
+      | Needs | CI | Review | Updated | PR |
+      | --- | --- | --- | --- | --- |
+      | CI failing | red | none | 2026-06-18 | https://github.com/o/r/pull/1 |
+      "
+    `);
   });
 
   test("reports the empty queue plainly", () => {
@@ -48,19 +50,21 @@ describe("fetchEntries", () => {
     const result = await fetchEntries(
       `echo '[{"url":"u","platform":"github","ci":"red","review":"none","isDraft":false,"updatedAt":"2026-06-19T00:00:00Z"}]'`,
     );
-    expect(result).toEqual({
-      ok: true,
-      entries: [
-        {
-          url: "u",
-          platform: "github",
-          ci: "red",
-          review: "none",
-          isDraft: false,
-          updatedAt: "2026-06-19T00:00:00Z",
-        },
-      ],
-    });
+    expect(result).toMatchInlineSnapshot(`
+      {
+        "entries": [
+          {
+            "ci": "red",
+            "isDraft": false,
+            "platform": "github",
+            "review": "none",
+            "updatedAt": "2026-06-19T00:00:00Z",
+            "url": "u",
+          },
+        ],
+        "ok": true,
+      }
+    `);
   });
 
   test("reports a non-zero exit as a failed source", async () => {

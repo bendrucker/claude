@@ -75,7 +75,14 @@ describe("rankQueue", () => {
       NOW,
       STALE_DAYS,
     );
-    expect(ranked.map((entry) => entry.url)).toEqual(["red-old", "red-new", "changes", "draft"]);
+    expect(ranked.map((entry) => entry.url)).toMatchInlineSnapshot(`
+      [
+        "red-old",
+        "red-new",
+        "changes",
+        "draft",
+      ]
+    `);
   });
 });
 

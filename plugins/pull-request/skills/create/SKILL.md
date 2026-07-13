@@ -45,11 +45,22 @@ Mine the conversation that produced this change. The substance lives there: deci
 
 - Open with what changed (a bare verb: "Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when the change needs justifying. Don't restate the title.
 - Length tracks substance, not diff size. A subtle one-line fix may need paragraphs. A large mechanical change may need two sentences.
+- Restate nothing another surface already carries. The diff shows what changed, git shows which files, and the status checks show that lint, types, and tests pass. Name a check only when its result is not one CI will post: a manual observation, an intentional exclusion, a pre-existing warning you're leaving in place.
+- Shape prose so it reads. One thread per paragraph, and break a paragraph that runs past three or four sentences. A single sentence stacking clauses behind commas is a wall even when every clause is true. When items are parallel and merely co-occur (findings, cases covered, checks run), make them a list. Prose is for reasoning that connects one point to the next. "Default to prose" means don't add the reflexive scaffold, not cram an enumeration into one sentence.
 - Default to prose. Use `##` sections only when the body is long enough to need them. Small PRs are a tight paragraph with no headers.
+- Audience sets the bar (same owner-and-visibility probe as [Reviewers](#reviewers)). Owner is you: a personal repo you review through Claude, so stay concise and skip background you already hold. Private or org-owned: a corporate repo coworkers skim, so lead with intent at moderate detail. Public and not yours: an open-source repo under external scrutiny with the highest cost for unclear intent, so spend the most on decisions and evidence.
 - Reference the motivating issue at the end of the opening (`Closes #N`, `Fixes #N`, or `#N` if not closing). Related-for-context issues go in a `## References` section, never bare at the bottom.
 - Wrap code identifiers in backticks: function names, class names, file paths, endpoints, status codes. Do not backtick anything the platform auto-links: commit SHAs and issue/MR references (`#N`, `!N`, `owner/repo#N`). Backticks render them as code and kill the link. Write them bare.
 
 See [`sections.md`](sections.md) for the substance catalog (what to surface, by change type), optional-section guidance, how to ground claims in evidence, and the slop patterns to cut. Load the `writing` skill for the full set of tropes to avoid.
+
+## Outline First
+
+A wall of text is easier to prevent than to fix. For a large change, or any open-source PR, settle the structure before writing prose.
+
+- Gauge size from the diff in the context above. A change spanning several concepts or many files, or any open-source-tier PR, earns an outline first. A small personal change does not: write it in one pass.
+- The outline is the section headings you'll use, each with one-line bullets naming what belongs under it. Keep it under a few hundred characters, bullets rather than sentences. Leave a placeholder for a screenshot, table, or benchmark you'll add later.
+- Show the outline to the user and stop. Let them cut a section, add one, or reshape it before you spend tokens on prose. Then expand each bullet into the body, following the shape rules and the section catalog.
 
 ## Template
 
@@ -122,6 +133,7 @@ If `--dry-run` (or `--body-only`) is set, follow the Dry Run section instead of 
 1. Stage changes if not already staged: `git add .`
 1. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
 1. Push the branch to remote: `git push -u origin HEAD`
+1. Draft the body. For a large change or any open-source PR, outline the structure first and get the user's sign-off before expanding it (see [Outline First](#outline-first)). A small personal change skips straight to the full body.
 1. Create the PR/MR. Append `--draft` to the create command when `--draft` is set:
    - Write the body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
    - Include the branch name in the filename to avoid conflicts with concurrent agents

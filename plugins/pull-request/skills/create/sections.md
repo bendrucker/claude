@@ -8,13 +8,38 @@ Write the body to stand on its own. The reviewer has the diff and the linked iss
 
 Write in active voice and first person for your own calls. "I chose X over Y because…", "I traced this to…". Don't write passively ("X was added", "the bug was caused by…"). Keep the prose plain. Technical terms are fine. Marketing and model flourishes (`source of truth`, `fail loudly`, `escape hatch`, `cleanly`, `wires up`) are not. Load the `writing` skill for the full set of tropes.
 
+## Audience
+
+How much a body earns depends on who reads it. Read the tier from the repo's owner and visibility, the same probe the create skill runs for reviewers.
+
+- **Personal** (a repo you own, public or private): you review it through Claude, and no one else reads the body. Keep it tight. State intent and the decisions worth a second look, and skip background you already carry.
+- **Corporate** (a private or org-owned repo): coworkers skim it. Lead with intent so the skim lands, and keep supporting detail moderate.
+- **Open source** (a public repo you don't own): external maintainers scrutinize it, and unclear intent has the widest blast radius. Spend the most here on decisions, alternatives ruled out, and evidence.
+
+The tier scales depth and length. It does not license a wall of text: the shape and density rules below hold at every tier.
+
+## Intent
+
+Restating the diff has a subtle form that passes for substance: narrating the code at a higher altitude. A paragraph that walks the new control flow, names what each function now does, or describes how the pieces fit is still a retelling of the diff. A careful reviewer reconstructs all of it by reading the change.
+
+Intent is what the code cannot state about itself: why the change exists, the requirement it satisfies, the constraint that forced this shape, the alternative it beat. Test each sentence. If a reader could reconstruct it by reading the changed code, it is narration, so cut it or replace it with the reason behind it. Quote or point to the issue requirement the change satisfies rather than paraphrasing what the code now does.
+
 ## Shape
 
 Default to prose, not a scaffold.
 
 - Open with what changed (a bare verb: "Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when the change needs justifying. Don't restate the title. Don't open with "This PR introduces".
 - Length tracks substance, not diff size. A subtle one-line fix may need paragraphs of root-cause reasoning. A large mechanical change may need two sentences.
-- Use `##` sections only when the body is long enough to need them. A small PR is a tight paragraph with no headers.
+- Use `##` sections only when the body is long enough to need them. A small PR is a tight paragraph with no headers. Past four or five paragraphs, unsectioned prose becomes hard to scan, so give it headings.
+
+### Density
+
+Good substance still fails the reader when it arrives as a wall. The most common defect in real bodies is not the wrong content, it is the right content packed too tightly.
+
+- One thread per paragraph. A paragraph that runs past three or four sentences is doing too much. Split it.
+- One idea per sentence. A sentence that stacks clauses behind three or more commas is a list wearing prose clothing. It reads as a wall even when every clause is true.
+- Prose carries reasoning that connects one point to the next. A list carries items that merely co-occur: findings, cases a test covers, checks run, files touched for one reason. When the content is a set of parallel items, make it a list.
+- "Default to prose" is a rule against the reflexive `## Changes` plus `## Testing` scaffold. It is not a rule to compress an enumeration into a single sentence. The scaffold and the run-on are the same mistake from opposite directions.
 
 ## Headings
 
@@ -27,8 +52,10 @@ A heading names the section's topic. It is not a sentence about the topic. Write
 - Name the topic, not the meta-move: `What Changed` → `Changes`; `What I Didn't Do` → `Deferred Work`; `What I Didn't Change` → `Unchanged Behavior`.
 - Keep imperatives tight: `Hide the Inherited `--format` Flag` → `Hide Inherited `--format` Flag`. Drop the article, lose the trailing clause.
 - Use Title Case: `Two fixes found while testing the tmux calls` → `Two Fixes`.
+- Drop a colon that splices a status onto the topic: `Not Yet Met: The Live Proof` → `Deferred Proof`, with the status in the prose below. A colon carrying a clause is the parenthetical problem in another form.
+- Don't open with a `## Summary` heading when you aren't following a template. The first paragraph is the summary already. A `Summary` header names the section's obvious job instead of its topic.
 
-A heading has slipped into a sentence when it carries a comma, a trailing period or question mark, a linking verb (`is`, `are`, `exits`), a relative clause (`that`, `which`), or a subject pronoun (`this`, `it`).
+A heading has slipped into a sentence when it carries a comma, a colon, a trailing period or question mark, a linking verb (`is`, `are`, `exits`), a relative clause (`that`, `which`), or a subject pronoun (`this`, `it`).
 
 ## Mine the Conversation
 
@@ -64,20 +91,27 @@ Use these only when the body is long enough to earn them. A small PR stays a par
 
 Organize by concept, not by file. Each bullet is one conceptual shift, even when it spans files. Never write `**path**: description`. Reference an identifier only when it adds something the diff doesn't. Don't pair a count with an enumeration ("all three X (a, b, c)"). Enumerate or summarize, not both. Omit cleanup that follows from the main change (dead imports). The diff shows it.
 
+For a schema change, name the tables and columns touched, because a file name rarely reveals them. Two limits keep this from becoming a diff transcript. Past roughly ten columns, naming each one is rote, so summarize the change and name only the columns that carry a decision. And when the schema is generated from a model whose name maps to the table, the changed model already tells the reviewer which table moved, so add only what that mapping doesn't. A hand-written, date-prefixed migration is worth describing. A regenerated schema file is not.
+
 ### Testing
 
-Only if you added tests or tested by hand. State what the test proves, not that it exists. The falsification ("reverting the fix makes `TestX` fail"), the edge cases covered, what you verified manually and what you couldn't. Never test counts ("added 5 tests"). They measure nothing. Never "all tests pass". CI shows that. Paste real output over claiming success.
+Include this only when a test or a hand check tells the reviewer something the status checks won't. State what the test proves, not that it exists: the falsification ("reverting the fix makes `TestX` fail"), the edge cases covered, what you verified by hand and what you couldn't.
+
+- Say nothing CI will post. A roll-call of green checks (`lint passes`, `types clean`, `build` green, `193 pass, 0 fail`, `0 errors, 0 warnings`) restates the status checks the reviewer already sees on the PR. Name a check only when its result is not one CI carries: a check CI doesn't run, an intentional exclusion (`ruff over the repo, generated tree excluded`), or a pre-existing warning you're leaving in place.
+- Never test counts ("added 5 tests", "1165 assertions"). They measure nothing.
+- Paste real output over claiming success.
 
 ### References
 
-Related links, issues, or reviews that aren't the motivating issue. Use `Closes #N` for what this resolves and `Relates to #N` for context, keeping the two distinct.
+Related links, issues, or reviews that aren't the motivating issue. Use `Closes #N` for what this resolves and `Relates to #N` for context, keeping the two distinct. Every link must resolve for the reviewer. A private task-tracker URL (a Things link, an internal note) is a dead end, so drop it or replace it with the openable artifact it points to.
 
 ## Slop to Cut
 
 - The reflexive `## Changes` plus `## Testing` scaffold on every PR. Small PRs don't need it.
 - Sentence or fragment headings. A heading names the topic, it doesn't narrate it.
 - Bullets that narrate which file changed. If a bullet only says what the diff shows, delete it.
-- Test counts, "all tests pass", coverage inventories.
+- Test counts, "all tests pass", coverage inventories, and the roll-call of green checks (`lint passes`, `0 errors, 0 warnings`, `build green`). The status checks carry all of it.
+- A run-on paragraph, or a sentence stacking clauses behind commas, where a list belongs. Right content, wrong shape.
 - Count-padding ("six detectors, three and three"). The number is rarely the point.
 - The consequence chain (`, so the…`) used as a filler connective, and the antithesis (`not just X but Y`, `X instead of Y`) used as framing. Both read as tics when habitual.
 - Indirect references to an artifact the reader can't open: "deviations from the plan", "as originally planned", "the plan assumed", "per the plan", "the issue specified", a `## Deviations From the Plan` heading. The deviation's substance is worth keeping; framing it as a gap against an unseen plan, issue, or conversation is the tell. Restate it as a decision that stands on its own.

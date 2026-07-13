@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 import { mkdirSync } from "node:fs";
 import * as path from "node:path";

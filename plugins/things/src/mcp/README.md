@@ -79,7 +79,16 @@ tailscale funnel --bg 3111
 
 The first tool call that touches Things prompts for a TCC Automation grant (the server binary controlling Things3). Approve it once in System Settings if the dialog is missed.
 
-tsidp runs in Funnel mode so claude.ai can reach the token and registration endpoints. The `/authorize` step stays tailnet-only and identifies the visitor via WhoIs, so completing the OAuth flow requires being on the tailnet. Note that tsidp has no consent screen (authorize silently redirects), which is why the gate holds its own approval layer.
+tsidp runs in Funnel mode so claude.ai can reach the token endpoint. The `/authorize` step stays tailnet-only and identifies the visitor via WhoIs, so completing the OAuth flow requires being on the tailnet. Note that tsidp has no consent screen (authorize silently redirects), which is why the gate holds its own approval layer.
+
+Dynamic Client Registration only works from the tailnet: the `allow_dcr` capability is keyed on tailnet identity, and claude.ai's cloud calls `/register` over the funnel where it has none, so its automatic registration fails ("Automatic client registration isn't supported"). Pre-register a client for it from the Mac and paste the credentials into the connector's Advanced settings:
+
+```bash
+curl -s -X POST https://idp.<tailnet>.ts.net/register -H 'Content-Type: application/json' \
+  -d '{"redirect_uris":["https://claude.ai/api/mcp/auth_callback","https://claude.com/api/mcp/auth_callback"],"client_name":"Claude (claude.ai connector)"}'
+```
+
+This is a security upside: nothing on the public internet can register OAuth clients against the IdP. Claude Code needs no manual client because it runs on the tailnet and registers itself (with its per-session localhost callback) through the same tailnet-only DCR path.
 
 ## First-Use Approval
 

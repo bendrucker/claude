@@ -30,7 +30,7 @@ ${CLAUDE_SKILL_DIR}/scripts/aw-query.sh window-titles --recent 7d -n 40
 ${CLAUDE_SKILL_DIR}/scripts/aw-query.sh afk --recent 1d
 ```
 
-Durations come back both formatted (`duration`, e.g. `1h 23m`) and raw (`seconds`) so results are readable and still sortable/summable.
+The aggregate queries (`top-apps`, `window-titles`, `afk`) return durations both formatted (`duration`, e.g. `1h 23m`) and raw (`seconds`) so results are readable and still sortable/summable. `app-timeline` lists individual focus events and returns raw `seconds` only.
 
 ## Queries
 

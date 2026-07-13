@@ -70,6 +70,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -n)
       [[ $# -ge 2 ]] || { echo "-n requires an argument" >&2; exit 1; }
+      [[ "$2" =~ ^[0-9]+$ ]] || { echo "-n requires a non-negative integer: '$2'" >&2; exit 1; }
       LIMIT="$2"
       shift 2
       ;;
@@ -117,10 +118,15 @@ fi
 
 [[ -n "$LIMIT" ]] || LIMIT="$(default_limit "$QUERY")"
 
+# Double any single quotes so a db path containing one can't break out of the
+# ATTACH string literal.
+quote="'"
+DB_SQL="${DB//$quote/$quote$quote}"
+
 duckdb <<SQL
 INSTALL sqlite; LOAD sqlite;
 INSTALL json; LOAD json;
-ATTACH '$DB' AS aw (TYPE sqlite, READ_ONLY);
+ATTACH '$DB_SQL' AS aw (TYPE sqlite, READ_ONLY);
 SET VARIABLE cutoff = $CUTOFF;
 SET VARIABLE "limit" = $LIMIT;
 .read $QUERY_FILE

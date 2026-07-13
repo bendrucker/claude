@@ -119,6 +119,77 @@ describe("size advisory", () => {
   });
 });
 
+describe("append-only re-present", () => {
+  const lines = (count: number, prefix = "line") =>
+    Array.from({ length: count }, (_, i) => `${prefix} ${i}`);
+
+  const initial = lines(10).join("\n");
+
+  it("asks when a re-present keeps nearly all prior lines and only adds new ones", async () => {
+    await decision(initial);
+    const appended = `${initial}\nline 10`;
+    expect(await decision(appended)).toEqual({
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: expect.stringContaining("append-only"),
+    });
+  });
+
+  it("returns null for a genuine revision with low carry-over", async () => {
+    await decision(initial);
+    const revised = lines(10, "revised").join("\n");
+    expect(await decision(revised)).toBeNull();
+  });
+
+  it("does not ask when growth is zero even with full carry-over", async () => {
+    await decision(initial);
+    // Same lines, reordered: full carry-over but no net new lines.
+    const reordered = [...lines(10)].reverse().join("\n");
+    expect(await decision(reordered)).toBeNull();
+  });
+
+  it("does not ask when more than the incidental-drop allowance is removed", async () => {
+    const big = lines(20).join("\n");
+    await decision(big);
+    // Drop 2 prior lines and add 3 new ones: carry-over is still >= 0.9, but
+    // removal exceeds the incidental-drop allowance, so this is a real edit.
+    const trimmedAndGrown = [...lines(18), ...lines(3, "new")].join("\n");
+    expect(await decision(trimmedAndGrown)).toBeNull();
+  });
+
+  it("allows and skips state when the stored line set is corrupt", async () => {
+    await decision(initial);
+    await Bun.write(join(stateRoot, "session-1", "exit-plan-lines"), "not json");
+    expect(await decision(`${initial}\nline 10`)).toBeNull();
+  });
+
+  it("prefers deny when the append-only re-present is byte-identical", async () => {
+    await decision(initial);
+    await decision(`${initial}\nline 10`);
+    expect((await decision(`${initial}\nline 10`))?.permissionDecision).toBe("deny");
+  });
+
+  it("asks once for append-only, not size, when the re-present is also oversized", async () => {
+    const pad = "x".repeat(120);
+    const padded = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, i) => `${prefix} ${i} ${pad}`);
+    const base = padded(90, "line").join("\n");
+    expect(base.length).toBeLessThan(12_000);
+    await decision(base);
+
+    const grown = [...padded(90, "line"), ...padded(5, "new")].join("\n");
+    expect(grown.length).toBeGreaterThan(12_000);
+    expect(await decision(grown)).toEqual({
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: expect.stringContaining("append-only"),
+    });
+    // Append-only asks before the size check, so the size branch never runs and
+    // records no marker: one prompt for append-only, no second prompt for size.
+    expect(readdirSync(join(stateRoot, "session-1"))).not.toContain("exit-plan-size-asked");
+  });
+});
+
 describe("fail open", () => {
   it("allows and skips state when session_id is missing", async () => {
     const input = mockInput("My plan");

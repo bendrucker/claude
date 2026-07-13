@@ -28,7 +28,7 @@ Requested mode: `$0`. Local time: !`date "+%A %H:%M"`.
 - `end`: read [references/end.md](references/end.md)
 - `setup`: read [references/setup.md](references/setup.md)
 
-With no argument, suggest a mode from the local time above: before about 13:00 suggests start, after suggests end. On a weekend, suggest nothing and ask. Confirm the suggestion with AskUserQuestion before proceeding.
+With no argument, suggest a mode from the local time above: before the midpoint of the configured working hours (about 13:00 by default) suggests start, after suggests end. On a weekend, suggest nothing and ask. Confirm the suggestion with AskUserQuestion before proceeding.
 
 Arguments beyond the mode are a focus hint ($ARGUMENTS). Weight the brief toward what they name.
 

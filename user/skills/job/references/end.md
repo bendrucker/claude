@@ -29,7 +29,7 @@ Flag items that need collaboration lead time (a reviewer in another timezone, a 
 Review debt is inbound requests you did not reach today, unanswered threads on others' PRs/MRs, and any message, notification, or email still awaiting your reply or filing. Choose one path per item:
 
 - Reply now: judge whether the thread needs a substantive response first. Where a reaction or brief acknowledgement closes it, prefer that. Draft a reply only when it carries real content, keep it terse, and include it in the brief. Posting a draft the user approved is safe.
-- Carry to tomorrow: record it explicitly so it appears in tomorrow's start brief.
+- Carry to tomorrow: capture it where it belongs per Tracker Hygiene below (team work to the tracker, personal follow-ups to the personal inbox), so tomorrow's start gather surfaces it rather than a memory.
 
 Never silently drop an item.
 

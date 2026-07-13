@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { type PreToolUseHookInput, runHook } from "@bendrucker/claude-plugin-toolkit";
 import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
 import * as tropes from "./check-tropes";
 import * as headings from "./headings";
@@ -101,24 +100,10 @@ export async function dispatch(
   );
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[writing/pretooluse] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const { output, log } = await dispatch(input);
-  appendRunLog(log);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook<PreToolUseHookInput, SyncHookJSONOutput>(async (input) => {
+    const { output, log } = await dispatch(input);
+    appendRunLog(log);
+    return output;
+  });
 }

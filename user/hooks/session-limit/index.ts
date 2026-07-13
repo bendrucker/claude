@@ -3,7 +3,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { SyncHookJSONOutput, UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import { readStdinJson, writeStdoutJson } from "@bendrucker/claude-plugin-toolkit";
 import { expandTilde, type RateLimits } from "../../scripts/rate-limits";
 
 // Highest announced band per window, keyed to the block it applies to. A changed

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { PostToolUseInput } from "@constellos/claude-code-kit";
+import type { PostToolUseHookInput } from "@bendrucker/claude-plugin-toolkit";
 import { processPostToolUse } from "./check-lint";
 import type { SkillLintResult } from "./skill-lint/types";
 
@@ -47,7 +47,7 @@ function postToolUseInput(filePath: string) {
 }
 
 describe("processPostToolUse", () => {
-  test.each<{ name: string; input: PostToolUseInput; expectLint: boolean }>([
+  test.each<{ name: string; input: PostToolUseHookInput; expectLint: boolean }>([
     {
       name: "returns lint issues for SKILL.md writes",
       input: postToolUseInput("/plugins/gitlab/skills/ci/SKILL.md"),

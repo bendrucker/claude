@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "@bendrucker/claude-plugin-toolkit";
 import { isPublicUrl, processInput } from "./fetch";
 
 function mockInput(url: string): PreToolUseHookInput {

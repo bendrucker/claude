@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "@bendrucker/claude-plugin-toolkit";
 import { processInput } from "./gate";
 
 let stateRoot: string;

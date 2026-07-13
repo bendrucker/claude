@@ -3,8 +3,11 @@
 import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
+import {
+  type PreToolUseHookInput,
+  runHook,
+  type SyncHookJSONOutput,
+} from "@bendrucker/claude-plugin-toolkit";
 
 const SIZE_THRESHOLD = 12_000;
 
@@ -80,23 +83,6 @@ export async function processInput(
   return null;
 }
 
-async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
-  try {
-    input = await readStdinJson<PreToolUseHookInput>();
-  } catch (error) {
-    console.error(
-      `[plan/gate] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
-
-  const output = await processInput(input);
-  if (output) {
-    writeStdoutJson(output);
-  }
-}
-
 if (import.meta.main) {
-  main().catch(console.error);
+  runHook<PreToolUseHookInput, SyncHookJSONOutput>(processInput);
 }

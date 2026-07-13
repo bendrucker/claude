@@ -19,7 +19,8 @@ if [ -n "$session_id" ]; then
   fi
 fi
 
-cat "$(dirname "$0")/../references/guidelines.md"
+transcript=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
+"$(dirname "$0")/injection-content.sh" "$transcript"
 
 if [ -n "$marker" ]; then
   touch "$marker"

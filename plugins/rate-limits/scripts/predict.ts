@@ -61,19 +61,27 @@ export function burnRate(samples: HistorySample[], window: number): number | nul
 function slope(points: Point[]): number | null {
   const n = points.length;
   if (n < 2) return null;
-  let sumT = 0;
-  let sumP = 0;
-  let sumTT = 0;
-  let sumTP = 0;
+  // `p.t` are epoch ms (~1.73e12), so accumulating raw t*t loses most of the
+  // significant digits and the slope carries 20-40% relative error near the
+  // minimum spread. Centering on the mean time keeps the deviations small and
+  // recovers full precision without changing the fitted slope.
+  let meanT = 0;
+  let meanP = 0;
   for (const p of points) {
-    sumT += p.t;
-    sumP += p.pct;
-    sumTT += p.t * p.t;
-    sumTP += p.t * p.pct;
+    meanT += p.t;
+    meanP += p.pct;
   }
-  const denom = n * sumTT - sumT * sumT;
-  if (denom === 0) return null;
-  return (n * sumTP - sumT * sumP) / denom;
+  meanT /= n;
+  meanP /= n;
+  let num = 0;
+  let den = 0;
+  for (const p of points) {
+    const dt = p.t - meanT;
+    num += dt * (p.pct - meanP);
+    den += dt * dt;
+  }
+  if (den === 0) return null;
+  return num / den;
 }
 
 function timeSpread(points: Point[]): number {

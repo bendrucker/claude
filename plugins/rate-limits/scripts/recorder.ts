@@ -32,6 +32,14 @@ async function record(input: unknown, nowMs: number): Promise<void> {
   }
 }
 
+// The README wires the recorder as `recorder.ts -- <inner-cmd>`, but neither Bun
+// nor Node strips the `--` separator when it follows the script path, so it
+// survives in argv. Drop a single leading `--` so the inner command is what gets
+// spawned rather than the literal `--`.
+export function innerArgv(argv: string[]): string[] {
+  return argv[0] === "--" ? argv.slice(1) : argv;
+}
+
 async function main(): Promise<void> {
   const stdinText = await Bun.stdin.text();
 
@@ -41,7 +49,7 @@ async function main(): Promise<void> {
     // Unparseable payload still gets forwarded to the inner statusline verbatim.
   }
 
-  const inner = process.argv.slice(2);
+  const inner = innerArgv(process.argv.slice(2));
   if (inner.length === 0) {
     process.stdout.write(stdinText);
     return;

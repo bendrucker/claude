@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { HistorySample, RateLimits } from "../scripts/history";
 import type { Marker } from "../scripts/marker";
-import { evaluate, resolveOptions } from "../scripts/predict";
+import { burnRate, evaluate, resolveOptions } from "../scripts/predict";
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -112,6 +112,31 @@ describe("cross-surface dedup", () => {
     const stale: Marker = { resetsAt: RESET - 9999, predictedBreach: true, alertedEtaMs: now };
     const result = evaluate(history, rl(40), now, stale, opts);
     expect(result?.messages.length).toBe(1);
+  });
+});
+
+describe("burn rate precision", () => {
+  // Real epoch-ms timestamps (~1.77e12) make the uncentered normal equations
+  // lose most significant digits near the minimum spread. A perfectly linear
+  // block must recover its exact slope regardless of the timestamp magnitude.
+  test("recovers a known slope from large epoch-ms timestamps", () => {
+    const base = Date.UTC(2026, 0, 1);
+    const perMs = 1 / (60 * 1000); // 1%/min
+    const spanMs = 5 * MIN;
+    const points: HistorySample[] = [];
+    for (let i = 0; i < 6; i++) {
+      const t = base + (i / 5) * spanMs;
+      points.push({
+        t,
+        five: 40 + (t - base) * perMs,
+        fiveReset: RESET,
+        seven: null,
+        sevenReset: null,
+      });
+    }
+    const rate = burnRate(points, RESET);
+    expect(rate).not.toBeNull();
+    expect(Math.abs((rate as number) - perMs) / perMs).toBeLessThan(1e-6);
   });
 });
 

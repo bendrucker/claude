@@ -168,6 +168,26 @@ describe("append-only re-present", () => {
     await decision(`${initial}\nline 10`);
     expect((await decision(`${initial}\nline 10`))?.permissionDecision).toBe("deny");
   });
+
+  it("asks once for append-only, not size, when the re-present is also oversized", async () => {
+    const pad = "x".repeat(120);
+    const padded = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, i) => `${prefix} ${i} ${pad}`);
+    const base = padded(90, "line").join("\n");
+    expect(base.length).toBeLessThan(12_000);
+    await decision(base);
+
+    const grown = [...padded(90, "line"), ...padded(5, "new")].join("\n");
+    expect(grown.length).toBeGreaterThan(12_000);
+    expect(await decision(grown)).toEqual({
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: expect.stringContaining("append-only"),
+    });
+    // Append-only asks before the size check, so the size branch never runs and
+    // records no marker: one prompt for append-only, no second prompt for size.
+    expect(readdirSync(join(stateRoot, "session-1"))).not.toContain("exit-plan-size-asked");
+  });
 });
 
 describe("fail open", () => {

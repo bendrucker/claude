@@ -17,7 +17,7 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 
 ## Sandbox and Nested Commands
 
-`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. Scripts that shell out to Go CLIs or hand off to Launch Services run sandboxed via `sandbox.network.allowMachLookup` and `sandbox.allowAppleEvents`. See [`scripts.md`](scripts.md).
+`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. Go CLIs run sandboxed via `sandbox.network.allowMachLookup`; wrappers that hand off to Apple Events or Launch Services need a full skip via the `mac` plugin's `claude:dangerouslyDisableSandbox` marker hook. See [`scripts.md`](scripts.md).
 
 ## Sandbox Trust Model
 

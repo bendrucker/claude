@@ -14,7 +14,6 @@ export type Invocation = { cmd: string; scriptArg?: string };
 
 export function extractCommands(command: string): Invocation[] {
   const segments = command.split(SHELL_OPERATORS);
-  const seen = new Set<string>();
   const result: Invocation[] = [];
 
   for (const segment of segments) {
@@ -33,9 +32,6 @@ export function extractCommands(command: string): Invocation[] {
     if (!cmd) continue;
 
     const name = basename(cmd);
-    if (seen.has(name)) continue;
-    seen.add(name);
-
     const invocation: Invocation = { cmd };
     if (SCRIPT_INTERPRETERS.has(name)) {
       const next = tokens[i + 1];

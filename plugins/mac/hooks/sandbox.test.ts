@@ -116,6 +116,15 @@ describe("processInput", () => {
     expect(result).toBeNull();
   });
 
+  test("honors marker on second bun invocation in a chain", async () => {
+    const input = makeInput(`bun ${unmarkedScriptPath} && bun ${markedScriptPath}`);
+    const result = await processInput(input, "darwin");
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+
   test("processes Monitor tool input the same as Bash", async () => {
     const input = makeInput(`bun ${markedScriptPath}`, "Monitor");
     const result = await processInput(input, "darwin");

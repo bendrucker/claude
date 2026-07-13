@@ -82,7 +82,7 @@ describe("createVerifier", () => {
       calls++;
       return jsonResponse({ active: true, exp: Math.floor(Date.now() / 1000) + 3600 });
     };
-    const verify = createVerifier("https://idp/introspect", fetcher);
+    const verify = createVerifier("https://idp/introspect", {}, fetcher);
 
     const first = await verify("token-a");
     const second = await verify("token-a");
@@ -103,9 +103,27 @@ describe("createVerifier", () => {
       calls++;
       return fetcher();
     };
-    const verify = createVerifier("https://idp/introspect", counting);
+    const verify = createVerifier("https://idp/introspect", {}, counting);
     expect(await verify("bad")).toBeNull();
     expect(await verify("bad")).toBeNull();
     expect(calls).toBe(2);
+  });
+
+  const RESOURCE = "https://host.example.ts.net/mcp";
+
+  test.each<{ name: string; aud: unknown; expected: boolean }>([
+    { name: "aud array containing the resource", aud: ["client-1", RESOURCE], expected: true },
+    { name: "aud string equal to the resource", aud: RESOURCE, expected: true },
+    {
+      name: "aud for a different resource",
+      aud: ["https://host.example.ts.net/other"],
+      expected: false,
+    },
+    { name: "missing aud", aud: undefined, expected: false },
+  ])("resource option: $name", async ({ aud, expected }) => {
+    const fetcher = async () => jsonResponse({ active: true, aud });
+    const verify = createVerifier("https://idp/introspect", { resource: RESOURCE }, fetcher);
+    const info = await verify("token");
+    expect(info !== null).toBe(expected);
   });
 });

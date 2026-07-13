@@ -1,35 +1,20 @@
 #!/usr/bin/env bun
 
 /**
- * Things MCP server: Streamable HTTP transport, OAuth-protected via tsidp.
+ * Things MCP server: stateless Streamable HTTP transport, loopback only.
  *
- * Runs stateless (a fresh McpServer per POST), binds loopback only, and is
- * published to the tailnet/internet by Tailscale Serve/Funnel in front of it.
- * See README.md for the launchd + Tailscale setup.
+ * This process has no auth code. It binds 127.0.0.1 and is only reachable
+ * through the gate (gate.ts), which owns OAuth, first-use approval, and the
+ * funnel-facing port. See README.md for the launchd + Tailscale setup.
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { cli } from "cleye";
-import {
-  bearerToken,
-  createVerifier,
-  discoverIntrospectionEndpoint,
-  protectedResourceMetadata,
-  type Verifier,
-  wwwAuthenticate,
-} from "./auth";
 import { registerTools } from "./tools";
 
 const SERVER_INFO = { name: "things", version: "0.1.0" };
-
-function setCors(res: ServerResponse): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id, WWW-Authenticate");
-}
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -73,56 +58,20 @@ if (import.meta.main) {
     flags: {
       port: {
         type: Number,
-        default: 3111,
+        default: 3112,
         description: "Port to listen on (loopback only)",
       },
-      authorizationServer: {
+      path: {
         type: String,
-        description: "OAuth authorization server base URL (e.g. https://idp.<tailnet>.ts.net)",
-      },
-      resource: {
-        type: String,
-        description:
-          "Public URL of the MCP endpoint (e.g. https://<host>.<tailnet>.ts.net/mcp). Its path also becomes the local endpoint path, so multiple servers can share a host under different mounts.",
-      },
-      insecureNoAuth: {
-        type: Boolean,
-        default: false,
-        description: "Disable OAuth entirely. Local testing only.",
+        default: "/mcp",
+        description: "URL path of the MCP endpoint",
       },
     },
   });
 
-  const { port, authorizationServer, resource, insecureNoAuth } = argv.flags;
-
-  let verifier: Verifier | null = null;
-  let resourceUrl = resource ?? `http://localhost:${port}/mcp`;
-  let authServerUrl = authorizationServer ?? "";
-
-  if (insecureNoAuth) {
-    console.error("WARNING: --insecure-no-auth is set. Every request is accepted.");
-  } else {
-    if (!authorizationServer || !resource) {
-      console.error(
-        "--authorization-server and --resource are required (or pass --insecure-no-auth for local dev)",
-      );
-      process.exit(1);
-    }
-    authServerUrl = authorizationServer;
-    resourceUrl = resource;
-    verifier = createVerifier(await discoverIntrospectionEndpoint(authorizationServer));
-  }
-
-  const mcpPath = new URL(resourceUrl).pathname;
+  const { port, path } = argv.flags;
 
   const httpServer = createServer(async (req, res) => {
-    setCors(res);
-    if (req.method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
-
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
     try {
@@ -131,21 +80,7 @@ if (import.meta.main) {
         return;
       }
 
-      if (url.pathname.startsWith("/.well-known/oauth-protected-resource")) {
-        sendJson(res, 200, protectedResourceMetadata(authServerUrl, resourceUrl));
-        return;
-      }
-
-      if (url.pathname === mcpPath) {
-        if (verifier) {
-          const token = bearerToken(req.headers.authorization);
-          const info = token ? await verifier(token) : null;
-          if (!info) {
-            res.writeHead(401, { "WWW-Authenticate": wwwAuthenticate(resourceUrl) });
-            res.end();
-            return;
-          }
-        }
+      if (url.pathname === path) {
         await handleMcp(req, res);
         return;
       }
@@ -163,10 +98,6 @@ if (import.meta.main) {
   });
 
   httpServer.listen(port, "127.0.0.1", () => {
-    console.error(`things-mcp listening on http://127.0.0.1:${port}${mcpPath}`);
-    console.error(`resource URL: ${resourceUrl}`);
-    console.error(
-      insecureNoAuth ? "auth: DISABLED" : `auth: authorization server at ${authServerUrl}`,
-    );
+    console.error(`things-mcp listening on http://127.0.0.1:${port}${path}`);
   });
 }

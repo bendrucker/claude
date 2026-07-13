@@ -19,6 +19,8 @@ interface TailnetIdentity {
   selfDnsName: string;
   /** The tailnet's MagicDNS suffix (e.g. example.ts.net). */
   magicDnsSuffix: string;
+  /** The login name of the user this node belongs to (e.g. user@github). */
+  loginName?: string;
 }
 
 async function tailnetIdentity(): Promise<TailnetIdentity> {
@@ -27,7 +29,9 @@ async function tailnetIdentity(): Promise<TailnetIdentity> {
       const status = await $`${bin} status --json`.quiet().json();
       const selfDnsName = (status?.Self?.DNSName as string | undefined)?.replace(/\.$/, "");
       const magicDnsSuffix = status?.MagicDNSSuffix as string | undefined;
-      if (selfDnsName && magicDnsSuffix) return { selfDnsName, magicDnsSuffix };
+      const userId = status?.Self?.UserID as number | undefined;
+      const loginName = status?.User?.[String(userId)]?.LoginName as string | undefined;
+      if (selfDnsName && magicDnsSuffix) return { selfDnsName, magicDnsSuffix, loginName };
     } catch {
       // try the next candidate
     }
@@ -90,7 +94,17 @@ async function installAgent(spec: AgentSpec, dryRun: boolean): Promise<void> {
   await Bun.write(path, plist);
   const domain = `gui/${process.getuid?.() ?? 501}`;
   await $`launchctl bootout ${domain}/${spec.label}`.quiet().nothrow();
-  await $`launchctl bootstrap ${domain} ${path}`;
+
+  // Bootstrapping a label right after bootout races the old job's teardown
+  // and fails with EIO, so retry until launchd accepts it.
+  for (let attempt = 1; ; attempt++) {
+    const result = await $`launchctl bootstrap ${domain} ${path}`.quiet().nothrow();
+    if (result.exitCode === 0) break;
+    if (attempt >= 5) {
+      throw new Error(`launchctl bootstrap ${spec.label} failed: ${result.stderr.toString()}`);
+    }
+    await Bun.sleep(1000);
+  }
   console.log(`installed ${spec.label} (${path})`);
 }
 
@@ -98,13 +112,19 @@ if (import.meta.main) {
   const argv = cli({
     name: "install",
     help: {
-      description: "Render and install the tsidp and things-mcp LaunchAgents for this machine.",
+      description:
+        "Render and install the tsidp, mcp-gate, and things-mcp LaunchAgents for this machine.",
     },
     flags: {
       port: {
         type: Number,
         default: 3111,
-        description: "Loopback port for the MCP server",
+        description: "Loopback port for the gate (the funnel target)",
+      },
+      serverPort: {
+        type: Number,
+        default: 3112,
+        description: "Loopback port for the plain Things MCP server behind the gate",
       },
       path: {
         type: String,
@@ -133,11 +153,14 @@ if (import.meta.main) {
     },
   });
 
-  const { port, path, tsidpBin, skipTsidp, dryRun } = argv.flags;
+  const { port, serverPort, path, tsidpBin, skipTsidp, dryRun } = argv.flags;
   const identity = await tailnetIdentity();
   const authorizationServer =
     argv.flags.authorizationServer ?? `https://idp.${identity.magicDnsSuffix}`;
   const resource = `https://${identity.selfDnsName}${path}`;
+  // Prefer the PATH symlink over process.execPath, which resolves to a
+  // version-pinned Cellar path that dangles after a brew upgrade.
+  const bun = Bun.which("bun") ?? process.execPath;
 
   if (!skipTsidp) {
     await installAgent(
@@ -161,12 +184,28 @@ if (import.meta.main) {
     {
       label: "me.bendrucker.things-mcp",
       programArguments: [
-        // Prefer the PATH symlink over process.execPath, which resolves to a
-        // version-pinned Cellar path that dangles after a brew upgrade.
-        Bun.which("bun") ?? process.execPath,
+        bun,
         join(import.meta.dirname, "server.ts"),
         "--port",
+        String(serverPort),
+        "--path",
+        path,
+      ],
+    },
+    dryRun,
+  );
+
+  await installAgent(
+    {
+      label: "me.bendrucker.mcp-gate",
+      programArguments: [
+        bun,
+        join(import.meta.dirname, "gate.ts"),
+        "serve",
+        "--port",
         String(port),
+        "--upstream",
+        `http://127.0.0.1:${serverPort}${path}`,
         "--authorization-server",
         authorizationServer,
         "--resource",
@@ -179,6 +218,9 @@ if (import.meta.main) {
   if (!dryRun) {
     console.log(`\nresource URL: ${resource}`);
     console.log(`authorization server: ${authorizationServer}`);
-    console.log(`publish it: tailscale funnel --bg ${port}`);
+    console.log(`publish the gate: tailscale funnel --bg ${port}`);
+    console.log(
+      `approve a user: bun ${join(import.meta.dirname, "gate.ts")} approve ${identity.loginName ?? "<login>"}`,
+    );
   }
 }

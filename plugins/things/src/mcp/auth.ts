@@ -47,12 +47,23 @@ export async function discoverIntrospectionEndpoint(
 
 const MAX_CACHE_TTL_MS = 5 * 60 * 1000;
 
+export interface VerifierOptions {
+  /** Required audience: the token must have been issued for this resource (RFC 8707). */
+  resource?: string;
+}
+
 /**
  * Verifies bearer tokens against the introspection endpoint, caching active
  * tokens until they expire (capped at five minutes so revocation is not
- * deferred indefinitely).
+ * deferred indefinitely). A token must be active and issued for this resource.
+ * Whether the authenticated user is allowed in is the grant store's decision,
+ * not the verifier's.
  */
-export function createVerifier(introspectionEndpoint: string, fetcher: Fetcher = fetch): Verifier {
+export function createVerifier(
+  introspectionEndpoint: string,
+  options: VerifierOptions = {},
+  fetcher: Fetcher = fetch,
+): Verifier {
   const cache = new Map<string, { expires: number; info: Introspection }>();
 
   return async function verify(token: string): Promise<Introspection | null> {
@@ -69,6 +80,7 @@ export function createVerifier(introspectionEndpoint: string, fetcher: Fetcher =
 
     const info = (await response.json()) as Introspection;
     if (!info.active) return null;
+    if (options.resource && !audiences(info).includes(options.resource)) return null;
 
     const tokenExpiry = typeof info.exp === "number" ? info.exp * 1000 : 0;
     const expires = Math.min(
@@ -82,6 +94,14 @@ export function createVerifier(introspectionEndpoint: string, fetcher: Fetcher =
     cache.set(token, { expires, info });
     return info;
   };
+}
+
+/** RFC 7662 `aud` may be a single string or an array. */
+function audiences(info: Introspection): string[] {
+  const aud = info.aud;
+  if (typeof aud === "string") return [aud];
+  if (Array.isArray(aud)) return aud.filter((value): value is string => typeof value === "string");
+  return [];
 }
 
 export function bearerToken(authorization: string | undefined): string | null {

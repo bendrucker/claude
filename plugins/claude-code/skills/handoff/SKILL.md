@@ -30,21 +30,39 @@ Synthesize the conversation into a prompt that lets an agent with zero prior con
 
 Keep it dense and specific. Do not duplicate content that already lives in an artifact (a plan, an ADR, an issue, a diff). Reference it by path or URL and let the agent read it.
 
-If the user passed an argument, treat it as the focus for the next session and shape the summary around it.
+If the user passed an argument, treat it as the focus for the next session and shape the summary around it. With no argument, summarize the conversation as a whole.
 
 ## Redact
 
 The summary becomes the agent's prompt, so strip anything sensitive before launching: API keys, tokens, passwords, connection strings, PII. Reference where a secret lives (an env var, a secrets manager) rather than its value.
 
+## Size the Run
+
+The agent runs unattended, so choose its horsepower and autonomy up front. Propose all three to the user with the launch command and your reasoning, and let them override.
+
+#### Model and Effort
+
+Match `--model` and `--effort` to the task rather than reflexively picking the biggest. A well-specified, mechanical task runs fine on `--model sonnet` at `--effort medium`. Reserve `--model opus` with `--effort high` (or `xhigh`/`max`) for open-ended, high-stakes, or reasoning-heavy work. `--effort` takes `low`, `medium`, `high`, `xhigh`, or `max`. `--model` takes an alias (`opus`, `sonnet`, `haiku`, `fable`) or a full model name.
+
+#### Permission Mode
+
+The agent cannot answer permission prompts while the user is away, so pick a `--permission-mode` that lets it make progress at a risk the user accepts. Background sessions isolate in their own worktree, so the blast radius of a coding task is already contained. Weigh the choice against how reversible and contained the work is:
+
+- `acceptEdits`: auto-accept file edits while still gating riskier actions. A sane default for contained coding work.
+- `bypassPermissions`: fully unattended, no gating. Use only when the work is contained and reversible and the user accepts it.
+- `plan`: the agent plans and stops for approval before acting. Fits speculative or high-risk work the user wants to inspect first, at the cost of the agent pausing rather than finishing.
+- `auto`, `dontAsk`, and `manual` are also available. `manual` is the standard interactive prompting.
+
 ## Launch
 
-Confirm the summary with the user unless they already told you to launch, then start the agent:
+Confirm the summary and the sizing with the user unless they already told you to launch, then start the agent:
 
 ```bash
-claude --bg --name "<descriptive name>" "<summary>"
+claude --bg --name "<descriptive name>" --model <model> --effort <level> --permission-mode <mode> "<summary>"
 ```
 
 - Always pass `--name` (`-n`). It sets the display name in the agent list, session picker, and terminal title, so a glance tells the user which job is which.
+- Pass `--model`, `--effort`, and `--permission-mode` with the values chosen in [Size the Run](#size-the-run) so the run's horsepower and autonomy are set deliberately for this task.
 - The agent starts in the current working directory and returns control immediately.
 - Background sessions run in their own isolated git worktree by default (`worktree.bgIsolation`), so uncommitted changes in the current tree may not carry over. Commit first, or anchor the summary to a pushed branch, PR, or commit rather than unsaved edits.
 - `--bg` cannot be combined with `-p`.
@@ -54,7 +72,7 @@ claude --bg --name "<descriptive name>" "<summary>"
 Tell the user how to follow and steer the agent they just launched:
 
 - `claude agents` opens the agent view. Arrow to a session, `Space` to peek at its output without leaving, `Enter` to attach and chat interactively, `←` on an empty prompt to step back out.
-- `claude attach <session-id>` jumps straight into a session; `claude logs <session-id>` prints recent output; `claude stop <session-id>` and `claude rm <session-id>` end and remove it.
+- `claude attach <session-id>` jumps straight into a session. `claude logs <session-id>` prints recent output. `claude stop <session-id>` and `claude rm <session-id>` end and remove it.
 - `claude agents --json` lists sessions programmatically.
 - From inside any session, `/bg` backgrounds work and `/tasks` shows running agents.
 
@@ -64,5 +82,4 @@ The agent view marks each session: green `✓` completed, red `✗` failed, yell
 
 - **Zero shared memory.** The new agent sees only the summary, not this conversation. Anything you leave out is lost. When in doubt, name the file or artifact so the agent can read it itself.
 - **Isolated worktree.** The default `bgIsolation` means the agent works on a copy, not your live tree. Reference committed, pushed state for anything the agent must build on.
-- **Secrets become the prompt.** Redact before launching, every time.
-- **Don't restate artifacts.** A summary that reproduces a plan doc wastes tokens and drifts out of sync. Link and move on.
+- **No unattended autonomy by accident.** A summary that assumes approvals will happen stalls behind the first prompt. The chosen `--permission-mode` is what actually lets the agent finish while the user is away.

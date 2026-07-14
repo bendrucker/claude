@@ -66,7 +66,7 @@ If not on the branch, first run `gh pr checkout` to switch.
    - **high**: large refactors, multi-module, public API or schema changes, ~500–2000 lines
    - **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations
    - **max**: rare — incident hotfix or change with extreme blast radius
-5. **Think** - Evaluate against priorities (see [priorities.md](priorities.md)), incorporating `/code-review` findings
+5. **Think** - Evaluate along two axes. Requirement fulfillment: does the change deliver what was asked (see [requirements.md](requirements.md))? Code quality: evaluate against priorities (see [priorities.md](priorities.md)) and smells (see [smells.md](smells.md)), incorporating `/code-review` findings. Keep the axes separate so a clean diff does not mask a missed requirement.
 6. **Stage** - Open the PR diff in tuicr via `review:tuicr` (`tuicr pr <N>` for GitHub, `tuicr mr <N>` for GitLab) and seed proposed comments with `tuicr review add` (pass `--username` so they read as agent comments). Capture the PR head SHA (and base/start SHAs for GitLab, from the MR `diff_refs`) for mapping. Skip staging when approving with no comments.
 7. **Revise** - I curate in the tuicr pane: delete comments I reject, reword, and add my own at any line. The surviving set gets posted.
 8. **Submit a GitHub PR yourself from the TUI** - For a GitHub PR you curated in the tuicr pane, the fastest path is tuicr's own `:submit` (Comment / Approve / Request changes / Draft), which posts a real PR review via `gh`. When that fits, skip the map-and-post steps below. Claude maps and posts only for GitLab (tuicr cannot post to GitLab at all) or when the review runs headless with no TUI.

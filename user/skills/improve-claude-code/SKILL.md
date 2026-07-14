@@ -155,7 +155,7 @@ Feed the approved plans into a second Workflow shaped as `pipeline(approvedPlans
 
 A pipeline, not a barrier: item A can reach `ciGate` while item B is still implementing, and concurrency auto-caps at `min(16, cores-2)`. Do not hold worktree agents open on long CI waits. The gate catches trivial breakage, then [Monitor CI](#monitor-ci-and-fix-failures) hands the rest to [Watch](#watch). Back in the main loop, [Annotate Things](#annotate-things) and [Summary](#summary) consume the pipeline results unchanged.
 
-The two Workflow calls, the pipeline shape, and one schema (`meta` must be a pure literal):
+The two Workflow calls, the pipeline shape, and each stage's result schema (`meta` must be a pure literal):
 
 ```javascript
 // The main loop fires two workflows with the interactive approval gate between them:
@@ -179,6 +179,16 @@ const IMPLEMENTED = {
     thingsId: { type: 'string' },
     prUrl: { type: 'string' },
     branch: { type: 'string' },
+  },
+}
+
+const CI_GATE = {
+  type: 'object',
+  required: ['thingsId', 'prUrl', 'ciStatus'],
+  properties: {
+    thingsId: { type: 'string' },
+    prUrl: { type: 'string' },
+    ciStatus: { type: 'string' },
   },
 }
 

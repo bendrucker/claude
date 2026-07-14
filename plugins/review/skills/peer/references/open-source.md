@@ -8,7 +8,7 @@
 
 ## What to Review
 
-- Enforce minimal PR scope. Push back on unrelated changes (dependency bumps, formatting, contributor additions) that aren't part of the stated goal. Be persistent if they reappear after feedback.
+- Enforce minimal PR scope. Push back on unrelated changes (dependency bumps, formatting, contributor additions) that aren't part of the stated goal (see [requirements.md](../requirements.md) for the scope-creep check). Be persistent if they reappear after feedback.
 - Focus on subjective qualities. When you spot something automatable (lint rule, CI check), file an issue to automate it and link it in the review comment rather than requesting the manual fix.
 
 ## How to Comment

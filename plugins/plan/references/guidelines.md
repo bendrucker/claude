@@ -65,6 +65,8 @@ Aim for at least one criterion that fails when the change is wrong while the sui
 
 Without the before/after contrast, a criterion only restates intent. Mechanical checks (`make test`, lint, typecheck, build) are necessary but not sufficient: list them once and confirm a named target exists before citing it. A criterion must be able to fail for a reason other than the edit not applying, so do not verify by asserting the diff landed (deleted attribute absent, added clause present).
 
+Layer verification through the plan. A criterion parked only at the end catches the break after the whole plan is built, not at the slice that caused it. Where a slice must hold before the next builds on it, place a `🧪` verification checkpoint at the proving point (see `Checkpoints`).
+
 ## Revision
 
 A redirect is new input scoped to what it names. On each iteration:
@@ -82,6 +84,32 @@ Before naming symbols, files, directories, or headings, check what already gover
 - Cross-module symbols drop the leading underscore. Private stays private.
 - `ls` the sibling layout and match it (for skills, a `references/` subdir).
 - Honor standing `CLAUDE.md` rules. Numbered `Step`/`Phase` headings are banned everywhere, plan files included.
+
+## Checkpoints
+
+A checkpoint is a line the plan marks with an emoji so execution stops at it and does something before continuing past. Two kinds, each with its own marker and discipline:
+
+- `✋` a human checkpoint: hand back for a read.
+- `🧪` a verification checkpoint: run a named check and confirm its signal.
+
+Every marker is load-bearing in both directions, not decoration. When execution reaches a marked line it honors the marker before continuing past. Because each line states its instruction in plain words, a session that executes the plan without this guidance in context still honors it. The user may add a marker by hand, including on a line the plan did not mark, to insert a checkpoint the plan missed. A hand-added checkpoint is honored exactly like an authored one. These emoji are the only ones the plan carries. Add a new marker type only by defining its discipline here first.
+
+### `✋` Human Checkpoints
+
+When the approach carries uncertainty that convergence cannot settle in advance because only building resolves it, build in points where the plan hands back for a look before it runs on. This is not a license to skip convergence: settle everything you can before plan mode, then checkpoint what only building can. A plan that sequences every slice with no return point commits the user to an approach they cannot correct until it is all built, which is where an unsettled approach goes off the rails.
+
+- Place a checkpoint where a wrong assumption is expensive to unwind: after the first vertical slice proves the approach, at an interface or schema the rest builds on, before a one-way door (a migration, a public rename, a destructive or outward-facing step).
+- Do not checkpoint mechanical fan-out (one pattern across many files, a rename across call sites). Reserve checkpoints for decisions, not volume.
+
+Write each as a visible stop instruction: `✋ Checkpoint: stop and confirm <what> before <what continues>`. When execution reaches the line, stop there. Present what is built and wait for the user's read before continuing past it, the same stop discipline as `Pauses`.
+
+### `🧪` Verification Checkpoints
+
+Do not defer every check to the end. When a slice must hold before the next is built on top of it, mark the point where it is proven, so a broken assumption surfaces at the slice that introduced it rather than after the whole plan is built.
+
+- Place one after a slice whose correctness the rest depends on: a schema the later slices read, a parser the pipeline feeds, a migration the next step assumes has run.
+- Write each as a runnable check naming its signal, the same before/after shape as `Verification`: `🧪 Verify: <signal> via <command> before <what continues>`.
+- When execution reaches the line, run the check. If the signal matches, continue. If it does not, stop and surface the gap instead of building on it.
 
 ## Pauses
 

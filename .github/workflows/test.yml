@@ -84,6 +84,9 @@ jobs:
       - name: Check skill hook path variables
         run: bun scripts/check-skill-hook-vars.ts
 
+      - name: Check embedded markdown code
+        run: bun scripts/check-md-code.ts
+
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'
         env:

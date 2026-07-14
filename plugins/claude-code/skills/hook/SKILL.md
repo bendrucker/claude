@@ -122,7 +122,7 @@ Store complex hooks in `.claude/hooks/` or project `hooks/` directory:
 ```
 
 Reference with:
-```json
+```json fragment
 "command": "bun $CLAUDE_PROJECT_DIR/.claude/hooks/my-hook.ts"
 ```
 

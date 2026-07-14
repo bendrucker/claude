@@ -118,13 +118,13 @@ Use `things:jxa` to find all open todos tagged `claude-code`. Display a numbered
 | # | Title | Notes (first line) | List |
 |---|-------|--------------------|------|
 
-Ask the user which items to work on (numbers, ranges like `1-3`, or `all`). Cap each batch at 3 to keep parallel agents manageable. Split larger selections automatically.
+Ask the user which items to work on (numbers, ranges like `1-3`, or `all`). Selection is unbounded: the workflows below cap their own concurrency at `min(16, cores-2)`, so there is no manual batching and no splitting of large selections. Before firing a very large selection (roughly more than 15 items), confirm once, since each todo spawns its own worktree and PR.
 
 ## Session Context
 
 Each todo's notes embed the originating session as `Session: <uuid>`. For every selected todo, parse that UUID and use the `claude-code:session` skill to pull the original context: what you were doing, the commands that ran, and the errors that prompted the todo. This is richer than the todo's prose summary and grounds each plan in the real failure.
 
-Refresh the index once (`refresh.ts --refresh`), then look up each todo's session over the shared file with `duckdb -readonly` at the stable DB path (see the session skill's "Parallel Queries" section). Read-only opens coexist, so a batch of lookups runs concurrently without contending; never re-refresh per todo. Query `messages` / `content_items` / `text_content` filtered by `WHERE session_id = '<uuid>'`. Do not filter by `host`: many todos come from the work machine, whose corpus is imported as a separate host, and omitting the filter spans every machine. Distill the result to a few lines per todo and pass it to the matching `Plan` agent with the title and notes.
+Refresh the index once (`refresh.ts --refresh`), then look up each todo's session over the shared file with `duckdb -readonly` at the stable DB path (see the session skill's "Parallel Queries" section). Read-only opens coexist, so a batch of lookups runs concurrently without contending; never re-refresh per todo. Query `messages` / `content_items` / `text_content` filtered by `WHERE session_id = '<uuid>'`. Do not filter by `host`: many todos come from the work machine, whose corpus is imported as a separate host, and omitting the filter spans every machine. Distill the result to a few lines per todo and pass it, with the title and notes, to the matching agent in the [Plan](#plan) workflow. The refresh happens here in the main loop; agents receive the stable DB path for any further read-only lookup but never refresh.
 
 If the UUID is absent from the index (not yet imported, or the index needs a refresh), proceed with notes only and say so for that todo.
 
@@ -134,15 +134,72 @@ Session context informs local planning only. Imported hosts may be marked `block
 
 ## Plan
 
-Launch parallel `Plan` agents (one per todo). Give each the todo title, full notes, the session context from the previous step, and instruction to explore the repo and produce an implementation plan.
+The mechanical fan-out runs as a **Workflow**. Instructing `Workflow` from inside this user-invoked skill is a sanctioned opt-in under the Workflow tool's own rules, so author and run the script rather than refusing mid-run.
 
-Point agents to relevant domain skills: `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts.
+Run one Workflow (`parallel`) with one agent per selected todo. Give each agent its todo title, full notes, and the distilled session context, and have it explore the repo and produce an implementation plan. Point agents at the relevant domain skills: `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts. Preserve the [egress](#egress) rule inside the workflow: session-derived context stays local and never enters agent output that leaves the machine.
 
-Present all plans. For each, propose a `/code-review` effort (typically `low`; `medium` for changes touching multiple plugins) and confirm via `AskUserQuestion` alongside plan approval.
+Each agent returns a structured plan:
+
+```
+{ thingsId, todoTitle, plan, proposedEffort ('low'|'medium'|'high'), filesTouched[] }
+```
+
+The workflow returns the plans to the main loop. Present them there and collect approval plus a per-plan `/code-review` effort (typically `low`; `medium` for changes touching multiple plugins) via `AskUserQuestion`. This gate is interactive, so it stays in the main loop and cannot move into a workflow.
 
 ## Implement
 
-For each approved plan, launch a background `general-purpose` agent with `isolation: "worktree"`. Each agent implements the plan, runs `bun test`, runs `/code-review <effort>` with the level chosen during planning, commits, and creates the PR via `pull-request:create`. Pass the same domain skills from the planning step.
+Feed the approved plans into a second Workflow shaped as `pipeline(approvedPlans, implement, ciGate)`:
+
+- `implement`: an `agent` with `agentType: 'general-purpose'` and `isolation: "worktree"` implements the plan, runs `bun test`, runs `/code-review <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with the [`Original Task`](#pr-body) backlink. Returns `{ thingsId, prUrl, branch }`.
+- `ciGate`: a fast initial CI check with one trivial-failure fix pass. Returns `{ thingsId, prUrl, ciStatus }`.
+
+A pipeline, not a barrier: item A can reach `ciGate` while item B is still implementing, and concurrency auto-caps at `min(16, cores-2)`. Do not hold worktree agents open on long CI waits. The gate catches trivial breakage, then [Monitor CI](#monitor-ci-and-fix-failures) hands the rest to [Watch](#watch). Back in the main loop, [Annotate Things](#annotate-things) and [Summary](#summary) consume the pipeline results unchanged.
+
+The two Workflow calls, the pipeline shape, and one schema (`meta` must be a pure literal):
+
+```javascript
+// The main loop fires two workflows with the interactive approval gate between them:
+//   const plans = await Workflow({ script: planScript })                                 // #1 parallel -> plan[]
+//   const approved = /* AskUserQuestion: approve plans + per-plan effort (main loop only) */
+//   const results = await Workflow({ script: implementScript, args: { approved } })       // #2 pipeline -> result[]
+//
+// planScript fans out one agent per todo, each returning the Plan-section schema.
+// implementScript (this module) pipelines implement -> ciGate:
+
+export const meta = {
+  name: 'improve-cc-implement',
+  description: 'Implement each approved plan as a PR, then fast-gate CI',
+  phases: [{ title: 'Implement' }, { title: 'CI gate' }],
+}
+
+const IMPLEMENTED = {
+  type: 'object',
+  required: ['thingsId', 'prUrl', 'branch'],
+  properties: {
+    thingsId: { type: 'string' },
+    prUrl: { type: 'string' },
+    branch: { type: 'string' },
+  },
+}
+
+const results = await pipeline(
+  args.approved,
+  (plan) =>
+    agent(implementPrompt(plan), {
+      agentType: 'general-purpose',
+      isolation: 'worktree',
+      phase: 'Implement',
+      schema: IMPLEMENTED,
+    }),
+  (built, plan) =>
+    agent(ciGatePrompt(built), {
+      label: `ci:${plan.thingsId}`,
+      phase: 'CI gate',
+      schema: CI_GATE,
+    }),
+)
+// the workflow returns `results` to the main loop for Annotate Things and Summary.
+```
 
 #### PR body
 
@@ -154,7 +211,7 @@ Original Task: [<todo-title>](https://things.bendrucker.me/show?id=<todo-id>)
 
 ## Monitor CI and Fix Failures
 
-Use `github:actions-monitor` agents (one per PR) to collect pass/fail status. For failures, launch a worktree agent with the logs and branch to fix, test, and push. Re-monitor after fixes.
+The `ciGate` stage of the [Implement](#implement) pipeline already ran a fast initial check with one trivial-failure fix pass, so each PR lands with a first CI signal. Do not keep worktree agents open waiting on long CI runs or review rounds. Hand ongoing CI and review tracking to [Watch](#watch): `/loop /improve-claude-code watch` re-checks every open PR each tick, fixes CI failures, implements review feedback, and closes each backing todo on merge.
 
 ## Annotate Things
 
@@ -177,7 +234,7 @@ Invoke as `/loop /improve-claude-code watch`. Recover the PR-to-todo mapping fro
 
 Walk every open tracked PR once and handle its state:
 
-- CI red: launch a worktree agent with the failing logs and branch to fix, test, and push, the same as [Monitor CI and Fix Failures](#monitor-ci-and-fix-failures).
+- CI red: launch a worktree agent with the failing logs and branch to fix, test, and push.
 - A reviewer thread requests a change: launch a worktree agent to implement it, run `bun test` and `biome check`, then commit and push. Reply to the thread naming the change and its commit. Leave the thread unresolved for the reviewer, and do not merge.
 - Merged: close the backing Things todo. Append the PR link, mark it completed, and remove the `claude-code` tag via `things:url`.
 - Closed without merging: leave the todo tagged `claude-code` with a note so it resurfaces next run.

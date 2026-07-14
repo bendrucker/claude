@@ -83,6 +83,20 @@ Before naming symbols, files, directories, or headings, check what already gover
 - `ls` the sibling layout and match it (for skills, a `references/` subdir).
 - Honor standing `CLAUDE.md` rules. Numbered `Step`/`Phase` headings are banned everywhere, plan files included.
 
+## Human Checkpoints
+
+When the spec was not fully settled before plan mode opened, build in points where the plan hands back for a look before it runs on. A plan that sequences every slice with no return point commits the user to an approach they cannot correct until it is all built, which is where an unclear spec goes off the rails.
+
+- Place a checkpoint where a wrong assumption is expensive to unwind: after the first vertical slice proves the approach, at an interface or schema the rest builds on, before a one-way door (a migration, a public rename, a destructive or outward-facing step).
+- Do not checkpoint mechanical fan-out (one pattern across many files, a rename across call sites). Reserve checkpoints for decisions, not volume.
+
+Write each checkpoint as a visible stop instruction marked with `✋`, naming what the user confirms: `✋ Checkpoint: stop and confirm <what> before <what continues>`. The marker is load-bearing in both directions, not decoration:
+
+- When execution reaches a `✋` line, stop there. Present what is built and wait for the user's read before continuing past it, the same stop discipline as `Pauses`. Because the line states the stop in plain words, a session that executes the plan without this guidance in context still honors it.
+- The user may add `✋` to the plan by hand, including on a line the plan did not mark, to insert a checkpoint the plan missed. A hand-added checkpoint is honored exactly like an authored one.
+
+`✋` is the only marker the plan uses and the only emoji it should carry. Do not introduce others.
+
 ## Pauses
 
 A pause or bare interrupt in plan mode is a stop signal. Present and wait. Do not edit silently and re-submit.

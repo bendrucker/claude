@@ -61,3 +61,10 @@ repos:
         files: ^(plugins/|\.claude-plugin/marketplace\.json)
         pass_filenames: false
         entry: bun scripts/check-marketplace.ts
+
+      - id: md-code
+        name: Markdown embedded code
+        language: system
+        files: \.md$
+        pass_filenames: false
+        entry: bun scripts/check-md-code.ts

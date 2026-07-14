@@ -162,7 +162,7 @@ JSON.stringify(todos, null, 2);
 ```
 
 **Querying Todos:**
-```javascript
+```javascript fragment
 // Get all todos
 const allTodos = app.toDos();
 

@@ -256,7 +256,7 @@ open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 ### Operations
 
 **Create (default):**
-```json
+```json fragment
 {
   "type": "to-do",
   "operation": "create",
@@ -265,7 +265,7 @@ open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 ```
 
 **Update:**
-```json
+```json fragment
 {
   "type": "to-do",
   "operation": "update",

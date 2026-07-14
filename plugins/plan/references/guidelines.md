@@ -85,7 +85,7 @@ Before naming symbols, files, directories, or headings, check what already gover
 
 ## Human Checkpoints
 
-When the spec was not fully settled before plan mode opened, build in points where the plan hands back for a look before it runs on. A plan that sequences every slice with no return point commits the user to an approach they cannot correct until it is all built, which is where an unclear spec goes off the rails.
+When the approach carries uncertainty that convergence cannot settle in advance because only building resolves it, build in points where the plan hands back for a look before it runs on. This is not a license to skip convergence: settle everything you can before plan mode, then checkpoint what only building can. A plan that sequences every slice with no return point commits the user to an approach they cannot correct until it is all built, which is where an unsettled approach goes off the rails.
 
 - Place a checkpoint where a wrong assumption is expensive to unwind: after the first vertical slice proves the approach, at an interface or schema the rest builds on, before a one-way door (a migration, a public rename, a destructive or outward-facing step).
 - Do not checkpoint mechanical fan-out (one pattern across many files, a rename across call sites). Reserve checkpoints for decisions, not volume.

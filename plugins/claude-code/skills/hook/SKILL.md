@@ -86,10 +86,10 @@ input=$(cat)
 file_path=$(echo "$input" | jq -r '.tool_input.file_path')
 ```
 
-Or use `@constellos/claude-code-kit/runners`:
+Parse in TypeScript:
 ```typescript
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
-const input = await readStdinJson<PreToolUseHookInput>();
+import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+const input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
 ```
 
 ## Hook Output

@@ -4,7 +4,6 @@ import { execFile } from "node:child_process";
 import { isAbsolute, relative, sep } from "node:path";
 import { promisify } from "node:util";
 import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 const execFileAsync = promisify(execFile);
 const PREK_TIMEOUT = 120_000;
@@ -127,7 +126,7 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
 async function main(): Promise<void> {
   let input: StopHookInput;
   try {
-    input = await readStdinJson<StopHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as StopHookInput;
   } catch {
     return;
   }
@@ -136,7 +135,7 @@ async function main(): Promise<void> {
 
   const output = await processStop(input);
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

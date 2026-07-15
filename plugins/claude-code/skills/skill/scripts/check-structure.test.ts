@@ -1,9 +1,9 @@
 import { describe, expect, it, test } from "bun:test";
-import type { PostToolUseInput } from "@constellos/claude-code-kit";
+import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { extractSkillRoot, processHookInput, validateSkillPath } from "./check-structure";
 import { makePostToolUseInput } from "./test-support";
 
-function mockWriteInput(filePath: string): PostToolUseInput {
+function mockWriteInput(filePath: string): PostToolUseHookInput {
   return makePostToolUseInput({ tool_input: { file_path: filePath, content: "" } });
 }
 

@@ -2,7 +2,6 @@
 
 import { join, relative } from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { parseLcov, uncoveredLines } from "../../../scripts/coverage/lcov";
 
 const repoRoot = join(import.meta.dirname, "..", "..", "..");
@@ -81,7 +80,7 @@ export async function processPostToolUse(
 async function main(): Promise<void> {
   let input: PostToolUseHookInput;
   try {
-    input = await readStdinJson<PostToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
   } catch (error) {
     console.error(
       `[coverage] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
@@ -91,7 +90,7 @@ async function main(): Promise<void> {
 
   const output = await processPostToolUse(input);
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | null {
   const command = (input.tool_input as { command?: string }).command;
@@ -22,7 +21,7 @@ export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | 
 async function main(): Promise<void> {
   let input: PostToolUseHookInput;
   try {
-    input = await readStdinJson<PostToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
   } catch {
     return;
   }
@@ -31,7 +30,7 @@ async function main(): Promise<void> {
 
   const output = processInput(input);
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

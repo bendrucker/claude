@@ -2,7 +2,6 @@
 
 import { join } from "node:path";
 import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 // Mirrors VIOLATION_EXIT in scripts/check-plugin-deps.ts. Deliberately a
 // literal rather than an import: importing the checker would pull its module
@@ -45,11 +44,11 @@ export async function processStop(
 }
 
 async function main(): Promise<void> {
-  const input = await readStdinJson<StopHookInput>();
+  const input = JSON.parse(await Bun.stdin.text()) as StopHookInput;
   if (input.hook_event_name !== "Stop") return;
 
   const output = await processStop(input);
-  if (output) writeStdoutJson(output);
+  if (output) process.stdout.write(JSON.stringify(output) + "\n");
 }
 
 if (import.meta.main) {

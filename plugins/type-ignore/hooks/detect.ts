@@ -3,7 +3,6 @@
 import { mkdirSync } from "node:fs";
 import * as path from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { EXTENSION_MAP, LANGUAGES, TARGET_EXTENSIONS } from "./languages";
 
 export type WriteInput = { file_path: string; content: string };
@@ -154,7 +153,7 @@ export async function processInput(
 async function main(): Promise<void> {
   let input: PostToolUseHookInput;
   try {
-    input = await readStdinJson<PostToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
   } catch (error) {
     console.error(
       `[type-ignore] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
@@ -164,7 +163,7 @@ async function main(): Promise<void> {
 
   const output = await processInput(input);
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

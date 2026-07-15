@@ -13,7 +13,6 @@
       "devDependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
         "@biomejs/biome": "^2.3.13",
-        "@constellos/claude-code-kit": "^0.4.0",
         "@types/bun": "^1.3.12",
         "@types/mdast": "^4.0.4",
         "ajv": "^8.17.1",
@@ -53,7 +52,7 @@
     "plugins/claude-code": {
       "name": "claude-code",
       "dependencies": {
-        "@constellos/claude-code-kit": "^0.4.0",
+        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
       },
     },
     "plugins/claude-code/skills/session": {
@@ -91,7 +90,6 @@
       "name": "git",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
     "plugins/github": {
@@ -99,7 +97,6 @@
       "version": "1.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "cleye": "^2.0.0",
         "url-pattern": "^1.0.3",
       },
@@ -109,7 +106,6 @@
       "version": "1.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "cleye": "^2.2.1",
         "table": "^6.9.0",
         "url-pattern": "^1.0.3",
@@ -119,7 +115,6 @@
       "name": "go",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
     "plugins/issue": {
@@ -133,14 +128,12 @@
       "name": "linear",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
     "plugins/mac": {
       "name": "mac",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "acorn": "^8.15.0",
         "cleye": "^2.0.0",
       },
@@ -170,21 +163,18 @@
       "name": "newline",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
     "plugins/plan": {
       "name": "@bendrucker/claude-plan",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
     "plugins/pull-request": {
       "name": "pull-request",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "ap-style-title-case": "^2.0.0",
         "mdast-util-from-markdown": "^2.0.2",
         "unist-util-visit": "^5.1.0",
@@ -204,7 +194,6 @@
       "name": "shortcuts",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
     "plugins/things": {
@@ -212,7 +201,6 @@
       "version": "1.0.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "cleye": "^2.0.0",
         "table": "^6.9.0",
       },
@@ -229,7 +217,6 @@
       "name": "@bendrucker/claude-tmux",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "cleye": "^2.0.0",
         "table": "^6.9.0",
       },
@@ -238,7 +225,6 @@
       "name": "@bendrucker/type-ignore",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
     "plugins/ui-design": {
@@ -246,7 +232,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "@xmldom/xmldom": "^0.9.8",
         "cleye": "^2.2.1",
         "playwright": "^1.50.1",
@@ -258,7 +243,6 @@
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
         "@anthropic-ai/sdk": "^0.105.0",
-        "@constellos/claude-code-kit": "^0.4.0",
         "@duckdb/node-api": "1.5.0-r.1",
         "ap-style-title-case": "^2.0.0",
         "cleye": "^2.2.1",
@@ -277,7 +261,6 @@
       "name": "x-callback-url",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "@constellos/claude-code-kit": "^0.4.0",
       },
     },
   },
@@ -360,8 +343,6 @@
     "@bramus/specificity": ["@bramus/specificity@2.4.2", "", { "dependencies": { "css-tree": "^3.0.0" }, "bin": { "specificity": "bin/cli.js" } }, "sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw=="],
 
     "@chevrotain/types": ["@chevrotain/types@11.1.2", "", {}, "sha512-U+HFai5+zmJCkK86QsaJtoITlboZHBqrVketcO2ROv865xfCMSFpELQoz1GkX5GzME8pTa+3kbKrZHQtI0gdbw=="],
-
-    "@constellos/claude-code-kit": ["@constellos/claude-code-kit@0.4.0", "", { "dependencies": { "zod": "^3.23.0" }, "optionalDependencies": { "gray-matter": "^4.0.3", "minimatch": "^10.0.1" }, "peerDependencies": { "@modelcontextprotocol/sdk": ">=1.0.0" }, "optionalPeers": ["@modelcontextprotocol/sdk"], "bin": { "cck": "bin/cck.js", "claude-code-kit": "bin/cck.js", "cck-hook": "bin/cck-hook.js", "cck-sync-mcp": "bin/cck-sync-mcp.js" } }, "sha512-dS7gOlUiHNYV8RMmU5KqxKi3Q9OUPCWPfZ/nvWRnymjO3JogGUgQL56C2av270oowbMpCXuw1PXVAiySlQ0gwg=="],
 
     "@csstools/color-helpers": ["@csstools/color-helpers@6.0.2", "", {}, "sha512-LMGQLS9EuADloEFkcTBR3BwV/CGHV7zyDxVRtVDTwdI2Ca4it0CCVTT9wCkxSgokjE5Ho41hEPgb8OEUwoXr6Q=="],
 
@@ -721,13 +702,9 @@
 
     "babel-runtime": ["babel-runtime@6.26.0", "", { "dependencies": { "core-js": "^2.4.0", "regenerator-runtime": "^0.11.0" } }, "sha512-ITKNuq2wKlW1fJg9sSW52eepoYgZBggvOAHC0u/CYu/qxQ9EVzThCgR69BnSXLHjy2f7SY5zaQ4yt7H9ZVxY2g=="],
 
-    "balanced-match": ["balanced-match@4.0.4", "", {}, "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA=="],
-
     "bidi-js": ["bidi-js@1.0.3", "", { "dependencies": { "require-from-string": "^2.0.2" } }, "sha512-RKshQI1R3YQ+n9YJz2QQ147P66ELpa1FQEg20Dk8oW9t2KgLbpDLLp9aGZ7y8WHSshDknG0bknqGw5/tyCs5tw=="],
 
     "body-parser": ["body-parser@2.2.2", "", { "dependencies": { "bytes": "^3.1.2", "content-type": "^1.0.5", "debug": "^4.4.3", "http-errors": "^2.0.0", "iconv-lite": "^0.7.0", "on-finished": "^2.4.1", "qs": "^6.14.1", "raw-body": "^3.0.1", "type-is": "^2.0.1" } }, "sha512-oP5VkATKlNwcgvxi0vM0p/D3n2C3EReYVX+DNYs5TjZFn/oQt2j+4sVJtSMr18pdRr8wjTcBl6LoV+FUwzPmNA=="],
-
-    "brace-expansion": ["brace-expansion@5.0.6", "", { "dependencies": { "balanced-match": "^4.0.2" } }, "sha512-kLpxurY4Z4r9sgMsyG0Z9uzsBlgiU/EFKhj/h91/8yHu0edo7XuixOIH3VcJ8kkxs6/jPzoI6U9Vj3WqbMQ94g=="],
 
     "bson": ["bson@7.2.0", "", {}, "sha512-YCEo7KjMlbNlyHhz7zAZNDpIpQbd+wOEHJYezv0nMYTn4x31eIUM2yomNNubclAt63dObUzKHWsBLJ9QcZNSnQ=="],
 
@@ -1189,8 +1166,6 @@
 
     "min-indent": ["min-indent@1.0.1", "", {}, "sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg=="],
 
-    "minimatch": ["minimatch@10.2.5", "", { "dependencies": { "brace-expansion": "^5.0.5" } }, "sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg=="],
-
     "minimist": ["minimist@1.2.8", "", {}, "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="],
 
     "minimist-options": ["minimist-options@4.1.0", "", { "dependencies": { "arrify": "^1.0.1", "is-plain-obj": "^1.1.0", "kind-of": "^6.0.3" } }, "sha512-Q4r8ghd80yhO/0j1O3B2BjweX3fiHg9cdOwjJd2J76Q135c+NDxGCqdYKQ1SKBuFfgWbAUzBfvYjPUEeNgqN1A=="],
@@ -1566,8 +1541,6 @@
     "zwitch": ["zwitch@2.0.4", "", {}, "sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A=="],
 
     "@bendrucker/claude-writing/@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.105.0", "", { "dependencies": { "json-schema-to-ts": "^3.1.1", "standardwebhooks": "^1.0.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-sDyu+aM9cE6uZE+HgRjjHRb+qqb87GHZOx+8bE0YlWetdL1YcVLxn8h9ltxGOflyChTe6PMEo50kMQV4cw0hfg=="],
-
-    "@constellos/claude-code-kit/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "cli-color/ansi-regex": ["ansi-regex@2.1.1", "", {}, "sha512-TIGnTpdo+E3+pCyAluZvtED5p5wCqLdezCyhPZzKPcxvFplEt4i+W7OONCKgeZFT3+y5NZZfOOS/Bdcanm1MYA=="],
 

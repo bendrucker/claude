@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { isMemoryPath } from "./memory-path";
 
 type ToolInput = {
@@ -51,7 +50,7 @@ export async function processInput(
 async function main(): Promise<void> {
   let input: PostToolUseHookInput;
   try {
-    input = await readStdinJson<PostToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
   } catch (error) {
     console.error(
       `[newline/ensure] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
@@ -62,7 +61,7 @@ async function main(): Promise<void> {
   try {
     const output = await processInput(input);
     if (output) {
-      writeStdoutJson(output);
+      process.stdout.write(JSON.stringify(output) + "\n");
     }
   } catch (error) {
     console.error(`[newline/ensure] ${error instanceof Error ? error.message : String(error)}`);

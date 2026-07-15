@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export type FileInput = {
   file_path?: string;
@@ -66,7 +65,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = await readStdinJson<PreToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
   } catch (error) {
     console.error(
       `[go/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
@@ -76,7 +75,7 @@ async function main(): Promise<void> {
 
   const output = await processInput(input);
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

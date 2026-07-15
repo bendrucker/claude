@@ -30,7 +30,6 @@ export async function processPostToolUse(
   if (messages.length === 0) return null;
 
   return {
-    decision: undefined,
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
       additionalContext: `skill-lint found issues in ${filePath}:\n\n${messages.join("\n")}`,

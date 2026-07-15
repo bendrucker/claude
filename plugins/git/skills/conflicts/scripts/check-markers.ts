@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { $ } from "bun";
 
 function formatOutput(reason: string): SyncHookJSONOutput {
@@ -17,7 +16,7 @@ function formatOutput(reason: string): SyncHookJSONOutput {
 async function main(): Promise<void> {
   let _input: PreToolUseHookInput;
   try {
-    _input = await readStdinJson<PreToolUseHookInput>();
+    _input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
   } catch (error) {
     console.error(
       `[git/conflicts/check-markers] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
@@ -35,11 +34,10 @@ async function main(): Promise<void> {
       .slice(0, 5)
       .join(", ");
 
-    writeStdoutJson(
-      formatOutput(
-        `Conflict markers in staged files: ${markers || "run 'git diff --cached --check' for details"}`,
-      ),
+    const denial = formatOutput(
+      `Conflict markers in staged files: ${markers || "run 'git diff --cached --check' for details"}`,
     );
+    process.stdout.write(JSON.stringify(denial) + "\n");
   }
 }
 

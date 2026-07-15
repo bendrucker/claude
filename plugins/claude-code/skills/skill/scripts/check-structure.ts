@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 
 import { relative } from "node:path";
-import type { PostToolUseInput } from "@constellos/claude-code-kit";
-import { readStdinJson } from "@constellos/claude-code-kit/runners";
+import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 
 const SPEC_URL = "https://agentskills.io/specification#optional-directories";
 
@@ -35,10 +34,10 @@ export function validateSkillPath(filePath: string, skillRoot: string): string |
   return `'${rel}' is outside the standard skill structure. Allowed paths: ${allowed}. See ${SPEC_URL}`;
 }
 
-export function processHookInput(input: PostToolUseInput): string[] {
+export function processHookInput(input: PostToolUseHookInput): string[] {
   if (input.tool_name !== "Write" && input.tool_name !== "Edit") return [];
 
-  const filePath = input.tool_input.file_path;
+  const filePath = (input.tool_input as { file_path?: string }).file_path;
   if (!filePath) return [];
 
   const skillRoot = extractSkillRoot(filePath);
@@ -49,9 +48,9 @@ export function processHookInput(input: PostToolUseInput): string[] {
 }
 
 async function main(): Promise<void> {
-  let input: PostToolUseInput;
+  let input: PostToolUseHookInput;
   try {
-    input = await readStdinJson<PostToolUseInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
   } catch {
     return;
   }

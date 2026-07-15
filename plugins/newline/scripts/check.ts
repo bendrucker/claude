@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson } from "@constellos/claude-code-kit/runners";
 import { isMemoryPath } from "./memory-path";
 import { setState } from "./state";
 
@@ -40,7 +39,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<void> {
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = await readStdinJson<PreToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
   } catch (error) {
     console.error(
       `[newline/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

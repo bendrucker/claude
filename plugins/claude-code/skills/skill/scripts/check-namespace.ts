@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 
 import { basename } from "node:path";
-import type { PostToolUseInput } from "@constellos/claude-code-kit";
-import { readStdinJson } from "@constellos/claude-code-kit/runners";
+import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 
 export function extractPluginName(filePath: string): string | null {
   const match = filePath.match(/plugins\/([^/]+)\//);
@@ -67,11 +66,11 @@ export function checkSkillNamespace(name: string, pluginName: string): string[] 
   return warnings;
 }
 
-export async function processHookInput(input: PostToolUseInput): Promise<string[]> {
+export async function processHookInput(input: PostToolUseHookInput): Promise<string[]> {
   const warnings: string[] = [];
 
   if (input.tool_name !== "Write" && input.tool_name !== "Edit") return warnings;
-  const filePath = input.tool_input.file_path;
+  const filePath = (input.tool_input as { file_path?: string }).file_path;
   if (!filePath) return warnings;
 
   const pluginName = extractPluginName(filePath);
@@ -98,9 +97,9 @@ export async function processHookInput(input: PostToolUseInput): Promise<string[
 }
 
 async function main(): Promise<void> {
-  let input: PostToolUseInput;
+  let input: PostToolUseHookInput;
   try {
-    input = await readStdinJson<PostToolUseInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
   } catch {
     return;
   }

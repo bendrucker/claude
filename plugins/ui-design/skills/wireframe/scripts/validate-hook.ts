@@ -2,7 +2,6 @@
 
 import { extname } from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 import { validate } from "./validate";
 
@@ -50,14 +49,14 @@ Fix these layout issues before rendering.`);
 async function main(): Promise<void> {
   let input: PostToolUseHookInput;
   try {
-    input = await readStdinJson<PostToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
   } catch {
     return;
   }
 
   const output = await processInput(input);
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

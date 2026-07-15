@@ -1,23 +1,23 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { processInput } from "./validate-body";
 
 function denyWithError(reason: string): void {
-  writeStdoutJson({
+  const output = {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
       permissionDecisionReason: reason,
     },
-  } satisfies SyncHookJSONOutput);
+  } satisfies SyncHookJSONOutput;
+  process.stdout.write(JSON.stringify(output) + "\n");
 }
 
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = await readStdinJson<PreToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[pull-request/validate] Failed to parse hook input: ${message}`);
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
 
   const output = await processInput(input);
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@constellos/claude-code-kit": "^0.4.0"
+    "@anthropic-ai/claude-agent-sdk": "^0.3.0"
   }
 }

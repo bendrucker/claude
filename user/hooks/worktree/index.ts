@@ -1,7 +1,6 @@
 #!/usr/bin/env npx tsx
 
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 
 export type BashInput = {
   command?: string;
@@ -82,7 +81,7 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = await readStdinJson<PreToolUseHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
   } catch (error) {
     console.error(
       `[worktree] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
@@ -92,7 +91,7 @@ async function main(): Promise<void> {
 
   const output = processInput(input);
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

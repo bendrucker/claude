@@ -3,7 +3,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { SyncHookJSONOutput, UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { readStdinJson, writeStdoutJson } from "@constellos/claude-code-kit/runners";
 import { expandTilde, type RateLimits } from "../../scripts/rate-limits";
 
 // Highest announced band per window, keyed to the block it applies to. A changed
@@ -195,7 +194,7 @@ export async function processInput(
 async function main(): Promise<void> {
   let input: UserPromptSubmitHookInput;
   try {
-    input = await readStdinJson<UserPromptSubmitHookInput>();
+    input = JSON.parse(await Bun.stdin.text()) as UserPromptSubmitHookInput;
   } catch (error) {
     console.error(
       `[session-limit] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
@@ -205,7 +204,7 @@ async function main(): Promise<void> {
 
   const output = await processInput(input, Date.now());
   if (output) {
-    writeStdoutJson(output);
+    process.stdout.write(JSON.stringify(output) + "\n");
   }
 }
 

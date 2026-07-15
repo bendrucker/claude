@@ -11,91 +11,127 @@
     {
       "name": "go",
       "description": "Go language coding standards, best practices, and testing patterns",
+      "category": "Languages & infra",
+      "keywords": ["language-support", "testing", "conventions"],
       "source": "./plugins/go"
     },
     {
       "name": "mac",
       "description": "macOS-specific automation, sandbox workarounds, and system integration",
+      "category": "macOS & desktop",
+      "keywords": ["automation", "system-integration", "sandbox"],
       "source": "./plugins/mac"
     },
     {
       "name": "git",
       "description": "Git workflow and branching best practices",
+      "category": "Version control & review",
+      "keywords": ["branching", "workflow", "conventions"],
       "source": "./plugins/git"
     },
     {
       "name": "gitlab",
       "description": "GitLab workflow best practices and glab CLI usage",
+      "category": "Version control & review",
+      "keywords": ["ci-cd", "workflow", "automation"],
       "source": "./plugins/gitlab"
     },
     {
       "name": "linear",
       "description": "Managing Linear issues, projects, and teams",
+      "category": "Issues & planning",
+      "keywords": ["issue-tracking", "project-management"],
       "source": "./plugins/linear"
     },
     {
       "name": "things",
       "description": "Interacting with Things 3 task manager for Mac",
+      "category": "Issues & planning",
+      "keywords": ["task-management", "macos"],
       "source": "./plugins/things"
     },
     {
       "name": "issue",
       "description": "Work on issues from GitHub, Linear, or GitLab",
+      "category": "Issues & planning",
+      "keywords": ["issue-tracking", "multi-platform"],
       "source": "./plugins/issue"
     },
     {
       "name": "review",
       "description": "Code review workflows for peer and self review",
+      "category": "Version control & review",
+      "keywords": ["code-review", "peer-review"],
       "source": "./plugins/review"
     },
     {
       "name": "newline",
       "description": "POSIX-compliant trailing newline management",
+      "category": "Claude Code tooling",
+      "keywords": ["file-formatting", "lint"],
       "source": "./plugins/newline"
     },
     {
       "name": "writing",
       "description": "Writing style enforcement hooks and AI trope detection",
+      "category": "Writing & docs",
+      "keywords": ["style-enforcement", "ai-detection"],
       "source": "./plugins/writing"
     },
     {
       "name": "github",
       "description": "GitHub workflow, Actions monitoring, and rulesets management",
+      "category": "Version control & review",
+      "keywords": ["ci-cd", "automation", "actions"],
       "source": "./plugins/github"
     },
     {
       "name": "claude-code",
       "description": "Meta-tools for Claude Code configuration and customization",
+      "category": "Claude Code tooling",
+      "keywords": ["configuration", "customization"],
       "source": "./plugins/claude-code"
     },
     {
       "name": "pull-request",
       "description": "Pull request workflows: create, update, babysit CI, and reviewer follow-up",
+      "category": "Version control & review",
+      "keywords": ["pr-automation", "formatting"],
       "source": "./plugins/pull-request"
     },
     {
       "name": "bun",
       "description": "Bun runtime patterns, bunx, shell scripting, lockfile, and testing",
+      "category": "Languages & infra",
+      "keywords": ["runtime", "package-management", "testing"],
       "source": "./plugins/bun"
     },
     {
       "name": "research",
       "description": "Research existing solutions when exploring a new problem space",
+      "category": "Claude Code tooling",
+      "keywords": ["discovery", "solution-research"],
       "source": "./plugins/research"
     },
     {
       "name": "shortcuts",
       "description": "Creating and running macOS Shortcuts programmatically",
+      "category": "macOS & desktop",
+      "keywords": ["automation", "macos-shortcuts"],
       "source": "./plugins/shortcuts"
     },
     {
       "name": "type-ignore",
       "description": "Detects and eliminates type ignores across your codebase",
+      "category": "Claude Code tooling",
+      "keywords": ["typescript", "code-quality"],
       "source": "./plugins/type-ignore"
     },
     {
       "name": "agents-md",
       "description": "Loads AGENTS.md files automatically into Claude Code sessions",
+      "category": "Claude Code tooling",
+      "keywords": ["automation", "session-setup"],
       "source": {
         "source": "github",
         "repo": "bendrucker/claude-code-agents-md"
@@ -104,46 +140,64 @@
     {
       "name": "x-callback-url",
       "description": "Call x-callback-url schemes from the CLI and receive responses",
+      "category": "macOS & desktop",
+      "keywords": ["inter-app-communication", "url-schemes"],
       "source": "./plugins/x-callback-url"
     },
     {
       "name": "ui-design",
       "description": "UI design tools including wireframing with layout validation",
+      "category": "Writing & docs",
+      "keywords": ["wireframing", "prototyping"],
       "source": "./plugins/ui-design"
     },
     {
       "name": "mermaid",
       "description": "Create, validate, and render Mermaid diagrams",
+      "category": "Writing & docs",
+      "keywords": ["diagrams", "visualization"],
       "source": "./plugins/mermaid"
     },
     {
       "name": "tech-spec",
       "description": "Create and review technical specifications",
+      "category": "Issues & planning",
+      "keywords": ["documentation", "planning"],
       "source": "./plugins/tech-spec"
     },
     {
       "name": "plan",
       "description": "Planning mode guidelines and context injection",
+      "category": "Issues & planning",
+      "keywords": ["planning", "structured-thinking"],
       "source": "./plugins/plan"
     },
     {
       "name": "mail",
       "description": "Apple Mail integration for reading and managing email via JXA",
+      "category": "macOS & desktop",
+      "keywords": ["email", "jxa"],
       "source": "./plugins/mail"
     },
     {
       "name": "opentelemetry",
       "description": "OpenTelemetry instrumentation patterns, semantic conventions, and testing",
+      "category": "Languages & infra",
+      "keywords": ["observability", "instrumentation"],
       "source": "./plugins/opentelemetry"
     },
     {
       "name": "terraform",
       "description": "Terraform Cloud workspace management, run monitoring, and registry lookups",
+      "category": "Languages & infra",
+      "keywords": ["infrastructure-as-code", "cloud"],
       "source": "./plugins/terraform"
     },
     {
       "name": "honeycomb",
       "description": "Honeycomb CLI and MCP server for observability",
+      "category": "Languages & infra",
+      "keywords": ["observability", "debugging"],
       "source": {
         "source": "github",
         "repo": "bendrucker/honeycomb-cli"
@@ -152,31 +206,43 @@
     {
       "name": "raycast",
       "description": "Raycast extension development patterns, API, and Store publishing",
+      "category": "macOS & desktop",
+      "keywords": ["launcher", "extension-development"],
       "source": "./plugins/raycast"
     },
     {
       "name": "tmux",
       "description": "Tmux session awareness and pane interaction",
+      "category": "macOS & desktop",
+      "keywords": ["terminal", "pane-management"],
       "source": "./plugins/tmux"
     },
     {
       "name": "comments",
       "description": "Detect AI slop code comments in a diff and steer clean comment generation",
+      "category": "Version control & review",
+      "keywords": ["code-review", "ai-detection"],
       "source": "./plugins/comments"
     },
     {
       "name": "meme",
       "description": "Generate memes from images: classic Impact macros, labels, and TV-subtitle captions",
+      "category": "macOS & desktop",
+      "keywords": ["image-generation", "fun"],
       "source": "./plugins/meme"
     },
     {
       "name": "activitywatch",
       "description": "Query local ActivityWatch usage data: per-app time, window titles, and active vs idle spans",
+      "category": "macOS & desktop",
+      "keywords": ["time-tracking", "activity-monitoring"],
       "source": "./plugins/activitywatch"
     },
     {
       "name": "atuin",
       "description": "Query local shell history from atuin: recent commands, usage stats, and ad-hoc SQL over the history db",
+      "category": "Languages & infra",
+      "keywords": ["shell-history", "sql"],
       "source": "./plugins/atuin"
     }
   ]

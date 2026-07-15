@@ -28,6 +28,8 @@ export interface MarketplaceListing {
   name: string;
   source: PluginSource;
   description?: string;
+  category?: string;
+  keywords?: string[];
   /** Source is a local `./plugins/<name>` path rather than a remote reference. */
   local: boolean;
 }
@@ -84,7 +86,13 @@ export interface LoadOptions {
 }
 
 interface MarketplaceFile {
-  plugins: Array<{ name: string; source: PluginSource; description?: string }>;
+  plugins: Array<{
+    name: string;
+    source: PluginSource;
+    description?: string;
+    category?: string;
+    keywords?: string[];
+  }>;
 }
 
 export interface SettingsFile {
@@ -165,6 +173,8 @@ export async function loadPlugins(opts?: LoadOptions): Promise<Plugin[]> {
       source: entry.source,
       local,
       ...(entry.description !== undefined ? { description: entry.description } : {}),
+      ...(entry.category !== undefined ? { category: entry.category } : {}),
+      ...(entry.keywords !== undefined ? { keywords: entry.keywords } : {}),
     };
   }
 

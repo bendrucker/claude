@@ -33,6 +33,22 @@ jobs:
       - name: TypeScript build
         run: bun run build
 
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/bun-install
+
+      - name: Check
+        run: bun run site:check
+
+      - name: Build
+        run: bun run site:build
+
   hooks:
     runs-on: ubuntu-latest
     steps:

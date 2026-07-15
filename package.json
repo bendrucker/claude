@@ -31,7 +31,8 @@
     "plugins/comments",
     "plugins/meme",
     ".claude/skills/agent-ideas",
-    "evals/pr-body"
+    "evals/pr-body",
+    "site"
   ],
   "scripts": {
     "build": "tsc --noEmit",
@@ -43,6 +44,10 @@
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
     "schemas": "bun scripts/schemas/index.ts",
+    "site:dev": "bun --bun run --cwd site node_modules/.bin/astro dev",
+    "site:build": "bun --bun run --cwd site node_modules/.bin/astro build",
+    "site:check": "bun --bun run --cwd site node_modules/.bin/astro check",
+    "site:preview": "bun --bun run --cwd site node_modules/.bin/astro preview",
     "skill-lint": "bun ./packages/skill-lint/cli.ts",
     "test": "bun test",
     "test:unit": "bun test"

@@ -13,3 +13,7 @@ node_modules/
 # The coverage tooling lives in a directory named `coverage`. Re-include it
 # against a global `coverage` ignore so the source stays tracked.
 !scripts/coverage/
+
+# Astro build output
+site/dist/
+site/.astro/

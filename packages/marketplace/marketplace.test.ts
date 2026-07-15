@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -118,6 +118,38 @@ describe("loadPlugins", () => {
   test("settingsPath override is honored", async () => {
     const plugins = await loadPlugins({ root, settingsPath: join(root, "user", "settings.json") });
     expect(plugins.find((p) => p.name === "alpha")?.enabled).toBe(true);
+  });
+
+  test("category and keywords pass through when present, absent otherwise", async () => {
+    const isolatedRoot = await mkdtemp(join(tmpdir(), "marketplace-test-category-"));
+    try {
+      await mkdir(join(isolatedRoot, "plugins"), { recursive: true });
+      await Bun.write(
+        join(isolatedRoot, ".claude-plugin/marketplace.json"),
+        JSON.stringify({
+          plugins: [
+            {
+              name: "gamma",
+              source: { source: "github", repo: "owner/gamma" },
+              category: "workflow",
+              keywords: ["automation", "hooks"],
+            },
+            { name: "delta", source: { source: "github", repo: "owner/delta" } },
+          ],
+        }),
+      );
+
+      const plugins = await loadPlugins({ root: isolatedRoot });
+      const byName = new Map(plugins.map((p) => [p.name, p]));
+      expect(byName.get("gamma")?.listing).toMatchObject({
+        category: "workflow",
+        keywords: ["automation", "hooks"],
+      });
+      expect(byName.get("delta")?.listing?.category).toBeUndefined();
+      expect(byName.get("delta")?.listing?.keywords).toBeUndefined();
+    } finally {
+      await rm(isolatedRoot, { recursive: true, force: true });
+    }
   });
 });
 

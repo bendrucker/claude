@@ -1,0 +1,16 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { Puzzle } from "lucide-astro";
+
+// Placeholder read proving the build runs under Bun (Bun.file is undefined under Node).
+// This page exists only to prove the scaffold works. Real content lands in a follow-on pass.
+const pkg = await Bun.file("package.json").json();
+---
+
+<Layout title="Claude Code Plugin Marketplace">
+  <main class="flex min-h-screen flex-col items-center justify-center gap-4">
+    <Puzzle class="h-12 w-12" />
+    <h1 class="text-2xl font-bold">{pkg.name}</h1>
+    <p class="text-gray-500">Placeholder homepage. Real content lands in a follow-on pass.</p>
+  </main>
+</Layout>

@@ -14,5 +14,5 @@
     "skipLibCheck": true
   },
   "include": ["./**/*.ts", ".claude/**/*.ts"],
-  "exclude": ["**/fixtures/**", ".claude/workflows/**"]
+  "exclude": ["**/fixtures/**", ".claude/workflows/**", "site/**"]
 }

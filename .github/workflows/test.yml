@@ -46,8 +46,6 @@ jobs:
 
   validate:
     runs-on: ubuntu-latest
-    outputs:
-      plugins: ${{ steps.list.outputs.plugins }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -102,17 +100,27 @@ jobs:
           Consider adding these to \`enabledPlugins\` if they should be active." || true
           fi
 
+  plugins-list:
+    runs-on: ubuntu-latest
+    outputs:
+      plugins: ${{ steps.list.outputs.plugins }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/bun-install
+
       - name: List local plugins
         id: list
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           always_args=(
-            --always=schemas/
-            --always=scripts/
+            --always=scripts/list-plugins.ts
+            --always=packages/marketplace/
+            --always=packages/skill-lint/
             --always=.github/workflows/test.yml
             --always=.claude-plugin/marketplace.json
-            --always=.claude/settings.json
           )
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             readarray -t files < <(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path')
@@ -123,14 +131,14 @@ jobs:
           echo "plugins=$plugins" >> "$GITHUB_OUTPUT"
 
   plugin:
-    needs: validate
-    if: needs.validate.outputs.plugins != '[]'
+    needs: plugins-list
+    if: needs.plugins-list.outputs.plugins != '[]'
     runs-on: ${{ matrix.plugin.runner }}
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        plugin: ${{ fromJson(needs.validate.outputs.plugins) }}
+        plugin: ${{ fromJson(needs.plugins-list.outputs.plugins) }}
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
@@ -217,13 +225,13 @@ jobs:
         run: find "./plugins/${{ matrix.plugin.name }}" -name '*.integration.ts' -exec bun test {} +
 
   plugins:
-    needs: [validate, plugin]
+    needs: [plugins-list, plugin]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }}
     steps:
       - name: Check plugin results
         run: |
-          if [[ "${{ needs.validate.outputs.plugins }}" == "[]" ]]; then
+          if [[ "${{ needs.plugins-list.outputs.plugins }}" == "[]" ]]; then
             echo "No plugins to test"
             exit 0
           fi
@@ -284,6 +292,8 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install Claude Code CLI
+        id: cli
+        background: true
         run: curl -fsSL https://claude.ai/install.sh | bash
 
       - name: Setup Claude configuration
@@ -292,6 +302,9 @@ jobs:
           for item in user/*; do
             ln -sfn "$GITHUB_WORKSPACE/$item" "$HOME/.claude/$(basename "$item")"
           done
+
+      - name: Wait for CLI
+        wait: cli
 
       - name: Generate context report
         run: |

@@ -57,7 +57,7 @@ describe("extractBodyFilePath", () => {
 describe("validateBody", () => {
   it("returns null for valid body without test counts", () => {
     expect(
-      validateBody("## Summary\nFixes a bug\n\n## Test plan\nUnit tests cover the fix"),
+      validateBody("## Summary\nFixes a bug\n\n## Test Plan\nUnit tests cover the fix"),
     ).toBeNull();
   });
 
@@ -138,6 +138,29 @@ describe("validateBody", () => {
       "## Changes\n\n- **Caching**: stores records in memory\n- **Eviction**: drops the oldest entry",
     );
     expect(result).toBeNull();
+  });
+
+  it("warns on a sentence-case section heading", () => {
+    const result = validateBody("## Two fixes found while testing\n\nReshapes the resolver.");
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("AP title case");
+    expect(getAdditionalContext(result)).toContain("Two Fixes Found While Testing");
+  });
+
+  it("keeps a heading's inline code intact in the suggestion", () => {
+    const result = validateBody("## changes to `validate.ts`\n\nReshapes the resolver.");
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain(
+      '"changes to `validate.ts`" → "Changes to `validate.ts`"',
+    );
+  });
+
+  it("does not warn on AP-cased headings with an acronym", () => {
+    expect(
+      validateBody(
+        "## API Changes\n\nAdds an endpoint.\n\n## Changes to the Parser\n\nRewrites it.",
+      ),
+    ).toBeNull();
   });
 });
 
@@ -343,6 +366,16 @@ describe("processInput", () => {
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
     );
     expect(result).toBeNull();
+  });
+
+  it("warns on a sentence-case heading in a body file", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    await Bun.write(bodyFile, "## Two fixes found while testing\n\nReshapes the resolver.");
+    const result = await processInput(
+      createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
+    );
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("Two Fixes Found While Testing");
   });
 
   it("lets a test-count deny precede a backticked SHA warning", async () => {

@@ -1,4 +1,5 @@
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { headingCaseViolations } from "./heading-case";
 
 function hasBashCommand(input: unknown): input is { command: string } {
   return (
@@ -231,6 +232,15 @@ function structuralReasons(body: string): string[] {
   }
   if (hasBacktickedRef(body)) {
     reasons.push(AUTOLINK_REASON);
+  }
+  const headingViolations = headingCaseViolations(body);
+  if (headingViolations.length > 0) {
+    const suggestions = headingViolations
+      .map((violation) => `"${violation.text}" → "${violation.suggested}"`)
+      .join("; ");
+    reasons.push(
+      `Section headings should use AP title case. Suggested: ${suggestions}. Adjust unless a heading is intentionally cased (proper noun, code identifier).`,
+    );
   }
   return reasons;
 }

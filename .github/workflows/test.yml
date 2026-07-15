@@ -87,6 +87,9 @@ jobs:
       - name: Check embedded markdown code
         run: bun scripts/check-md-code.ts
 
+      - name: Check permission rules
+        run: bun scripts/check-permission-rules.ts
+
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'
         env:

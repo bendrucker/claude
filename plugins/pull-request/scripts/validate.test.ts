@@ -149,7 +149,9 @@ describe("validateBody", () => {
 
   it("does not warn on AP-cased headings with an acronym", () => {
     expect(
-      validateBody("## API Changes\n\nAdds an endpoint.\n\n## Changes to the Parser\n\nRewrites it."),
+      validateBody(
+        "## API Changes\n\nAdds an endpoint.\n\n## Changes to the Parser\n\nRewrites it.",
+      ),
     ).toBeNull();
   });
 });

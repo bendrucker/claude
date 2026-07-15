@@ -1,0 +1,19 @@
+---
+import { Puzzle } from "lucide-astro";
+import { withBase } from "../lib/base";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Not found · Claude Code Plugin Marketplace">
+  <main class="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
+    <Puzzle class="h-10 w-10 text-accent" aria-hidden="true" />
+    <h1 class="text-2xl font-bold tracking-tight">Page not found</h1>
+    <p class="text-sm text-muted">This plugin, or this page, doesn't exist.</p>
+    <a
+      href={withBase("/")}
+      class="rounded-md border border-border px-4 py-2 text-sm font-medium hover:border-accent hover:text-accent"
+    >
+      Back to all plugins
+    </a>
+  </main>
+</Layout>

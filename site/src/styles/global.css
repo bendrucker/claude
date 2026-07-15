@@ -1,1 +1,173 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-bg: #fbfaf8;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f3f1ed;
+  --color-border: #e4e0d9;
+  --color-fg: #201d18;
+  --color-muted: #6b655b;
+  --color-accent: #a8460f;
+  --color-accent-fg: #fff7f0;
+  --color-focus: #a8460f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #16140f;
+    --color-surface: #1e1b15;
+    --color-surface-raised: #2a261e;
+    --color-border: #38332a;
+    --color-fg: #f2ede3;
+    --color-muted: #a89e8d;
+    --color-accent: #f2934f;
+    --color-accent-fg: #201200;
+    --color-focus: #f2934f;
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-mono);
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+dialog::backdrop {
+  background-color: rgb(0 0 0 / 55%);
+  backdrop-filter: blur(2px);
+}
+
+dialog {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Dual-theme shiki output: astro-code emits --shiki-light/-dark custom
+   properties per node, so the same markup repaints under prefers-color-scheme
+   without a second highlighter pass. */
+.astro-code,
+.astro-code span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  .astro-code,
+  .astro-code span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+  }
+}
+
+.readme {
+  line-height: 1.7;
+}
+
+.readme h1,
+.readme h2,
+.readme h3,
+.readme h4 {
+  font-weight: 600;
+  margin-top: 1.75em;
+  margin-bottom: 0.5em;
+}
+
+.readme h1 {
+  font-size: 1.5rem;
+}
+.readme h2 {
+  font-size: 1.25rem;
+}
+.readme h3 {
+  font-size: 1.1rem;
+}
+
+.readme p,
+.readme ul,
+.readme ol,
+.readme pre,
+.readme table {
+  margin-bottom: 1em;
+}
+
+.readme ul,
+.readme ol {
+  padding-left: 1.5em;
+}
+
+.readme ul {
+  list-style: disc;
+}
+
+.readme ol {
+  list-style: decimal;
+}
+
+.readme a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.readme code {
+  background-color: var(--color-surface-raised);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+
+.readme pre {
+  border-radius: 0.5rem;
+  padding: 1em;
+  overflow-x: auto;
+}
+
+.readme pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.readme blockquote {
+  border-left: 3px solid var(--color-border);
+  padding-left: 1em;
+  color: var(--color-muted);
+}
+
+.readme table {
+  width: 100%;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+.readme th,
+.readme td {
+  border: 1px solid var(--color-border);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}

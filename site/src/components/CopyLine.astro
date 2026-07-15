@@ -1,0 +1,31 @@
+---
+import { Check, Copy } from "lucide-astro";
+
+interface Props {
+  text: string;
+  multiline?: boolean;
+}
+
+const { text, multiline = false } = Astro.props;
+---
+
+<div
+  class="group flex items-start gap-2 rounded-md border border-border bg-surface-raised px-3 py-2 font-mono text-xs"
+>
+  {
+    multiline ? (
+      <pre class="flex-1 overflow-x-auto whitespace-pre">{text}</pre>
+    ) : (
+      <code class="flex-1 overflow-x-auto whitespace-pre">{text}</code>
+    )
+  }
+  <button
+    type="button"
+    class="copy-button shrink-0 rounded p-1 text-muted transition-colors hover:text-fg"
+    data-copy={text}
+    aria-label="Copy to clipboard"
+  >
+    <Copy class="copy-icon h-3.5 w-3.5" aria-hidden="true" />
+    <Check class="check-icon hidden h-3.5 w-3.5 text-accent" aria-hidden="true" />
+  </button>
+</div>

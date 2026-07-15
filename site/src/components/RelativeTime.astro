@@ -1,0 +1,11 @@
+---
+import { relativeTime } from "../lib/relative-time";
+
+interface Props {
+  date: string;
+}
+
+const { date } = Astro.props;
+---
+
+<time datetime={date} data-relative>{relativeTime(date)}</time>

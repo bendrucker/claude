@@ -1,16 +1,136 @@
 ---
+import { Puzzle, Search, X } from "lucide-astro";
+import PluginCard from "../components/PluginCard.astro";
+import PluginDetail from "../components/PluginDetail.astro";
+import { loadCatalog } from "../data/catalog";
+import { withBase } from "../lib/base";
+import { REPO_ROOT } from "../lib/repo-root";
+import { buildSearchIndex } from "../lib/search-index";
 import Layout from "../layouts/Layout.astro";
-import { Puzzle } from "lucide-astro";
 
-// Placeholder read proving the build runs under Bun (Bun.file is undefined under Node).
-// This page exists only to prove the scaffold works. Real content lands in a follow-on pass.
-const pkg = await Bun.file("package.json").json();
+const catalog = await loadCatalog({ root: REPO_ROOT });
+const { plugins } = catalog;
+const categories = [...new Set(plugins.map((p) => p.category).filter((c): c is string => Boolean(c)))].sort(
+  (a, b) => a.localeCompare(b),
+);
+const searchIndex = buildSearchIndex(catalog);
+
+const SHORTCUTS: Array<[string, string]> = [
+  ["/", "Focus search"],
+  ["j / k or ↓ / ↑", "Move between plugins"],
+  ["Enter", "Open the focused plugin"],
+  ["Esc", "Close the open plugin"],
+  ["s", "Cycle sort order"],
+  ["?", "Toggle this help"],
+];
 ---
 
-<Layout title="Claude Code Plugin Marketplace">
-  <main class="flex min-h-screen flex-col items-center justify-center gap-4">
-    <Puzzle class="h-12 w-12" />
-    <h1 class="text-2xl font-bold">{pkg.name}</h1>
-    <p class="text-gray-500">Placeholder homepage. Real content lands in a follow-on pass.</p>
-  </main>
+<Layout
+  title="Claude Code Plugin Marketplace"
+  description={`${plugins.length} Claude Code plugins from the bendrucker marketplace.`}
+>
+  <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="mb-8 flex items-center gap-3">
+      <Puzzle class="h-8 w-8 shrink-0 text-accent" aria-hidden="true" />
+      <div>
+        <h1 class="text-xl font-bold tracking-tight">bendrucker's Claude Code plugins</h1>
+        <p class="text-sm text-muted">
+          {plugins.length} plugins, installable from one marketplace.
+        </p>
+      </div>
+    </header>
+
+    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div class="relative flex-1">
+        <Search
+          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+          aria-hidden="true"
+        />
+        <input
+          id="search-input"
+          type="search"
+          placeholder="Search plugins and skills (press /)"
+          class="w-full rounded-md border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none focus-visible:border-accent"
+        />
+      </div>
+      <select
+        id="category-filter"
+        class="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus-visible:border-accent"
+      >
+        <option value="">All categories</option>
+        {categories.map((category) => <option value={category}>{category}</option>)}
+      </select>
+      <button
+        id="sort-button"
+        type="button"
+        class="rounded-md border border-border bg-surface px-3 py-2 text-left text-sm outline-none focus-visible:border-accent"
+      >
+        Sort: Name
+      </button>
+    </div>
+
+    <p id="result-count" class="mb-3 text-xs text-muted" aria-live="polite"></p>
+
+    <ul id="plugin-grid" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {plugins.map((plugin) => <PluginCard plugin={plugin} />)}
+    </ul>
+
+    <p id="empty-state" class="hidden py-16 text-center text-sm text-muted">
+      No plugins match your search.
+    </p>
+
+    <footer class="mt-12 border-t border-border pt-6 text-xs text-muted">
+      <p>
+        Press <kbd class="rounded border border-border px-1 py-0.5">?</kbd> for keyboard shortcuts. Full
+        catalog available at <code>{withBase("/plugins.json")}</code>.
+      </p>
+    </footer>
+  </div>
+
+  <dialog id="plugin-dialog" class="m-auto max-h-[85vh] w-[min(48rem,92vw)] overflow-hidden rounded-xl">
+    <div class="max-h-[85vh] overflow-y-auto border border-border bg-surface p-6 shadow-2xl">
+      <button
+        type="button"
+        data-dialog-close
+        aria-label="Close"
+        class="float-right rounded p-1 text-muted hover:text-fg"
+      >
+        <X class="h-4 w-4" aria-hidden="true" />
+      </button>
+      <div id="plugin-dialog-content"></div>
+    </div>
+  </dialog>
+
+  <dialog id="help-dialog" aria-label="Keyboard shortcuts" class="m-auto w-[min(24rem,92vw)] rounded-xl">
+    <div class="rounded-xl border border-border bg-surface p-5 shadow-2xl">
+      <h2 class="mb-3 text-sm font-semibold">Keyboard shortcuts</h2>
+      <dl class="space-y-1.5 text-sm">
+        {
+          SHORTCUTS.map(([key, description]) => (
+            <div class="flex items-center justify-between gap-4">
+              <dt>
+                <kbd class="rounded border border-border px-1.5 py-0.5 font-mono text-xs">{key}</kbd>
+              </dt>
+              <dd class="text-muted">{description}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </dialog>
+
+  {
+    plugins.map((plugin) => (
+      <template data-plugin-template={plugin.name} data-href={withBase(plugin.route)}>
+        <PluginDetail plugin={plugin} headingLevel="h2" />
+      </template>
+    ))
+  }
+
+  <script type="application/json" id="search-index-data" is:inline set:html={JSON.stringify(searchIndex)} />
+
+  <script>
+    import { initSite } from "../scripts/site";
+    initSite();
+  </script>
 </Layout>

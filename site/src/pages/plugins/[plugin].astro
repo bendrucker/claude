@@ -1,0 +1,41 @@
+---
+import { ArrowLeft } from "lucide-astro";
+import PluginDetail from "../../components/PluginDetail.astro";
+import type { CatalogPlugin } from "../../data/catalog";
+import { loadCatalog } from "../../data/catalog";
+import { withBase } from "../../lib/base";
+import { REPO_ROOT } from "../../lib/repo-root";
+import Layout from "../../layouts/Layout.astro";
+
+export async function getStaticPaths() {
+  const { plugins } = await loadCatalog({ root: REPO_ROOT });
+  return plugins.map((plugin) => ({
+    params: { plugin: plugin.name },
+    props: { plugin },
+  }));
+}
+
+interface Props {
+  plugin: CatalogPlugin;
+}
+
+const { plugin } = Astro.props;
+---
+
+<Layout
+  title={`${plugin.name} · Claude Code Plugin Marketplace`}
+  description={plugin.description ?? `The ${plugin.name} Claude Code plugin.`}
+>
+  <div class="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+    <a href={withBase("/")} class="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-accent">
+      <ArrowLeft class="h-3.5 w-3.5" aria-hidden="true" />
+      All plugins
+    </a>
+    <PluginDetail plugin={plugin} headingLevel="h1" />
+  </div>
+
+  <script>
+    import { initSite } from "../../scripts/site";
+    initSite();
+  </script>
+</Layout>

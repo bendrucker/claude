@@ -1,0 +1,53 @@
+---
+import CopyLine from "./CopyLine.astro";
+import { INSTALL_SCOPES, installInstructions } from "../lib/install";
+
+interface Props {
+  pluginName: string;
+}
+
+const { pluginName } = Astro.props;
+const install = installInstructions(pluginName);
+---
+
+<div class="space-y-4">
+  <div>
+    <p class="mb-1 text-xs font-medium text-muted">1. Add the marketplace</p>
+    <CopyLine text={install.marketplaceAdd} />
+  </div>
+  <div>
+    <p class="mb-1 text-xs font-medium text-muted">2. Install the plugin</p>
+    <CopyLine text={install.install} />
+  </div>
+  <div class="install-cli">
+    <p class="mb-1 text-xs font-medium text-muted">Or via the CLI</p>
+    <div class="mb-1.5 inline-flex rounded-md border border-border p-0.5" role="radiogroup" aria-label="Install scope">
+      {
+        INSTALL_SCOPES.map((scope, i) => (
+          <button
+            type="button"
+            class="scope-button rounded px-2 py-0.5 text-xs capitalize text-muted aria-checked:bg-accent aria-checked:text-accent-fg"
+            data-scope={scope}
+            role="radio"
+            aria-checked={i === 0}
+          >
+            {scope}
+          </button>
+        ))
+      }
+    </div>
+    {
+      INSTALL_SCOPES.map((scope, i) => (
+        <div data-cli-scope={scope} class:list={["cli-line", { hidden: i !== 0 }]}>
+          <CopyLine text={install.cli[scope]} />
+        </div>
+      ))
+    }
+  </div>
+  <details class="text-xs">
+    <summary class="cursor-pointer font-medium text-muted">Or add to settings.json</summary>
+    <div class="mt-1.5">
+      <CopyLine text={install.settingsSnippet} multiline />
+    </div>
+  </details>
+</div>

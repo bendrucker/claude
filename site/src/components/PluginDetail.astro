@@ -1,0 +1,228 @@
+---
+import { Bot, ExternalLink, Sparkles, Webhook } from "lucide-astro";
+import type { CatalogPlugin } from "../data/catalog";
+import { githubBlobUrl, pluginRoute } from "../data/routes";
+import ChipList from "./ChipList.astro";
+import InstallInstructions from "./InstallInstructions.astro";
+import RelativeTime from "./RelativeTime.astro";
+import { withBase } from "../lib/base";
+import { githubTreeUrl, pluginSourceUrl } from "../lib/github";
+import { renderReadme } from "../lib/markdown";
+import { REPO_ROOT } from "../lib/repo-root";
+
+interface Props {
+  plugin: CatalogPlugin;
+  headingLevel?: "h1" | "h2";
+}
+
+const { plugin, headingLevel = "h2" } = Astro.props;
+const Heading = headingLevel;
+const headingId = `plugin-heading-${plugin.name}`;
+
+const readmeHtml = plugin.readmePath ? await renderReadme(REPO_ROOT, plugin.readmePath) : undefined;
+const sourceUrl = pluginSourceUrl(plugin.source);
+---
+
+<article data-plugin-detail data-plugin-name={plugin.name} class="mx-auto max-w-3xl">
+  <header class="mb-6">
+    {
+      plugin.category && (
+        <span class="mb-2 inline-block rounded-full bg-surface-raised px-2.5 py-0.5 text-xs font-medium text-muted">
+          {plugin.category}
+        </span>
+      )
+    }
+    <Heading id={headingId} class="text-2xl font-bold tracking-tight">
+      {plugin.name}
+    </Heading>
+    {plugin.description && <p class="mt-1.5 text-muted">{plugin.description}</p>}
+
+    <div class="mt-3">
+      <ChipList plugin={plugin} />
+    </div>
+
+    {
+      plugin.keywords.length > 0 && (
+        <ul class="mt-3 flex flex-wrap gap-1.5">
+          {plugin.keywords.map((keyword) => (
+            <li class="rounded-full border border-border px-2 py-0.5 text-xs text-muted">{keyword}</li>
+          ))}
+        </ul>
+      )
+    }
+
+    {
+      plugin.history && (
+        <p class="mt-3 flex flex-wrap gap-x-3 text-xs text-muted">
+          <span>
+            Added <RelativeTime date={plugin.history.firstCommit} />
+          </span>
+          <span>
+            Updated <RelativeTime date={plugin.history.lastCommit} />
+          </span>
+        </p>
+      )
+    }
+
+    {
+      !plugin.local && sourceUrl && (
+        <p class="mt-3 text-xs text-muted">
+          Source:{" "}
+          <a href={sourceUrl} class="inline-flex items-center gap-1 text-accent underline underline-offset-2">
+            {typeof plugin.source === "object" ? plugin.source.repo : sourceUrl}
+            <ExternalLink class="h-3 w-3" aria-hidden="true" />
+          </a>
+        </p>
+      )
+    }
+  </header>
+
+  {
+    plugin.dependencies.length > 0 && (
+      <section class="mb-6">
+        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Depends on</h3>
+        <ul class="flex flex-wrap gap-1.5">
+          {plugin.dependencies.map((dep) => (
+            <li>
+              <a
+                href={withBase(pluginRoute(dep))}
+                data-plugin-nav={dep}
+                class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-fg hover:border-accent hover:text-accent"
+              >
+                {dep}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  <section class="mb-6">
+    <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Install</h3>
+    <InstallInstructions pluginName={plugin.name} />
+  </section>
+
+  {
+    plugin.skills.length > 0 && (
+      <section class="mb-6">
+        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Skills</h3>
+        <ul class="space-y-1.5">
+          {plugin.skills.map((skill) => (
+            <li class="rounded-md border border-border p-2.5">
+              <a href={skill.githubBlobUrl} class="flex items-start justify-between gap-2 text-sm">
+                <span class="flex items-start gap-2">
+                  <Sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
+                  <span>
+                    <span class="font-mono font-medium">{skill.name}</span>
+                    <span class="block text-xs text-muted">{skill.description}</span>
+                  </span>
+                </span>
+                <ExternalLink class="mt-0.5 h-3 w-3 shrink-0 text-muted" aria-hidden="true" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  {
+    plugin.agents.length > 0 && (
+      <section class="mb-6">
+        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Agents</h3>
+        <ul class="space-y-1.5">
+          {plugin.agents.map((agent) => (
+            <li class="rounded-md border border-border p-2.5">
+              <a href={agent.githubBlobUrl} class="flex items-start justify-between gap-2 text-sm">
+                <span class="flex items-start gap-2">
+                  <Bot class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
+                  <span>
+                    <span class="font-mono font-medium">{agent.name}</span>
+                    <span class="block text-xs text-muted">{agent.description}</span>
+                  </span>
+                </span>
+                <ExternalLink class="mt-0.5 h-3 w-3 shrink-0 text-muted" aria-hidden="true" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  {
+    plugin.hooks && (
+      <section class="mb-6">
+        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Hooks</h3>
+        <div class="rounded-md border border-border p-2.5">
+          <a href={plugin.hooks.githubBlobUrl} class="flex items-start justify-between gap-2 text-sm">
+            <span class="flex items-start gap-2">
+              <Webhook class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
+              <span class="text-xs text-muted">{plugin.hooks.description}</span>
+            </span>
+            <ExternalLink class="mt-0.5 h-3 w-3 shrink-0 text-muted" aria-hidden="true" />
+          </a>
+          <ul class="mt-2 flex flex-wrap gap-1.5 pl-5">
+            {plugin.hooks.events.map((event) => (
+              <li class="rounded-full bg-surface-raised px-2 py-0.5 font-mono text-xs text-muted">{event}</li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    plugin.mcpServers.length > 0 && (
+      <section class="mb-6">
+        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">MCP servers</h3>
+        <p class="text-sm">
+          <a
+            href={githubBlobUrl(`plugins/${plugin.name}/.mcp.json`)}
+            class="inline-flex items-center gap-1 text-accent underline underline-offset-2"
+          >
+            {plugin.mcpServers.join(", ")}
+            <ExternalLink class="h-3 w-3" aria-hidden="true" />
+          </a>
+        </p>
+      </section>
+    )
+  }
+
+  {
+    plugin.tsFiles.length > 0 && (
+      <section class="mb-6">
+        <p class="text-sm">
+          <a
+            href={githubTreeUrl(`plugins/${plugin.name}`)}
+            class="inline-flex items-center gap-1 text-accent underline underline-offset-2"
+          >
+            {plugin.tsFiles.length} TypeScript file{plugin.tsFiles.length === 1 ? "" : "s"}
+            <ExternalLink class="h-3 w-3" aria-hidden="true" />
+          </a>
+        </p>
+      </section>
+    )
+  }
+
+  {
+    readmeHtml ? (
+      <section class="readme border-t border-border pt-6" set:html={readmeHtml} />
+    ) : (
+      !plugin.local && (
+        <section class="border-t border-border pt-6 text-sm text-muted">
+          <p>
+            This plugin is hosted in its own repository.{" "}
+            {sourceUrl && (
+              <a href={sourceUrl} class="text-accent underline underline-offset-2">
+                View the source on GitHub
+              </a>
+            )}
+            .
+          </p>
+        </section>
+      )
+    )
+  }
+</article>

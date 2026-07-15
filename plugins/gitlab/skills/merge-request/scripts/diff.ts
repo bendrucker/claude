@@ -117,6 +117,26 @@ export function buildPosition(
   return position;
 }
 
+export function formatError(err: unknown): string {
+  if (err && typeof err === "object") {
+    // Bun ShellError buries the useful text in its stdout/stderr buffers;
+    // its message is just "Failed with exit code N".
+    const record = err as Record<string, unknown>;
+    const streams = [record.stderr, record.stdout]
+      .map((stream) => (stream == null ? "" : String(stream).trim()))
+      .filter((text) => text.length > 0);
+    if (streams.length > 0) return streams.join("\n");
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+export function exitOnRejection(): void {
+  process.on("unhandledRejection", (err) => {
+    console.error(formatError(err));
+    process.exit(1);
+  });
+}
+
 export async function readBody(file: string | undefined): Promise<string> {
   if (file === "-" || !file) {
     return await Bun.stdin.text();

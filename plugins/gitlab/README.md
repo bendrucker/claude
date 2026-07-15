@@ -7,10 +7,8 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 ### Skills
 
 - **merge-request**: Working with merge requests and stacked diffs
-- **ci**: CI/CD pipelines and jobs
-- **ci-monitor**: Watch an MR's CI and stream state events; invokes the logs agent on failures
-- **api**: REST and GraphQL API access
-- **docs**: Navigating GitLab documentation
+- **ci-monitor**: Watch an MR's CI and stream state events; invokes the logs agent on failures. Also covers `.gitlab-ci.yml` authoring and linting
+- **api**: REST and GraphQL API access, plus GitLab docs navigation
 
 ### Agents
 
@@ -20,6 +18,7 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 
 - Transforms GitLab URLs into API requests for better content fetching
 - Detects glab OAuth token expiration and provides recovery guidance
+- Denies gh-isms that always fail against GitLab (`glab api --jq`, `gh pr` on a GitLab remote, escaped-`$` inline GraphQL, hallucinated mutations) with the corrected form, and nudges loading `gitlab:merge-request` before hand-rolled MR transactions
 
 ## Testing
 

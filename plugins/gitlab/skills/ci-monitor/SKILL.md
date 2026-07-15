@@ -1,6 +1,6 @@
 ---
 name: gitlab:ci-monitor
-description: Investigate GitLab CI pipeline failures and extract diagnostics. Use when watching MR CI, branch builds, or specific pipelines.
+description: Watch GitLab CI and investigate pipeline failures. Use when a pipeline or job is failing or red, when watching MR CI, branch builds, or a specific pipeline, when waiting for CI to go green, or when authoring or validating .gitlab-ci.yml.
 argument-hint: "[mr-url | branch | pipeline-id] [--max-minutes N] [--project group/project]"
 effort: low
 allowed-tools:
@@ -88,6 +88,19 @@ On `merged`, `pr-closed`, or `max-time-reached`, the monitor has already exited.
 #### Stopping
 
 The monitor exits on its own for `status: success`, `merged`, `pr-closed`, and `max-time-reached`. In pipeline-id mode it also exits on `status: failing`. To stop earlier (e.g. after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
+
+## Config Authoring
+
+For editing `.gitlab-ci.yml` rather than watching a run:
+
+```bash
+glab ci lint               # Validate .gitlab-ci.yml before pushing
+glab ci status             # Pipeline status for current branch
+glab ci trace <job-id>     # Stream job logs
+glab ci retry <job-id>     # Retry a failed job
+```
+
+Keyword syntax lives at `/ci/yaml/` in [GitLab docs](https://docs.gitlab.com/ci/yaml/); predefined variables at `/ci/variables/`.
 
 ## Reference
 

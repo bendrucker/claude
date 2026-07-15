@@ -46,10 +46,10 @@ Schedule `⏰` plan check-ins in Things with `things:url add`, which unlike inbo
 Notes carry what to check, the plan path, the repo, and a launch URL:
 
 ```
-claude-cli://open?q=<encoded prompt>&cwd=<absolute main repo path>
+claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 ```
 
-- `open` is the only action. Use `q` for the prompt and `cwd` for the working directory.
+- `open` is the only action. Use `q` for the prompt and `cwd` for the working directory. Both are ordinary percent-encoded query params. The handler base64-encodes them itself when it builds the session's argv.
 - The URL prefills a new session's prompt without submitting it, and cannot resume the original session.
 - Point `cwd` at the main repo, never a worktree. Worktrees get pruned.
 

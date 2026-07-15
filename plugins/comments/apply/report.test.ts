@@ -139,4 +139,14 @@ describe("summarize", () => {
     ];
     expect(summarize(items)).toBe("1 delete / 2 trim / 1 rewrite across 2 file(s)");
   });
+
+  test("counts only what applies, moving refused verdicts to a manual-handling tail", () => {
+    const items = [
+      reportItem({ path: "src/a.ts" }),
+      reportItem({ path: "src/b.ts", verdict: verdict({ trimToLines: [2] }), skipped: true }),
+    ];
+    expect(summarize(items)).toBe(
+      "1 delete / 0 trim / 0 rewrite across 1 file(s), 1 to manual handling",
+    );
+  });
 });

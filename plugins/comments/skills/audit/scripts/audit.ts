@@ -307,6 +307,10 @@ const applyCmd = command(
       }
     }
 
+    for (const item of reportItems) {
+      if (skippedComments.has(`${item.path}:${item.startLine}`)) item.skipped = true;
+    }
+
     const driftSkips = [...verdicts.keys()].filter((id) => !matched.has(id));
 
     if (report) {
@@ -322,13 +326,8 @@ const applyCmd = command(
         process.exit(1);
       } else {
         await applyToBranch(editsByPath, { branch });
-        // Count only what landed. Verdicts skipped for manual handling show up
-        // in the list below.
-        const applied = reportItems.filter(
-          (item) => !skippedComments.has(`${item.path}:${item.startLine}`),
-        );
         console.log(
-          `Applied ${summarize(applied)} on branch ${color.bold(branch)}. Review with git diff HEAD..${branch}.`,
+          `Applied ${summarize(reportItems)} on branch ${color.bold(branch)}. Review with git diff HEAD..${branch}.`,
         );
       }
     }

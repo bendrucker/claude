@@ -38,7 +38,9 @@ export interface FileEditOptions {
 /**
  * Words that continue a sentence rather than start one. A kept line opening
  * with one of these, right after a dropped line that lacks terminal
- * punctuation, is almost certainly a mid-sentence fragment.
+ * punctuation, is almost certainly a mid-sentence fragment. Sentence-opening
+ * prepositions (for, to, from, of, as) are excluded: they routinely start
+ * complete sentences ("For each entry, retry once.") and over-fire the guard.
  */
 export const SENTENCE_CONNECTIVES = new Set([
   "and",
@@ -64,11 +66,6 @@ export const SENTENCE_CONNECTIVES = new Set([
   "while",
   "when",
   "where",
-  "as",
-  "of",
-  "to",
-  "for",
-  "from",
 ]);
 
 /** A line's prose: leading/trailing comment markers and whitespace stripped. */

@@ -15,6 +15,8 @@ export interface ReportItem {
   verdict: Verdict;
   /** The original comment text, for rendering a rewrite's old → new preview. */
   text?: string;
+  /** True when the applier refused the edit and left it for manual handling. */
+  skipped?: boolean;
 }
 
 /** The first line of a possibly multi-line comment, for a one-line preview. */
@@ -31,13 +33,21 @@ function actionLabel(verdict: Verdict): string {
   return verdict.trimTo || verdict.trimToLines?.length ? "trim" : "delete";
 }
 
-/** One-line split of the flagged verdicts: `N delete / M trim / K rewrite across F files`. */
+/**
+ * One-line split of the flagged verdicts: `N delete / M trim / K rewrite across
+ * F files`. Counts only what the applier will change. Verdicts it refused are
+ * appended as `, J to manual handling` so the split reads without the stderr
+ * skip list.
+ */
 export function summarize(items: ReportItem[]): string {
   const flagged = items.filter((item) => item.verdict.action !== "keep");
+  const applied = flagged.filter((item) => !item.skipped);
   const count = (label: string) =>
-    flagged.filter((item) => actionLabel(item.verdict) === label).length;
-  const files = new Set(flagged.map((item) => item.path)).size;
-  return `${count("delete")} delete / ${count("trim")} trim / ${count("rewrite")} rewrite across ${files} file(s)`;
+    applied.filter((item) => actionLabel(item.verdict) === label).length;
+  const files = new Set(applied.map((item) => item.path)).size;
+  const manual = flagged.length - applied.length;
+  const split = `${count("delete")} delete / ${count("trim")} trim / ${count("rewrite")} rewrite across ${files} file(s)`;
+  return manual > 0 ? `${split}, ${manual} to manual handling` : split;
 }
 
 /**

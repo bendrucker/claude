@@ -261,6 +261,21 @@ describe("computeFileEdits", () => {
       skipDetail: /mid-sentence fragment/,
     },
     {
+      name: "fragment guard: does not fire on a sentence-opening preposition",
+      source: "op();\n# walk the queue and rebuild it\n# For each entry, retry once.\ndone();",
+      items: [
+        item({
+          startLine: 2,
+          endLine: 3,
+          startColumn: 0,
+          endColumn: "# For each entry, retry once.".length,
+          verdict: verdict({ trimToLines: [2] }),
+        }),
+      ],
+      expected: "op();\n# For each entry, retry once.\ndone();",
+      skipsEmpty: true,
+    },
+    {
       name: "fragment guard: does not fire on an identifier-led kept line",
       source: "op();\n# checks each flag value\n# bool is coerced to int here\ndone();",
       items: [

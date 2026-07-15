@@ -110,8 +110,9 @@ refused and listed for manual handling instead. A comment that moved or changed
 since preflight gets a new id, matches no verdict, and is skipped. Review the
 result with `git diff HEAD..comments/audit-<hash>`. Apply requires a clean
 working tree. The success message and `--report` both open with a
-`N delete / M trim / K rewrite across F files` split: a `trim` that keeps
-nothing is reported as `delete`.
+`N delete / M trim / K rewrite across F files` split, counting only what
+auto-applies: a `trim` that keeps nothing is reported as `delete`, and refused
+verdicts appear as a `, J to manual handling` tail.
 
 `--report` prints the findings grouped by file (`path:line  action  category
 confidence  rationale`, with an old → new preview for each rewrite and a

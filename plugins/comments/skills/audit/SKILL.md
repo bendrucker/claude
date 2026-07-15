@@ -6,7 +6,7 @@ description: >-
   comments a change introduced) or a whole repo, ranks by intrinsic complexity,
   fans out judging agents, and applies the trims to a fresh branch. Use when
   reviewing a branch or merge request, or sweeping a slop-heavy codebase.
-argument-hint: "[--all] [--base <ref>] [--mr <iid>] [--path <glob>] [--sort <key>] [--limit <n>] [--report] [--fix]"
+argument-hint: "[--all] [--base <ref>] [--mr <iid>] [--path <glob>] [--sort <key>] [--limit <n>] [--report] [--fix] [--format <template>]"
 disable-model-invocation: true
 allowed-tools:
   - Bash
@@ -48,6 +48,8 @@ compiler directives (`eslint-disable`, `noqa`, `go:generate`), shebang lines,
 and license headers never reach the judge.
 - `--fix`: ask the judge for a concrete suggestion per finding.
 - `--report`: at apply time, print findings instead of writing a branch.
+- `--format <template>`: at apply time, pipe each edited file through a
+  formatter before committing.
 
 ## Preflight
 
@@ -93,7 +95,7 @@ verdicts stay on disk, off the conversation, for `apply` to read.
 ## Apply
 
 ```bash
-bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [--fix]
+bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [--fix] [--format <template>]
 ```
 
 Default apply re-extracts the judged files and matches verdicts to comments by
@@ -101,13 +103,43 @@ id at their current position, applies the trims and rewrites, and commits to a
 fresh `comments/audit-<hash>` branch off HEAD. The commit is built with git
 plumbing, so the working tree is never modified and the current branch stays
 checked out. A `rewrite` replaces the comment span in place with the de-voiced
-text, so the diff shows the cleaned comment. A comment that moved or changed
+text, so the diff shows the cleaned comment. A partial trim carries the kept
+comment as rewritten text (`trimTo`) and is spliced the same way; a legacy
+line-range trim (`trimToLines`) that would strand a mid-sentence fragment is
+refused and listed for manual handling instead. A comment that moved or changed
 since preflight gets a new id, matches no verdict, and is skipped. Review the
 result with `git diff HEAD..comments/audit-<hash>`. Apply requires a clean
-working tree.
+working tree. The success message and `--report` both open with a
+`N delete / M trim / K rewrite across F files` split: a `trim` that keeps
+nothing is reported as `delete`.
 
 `--report` prints the findings grouped by file (`path:line  action  category
-confidence  rationale`, with an old → new preview for each rewrite) and writes
-nothing. Use it to review before applying, or on a dirty tree. Comments the
-applier cannot change safely (a comment interleaved with code, a trim that would
-break a block delimiter) are left in place and listed for manual handling.
+confidence  rationale`, with an old → new preview for each rewrite and a
+`keep:` preview for each partial trim) and writes nothing. Use it to review
+before applying, or on a dirty tree.
+
+### Formatting
+
+The applier splices lines without running a formatter, which can leave debris a
+formatter would fix (a stray blank, a collapsed trailing comment past the line
+width). `--format` takes a shell command template: `{}` is replaced with the
+repo-relative path, the file's new content is piped on stdin, stdout is taken as
+the formatted content, and the command runs from the repo root. A non-zero exit
+warns and keeps the unformatted content. Examples:
+
+```bash
+--format 'ruff format --stdin-filename {} -'
+--format 'prettier --stdin-filepath {}'
+```
+
+Pick the formatter from the target repo's own configuration and pass it
+explicitly, or omit the flag. NEVER guess at, auto-discover, or auto-execute a
+formatter the repo does not configure.
+
+### Manual Handling
+
+Comments the applier cannot change safely are left in place and listed for
+manual handling: a comment interleaved with code, a trim that would break a
+block delimiter, and a line-range trim whose kept line would open mid-sentence.
+Applier-produced lines that exceed the width limit are applied but listed as
+warnings to re-wrap by hand.

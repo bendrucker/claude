@@ -18,6 +18,7 @@ the voice/rewrite cases.
   "action": "trim",
   "category": "restate-the-what",
   "rewrite": null,
+  "trimTo": "# the kept comment, rewritten to stand alone",
   "trimToLines": [1],
   "source": "jacob/!680 get_records.py:1116",
   "note": "Ben's review note or the rationale for the label"
@@ -32,8 +33,13 @@ the voice/rewrite cases.
 - `rewrite`: for a `rewrite` fixture, the owner's gold de-voiced text, for hand
   spot-checks. The gate scores the predicted action; rewrite text is checked by
   hand. `null` otherwise.
-- `trimToLines`: optional, only for mixed blocks where some lines are a genuine
-  why and others are slop. The lines worth keeping (relative to the comment).
+- `trimTo`: optional, only for mixed blocks where part is a genuine why and the
+  rest is slop: the owner's gold kept-comment text, rewritten to read as complete
+  sentences. Like `rewrite`, it is for hand spot-checks; the gate scores the
+  action.
+- `trimToLines`: the deprecated line-range form of a partial trim, kept where a
+  fixture also exercises the applier's compat path. The lines worth keeping
+  (relative to the comment).
 - `context`: real source, line-numbered, so the judge can answer the
   what-on-dense question.
 

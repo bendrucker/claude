@@ -23,9 +23,28 @@ function firstLine(text: string): string {
 }
 
 /**
+ * A `trim` that keeps nothing (no `trimTo`, no `trimToLines`) removes the whole
+ * comment, so it reads as `delete`; a `trim` that keeps part stays `trim`.
+ */
+function actionLabel(verdict: Verdict): string {
+  if (verdict.action !== "trim") return verdict.action;
+  return verdict.trimTo || verdict.trimToLines?.length ? "trim" : "delete";
+}
+
+/** One-line split of the flagged verdicts: `N delete / M trim / K rewrite across F files`. */
+export function summarize(items: ReportItem[]): string {
+  const flagged = items.filter((item) => item.verdict.action !== "keep");
+  const count = (label: string) =>
+    flagged.filter((item) => actionLabel(item.verdict) === label).length;
+  const files = new Set(flagged.map((item) => item.path)).size;
+  return `${count("delete")} delete / ${count("trim")} trim / ${count("rewrite")} rewrite across ${files} file(s)`;
+}
+
+/**
  * Render the flagged comments grouped by file as `path:line  action  category
- * confidence  rationale`. A `rewrite` shows its old → new preview; with `fix`, a
- * suggestion and any keep-lines follow. `keep` items are dropped.
+ * confidence  rationale`, under a delete/trim/rewrite summary line. A `rewrite`
+ * shows its old → new preview; a partial trim shows what it keeps; with `fix`,
+ * a suggestion follows. `keep` items are dropped.
  */
 export function renderReport(items: ReportItem[], options: { fix: boolean }): string {
   const flagged = items.filter((item) => item.verdict.action !== "keep");
@@ -45,7 +64,7 @@ export function renderReport(items: ReportItem[], options: { fix: boolean }): st
       const conf =
         verdict.confidence === "high" ? color.red(verdict.confidence) : verdict.confidence;
       lines.push(
-        `  ${color.dim(`:${startLine}`)}  ${verdict.action}  ${verdict.category}  ${conf}`,
+        `  ${color.dim(`:${startLine}`)}  ${actionLabel(verdict)}  ${verdict.category}  ${conf}`,
       );
       lines.push(`      ${verdict.rationale}`);
       if (verdict.action === "rewrite" && verdict.rewrite) {
@@ -55,11 +74,13 @@ export function renderReport(items: ReportItem[], options: { fix: boolean }): st
       if (options.fix && verdict.suggestedFix) {
         lines.push(color.dim(`      fix: ${verdict.suggestedFix}`));
       }
-      if (verdict.trimToLines?.length) {
+      if (verdict.trimTo) {
+        lines.push(color.dim(`      keep: ${firstLine(verdict.trimTo)}`));
+      } else if (verdict.trimToLines?.length) {
         lines.push(color.dim(`      keep lines: ${verdict.trimToLines.join(", ")}`));
       }
     }
     blocks.push(lines.join("\n"));
   }
-  return blocks.join("\n\n");
+  return [color.bold(summarize(items)), ...blocks].join("\n\n");
 }

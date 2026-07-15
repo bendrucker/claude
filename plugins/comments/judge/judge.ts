@@ -70,6 +70,14 @@ export function parseVerdict(value: unknown, label: string | number): Verdict {
   if (action !== "rewrite" && hasRewrite) {
     throw new Error(`Judge verdict ${label} "rewrite" is only valid when action is "rewrite"`);
   }
+  if (record.trimTo != null) {
+    if (typeof record.trimTo !== "string" || record.trimTo.length === 0) {
+      throw new Error(`Judge verdict ${label} "trimTo" must be a non-empty string`);
+    }
+    if (action !== "trim") {
+      throw new Error(`Judge verdict ${label} "trimTo" is only valid when action is "trim"`);
+    }
+  }
   const verdict: Verdict = {
     action,
     category: (record.category ?? null) as SlopCategory | null,
@@ -78,6 +86,7 @@ export function parseVerdict(value: unknown, label: string | number): Verdict {
     rewrite: action === "rewrite" ? (record.rewrite as string) : null,
   };
   if (typeof record.suggestedFix === "string") verdict.suggestedFix = record.suggestedFix;
+  if (typeof record.trimTo === "string") verdict.trimTo = record.trimTo;
   if (Array.isArray(record.trimToLines)) {
     verdict.trimToLines = record.trimToLines.filter(
       (line): line is number => typeof line === "number",

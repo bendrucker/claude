@@ -47,6 +47,49 @@ describe("parseVerdict", () => {
     expect(() => parseVerdict(raw({ action: "delete" }), "x")).toThrow(/"action" must be one of/);
   });
 
+  test.each<{ name: string; over: Record<string, unknown>; error?: RegExp; trimTo?: string }>([
+    {
+      name: "accepts trimTo on a trim verdict",
+      over: { trimTo: "# the kept why" },
+      trimTo: "# the kept why",
+    },
+    {
+      name: "accepts a trim verdict without trimTo (whole-comment delete)",
+      over: {},
+    },
+    {
+      name: "rejects an empty trimTo",
+      over: { trimTo: "" },
+      error: /"trimTo" must be a non-empty string/,
+    },
+    {
+      name: "rejects a non-string trimTo",
+      over: { trimTo: [2] },
+      error: /"trimTo" must be a non-empty string/,
+    },
+    {
+      name: "rejects trimTo on keep",
+      over: { action: "keep", category: null, trimTo: "# stray" },
+      error: /"trimTo" is only valid when action is "trim"/,
+    },
+    {
+      name: "rejects trimTo on rewrite",
+      over: { action: "rewrite", category: "voice", rewrite: "// fact", trimTo: "# stray" },
+      error: /"trimTo" is only valid when action is "trim"/,
+    },
+  ])("$name", ({ over, error, trimTo }) => {
+    if (error) {
+      expect(() => parseVerdict(raw(over), "x")).toThrow(error);
+      return;
+    }
+    const v = parseVerdict(raw(over), "x");
+    if (trimTo) {
+      expect(v.trimTo).toBe(trimTo);
+    } else {
+      expect(v.trimTo).toBeUndefined();
+    }
+  });
+
   test("preserves suggestedFix and numeric trimToLines", () => {
     const v = parseVerdict(raw({ suggestedFix: "drop it", trimToLines: [1, "x", 3] }), "x");
     expect(v.suggestedFix).toBe("drop it");

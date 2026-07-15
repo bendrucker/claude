@@ -33,8 +33,8 @@ export type SlopCategory = (typeof SLOP_CATEGORIES)[number];
  * What the applier does with a comment.
  *
  * - `keep`: it earns its place and is cleanly written. Leave it.
- * - `trim`: it carries no fact a competent reader lacks. Delete it, or trim to
- *   the worthwhile lines via `trimToLines`.
+ * - `trim`: it carries no fact a competent reader lacks. Delete it, or keep
+ *   only the worthwhile part via `trimTo`.
  * - `rewrite`: it carries a real fact under AI voice. Strip the voice, keep the
  *   fact. `rewrite` holds the de-voiced comment text.
  */
@@ -59,10 +59,18 @@ export interface Verdict {
   /** Present only with `--fix`: a concrete rewrite, trim, or delete suggestion. */
   suggestedFix?: string;
   /**
-   * For a mixed block where only some lines are slop: the lines worth keeping,
-   * numbered 1-based and relative to the comment (line 1 is the comment's first
-   * line). Empty means delete the whole comment. Omitted when the comment is
-   * judged as a single unit.
+   * For a partial `trim`: the kept comment, rewritten as it should read. Same
+   * contract as `rewrite` (delimiters included, no leading indentation), so a
+   * kept clause whose sentence started on a dropped line reads as a complete
+   * sentence, and the cut may land mid-line. Omitted when the whole comment
+   * should go. Preferred over `trimToLines`.
+   */
+  trimTo?: string;
+  /**
+   * Deprecated line-range form of a partial trim, still accepted by the
+   * applier: the lines worth keeping, numbered 1-based and relative to the
+   * comment (line 1 is the comment's first line). Empty means delete the whole
+   * comment. Prefer `trimTo`, which cannot strand a mid-sentence fragment.
    */
   trimToLines?: number[];
 }
@@ -83,6 +91,7 @@ export function verdictSchema(): Record<string, unknown> {
       rationale: { type: "string" },
       rewrite: { anyOf: [{ type: "string" }, { type: "null" }] },
       suggestedFix: { anyOf: [{ type: "string" }, { type: "null" }] },
+      trimTo: { anyOf: [{ type: "string" }, { type: "null" }] },
       trimToLines: {
         anyOf: [{ type: "array", items: { type: "integer" } }, { type: "null" }],
       },

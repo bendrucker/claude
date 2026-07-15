@@ -4,6 +4,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
+// The <session_id> "loaded" marker is written by the bang-execution line in
+// skills/merge-request/SKILL.md. Keep the path in sync with that command.
 export const MARKER_DIR = "/tmp/claude/gitlab-skill";
 
 export interface LintEnv {
@@ -50,6 +52,12 @@ function context(text: string): SyncHookJSONOutput {
   };
 }
 
+// Blank out quoted spans so flag checks never match text inside argument
+// values (note bodies, field values), only real flags.
+export function stripQuoted(command: string): string {
+  return command.replace(/'[^']*'/g, " ").replace(/"[^"]*"/g, " ");
+}
+
 // Segments approximate one process invocation each, so a `grep -q` elsewhere
 // in a pipeline never trips the glab flag checks.
 function segments(command: string): string[] {
@@ -57,34 +65,32 @@ function segments(command: string): string[] {
 }
 
 export function lintGlab(command: string): string | null {
-  for (const segment of segments(command)) {
-    if (!/\bglab\s+api\b/.test(segment)) continue;
-    if (/\s(--jq\b|-q(\s|$))/.test(segment)) {
+  for (const segment of segments(stripQuoted(command))) {
+    if (!/\bglab\s/.test(segment)) continue;
+    if (/\bglab\s+api\b/.test(segment) && /\s(--jq\b|-q(\s|$))/.test(segment)) {
       return "glab api has no --jq/-q output filter (that's gh api). Pipe to jq instead: glab api <endpoint> | jq '<filter>'";
     }
-  }
-
-  for (const segment of segments(command)) {
-    if (/\bglab\s/.test(segment) && /\s--json\b/.test(segment)) {
-      return "glab has no --json flag (that's gh). Use --output json (or -F json on older glab).";
+    if (/\s--json\b/.test(segment)) {
+      return "glab has no --json flag (that's gh). Use --output json.";
     }
   }
 
-  if (/\bglab\s+api\s+graphql\b/.test(command) && command.includes("\\$")) {
-    return [
-      "Escaped dollars (\\$) corrupt GraphQL variable declarations. Pass the query via a quoted heredoc so $ needs no escaping:",
-      `glab api graphql -f query="$(cat <<'GQL'`,
-      "mutation($projectPath: ID!, $iid: String!) { ... }",
-      "GQL",
-      ')" -f projectPath=<group/project> -f iid=<iid>',
-    ].join("\n");
-  }
-
-  if (command.includes("mergeRequestSetAutoMerge")) {
-    return "mergeRequestSetAutoMerge does not exist in GitLab's GraphQL schema. Auto-merge is REST-only: use the gitlab:merge-request skill's merge.ts (handles merge trains) or glab mr merge --auto-merge.";
-  }
-  if (command.includes("mergeRequestRequestReview")) {
-    return "mergeRequestRequestReview does not exist in GitLab's GraphQL schema. To re-request a review use mergeRequestReviewerRereview; to request changes use mergeRequestRequestChanges. See the gitlab:merge-request skill.";
+  if (/\bglab\s+api\s+graphql\b/.test(command)) {
+    if (/query=["']?[^;&|]*\\\$/.test(command)) {
+      return [
+        "Escaped dollars (\\$) corrupt GraphQL variable declarations. Pass the query via a quoted heredoc so $ needs no escaping:",
+        `glab api graphql -f query="$(cat <<'GQL'`,
+        "mutation($projectPath: ID!, $iid: String!) { ... }",
+        "GQL",
+        ')" -f projectPath=<group/project> -f iid=<iid>',
+      ].join("\n");
+    }
+    if (command.includes("mergeRequestSetAutoMerge")) {
+      return "mergeRequestSetAutoMerge does not exist in GitLab's GraphQL schema. Auto-merge is REST-only: use the gitlab:merge-request skill's merge.ts (handles merge trains) or glab mr merge --auto-merge.";
+    }
+    if (command.includes("mergeRequestRequestReview")) {
+      return "mergeRequestRequestReview does not exist in GitLab's GraphQL schema. To re-request a review use mergeRequestReviewerRereview; to request changes use mergeRequestRequestChanges. See the gitlab:merge-request skill.";
+    }
   }
 
   return null;
@@ -117,8 +123,8 @@ function gitConfigPath(cwd: string, env: LintEnv): string | null {
         const gitDir = isAbsolute(match[1]) ? match[1] : resolve(dir, match[1]);
         for (const candidate of [
           join(gitDir, "config"),
-          // A linked worktree's gitdir is <main>/.git/worktrees/<name>;
-          // the shared config lives two levels up.
+          // A linked worktree's gitdir is <main>/.git/worktrees/<name>.
+          // The shared config lives two levels up.
           resolve(gitDir, "..", "..", "config"),
         ]) {
           if (env.fileExists(candidate)) return candidate;
@@ -146,14 +152,14 @@ export function originHost(cwd: string, env: LintEnv): string | null {
 }
 
 export function lintGh(command: string, cwd: string, env: LintEnv): string | null {
-  for (const segment of segments(command)) {
-    if (!/(^|\s)gh\s+(pr|issue)\b/.test(segment)) continue;
-    if (/\s(-R|--repo)\b/.test(segment)) continue;
+  const targetsOrigin = segments(stripQuoted(command)).some(
+    (segment) => /(^|\s)gh\s+(pr|issue)\b/.test(segment) && !/\s(-R|--repo)\b/.test(segment),
+  );
+  if (!targetsOrigin) return null;
 
-    const host = originHost(cwd, env);
-    if (host && isGitLabHost(host)) {
-      return `This repository's origin remote is GitLab (${host}); gh cannot resolve it. Use glab instead, and load gitlab:merge-request for MR workflows (or pass -R <owner>/<repo> if you really meant a GitHub repo).`;
-    }
+  const host = originHost(cwd, env);
+  if (host && isGitLabHost(host)) {
+    return `This repository's origin remote is GitLab (${host}). gh cannot resolve it; use glab instead, and load gitlab:merge-request for MR workflows (or pass -R <owner>/<repo> if you really meant a GitHub repo).`;
   }
   return null;
 }

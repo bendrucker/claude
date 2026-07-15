@@ -96,11 +96,14 @@ For editing `.gitlab-ci.yml` rather than watching a run:
 ```bash
 glab ci lint               # Validate .gitlab-ci.yml before pushing
 glab ci status             # Pipeline status for current branch
+glab ci list               # List recent pipelines
+glab ci run                # Trigger a pipeline for the current branch
+glab ci view               # Interactive pipeline/job view
 glab ci trace <job-id>     # Stream job logs
 glab ci retry <job-id>     # Retry a failed job
 ```
 
-Keyword syntax lives at `/ci/yaml/` in [GitLab docs](https://docs.gitlab.com/ci/yaml/); predefined variables at `/ci/variables/`.
+Keyword syntax lives at `/ci/yaml/` in [GitLab docs](https://docs.gitlab.com/ci/yaml/). Predefined variables are at `/ci/variables/`.
 
 ## Reference
 

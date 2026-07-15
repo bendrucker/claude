@@ -61,6 +61,11 @@ describe("glab gh-ism denials", () => {
       reason: "quoted heredoc",
     },
     {
+      name: "--jq despite a quoted pipe in the endpoint",
+      command: `glab api "projects/:id/issues?labels=bug|urgent" --jq '.[].iid'`,
+      reason: "Pipe to jq",
+    },
+    {
       name: "hallucinated mergeRequestSetAutoMerge",
       command: `glab api graphql -f query="$(cat <<'GQL'\nmutation { mergeRequestSetAutoMerge } \nGQL\n)"`,
       reason: "merge.ts",
@@ -82,6 +87,14 @@ describe("glab gh-ism denials", () => {
     { name: "grep -q in another pipeline segment", command: "glab api user | grep -q ben" },
     { name: "--output json", command: "glab mr view 42 --output json" },
     {
+      name: "-q inside a quoted field value",
+      command: "glab api projects/:id/issues --field 'description=pass -q for quiet mode'",
+    },
+    {
+      name: "escaped dollar in a downstream awk stage",
+      command: `glab api graphql -f query='{ project { id } }' | jq -r .data | awk "{print \\$1}"`,
+    },
+    {
       name: "heredoc GraphQL with real dollars",
       command: `glab api graphql -f query="$(cat <<'GQL'\nmutation($projectPath: ID!) { mergeRequestReviewerRereview }\nGQL\n)"`,
     },
@@ -89,6 +102,20 @@ describe("glab gh-ism denials", () => {
   ])("allows $name", ({ command }) => {
     const env = fakeEnv(GITHUB_REPO);
     expect(processInput(mockInput(command), env)).toBeNull();
+  });
+
+  test.each<{ name: string; command: string }>([
+    {
+      name: "--json inside a quoted note body",
+      command: `glab mr note 5 -m "renamed --json to --output json"`,
+    },
+    {
+      name: "mutation name inside a quoted note body",
+      command: "glab mr note 42 -m 'Confirmed mergeRequestSetAutoMerge is not in the schema'",
+    },
+  ])("does not deny $name", ({ command }) => {
+    const output = decision(processInput(mockInput(command), fakeEnv(GITHUB_REPO)));
+    expect(output?.permissionDecision).toBeUndefined();
   });
 });
 

@@ -31,7 +31,7 @@ The sandbox is egress control, not filesystem lockdown. Credentials stay outside
 
 `api.anthropic.com` is the known exfil-capable host (it accepts uploads). It stays because the agent needs the model API.
 
-`gitlab.com` is a partial exception to the secrets-outside rule: `glab` stores its OAuth token in `~/.config/glab-cli/config.yml` (no keychain support), which the sandbox can read. A sandboxed process could therefore send that token to gitlab.com itself, and no further. Accepted because the alternative was near-universal `dangerouslyDisableSandbox` on `glab` calls, which exposed far more. The write allowlist covers only `~/.config/glab-cli/recover` (glab's crash-recovery files), not the config file itself.
+`gitlab.com` is a partial exception to the secrets-outside rule: `glab` stores its OAuth token in `~/.config/glab-cli/config.yml` (no keychain support), which the sandbox can read. A sandboxed process can therefore exfiltrate that token through any allowlisted egress host, and `gitlab.com` itself accepts uploads (snippets, repos). Accepted because the alternative was near-universal `dangerouslyDisableSandbox` on `glab` calls, which exposed far more. The write allowlist covers only `~/.config/glab-cli/recover` (`glab`'s crash-recovery files), not the config file itself.
 
 ### Sockets and Writes
 

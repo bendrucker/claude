@@ -29,11 +29,11 @@ glab api projects/:id/issues --paginate               # All pages
 
 #### No `--jq`/`-q`
 
-Output filtering flags belong to `gh api`. Pipe to `jq` instead: `glab api <endpoint> | jq '<filter>'`. Likewise there is no `--json` flag anywhere in glab; use `--output json`.
+Output filtering flags belong to `gh api`. Pipe to `jq` instead: `glab api <endpoint> | jq '<filter>'`. There is also no `--json` flag anywhere in `glab`. Use `--output json`.
 
 #### Error Bodies Land on Stdout
 
-A 404/4xx response is a JSON error body (`{"message":"404 Not found"}`), so `glab api ... | jq '.field'` turns the real HTTP error into a misleading jq parse error. When a pipeline fails, rerun the `glab api` call bare and read the body before touching the jq filter.
+A 404/4xx response is a JSON error body (`{"message":"404 Not found"}`), so `glab api ... | jq '.field'` turns the real HTTP error into misleading `null` output or a jq type error (`Cannot index string`, `Cannot iterate over object`). When a pipeline misbehaves, rerun the `glab api` call bare and read the body before touching the jq filter.
 
 #### Pagination Pitfall
 
@@ -62,18 +62,18 @@ Escaping `$` in an inline `-f query='mutation($var...)'` corrupts the query (Git
 
 ```bash
 glab api graphql -f query="$(cat <<'GQL'
-mutation($projectPath: ID!, $iid: String!) {
+mutation($projectPath: ID!, $iid: String!, $userId: UserID!) {
   mergeRequestReviewerRereview(input: { projectPath: $projectPath, iid: $iid, userId: $userId }) { errors }
 }
 GQL
-)" -f projectPath=group/project -f iid=123
+)" -f projectPath=group/project -f iid=123 -f userId="gid://gitlab/User/42"
 ```
 
 Pass variables with `-f` (strings), not `-F`: `-F` coerces numeric-looking values to int, and `iid` is typed `String!`. `projectPath` is typed `ID!`, not `String!`.
 
 #### Hallucinated Mutations
 
-Do not guess mutation names from GitHub's schema. `mergeRequestSetAutoMerge` and `mergeRequestRequestReview` are not in GitLab's schema. Auto-merge is REST-only (`glab mr merge --auto-merge`, or the `gitlab:merge-request` skill's merge.ts for merge trains). Re-requesting review is `mergeRequestReviewerRereview`; requesting changes is `mergeRequestRequestChanges`. Probing the schema fires the mutation, so use documented forms only.
+Do not guess mutation names from GitHub's schema. `mergeRequestSetAutoMerge` and `mergeRequestRequestReview` are not in GitLab's schema. Auto-merge is REST-only (`glab mr merge --auto-merge`, or the `gitlab:merge-request` skill's `merge.ts` for merge trains). Re-requesting review is `mergeRequestReviewerRereview`. Requesting changes is `mergeRequestRequestChanges`. Trial-executing a guessed mutation runs it for real if it exists, so use documented forms only.
 
 ## Output
 
@@ -87,6 +87,7 @@ For `glab` command reference, use `glab <command> --help` instead of web docs (t
 | Need | Path |
 |------|------|
 | REST endpoints | `/api/` |
+| MR API fields | `/api/merge_requests/` |
 | GraphQL schema | `/api/graphql/reference/` |
 | CI/CD YAML syntax | `/ci/yaml/` |
 | Predefined CI variables | `/ci/variables/` |

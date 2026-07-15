@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
+import { errorText } from "../../../scripts/merge";
 
 export type DiffRefs = { base_sha: string; head_sha: string; start_sha: string };
 
@@ -117,22 +118,12 @@ export function buildPosition(
   return position;
 }
 
-export function formatError(err: unknown): string {
-  if (err && typeof err === "object") {
-    // Bun ShellError buries the useful text in its stdout/stderr buffers;
-    // its message is just "Failed with exit code N".
-    const record = err as Record<string, unknown>;
-    const streams = [record.stderr, record.stdout]
-      .map((stream) => (stream == null ? "" : String(stream).trim()))
-      .filter((text) => text.length > 0);
-    if (streams.length > 0) return streams.join("\n");
-  }
-  return err instanceof Error ? err.message : String(err);
-}
-
+// Surface rejections (validation failures, glab errors) as the underlying
+// message instead of a Bun stack trace. cleye does not await async command
+// handlers, so their throws land here.
 export function exitOnRejection(): void {
   process.on("unhandledRejection", (err) => {
-    console.error(formatError(err));
+    console.error(errorText(err));
     process.exit(1);
   });
 }

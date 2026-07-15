@@ -1,7 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
 import {
   buildPosition,
-  formatError,
   type Hunk,
   isLineInDiff,
   parseDiffHunks,
@@ -158,31 +157,5 @@ describe("buildPosition", () => {
   ])("$name", ({ lineArg, extra }) => {
     const pos = buildPosition(refs, "src/app.ts", lineArg);
     expect(pos).toEqual({ ...base, ...extra });
-  });
-});
-
-describe("formatError", () => {
-  test.each<{ name: string; err: unknown; expected: string }>([
-    {
-      name: "plain Error uses message",
-      err: new Error("Line 42 of src/app.ts is not within a diff hunk"),
-      expected: "Line 42 of src/app.ts is not within a diff hunk",
-    },
-    {
-      name: "shell error prefers stderr and stdout buffers",
-      err: {
-        stderr: Buffer.from("glab: 404 Not Found (HTTP 404)"),
-        stdout: Buffer.from('{"message":"404 Not found"}'),
-      },
-      expected: 'glab: 404 Not Found (HTTP 404)\n{"message":"404 Not found"}',
-    },
-    {
-      name: "shell error with only stdout",
-      err: { stdout: Buffer.from('{"message":"error"}'), stderr: Buffer.from("") },
-      expected: '{"message":"error"}',
-    },
-    { name: "non-object falls back to String", err: "boom", expected: "boom" },
-  ])("$name", ({ err, expected }) => {
-    expect(formatError(err)).toBe(expected);
   });
 });

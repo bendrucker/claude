@@ -147,6 +147,14 @@ describe("validateBody", () => {
     expect(getAdditionalContext(result)).toContain("Two Fixes Found While Testing");
   });
 
+  it("keeps a heading's inline code intact in the suggestion", () => {
+    const result = validateBody("## changes to `validate.ts`\n\nReshapes the resolver.");
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain(
+      '"changes to `validate.ts`" → "Changes to `validate.ts`"',
+    );
+  });
+
   it("does not warn on AP-cased headings with an acronym", () => {
     expect(
       validateBody(

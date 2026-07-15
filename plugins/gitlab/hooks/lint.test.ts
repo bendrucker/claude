@@ -115,6 +115,11 @@ describe("glab gh-ism denials", () => {
       name: "mutation name inside a quoted note body",
       command: "glab mr note 42 -m 'Confirmed mergeRequestSetAutoMerge is not in the schema'",
     },
+    {
+      name: "mutation name in a note compounded after a valid graphql call",
+      command:
+        "glab api graphql -f query='{ project { id } }' && glab mr note 42 -m 'mergeRequestSetAutoMerge is not in the schema'",
+    },
   ])("does not deny $name", async ({ command }) => {
     const output = decision(await processInput(mockInput(command), fakeEnv(GITHUB_REPO)));
     expect(output?.permissionDecision).toBeUndefined();

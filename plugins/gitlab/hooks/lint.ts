@@ -73,8 +73,13 @@ export function lintGlab(command: string): string | null {
     }
   }
 
-  if (/\bglab\s+api\s+graphql\b/.test(command)) {
-    if (/query=["']?[^;&|]*\\\$/.test(command)) {
+  // GraphQL checks scan raw text (queries live inside quotes), scoped to the
+  // segment invoking `glab api graphql` so text in sibling commands (note
+  // bodies) never matches. Newlines don't split here: heredoc queries span
+  // lines within one invocation.
+  for (const segment of command.split(/\|\|?|&&|;/)) {
+    if (!/\bglab\s+api\s+graphql\b/.test(segment)) continue;
+    if (/query=["']?[^;&|]*\\\$/.test(segment)) {
       return [
         "Escaped dollars (\\$) corrupt GraphQL variable declarations. Pass the query via a quoted heredoc so $ needs no escaping:",
         `glab api graphql -f query="$(cat <<'GQL'`,
@@ -83,10 +88,10 @@ export function lintGlab(command: string): string | null {
         ')" -f projectPath=<group/project> -f iid=<iid>',
       ].join("\n");
     }
-    if (command.includes("mergeRequestSetAutoMerge")) {
+    if (segment.includes("mergeRequestSetAutoMerge")) {
       return "mergeRequestSetAutoMerge does not exist in GitLab's GraphQL schema. Auto-merge is REST-only: use the gitlab:merge-request skill's merge.ts (handles merge trains) or glab mr merge --auto-merge.";
     }
-    if (command.includes("mergeRequestRequestReview")) {
+    if (segment.includes("mergeRequestRequestReview")) {
       return "mergeRequestRequestReview does not exist in GitLab's GraphQL schema. To re-request a review use mergeRequestReviewerRereview; to request changes use mergeRequestRequestChanges. See the gitlab:merge-request skill.";
     }
   }

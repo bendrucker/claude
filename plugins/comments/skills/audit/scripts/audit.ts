@@ -6,8 +6,9 @@ import { $ } from "bun";
 import { cli, command } from "cleye";
 import { applyToBranch, isCleanTree } from "../../../apply/branch";
 import { computeFileEdits, type EditItem } from "../../../apply/edits";
+import { formatContent } from "../../../apply/format";
 import { collectVerdicts, matchVerdicts } from "../../../apply/join";
-import { color, type ReportItem, renderReport } from "../../../apply/report";
+import { color, type ReportItem, renderReport, summarize } from "../../../apply/report";
 import {
   type CollectedComment,
   collectDiff,
@@ -213,11 +214,16 @@ const applyCmd = command(
       job: { type: String, description: "The job dir printed by preflight" },
       report: { type: Boolean, default: false, description: "Print findings instead of applying" },
       fix: { type: Boolean, default: false, description: "Include suggestions in the report" },
+      format: {
+        type: String,
+        description:
+          "Format each edited file through this shell template ({} = path, content on stdin)",
+      },
     },
   },
   async (parsed) => {
     await chdirToRepoRoot();
-    const { job, report, fix } = parsed.flags;
+    const { job, report, fix, format } = parsed.flags;
     if (!job) {
       console.error("--job <dir> is required.");
       process.exit(1);
@@ -250,6 +256,8 @@ const applyCmd = command(
     const editsByPath = new Map<string, string>();
     const matched = new Set<string>();
     const manualSkips: string[] = [];
+    const skippedComments = new Set<string>();
+    const editWarnings: { path: string; line: number; detail: string }[] = [];
 
     // Re-extract each judged file and match verdicts by id at the comment's
     // current range. A verdict whose id no longer re-extracts has drifted.
@@ -272,10 +280,35 @@ const applyCmd = command(
       }
       if (editItems.length > 0) {
         const result = computeFileEdits(source, editItems);
-        for (const skip of result.skips)
+        for (const skip of result.skips) {
           manualSkips.push(`${path}:${skip.startLine}  ${skip.detail}`);
+          skippedComments.add(`${path}:${skip.startLine}`);
+        }
+        for (const warning of result.warnings)
+          editWarnings.push({ path, line: warning.line, detail: warning.detail });
         if (result.content !== source) editsByPath.set(path, result.content);
       }
+    }
+
+    const formattedPaths = new Set<string>();
+    if (format && !report) {
+      for (const [path, content] of editsByPath) {
+        const formatted = await formatContent(format, path, content);
+        if (formatted.formatted) {
+          editsByPath.set(path, formatted.content);
+          formattedPaths.add(path);
+        } else {
+          console.error(
+            color.yellow(
+              `Formatter failed for ${path} (${formatted.error}); keeping unformatted content.`,
+            ),
+          );
+        }
+      }
+    }
+
+    for (const item of reportItems) {
+      if (skippedComments.has(`${item.path}:${item.startLine}`)) item.skipped = true;
     }
 
     const driftSkips = [...verdicts.keys()].filter((id) => !matched.has(id));
@@ -294,7 +327,7 @@ const applyCmd = command(
       } else {
         await applyToBranch(editsByPath, { branch });
         console.log(
-          `Trimmed ${editsByPath.size} file(s) on branch ${color.bold(branch)}. Review with git diff HEAD..${branch}.`,
+          `Applied ${summarize(reportItems)} on branch ${color.bold(branch)}. Review with git diff HEAD..${branch}.`,
         );
       }
     }
@@ -309,6 +342,14 @@ const applyCmd = command(
     if (manualSkips.length > 0) {
       console.error(color.yellow(`Left ${manualSkips.length} comment(s) for manual handling:`));
       for (const skip of manualSkips) console.error(`  ${skip}`);
+    }
+    // A formatter that succeeded owns line wrapping for its file, so its
+    // over-length warnings are stale.
+    const remainingWarnings = editWarnings.filter((warning) => !formattedPaths.has(warning.path));
+    if (remainingWarnings.length > 0) {
+      console.error(color.yellow(`Applied ${remainingWarnings.length} edit(s) worth re-checking:`));
+      for (const warning of remainingWarnings)
+        console.error(`  ${warning.path}:${warning.line}  ${warning.detail}`);
     }
   },
 );

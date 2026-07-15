@@ -81,7 +81,7 @@ is actually present.
   the query selects, the columns it returns, or the steps it runs is restatement,
   however analytical it reads. Such a header earns `keep` only for the line that
   states a fact the code cannot (a non-obvious data shape, a filter's load-bearing
-  reason). Trim it, or `trimToLines` to that one line, when the rest only
+  reason). Trim it, or keep only that line via `trimTo`, when the rest only
   describes the query in words.
 - **narration**: a diary of the change rather than documentation of the code.
   Migration stories repeated across helpers; roadmap/ticket breadcrumbs
@@ -124,14 +124,17 @@ is actually present.
 
 A single comment block can mix a genuine why with slop restatement. Do not
 keep-or-trim the whole block. When only part is slop, set `action: "trim"` and
-use `trimToLines` to list the 1-based line numbers (within the comment) worth
-keeping; the rest is the slop to drop. When the whole comment should go, omit
-`trimToLines` or leave it empty.
+put the kept comment in `trimTo`: the comment as it should read after the cut,
+rewritten to read as complete sentences, with its delimiters and no leading
+indentation (the same contract as `rewrite`). The cut may land mid-line. A kept
+clause whose sentence started on a dropped line must be rewritten to stand
+alone; never ship a dangling fragment. When the whole comment should go, omit
+`trimTo`.
 
 A genuine why elsewhere in the block does not excuse a clause that restates the
 adjacent code. When a clause paraphrases the mechanics of the code it sits
-against, it is slop even when a neighboring clause is real why. Trim to the
-why-only lines. Reserve `keep` for blocks that are why throughout.
+against, it is slop even when a neighboring clause is real why. Keep only the
+why in `trimTo`. Reserve `keep` for blocks that are why throughout.
 
 ## Output
 
@@ -149,7 +152,7 @@ verdict per comment. Per verdict:
   and the voice you are stripping if rewriting.
 - `rewrite`: for `rewrite` only, the cleaned comment text including its
   delimiters. `null` otherwise.
-- `trimToLines`: only for a partial `trim` of a multi-line block, per above.
+- `trimTo`: only for a partial `trim`, the kept comment rewritten per above.
   `null` otherwise.
 
 When in doubt on a plain comment, keep it: passing a mediocre comment is cheaper

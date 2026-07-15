@@ -15,6 +15,8 @@ export interface ReportItem {
   verdict: Verdict;
   /** The original comment text, for rendering a rewrite's old → new preview. */
   text?: string;
+  /** True when the applier refused the edit and left it for manual handling. */
+  skipped?: boolean;
 }
 
 /** The first line of a possibly multi-line comment, for a one-line preview. */
@@ -23,9 +25,36 @@ function firstLine(text: string): string {
 }
 
 /**
+ * A `trim` that keeps nothing (no `trimTo`, no `trimToLines`) removes the whole
+ * comment, so it reads as `delete`; a `trim` that keeps part stays `trim`.
+ */
+function actionLabel(verdict: Verdict): string {
+  if (verdict.action !== "trim") return verdict.action;
+  return verdict.trimTo || verdict.trimToLines?.length ? "trim" : "delete";
+}
+
+/**
+ * One-line split of the flagged verdicts: `N delete / M trim / K rewrite across
+ * F files`. Counts only what the applier will change. Verdicts it refused are
+ * appended as `, J to manual handling` so the split reads without the stderr
+ * skip list.
+ */
+export function summarize(items: ReportItem[]): string {
+  const flagged = items.filter((item) => item.verdict.action !== "keep");
+  const applied = flagged.filter((item) => !item.skipped);
+  const count = (label: string) =>
+    applied.filter((item) => actionLabel(item.verdict) === label).length;
+  const files = new Set(applied.map((item) => item.path)).size;
+  const manual = flagged.length - applied.length;
+  const split = `${count("delete")} delete / ${count("trim")} trim / ${count("rewrite")} rewrite across ${files} file(s)`;
+  return manual > 0 ? `${split}, ${manual} to manual handling` : split;
+}
+
+/**
  * Render the flagged comments grouped by file as `path:line  action  category
- * confidence  rationale`. A `rewrite` shows its old → new preview; with `fix`, a
- * suggestion and any keep-lines follow. `keep` items are dropped.
+ * confidence  rationale`, under a delete/trim/rewrite summary line. A `rewrite`
+ * shows its old → new preview; a partial trim shows what it keeps; with `fix`,
+ * a suggestion follows. `keep` items are dropped.
  */
 export function renderReport(items: ReportItem[], options: { fix: boolean }): string {
   const flagged = items.filter((item) => item.verdict.action !== "keep");
@@ -45,7 +74,7 @@ export function renderReport(items: ReportItem[], options: { fix: boolean }): st
       const conf =
         verdict.confidence === "high" ? color.red(verdict.confidence) : verdict.confidence;
       lines.push(
-        `  ${color.dim(`:${startLine}`)}  ${verdict.action}  ${verdict.category}  ${conf}`,
+        `  ${color.dim(`:${startLine}`)}  ${actionLabel(verdict)}  ${verdict.category}  ${conf}`,
       );
       lines.push(`      ${verdict.rationale}`);
       if (verdict.action === "rewrite" && verdict.rewrite) {
@@ -55,11 +84,13 @@ export function renderReport(items: ReportItem[], options: { fix: boolean }): st
       if (options.fix && verdict.suggestedFix) {
         lines.push(color.dim(`      fix: ${verdict.suggestedFix}`));
       }
-      if (verdict.trimToLines?.length) {
+      if (verdict.trimTo) {
+        lines.push(color.dim(`      keep: ${firstLine(verdict.trimTo)}`));
+      } else if (verdict.trimToLines?.length) {
         lines.push(color.dim(`      keep lines: ${verdict.trimToLines.join(", ")}`));
       }
     }
     blocks.push(lines.join("\n"));
   }
-  return blocks.join("\n\n");
+  return [color.bold(summarize(items)), ...blocks].join("\n\n");
 }

@@ -38,6 +38,8 @@ export interface Fixture {
   category: SlopCategory | null;
   /** For `action: "rewrite"`: the owner's gold de-voiced text, for hand spot-checks. */
   rewrite?: string | null;
+  /** For a partial `trim`: the owner's gold kept-comment text, for hand spot-checks. */
+  trimTo?: string;
   trimToLines?: number[];
   source?: string;
   note?: string;
@@ -90,6 +92,12 @@ function validateFixture(value: unknown, file: string): Fixture {
     action: action as VerdictAction,
     category: category as SlopCategory | null,
   };
+  if (record.trimTo != null) {
+    if (typeof record.trimTo !== "string" || record.trimTo.length === 0 || action !== "trim") {
+      throw new Error(`Fixture ${file} "trimTo" must be a non-empty string on a "trim" fixture`);
+    }
+    fixture.trimTo = record.trimTo;
+  }
   if (typeof record.rewrite === "string") fixture.rewrite = record.rewrite;
   if (Array.isArray(record.trimToLines)) fixture.trimToLines = record.trimToLines as number[];
   if (typeof record.source === "string") fixture.source = record.source;

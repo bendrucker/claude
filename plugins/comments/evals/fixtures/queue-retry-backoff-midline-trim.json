@@ -1,0 +1,12 @@
+{
+  "id": "queue-retry-backoff-midline-trim",
+  "path": "src/queue/retry.py",
+  "language": "python",
+  "kind": "line",
+  "comment": "# Walk the pending queue in insertion order and retry each entry, reusing\n    # the same backoff the first attempt chose: the broker rate-limits per key.",
+  "context": "12: def retry_pending(queue: PendingQueue) -> None:\n13:     # Walk the pending queue in insertion order and retry each entry, reusing\n14:     # the same backoff the first attempt chose: the broker rate-limits per key.\n15:     for entry in queue.pending():\n16:         send(entry, backoff=entry.backoff)\n17:",
+  "action": "trim",
+  "category": "restate-the-what",
+  "trimTo": "# Retries reuse the first attempt's backoff: the broker rate-limits per key.",
+  "note": "Mixed block whose sentence boundary lands mid-line. The walk-and-retry clause restates the loop below; the kept why (broker rate-limits per key) starts mid-sentence on line 1 and continues onto line 2, so a line-range trim of either line strands a fragment. The gold trimTo rewrites the kept clause to stand alone."
+}

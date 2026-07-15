@@ -18,9 +18,63 @@ export interface EditSkip {
   detail: string;
 }
 
+/** A line the applier produced that a human should re-check, not a refusal. */
+export interface EditWarning {
+  line: number;
+  detail: string;
+}
+
 export interface FileEditResult {
   content: string;
   skips: EditSkip[];
+  warnings: EditWarning[];
+}
+
+export interface FileEditOptions {
+  /** Applier-produced lines longer than this are flagged in `warnings`. */
+  maxWidth?: number;
+}
+
+/**
+ * Words that continue a sentence rather than start one. A kept line opening
+ * with one of these, right after a dropped line that lacks terminal
+ * punctuation, is almost certainly a mid-sentence fragment. Sentence-opening
+ * prepositions (for, to, from, of, as) are excluded: they routinely start
+ * complete sentences ("For each entry, retry once.") and over-fire the guard.
+ */
+export const SENTENCE_CONNECTIVES = new Set([
+  "and",
+  "or",
+  "but",
+  "so",
+  "which",
+  "that",
+  "the",
+  "this",
+  "these",
+  "those",
+  "other",
+  "others",
+  "its",
+  "their",
+  "instead",
+  "rather",
+  "with",
+  "without",
+  "because",
+  "since",
+  "while",
+  "when",
+  "where",
+]);
+
+/** A line's prose: leading/trailing comment markers and whitespace stripped. */
+function stripCommentMarkers(line: string): string {
+  return line
+    .trim()
+    .replace(/^(?:\/\*+|\/\/+|#+|--+|;+|"""|'''|\*+)\s*/, "")
+    .replace(/\s*(?:\*+\/|"""|''')$/, "")
+    .trim();
 }
 
 /**
@@ -39,9 +93,31 @@ function keepLines(item: EditItem): number[] | null {
   return keep.length === 0 ? null : keep;
 }
 
+/**
+ * True when a line-range trim would keep a line that continues a sentence begun
+ * on a dropped line: the dropped boundary line does not end a sentence and the
+ * kept line opens with a connective word. `trimToLines` cannot express the
+ * needed mid-line cut, so the trim must go to a human (or a `trimTo` verdict).
+ */
+function strandsFragment(item: EditItem, kept: Set<number>, lines: string[]): boolean {
+  for (const n of kept) {
+    if (n <= item.startLine || kept.has(n - 1)) continue;
+    const dropped = stripCommentMarkers(lines[n - 2] ?? "");
+    if (/[.!?:]$/.test(dropped)) continue;
+    // Match letters only, so a connective with trailing punctuation ("that,")
+    // still resolves to its word.
+    const firstWord = stripCommentMarkers(lines[n - 1] ?? "")
+      .match(/^[A-Za-z']+/)?.[0]
+      ?.toLowerCase();
+    if (firstWord && SENTENCE_CONNECTIVES.has(firstWord)) return true;
+  }
+  return false;
+}
+
 function applyTrim(
   item: EditItem,
   keep: number[],
+  lines: string[],
   deletions: Set<number>,
   skips: EditSkip[],
 ): void {
@@ -54,6 +130,15 @@ function applyTrim(
       startLine: item.startLine,
       reason: "manual",
       detail: "trim would drop the opening or closing delimiter of a block comment",
+    });
+    return;
+  }
+  if (strandsFragment(item, kept, lines)) {
+    skips.push({
+      startLine: item.startLine,
+      reason: "manual",
+      detail:
+        "partial trim would keep a mid-sentence fragment (sentence starts mid-line on a dropped line); rewrite by hand",
     });
     return;
   }
@@ -92,13 +177,51 @@ function applyFull(
 }
 
 /**
- * Replace a comment's span with the judge's de-voiced rewrite. The rewrite text
- * carries the delimiters but no leading indentation; the applier owns it. For a
- * full-line comment the span's lines become the indented rewrite lines. For a
- * trailing line comment the rewrite is spliced after the code, one space apart.
- * Anything else (a trailing block, code interleaved on the line) is skipped and
- * flagged, the same conservative bar trims use.
+ * Replace a comment's span with judge-authored text (a `rewrite` or a partial
+ * trim's `trimTo`). The text carries the delimiters but no leading indentation;
+ * the applier owns it. For a full-line comment the span's lines become the
+ * indented text lines. For a trailing line comment the text is spliced after
+ * the code, one space apart. Anything else (a trailing block, code interleaved
+ * on the line) is skipped and flagged, the same conservative bar trims use.
  */
+function replaceSpan(
+  item: EditItem,
+  text: string,
+  lines: string[],
+  deletions: Set<number>,
+  spanInserts: Map<number, string[]>,
+  skips: EditSkip[],
+): void {
+  const before = (lines[item.startLine - 1] ?? "").slice(0, item.startColumn);
+  const after = (lines[item.endLine - 1] ?? "").slice(item.endColumn);
+  const wsBefore = before.trim().length === 0;
+  const wsAfter = after.trim().length === 0;
+  const textLines = text.split("\n");
+
+  if (wsBefore && wsAfter) {
+    const indent = before;
+    spanInserts.set(
+      item.startLine,
+      textLines.map((line) => `${indent}${line}`.replace(/\s+$/, "")),
+    );
+    for (let n = item.startLine; n <= item.endLine; n++) deletions.add(n);
+    return;
+  }
+
+  if (!wsBefore && wsAfter && item.kind === "line" && item.startLine === item.endLine) {
+    const code = before.replace(/\s+$/, "");
+    spanInserts.set(item.startLine, [`${code} ${textLines.join(" ")}`.replace(/\s+$/, "")]);
+    deletions.add(item.startLine);
+    return;
+  }
+
+  skips.push({
+    startLine: item.startLine,
+    reason: "manual",
+    detail: "comment is interleaved with code on its line",
+  });
+}
+
 function applyRewrite(
   item: EditItem,
   lines: string[],
@@ -115,34 +238,7 @@ function applyRewrite(
     });
     return;
   }
-  const before = (lines[item.startLine - 1] ?? "").slice(0, item.startColumn);
-  const after = (lines[item.endLine - 1] ?? "").slice(item.endColumn);
-  const wsBefore = before.trim().length === 0;
-  const wsAfter = after.trim().length === 0;
-  const rewriteLines = rewrite.split("\n");
-
-  if (wsBefore && wsAfter) {
-    const indent = before;
-    spanInserts.set(
-      item.startLine,
-      rewriteLines.map((line) => `${indent}${line}`.replace(/\s+$/, "")),
-    );
-    for (let n = item.startLine; n <= item.endLine; n++) deletions.add(n);
-    return;
-  }
-
-  if (!wsBefore && wsAfter && item.kind === "line" && item.startLine === item.endLine) {
-    const code = before.replace(/\s+$/, "");
-    spanInserts.set(item.startLine, [`${code} ${rewriteLines.join(" ")}`.replace(/\s+$/, "")]);
-    deletions.add(item.startLine);
-    return;
-  }
-
-  skips.push({
-    startLine: item.startLine,
-    reason: "manual",
-    detail: "comment is interleaved with code on its line",
-  });
+  replaceSpan(item, rewrite, lines, deletions, spanInserts, skips);
 }
 
 /**
@@ -151,7 +247,9 @@ function applyRewrite(
  * them once, never mutating line indices mid-loop. By action:
  *
  * - `keep` → left untouched;
- * - `trim` with `trimToLines` → keep those comment-relative lines, drop the rest;
+ * - `trim` with `trimTo` → replace the comment span with the kept, rewritten text;
+ * - `trim` with `trimToLines` → keep those comment-relative lines, drop the rest,
+ *   unless the cut would strand a mid-sentence fragment (skipped for a human);
  * - `trim` whole, full-line comment → delete its lines;
  * - `trim` whole, trailing line comment after code → strip it, keep the code;
  * - `rewrite` → replace the comment span with the indented de-voiced text;
@@ -159,22 +257,33 @@ function applyRewrite(
  *
  * Overlapping verdicts on one line resolve with deletion winning over a replace.
  * A span insert at a line takes precedence over its own span's deletions.
+ * Applier-produced lines longer than `maxWidth` are flagged in `warnings`.
  */
-export function computeFileEdits(source: string, items: EditItem[]): FileEditResult {
+export function computeFileEdits(
+  source: string,
+  items: EditItem[],
+  options: FileEditOptions = {},
+): FileEditResult {
+  const { maxWidth = 100 } = options;
   const lines = source.split("\n");
   const deletions = new Set<number>();
   const replacements = new Map<number, string>();
   const spanInserts = new Map<number, string[]>();
   const skips: EditSkip[] = [];
+  const warnings: EditWarning[] = [];
 
   for (const item of items) {
     switch (item.verdict.action) {
       case "keep":
         break;
       case "trim": {
+        if (item.verdict.trimTo) {
+          replaceSpan(item, item.verdict.trimTo, lines, deletions, spanInserts, skips);
+          break;
+        }
         const keep = keepLines(item);
         if (keep != null) {
-          applyTrim(item, keep, deletions, skips);
+          applyTrim(item, keep, lines, deletions, skips);
         } else {
           applyFull(item, lines, deletions, replacements, skips);
         }
@@ -186,15 +295,28 @@ export function computeFileEdits(source: string, items: EditItem[]): FileEditRes
     }
   }
 
+  for (const [n, insert] of spanInserts) {
+    for (const line of insert) {
+      if (line.length > maxWidth) {
+        warnings.push({
+          line: n,
+          detail: `applier produced a ${line.length}-character line (over ${maxWidth}); re-wrap by hand`,
+        });
+      }
+    }
+  }
+
   const isBlank = (line: string): boolean => line.trim().length === 0;
   const out: string[] = [];
+  let lastPushed = "";
   let lastPushedBlank = false;
   for (let n = 1; n <= lines.length; n++) {
     const insert = spanInserts.get(n);
     if (insert) {
       if (insert.length > 0) {
         for (const line of insert) out.push(line);
-        lastPushedBlank = isBlank(insert[insert.length - 1] as string);
+        lastPushed = insert[insert.length - 1] as string;
+        lastPushedBlank = isBlank(lastPushed);
       }
       continue;
     }
@@ -206,8 +328,15 @@ export function computeFileEdits(source: string, items: EditItem[]): FileEditRes
     if (isBlank(line) && lastPushedBlank && (deletions.has(n - 1) || deletions.has(n + 1))) {
       continue;
     }
+    // Deleting a docstring directly under a `def f():` or `{` opener can leave a
+    // blank as the block's first line. Drop a blank right after a deleted span
+    // when the surviving line above the span opens a block.
+    if (isBlank(line) && deletions.has(n - 1) && /[:{]$/.test(lastPushed.trimEnd())) {
+      continue;
+    }
     out.push(line);
+    lastPushed = line;
     lastPushedBlank = isBlank(line);
   }
-  return { content: out.join("\n"), skips };
+  return { content: out.join("\n"), skips, warnings };
 }

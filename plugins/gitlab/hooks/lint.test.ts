@@ -18,13 +18,15 @@ function fakeEnv(files: Record<string, string> = {}): LintEnv & { touched: strin
   const touched: string[] = [];
   return {
     touched,
-    fileExists: (path) => path in files || touched.includes(path),
-    readFile: (path) => files[path] ?? null,
-    touch: (path) => touched.push(path),
+    fileExists: async (path) => path in files || touched.includes(path),
+    readFile: async (path) => files[path] ?? null,
+    touch: async (path) => {
+      touched.push(path);
+    },
   };
 }
 
-function decision(result: ReturnType<typeof processInput>) {
+function decision(result: Awaited<ReturnType<typeof processInput>>) {
   const output = result?.hookSpecificOutput as
     | { permissionDecision?: string; permissionDecisionReason?: string; additionalContext?: string }
     | undefined;
@@ -75,8 +77,8 @@ describe("glab gh-ism denials", () => {
       command: "glab api graphql -f query='mutation { mergeRequestRequestReview }'",
       reason: "mergeRequestReviewerRereview",
     },
-  ])("denies $name", ({ command, reason }) => {
-    const output = decision(processInput(mockInput(command), fakeEnv()));
+  ])("denies $name", async ({ command, reason }) => {
+    const output = decision(await processInput(mockInput(command), fakeEnv()));
     expect(output?.permissionDecision).toBe("deny");
     expect(output?.permissionDecisionReason).toContain(reason);
   });
@@ -99,9 +101,9 @@ describe("glab gh-ism denials", () => {
       command: `glab api graphql -f query="$(cat <<'GQL'\nmutation($projectPath: ID!) { mergeRequestReviewerRereview }\nGQL\n)"`,
     },
     { name: "gh --jq in a gh segment", command: "gh api repos/o/r --jq .name && glab mr list" },
-  ])("allows $name", ({ command }) => {
+  ])("allows $name", async ({ command }) => {
     const env = fakeEnv(GITHUB_REPO);
-    expect(processInput(mockInput(command), env)).toBeNull();
+    expect(await processInput(mockInput(command), env)).toBeNull();
   });
 
   test.each<{ name: string; command: string }>([
@@ -113,8 +115,8 @@ describe("glab gh-ism denials", () => {
       name: "mutation name inside a quoted note body",
       command: "glab mr note 42 -m 'Confirmed mergeRequestSetAutoMerge is not in the schema'",
     },
-  ])("does not deny $name", ({ command }) => {
-    const output = decision(processInput(mockInput(command), fakeEnv(GITHUB_REPO)));
+  ])("does not deny $name", async ({ command }) => {
+    const output = decision(await processInput(mockInput(command), fakeEnv(GITHUB_REPO)));
     expect(output?.permissionDecision).toBeUndefined();
   });
 });
@@ -125,8 +127,8 @@ describe("gh on a GitLab remote", () => {
     { name: "gh pr list", command: "gh pr list" },
     { name: "gh issue view", command: "gh issue view 12" },
     { name: "gh pr after another command", command: "git push && gh pr view" },
-  ])("denies $name", ({ command }) => {
-    const output = decision(processInput(mockInput(command), fakeEnv(GITLAB_REPO)));
+  ])("denies $name", async ({ command }) => {
+    const output = decision(await processInput(mockInput(command), fakeEnv(GITLAB_REPO)));
     expect(output?.permissionDecision).toBe("deny");
     expect(output?.permissionDecisionReason).toContain("glab");
   });
@@ -143,7 +145,11 @@ describe("gh on a GitLab remote", () => {
       command: "gh pr list --repo owner/repo",
       files: GITLAB_REPO,
     },
-    { name: "gh api (reference lookups are legitimate)", command: "gh api repos/o/r", files: GITLAB_REPO },
+    {
+      name: "gh api (reference lookups are legitimate)",
+      command: "gh api repos/o/r",
+      files: GITLAB_REPO,
+    },
     { name: "gh run view", command: "gh run view 123", files: GITLAB_REPO },
     { name: "no git repo at cwd", command: "gh pr view", files: {} },
     {
@@ -151,16 +157,16 @@ describe("gh on a GitLab remote", () => {
       command: "gh pr view",
       files: { "/repo/.git/config": '[remote "origin"]\n\turl = git@git.company.com:g/p.git\n' },
     },
-  ])("allows $name", ({ command, files }) => {
-    expect(processInput(mockInput(command), fakeEnv(files))).toBeNull();
+  ])("allows $name", async ({ command, files }) => {
+    expect(await processInput(mockInput(command), fakeEnv(files))).toBeNull();
   });
 
-  test("resolves the shared config through a worktree .git file", () => {
+  test("resolves the shared config through a worktree .git file", async () => {
     const env = fakeEnv({
       "/repo/wt/.git": "gitdir: /repo/.git/worktrees/wt\n",
       "/repo/.git/config": GITLAB_REPO["/repo/.git/config"] as string,
     });
-    const output = decision(processInput(mockInput("gh pr view", "/repo/wt"), env));
+    const output = decision(await processInput(mockInput("gh pr view", "/repo/wt"), env));
     expect(output?.permissionDecision).toBe("deny");
   });
 });
@@ -172,43 +178,47 @@ describe("merge-request skill nudge", () => {
   test.each<{ name: string; command: string }>([
     { name: "glab mr create", command: "git push && glab mr create --fill" },
     { name: "glab mr merge", command: "glab mr merge 42 --auto-merge" },
-    { name: "merge train API", command: "glab api projects/:id/merge_trains/merge_requests/42 -X POST" },
+    {
+      name: "merge train API",
+      command: "glab api projects/:id/merge_trains/merge_requests/42 -X POST",
+    },
     { name: "draft notes API", command: "glab api projects/:id/merge_requests/42/draft_notes" },
-  ])("nudges once for $name", ({ command }) => {
+  ])("nudges once for $name", async ({ command }) => {
     const env = fakeEnv();
-    const output = decision(processInput(mockInput(command), env));
+    const output = decision(await processInput(mockInput(command), env));
     expect(output?.permissionDecision).toBeUndefined();
     expect(output?.additionalContext).toContain("gitlab:merge-request");
     expect(env.touched).toContain(nudgeMarker);
   });
 
-  test("stays quiet when the skill marker exists", () => {
+  test("stays quiet when the skill marker exists", async () => {
     const env = fakeEnv({ [marker]: "" });
-    expect(processInput(mockInput("glab mr create --fill"), env)).toBeNull();
+    expect(await processInput(mockInput("glab mr create --fill"), env)).toBeNull();
   });
 
-  test("stays quiet after a prior nudge", () => {
+  test("stays quiet after a prior nudge", async () => {
     const env = fakeEnv({ [nudgeMarker]: "" });
-    expect(processInput(mockInput("glab mr merge 42"), env)).toBeNull();
+    expect(await processInput(mockInput("glab mr merge 42"), env)).toBeNull();
   });
 
-  test("does not nudge read-only glab commands", () => {
+  test("does not nudge read-only glab commands", async () => {
     const env = fakeEnv();
-    expect(processInput(mockInput("glab mr view 42"), env)).toBeNull();
+    expect(await processInput(mockInput("glab mr view 42"), env)).toBeNull();
     expect(env.touched).toEqual([]);
   });
 });
 
 describe("pass-through", () => {
-  test.each<[string]>([["git status"], ["bun test"], ["echo glab-adjacent"]])(
-    "ignores %p",
-    (command) => {
-      expect(processInput(mockInput(command), fakeEnv())).toBeNull();
-    },
-  );
+  test.each<[string]>([
+    ["git status"],
+    ["bun test"],
+    ["echo glab-adjacent"],
+  ])("ignores %p", async (command) => {
+    expect(await processInput(mockInput(command), fakeEnv())).toBeNull();
+  });
 
-  test("ignores missing command", () => {
+  test("ignores missing command", async () => {
     const input = mockInput("");
-    expect(processInput(input, fakeEnv())).toBeNull();
+    expect(await processInput(input, fakeEnv())).toBeNull();
   });
 });

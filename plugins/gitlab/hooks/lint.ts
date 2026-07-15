@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
@@ -9,24 +8,23 @@ import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/clau
 export const MARKER_DIR = "/tmp/claude/gitlab-skill";
 
 export interface LintEnv {
-  fileExists(path: string): boolean;
-  readFile(path: string): string | null;
-  touch(path: string): void;
+  fileExists(path: string): Promise<boolean>;
+  readFile(path: string): Promise<string | null>;
+  touch(path: string): Promise<void>;
 }
 
 const defaultEnv: LintEnv = {
-  fileExists: (path) => existsSync(path),
-  readFile: (path) => {
+  fileExists: (path) => Bun.file(path).exists(),
+  readFile: async (path) => {
     try {
-      return readFileSync(path, "utf8");
+      return await Bun.file(path).text();
     } catch {
       return null;
     }
   },
-  touch: (path) => {
+  touch: async (path) => {
     try {
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, "");
+      await Bun.write(path, "");
     } catch {
       // fail open: the nudge just repeats next time
     }
@@ -108,15 +106,15 @@ function isGitLabHost(host: string): boolean {
   return host.split(".").includes("gitlab");
 }
 
-function gitConfigPath(cwd: string, env: LintEnv): string | null {
+async function gitConfigPath(cwd: string, env: LintEnv): Promise<string | null> {
   let dir = cwd;
   for (;;) {
     const dotGit = join(dir, ".git");
     const direct = join(dotGit, "config");
-    if (env.fileExists(direct)) return direct;
+    if (await env.fileExists(direct)) return direct;
 
     // Worktrees and submodules use a `.git` file: `gitdir: <path>`.
-    const pointer = env.readFile(dotGit);
+    const pointer = await env.readFile(dotGit);
     if (pointer) {
       const match = pointer.match(/^gitdir:\s*(.+)\s*$/m);
       if (match?.[1]) {
@@ -127,7 +125,7 @@ function gitConfigPath(cwd: string, env: LintEnv): string | null {
           // The shared config lives two levels up.
           resolve(gitDir, "..", "..", "config"),
         ]) {
-          if (env.fileExists(candidate)) return candidate;
+          if (await env.fileExists(candidate)) return candidate;
         }
       }
       return null;
@@ -139,10 +137,10 @@ function gitConfigPath(cwd: string, env: LintEnv): string | null {
   }
 }
 
-export function originHost(cwd: string, env: LintEnv): string | null {
-  const configPath = gitConfigPath(cwd, env);
+export async function originHost(cwd: string, env: LintEnv): Promise<string | null> {
+  const configPath = await gitConfigPath(cwd, env);
   if (!configPath) return null;
-  const config = env.readFile(configPath);
+  const config = await env.readFile(configPath);
   if (!config) return null;
   const section = config.match(/\[remote "origin"\]([^[]*)/);
   if (!section?.[1]) return null;
@@ -151,46 +149,42 @@ export function originHost(cwd: string, env: LintEnv): string | null {
   return remoteHost(url[1].trim());
 }
 
-export function lintGh(command: string, cwd: string, env: LintEnv): string | null {
+export async function lintGh(command: string, cwd: string, env: LintEnv): Promise<string | null> {
   const targetsOrigin = segments(stripQuoted(command)).some(
     (segment) => /(^|\s)gh\s+(pr|issue)\b/.test(segment) && !/\s(-R|--repo)\b/.test(segment),
   );
   if (!targetsOrigin) return null;
 
-  const host = originHost(cwd, env);
+  const host = await originHost(cwd, env);
   if (host && isGitLabHost(host)) {
     return `This repository's origin remote is GitLab (${host}). gh cannot resolve it; use glab instead, and load gitlab:merge-request for MR workflows (or pass -R <owner>/<repo> if you really meant a GitHub repo).`;
   }
   return null;
 }
 
-const TRANSACTIONAL = [
-  /\bglab\s+mr\s+(create|merge|update|note)\b/,
-  /merge_trains/,
-  /draft_notes/,
-];
+const TRANSACTIONAL = [/\bglab\s+mr\s+(create|merge|update|note)\b/, /merge_trains/, /draft_notes/];
 
-export function nudgeSkill(
+export async function nudgeSkill(
   command: string,
   sessionId: string,
   env: LintEnv,
-): SyncHookJSONOutput | null {
+): Promise<SyncHookJSONOutput | null> {
   if (!TRANSACTIONAL.some((pattern) => pattern.test(command))) return null;
 
   const loaded = join(MARKER_DIR, sessionId);
   const nudged = join(MARKER_DIR, `${sessionId}.nudged`);
-  if (env.fileExists(loaded) || env.fileExists(nudged)) return null;
+  if ((await env.fileExists(loaded)) || (await env.fileExists(nudged))) return null;
 
-  env.touch(nudged);
+  await env.touch(nudged);
   return context(
     "This command transacts on a merge request but the gitlab:merge-request skill is not loaded. Load it first: it owns merge trains, auto-merge re-arming, draft notes, discussions, and reviewer/username resolution, and its scripts avoid known glab API pitfalls.",
   );
 }
 
-export function processInput(
+export async function processInput(
   input: PreToolUseHookInput,
   env: LintEnv = defaultEnv,
-): SyncHookJSONOutput | null {
+): Promise<SyncHookJSONOutput | null> {
   const command = (input.tool_input as { command?: string }).command;
   if (!command) return null;
 
@@ -200,7 +194,7 @@ export function processInput(
   }
 
   if (/(^|\s)gh\s/.test(command)) {
-    const violation = lintGh(command, input.cwd, env);
+    const violation = await lintGh(command, input.cwd, env);
     if (violation) return deny(violation);
   }
 
@@ -221,9 +215,9 @@ async function main(): Promise<void> {
 
   if (input.hook_event_name !== "PreToolUse") return;
 
-  const output = processInput(input);
+  const output = await processInput(input);
   if (output) {
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(`${JSON.stringify(output)}\n`);
   }
 }
 

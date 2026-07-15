@@ -31,6 +31,25 @@ describe("createGrantStore", () => {
     expect(await store.list()).toHaveLength(1);
   });
 
+  test("concurrent recordPending for the same user keeps the first timestamp", async () => {
+    const store = tempStore();
+    const [first, second] = await Promise.all([
+      store.recordPending("ben@example.com"),
+      store.recordPending("ben@example.com"),
+    ]);
+    expect(second.firstSeen).toBe(first.firstSeen);
+    expect(await store.list()).toHaveLength(1);
+  });
+
+  test("concurrent recordPending for different users persists both", async () => {
+    const store = tempStore();
+    await Promise.all([store.recordPending("a@example.com"), store.recordPending("b@example.com")]);
+    expect((await store.list()).map((grant) => grant.user).sort()).toEqual([
+      "a@example.com",
+      "b@example.com",
+    ]);
+  });
+
   test("deny without prior pending record", async () => {
     const store = tempStore();
     await store.set("intruder@example.com", "denied");

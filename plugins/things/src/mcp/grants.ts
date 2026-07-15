@@ -43,38 +43,52 @@ export function createGrantStore(path: string): GrantStore {
     return user.trim().toLowerCase();
   }
 
+  // Serializes load-modify-save cycles. Without this, two concurrent writes
+  // can both load before either saves, and the second save silently discards
+  // the first caller's entry (and its firstSeen timestamp).
+  let queue: Promise<unknown> = Promise.resolve();
+  function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+    const result = queue.then(fn);
+    queue = result.catch(() => {});
+    return result;
+  }
+
   return {
     async get(user) {
       const data = await load();
       return data.grants.find((grant) => grant.user === normalize(user)) ?? null;
     },
 
-    async recordPending(user) {
-      const data = await load();
-      const existing = data.grants.find((grant) => grant.user === normalize(user));
-      if (existing) return existing;
-      const grant: Grant = {
-        user: normalize(user),
-        status: "pending",
-        firstSeen: new Date().toISOString(),
-      };
-      data.grants.push(grant);
-      await save(data);
-      return grant;
+    recordPending(user) {
+      return withWriteLock(async () => {
+        const data = await load();
+        const existing = data.grants.find((grant) => grant.user === normalize(user));
+        if (existing) return existing;
+        const grant: Grant = {
+          user: normalize(user),
+          status: "pending",
+          firstSeen: new Date().toISOString(),
+        };
+        data.grants.push(grant);
+        await save(data);
+        return grant;
+      });
     },
 
-    async set(user, status) {
-      const data = await load();
-      let grant = data.grants.find((entry) => entry.user === normalize(user));
-      if (!grant) {
-        grant = { user: normalize(user), status, firstSeen: new Date().toISOString() };
-        data.grants.push(grant);
-      } else {
-        grant.status = status;
-      }
-      grant.decidedAt = new Date().toISOString();
-      await save(data);
-      return grant;
+    set(user, status) {
+      return withWriteLock(async () => {
+        const data = await load();
+        let grant = data.grants.find((entry) => entry.user === normalize(user));
+        if (!grant) {
+          grant = { user: normalize(user), status, firstSeen: new Date().toISOString() };
+          data.grants.push(grant);
+        } else {
+          grant.status = status;
+        }
+        grant.decidedAt = new Date().toISOString();
+        await save(data);
+        return grant;
+      });
     },
 
     async list() {

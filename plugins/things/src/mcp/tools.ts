@@ -92,6 +92,29 @@ export function updateAttributes(args: UpdateAttributeArgs): Record<string, stri
   return attributes;
 }
 
+/**
+ * Ensures exactly one of title/titles is provided. The Things URL scheme's
+ * behavior when `add` receives both is undocumented and may create extra
+ * todos, so reject the combination instead of dispatching it.
+ */
+export function validateCaptureTitles(title?: string, titles?: string[]): void {
+  if (title !== undefined && titles !== undefined) {
+    throw new Error("Provide title (single todo) or titles (multiple todos), not both");
+  }
+  if (!title && !titles?.length) {
+    throw new Error("title or titles is required");
+  }
+}
+
+/** Rejects blank IDs before they reach Things, which fails silently on them. */
+export function validateIds(ids: string[]): void {
+  ids.forEach((id, index) => {
+    if (id.trim() === "") {
+      throw new Error(`ids[${index}] must be a non-empty string, got ${JSON.stringify(id)}`);
+    }
+  });
+}
+
 const whenDescription =
   "Schedule: today, tomorrow, evening, anytime, someday, yyyy-mm-dd, or natural language like 'next week'";
 
@@ -258,6 +281,7 @@ export function registerTools(server: McpServer): void {
       if (Object.keys(attributes).length === 0) {
         throw new Error("At least one attribute to update is required");
       }
+      validateIds(ids);
       await ensureThingsRunning();
 
       if (ids.length === 1 && ids[0]) {
@@ -295,9 +319,7 @@ export function registerTools(server: McpServer): void {
       },
     },
     async (args) => {
-      if (!args.title && !args.titles?.length) {
-        throw new Error("title or titles is required");
-      }
+      validateCaptureTitles(args.title, args.titles);
       await ensureThingsRunning();
 
       const params = new Map<string, string>();

@@ -1,6 +1,6 @@
 ---
-import { Puzzle, Search, X } from "lucide-astro";
-import PluginCard from "../components/PluginCard.astro";
+import { Puzzle, X } from "lucide-astro";
+import PluginBrowser from "../components/PluginBrowser.vue";
 import PluginDetail from "../components/PluginDetail.astro";
 import { loadCatalog } from "../data/catalog";
 import { withBase } from "../lib/base";
@@ -32,52 +32,15 @@ const SHORTCUTS: Array<[string, string]> = [
   <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
     <header class="mb-8 flex items-center gap-3">
       <Puzzle class="h-8 w-8 shrink-0 text-accent" aria-hidden="true" />
-      <div>
-        <h1 class="text-xl font-bold tracking-tight">bendrucker's Claude Code plugins</h1>
-        <p class="text-sm text-muted">
-          {plugins.length} plugins, installable from one marketplace.
-        </p>
-      </div>
+      <h1 class="text-xl font-bold tracking-tight">Ben's Claude Code plugins</h1>
     </header>
 
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div class="relative flex-1">
-        <Search
-          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-          aria-hidden="true"
-        />
-        <input
-          id="search-input"
-          type="search"
-          placeholder="Search plugins and skills (press /)"
-          class="w-full rounded-md border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none focus-visible:border-accent"
-        />
-      </div>
-      <select
-        id="category-filter"
-        class="rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus-visible:border-accent"
-      >
-        <option value="">All categories</option>
-        {categories.map((category) => <option value={category}>{category}</option>)}
-      </select>
-      <button
-        id="sort-button"
-        type="button"
-        class="rounded-md border border-border bg-surface px-3 py-2 text-left text-sm outline-none focus-visible:border-accent"
-      >
-        Sort: Name
-      </button>
-    </div>
-
-    <p id="result-count" class="mb-3 text-xs text-muted" aria-live="polite"></p>
-
-    <ul id="plugin-grid" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {plugins.map((plugin) => <PluginCard plugin={plugin} />)}
-    </ul>
-
-    <p id="empty-state" class="hidden py-16 text-center text-sm text-muted">
-      No plugins match your search.
-    </p>
+    <PluginBrowser
+      client:load
+      plugins={plugins}
+      records={searchIndex}
+      categories={categories}
+    />
 
     <footer class="mt-12 border-t border-border pt-6 text-xs text-muted">
       <p>
@@ -126,8 +89,6 @@ const SHORTCUTS: Array<[string, string]> = [
       </template>
     ))
   }
-
-  <script type="application/json" id="search-index-data" is:inline set:html={JSON.stringify(searchIndex)} />
 
   <script>
     import { initSite } from "../scripts/site";

@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
+import vue from "@astrojs/vue";
 import tailwindcss from "@tailwindcss/vite";
 
 // Build output bundles every module into a flat `dist/.prerender/chunks/`
@@ -15,6 +16,7 @@ export default defineConfig({
   site: "https://bendrucker.github.io",
   base: "/claude",
   output: "static",
+  integrations: [vue()],
   vite: {
     plugins: [tailwindcss()],
     define: {

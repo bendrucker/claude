@@ -9,16 +9,20 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "astro": "7.0.9",
     "@astrojs/markdown-remark": "7.2.1",
+    "@astrojs/vue": "7.0.1",
     "@tailwindcss/vite": "4.3.2",
-    "tailwindcss": "4.3.2",
+    "astro": "7.0.9",
     "lucide-astro": "0.556.0",
-    "unist-util-visit": "^5.1.0"
+    "lucide-vue-next": "1.0.0",
+    "tailwindcss": "4.3.2",
+    "unist-util-visit": "^5.1.0",
+    "vue": "3.5.38"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.9",
     "@types/hast": "^3.0.4",
-    "vfile": "^6.0.3"
+    "vfile": "^6.0.3",
+    "vue-tsc": "^3.3.7"
   }
 }

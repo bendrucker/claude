@@ -47,7 +47,7 @@ Both modes follow this contract.
 
 ### Gather
 
-Read-only first. The sources are independent (review queue, own PRs, tracker, messaging inbox, email inbox), so dispatch parallel read-only sub-agents and merge their results.
+Read-only first. The sources are independent (review queue, own PRs, tracker, messaging inbox, email inbox), so dispatch parallel read-only sub-agents and merge their results. Merge on shared identifiers: when items from different sources name the same issue or MR, they are one piece of work and become one brief entry carrying every source's state. Sub-agents cannot see each other's results. The join is the orchestrator's job, keyed on the cross-references each sub-agent returns.
 
 ### Brief
 

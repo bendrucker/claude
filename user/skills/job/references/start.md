@@ -8,11 +8,11 @@ Dispatch parallel read-only sub-agents:
 
 - Inbound: PRs/MRs where the configured username is a requested reviewer or approver, with age, author, and whether you reviewed before.
 - Outbox: your own open PRs/MRs, with CI status, unresolved threads, reviewer assignment, and draft state.
-- Tracker: issues assigned to the configured user, plus the current cycle as the config expresses it. Record each issue's project, since the brief groups by it. Include the tracker's notification inbox, which is separate from assigned issues.
+- Tracker: issues assigned to the configured user, plus the current cycle as the config expresses it. Record each issue's project, since the brief groups by it. Include the tracker's notification inbox, which is separate from assigned issues, and recent comment activity on assigned and related issues regardless of read state: for each active thread, who commented last, when, and what they asked. A comment already read is still activity. Note where the user's own most recent comment has no reply.
 - Messaging (when configured): direct messages and mentions to the configured user since the last working day that imply an action, with sender, link, and the ask.
 - Email (when configured): unhandled mail that needs a reply, an action, or filing, with sender, subject, and link.
 
-Each sub-agent uses the delegated skill, MCP, or CLI for its source and returns structured state: identifiers, links, and statuses the brief can consume directly.
+Each sub-agent uses the delegated skill, MCP, or CLI for its source and returns structured state: identifiers, links, and statuses the brief can consume directly, plus every cross-reference an item carries, such as an issue key in an MR title or branch, or an MR named in a comment or message. These cross-references drive the merge in `SKILL.md`, joining one piece of work reported from several sources. Sub-agents report state, not dispositions: who spoke last, when, and what is open. Deciding an item needs nothing is a triage call, and triage happens in the brief.
 
 ## Inbound Review Queue
 
@@ -20,7 +20,7 @@ Order items blocking others first, then oldest.
 
 Separate fresh requests from re-reviews where the author responded to your earlier feedback. For re-reviews, delegate the addressed-or-not analysis to an installed review-follow-up skill if one exists. Otherwise compare the threads against your prior comments.
 
-Before recommending an action, give each item a one-line summary of what it changes and an estimated review effort. Delegate both to the installed review skill's summary pass when it offers one, so the estimate uses the same effort scale the eventual review would, and the brief never starts the review itself. The estimate is what makes the queue schedulable: it shows the morning's total review load and lets a run of small reviews clear ahead of one deep one.
+When merged discussion arrives with a queue item, fold it into the item's summary, since an active thread can change what the review should conclude. Before recommending an action, give each item a one-line summary of what it changes and an estimated review effort. Delegate both to the installed review skill's summary pass when it offers one, so the estimate uses the same effort scale the eventual review would, and the brief never starts the review itself. The estimate is what makes the queue schedulable: it shows the morning's total review load and lets a run of small reviews clear ahead of one deep one.
 
 Recommended actions per item:
 
@@ -41,6 +41,8 @@ For each of your open PRs/MRs, flag:
 ## Inbox Triage
 
 Triage each inbound item, whether a message, a tracker notification, or an email, into an action: a review handoff, a decision you owe someone, a question to answer, or a new task. An item often carries the only signal for a focus item, so a thread that names an MR or issue belongs with that work in the brief, not stranded in a separate inbox list. Map every item to the project it concerns, or to `Misc`.
+
+Read is not handled. Notification state records only what the user has seen, so judge each thread by who spoke last and what remains open, never by unread flags. Two states never collapse into background noise: a thread where the user's own most recent comment is unanswered, which is live work awaiting a reply rather than a closed loop, and active discussion on work that also has an open MR in the user's review queue, which is review context and merges into that review's entry, since the thread may be converging on a different fix than the diff shows.
 
 Inbox zero is the target. Each item leaves the day in a terminal state: handled, reacted to or briefly acknowledged, deferred, or archived. Before drafting a reply, judge whether the thread needs a substantive response. Where a reaction or brief acknowledgement closes it, prefer that over filler. Draft a reply only when it carries real content, and keep it terse.
 

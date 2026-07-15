@@ -39,6 +39,20 @@ Every customization costs tokens on every session. Before adding one, define how
 
 The Bash tool escapes `!` to `\!` on every path, including single quotes and heredocs, breaking `jq !=`, `awk !~`, and similar operators ([#2941](https://github.com/anthropics/claude-code/issues/2941), [#10335](https://github.com/anthropics/claude-code/issues/10335)). For `jq`, use `| not` instead of `!=`. For anything else, author the content with the Write tool, then run it. No shell quoting or heredoc bypasses the escape.
 
+## Check-ins
+
+Schedule `⏰` plan check-ins in Things with `things:url add`, which unlike inbox capture can set `when=<yyyy-mm-dd>`. Tag them `claude-code`. Things is the only tracker that can raise work on a future date, so work-tracked check-ins go there too, linking their Linear issue in the notes.
+
+Notes carry what to check, the plan path, the repo, and a launch URL:
+
+```
+claude-cli://open?q=<encoded prompt>&cwd=<absolute main repo path>
+```
+
+- `open` is the only action. Use `q` for the prompt and `cwd` for the working directory.
+- The URL prefills a new session's prompt without submitting it, and cannot resume the original session.
+- Point `cwd` at the main repo, never a worktree. Worktrees get pruned.
+
 ## Git
 
 - Never `git push` to the default branch (usually `main` or `master`) unless I explicitly instruct you.

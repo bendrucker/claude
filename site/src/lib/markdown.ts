@@ -47,16 +47,17 @@ function rehypeRewriteRepoLinks(repoRoot: string) {
   };
 }
 
-let processor: Awaited<ReturnType<typeof createMarkdownProcessor>> | undefined;
+const processors = new Map<string, Promise<Awaited<ReturnType<typeof createMarkdownProcessor>>>>();
 
 /**
- * One shiki-backed processor shared across every README render. Building it
- * loads the syntax highlighter, so it is created once and reused rather than
- * per call.
+ * A shiki-backed processor per repo root. Building one loads the syntax
+ * highlighter, so they are cached rather than rebuilt per render, but the root
+ * is baked into the link-rewriting plugin and so has to key the cache.
  */
-async function getProcessor(repoRoot: string) {
+function getProcessor(repoRoot: string) {
+  let processor = processors.get(repoRoot);
   if (!processor) {
-    processor = await createMarkdownProcessor({
+    processor = createMarkdownProcessor({
       syntaxHighlight: "shiki",
       shikiConfig: {
         themes: { light: "github-light", dark: "github-dark" },
@@ -64,6 +65,7 @@ async function getProcessor(repoRoot: string) {
       },
       rehypePlugins: [() => rehypeRewriteRepoLinks(repoRoot)],
     });
+    processors.set(repoRoot, processor);
   }
   return processor;
 }

@@ -219,6 +219,27 @@ function initModal(): void {
   });
 }
 
+/**
+ * Confirms a copy only once the clipboard has actually taken the text. The API
+ * rejects when the page is not a secure context or the user denied
+ * `clipboard-write`, and a check mark there would claim a copy that never
+ * happened.
+ */
+async function copyToClipboard(button: HTMLElement, text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    return;
+  }
+
+  button.querySelector(".copy-icon")?.classList.add("hidden");
+  button.querySelector(".check-icon")?.classList.remove("hidden");
+  window.setTimeout(() => {
+    button.querySelector(".copy-icon")?.classList.remove("hidden");
+    button.querySelector(".check-icon")?.classList.add("hidden");
+  }, 1500);
+}
+
 function initInstallInteractions(): void {
   document.addEventListener("click", (event) => {
     const target =
@@ -227,14 +248,7 @@ function initInstallInteractions(): void {
     const text = target.getAttribute("data-copy");
     if (!text) return;
 
-    navigator.clipboard.writeText(text).then(() => {
-      target.querySelector(".copy-icon")?.classList.add("hidden");
-      target.querySelector(".check-icon")?.classList.remove("hidden");
-      window.setTimeout(() => {
-        target.querySelector(".copy-icon")?.classList.remove("hidden");
-        target.querySelector(".check-icon")?.classList.add("hidden");
-      }, 1500);
-    });
+    void copyToClipboard(target, text);
   });
 
   document.addEventListener("click", (event) => {

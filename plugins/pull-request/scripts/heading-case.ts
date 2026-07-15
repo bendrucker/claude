@@ -75,20 +75,32 @@ function isIdentifier(word: string): boolean {
   return /[A-Z]/.test(letters.slice(1));
 }
 
-export function extractHeadings(body: string): Heading[] {
+interface ParsedHeading {
+  children: PhrasingContent[];
+  combined: string;
+  codeSpans: string[];
+}
+
+function parseHeadings(body: string): ParsedHeading[] {
   const tree = fromMarkdown(body);
-  const headings: Heading[] = [];
+  const headings: ParsedHeading[] = [];
   visit(tree, "heading", (node: MdastHeading) => {
     const { combined, codeSpans } = reconstruct(node.children);
-    headings.push({ children: node.children, text: restore(combined.trim(), codeSpans) });
+    headings.push({ children: node.children, combined, codeSpans });
   });
   return headings;
 }
 
+export function extractHeadings(body: string): Heading[] {
+  return parseHeadings(body).map(({ children, combined, codeSpans }) => ({
+    children,
+    text: restore(combined.trim(), codeSpans),
+  }));
+}
+
 export function headingCaseViolations(body: string): { text: string; suggested: string }[] {
   const violations: { text: string; suggested: string }[] = [];
-  for (const heading of extractHeadings(body)) {
-    const { combined, codeSpans } = reconstruct(heading.children);
+  for (const { combined, codeSpans } of parseHeadings(body)) {
     const trimmed = combined.trim();
     if (trimmed.length === 0) continue;
 

@@ -1,6 +1,6 @@
 ---
 name: gitlab:merge-request
-description: Working with GitLab merge requests via glab. Use when creating, updating, reviewing, or merging MRs.
+description: Working with GitLab merge requests via glab. Use when creating, updating, reviewing, or merging MRs, enabling auto-merge or merge trains, requesting or re-requesting reviewers, handling approvals, or working review threads, discussions, and draft notes. Load before running any `glab mr` or MR-mutating `glab api` command.
 argument-hint: "[create | merge | review | discussions | block] [--draft] [--auto] [--role author|reviewer]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/*:*)
@@ -11,6 +11,10 @@ allowed-tools:
 # Merge Requests
 
 Working with GitLab merge requests via `glab mr`.
+
+Scripts directory (absolute, for invocations from other skills where `${CLAUDE_SKILL_DIR}` points elsewhere): !`mkdir -p /tmp/claude/gitlab-skill 2>/dev/null; touch "/tmp/claude/gitlab-skill/${CLAUDE_SESSION_ID}" 2>/dev/null; echo "${CLAUDE_SKILL_DIR}/scripts"`
+
+Loading this skill also stamps `/tmp/claude/gitlab-skill/<session>`, which tells the plugin's `hooks/lint.ts` to skip its load-this-skill nudge. Keep the path in sync with `MARKER_DIR` there.
 
 ## Arguments
 

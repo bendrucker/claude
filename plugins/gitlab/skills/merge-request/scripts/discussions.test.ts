@@ -202,3 +202,20 @@ describe("formatDigest", () => {
     expect(formatDigest([], 80)).toBe("");
   });
 });
+
+describe("null notes tolerance", () => {
+  const degenerate: Discussion[] = [
+    { id: "null-notes", notes: null },
+    { id: "missing-notes" },
+    { id: "empty-notes", notes: [] },
+    makeDiscussion("real"),
+  ];
+
+  it("filterDiscussions drops discussions without notes", () => {
+    expect(filterDiscussions(degenerate, {}).map((d) => d.id)).toEqual(["real"]);
+  });
+
+  it("deduplicateDiscussions skips discussions without notes", () => {
+    expect(deduplicateDiscussions(degenerate).map((d) => d.id)).toEqual(["real"]);
+  });
+});

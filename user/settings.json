@@ -41,6 +41,7 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:gitlab.com)",
       "WebFetch(domain:proxy.golang.org)",
       "WebFetch(domain:sum.golang.org)",
       "WebFetch(domain:pkg.go.dev)",
@@ -328,6 +329,7 @@
         "~/src/go/pkg/mod",
         "~/src/go/pkg/sumdb",
         "~/.bun/install",
+        "~/.config/glab-cli/recover",
         "~/.npm",
         "~/.local/share/uv",
         "~/.local/share/graphite"

@@ -4,12 +4,15 @@ import { $ } from "bun";
 import { cli, command } from "cleye";
 import {
   buildPosition,
+  exitOnRejection,
   fetchMrDiffs,
   getDiffRefs,
   glabApiPost,
   readBody,
   validateLineInDiff,
 } from "./diff";
+
+exitOnRejection();
 
 function apiPath(mr: number): string {
   return `projects/:id/merge_requests/${mr}/draft_notes`;

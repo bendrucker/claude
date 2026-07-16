@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
+import { errorText } from "../../../scripts/merge";
 
 export type DiffRefs = { base_sha: string; head_sha: string; start_sha: string };
 
@@ -115,6 +116,16 @@ export function buildPosition(
   }
 
   return position;
+}
+
+// Surface rejections (validation failures, glab errors) as the underlying
+// message instead of a Bun stack trace. cleye does not await async command
+// handlers, so their throws land here.
+export function exitOnRejection(): void {
+  process.on("unhandledRejection", (err) => {
+    console.error(errorText(err));
+    process.exit(1);
+  });
 }
 
 export async function readBody(file: string | undefined): Promise<string> {

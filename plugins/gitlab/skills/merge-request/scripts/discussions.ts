@@ -5,6 +5,7 @@ import { cli, command } from "cleye";
 import { table } from "table";
 import {
   buildPosition,
+  exitOnRejection,
   fetchMrDiffs,
   getDiffRefs,
   glabApiPost,
@@ -15,6 +16,8 @@ import {
 import { isReviewTarget, loadExtraReviewers } from "./reviewers";
 
 export { parseGlabPaginated } from "./diff";
+
+exitOnRejection();
 
 type LineRange = {
   start: { type: "new" | "old"; new_line?: number; old_line?: number };
@@ -38,10 +41,15 @@ type Note = {
   position?: Position | null;
 };
 
+// GitLab omits or nulls `notes` on some system/individual-note discussions.
 export type Discussion = {
   id: string;
-  notes: Note[];
+  notes?: Note[] | null;
 };
+
+function firstNote(d: Discussion): Note | null {
+  return d.notes?.[0] ?? null;
+}
 
 export type DiscussionSummary = {
   id: string;
@@ -57,7 +65,7 @@ export type DiscussionSummary = {
 export const DEFAULT_BODY_TRUNCATE = 80;
 
 function summarize(d: Discussion): DiscussionSummary | null {
-  const note = d.notes[0];
+  const note = firstNote(d);
   if (!note) return null;
   const result: DiscussionSummary = {
     id: d.id,
@@ -129,7 +137,7 @@ export type FilterOptions = {
 
 export function filterDiscussions(discussions: Discussion[], opts: FilterOptions): Discussion[] {
   return discussions.filter((d) => {
-    const note = d.notes[0];
+    const note = firstNote(d);
     if (!note) return false;
     if (opts.author && note.author.username !== opts.author) return false;
     if (opts.bots && !isReviewTarget(note.author.username, opts.extra)) return false;
@@ -142,7 +150,7 @@ export function filterDiscussions(discussions: Discussion[], opts: FilterOptions
 export function deduplicateDiscussions(discussions: Discussion[]): Discussion[] {
   const seen = new Map<string, Discussion>();
   for (const d of discussions) {
-    const note = d.notes[0];
+    const note = firstNote(d);
     if (!note) continue;
     const path = note.position?.new_path ?? "";
     const prefix = note.body.slice(0, 80);
@@ -313,9 +321,9 @@ const summaryCmd = command(
     const raw = await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
     const discussions = parseGlabPaginated(raw) as Discussion[];
 
-    const resolvable = discussions.filter((d) => d.notes[0]?.resolvable);
-    const resolved = resolvable.filter((d) => d.notes[0]?.resolved);
-    const unresolved = resolvable.filter((d) => !d.notes[0]?.resolved);
+    const resolvable = discussions.filter((d) => firstNote(d)?.resolvable);
+    const resolved = resolvable.filter((d) => firstNote(d)?.resolved);
+    const unresolved = resolvable.filter((d) => !firstNote(d)?.resolved);
 
     console.log(`Resolvable: ${resolvable.length}`);
     console.log(`Resolved: ${resolved.length}`);
@@ -324,7 +332,7 @@ const summaryCmd = command(
 
     const byAuthor = new Map<string, { resolved: number; unresolved: number }>();
     for (const d of resolvable) {
-      const note = d.notes[0];
+      const note = firstNote(d);
       if (!note) continue;
       const author = note.author.username;
       const entry = byAuthor.get(author) ?? { resolved: 0, unresolved: 0 };

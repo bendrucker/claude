@@ -13,7 +13,7 @@ export interface LintEnv {
   touch(path: string): Promise<void>;
 }
 
-const defaultEnv: LintEnv = {
+export const defaultEnv: LintEnv = {
   fileExists: (path) => Bun.file(path).exists(),
   readFile: async (path) => {
     try {

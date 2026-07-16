@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { type LintEnv, MARKER_DIR, processInput } from "./lint";
+import { defaultEnv, type LintEnv, MARKER_DIR, processInput } from "./lint";
 
 function mockInput(command: string, cwd = "/repo"): PreToolUseHookInput {
   return {
@@ -210,6 +213,13 @@ describe("merge-request skill nudge", () => {
     const env = fakeEnv();
     expect(await processInput(mockInput("glab mr view 42"), env)).toBeNull();
     expect(env.touched).toEqual([]);
+  });
+
+  test("defaultEnv.touch writes the marker before the marker directory exists", async () => {
+    const base = mkdtempSync(join(tmpdir(), "gitlab-lint-"));
+    const marker = join(base, "gitlab-skill", "session.nudged");
+    await defaultEnv.touch(marker);
+    expect(await defaultEnv.fileExists(marker)).toBe(true);
   });
 });
 

@@ -8,6 +8,8 @@ export interface ComponentTypeRow {
   iconName?: ComponentIconName;
   count: (plugin: CatalogPlugin) => number;
   label: string | ((count: number) => string);
+  /** A plugin either is remote or it is not, so a "1" would say nothing. Marker rows show the icon alone. */
+  marker?: true;
 }
 
 function plural(word: string, count: number): string {
@@ -43,8 +45,8 @@ export const COMPONENT_TYPES: ComponentTypeRow[] = [
   {
     key: "hooks",
     iconName: "Webhook",
-    count: (plugin) => (plugin.hooks ? 1 : 0),
-    label: "Hooks",
+    count: (plugin) => plugin.hooks?.events.length ?? 0,
+    label: (n) => plural("hook event", n),
   },
   {
     key: "mcpServers",
@@ -56,7 +58,8 @@ export const COMPONENT_TYPES: ComponentTypeRow[] = [
     key: "remote",
     iconName: "Github",
     count: (plugin) => (plugin.local ? 0 : 1),
-    label: "GitHub",
+    label: "Hosted on GitHub",
+    marker: true,
   },
   { key: "lspServers", count: () => 0, label: "LSP servers" },
   { key: "outputStyles", count: () => 0, label: "Output styles" },
@@ -69,7 +72,10 @@ export const COMPONENT_TYPES: ComponentTypeRow[] = [
 export interface Chip {
   key: string;
   iconName?: ComponentIconName;
-  text: string;
+  /** The chip's whole meaning in words, e.g. `3 skills`. The icon carries it visually, so this is what a screen reader reads. */
+  label: string;
+  /** Absent on marker rows, which show no number. */
+  count?: number;
 }
 
 /** Every chip a plugin card or detail view should render, skipping zero-count rows. */
@@ -78,7 +84,8 @@ export function chipsFor(plugin: CatalogPlugin): Chip[] {
     .filter(({ count }) => count > 0)
     .map(({ row, count }) => ({
       key: row.key,
-      iconName: row.iconName,
-      text: typeof row.label === "function" ? row.label(count) : row.label,
+      ...(row.iconName !== undefined ? { iconName: row.iconName } : {}),
+      label: typeof row.label === "function" ? row.label(count) : row.label,
+      ...(row.marker ? {} : { count }),
     }));
 }

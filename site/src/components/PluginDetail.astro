@@ -6,7 +6,7 @@ import ChipList from "./ChipList.vue";
 import InstallInstructions from "./InstallInstructions.astro";
 import RelativeTime from "./RelativeTime.astro";
 import { withBase } from "../lib/base";
-import { githubTreeUrl, pluginSourceUrl } from "../lib/github";
+import { pluginSourceUrl } from "../lib/github";
 import { renderReadme } from "../lib/markdown";
 import { REPO_ROOT } from "../lib/repo-root";
 
@@ -183,22 +183,6 @@ const sourceUrl = pluginSourceUrl(plugin.source);
             class="inline-flex items-center gap-1 text-accent underline underline-offset-2"
           >
             {plugin.mcpServers.join(", ")}
-            <ExternalLink class="h-3 w-3" aria-hidden="true" />
-          </a>
-        </p>
-      </section>
-    )
-  }
-
-  {
-    plugin.tsFiles.length > 0 && (
-      <section class="mb-6">
-        <p class="text-sm">
-          <a
-            href={githubTreeUrl(`plugins/${plugin.name}`)}
-            class="inline-flex items-center gap-1 text-accent underline underline-offset-2"
-          >
-            {plugin.tsFiles.length} TypeScript file{plugin.tsFiles.length === 1 ? "" : "s"}
             <ExternalLink class="h-3 w-3" aria-hidden="true" />
           </a>
         </p>

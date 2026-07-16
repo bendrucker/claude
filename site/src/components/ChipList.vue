@@ -19,19 +19,22 @@ const chips = computed(() => chipsFor(props.plugin));
 </script>
 
 <template>
-  <ul class="flex flex-wrap gap-1.5">
+  <ul class="flex flex-wrap gap-2">
     <li
       v-for="chip in chips"
       :key="chip.key"
-      class="inline-flex items-center gap-1 rounded-full border border-border bg-surface-raised px-2 py-0.5 text-xs text-muted"
+      :title="chip.label"
+      class="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface-raised text-muted"
     >
-      <component
-        :is="ICONS[chip.iconName]"
-        v-if="chip.iconName"
-        class="h-3 w-3"
+      <component :is="ICONS[chip.iconName]" v-if="chip.iconName" class="h-4 w-4" aria-hidden="true" />
+      <span
+        v-if="chip.count !== undefined"
         aria-hidden="true"
-      />
-      {{ chip.text }}
+        class="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-bg bg-accent px-1 text-[10px] font-semibold leading-none text-accent-fg tabular-nums"
+      >
+        {{ chip.count }}
+      </span>
+      <span class="sr-only">{{ chip.label }}</span>
     </li>
   </ul>
 </template>

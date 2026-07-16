@@ -5,7 +5,7 @@ const GITHUB_REPO = "bendrucker/claude";
 const GITHUB_REF = "main";
 
 /** GitHub tree (directory listing) URL for a repo-relative path. */
-export function githubTreeUrl(repoPath: string): string {
+function githubTreeUrl(repoPath: string): string {
   return `https://github.com/${GITHUB_REPO}/tree/${GITHUB_REF}/${repoPath}`;
 }
 

@@ -21,7 +21,7 @@ const href = computed(() => withBase(props.plugin.route));
     <a
       :href="href"
       :data-plugin-nav="plugin.name"
-      class="block h-full rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent"
+      class="flex h-full flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent"
     >
       <div class="mb-1 flex items-start justify-between gap-2">
         <h3 class="font-mono text-sm font-semibold">{{ plugin.name }}</h3>
@@ -35,10 +35,14 @@ const href = computed(() => withBase(props.plugin.route));
       <p v-if="plugin.description" class="mb-3 line-clamp-2 text-sm text-muted">
         {{ plugin.description }}
       </p>
-      <ChipList :plugin="plugin" />
-      <p v-if="matchedSkills.length > 0" class="mt-2 text-xs text-accent">
-        Matched: {{ matchedSkills.join(", ") }}
-      </p>
+      <!-- Pinned to the bottom so badges line up across a row whether a card's
+           description runs to one line or two. -->
+      <div class="mt-auto pt-1">
+        <ChipList :plugin="plugin" />
+        <p v-if="matchedSkills.length > 0" class="mt-2 text-xs text-accent">
+          Matched: {{ matchedSkills.join(", ") }}
+        </p>
+      </div>
     </a>
   </li>
 </template>

@@ -87,10 +87,11 @@ Before naming symbols, files, directories, or headings, check what already gover
 
 ## Checkpoints
 
-A checkpoint is a line the plan marks with an emoji so execution stops at it and does something before continuing past. Two kinds, each with its own marker and discipline:
+A checkpoint is a line the plan marks with an emoji. Three kinds, each with its own marker and discipline:
 
 - `✋` a human checkpoint: hand back for a read.
 - `🧪` a verification checkpoint: run a named check and confirm its signal.
+- `⏰` a check-in checkpoint: schedule a future look at work that needs time to prove out.
 
 Every marker is load-bearing in both directions, not decoration. When execution reaches a marked line it honors the marker before continuing past. Because each line states its instruction in plain words, a session that executes the plan without this guidance in context still honors it. The user may add a marker by hand, including on a line the plan did not mark, to insert a checkpoint the plan missed. A hand-added checkpoint is honored exactly like an authored one. These emoji are the only ones the plan carries. Add a new marker type only by defining its discipline here first.
 
@@ -111,12 +112,20 @@ Do not defer every check to the end. When a slice must hold before the next is b
 - Write each as a runnable check naming its signal, the same before/after shape as `Verification`: `🧪 Verify: <signal> via <command> before <what continues>`.
 - When execution reaches the line, run the check. If the signal matches, continue. If it does not, stop and surface the gap instead of building on it.
 
+### `⏰` Check-in Checkpoints
+
+Some outcomes cannot be known by the time execution ends because they need elapsed time. Mark the point where the work is done but unproven and schedule the look, so the intent does not die with the session.
+
+- Place one only where waiting is the point: a rollout soaking under real traffic, a migration settling, an upstream fix landing. If the check can run now, it is a `🧪`.
+- Write each as `⏰ Check in: schedule <what to look at> in your task manager for <absolute date>`. The date is when to look again, not an estimate of how long the work takes. Execution creates the item at that line and continues past without stopping.
+- Give the scheduled item what a fresh session needs to re-enter: where the work lives and how to resume it. It fires with none of this context.
+
 ## Pauses
 
 A pause or bare interrupt in plan mode is a stop signal. Present and wait. Do not edit silently and re-submit.
 
 ## Carryovers
 
-- No time estimates.
+- No time estimates. A `⏰` check-in date is not one (see `Checkpoints`).
 - Reference skills inline where they run ("use `pull-request:create` after committing", "load `git:conflicts` when a rebase or merge hits conflicts") rather than in a separate list.
 - Document out-of-scope observations separately. Keep them out of the change.

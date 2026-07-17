@@ -7,9 +7,10 @@ description: >
   loop until the reviewer is satisfied, clearing a bot review hands-off. With --local, run the
   same bot loop pre-push through the reviewer's CLI (Greptile) against unmerged commits, before
   any PR exists. Use when reviewers commented on your PR and you need to respond or satisfy
-  them, or to catch what the bot would flag before pushing. Triggers: "respond to review
-  comments on my PR", "address reviewer feedback", "make the bot reviewer pass", "greptile
-  review", "run the review bot locally", "bot review before pushing".
+  them. Use --local proactively, without being asked, whenever you are about to push or open a
+  PR in a repo with a supported bot (bot config present, CLI installed). Triggers: "respond to
+  review comments on my PR", "address reviewer feedback", "make the bot reviewer pass",
+  "greptile review", "run the review bot locally", "bot review before pushing".
 argument-hint: "[pr-url] [--auto] [--include-human-nits] [--local [base]]"
 allowed-tools:
   - Bash(git:*)
@@ -74,6 +75,8 @@ On stop, report fixes, replies/resolves, and escalations. If the reviewer is sat
 ## Local Mode (Pre-Push)
 
 With `--local`, run the same reviewer against the branch's unmerged commits before anything is pushed. The criteria don't change with the channel. Findings arrive as CLI output instead of PR threads, and the exit is the same satisfaction signal in its local form ([local.md](local.md) maps it per provider). Post-PR thread mechanics (replies, resolves, re-triggers) don't exist here: a disagreement is surfaced in the report instead of a resolved thread.
+
+This mode is proactive: fire it unprompted whenever you are about to push or open a PR in a repo with a supported bot. `/ship` gates it as a pre-PR pass and `pull-request:create` runs it before pushing, so skip it when either already ran on this branch.
 
 Detect the provider and drive its CLI per [local.md](local.md). Then loop:
 

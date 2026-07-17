@@ -9,6 +9,7 @@ allowed-tools:
   - mcp__github
   - Agent
   - Skill(pull-request:babysit)
+  - Skill(pull-request:follow-up)
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
   - "Bash(git push:*)"
@@ -132,6 +133,7 @@ If `--dry-run` (or `--body-only`) is set, follow the Dry Run section instead of 
 1. **Branch validation**: If the context above shows you're on a default branch (main/master), stop and ask the user to switch to a feature branch first.
 1. Stage changes if not already staged: `git add .`
 1. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
+1. Local bot review, proactive: when the repo has a supported review bot (bot config like `.greptile/config.json` present and its CLI installed), run `pull-request:follow-up --local` before pushing so the hosted reviewer's findings surface while the branch is still local. Skip when a local bot pass already ran on this branch in this session (`/ship` runs it as a gated pass) or the user declines.
 1. Push the branch to remote: `git push -u origin HEAD`
 1. Draft the body. For a large change or any open-source PR, outline the structure first and get the user's sign-off before expanding it (see [Outline First](#outline-first)). A small personal change skips straight to the full body.
 1. Create the PR/MR. Append `--draft` to the create command when `--draft` is set:

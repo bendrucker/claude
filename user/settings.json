@@ -76,6 +76,16 @@
     "deny": []
   },
   "hooks": {
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'p=$(jq -er .worktree_path) || exit 1; [ -e \"$p\" ] && exit 1; exit 0'"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "*",

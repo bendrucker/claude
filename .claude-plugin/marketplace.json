@@ -178,6 +178,11 @@
       "name": "activitywatch",
       "description": "Query local ActivityWatch usage data: per-app time, window titles, and active vs idle spans",
       "source": "./plugins/activitywatch"
+    },
+    {
+      "name": "atuin",
+      "description": "Query local shell history from atuin: recent commands, usage stats, and ad-hoc SQL over the history db",
+      "source": "./plugins/atuin"
     }
   ]
 }

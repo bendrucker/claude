@@ -253,7 +253,8 @@
     "bun@bendrucker": true,
     "mermaid@bendrucker": true,
     "typescript-lsp@claude-plugins-official": true,
-    "gopls-lsp@claude-plugins-official": true
+    "gopls-lsp@claude-plugins-official": true,
+    "atuin@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -332,7 +333,8 @@
         "~/.config/glab-cli/recover",
         "~/.npm",
         "~/.local/share/uv",
-        "~/.local/share/graphite"
+        "~/.local/share/graphite",
+        "~/.local/share/atuin"
       ]
     },
     "excludedCommands": [

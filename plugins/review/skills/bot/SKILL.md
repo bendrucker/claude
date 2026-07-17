@@ -27,31 +27,31 @@ hosted bot comments after a PR exists belongs to `pull-request:follow-up`, not t
 
 ## Arguments
 
-`$ARGUMENTS` is the base branch to review against. Default: the provider's default (`main` for
-Greptile).
+`$ARGUMENTS` is the base branch to review against, passed as `-b <base>`. Absent, omit `-b` so
+the CLI reviews against the repository's default branch.
 
 ## Provider
 
 - **`greptile` CLI**: !`command -v greptile >/dev/null 2>&1 && greptile --version 2>/dev/null || echo "not installed"`
 
-Detect the provider before running anything. The repo's bot config is the primary signal, an
-installed CLI the fallback:
+Detect the provider before running anything. The repo's bot config decides. The installed CLI is
+a fallback only when no config exists:
 
-- `.greptile/config.json` exists, or the probe above shows a version → Greptile.
-- `.coderabbit.yaml` → CodeRabbit (no local workflow here yet; say so and stop).
-- Neither → ask which bot reviews this repo's PRs.
+- `.greptile/config.json` → Greptile.
+- `.coderabbit.yaml` → CodeRabbit (no local workflow here yet: say so and stop).
+- Neither config, but the probe above shows a version → Greptile.
+- Otherwise → ask which bot reviews this repo's PRs.
 
 ## Greptile
 
 1. **Preflight**: confirm you are in a git repo. If the CLI is missing, offer to install it
-   (`npm i -g greptile` or `brew install greptileai/tap/greptile`) and ask before installing.
-   Check auth with `greptile whoami`; on failure, offer `greptile login` (interactive, so suggest
-   the user run it themselves). Greptile reviews committed work only: if the tree is dirty, offer
-   to commit first.
-2. **Run**: `greptile review -b <base> --json`. Fall back to `--agent` (streaming agent output)
-   if `--json` fails. For an interrupted run, `greptile review --resume` continues it and
-   `greptile review status` shows where it left off. Defer other flags to
-   `greptile review --help`.
+   (`npm i -g greptile` or `brew install greptileai/tap/greptile`). Check auth with
+   `greptile whoami`. On failure, offer `greptile login` (interactive, so suggest I run it
+   myself). Greptile reviews committed work only: if the tree is dirty, offer to commit first.
+2. **Run**: `greptile review --json`, adding `-b <base>` only when a base was given. Fall back
+   to `--agent` (plain-text output for agents) if `--json` fails. For an interrupted run,
+   `greptile review --resume` continues it and `greptile review status` reports the most recent
+   review. For other flags, check `greptile review --help`.
 3. **Summarize**: report findings grouped by severity, each with a `file:line` reference and a
    one-line statement of the issue.
 4. **Triage**: apply the clear wins. A finding you disagree with stays open: surface it with your

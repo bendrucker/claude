@@ -114,7 +114,7 @@ async function main(): Promise<void> {
   const { output, log } = await dispatch(input);
   appendRunLog(log);
   if (output) {
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(`${JSON.stringify(output)}\n`);
   }
 }
 

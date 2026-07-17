@@ -75,7 +75,7 @@ async function main(): Promise<void> {
   try {
     const output = await processInput(input);
     if (output) {
-      process.stdout.write(JSON.stringify(output) + "\n");
+      process.stdout.write(`${JSON.stringify(output)}\n`);
     }
   } catch (error) {
     console.error(`[newline/preserve] ${error instanceof Error ? error.message : String(error)}`);

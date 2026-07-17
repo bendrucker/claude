@@ -90,7 +90,7 @@ async function main() {
     if (!wanted.includes(label.label)) continue;
     const c = byId.get(id);
     if (!c) continue;
-    const head = `${label.label.toUpperCase()} ${dim(`[${c.host}] ${c.source}${c.line ? ":" + c.line : ""}`)}`;
+    const head = `${label.label.toUpperCase()} ${dim(`[${c.host}] ${c.source}${c.line ? `:${c.line}` : ""}`)}`;
     console.log(label.label === "bad" ? red(head) : green(head));
     if (label.note) console.log(dim(`note: ${label.note}`));
     console.log(c.body);

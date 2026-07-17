@@ -11,7 +11,7 @@ function denyWithError(reason: string): void {
       permissionDecisionReason: reason,
     },
   } satisfies SyncHookJSONOutput;
-  process.stdout.write(JSON.stringify(output) + "\n");
+  process.stdout.write(`${JSON.stringify(output)}\n`);
 }
 
 async function main(): Promise<void> {
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
 
   const output = await processInput(input);
   if (output) {
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(`${JSON.stringify(output)}\n`);
   }
 }
 

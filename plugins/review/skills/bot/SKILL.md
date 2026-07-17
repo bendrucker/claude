@@ -8,7 +8,12 @@ description: >
 argument-hint: "[base-branch]"
 allowed-tools:
   - Bash(greptile:*)
-  - Bash(git:*)
+  - Bash(git status:*)
+  - Bash(git diff:*)
+  - Bash(git log:*)
+  - Bash(git rev-parse:*)
+  - Bash(git add:*)
+  - Bash(git commit:*)
   - Bash(jq:*)
   - Read
   - Edit

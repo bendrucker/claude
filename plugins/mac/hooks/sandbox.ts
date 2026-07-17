@@ -100,7 +100,7 @@ async function main(): Promise<void> {
 
   const output = await processInput(input);
   if (output) {
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(`${JSON.stringify(output)}\n`);
   }
 }
 

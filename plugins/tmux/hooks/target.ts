@@ -81,7 +81,7 @@ async function main(): Promise<void> {
 
   const output = processInput(input, process.env.TMUX_PANE);
   if (output) {
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(`${JSON.stringify(output)}\n`);
   }
 }
 

@@ -204,7 +204,7 @@ async function main(): Promise<void> {
 
   const output = await processInput(input, Date.now());
   if (output) {
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(`${JSON.stringify(output)}\n`);
   }
 }
 

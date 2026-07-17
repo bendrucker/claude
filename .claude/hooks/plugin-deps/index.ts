@@ -48,7 +48,7 @@ async function main(): Promise<void> {
   if (input.hook_event_name !== "Stop") return;
 
   const output = await processStop(input);
-  if (output) process.stdout.write(JSON.stringify(output) + "\n");
+  if (output) process.stdout.write(`${JSON.stringify(output)}\n`);
 }
 
 if (import.meta.main) {

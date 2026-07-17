@@ -37,7 +37,7 @@ async function main(): Promise<void> {
     const denial = formatOutput(
       `Conflict markers in staged files: ${markers || "run 'git diff --cached --check' for details"}`,
     );
-    process.stdout.write(JSON.stringify(denial) + "\n");
+    process.stdout.write(`${JSON.stringify(denial)}\n`);
   }
 }
 

@@ -45,7 +45,7 @@
     },
     {
       "name": "review",
-      "description": "Code review workflows for peer and self review",
+      "description": "Code review workflows: self, peer, local review bots, and reviewer follow-up",
       "source": "./plugins/review"
     },
     {

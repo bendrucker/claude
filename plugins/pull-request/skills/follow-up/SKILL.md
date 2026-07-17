@@ -17,6 +17,7 @@ allowed-tools:
   - Bash(gh:*)
   - Bash(greptile:*)
   - Bash(jq:*)
+  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*)"
   - Skill(github:pr-comments)
   - Skill(gitlab:merge-request)
   - Skill(pull-request:babysit)
@@ -78,7 +79,9 @@ With `--local`, run the same reviewer against the branch's unmerged commits befo
 
 This mode is proactive: fire it unprompted whenever you are about to push or open a PR in a repo with a supported bot. `/ship` gates it as a pre-PR pass and `pull-request:create` runs it before pushing, so skip it when either already ran on this branch.
 
-Detect the provider and drive its CLI per [local.md](local.md). Then loop:
+- Local detection: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts`
+
+The line above is the injected fast path (repo config and CLI presence, no turn spent). Resolve it to a provider per [local.md](local.md), which also covers the hosted signals for repos with no config file. Then loop:
 
 1. Run the review. Summarize findings by severity, each with a `file:line` reference.
 2. Triage with the same partition as `--auto`: actionable → fix; noise or disagreement → surface it with your reasoning rather than silently skipping; unsure → escalate.

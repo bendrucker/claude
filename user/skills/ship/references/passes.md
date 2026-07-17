@@ -11,7 +11,7 @@ Most passes gate on the diff (against the base, plus the working tree). The base
 | A substantial plan in context (`~/.claude/plans/` file) and a long or redirected session | `plan:review` | Read-only, non-blocking: background dispatch, joined before create |
 | Code changes | `code-review <effort> --fix` or `simplify` | Exactly one. Skip on docs/config-only |
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
-| A review bot configured for the repo (`.greptile/config.json`, `.coderabbit.yaml`) with its CLI installed | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
+| A supported review bot detected for the repo (config fast path, hosted signals otherwise; follow-up's `local.md` owns detection) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
 | A runtime surface | `verify` | Declines tests-only and docs-only itself |
 

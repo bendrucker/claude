@@ -38,7 +38,7 @@ Resolve the base to a **remote** ref so ship's view matches what the PR merges a
 - **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) *and* the session ran long or redirected enough that the diff could have drifted from it. Dispatched in the background alongside the fix passes, joined before create. A small plan in a tight session doesn't warrant it. No plan, skip.
 - **Correctness and quality**: code changed. Exactly one of `code-review <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
 - **`comments:audit`**: diff adds code comments.
-- **`pull-request:follow-up --local`**: a review bot watches this repo's PRs (bot config present, e.g. `.greptile/config.json`) and its CLI is installed. Runs the hosted reviewer locally before the PR exists.
+- **`pull-request:follow-up --local`**: a supported review bot is detected for the repo. Follow-up's `local.md` owns detection (repo config fast path, hosted signals when no config is committed) and exits early when nothing is detected. Runs the hosted reviewer locally before the PR exists.
 - **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
 - **`verify`**: diff has a runtime surface. Declines tests-only and docs-only itself.
 

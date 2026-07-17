@@ -4,12 +4,15 @@ Mechanics for running a hosted reviewer's CLI locally in [Local Mode](SKILL.md#l
 
 ## Provider Detection
 
-The repo's bot config decides. An installed CLI is a fallback only when no config exists:
+SKILL.md injects the fast path at load: `scripts/detect-bot.ts` reports each provider's repo config and CLI presence without spending a turn. Resolve its verdict:
 
-- `.greptile/config.json` → Greptile.
-- `.coderabbit.yaml` → CodeRabbit (no local workflow yet: say so and stop).
-- Neither config, but `greptile` is on PATH → Greptile.
-- Otherwise → ask which bot reviews this repo's PRs.
+- A repo config hit is definitive: that provider reviews this repo.
+- No config does not mean no bot. Repos often run a hosted reviewer with nothing committed, so check the hosted signals (the same ones behind "When a Review Is Expected" in [reviewers.md](reviewers.md)). One call usually settles it, recent commenters first:
+  - `gh api 'repos/{owner}/{repo}/issues/comments?sort=updated&direction=desc&per_page=100' --jq '[.[].user.login] | unique | map(select(test("greptile|coderabbit")))'`
+  - Falling back to required checks: `gh api 'repos/{owner}/{repo}/rules/branches/{default-branch}' --jq '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]'`
+- A CLI on PATH with no config and no hosted signals is just a global install. Don't run a bot against a repo it doesn't review.
+- Provider identified but CLI missing → offer to install it (per the provider section below). Provider identified with no supported local workflow (CodeRabbit today) → say so and stop.
+- No signals anywhere → no bot reviews this repo. In the proactive paths (ship's pass, create's pre-push step) skip silently. On an explicit `--local` request, ask which bot reviews this repo's PRs.
 
 ## Greptile
 

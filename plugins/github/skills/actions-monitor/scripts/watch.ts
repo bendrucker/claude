@@ -307,12 +307,13 @@ function mergeabilityUndetermined(m: Mergeability): boolean {
 // the caller should fall back to a local merge dry-run.
 export async function resolveMergeable(
   prNumber: number,
+  repo: string,
   run: ExecFn = exec,
   sleepFn: (ms: number) => Promise<void> = sleep,
 ): Promise<Mergeability> {
   let current: Mergeability = { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" };
   for (let attempt = 0; attempt < MERGEABLE_UNKNOWN_RETRIES; attempt += 1) {
-    const result = run(`gh pr view ${prNumber} --json mergeable,mergeStateStatus`);
+    const result = run(`gh pr view ${prNumber} --repo ${repo} --json mergeable,mergeStateStatus`);
     if (result.ok) {
       const parsed = parseMergeability(result.stdout);
       if (parsed) {
@@ -377,9 +378,9 @@ export type Probed =
   | { kind: "empty" }
   | { kind: "not-found"; stderr: string };
 
-export function probePr(prNumber: number, run: ExecFn = exec): Probed {
+export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Probed {
   const prResult = run(
-    `gh pr view ${prNumber} --json headRefOid,headRefName,state,mergeable,mergeStateStatus`,
+    `gh pr view ${prNumber} --repo ${repo} --json headRefOid,headRefName,state,mergeable,mergeStateStatus`,
   );
   if (!prResult.ok) {
     return {
@@ -416,7 +417,9 @@ export function probePr(prNumber: number, run: ExecFn = exec): Probed {
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
-  const checksResult = run(`gh pr checks ${prNumber} --required=false --json state,bucket,name`);
+  const checksResult = run(
+    `gh pr checks ${prNumber} --repo ${repo} --required=false --json state,bucket,name`,
+  );
   if (!checksResult.ok) {
     return {
       kind: "error",
@@ -441,7 +444,7 @@ export function probePr(prNumber: number, run: ExecFn = exec): Probed {
   }
 
   const runIdResult = run(
-    `gh run list --branch ${branch} --limit 1 --json databaseId --jq '.[0].databaseId // ""'`,
+    `gh run list --repo ${repo} --branch ${branch} --limit 1 --json databaseId --jq '.[0].databaseId // ""'`,
   );
   if (!runIdResult.ok) {
     return {
@@ -610,6 +613,7 @@ async function run(options: RunOptions): Promise<void> {
   if (options.mode === "pr") {
     const parsed = parsePrUrl(options.prUrl);
     prNumber = parsed.number;
+    repo = `${parsed.owner}/${parsed.repo}`;
   } else if (options.mode === "branch") {
     repo = options.repo;
     branch = options.branch;
@@ -636,8 +640,8 @@ async function run(options: RunOptions): Promise<void> {
     }
 
     let result: Probed;
-    if (options.mode === "pr" && prNumber !== null) {
-      result = probePr(prNumber);
+    if (options.mode === "pr" && prNumber !== null && repo !== null) {
+      result = probePr(prNumber, repo);
     } else if (options.mode === "branch" && repo !== null && branch !== null) {
       result = probeBranch(repo, branch);
     } else if (options.mode === "run-id" && repo !== null) {
@@ -670,8 +674,13 @@ async function run(options: RunOptions): Promise<void> {
       // Settle mergeability before deriving events so `conflicts` lands in the
       // same cycle as a stale `success`, ahead of the terminal return below.
       let probe = result.probe;
-      if (options.mode === "pr" && prNumber !== null && probeIsUndetermined(probe)) {
-        const resolved = await resolveMergeable(prNumber, exec, sleep);
+      if (
+        options.mode === "pr" &&
+        prNumber !== null &&
+        repo !== null &&
+        probeIsUndetermined(probe)
+      ) {
+        const resolved = await resolveMergeable(prNumber, repo, exec, sleep);
         probe = {
           ...probe,
           mergeable: resolved.mergeable,

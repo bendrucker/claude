@@ -25,7 +25,7 @@ Watch a PR, branch, or specific run's GitHub Actions progress and react to failu
 
 Accepted forms:
 
-- A GitHub PR URL (e.g. `https://github.com/owner/repo/pull/42`) runs in **PR mode**.
+- A GitHub PR URL (e.g. `https://github.com/owner/repo/pull/42`) runs in **PR mode**. The owner and repo come from the URL, so PR mode watches the right PR from any working directory.
 - A branch name (e.g. `main`) runs in **branch mode**. The script infers the repo from `git remote get-url origin` in the current directory; pass `--repo <owner/repo>` to override.
 - A run ID (e.g. `12345678`) runs in **run-id mode**, watching a specific workflow run directly. Covers `workflow_dispatch`, manually-triggered, and re-run cases where the run ID is known. The repo is inferred from the git remote; pass `--repo <owner/repo>` to override.
 - No argument: derive the current PR from the current branch with `gh pr view --json url --jq '.url'`. If the branch has no PR, fall back to branch mode with the current branch name.

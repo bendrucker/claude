@@ -379,7 +379,7 @@ describe("resolveMergeable", () => {
       { match: "gh pr view 42", result: ok(mergeJson("UNKNOWN", "UNKNOWN")) },
       { match: "gh pr view 42", result: ok(mergeJson("CONFLICTING", "DIRTY")) },
     ]);
-    const resolved = await resolveMergeable(42, exec, noopSleep);
+    const resolved = await resolveMergeable(42, "owner/repo", exec, noopSleep);
     expect(resolved).toEqual({ mergeable: "CONFLICTING", mergeStateStatus: "DIRTY" });
     expect(remaining()).toEqual([]);
   });
@@ -390,7 +390,7 @@ describe("resolveMergeable", () => {
       result: ok(mergeJson("UNKNOWN", "UNKNOWN")),
     }));
     const { exec, remaining } = makeExec(scripted);
-    const resolved = await resolveMergeable(42, exec, noopSleep);
+    const resolved = await resolveMergeable(42, "owner/repo", exec, noopSleep);
     expect(resolved).toEqual({ mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" });
     expect(remaining()).toEqual([]);
   });
@@ -598,9 +598,9 @@ describe("probePr (gh schema integration)", () => {
     const { exec, remaining } = makeExec([
       { match: "gh pr view 42", result: ok(prJson) },
       { match: "gh pr checks 42", result: ok(checksJson) },
-      { match: "gh run list --branch feature/x", result: ok("999") },
+      { match: "gh run list --repo owner/repo --branch feature/x", result: ok("999") },
     ]);
-    const result = probePr(42, exec);
+    const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("ok");
     if (result.kind !== "ok") return;
     expect(result.probe.state).toBe("success");
@@ -625,11 +625,44 @@ describe("probePr (gh schema integration)", () => {
       if (command.startsWith("gh run list")) return ok("");
       throw new Error(`unexpected: ${command}`);
     };
-    probePr(42, recordingExec);
+    probePr(42, "owner/repo", recordingExec);
     const checksCall = seen.find((c) => c.startsWith("gh pr checks"));
     expect(checksCall).toBeDefined();
     expect(checksCall).toContain("--json state,bucket,name");
     expect(checksCall).not.toContain("conclusion");
+  });
+
+  it("targets the PR's own repo rather than the ambient checkout (regression)", () => {
+    // Every gh call must name the repo. Without --repo, gh resolves the repo
+    // from the working directory's remote, so watching a PR in one repo from a
+    // checkout of another silently reports the wrong PR's state: same number,
+    // different repo. That misfire is indistinguishable from a normal event
+    // stream: a long-merged PR at that number emits success and merged at once.
+    const seen: string[] = [];
+    const recordingExec: ExecFn = (command) => {
+      seen.push(command);
+      if (command.startsWith("gh pr view")) {
+        return ok(
+          JSON.stringify({
+            headRefOid: "abc123",
+            headRefName: "feature/x",
+            state: "OPEN",
+            mergeable: "MERGEABLE",
+            mergeStateStatus: "CLEAN",
+          }),
+        );
+      }
+      if (command.startsWith("gh pr checks")) {
+        return ok(JSON.stringify([{ state: "SUCCESS", bucket: "pass", name: "x" }]));
+      }
+      if (command.startsWith("gh run list")) return ok("999");
+      throw new Error(`unexpected: ${command}`);
+    };
+    probePr(42, "owner/repo", recordingExec);
+    expect(seen).not.toBeEmpty();
+    for (const command of seen) {
+      expect(command).toContain("--repo owner/repo");
+    }
   });
 
   it("emits state=failing when any check is in fail bucket", () => {
@@ -642,7 +675,7 @@ describe("probePr (gh schema integration)", () => {
       { match: "gh pr checks", result: ok(checksJson) },
       { match: "gh run list", result: ok("123") },
     ]);
-    const result = probePr(42, exec);
+    const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("ok");
     if (result.kind !== "ok") return;
     expect(result.probe.state).toBe("failing");
@@ -658,7 +691,7 @@ describe("probePr (gh schema integration)", () => {
       { match: "gh pr checks", result: ok(checksJson) },
       { match: "gh run list", result: ok("123") },
     ]);
-    const result = probePr(42, exec);
+    const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("ok");
     if (result.kind !== "ok") return;
     expect(result.probe.state).toBe("queued");
@@ -674,7 +707,7 @@ describe("probePr (gh schema integration)", () => {
       { match: "gh pr view", result: ok(prJson) },
       { match: "gh pr checks", result: ghError },
     ]);
-    const result = probePr(42, exec);
+    const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("error");
     if (result.kind !== "error") return;
     expect(result.stderr).toContain("Unknown JSON field");
@@ -683,7 +716,7 @@ describe("probePr (gh schema integration)", () => {
 
   it("returns kind=error when gh pr view emits unparseable JSON", () => {
     const { exec } = makeExec([{ match: "gh pr view", result: ok("not json") }]);
-    const result = probePr(42, exec);
+    const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("error");
   });
 
@@ -694,7 +727,7 @@ describe("probePr (gh schema integration)", () => {
       mergeable: "MERGEABLE",
     });
     const { exec } = makeExec([{ match: "gh pr view", result: ok(partialJson) }]);
-    const result = probePr(42, exec);
+    const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("error");
     if (result.kind !== "error") return;
     expect(result.stderr).toContain("headRefName");

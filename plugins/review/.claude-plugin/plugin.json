@@ -1,6 +1,6 @@
 {
   "name": "review",
-  "description": "Code review workflows: self, peer, local review bots, and reviewer follow-up",
+  "description": "Code review workflows for peer and self review",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

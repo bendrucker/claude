@@ -4,13 +4,18 @@ description: >
   Follow up as the author on review feedback left on your own PR/MR: check which reviewer
   comments still need a response, investigate how threads were resolved (including silent
   resolves), and draft replies. With --auto, autonomously triage AI-reviewer (bot) threads and
-  loop until the reviewer is satisfied, clearing a bot review hands-off. Use when reviewers
-  commented on your PR and you need to respond or satisfy them. Triggers: "respond to review
-  comments on my PR", "address reviewer feedback", "make the bot reviewer pass".
-argument-hint: "[pr-url] [--auto] [--include-human-nits]"
+  loop until the reviewer is satisfied, clearing a bot review hands-off. With --local, run the
+  same bot loop pre-push through the reviewer's CLI (Greptile) against unmerged commits, before
+  any PR exists. Use when reviewers commented on your PR and you need to respond or satisfy
+  them, or to catch what the bot would flag before pushing. Triggers: "respond to review
+  comments on my PR", "address reviewer feedback", "make the bot reviewer pass", "greptile
+  review", "run the review bot locally", "bot review before pushing".
+argument-hint: "[pr-url] [--auto] [--include-human-nits] [--local [base]]"
 allowed-tools:
   - Bash(git:*)
   - Bash(gh:*)
+  - Bash(greptile:*)
+  - Bash(jq:*)
   - Skill(github:pr-comments)
   - Skill(gitlab:merge-request)
   - Skill(pull-request:babysit)
@@ -25,6 +30,7 @@ Parse the URL and flags from `$ARGUMENTS`. GitHub URLs contain `github.com`; Git
 
 - `--auto`: autonomously triage **bot** threads, looping until the reviewer is satisfied (see [The Autonomous Loop](#the-autonomous-loop)).
 - `--include-human-nits`: under `--auto`, also act on **human** threads, but only trivial high-confidence changes (typos, renames, one-liners). Off by default.
+- `--local [base]`: run the bot loop pre-push through the reviewer's CLI instead of PR threads, against the branch's unmerged commits (see [Local Mode](#local-mode-pre-push)). The optional base overrides what the review runs against. No PR is involved, so `pr-url` and the other flags don't apply.
 
 ## Default Workflow (Gated)
 
@@ -64,6 +70,19 @@ When a bot review is **expected** ([reviewers.md](reviewers.md) defines the sign
 babysit and follow-up compose both directions: `babysit --reviews` hands off to this loop after its first green, and this loop calls babysit between rounds. The entry point is the outer one. "Wait for a bot review before merging" is exactly this pairing (`babysit --reviews --merge`, or this loop then merge), keyed on each reviewer's signal ([reviewers.md](reviewers.md)).
 
 On stop, report fixes, replies/resolves, and escalations. If the reviewer is satisfied, suggest the next action (human review, merge train, auto-merge) but don't perform it unless asked. `pull-request:babysit --merge` drives to merged.
+
+## Local Mode (Pre-Push)
+
+With `--local`, run the same reviewer against the branch's unmerged commits before anything is pushed. The criteria don't change with the channel. Findings arrive as CLI output instead of PR threads, and the exit is the same satisfaction signal in its local form ([local.md](local.md) maps it per provider). Post-PR thread mechanics (replies, resolves, re-triggers) don't exist here: a disagreement is surfaced in the report instead of a resolved thread.
+
+Detect the provider and drive its CLI per [local.md](local.md). Then loop:
+
+1. Run the review. Summarize findings by severity, each with a `file:line` reference.
+2. Triage with the same partition as `--auto`: actionable → fix; noise or disagreement → surface it with your reasoning rather than silently skipping; unsure → escalate.
+3. Commit the fixes and re-run. Repeat until the satisfaction signal hits or I stop.
+4. Hand off: offer next steps (push, PR, `/ship`) without taking them.
+
+Once a PR exists, triage the hosted bot's comments through the normal flow above.
 
 ## Guardrails
 

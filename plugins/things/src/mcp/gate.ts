@@ -6,10 +6,10 @@
  * The gate is the only funnel-facing process. It serves the RFC 9728
  * protected-resource metadata, validates bearer tokens against the
  * authorization server's RFC 7662 introspection endpoint (including the RFC
- * 8707 audience), and enforces first-use approval: an authenticated user who
+ * 8707 audience), and enforces first-use approval: a (user, client) pair that
  * has never connected before is recorded as pending and denied until approved
- * with `gate.ts approve <user>`. Approved requests proxy to the upstream MCP
- * server, which runs loopback-only with no auth code of its own.
+ * with `gate.ts approve <user> <client>`. Approved requests proxy to the
+ * upstream MCP server, which runs loopback-only with no auth code of its own.
  */
 
 import { cli, command } from "cleye";
@@ -90,13 +90,26 @@ async function handle(req: Request, config: GateConfig): Promise<Response> {
     return json({ error: "access_denied", error_description: "token has no user identity" }, 403);
   }
 
-  const grant = (await config.grants.get(user)) ?? (await config.grants.recordPending(user));
+  // The authorization server mints tokens for any registered client without a
+  // consent step, so a token is only as trustworthy as the client it names.
+  // Without one there is nothing to authorize against.
+  const client = typeof info.client_id === "string" ? info.client_id : null;
+  if (!client) {
+    return json({ error: "access_denied", error_description: "token has no client identity" }, 403);
+  }
+
+  const subject = { user, client };
+  const grant = (await config.grants.get(subject)) ?? (await config.grants.recordPending(subject));
   if (grant.status !== "approved") {
     console.error(
-      `denied ${grant.status} user ${user}. Approve with: bun ${import.meta.path} approve ${user}`,
+      `denied ${grant.status} user ${user} via client ${client}. ` +
+        `Approve with: bun ${import.meta.path} approve ${user} ${client}`,
     );
     return json(
-      { error: "access_denied", error_description: `user ${user} is ${grant.status} approval` },
+      {
+        error: "access_denied",
+        error_description: `user ${user} via client ${client} is ${grant.status} approval`,
+      },
       403,
     );
   }
@@ -199,24 +212,24 @@ if (import.meta.main) {
   );
 
   const approveCmd = command(
-    { name: "approve", parameters: ["<user>"], flags: { stateDir: stateDirFlag } },
+    { name: "approve", parameters: ["<user>", "<client>"], flags: { stateDir: stateDirFlag } },
     async (parsed) => {
       const grant = await createGrantStore(`${parsed.flags.stateDir}/grants.json`).set(
-        parsed._.user,
+        { user: parsed._.user, client: parsed._.client },
         "approved",
       );
-      console.log(`approved ${grant.user}`);
+      console.log(`approved ${grant.user} via client ${grant.client}`);
     },
   );
 
   const denyCmd = command(
-    { name: "deny", parameters: ["<user>"], flags: { stateDir: stateDirFlag } },
+    { name: "deny", parameters: ["<user>", "<client>"], flags: { stateDir: stateDirFlag } },
     async (parsed) => {
       const grant = await createGrantStore(`${parsed.flags.stateDir}/grants.json`).set(
-        parsed._.user,
+        { user: parsed._.user, client: parsed._.client },
         "denied",
       );
-      console.log(`denied ${grant.user}`);
+      console.log(`denied ${grant.user} via client ${grant.client}`);
     },
   );
 
@@ -227,7 +240,8 @@ if (import.meta.main) {
       return;
     }
     for (const grant of grants) {
-      console.log(`${grant.status}\t${grant.user}\t(first seen ${grant.firstSeen})`);
+      const client = grant.client ?? "(no client, never matches)";
+      console.log(`${grant.status}\t${grant.user}\t${client}\t(first seen ${grant.firstSeen})`);
     }
   });
 

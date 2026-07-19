@@ -2,7 +2,7 @@
 
 Remote MCP access to Things 3 over Streamable HTTP. One server backs every surface: claude.ai custom connector, Cowork, mobile, and Claude Code.
 
-Auth lives in a separate gate process, an OAuth-protecting reverse proxy that could front any plain HTTP MCP server. Authentication comes from [tsidp](https://tailscale.com/docs/features/tsidp) (identity = your tailnet login, the authorize step only works on the tailnet). Authorization is the gate's own first-use approval store: an authenticated identity connecting for the first time is recorded as pending and denied until explicitly approved. Token validity alone is never enough.
+Auth lives in a separate gate process, an OAuth-protecting reverse proxy that could front any plain HTTP MCP server. Authentication comes from [tsidp](https://tailscale.com/docs/features/tsidp) (identity = your tailnet login, the authorize step only works on the tailnet). Authorization is the gate's own first-use approval store: an authenticated identity connecting for the first time through a given OAuth client is recorded as pending and denied until explicitly approved. Token validity alone is never enough.
 
 ```
 claude.ai / Claude Code
@@ -92,14 +92,18 @@ This is a security upside: nothing on the public internet can register OAuth cli
 
 ## First-Use Approval
 
-The first connection from a new identity authenticates fine and then gets 403 with a pending grant. Approve it on the Mac:
+The first connection from a new (identity, OAuth client) pair authenticates fine and then gets 403 with a pending grant. Approve it on the Mac:
 
 ```bash
 bun src/mcp/gate.ts list
-bun src/mcp/gate.ts approve <login>
+bun src/mcp/gate.ts approve <login> <client-id>
 ```
 
-Then retry the connection. `deny` blocks an identity permanently. The store lives at `~/.local/state/mcp-gate/grants.json` and the gate logs each denied attempt with the exact approve command.
+Then retry the connection. `deny` blocks a pair permanently. The store lives at `~/.local/state/mcp-gate/grants.json` and the gate logs each denied attempt with the exact approve command.
+
+Grants are keyed on the pair because tsidp issues tokens for any registered client without asking. A token minted for someone else's client still introspects as you, so approving `<login>` outright would authorize every client that ever gets registered. Keying on the pair means a new client is inert until you approve it, and its appearance in `list` is itself the signal that one was registered. Grants written before this change carry no client, match nothing, and need one re-approval each.
+
+This narrows but does not close the risk: a tailnet node holding `allow_dcr` can still register clients, and DCR skips the redirect-URI validation the admin UI performs (it rejects `javascript:`, `data:`, and schemeless URIs; DCR checks only that the list is non-empty). Grant `allow_dcr` narrowly.
 
 ## Surfaces
 

@@ -1,31 +1,47 @@
 /**
  * First-use approval store for the MCP gate.
  *
- * Authentication proves who a caller is. This store decides whether that
- * identity is allowed in: unknown users are recorded as pending and denied
- * until explicitly approved. The store is a JSON file so the gate process and
- * the approval CLI share state without a database.
+ * Authentication proves who a caller is and which OAuth client it authorized.
+ * This store decides whether that pair is allowed in: an unknown pair is
+ * recorded as pending and denied until explicitly approved. The store is a JSON
+ * file so the gate process and the approval CLI share state without a database.
+ *
+ * Grants are keyed by (user, client) rather than user alone because the
+ * authorization server issues tokens for any registered client without a
+ * consent step. A token minted for an attacker's client still introspects as
+ * the legitimate user, so the user alone is not enough to authorize on.
  */
 
 export type GrantStatus = "pending" | "approved" | "denied";
 
-export interface Grant {
+/** The (user, client) pair a grant authorizes, taken from token introspection. */
+export interface GrantSubject {
   user: string;
+  client: string;
+}
+
+export interface Grant extends GrantSubject {
   status: GrantStatus;
   firstSeen: string;
   decidedAt?: string;
 }
 
+/**
+ * Entries written before grants were keyed by client have no `client`. They
+ * match no subject, so a previously approved user re-approves once per client.
+ */
+type StoredGrant = Omit<Grant, "client"> & { client?: string };
+
 export interface GrantStore {
-  get(user: string): Promise<Grant | null>;
-  /** Records an unknown user as pending. Returns the existing grant if one exists. */
-  recordPending(user: string): Promise<Grant>;
-  set(user: string, status: GrantStatus): Promise<Grant>;
-  list(): Promise<Grant[]>;
+  get(subject: GrantSubject): Promise<Grant | null>;
+  /** Records an unknown subject as pending. Returns the existing grant if one exists. */
+  recordPending(subject: GrantSubject): Promise<Grant>;
+  set(subject: GrantSubject, status: GrantStatus): Promise<Grant>;
+  list(): Promise<StoredGrant[]>;
 }
 
 interface GrantsFile {
-  grants: Grant[];
+  grants: StoredGrant[];
 }
 
 export function createGrantStore(path: string): GrantStore {
@@ -39,8 +55,16 @@ export function createGrantStore(path: string): GrantStore {
     await Bun.write(path, `${JSON.stringify(data, null, 2)}\n`);
   }
 
-  function normalize(user: string): string {
-    return user.trim().toLowerCase();
+  /** Client IDs are opaque and case-sensitive. Only the user is case-folded. */
+  function normalize({ user, client }: GrantSubject): GrantSubject {
+    return { user: user.trim().toLowerCase(), client: client.trim() };
+  }
+
+  function find(data: GrantsFile, subject: GrantSubject): Grant | undefined {
+    const { user, client } = normalize(subject);
+    return data.grants.find(
+      (grant): grant is Grant => grant.user === user && grant.client === client,
+    );
   }
 
   // Serializes load-modify-save cycles. Without this, two concurrent writes
@@ -54,18 +78,17 @@ export function createGrantStore(path: string): GrantStore {
   }
 
   return {
-    async get(user) {
-      const data = await load();
-      return data.grants.find((grant) => grant.user === normalize(user)) ?? null;
+    async get(subject) {
+      return find(await load(), subject) ?? null;
     },
 
-    recordPending(user) {
+    recordPending(subject) {
       return withWriteLock(async () => {
         const data = await load();
-        const existing = data.grants.find((grant) => grant.user === normalize(user));
+        const existing = find(data, subject);
         if (existing) return existing;
         const grant: Grant = {
-          user: normalize(user),
+          ...normalize(subject),
           status: "pending",
           firstSeen: new Date().toISOString(),
         };
@@ -75,12 +98,12 @@ export function createGrantStore(path: string): GrantStore {
       });
     },
 
-    set(user, status) {
+    set(subject, status) {
       return withWriteLock(async () => {
         const data = await load();
-        let grant = data.grants.find((entry) => entry.user === normalize(user));
+        let grant = find(data, subject);
         if (!grant) {
-          grant = { user: normalize(user), status, firstSeen: new Date().toISOString() };
+          grant = { ...normalize(subject), status, firstSeen: new Date().toISOString() };
           data.grants.push(grant);
         } else {
           grant.status = status;

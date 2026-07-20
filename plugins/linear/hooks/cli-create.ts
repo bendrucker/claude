@@ -16,7 +16,7 @@ const LEADING_CREATE = /^linear\s+issue\s+create(\s|$)/;
 // create, so it supplies a state of its own.
 const HAS_STATE = /(^|\s)(-s|--state)([=\s]|$)/;
 const HAS_START = /(^|\s)--start(\s|$)/;
-const HAS_ASSIGNEE = /(^|\s)(-a|--assignee)[=\s]/;
+const ASSIGNEE = /(?:^|\s)(?:-a|--assignee)[=\s]+(\S+)/;
 
 export function isSingleInvocation(command: string): boolean {
   if (SUBSTITUTION.test(command)) return false;
@@ -30,7 +30,7 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
   if (!command || !CREATE.test(command)) return null;
   if (HAS_STATE.test(command) || HAS_START.test(command)) return null;
 
-  const state = getDefaultState(command.match(HAS_ASSIGNEE)?.[0]);
+  const state = getDefaultState(command.match(ASSIGNEE)?.[1]);
 
   // In a compound command, an appended flag lands on the last segment, so hand
   // the fix back for the author to place.
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
 
   const output = processInput(input);
   if (output) {
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(`${JSON.stringify(output)}\n`);
   }
 }
 

@@ -101,3 +101,23 @@ exports[`processInput trailing whitespace is trimmed before the flag 1`] = `
   },
 }
 `;
+
+exports[`processInput an || chain is denied 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "\`linear issue create\` without \`--state\` lands the issue in Triage. Add \`--state Backlog\` to the create command.",
+  },
+}
+`;
+
+exports[`processInput a ; sequence is denied 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "\`linear issue create\` without \`--state\` lands the issue in Triage. Add \`--state Backlog\` to the create command.",
+  },
+}
+`;

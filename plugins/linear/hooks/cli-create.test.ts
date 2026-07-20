@@ -31,6 +31,8 @@ describe("processInput", () => {
       "an && chain is denied",
       "linear issue create --title x --team BEN && linear issue view BEN-1",
     ],
+    ["an || chain is denied", "linear issue create --title x --team BEN || exit 1"],
+    ["a ; sequence is denied", "linear issue create --title x --team BEN; echo done"],
     ["env-prefixed invocation is rewritten", "LINEAR_API_KEY=abc linear issue create --title x"],
     ["issue update does not fire", "linear issue update BEN-1 --title x"],
     ["a create mentioned inside a title does not fire", "echo 'linear issue create'"],

@@ -27,6 +27,7 @@ Every customization costs tokens on every session. Before adding one, define how
 
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.
 - For questions about Claude Code features or usage, use the Task tool with `subagent_type='claude-code-guide'` to consult official documentation.
+- Prefer the `agent-browser` skill over `WebFetch`/`WebSearch` when a task needs a real browser — interacting with a page, screenshots, scraping JS-rendered content, or web-app QA/dogfooding. It loads the CLI's version-matched `skills get` workflows. Plain `WebFetch` stays fine for static page fetches.
 - Finish a branch with `/ship`: it runs the warranted review passes, opens the PR, babysits CI to green, triages bot comments, and refreshes the body. Don't hand-chain `EnterWorktree` + `pull-request:create` for a branch finish.
 - `pull-request:create` remains the skill for opening a PR directly (it is what `/ship` calls). If it's unavailable, create the PR with an empty body.
 - Open PRs ready for review by default. Reserve `--draft` for speculative changes that need deep human review before merge. Draft status can suppress bot review.

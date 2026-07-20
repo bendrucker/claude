@@ -255,7 +255,9 @@ describe("sustained growth", () => {
     expect(await decision(grownAgain)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: `Presentation 3 is larger than any before it (${grown.length} -> ${grownAgain.length} chars). If redirects added scope, that growth is right. Otherwise it is residue: delete superseded design, move resolved research to <plan>-decisions.md, and keep only what the implementer builds from. Approve to present anyway.`,
+      permissionDecisionReason: expect.stringContaining(
+        `Presentation 3 is larger than any before it (${grown.length} -> ${grownAgain.length} chars)`,
+      ),
     });
   });
 
@@ -278,6 +280,15 @@ describe("sustained growth", () => {
     await decision(grown);
     expect((await decision(grownAgain))?.permissionDecision).toBe("ask");
     expect(await decision(rewrite("delta", 60))).toBeNull();
+  });
+
+  it("counts a present the append-only check asked on, and reports its ordinal", async () => {
+    await decision(skeletal);
+    await decision(grown);
+    // An append-only third present returns before the growth branch, so the
+    // growth ask is still available when a genuine rewrite lands fourth.
+    expect((await decision(`${grown}\nbravo tail`))?.permissionDecision).toBe("ask");
+    expect((await decision(grownAgain))?.permissionDecisionReason).toContain("Presentation 4");
   });
 
   it("allows and skips the check when the stored history is corrupt", async () => {

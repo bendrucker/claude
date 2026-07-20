@@ -287,11 +287,20 @@ describe("sustained growth", () => {
     expect(await decision(grownAgain)).toBeNull();
   });
 
-  it("prefers deny when the grown re-present is byte-identical", async () => {
+  it("still denies a byte-identical re-present after the growth ask has fired", async () => {
     await decision(skeletal);
     await decision(grown);
     await decision(grownAgain);
     expect((await decision(grownAgain))?.permissionDecision).toBe("deny");
+  });
+
+  it("does not spend the ask on a plan that barely clears the high-water mark", async () => {
+    await decision(skeletal);
+    await decision(grown);
+    // One character over the high-water mark falls inside the noise margin.
+    expect(await decision(`${grown}x`)).toBeNull();
+    // The ask is still available for growth that reads as accumulation.
+    expect((await decision(grownAgain))?.permissionDecision).toBe("ask");
   });
 });
 

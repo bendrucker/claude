@@ -18,6 +18,9 @@ const APPEND_ONLY_MAX_REMOVED = 1;
 // Direction Before Detail prescribes a skeletal first plan, so growth into the
 // second present is the workflow working. Sustained growth starts at the third.
 const GROWTH_MIN_PRESENTS = 3;
+// Only one growth ask fires per session, so a plan that lands a hair over the
+// high-water mark must not spend it. Require a margin that reads as accumulation.
+const GROWTH_MIN_EXCESS_RATIO = 0.05;
 
 const DENY_REASON =
   "Plan text is byte-identical to the presentation that was just rejected. Re-read " +
@@ -157,8 +160,9 @@ export async function processInput(
     return formatDecision("deny", DENY_REASON);
   }
 
-  // A denied call never reached the user, so it is not a presentation and does
-  // not advance the count.
+  // Past the deny, so a byte-identical resubmission neither advances the count
+  // nor raises the high-water mark. An ask still does: the hook cannot observe
+  // whether the user approved it.
   const presentsRaw = await readState(presentsPath);
   const history = presentsRaw === null ? null : parsePresentHistory(presentsRaw);
   const ordinal = (history?.count ?? 0) + 1;
@@ -175,7 +179,7 @@ export async function processInput(
   if (
     history !== null &&
     ordinal >= GROWTH_MIN_PRESENTS &&
-    plan.length > history.maxLength &&
+    plan.length > history.maxLength * (1 + GROWTH_MIN_EXCESS_RATIO) &&
     (await readState(growthAskedPath)) === null
   ) {
     await writeState(growthAskedPath, "asked");

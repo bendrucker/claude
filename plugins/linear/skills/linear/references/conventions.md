@@ -50,7 +50,9 @@ Unassigned:
 }
 ```
 
-`hooks/save-issue.ts` injects this default on the MCP tool paths (the connector `save_issue` and the local or plugin `create_issue`), and only when creating without an explicit `state`. The CLI/API path is not hooked. Set the state yourself there.
+`hooks/save-issue.ts` injects this default on the MCP tool paths (the connector `save_issue` and the local or plugin `create_issue`), and only when creating without an explicit `state`. `hooks/cli-create.ts` does the same for `linear issue create`, appending `--state` when the command is a single invocation and denying with the flag to add when it is piped or chained.
+
+Raw `linear api` mutations stay unhooked. Set `stateId` yourself there. An issue created through the API with no state lands in Triage on a triage-enabled team.
 
 ## CLI Idioms
 

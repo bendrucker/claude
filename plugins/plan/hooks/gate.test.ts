@@ -57,7 +57,7 @@ describe("unchanged re-present", () => {
     expect(await decision("My plan")).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining("Plan text is unchanged"),
+      permissionDecisionReason: expect.stringContaining("byte-identical"),
     });
   });
 
@@ -108,7 +108,7 @@ describe("append-only re-present", () => {
     expect(await decision(grown)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: expect.stringContaining("append-only growth"),
+      permissionDecisionReason: expect.stringContaining("keeps nearly every prior line"),
     });
   });
 
@@ -175,7 +175,7 @@ describe("append-only re-present", () => {
     expect(await decision(appended)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: expect.stringContaining("append-only"),
+      permissionDecisionReason: expect.stringContaining("keeps nearly every prior line"),
     });
   });
 
@@ -226,11 +226,72 @@ describe("append-only re-present", () => {
     expect(await decision(grown)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: expect.stringContaining("append-only"),
+      permissionDecisionReason: expect.stringContaining("keeps nearly every prior line"),
     });
     // Append-only asks before the size check, so the size branch never runs and
     // records no marker: one prompt for append-only, no second prompt for size.
     expect(readdirSync(join(stateRoot, "session-1"))).not.toContain("exit-plan-size-asked");
+  });
+});
+
+describe("sustained growth", () => {
+  // Each rewrite uses a distinct line prefix so carry-over stays low and the
+  // append-only check, which runs first, never fires.
+  const rewrite = (prefix: string, count: number) =>
+    Array.from({ length: count }, (_, i) => `${prefix} ${i}`).join("\n");
+
+  const skeletal = rewrite("alpha", 4);
+  const grown = rewrite("bravo", 12);
+  const grownAgain = rewrite("charlie", 30);
+
+  it("stays silent on a second present that grows", async () => {
+    await decision(skeletal);
+    expect(await decision(grown)).toBeNull();
+  });
+
+  it("asks on a third present above the high-water mark", async () => {
+    await decision(skeletal);
+    await decision(grown);
+    expect(await decision(grownAgain)).toEqual({
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: `Presentation 3 is larger than any before it (${grown.length} -> ${grownAgain.length} chars). If redirects added scope, that growth is right. Otherwise it is residue: delete superseded design, move resolved research to <plan>-decisions.md, and keep only what the implementer builds from. Approve to present anyway.`,
+    });
+  });
+
+  it("stays silent when the third present comes in under the high-water mark", async () => {
+    await decision(skeletal);
+    await decision(grownAgain);
+    expect(await decision(grown)).toBeNull();
+  });
+
+  it("measures against the high-water mark, not the previous present", async () => {
+    await decision(skeletal);
+    await decision(grownAgain);
+    await decision(rewrite("delta", 6));
+    // Larger than the present before it, still under the high-water mark.
+    expect(await decision(rewrite("echo", 10))).toBeNull();
+  });
+
+  it("asks at most once per session", async () => {
+    await decision(skeletal);
+    await decision(grown);
+    expect((await decision(grownAgain))?.permissionDecision).toBe("ask");
+    expect(await decision(rewrite("delta", 60))).toBeNull();
+  });
+
+  it("allows and skips the check when the stored history is corrupt", async () => {
+    await decision(skeletal);
+    await decision(grown);
+    await Bun.write(join(stateRoot, "session-1", "exit-plan-presents"), "not json");
+    expect(await decision(grownAgain)).toBeNull();
+  });
+
+  it("prefers deny when the grown re-present is byte-identical", async () => {
+    await decision(skeletal);
+    await decision(grown);
+    await decision(grownAgain);
+    expect((await decision(grownAgain))?.permissionDecision).toBe("deny");
   });
 });
 

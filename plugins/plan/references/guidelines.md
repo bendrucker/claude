@@ -69,11 +69,13 @@ Layer verification through the plan. A criterion parked only at the end catches 
 
 ## Revision
 
-A redirect is new input scoped to what it names. On each iteration:
+A redirect is new input scoped to what it names. The plan is the standalone execution document: a session holding only the plan file, with no access to this conversation, must be able to execute it. Every rule below is that test applied.
 
-- Revise the sections the feedback covers. Untouched sections stay untouched. Do not regrow the whole plan or log every decision and revision. Never re-present text unchanged after a rejection.
-- Consolidate before every re-present. A superseded design collapses to a two-line pointer: what it was, why it was parked, where the artifact lives. Resolved research moves to the decisions file. A plan that argues with its earlier self has stopped being a plan.
-- Lead the re-present with a short "Changed since last plan" block. The full document lives in the plan file the user reads at handoff. The re-present is for the delta.
+- Revise the sections the feedback covers. Untouched sections stay untouched. If a rejection arrives with no feedback, ask what to change instead of guessing at a revision.
+- When feedback supersedes a decision, delete the superseded text. Do not write around it, soften it, or annotate it.
+- Cut any content whose reader is the user in this conversation rather than the implementer in a fresh session: research residue, decision narration, restated feedback. Resolved research moves to `<plan>-decisions.md`.
+- A finished plan reads as if it were written once. Any sentence that only makes sense to a reader who saw an earlier draft ("changed since last plan", "previously considered", "now uses") is diary. The chat holds the history and the plan links the transcript.
+- A ruled-out approach survives only when the implementer would otherwise re-propose it: one line under `## Alternatives`, the approach and why it loses. Everything else is deleted, not parked.
 - Treat every AskUserQuestion answer from this session as a constraint. Before ExitPlanMode, verify the plan satisfies each one.
 - Question the axis, not the plan. When feedback or investigation opens an axis with more than one viable position (scope breadth, framework positioning, naming, execution shape), fire one batched AskUserQuestion before drafting into it. An unasked axis question costs full re-present cycles; one batched question is cheaper than one re-present.
 

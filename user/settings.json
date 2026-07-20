@@ -264,7 +264,8 @@
     "mermaid@bendrucker": true,
     "typescript-lsp@claude-plugins-official": true,
     "gopls-lsp@claude-plugins-official": true,
-    "atuin@bendrucker": true
+    "atuin@bendrucker": true,
+    "comments@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

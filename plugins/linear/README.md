@@ -11,6 +11,7 @@ Managing Linear issues, projects, and teams for Claude Code.
 ### Hooks
 
 - Guards `save_issue` calls: normalizes input shape, enforces the create/update preconditions, and sets a default state for new issues
+- Guards `linear issue create` Bash calls: appends the same default `--state`, or denies with the flag to add when the command is compound
 
 ## Testing
 

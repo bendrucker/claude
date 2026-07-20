@@ -1,0 +1,103 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`processInput bare create injects Backlog 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "command": "linear issue create --title x --team BEN --state Backlog",
+    },
+  },
+}
+`;
+
+exports[`processInput create with -a self injects Todo 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "command": "linear issue create --title x -a self --state Todo",
+    },
+  },
+}
+`;
+
+exports[`processInput create with --assignee injects Todo 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "command": "linear issue create --title x --assignee self --state Todo",
+    },
+  },
+}
+`;
+
+exports[`processInput create with --assignee= injects Todo 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "command": "linear issue create --title x --assignee=self --state Todo",
+    },
+  },
+}
+`;
+
+exports[`processInput existing -s passes through 1`] = `null`;
+
+exports[`processInput existing --state= passes through 1`] = `null`;
+
+exports[`processInput --start passes through 1`] = `null`;
+
+exports[`processInput command substitution with a pipe is denied 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "\`linear issue create\` without \`--state\` lands the issue in Triage. Add \`--state Backlog\` to the create command.",
+  },
+}
+`;
+
+exports[`processInput an && chain is denied 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "\`linear issue create\` without \`--state\` lands the issue in Triage. Add \`--state Backlog\` to the create command.",
+  },
+}
+`;
+
+exports[`processInput env-prefixed invocation is rewritten 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "command": "LINEAR_API_KEY=abc linear issue create --title x --state Backlog",
+    },
+  },
+}
+`;
+
+exports[`processInput issue update does not fire 1`] = `null`;
+
+exports[`processInput a create mentioned inside a title does not fire 1`] = `null`;
+
+exports[`processInput trailing whitespace is trimmed before the flag 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "updatedInput": {
+      "command": "linear issue create --title x --state Backlog",
+    },
+  },
+}
+`;

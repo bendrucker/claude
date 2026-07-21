@@ -909,9 +909,9 @@ describe("activity query", () => {
     // hooks-session contributes one, plan-iterations-session (added for the
     // plan-iterations query) contributes a second.
     expect(bySignal.get("mode: plan")).toBe(2);
-    // one system:api_error plus one assistant isApiErrorMessage marker, the
-    // surface that replaced it in newer CLI versions
-    expect(bySignal.get("api errors/retries")).toBe(2);
+    // seven system:api_error records plus two assistant isApiErrorMessage
+    // markers, the surface that replaced it in newer CLI versions
+    expect(bySignal.get("api errors/retries")).toBe(9);
   });
 
   it("scopes timestamp-less signals by their session's last activity", async () => {
@@ -1750,6 +1750,15 @@ describe("index-health query", () => {
     expect(silent.map((r) => r.subject)).toEqual(["attachment:health-quiet"]);
     expect(silent[0]?.status).toBe("alert");
     expect(silent[0]?.detail).toContain("worst historical gap 1");
+  });
+
+  it("classifies a silent kind with a live successor field as migrated, not dead", async () => {
+    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const migrated = rows.filter((r) => r.check_name === "stream-migrated");
+    expect(migrated.map((r) => r.subject)).toEqual(["system:api_error"]);
+    expect(migrated[0]?.status).toBe("info");
+    expect(migrated[0]?.detail).toContain("isApiErrorMessage");
+    expect(migrated[0]?.detail).toContain("still arriving");
   });
 
   it("reports a kind first seen late in the corpus as new, not kinds as old as the index", async () => {

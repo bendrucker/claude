@@ -1,0 +1,45 @@
+name: review drift
+
+on:
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/bun-install
+
+      - name: Install Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Check upstream code-review drift
+        id: drift
+        run: |
+          set +e
+          bun scripts/check-review-drift.ts > drift.txt 2>&1
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat drift.txt
+
+      - name: Open a drift issue
+        if: steps.drift.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh issue list --state open --search 'in:title "review:code drift"' --json number --jq 'length' | grep -qv '^0$'; then
+            echo "A drift issue is already open."
+            exit 0
+          fi
+          gh issue create \
+            --title "review:code drift from the built-in code-review" \
+            --body-file drift.txt

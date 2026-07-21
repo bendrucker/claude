@@ -9,7 +9,7 @@ allowed-tools:
   - Skill(things:url)
   - Skill(claude-code:session)
   - Skill(pull-request:create)
-  - Skill(code-review)
+  - Skill(review:code)
   - Skill(github:actions-monitor)
   - Skill(github:pr-comments)
 ---
@@ -84,7 +84,7 @@ Report how many todos landed. The existing triage, plan, implement, PR, CI, and 
 
 #### Direct Implementation
 
-Implement-as-you-go is an opt-in alternative to filing, chosen explicitly by the user per run. When the user asks for direct implementation, dispatch one background `general-purpose` agent with `isolation: "worktree"` for each grounded finding as soon as it lands, while the rest of the run continues. Each agent folds grounding in: it verifies the finding against the live config first, and if the config already addresses it, reports "not grounded" and changes nothing. Otherwise it implements, tests, runs `/code-review`, and opens a PR via `pull-request:create`. Collect the PR links at the end for the user to review locally or on GitHub.
+Implement-as-you-go is an opt-in alternative to filing, chosen explicitly by the user per run. When the user asks for direct implementation, dispatch one background `general-purpose` agent with `isolation: "worktree"` for each grounded finding as soon as it lands, while the rest of the run continues. Each agent folds grounding in: it verifies the finding against the live config first, and if the config already addresses it, reports "not grounded" and changes nothing. Otherwise it implements, tests, runs `review:code`, and opens a PR via `pull-request:create`. Collect the PR links at the end for the user to review locally or on GitHub.
 
 These PRs have no backing Things todo, so skip the `Original Task` link. Instead the body carries an Evidence section (local-host evidence only, never content from an egress-blocked host) plus one `Discovery: <fingerprint>` line per finding. The Dedup step now scans open and merged PR bodies, so a finding shipped this way is suppressed instead of resurfacing as `new` on the next run.
 
@@ -144,13 +144,13 @@ Each agent returns a structured plan:
 { thingsId, todoTitle, plan, proposedEffort ('low'|'medium'|'high'), filesTouched[] }
 ```
 
-The workflow returns the plans to the main loop. Present them there and collect approval plus a per-plan `/code-review` effort (typically `low`; `medium` for changes touching multiple plugins) via `AskUserQuestion`. This gate is interactive, so it stays in the main loop and cannot move into a workflow.
+The workflow returns the plans to the main loop. Present them there and collect approval plus a per-plan `review:code` effort (typically `low`; `medium` for changes touching multiple plugins) via `AskUserQuestion`. This gate is interactive, so it stays in the main loop and cannot move into a workflow.
 
 ## Implement
 
 Feed the approved plans into a second Workflow shaped as `pipeline(approvedPlans, implement, ciGate)`:
 
-- `implement`: an `agent` with `agentType: 'general-purpose'` and `isolation: "worktree"` implements the plan, runs `bun test`, runs `/code-review <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with the [`Original Task`](#pr-body) backlink. Returns `{ thingsId, prUrl, branch }`.
+- `implement`: an `agent` with `agentType: 'general-purpose'` and `isolation: "worktree"` implements the plan, runs `bun test`, runs `review:code <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with the [`Original Task`](#pr-body) backlink. Returns `{ thingsId, prUrl, branch }`.
 - `ciGate`: a fast initial CI check with one trivial-failure fix pass. Returns `{ thingsId, prUrl, ciStatus }`.
 
 A pipeline, not a barrier: item A can reach `ciGate` while item B is still implementing, and concurrency auto-caps at `min(16, cores-2)`. Do not hold worktree agents open on long CI waits. The gate catches trivial breakage, then [Monitor CI](#monitor-ci-and-fix-failures) hands the rest to [Watch](#watch). Back in the main loop, [Annotate Things](#annotate-things) and [Summary](#summary) consume the pipeline results unchanged.

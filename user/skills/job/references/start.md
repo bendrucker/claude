@@ -12,6 +12,8 @@ Dispatch parallel read-only sub-agents:
 - Messaging (when configured): direct messages and mentions to the configured user since the last working day that imply an action, with sender, link, and the ask.
 - Email (when configured): unhandled mail that needs a reply, an action, or filing, with sender, subject, and link.
 
+In-flight agents are the exception to the fan-out. Run `claude agents --json --all` inline in the orchestrator and join its records to brief items per the Agents rules in `SKILL.md`.
+
 Each sub-agent uses the delegated skill, MCP, or CLI for its source and returns structured state: identifiers, links, and statuses the brief can consume directly, plus every cross-reference an item carries, such as an issue key in an MR title or branch, or an MR named in a comment or message. These cross-references drive the merge in `SKILL.md`, joining one piece of work reported from several sources. Sub-agents report state, not dispositions: who spoke last, when, and what is open. Deciding an item needs nothing is a triage call, and triage happens in the brief.
 
 ## Inbound Review Queue
@@ -46,11 +48,15 @@ Read is not handled. Notification state records only what the user has seen, so 
 
 Inbox zero is the target. Each item leaves the day in a terminal state: handled, reacted to or briefly acknowledged, deferred, or archived. Before drafting a reply, judge whether the thread needs a substantive response. Where a reaction or brief acknowledgement closes it, prefer that over filler. Draft a reply only when it carries real content, and keep it terse.
 
+A blocked agent is an inbound item like any message or notification, and it gets the same terminal disposition: resumed by you, or deferred with a note recording what it is waiting on. Read is not handled applies here too. An agent you saw in `claude agents` and walked away from is still open work.
+
 Route what gets deferred by where it belongs. Work for the team backlog goes to the tracker, while personal next-steps and reminders go to the personal inbox when one is configured. "My inbox" means the personal inbox. When the destination is ambiguous, ask rather than defaulting to a tracker issue, and never create a tracker issue in place of a personal capture. Drafting a reply the user has read is safe, as is archiving something already handled. Sending a reply without review is ask-first.
 
 ## Today Plan
 
 Group everything gathered by project, with a `Misc` group for project-less items. From assignments and the current cycle, propose one to three focus items for the day, folding in anything the earlier phases produced: a real CI failure, a draft to finish, a decision a message asked for.
+
+In-flight agents shape this list. Work that already has a live session is underway, so it never becomes a fresh focus item. Where it needs your attention, the focus item is unblocking the session, not starting the work.
 
 Confirm two things with the user. First, the focus items. Second, the sequence across projects, because working a project at a time and clearing every review first are both reasonable, and only the user knows which they want today.
 

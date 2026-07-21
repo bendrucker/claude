@@ -1,6 +1,6 @@
 # End
 
-The day ends with decisions. Nothing leaves it unsent, unanswered, unfiled, or unpushed without one.
+The day ends with decisions. Nothing leaves it unsent, unanswered, unfiled, unpushed, or unattended without one.
 
 ## Gather
 
@@ -12,6 +12,8 @@ Dispatch parallel read-only sub-agents:
 - Email (when configured): unhandled mail awaiting your reply or filing, with sender and link.
 - Worktrees: every worktree's uncommitted and unpushed state (details under the sweep below).
 - Tracker: your in-flight issues, their current states, and their projects.
+
+Agents are gathered inline, not by a sub-agent: run `claude agents --json --all` in the orchestrator and join its records per the Agents rules in `SKILL.md`.
 
 ## Outbox Clearing
 
@@ -43,6 +45,12 @@ Enumerate worktrees via the configured worktree tool. Fall back to `git worktree
 - Unpushed commits (`git log @{u}..HEAD --oneline`, or all local commits when no upstream exists)
 
 Offer per worktree: commit and push as WIP (safe on your own branch), or record it as deliberately local in the completion summary.
+
+## Unattended Agents
+
+Every blocked or failed agent leaves the day resumed, stopped, or captured as a follow-up. Route captures per Tracker Hygiene below: team work to the tracker, personal follow-ups to the personal inbox. A blocked agent carries what it is waiting on in `waitingFor`, and that belongs in the capture, since tomorrow's answer is worthless without the question.
+
+A `working` agent can be left running overnight. That is a choice, so record it in the completion summary along with what it is expected to have finished by morning.
 
 ## Tracker Hygiene and Tomorrow
 

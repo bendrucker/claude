@@ -53,9 +53,12 @@ For Things, query via `things:jxa` for every `claude-code`-tagged todo and recen
 For PR bodies, scan every PR on the config repo:
 
 ```bash
-gh pr list --repo bendrucker/claude --state all --limit 1000 --json state,body \
-  --jq '.[] | .state as $s | (.body // "") | scan("Discovery: [0-9a-f]{12}") | "\($s) \(.)"'
+gh api --paginate '/repos/bendrucker/claude/pulls?state=all&per_page=100' \
+  --jq '.[] | (if .merged_at then "MERGED" elif .state == "closed" then "CLOSED" else "OPEN" end) as $s
+        | (.body // "") | scan("Discovery: [0-9a-f]{12}") | "\($s) \(.)"'
 ```
+
+Paginate rather than passing `gh pr list --limit <n>`, which silently drops every PR past the limit once the repo outgrows it.
 
 Each line is `<STATE> Discovery: <fp>`, where `STATE` is `OPEN`, `MERGED`, or `CLOSED`. Build a fingerprint-to-state map, strongest state wins (`MERGED` over `OPEN`). Then mark each candidate:
 

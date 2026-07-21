@@ -83,6 +83,8 @@ When the `x-callback-url` plugin is installed, `url.ts` uses xcall to get a resp
 
 Callback is enabled by default. Disable with `--callback=false` to fall back to fire-and-forget via `open -g`. If xcall is unavailable, the script falls back silently.
 
+xcall builds into the plugin data directory and needs `CLAUDE_PLUGIN_DATA` in the environment. A Bash tool call does not carry that variable, so a model-issued `url.ts` run takes the fallback path and stderr carries `CLAUDE_PLUGIN_DATA is not set`.
+
 ## Built-in List IDs (URL Scheme)
 
 For `show` command: `inbox`, `today`, `anytime`, `upcoming`, `someday`, `logbook`, `tomorrow`, `deadlines`, `repeating`, `all-projects`, `logged-projects`
@@ -111,9 +113,13 @@ Things supports [Markdown in notes](https://culturedcode.com/things/support/arti
 
 ## Gotchas
 
-#### Never retry on silent output
+#### Silent Success
 
-The write scripts (`url.ts`, `inbox.ts`) print to stdout on success. No output means the call failed. Read stderr, surface the cause to the user, and only retry once you understand the root cause. Silent retries have created duplicate todos.
+`url.ts` prints only when xcall returns a result. On the fallback path it exits 0 with empty stdout after a successful write, so empty output says nothing about whether the change landed.
+
+Judge failure by a non-zero exit and read stderr for the cause. To confirm a write that printed nothing, query the todo with the `things:jxa` skill. Never retry blind: a repeated `add` creates duplicate todos.
+
+`inbox.ts` and `reorder.ts` do print on success regardless of xcall, so silence from those is a genuine failure.
 
 #### Sandbox-blocked URL handoff
 

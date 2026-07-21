@@ -15,21 +15,37 @@ const APPEND_ONLY_MIN_GROWTH = 1;
 // Allow one incidental drop (e.g. a stray line) without losing the append-only signal.
 const APPEND_ONLY_MAX_REMOVED = 1;
 
+// Direction Before Detail prescribes a skeletal first plan, so growth into the
+// second present is the workflow working. Sustained growth starts at the third.
+const GROWTH_MIN_PRESENTS = 3;
+// Only one growth ask fires per session, so a plan that lands a hair over the
+// high-water mark must not spend it. Require a margin that reads as accumulation.
+const GROWTH_MIN_EXCESS_RATIO = 0.05;
+
 const DENY_REASON =
-  "Plan text is unchanged since the last presentation. Incorporate the redirect " +
-  "feedback with a targeted revision of the affected sections (do not regrow the " +
-  "document), lead with a short 'Changed since last plan' block, and re-present.";
+  "Plan text is byte-identical to the presentation that was just rejected. Re-read " +
+  "the user's messages since that presentation and revise the sections they name, " +
+  "deleting anything they superseded. If the rejection carried no feedback, use " +
+  "AskUserQuestion to get direction instead of resubmitting.";
 
 const APPEND_ONLY_ASK_REASON =
-  "This re-present keeps nearly all prior lines and only adds new ones: append-only " +
-  "growth, not a revision. Consolidate superseded design into a two-line pointer " +
-  "(what it was, why it was parked, where it lives), lead with a 'Changed since " +
-  "last plan' block, and re-present the delta, not the regrown document. Approve " +
-  "to present anyway.";
+  "This re-present keeps nearly every prior line and only adds new ones. Find what " +
+  "the feedback superseded and delete it instead of writing around it. The plan is " +
+  "the standalone execution document, not a record of this conversation. Approve to " +
+  "present anyway.";
+
+function growthAskReason(ordinal: number, previousMax: number, length: number): string {
+  return (
+    `Presentation ${ordinal} is larger than any before it (${previousMax} -> ${length} chars). ` +
+    "If redirects added scope, that growth is right. Otherwise it is residue: delete " +
+    "superseded design, move resolved research to <plan>-decisions.md, and keep only " +
+    "what the implementer builds from. Approve to present anyway."
+  );
+}
 
 const ASK_REASON =
-  "This plan exceeds 12k characters. Plans this large are rarely approved; " +
-  "consolidate superseded content into <plan>.decisions.md or split the scope. " +
+  "This plan exceeds 12k characters. Plans this large are rarely approved. " +
+  "Consolidate superseded content into <plan>-decisions.md or split the scope. " +
   "Approve to present anyway.";
 
 function formatDecision(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
@@ -77,6 +93,20 @@ function parseLineSet(raw: string): Set<string> | null {
   }
 }
 
+type PresentHistory = { count: number; maxLength: number };
+
+function parsePresentHistory(raw: string): PresentHistory | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const { count, maxLength } = parsed as Record<string, unknown>;
+    if (typeof count !== "number" || typeof maxLength !== "number") return null;
+    return { count, maxLength };
+  } catch {
+    return null;
+  }
+}
+
 function isAppendOnlyRevision(previous: Set<string>, current: Set<string>): boolean {
   if (previous.size === 0) return false;
 
@@ -114,6 +144,8 @@ export async function processInput(
 
   const hashPath = join(dir, "exit-plan-hash");
   const linesPath = join(dir, "exit-plan-lines");
+  const presentsPath = join(dir, "exit-plan-presents");
+  const growthAskedPath = join(dir, "exit-plan-growth-asked");
   const askedPath = join(dir, "exit-plan-size-asked");
 
   const hash = createHash("sha256").update(plan).digest("hex");
@@ -128,9 +160,30 @@ export async function processInput(
     return formatDecision("deny", DENY_REASON);
   }
 
+  // Past the deny, so a byte-identical resubmission neither advances the count
+  // nor raises the high-water mark. An ask still does: the hook cannot observe
+  // whether the user approved it.
+  const presentsRaw = await readState(presentsPath);
+  const history = presentsRaw === null ? null : parsePresentHistory(presentsRaw);
+  const ordinal = (history?.count ?? 0) + 1;
+  await writeState(
+    presentsPath,
+    JSON.stringify({ count: ordinal, maxLength: Math.max(history?.maxLength ?? 0, plan.length) }),
+  );
+
   const previousLines = previousLinesRaw === null ? null : parseLineSet(previousLinesRaw);
   if (previousLines !== null && isAppendOnlyRevision(previousLines, currentLines)) {
     return formatDecision("ask", APPEND_ONLY_ASK_REASON);
+  }
+
+  if (
+    history !== null &&
+    ordinal >= GROWTH_MIN_PRESENTS &&
+    plan.length > history.maxLength * (1 + GROWTH_MIN_EXCESS_RATIO) &&
+    (await readState(growthAskedPath)) === null
+  ) {
+    await writeState(growthAskedPath, "asked");
+    return formatDecision("ask", growthAskReason(ordinal, history.maxLength, plan.length));
   }
 
   if (plan.length > SIZE_THRESHOLD && (await readState(askedPath)) === null) {

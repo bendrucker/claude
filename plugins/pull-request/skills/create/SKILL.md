@@ -9,6 +9,7 @@ allowed-tools:
   - mcp__github
   - Agent
   - Skill(pull-request:babysit)
+  - Skill(pull-request:follow-up)
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
   - "Bash(git push:*)"
@@ -23,6 +24,7 @@ allowed-tools:
 ## Context
 
 - Remote URL: !`git remote get-url origin`
+- Review bot: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts`
 - PR Template: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-template.ts`
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
@@ -132,6 +134,7 @@ If `--dry-run` (or `--body-only`) is set, follow the Dry Run section instead of 
 1. **Branch validation**: If the context above shows you're on a default branch (main/master), stop and ask the user to switch to a feature branch first.
 1. Stage changes if not already staged: `git add .`
 1. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
+1. Local bot review, proactive: the Review bot line in Context above is the fast-path verdict. A repo config hit means that bot reviews this repo: run `pull-request:follow-up --local` before pushing so its findings surface while the branch is still local. With no config, a bot may still review the repo: follow-up's `local.md` hosted signals decide. Skip when a local bot pass already ran on this branch in this session (`/ship` runs it as a gated pass), when detection comes up empty, or when the user declines.
 1. Push the branch to remote: `git push -u origin HEAD`
 1. Draft the body. For a large change or any open-source PR, outline the structure first and get the user's sign-off before expanding it (see [Outline First](#outline-first)). A small personal change skips straight to the full body.
 1. Create the PR/MR. Append `--draft` to the create command when `--draft` is set:

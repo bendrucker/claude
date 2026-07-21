@@ -18,6 +18,7 @@ allowed-tools:
   - Skill(writing:review)
   - Skill(pull-request:create)
   - Skill(pull-request:babysit)
+  - Skill(pull-request:follow-up)
 ---
 
 # Ship
@@ -37,6 +38,7 @@ Resolve the base to a **remote** ref so ship's view matches what the PR merges a
 - **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) *and* the session ran long or redirected enough that the diff could have drifted from it. Dispatched in the background alongside the fix passes, joined before create. A small plan in a tight session doesn't warrant it. No plan, skip.
 - **Correctness and quality**: code changed. Exactly one of `review:code <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
 - **`comments:audit`**: diff adds code comments.
+- **`pull-request:follow-up --local`**: a supported review bot is detected for the repo. Follow-up's `local.md` owns detection (repo config fast path, hosted signals when no config is committed) and exits early when nothing is detected. Runs the hosted reviewer locally before the PR exists.
 - **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
 - **`verify`**: diff has a runtime surface. Declines tests-only and docs-only itself.
 
@@ -47,7 +49,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 - `--merge`: drive to merged (babysit `--merge`). Default: green and ready.
 - `--effort <low|medium|high|max|ultra>`: override inferred `review:code` effort. `ultra` is a billed cloud review only a user-typed `/code-review ultra` can start, so ship stops and hands it back instead of substituting a local level.
 - `--simplify`: force `simplify` over `review:code`.
-- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code`, `simplify`, `comments`, `writing`, `verify`.
+- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code`, `simplify`, `comments`, `bot`, `writing`, `verify`.
 - `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
 
 ## Pre-PR Reviews
@@ -55,9 +57,10 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 Serialized before create: `review:code --fix`, `simplify`, and comment trims all write to the branch. `plan:review`, when gated in, is read-only, so it runs as a background dispatch alongside these and joins before create rather than gating them. Its findings, if any, are acted on before the PR exists. [`references/passes.md`](references/passes.md) has the DAG.
 
 1. **`comments:audit`**: needs a clean tree (the fix passes dirty it), lands trims via fast-forward (see [Comment Trims](#comment-trims)). Pauses at preflight for an agent-count approval.
-2. **Correctness and quality**: `review:code <effort> --fix` or `simplify`.
-3. **`writing:review`** over touched prose. Address salient findings before the body is written.
-4. **`verify`** end to end.
+2. **`pull-request:follow-up --local`**: reviews committed work only and commits its own fixes, so it runs while the tree is still clean, before the fix passes. Pass the resolved base.
+3. **Correctness and quality**: `review:code <effort> --fix` or `simplify`.
+4. **`writing:review`** over touched prose. Address salient findings before the body is written.
+5. **`verify`** end to end.
 
 Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 

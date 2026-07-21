@@ -7,3 +7,10 @@
 {"type":"attachment","attachment":{"type":"health-fresh","note":"kind that appears late in the corpus"},"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-31T09:00:00.000Z","uuid":"hf-1"}
 {"type":"health-marker","sessionId":"health-session","cwd":"/Users/test/health","uuid":"hm-1"}
 {"type":"health-marker","sessionId":"health-session","cwd":"/Users/test/health","uuid":"hm-2"}
+{"type":"system","subtype":"api_error","level":"error","retryAttempt":1,"maxRetries":10,"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-16T09:00:00.000Z","uuid":"ha-1"}
+{"type":"system","subtype":"api_error","level":"error","retryAttempt":1,"maxRetries":10,"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-17T09:00:00.000Z","uuid":"ha-2"}
+{"type":"system","subtype":"api_error","level":"error","retryAttempt":1,"maxRetries":10,"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-18T09:00:00.000Z","uuid":"ha-3"}
+{"type":"system","subtype":"api_error","level":"error","retryAttempt":1,"maxRetries":10,"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-19T09:00:00.000Z","uuid":"ha-4"}
+{"type":"system","subtype":"api_error","level":"error","retryAttempt":1,"maxRetries":10,"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-20T09:00:00.000Z","uuid":"ha-5"}
+{"type":"system","subtype":"api_error","level":"error","retryAttempt":1,"maxRetries":10,"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-21T09:00:00.000Z","uuid":"ha-6"}
+{"type":"assistant","message":{"role":"assistant","model":"<synthetic>","content":[{"type":"text","text":"API Error: Internal server error"}]},"isApiErrorMessage":true,"sessionId":"health-session","cwd":"/Users/test/health","timestamp":"2024-01-31T09:00:00.000Z","uuid":"ha-new-1"}

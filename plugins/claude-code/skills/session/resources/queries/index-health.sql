@@ -13,9 +13,15 @@
 --   stream-silent (alert): a record kind that posted regularly and then went silent
 --     longer than its own worst historical gap. The signature of an upstream rename
 --     or removal: every query reading that kind now returns stale or empty results
---     with no staleness signal (e.g. attachment:diagnostics after CLI 2.1.198,
---     system:api_error after 2.1.179). Silence is judged against the kind's own gap
---     distribution so bursty-by-nature kinds don't false-positive.
+--     with no staleness signal (e.g. attachment:diagnostics after CLI 2.1.198).
+--     Silence is judged against the kind's own gap distribution so
+--     bursty-by-nature kinds don't false-positive.
+--   stream-migrated (info): a kind that went silent while a registered successor
+--     field keeps arriving on another record type (e.g. system:api_error stopped
+--     after CLI 2.1.179 and the signal moved to isApiErrorMessage on the synthetic
+--     assistant message). The event did not stop, only its representation changed:
+--     queries reading the kind alone under-report to zero. The detail names the
+--     successor field so a depth query can read both.
 --   stream-new (info): a kind first seen recently. New surfaces ship unconsumed;
 --     each is a triage prompt (add a view/query, or document it as noise).
 --   host-staleness (alert): an imported host whose newest record lags the corpus.
@@ -88,10 +94,31 @@ kind_rows AS (
   WHERE timestamp IS NOT NULL
   GROUP BY kind
 ),
+-- Kinds that stopped because an equivalent signal moved to a field on another
+-- record type, not because the signal itself stopped. Without this, stream-silent
+-- reports the kind as dead and every consumer concludes the event no longer
+-- happens. An entry retires itself: once the old kind ages out of retention it has
+-- no kind_stats row and stops emitting.
+kind_successors(kind, successor_field, successor_value) AS (
+  VALUES ('system:api_error', 'isApiErrorMessage', 'true')
+),
+successor_activity AS (
+  SELECT
+    s.kind,
+    s.successor_field,
+    COUNT(*) AS successor_rows,
+    MAX(r.timestamp)::DATE AS successor_last_seen
+  FROM kind_successors s
+  JOIN kind_stats ks ON ks.kind = s.kind
+  JOIN records r
+    ON json_extract_string(r.data, '$.' || s.successor_field) = s.successor_value
+   AND r.timestamp > ks.last_seen::TIMESTAMP
+  GROUP BY 1, 2
+),
 silent_streams AS (
   SELECT
-    'stream-silent' AS check_name,
-    'alert' AS status,
+    CASE WHEN sa.kind IS NULL THEN 'stream-silent' ELSE 'stream-migrated' END AS check_name,
+    CASE WHEN sa.kind IS NULL THEN 'alert' ELSE 'info' END AS status,
     ks.kind AS subject,
     'silent ' || DATE_DIFF('day', ks.last_seen::TIMESTAMP, c.max_ts)
       || ' days (worst historical gap ' || ks.max_gap
@@ -99,9 +126,14 @@ silent_streams AS (
       || ' on version ' || COALESCE(kr.last_version, 'unknown')
       || ' (corpus now ' || (SELECT version FROM corpus_version)
       || '); ' || kr.total || ' rows over ' || ks.active_day_count
-      || ' active days' AS detail
+      || ' active days'
+      || COALESCE('; the signal moved to the ' || sa.successor_field
+                  || ' field, still arriving (' || sa.successor_rows
+                  || ' rows since, last ' || sa.successor_last_seen
+                  || '), read both surfaces', '') AS detail
   FROM kind_stats ks
-  JOIN kind_rows kr USING (kind), corpus c
+  JOIN kind_rows kr USING (kind)
+  LEFT JOIN successor_activity sa USING (kind), corpus c
   WHERE ks.active_day_count >= COALESCE(TRY_CAST(getvariable('min_active_days') AS INTEGER), 5)
     AND DATE_DIFF('day', ks.last_seen::TIMESTAMP, c.max_ts) > GREATEST(ks.max_gap, 2)
 ),

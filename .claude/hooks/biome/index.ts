@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { exec } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -12,6 +12,7 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const BIOME_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "json", "jsonc"]);
 
@@ -58,7 +59,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 // 128 and stay in scope.
 async function isIgnored(filePath: string): Promise<boolean> {
   try {
-    await execAsync(`git check-ignore -q "${filePath}"`, { cwd: dirname(filePath) });
+    await execFileAsync("git", ["check-ignore", "-q", filePath], { cwd: dirname(filePath) });
     return true;
   } catch {
     return false;

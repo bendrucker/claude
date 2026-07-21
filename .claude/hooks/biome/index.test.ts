@@ -254,6 +254,25 @@ describe("biome hook", () => {
       const files = await parseTranscript(transcriptPath);
       expect(files).toEqual([tracked]);
     });
+
+    it("does not shell-evaluate a path containing a command substitution", async () => {
+      const repoDir = await mkdtemp(join(tempDir, "injection-repo-"));
+      await execAsync("git init", { cwd: repoDir });
+      // isIgnored runs git with cwd = the file's directory, so a bare relative
+      // name is where the injected `touch` would land if a shell evaluated it.
+      const malicious = join(repoDir, "$(touch pwned).ts");
+      await Bun.write(malicious, "export const a = 1;\n");
+
+      const transcriptPath = join(tempDir, `transcript-injection-${Date.now()}.jsonl`);
+      await Bun.write(
+        transcriptPath,
+        createTranscriptContent([{ path: malicious, tool: "Write" }]),
+      );
+
+      const files = await parseTranscript(transcriptPath);
+      expect(files).toEqual([malicious]);
+      expect(await Bun.file(join(repoDir, "pwned")).exists()).toBe(false);
+    });
   });
 
   describe("processPostToolUse", () => {

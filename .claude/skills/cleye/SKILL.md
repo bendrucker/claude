@@ -53,7 +53,7 @@ Access: `argv._.required`, `argv._.optional`, `argv._.files`.
 
 Flags accept a type constructor or a config object:
 
-```ts
+```ts fragment
 flags: {
   name: String,                    // shorthand
   count: {
@@ -79,7 +79,7 @@ Kebab-case flags (`--dry-run`) become camelCase properties (`argv.flags.dryRun`)
 
 Set `help.description` on `cli()` for a summary line above the generated usage block:
 
-```ts
+```ts fragment
 const argv = cli({
   name: "scan",
   parameters: ["<path>"],

@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import { $ } from "bun";
 import matter from "gray-matter";
-import { runCheck } from "./check";
+import { readTracked, runCheck, tracked } from "./check";
 
 // Claude Code warns on startup about Write(path), NotebookEdit(path), and
 // Glob(path) permission rules: the permission system routes file writes
@@ -29,11 +28,6 @@ function describe(file: string, context: string, rule: string): string {
   return `${file} (${context}): ${rule} (use ${REPLACEMENT[tool]}(...) instead)`;
 }
 
-async function tracked(pattern: string): Promise<string[]> {
-  const output = await $`git ls-files -z ${pattern}`.cwd(root).text();
-  return output.split("\0").filter(Boolean);
-}
-
 interface Permissions {
   allow?: string[];
   deny?: string[];
@@ -43,8 +37,11 @@ interface Permissions {
 async function checkSettings(): Promise<string[]> {
   const violations: string[] = [];
 
-  for (const file of await tracked("*settings*.json")) {
-    const parsed: unknown = await Bun.file(join(root, file)).json();
+  for (const file of await tracked("*settings*.json", root)) {
+    const raw = await readTracked(file, root);
+    if (raw === null) continue;
+
+    const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) continue;
 
     const permissions = (parsed as Record<string, unknown>).permissions as Permissions | undefined;
@@ -69,9 +66,9 @@ function frontmatterRules(value: unknown): string[] {
 async function checkFrontmatter(): Promise<string[]> {
   const violations: string[] = [];
 
-  for (const file of await tracked("*.md")) {
-    const raw = await Bun.file(join(root, file)).text();
-    if (!raw.startsWith("---")) continue;
+  for (const file of await tracked("*.md", root)) {
+    const raw = await readTracked(file, root);
+    if (raw === null || !raw.startsWith("---")) continue;
 
     let data: Record<string, unknown>;
     try {

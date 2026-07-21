@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import { Glob } from "bun";
 import type { Code } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import { runCheck } from "./check";
+import { readTracked, runCheck, tracked } from "./check";
 
 const root = join(import.meta.dirname, "..");
 
@@ -67,8 +66,10 @@ function checkBlock(node: Code): string | null {
   }
 }
 
-async function checkFile(file: string): Promise<string[]> {
-  const text = await Bun.file(join(root, file)).text();
+export async function checkFile(file: string): Promise<string[]> {
+  const text = await readTracked(file, root);
+  if (text === null) return [];
+
   const ast = fromMarkdown(text);
   const violations: string[] = [];
 
@@ -82,15 +83,8 @@ async function checkFile(file: string): Promise<string[]> {
   return violations;
 }
 
-async function findViolations(): Promise<string[]> {
-  const glob = new Glob("**/*.md");
-  const files: string[] = [];
-  for await (const file of glob.scan({ cwd: root })) {
-    if (file.includes("node_modules") || file.includes(".bun-cache")) continue;
-    files.push(file);
-  }
-
-  const results = await Promise.all(files.map(checkFile));
+export async function findViolations(): Promise<string[]> {
+  const results = await Promise.all((await tracked("*.md", root)).map(checkFile));
   return results.flat();
 }
 

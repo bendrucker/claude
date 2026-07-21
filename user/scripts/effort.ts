@@ -26,3 +26,11 @@ export function effortMarker(level?: string | null): EffortMarker | null {
   if (!glyph) return null;
   return { glyph, isDefault: level === DEFAULT_EFFORT };
 }
+
+// Agent configs may set effort to an integer token budget instead of a level.
+// Nothing on the ramp represents one, and a bare number in the meta would read
+// as a second token count, so integer efforts render nothing.
+export function effortGlyph(effort?: string | number | null): string | null {
+  if (typeof effort !== "string") return null;
+  return effortMarker(effort)?.glyph ?? null;
+}

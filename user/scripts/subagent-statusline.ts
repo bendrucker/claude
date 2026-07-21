@@ -2,6 +2,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { styleText } from "node:util";
+import { effortGlyph } from "./effort";
 import { genericGlyph, purposeGlyphs, remoteGlyph } from "./glyphs";
 import { modelMarker } from "./model";
 
@@ -13,10 +14,13 @@ export interface Task {
   status?: string;
   startTime?: number;
   tokenCount?: number;
+  model?: string;
+  effort?: string | number;
 }
 
 interface SubagentInput {
   columns?: number;
+  transcript_path?: string;
   tasks?: Task[];
 }
 
@@ -102,6 +106,11 @@ export function renderTask(
   if (task.startTime != null) metaParts.push(formatElapsed(task.startTime, now));
   if ((task.tokenCount ?? 0) > 0) metaParts.push(formatTokens(task.tokenCount ?? 0));
   if (model) metaParts.push(model);
+  // Every declared level renders. The payload carries no session effort to
+  // compare a task's against, and a task's effort is its agent config's
+  // declaration rather than a resolved level, so there is no baseline to hide.
+  const effort = effortGlyph(task.effort);
+  if (effort) metaParts.push(effort);
 
   // The type name trails as dim text after the meta. The icon already conveys
   // the kind, so a narrow terminal can drop the name without losing it.
@@ -233,9 +242,7 @@ export function extractActivity(entries: TranscriptEntry[]): string | null {
   return null;
 }
 
-// The newest assistant model in a transcript tail. Both the subagent's own model
-// and its parent session's model come from here. Comparing the two decides
-// whether a subagent is running off-default and warrants a letter.
+// The newest assistant model in a transcript tail.
 export function extractModel(entries: TranscriptEntry[]): string | null {
   for (let i = entries.length - 1; i >= 0; i--) {
     const model = entries[i]?.message?.model;
@@ -259,16 +266,14 @@ export function subagentModelLetter(
 
 // Each task id keys a sidecar pair the harness writes next to the subagent
 // transcript, scoped to the current project's sessions (derived from cwd). The
-// path prefix locates both the `.meta.json` and the `.jsonl`. Its first segment
-// is the parent session id. A miss yields no glyph or activity (the prune signal
-// if the harness changes this layout).
-function subagentBase(id: string, projectDir: string): { base: string; sessionId: string } | null {
+// path prefix locates both the `.meta.json` and the `.jsonl`. A miss yields no
+// glyph or activity (the prune signal if the harness changes this layout).
+function subagentBase(id: string, projectDir: string): string | null {
   try {
     for (const rel of new Bun.Glob(`*/subagents/agent-${id}.meta.json`).scanSync({
       cwd: projectDir,
     })) {
-      const sessionId = rel.split("/")[0] ?? "";
-      return { base: join(projectDir, rel).slice(0, -".meta.json".length), sessionId };
+      return join(projectDir, rel).slice(0, -".meta.json".length);
     }
   } catch {
     // Project directory unreadable: skip enrichment.
@@ -326,25 +331,22 @@ if (import.meta.main) {
   const projectDir = join(homedir(), ".claude", "projects", slug);
   const now = Date.now();
 
-  // All tasks on this line share one parent session, so its model is read once.
-  const sessionModels = new Map<string, string | null>();
-  const sessionModel = async (sessionId: string): Promise<string | null> => {
-    if (!sessionModels.has(sessionId)) {
-      const entries = await readEntries(join(projectDir, `${sessionId}.jsonl`));
-      sessionModels.set(sessionId, extractModel(entries));
-    }
-    return sessionModels.get(sessionId) ?? null;
-  };
+  // All tasks share the parent session named by stdin, so the model every
+  // subagent letter is compared against is read once.
+  const sessionModel = input.transcript_path
+    ? extractModel(await readEntries(input.transcript_path))
+    : null;
 
   const lines: string[] = [];
   for (const task of input.tasks ?? []) {
-    const located = subagentBase(task.id, projectDir);
-    const meta = located ? await readMeta(located.base) : null;
-    const entries = located ? await readEntries(`${located.base}.jsonl`) : [];
+    const base = subagentBase(task.id, projectDir);
+    const meta = base ? await readMeta(base) : null;
+    const entries = base ? await readEntries(`${base}.jsonl`) : [];
     const activity = extractActivity(entries);
-    const model = located
-      ? subagentModelLetter(extractModel(entries), await sessionModel(located.sessionId))
-      : null;
+    // The payload's model is resolved at spawn and covers a subagent that has
+    // yet to write a turn. Task types that carry none fall back to the
+    // transcript this loop already read for the activity.
+    const model = subagentModelLetter(task.model ?? extractModel(entries), sessionModel);
     lines.push(
       JSON.stringify(
         renderTask(

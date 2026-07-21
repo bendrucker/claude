@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type EffortMarker, effortMarker } from "./effort";
+import { type EffortMarker, effortGlyph, effortMarker } from "./effort";
 
 describe("effortMarker", () => {
   test.each<[string | null | undefined, EffortMarker | null]>([
@@ -14,5 +14,20 @@ describe("effortMarker", () => {
     [undefined, null],
   ])("level %p -> %p", (level, expected) => {
     expect(effortMarker(level)).toEqual(expected);
+  });
+});
+
+describe("effortGlyph", () => {
+  test.each<[string | number | null | undefined, string | null]>([
+    ["low", "∙"],
+    ["high", "⁝"],
+    ["max", "⁙"],
+    ["unknown", null],
+    [20_000, null],
+    [0, null],
+    [null, null],
+    [undefined, null],
+  ])("effort %p -> %p", (effort, expected) => {
+    expect(effortGlyph(effort)).toBe(expected);
   });
 });

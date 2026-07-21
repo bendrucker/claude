@@ -178,6 +178,29 @@ describe("renderTask", () => {
     expect(strip(out.content)).toContain("· 1m 5s · 1.5k · f · Explore");
   });
 
+  test.each<[string | number, string]>([
+    ["low", "· 1m 5s · ∙"],
+    ["max", "· 1m 5s · ⁙"],
+    [20_000, "· 1m 5s"],
+    ["turbo", "· 1m 5s"],
+  ])("effort %p renders %p", (effort, expected) => {
+    const out = renderTask({ id: "a", name: "x", startTime: 0, effort }, null, now, null);
+    expect(strip(out.content)).toEndWith(expected);
+  });
+
+  test("effort trails the model letter", () => {
+    const out = renderTask(
+      { id: "a", name: "x", startTime: 0, tokenCount: 1500, effort: "low" },
+      null,
+      now,
+      "Explore",
+      null,
+      null,
+      "f",
+    );
+    expect(strip(out.content)).toContain("· 1m 5s · 1.5k · f · ∙ · Explore");
+  });
+
   test("activity wins over the description and is not sentence-cased", () => {
     const out = renderTask(
       { id: "a", description: "you are implementing the parser" },

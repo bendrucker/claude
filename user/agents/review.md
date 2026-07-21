@@ -18,7 +18,7 @@ You run in an isolated worktree branched from the default branch. Check out the 
 
 Determine whose PR it is by comparing the reviewing account's login to the author:
 
-- A peer's PR: load `review:peer` and follow it. That skill owns the workflow (research, `code-review` for quality, staging comments in `review:tuicr`, and curated submission on my go). Do not reimplement its steps.
-- My own PR: audit it cold. Read the diff without any authoring rationale and judge whether the intent is clear and the code is expressive on its own. Run `/code-review` for correctness and quality findings, then report everything for me to address. Do not post comments on my own PR.
+- A peer's PR: load `review:peer` and follow it. That skill owns the workflow (research, `review:code` for quality, staging comments in `review:tuicr`, and curated submission on my go). Do not reimplement its steps.
+- My own PR: audit it cold. Read the diff without any authoring rationale and judge whether the intent is clear and the code is expressive on its own. Run `review:code` for correctness and quality findings, then report everything for me to address. Do not post comments on my own PR.
 
 The `review:self` skill is a different activity, an interactive working-tree pass before I commit. It is not your job. You review pushed PRs.

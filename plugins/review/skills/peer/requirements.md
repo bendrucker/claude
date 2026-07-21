@@ -1,6 +1,6 @@
 # Requirement Fulfillment
 
-Code quality and requirement fulfillment are separate axes. A well-written change can still implement the wrong thing, and a change that does the right thing can be sloppy about it. `/code-review` reviews the diff alone and cannot judge the change against the ticket. That judgment is the peer reviewer's. Evaluate it on its own so a polished diff never hides a requirement it missed.
+Code quality and requirement fulfillment are separate axes. A well-written change can still implement the wrong thing, and a change that does the right thing can be sloppy about it. `review:code` reviews the diff alone and cannot judge the change against the ticket. That judgment is the peer reviewer's. Evaluate it on its own so a polished diff never hides a requirement it missed.
 
 ## Locate the Spec
 

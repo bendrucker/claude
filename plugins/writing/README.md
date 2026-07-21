@@ -4,7 +4,7 @@ Writing style enforcement and slop detection for prose output (PR descriptions, 
 
 ## Contents
 
-- **Hooks**: Numbered heading detection, heading style enforcement, AI writing trope detection (em dashes, vocabulary, copula avoidance, promotional language, parallelism, connector density)
+- **Hooks**: Step, phase, and part numbering detection, heading style enforcement, AI writing trope detection (em dashes, vocabulary, copula avoidance, promotional language, parallelism, connector density)
 - **Skills**: `writing` system reminder for prose writing guidelines, `writing:analyze` session-history-based trope ruleset curation, `writing:rewrite` user-invoked text rewriter, `writing:scan` user-invoked trope detector (`audit` gates a directory, `score` measures one input's density), `writing:review` multi-agent document review
 - **Agents**: `content`, `style`, `artifacts` (conditional review lenses)
 

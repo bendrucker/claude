@@ -72,10 +72,15 @@ describe("formatDecision", () => {
 // checks.
 describe("hasNumberingHint", () => {
   test.each<{ name: string; content: string; hinted: boolean }>([
-    { name: "markdown numbered heading", content: "## 1. Setup\n\nBody\n", hinted: true },
+    { name: "markdown numbered heading", content: "## 1. Setup\n\nBody\n", hinted: false },
     { name: "markdown Step heading", content: "# Step 1\n", hinted: true },
     { name: "markdown Phase heading, wide gap", content: "# Phase    2\n", hinted: true },
-    { name: "tab after heading number", content: "## 3.\tSetup\n", hinted: true },
+    { name: "tab after heading number", content: "## 3.\tSetup\n", hinted: false },
+    {
+      name: "ranked findings heading",
+      content: "## 1. Append-Only Artifacts and Full-Document Regrowth (8 of 8 sessions)\n",
+      hinted: false,
+    },
     { name: "code identifier step1", content: "function step1() {}\n", hinted: true },
     { name: "code identifier Phase2", content: "class Phase2:\n    pass\n", hinted: true },
     {
@@ -93,11 +98,22 @@ describe("hasNumberingHint", () => {
 
 describe("checkMarkdown", () => {
   test.each<[string, string, string | null]>([
-    ['detects "# 1. Introduction"', "# 1. Introduction", "1. Introduction"],
     ['detects "## Step 2: Setup"', "## Step 2: Setup", "Step 2"],
     ['detects "### Phase 3"', "### Phase 3", "Phase 3"],
+    ['detects "#### Part 4: Rollout"', "#### Part 4: Rollout", "Part 4"],
     ["allows descriptive headings", "# Introduction", null],
     ["allows headings with numbers mid-text", "# Using OAuth2 for Authentication", null],
+    ["allows a bare numbered heading", "# 1. Introduction", null],
+    [
+      "allows a ranked findings heading",
+      "## 1. Append-Only Artifacts and Full-Document Regrowth (8 of 8 sessions)",
+      null,
+    ],
+    [
+      "allows a ranked findings heading with a count",
+      "## 2. AskUserQuestion Misalignment (7 of 8)",
+      null,
+    ],
   ])("%s", (_name, content, expected) => {
     const match = checkMarkdown(content);
     expected === null ? expect(match).toBeNull() : expect(match).toContain(expected);
@@ -275,10 +291,10 @@ describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {
 
 describe("processInput with markdown", () => {
   test.each<[string, string, string, boolean, string | null]>([
-    ['detects "# 1. Introduction"', "README.md", "# 1. Introduction", true, "1. Introduction"],
     ['detects "## Step 2: Setup"', "docs.md", "## Step 2: Setup", true, "Step 2"],
     ['detects "### Phase 3"', "guide.markdown", "### Phase 3", true, "Phase 3"],
     ["allows descriptive headings", "README.md", "# Introduction", false, null],
+    ["allows a bare numbered heading", "README.md", "# 1. Introduction", false, null],
     [
       "allows headings with numbers mid-text",
       "README.md",
@@ -299,8 +315,8 @@ describe("processInput with markdown", () => {
   });
 
   it("prefixes the edit-mode reminder", async () => {
-    const output = await getOutput(mockEditInput("README.md", "# 1. Introduction"), "edit");
-    expect(output?.additionalContext).toContain("This edit introduces numbered sequences.");
+    const output = await getOutput(mockEditInput("README.md", "## Step 2: Setup"), "edit");
+    expect(output?.additionalContext).toContain("This edit introduces step or phase numbering.");
   });
 });
 
@@ -345,30 +361,30 @@ describe("already-numbered files", () => {
 
   it("allows Edit when the file already has numbered headings", async () => {
     const filePath = join(dir, "review.md");
-    await Bun.write(filePath, "# Findings\n\n## 1. First issue\n\nDetails.\n");
-    const output = await getOutput(mockEditInput(filePath, "## 2. Second issue"), "edit");
+    await Bun.write(filePath, "# Findings\n\n## Step 1: First issue\n\nDetails.\n");
+    const output = await getOutput(mockEditInput(filePath, "## Step 2: Second issue"), "edit");
     expect(output).toBeNull();
   });
 
   it("reminds when Edit introduces numbering into a clean file", async () => {
     const filePath = join(dir, "clean.md");
     await Bun.write(filePath, "# Findings\n\nDetails.\n");
-    const output = await getOutput(mockEditInput(filePath, "## 1. First issue"), "edit");
-    expect(output?.additionalContext).toContain("numbered sequences");
+    const output = await getOutput(mockEditInput(filePath, "## Step 1: First issue"), "edit");
+    expect(output?.additionalContext).toContain("step or phase numbering");
   });
 
   it("allows non-numbered Edit to an already-numbered file", async () => {
     const filePath = join(dir, "review.md");
-    await Bun.write(filePath, "# Findings\n\n## 1. First issue\n");
+    await Bun.write(filePath, "# Findings\n\n## Step 1: First issue\n");
     const output = await getOutput(mockEditInput(filePath, "More details."), "edit");
     expect(output).toBeNull();
   });
 
   it("allows Write overwriting a file that already has numbered headings", async () => {
     const filePath = join(dir, "review.md");
-    await Bun.write(filePath, "## 1. First issue\n");
+    await Bun.write(filePath, "## Step 1: First issue\n");
     const output = await getOutput(
-      mockWriteInput(filePath, "## 1. First issue\n\n## 2. Second issue\n"),
+      mockWriteInput(filePath, "## Step 1: First issue\n\n## Step 2: Second issue\n"),
       "write",
     );
     expect(output).toBeNull();
@@ -376,8 +392,8 @@ describe("already-numbered files", () => {
 
   it("reminds when Write creates a new numbered file", async () => {
     const filePath = join(dir, "new.md");
-    const output = await getOutput(mockWriteInput(filePath, "# 1. Introduction"), "write");
-    expect(output?.additionalContext).toContain("numbered sequences");
+    const output = await getOutput(mockWriteInput(filePath, "# Step 1: Introduction"), "write");
+    expect(output?.additionalContext).toContain("step or phase numbering");
   });
 
   describe.skipIf(!hasSg())("code files (requires sg)", () => {
@@ -399,8 +415,8 @@ describe("already-numbered files", () => {
 
 describe("markdown context tier", () => {
   it("reminds rather than blocks on markdown Write", async () => {
-    const output = await getOutput(mockWriteInput("README.md", "# 1. Introduction"), "write");
+    const output = await getOutput(mockWriteInput("README.md", "# Step 1: Introduction"), "write");
     expect(output).not.toHaveProperty("permissionDecision");
-    expect(output?.additionalContext).toContain("numbered sequences");
+    expect(output?.additionalContext).toContain("step or phase numbering");
   });
 });

@@ -31,6 +31,8 @@ Biome linting is disabled for `scripts/jxa/` files via the root `biome.json` ove
 
 `reorder.ts` and `inbox.ts` are bun TypeScript scripts (not `osascript`). Their Launch Services handoff runs outside the command sandbox via the `claude:dangerouslyDisableSandbox` marker.
 
+The x-callback-url bridge needs `CLAUDE_PLUGIN_DATA` to locate its `.app` bundle, and Claude Code does not export it to Bash tool calls. The `things:url` skill sets it on every documented invocation, where the substitution has already resolved it, and the three scripts inherit it. Keep that prefix on any new documented command, or the callback is lost and `dispatch` silently falls back to `open`.
+
 ## What NOT to Do
 
 - **Don't use `tag.toDos().length`** for tag metadata — includes logbook items (13K+), extremely slow

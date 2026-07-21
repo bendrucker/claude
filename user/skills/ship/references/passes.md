@@ -15,7 +15,7 @@ Most passes gate on the diff (against the base, plus the working tree). The base
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
 | A runtime surface | `verify` | Declines tests-only and docs-only itself |
 
-Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `writing`, `verify`).
+Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `writing`, `verify`). `code-review` is still accepted for `review:code` so an old invocation does not silently run the pass it meant to skip.
 
 ## Plan Review
 

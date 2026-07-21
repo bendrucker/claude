@@ -60,7 +60,7 @@ Otherwise run the selected angles from [angles.md](angles.md). Each surfaces up 
 
 #### Fan-out cells
 
-`medium`, `high`, `xhigh`, and `max` on any model, plus `max` on Opus 4.8. Run each angle as an independent `Agent`. Give every agent the scope block, its single angle text, and the cleanup-precedence block if it carries a cleanup lens.
+`medium`, `high`, `xhigh`, and `max` on the default and Sonnet families, plus `max` on Opus 4.8. Run each angle as an independent `Agent`. Give every agent the scope block, its single angle text, and the cleanup-precedence block if it carries a cleanup lens.
 
 #### Inline cells
 

@@ -5,13 +5,17 @@ on:
     - cron: "0 14 * * 1"
   workflow_dispatch: {}
 
-permissions:
-  contents: read
-  issues: write
+permissions: {}
 
 jobs:
+  # Installs Claude Code from a mutable installer, so it holds no token beyond
+  # read access and cannot reach the issues API.
   drift:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      status: ${{ steps.drift.outputs.status }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -31,12 +35,31 @@ jobs:
           echo "status=$?" >> "$GITHUB_OUTPUT"
           cat drift.txt
 
-      - name: Open a drift issue
+      - name: Upload the report
         if: steps.drift.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift
+          path: drift.txt
+
+  report:
+    needs: drift
+    if: needs.drift.outputs.status != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: drift
+
+      - name: Open a drift issue
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          if gh issue list --state open --search 'in:title "review:code drift"' --json number --jq 'length' | grep -qv '^0$'; then
+          open=$(gh issue list --state open --search 'in:title "review:code drift"' --json number --jq 'length')
+          if [ "$open" != "0" ]; then
             echo "A drift issue is already open."
             exit 0
           fi

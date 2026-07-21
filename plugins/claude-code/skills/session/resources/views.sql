@@ -342,6 +342,7 @@ SELECT
   session_id,
   project_path,
   timestamp,
+  is_sidechain,
   source_file,
   source_line,
   (data->>'$.attachment.type')      AS kind,

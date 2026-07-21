@@ -769,6 +769,13 @@ describe("hook_blocks view", () => {
   });
 });
 
+type Latency = {
+  hook: string;
+  p95_ms: bigint | null;
+  ambient_p50_ms: bigint | null;
+  excess_p95_ms: bigint | null;
+};
+
 describe("hooks query", () => {
   it("aggregates runs, blocks, and asks per hook", async () => {
     const rows = await runQuery<{ hook: string; runs: bigint; blocks: bigint; asks: bigint }>(
@@ -791,6 +798,71 @@ describe("hooks query", () => {
     );
     expect(rows.length).toBe(1);
     expect(rows[0]?.hook).toContain("check-tropes");
+  });
+
+  it("attributes an isolated slow hook to itself", async () => {
+    // The culprit outnumbers its peers in its hour, so this also guards
+    // leave-one-out: a self-inclusive baseline would sit at the culprit's own
+    // ~3000ms and report no excess.
+    const rows = await runQuery<Latency>(db, "hooks", filterParams({ event: null, hook: null }));
+    const culprit = rows.find((r) => r.hook.includes("culprit.ts"));
+    expect(Number(culprit?.p95_ms)).toBeGreaterThan(2500);
+    expect(Number(culprit?.ambient_p50_ms)).toBeLessThan(200);
+    expect(Number(culprit?.excess_p95_ms)).toBeGreaterThan(2500);
+  });
+
+  it("does not attribute a host-wide slowdown to any one hook", async () => {
+    const rows = await runQuery<Latency>(db, "hooks", filterParams({ event: null, hook: null }));
+    const ambient = rows.find((r) => r.hook.includes("ambient-a.ts"));
+    expect(Number(ambient?.p95_ms)).toBeGreaterThan(2500);
+    expect(Number(ambient?.ambient_p50_ms)).toBeGreaterThan(2500);
+    expect(Number(ambient?.excess_p95_ms)).toBeLessThan(100);
+  });
+
+  it("computes the ambient baseline before the hook filter", async () => {
+    const rows = await runQuery<Latency>(
+      db,
+      "hooks",
+      filterParams({ event: null, hook: "*culprit*" }),
+    );
+    expect(rows.length).toBe(1);
+    // The baseline comes from the hook's peers. Scoping to one hook must not
+    // remove them, or every filtered run would look ambient-free.
+    expect(rows[0]?.ambient_p50_ms).not.toBeNull();
+    expect(Number(rows[0]?.ambient_p50_ms)).toBeLessThan(200);
+  });
+
+  it("reports no baseline for a hook with no timed runs", async () => {
+    const rows = await runQuery<Latency>(db, "hooks", filterParams({ event: null, hook: null }));
+    const stop = rows.find((r) => r.hook === "Stop");
+    expect(stop?.ambient_p50_ms).toBeNull();
+    // GREATEST skips NULL arguments, so a missing baseline must not read as zero excess.
+    expect(stop?.excess_p95_ms).toBeNull();
+  });
+
+  it("excludes untimed runs of a hook that has a baseline", async () => {
+    const rows = await runQuery<Latency>(db, "hooks", filterParams({ event: null, hook: null }));
+    // partly-timed.ts has one 3000ms run against 70ms peers plus nine untimed
+    // runs. Counting those as zero excess would drag the p95 down to ~1600.
+    const partly = rows.find((r) => r.hook.includes("partly-timed.ts"));
+    expect(Number(partly?.ambient_p50_ms)).toBeLessThan(200);
+    expect(Number(partly?.excess_p95_ms)).toBeGreaterThan(2500);
+  });
+});
+
+describe("catalog-reinjection-thrash-sessions query", () => {
+  it("splits catalog injections into main-thread and sidechain", async () => {
+    const rows = await runQuery<{
+      session_id: string;
+      main_injections: bigint;
+      sidechain_injections: bigint;
+      main_ktokens: number;
+      sidechain_ktokens: number;
+    }>(db, "catalog-reinjection-thrash-sessions", filterParams({ min_injections: "6" }));
+    const row = rows.find((r) => r.session_id === "delegation-session");
+    expect(Number(row?.main_injections)).toBe(2);
+    expect(Number(row?.sidechain_injections)).toBe(12);
+    expect(Number(row?.sidechain_ktokens)).toBeGreaterThan(Number(row?.main_ktokens));
   });
 });
 

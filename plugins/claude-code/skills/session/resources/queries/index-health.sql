@@ -102,18 +102,24 @@ kind_rows AS (
 kind_successors(kind, successor_field, successor_value) AS (
   VALUES ('system:api_error', 'isApiErrorMessage', 'true')
 ),
+-- Grouped by kind alone so the registry can hold several successors for one kind
+-- without fanning the LEFT JOIN below into duplicate health rows. `last_seen` is a
+-- day (kind_stats aggregates MAX over dates), so the comparison is day-granular
+-- too: casting it to a timestamp would read as midnight and let a successor
+-- arriving later on the kind's own last active day pass as evidence of a
+-- migration.
 successor_activity AS (
   SELECT
     s.kind,
-    s.successor_field,
+    string_agg(DISTINCT s.successor_field, ' and ') AS successor_field,
     COUNT(*) AS successor_rows,
     MAX(r.timestamp)::DATE AS successor_last_seen
   FROM kind_successors s
   JOIN kind_stats ks ON ks.kind = s.kind
   JOIN records r
     ON json_extract_string(r.data, '$.' || s.successor_field) = s.successor_value
-   AND r.timestamp > ks.last_seen::TIMESTAMP
-  GROUP BY 1, 2
+   AND r.timestamp::DATE > ks.last_seen
+  GROUP BY s.kind
 ),
 silent_streams AS (
   SELECT

@@ -171,7 +171,9 @@ await runCheck(
       );
     }
 
-    const snapshot = snapshots.includes(version) ? version : (snapshots.sort(bySemverDesc)[0] as string);
+    const snapshot = snapshots.includes(version)
+      ? version
+      : (snapshots.sort(bySemverDesc)[0] as string);
     if (snapshot !== version) {
       violations.push(
         `Installed Claude Code is ${version}; the newest snapshot is ${snapshot}. Re-extract and land references/upstream-${version}.md, then port any changes into SKILL.md, angles.md, and efforts.md.`,

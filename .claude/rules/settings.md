@@ -19,11 +19,23 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 
 `excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. Go CLIs run sandboxed via `sandbox.network.allowMachLookup`; wrappers that hand off to Apple Events or Launch Services need a full skip via the `mac` plugin's `claude:dangerouslyDisableSandbox` marker hook. See [`scripts.md`](scripts.md).
 
-## Plugin Data Dir Is Unwritable
+## Plugin Data Dir
 
 The runtime sandbox profile denies writes under `~/.claude/plugins`, and that deny shadows any `filesystem.allowWrite` entry beneath it. `~/.claude/plugins/data` was listed in `allowWrite` for a while and never took effect, so do not re-add it. The failure surfaces as a bare `Operation not permitted`, naming neither the deny rule nor the entry it shadows.
 
-Plugin scripts that must write their own data dir carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker instead.
+This is an upstream defect, not a policy we chose. The write profile emits every `allowOnly` rule before every `denyWithinAllow` rule, and Seatbelt takes the last matching rule, so a broad deny always beats a narrow allow no matter how specific. The read profile does not have this problem: it implements `allowWithinDeny`, so a narrower allow can reopen a denied region. Writes have no equivalent primitive, and the [sandboxing docs](https://code.claude.com/docs/en/sandboxing) state the specificity rule only for reads. Confirmed with `sandbox-exec`: given a deny of a parent and an allow of a child, emitting the allow first denies the child, and emitting it last permits the child while the rest of the parent stays denied.
+
+So the fix belongs upstream, and nothing in this repo's settings can express it today.
+
+Meanwhile, the four session-index writers carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker. That is a bridge around a bug, not the intended design, and it trades real sandbox coverage for a working toolchain.
+
+**Removal criterion.** Drop the markers when this probe succeeds under the sandbox:
+
+```
+touch ~/.claude/plugins/data/.sandbox-probe && rm ~/.claude/plugins/data/.sandbox-probe
+```
+
+Do not wait for an upstream announcement. [#41156](https://github.com/anthropics/claude-code/issues/41156) raised the same conflict at the permission-prompt layer, was wrongly auto-flagged as a duplicate, and was closed `NOT_PLANNED` by a staleness bot after two and a half months. Related: [#51973](https://github.com/anthropics/claude-code/issues/51973), [#34900](https://github.com/anthropics/claude-code/issues/34900). Treat the probe as the only reliable signal.
 
 ## Sandbox Trust Model
 

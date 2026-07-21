@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: opens the DuckDB index read-write in the plugin data dir, which the sandbox's ~/.claude/plugins deny covers
+// claude:dangerouslyDisableSandbox: temporary. Opens the DuckDB index read-write in
+// the plugin data dir, which an upstream sandbox defect makes unwritable. Remove this
+// when the probe in .claude/rules/settings.md succeeds.
 import { rm } from "node:fs/promises";
 import { cli } from "cleye";
 import {

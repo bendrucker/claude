@@ -29,6 +29,23 @@ const argv = cli({
 const BUNDLE_MIN_BYTES = 100_000_000;
 
 /**
+ * The descriptor's own registration, so the gate probe reads code-review's flag
+ * rather than any of the dozen other bundled skills that also set it.
+ */
+const DESCRIPTOR_ANCHOR = 'menuDescription:"Review the current diff for bugs and cleanups"';
+const DESCRIPTOR_WINDOW = 400;
+
+/** Orders semver descending. String sort puts 2.1.99 above 2.1.215. */
+function bySemverDesc(a: string, b: string): number {
+  const [x, y] = [a, b].map((v) => v.split(".").map(Number));
+  for (let i = 0; i < 3; i++) {
+    const diff = (y?.[i] ?? 0) - (x?.[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/**
  * Resolves the Claude Code bundle: a Bun single-file executable well over
  * 100 MB. `claude` on PATH is sometimes a thin launcher script rather than the
  * bundle, so a small file there sends us to the installer's version store.
@@ -41,7 +58,7 @@ async function findBinary(): Promise<string> {
 
   const versions = join(homedir(), ".local", "share", "claude", "versions");
   const entries = await readdir(versions).catch(() => []);
-  for (const entry of entries.sort().reverse()) {
+  for (const entry of entries.sort(bySemverDesc)) {
     const candidate = join(versions, entry, "claude");
     if (Bun.file(candidate).size > BUNDLE_MIN_BYTES) return candidate;
   }
@@ -142,13 +159,19 @@ await runCheck(
     const bundle = Buffer.from(await Bun.file(binary).arrayBuffer()).toString("latin1");
     const violations: string[] = [];
 
-    if (!bundle.includes("disableModelInvocation:!0")) {
+    const anchor = bundle.indexOf(DESCRIPTOR_ANCHOR);
+    const descriptor = anchor === -1 ? "" : bundle.slice(anchor, anchor + DESCRIPTOR_WINDOW);
+    if (anchor === -1) {
       violations.push(
-        "`disableModelInvocation:!0` is gone from the bundle. If the built-in /code-review is model-invocable again, delete review:code and go back to it.",
+        "Could not find the code-review descriptor registration. Re-derive the anchor before trusting the rest of this check.",
+      );
+    } else if (!descriptor.includes("disableModelInvocation:!0")) {
+      violations.push(
+        "code-review no longer sets `disableModelInvocation`. The built-in is model-invocable again, so delete review:code and go back to it.",
       );
     }
 
-    const snapshot = snapshots.includes(version) ? version : (snapshots.sort().at(-1) as string);
+    const snapshot = snapshots.includes(version) ? version : (snapshots.sort(bySemverDesc)[0] as string);
     if (snapshot !== version) {
       violations.push(
         `Installed Claude Code is ${version}; the newest snapshot is ${snapshot}. Re-extract and land references/upstream-${version}.md, then port any changes into SKILL.md, angles.md, and efforts.md.`,

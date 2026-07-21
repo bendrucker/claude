@@ -14,6 +14,7 @@ allowed-tools:
   - Bash(git log:*)
   - Bash(git show:*)
   - Bash(git rev-parse:*)
+  - Bash(git ls-files:*)
   - Bash(gh pr:*)
 ---
 
@@ -40,7 +41,8 @@ Resolve the diff:
 1. If `--base <ref>` was passed, the range is `<ref>...HEAD`.
 2. Otherwise `git diff @{upstream}...HEAD`, falling back to `git diff main...HEAD`, then `git diff HEAD~1`.
 3. If there are uncommitted changes, or the range diff is empty, also run `git diff HEAD` and include the working-tree changes. The review often runs before the commit.
-4. If `<target>` names a PR, branch, ref range, or path, build the matching diff command for it instead. If it is a free-form scope instruction, honor the restriction and start from the resolved range for whatever it does not narrow.
+4. `git diff` never shows untracked files, so a pre-commit review would miss brand-new files entirely. List them with `git ls-files --others --exclude-standard` and Read each one into scope as wholly added.
+5. If `<target>` names a PR, branch, ref range, or path, build the matching diff command for it instead. If it is a free-form scope instruction, honor the restriction and start from the resolved range for whatever it does not narrow.
 
 Then list the changed files, summarize what changed in one paragraph, and locate the CLAUDE.md files that govern them (user-level `~/.claude/CLAUDE.md`, the repo-root `CLAUDE.md`, and any `CLAUDE.md` or `CLAUDE.local.md` in an ancestor directory of a changed file). This scope block rides along to every finder, verifier, and sweep agent.
 

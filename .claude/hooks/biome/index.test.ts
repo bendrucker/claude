@@ -232,6 +232,47 @@ describe("biome hook", () => {
       const files = await parseTranscript(transcriptPath);
       expect(files).toEqual([]);
     });
+
+    it("filters out gitignored files but keeps tracked siblings", async () => {
+      const repoDir = await mkdtemp(join(tempDir, "ignored-transcript-"));
+      await execAsync("git init", { cwd: repoDir });
+      await Bun.write(join(repoDir, ".gitignore"), "tmp/\n");
+      const tracked = join(repoDir, "kept.ts");
+      const ignored = join(repoDir, "tmp", "scratch.ts");
+      await Bun.write(tracked, "export const a = 1;\n");
+      await Bun.write(ignored, "export const b = 2;\n");
+
+      const transcriptPath = join(tempDir, `transcript-gitignored-${Date.now()}.jsonl`);
+      await Bun.write(
+        transcriptPath,
+        createTranscriptContent([
+          { path: tracked, tool: "Write" },
+          { path: ignored, tool: "Write" },
+        ]),
+      );
+
+      const files = await parseTranscript(transcriptPath);
+      expect(files).toEqual([tracked]);
+    });
+
+    it("does not shell-evaluate a path containing a command substitution", async () => {
+      const repoDir = await mkdtemp(join(tempDir, "injection-repo-"));
+      await execAsync("git init", { cwd: repoDir });
+      // isIgnored runs git with cwd = the file's directory, so a bare relative
+      // name is where the injected `touch` would land if a shell evaluated it.
+      const malicious = join(repoDir, "$(touch pwned).ts");
+      await Bun.write(malicious, "export const a = 1;\n");
+
+      const transcriptPath = join(tempDir, `transcript-injection-${Date.now()}.jsonl`);
+      await Bun.write(
+        transcriptPath,
+        createTranscriptContent([{ path: malicious, tool: "Write" }]),
+      );
+
+      const files = await parseTranscript(transcriptPath);
+      expect(files).toEqual([malicious]);
+      expect(await Bun.file(join(repoDir, "pwned")).exists()).toBe(false);
+    });
   });
 
   describe("processPostToolUse", () => {

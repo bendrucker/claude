@@ -42,9 +42,9 @@ function mockInput(
   } as PreToolUseHookInput;
 }
 
-// Trips all three checkers at context tier: a numbered lowercase heading
+// Trips all three checkers at context tier: a lowercase step heading
 // (numbering + headings) and a spaced em dash (tropes).
-const MULTI_VIOLATION = "# 1. introduction\n\nThis — is bad\n";
+const MULTI_VIOLATION = "# step 1: introduction\n\nThis — is bad\n";
 
 function contextOf(output: unknown): string {
   return (output as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput
@@ -57,7 +57,7 @@ describe("single output per tool call", () => {
       mockInput("Write", { file_path: "docs/draft.md", content: MULTI_VIOLATION }),
     );
     expect(output).not.toBeNull();
-    expect(contextOf(output)).toContain("numbered sequences");
+    expect(contextOf(output)).toContain("step or phase numbering");
     const { ts, session_id, duration_ms, ...stable } = log;
     expect(typeof duration_ms).toBe("number");
     expect(stable).toMatchInlineSnapshot(`
@@ -113,8 +113,8 @@ describe("code files", () => {
 });
 
 describe("session-scoped repeat suppression", () => {
-  // Numbered heading only: title-cased so headings stays silent, no tropes.
-  const NUMBERED_ONLY = "# 1. Introduction\n\nPlain prose here.\n";
+  // Step heading only: title-cased so headings stays silent, no tropes.
+  const NUMBERED_ONLY = "# Step 1: Introduction\n\nPlain prose here.\n";
 
   it("suppresses a repeat of the same category within the window", async () => {
     const sessionId = crypto.randomUUID();

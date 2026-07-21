@@ -19,9 +19,10 @@ import {
 
 export type Mode = "write" | "edit";
 
-// Cheap prefilter covering every shape checkMarkdown or a numbering.yml rule
-// can flag. It gates the expensive path (mdast parse, sg spawn) in-process.
-const NUMBER_HINT = /(step|phase|part).{0,8}[0-9]|[0-9]\.( |\t)/i;
+// Every shape checkMarkdown or a numbering.yml rule can flag carries a
+// step/phase/part token near a digit, so this prefilter gates the expensive
+// path (mdast parse, sg spawn) in-process.
+const NUMBER_HINT = /(step|phase|part).{0,8}[0-9]/i;
 
 export function hasNumberingHint(content: string): boolean {
   return NUMBER_HINT.test(content);
@@ -39,6 +40,10 @@ type AstGrepMatch = {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Bare `N. ` headings are usually rankings or enumerations, not process steps,
+// so only explicit step labels count.
+const STEP_HEADING = /^(Step|Phase|Part)\s+[0-9]+/i;
+
 export function checkMarkdown(content: string): string | null {
   const ast = fromMarkdown(content);
   const matches: MarkdownMatch[] = [];
@@ -49,7 +54,7 @@ export function checkMarkdown(content: string): string | null {
       .map((child) => child.value)
       .join("");
 
-    if (/^[0-9]+\.\s/.test(text) || /^(Step|Phase|Part)\s+[0-9]+/i.test(text)) {
+    if (STEP_HEADING.test(text)) {
       matches.push({
         text: text.trim(),
         line: node.position?.start?.line || 0,
@@ -59,7 +64,7 @@ export function checkMarkdown(content: string): string | null {
   });
 
   if (matches.length > 0) {
-    return `Numbered heading: ${matches[0]?.text}`;
+    return `Numbered step heading: ${matches[0]?.text}`;
   }
 
   return null;
@@ -162,7 +167,7 @@ export async function check(input: PreToolUseHookInput, mode: Mode): Promise<Hoo
     return null;
   }
 
-  const reason = `Detected numbered sequences that create tight coupling.
+  const reason = `Detected step or phase numbering that creates tight coupling.
 ${match}
 
 Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
@@ -171,7 +176,8 @@ Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
   // prompts and 0 rejections, and an ask stalls background jobs. Code keeps
   // deny because blocking before the write is cheap and effective.
   if (isMarkdownFile(ext)) {
-    const message = mode === "edit" ? `This edit introduces numbered sequences. ${reason}` : reason;
+    const message =
+      mode === "edit" ? `This edit introduces step or phase numbering. ${reason}` : reason;
     return { output: formatContext(message), category: "numbering" };
   }
 

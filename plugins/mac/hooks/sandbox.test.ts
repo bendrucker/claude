@@ -69,6 +69,17 @@ describe("extractCommands", () => {
       { cmd: "bun", scriptArg: "/abs/path/watch.ts" },
     ]);
   });
+
+  test.each<[string, string]>([
+    ["/abs/path/refresh.ts --refresh", "/abs/path/refresh.ts"],
+    ["./scripts/run.sh foo", "./scripts/run.sh"],
+  ])("directly executed script %p is its own script arg", (command, expected) => {
+    expect(extractCommands(command)).toEqual([{ cmd: expected, scriptArg: expected }]);
+  });
+
+  test.each<[string]>([["git status"], ["/usr/bin/touch x"]])("no script arg for %p", (command) => {
+    expect(extractCommands(command)).toEqual([{ cmd: command.split(" ")[0] as string }]);
+  });
 });
 
 describe("hasBypassMarker", () => {
@@ -118,6 +129,28 @@ describe("processInput", () => {
 
   test("honors marker on second bun invocation in a chain", async () => {
     const input = makeInput(`bun ${unmarkedScriptPath} && bun ${markedScriptPath}`);
+    const result = await processInput(input, "darwin");
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+
+  test("disables sandbox for a marked script run directly", async () => {
+    const result = await processInput(makeInput(`${markedScriptPath} --refresh`), "darwin");
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+
+  test("does not disable sandbox for an unmarked script run directly", async () => {
+    const result = await processInput(makeInput(unmarkedScriptPath), "darwin");
+    expect(result).toBeNull();
+  });
+
+  test("honors marker on second directly-run script in a chain", async () => {
+    const input = makeInput(`${unmarkedScriptPath} && ${markedScriptPath}`);
     const result = await processInput(input, "darwin");
     expect(result?.hookSpecificOutput).toMatchObject({
       hookEventName: "PreToolUse",

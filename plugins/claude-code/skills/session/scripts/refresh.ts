@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// claude:dangerouslyDisableSandbox: opens the DuckDB index read-write in the plugin data dir, which the sandbox's ~/.claude/plugins deny covers
 import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";

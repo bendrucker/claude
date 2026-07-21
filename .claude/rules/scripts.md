@@ -36,11 +36,11 @@ Apple Events and Launch Services handoff (`osascript`, `open`, URL schemes) does
 
 `${CLAUDE_PLUGIN_ROOT}` does NOT expand in hook `matcher` fields (it only expands in `command` strings). A matcher like `Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/:*)` is compared literally against the resolved cache path (`bun /Users/.../plugins/cache/.../scripts/foo.ts`), never matches, and the hook never fires. Do not use `${CLAUDE_PLUGIN_ROOT}` in matchers.
 
-The marker hook sidesteps this: it uses a broad `Bash|Monitor` matcher and reads the head of the invoked `bun`/`node` script for the comment `claude:dangerouslyDisableSandbox`. When present, it injects `dangerouslyDisableSandbox: true`, running that command fully outside the sandbox. This is layout-independent, so it works regardless of the cache `<hash>` path. Add the marker after the shebang of any top-level script that hands off to Apple Events or Launch Services:
+The marker hook sidesteps this: it uses a broad `Bash|Monitor` matcher and reads the head of the invoked script for the comment `claude:dangerouslyDisableSandbox`. When present, it injects `dangerouslyDisableSandbox: true`, running that command fully outside the sandbox. This is layout-independent, so it works regardless of the cache `<hash>` path. Add the marker after the shebang of any top-level script that hands off to Apple Events or Launch Services, or that writes its plugin data dir under `~/.claude/plugins`:
 
 ```ts
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: <reason>
 ```
 
-The marker requires the `mac` plugin installed and only fires for interpreters in its `SCRIPT_INTERPRETERS` set (`bun`, `node`). See [`plugins/mac/README.md`](../../plugins/mac/README.md) for canonical docs.
+The marker requires the `mac` plugin installed. It fires for a script passed to an interpreter in the hook's `SCRIPT_INTERPRETERS` set (`bun`, `node`), and for a script executed directly by path when its extension is in `SCRIPT_EXTENSIONS` (`.ts`, `.js`, `.mjs`, `.cjs`, `.sh`). See [`plugins/mac/README.md`](../../plugins/mac/README.md) for canonical docs.

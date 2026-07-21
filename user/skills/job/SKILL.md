@@ -60,7 +60,7 @@ Background Claude sessions may already be working items in the brief. Run `claud
 Join each record to a brief item in this order:
 
 1. A `name` matching the `job:<identifier>` convention below. Exact and structural, so it is the only join that never guesses.
-2. An issue key, PR number, or PR URL appearing anywhere in `name`. This covers sessions launched by hand.
+2. A full PR URL in `name`, or an issue key or `#`-prefixed PR number bounded by non-alphanumeric characters and confirmed against the repo `cwd` resolves to. This covers sessions launched by hand. Do not match a bare substring: `#42` occurs inside `#142`, and every repo has a PR numbered 42.
 3. `cwd` resolved to a repo, narrowing the candidate items, plus a semantic match of the name text against item titles. Both texts are already in the brief, so this costs nothing extra.
 
 `cwd` is the directory the session launched from. A session that entered a worktree mid-run still reports its launch directory, usually a main checkout, occasionally a path that has since been pruned. Use it to scope candidates by repo. Never derive a branch from it, and never report it as the work.
@@ -79,10 +79,11 @@ An item with a matched agent gains one line under its existing entry:
 
 ```
 agent `<short id>` · <state>[ (<waitingFor>)] · <age>
-→ claude --resume <sessionId>
 ```
 
-Agents that matched no item become their own entries, grouped by the repo their `cwd` resolves to, or `Misc` when it resolves to none. A blocked agent is blocking work and sorts with it under the ordering rule above.
+A live session (`working`, `blocked`, or an interactive session whose `state` is null) adds a second line, `→ claude --resume <sessionId>`, because resuming it is the action. A `done` or `failed` session gets no resume line. It is history, so the item keeps the action it already had, and the entry carries the `sessionId` as the prior attempt worth reading.
+
+An unmatched agent becomes its own entry only when it still wants something: `blocked`, `failed`, or `working`. Since gather runs with `--all`, unmatched `done` records are completed history and get dropped. Keeping them would fill a prioritized brief with finished work. Group what remains by the repo `cwd` resolves to, or `Misc` when it resolves to none. A blocked agent is blocking work and sorts with it under the ordering rule above.
 
 Close with the mode's cross-project synthesis: the day's sequence, or the night's open decisions. This is the triage gate. The brief covers everything gathered, and nothing executes until the user approves the order. Omit empty groups and never pad. An empty queue is a two-line brief.
 

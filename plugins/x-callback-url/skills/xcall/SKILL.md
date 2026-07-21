@@ -15,6 +15,8 @@ Send [x-callback-url](https://x-callback-url.com/) requests from the command lin
 
 `xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source into `${CLAUDE_PLUGIN_DATA}/xcall.app` and registers the callback scheme (`xcall-claude://`) with Launch Services. Installing into the plugin's data directory (not the plugin source/cache tree) keeps the registered path stable across plugin updates: the marketplace cache is content-addressed, so building xcall.app inside it would orphan the Launch Services registration on the next update.
 
+Claude Code exports `CLAUDE_PLUGIN_DATA` to hooks and MCP servers but not to Bash tool calls, and `run.sh` is reached both ways. A consuming skill closes that gap by setting the variable on the command it documents, where the substitution has already resolved it. `things:url` does this on every `url.ts`, `inbox.ts`, and `reorder.ts` invocation. `build.sh` never guesses a location of its own, because a second bundle would take the `xcall-claude://` scheme from the first and `lsregister -f` does not take it back.
+
 ## Usage
 
 ```bash
@@ -23,7 +25,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "<url>"
 
 **stdout**: `x-success` query string on success
 **stderr**: `x-error` query string or timeout message
-**Exit codes**: 0 = success, 1 = error, 2 = cancel
+**Exit codes**: 0 = success, 1 = error, 2 = cancel, 3 = build failed
 
 ## Examples
 
@@ -75,10 +77,10 @@ Apps with their own CLI (e.g., Shortcuts via `shortcuts run`) don't need xcall â
 ## Build Details
 
 - Source: `scripts/main.swift` (~100 lines)
-- Build: `scripts/build.sh` compiles to `${CLAUDE_PLUGIN_DATA}/xcall.app/`. The script exits non-zero if `CLAUDE_PLUGIN_DATA` is unset.
+- Build: `scripts/build.sh` compiles to `${CLAUDE_PLUGIN_DATA}/xcall.app/`. It exits non-zero when the variable is unset
 - Bundle ID: `com.bendrucker.xcall-claude`
 - Callback scheme: `xcall-claude://`
 - `Info.plist`: `CFBundleTypeRole=Editor`, `LSUIElement=true`. `LSBackgroundOnly` is intentionally not set: combining it with `LSUIElement` causes macOS to refuse to route URL scheme callbacks to the app, surfacing as a "no application set" dialog.
-- After building, `build.sh` calls `lsregister -f` and verifies the scheme handler is the freshly built bundle. If verification fails it exits non-zero.
+- After building, `build.sh` calls `lsregister -f` and verifies the scheme handler is the freshly built bundle. A bundle left behind at a path an earlier version built into keeps the scheme, and `lsregister -f` does not take it back, so `build.sh` unregisters and deletes that copy before verifying. If verification still fails it exits non-zero.
 - Build is cached â€” recompiles only if `main.swift` is newer than the binary
 - Timeout: 10 seconds

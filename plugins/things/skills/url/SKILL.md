@@ -4,10 +4,9 @@ description: Create, update, and manage Things 3 tasks and projects, including q
 argument-hint: "<add | update | show | search | json | capture> [key=value ...]"
 effort: low
 allowed-tools:
-  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)"
-  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"
-  - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
-  - Bash
+  - "Bash(CLAUDE_PLUGIN_DATA=${CLAUDE_PLUGIN_DATA} bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)"
+  - "Bash(CLAUDE_PLUGIN_DATA=${CLAUDE_PLUGIN_DATA} bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts:*)"
+  - "Bash(CLAUDE_PLUGIN_DATA=${CLAUDE_PLUGIN_DATA} bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts:*)"
   - Read
 ---
 
@@ -23,11 +22,13 @@ Write operations for Things 3 via the `things:///` URL scheme.
 
 Use `url.ts` for most operations — it handles auth tokens and URL encoding.
 
+Keep the `CLAUDE_PLUGIN_DATA=` prefix on every invocation. Claude Code exports that variable to hooks and MCP servers but not to Bash tool calls, and the x-callback-url bridge needs it to locate its `.app` bundle. Dropping it costs the callback, so `url.ts` falls back to a fire-and-forget `open` and returns no todo id.
+
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts <command> [key=value ...]
+CLAUDE_PLUGIN_DATA=${CLAUDE_PLUGIN_DATA} bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts <command> [key=value ...]
 
 # Bulk update: pass multiple id= params to batch via JSON command
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts update id=X id=Y id=Z when=tomorrow
+CLAUDE_PLUGIN_DATA=${CLAUDE_PLUGIN_DATA} bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts update id=X id=Y id=Z when=tomorrow
 ```
 
 For raw URL scheme access: `open -g "things:///add?title=Buy%20milk&when=today"`
@@ -51,7 +52,7 @@ See [examples.md](examples.md) for detailed usage of each command.
 ## Reorder Items
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3> ...
+CLAUDE_PLUGIN_DATA=${CLAUDE_PLUGIN_DATA} bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3> ...
 ```
 
 Items appear at the top of the list in the order specified. Default list is `today`. Also works for items within a project. Use the `--list` value matching the items' current scheduling state.
@@ -61,14 +62,14 @@ Items appear at the top of the list in the order specified. Default list is `tod
 For quick captures to the inbox, use `inbox.ts`. It tags each todo `Claude` and appends session attribution, so prefer it over `url.ts add` when delegating a task mid-session.
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
+CLAUDE_PLUGIN_DATA=${CLAUDE_PLUGIN_DATA} bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
 ```
 
 `title` captures one todo. `titles` (newline-separated) captures several at once. Add tags with `--tag` (repeatable). Other params: `notes` (max 10,000 chars), `tags` (comma-separated), `checklist-items` (newline-separated, max 100). The script handles URL encoding, session attribution, and the `Claude` tag.
 
 ```bash
 # Multiple todos, each with the claude-code tag
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} --tag claude-code titles="Buy milk
+CLAUDE_PLUGIN_DATA=${CLAUDE_PLUGIN_DATA} bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} --tag claude-code titles="Buy milk
 Walk dog"
 ```
 

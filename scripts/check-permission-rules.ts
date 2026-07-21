@@ -2,7 +2,7 @@
 
 import { join } from "node:path";
 import matter from "gray-matter";
-import { runCheck, tracked } from "./check";
+import { readTracked, runCheck, tracked } from "./check";
 
 // Claude Code warns on startup about Write(path), NotebookEdit(path), and
 // Glob(path) permission rules: the permission system routes file writes
@@ -38,7 +38,10 @@ async function checkSettings(): Promise<string[]> {
   const violations: string[] = [];
 
   for (const file of await tracked("*settings*.json", root)) {
-    const parsed: unknown = await Bun.file(join(root, file)).json();
+    const raw = await readTracked(file, root);
+    if (raw === null) continue;
+
+    const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) continue;
 
     const permissions = (parsed as Record<string, unknown>).permissions as Permissions | undefined;
@@ -64,8 +67,8 @@ async function checkFrontmatter(): Promise<string[]> {
   const violations: string[] = [];
 
   for (const file of await tracked("*.md", root)) {
-    const raw = await Bun.file(join(root, file)).text();
-    if (!raw.startsWith("---")) continue;
+    const raw = await readTracked(file, root);
+    if (raw === null || !raw.startsWith("---")) continue;
 
     let data: Record<string, unknown>;
     try {

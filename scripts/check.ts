@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { exit } from "node:process";
 import { $ } from "bun";
 
@@ -10,6 +11,23 @@ import { $ } from "bun";
 export async function tracked(pattern: string, cwd: string): Promise<string[]> {
   const output = await $`git ls-files -z ${pattern}`.cwd(cwd).text();
   return output.split("\0").filter(Boolean);
+}
+
+/**
+ * Contents of a tracked file, or null when it is absent from the working tree.
+ *
+ * `git ls-files` lists files deleted locally but not yet staged, so every
+ * caller iterating a tracked list has to tolerate a missing file. Reading and
+ * catching beats checking existence first, which doubles the syscalls and still
+ * races: the file can vanish between the check and the read.
+ */
+export async function readTracked(file: string, cwd: string): Promise<string | null> {
+  try {
+    return await Bun.file(join(cwd, file)).text();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 export interface CheckResult {

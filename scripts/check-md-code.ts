@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Code } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import { runCheck, tracked } from "./check";
+import { readTracked, runCheck, tracked } from "./check";
 
 const root = join(import.meta.dirname, "..");
 
@@ -66,8 +66,10 @@ function checkBlock(node: Code): string | null {
   }
 }
 
-async function checkFile(file: string): Promise<string[]> {
-  const text = await Bun.file(join(root, file)).text();
+export async function checkFile(file: string): Promise<string[]> {
+  const text = await readTracked(file, root);
+  if (text === null) return [];
+
   const ast = fromMarkdown(text);
   const violations: string[] = [];
 
@@ -82,15 +84,7 @@ async function checkFile(file: string): Promise<string[]> {
 }
 
 export async function findViolations(): Promise<string[]> {
-  const files = await tracked("*.md", root);
-
-  // `git ls-files` reports tracked files that have been deleted in the working
-  // tree, so read only the ones still on disk.
-  const present = await Promise.all(
-    files.map(async (file) => ((await Bun.file(join(root, file)).exists()) ? file : null)),
-  );
-
-  const results = await Promise.all(present.filter((file) => file !== null).map(checkFile));
+  const results = await Promise.all((await tracked("*.md", root)).map(checkFile));
   return results.flat();
 }
 

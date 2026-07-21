@@ -70,7 +70,7 @@
     },
     {
       "name": "pull-request",
-      "description": "Create pull requests with proper formatting",
+      "description": "Pull request workflows: create, update, babysit CI, and reviewer follow-up",
       "source": "./plugins/pull-request"
     },
     {

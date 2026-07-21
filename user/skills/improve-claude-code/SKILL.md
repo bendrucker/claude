@@ -155,6 +155,8 @@ Feed the approved plans into a second Workflow shaped as `pipeline(approvedPlans
 
 A pipeline, not a barrier: item A can reach `ciGate` while item B is still implementing, and concurrency auto-caps at `min(16, cores-2)`. Do not hold worktree agents open on long CI waits. The gate catches trivial breakage, then [Monitor CI](#monitor-ci-and-fix-failures) hands the rest to [Watch](#watch). Back in the main loop, [Annotate Things](#annotate-things) and [Summary](#summary) consume the pipeline results unchanged.
 
+The Workflow tool delivers `args` to the script as a JSON string, so normalize it before calling any array method on it. The `parallel` plan workflow takes no args and is unaffected.
+
 The two Workflow calls, the pipeline shape, and each stage's result schema (`meta` must be a pure literal):
 
 ```javascript
@@ -171,6 +173,8 @@ export const meta = {
   description: 'Implement each approved plan as a PR, then fast-gate CI',
   phases: [{ title: 'Implement' }, { title: 'CI gate' }],
 }
+
+const { approved } = typeof args === 'string' ? JSON.parse(args) : args
 
 const IMPLEMENTED = {
   type: 'object',
@@ -193,7 +197,7 @@ const CI_GATE = {
 }
 
 const results = await pipeline(
-  args.approved,
+  approved,
   (plan) =>
     agent(implementPrompt(plan), {
       agentType: 'general-purpose',

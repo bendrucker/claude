@@ -51,6 +51,20 @@ async function fileExists(filePath: string): Promise<boolean> {
   return Bun.file(filePath).exists();
 }
 
+// A gitignored path (scratch under tmp/, a nested worktree) can never be
+// committed, so gating Stop on its lint errors blocks the session on throwaway
+// content. git check-ignore drops those while keeping new untracked source
+// files in scope, which `git ls-files` would not. Paths outside any repo exit
+// 128 and stay in scope.
+async function isIgnored(filePath: string): Promise<boolean> {
+  try {
+    await execAsync(`git check-ignore -q "${filePath}"`, { cwd: dirname(filePath) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Biome ships as a devDependency, so its binary lives in the module graph
 // rather than on PATH (`bun run` adds node_modules/.bin, but `bun test` and
 // direct hook invocation do not). Resolve it through the package and run it
@@ -86,8 +100,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   }
 
   const content = await Bun.file(transcriptPath).text();
-  const files = new Set<string>();
-  const existChecks: Array<Promise<{ path: string; exists: boolean }>> = [];
+  const candidates = new Set<string>();
 
   for (const line of content.split("\n")) {
     if (!line.trim()) continue;
@@ -102,20 +115,18 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
 
         const filePath = block.input?.file_path;
         if (filePath && isBiomeFile(filePath)) {
-          existChecks.push(fileExists(filePath).then((exists) => ({ path: filePath, exists })));
+          candidates.add(filePath);
         }
       }
     } catch {}
   }
 
-  const results = await Promise.all(existChecks);
-  for (const { path, exists } of results) {
-    if (exists) {
-      files.add(path);
-    }
-  }
-
-  return [...files];
+  const checks = [...candidates].map(async (path) => ({
+    path,
+    keep: (await fileExists(path)) && !(await isIgnored(path)),
+  }));
+  const results = await Promise.all(checks);
+  return results.filter((result) => result.keep).map((result) => result.path);
 }
 
 // Biome derives its project root from the working directory. Running from an

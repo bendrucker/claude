@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import { Glob } from "bun";
 import type { Code } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import { runCheck } from "./check";
+import { runCheck, tracked } from "./check";
 
 const root = join(import.meta.dirname, "..");
 
@@ -82,15 +81,16 @@ async function checkFile(file: string): Promise<string[]> {
   return violations;
 }
 
-async function findViolations(): Promise<string[]> {
-  const glob = new Glob("**/*.md");
-  const files: string[] = [];
-  for await (const file of glob.scan({ cwd: root })) {
-    if (file.includes("node_modules") || file.includes(".bun-cache")) continue;
-    files.push(file);
-  }
+export async function findViolations(): Promise<string[]> {
+  const files = await tracked("*.md", root);
 
-  const results = await Promise.all(files.map(checkFile));
+  // `git ls-files` reports tracked files that have been deleted in the working
+  // tree, so read only the ones still on disk.
+  const present = await Promise.all(
+    files.map(async (file) => ((await Bun.file(join(root, file)).exists()) ? file : null)),
+  );
+
+  const results = await Promise.all(present.filter((file) => file !== null).map(checkFile));
   return results.flat();
 }
 

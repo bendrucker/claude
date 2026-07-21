@@ -1,4 +1,16 @@
 import { exit } from "node:process";
+import { $ } from "bun";
+
+/**
+ * Repo-relative paths of git-tracked files matching a pathspec.
+ *
+ * The pathspec must stay interpolated: `Bun.$` glob-expands literal template
+ * text, which would reduce `*.md` to root-level files before git sees it.
+ */
+export async function tracked(pattern: string, cwd: string): Promise<string[]> {
+  const output = await $`git ls-files -z ${pattern}`.cwd(cwd).text();
+  return output.split("\0").filter(Boolean);
+}
 
 export interface CheckResult {
   /** Lines printed before the violation list when violations exist. */

@@ -178,7 +178,7 @@ Target at least min(files_changed, 4) findings — if you see fewer, widen to ot
 
 Template source:
 
-```js
+```fragment
 gVu=(e,t=!0)=>{ if(!t) return Hhs({...});   // t = Agent tool available
 return `\`medium effort → 3+5 angles × 6 candidates → 1-vote verify → ≤8 findings\`
 
@@ -284,7 +284,7 @@ Only differences vs `medium`: budget tag line, precision→recall framing paragr
 
 ### 1.6 `xhigh` / `max` — default/Sonnet, `Agent` available (`yVu("xhigh")`, `yVu("max")`)
 
-```js
+```fragment
 yVu=(e)=>(t,r=!0)=>{ if(!r) return Hhs({...});
 return `\`${e} effort → 5+5 angles × 8 candidates → 1-vote verify → sweep → ≤15 findings\`
 
@@ -636,7 +636,7 @@ setup/teardown asymmetry in tests; config defaults flipped.
 
 The **local inline** path has no Scope agent — it uses the Phase 0 text in §2.0. The **workflow-backed** path (`Workflow({name:"code-review", args:"<level> [target]"})`) has a dedicated Scope agent. Verbatim from the generated workflow script:
 
-```js
+```fragment
 // ─── Phase 0: Scope ───
 phase("Scope")
 const scope = await agent(
@@ -1375,7 +1375,7 @@ Dynamic `argumentHint` (`AeS`):
 
 `Hu` fills the rest of the descriptor:
 
-```js
+```fragment
 { type:"prompt", name, description, menuDescription, aliases, subcommands,
   hasUserSpecifiedDescription:true, allowedTools:e.allowedTools??[], disallowedTools:[],
   argumentHint, whenToUse, model, disableModelInvocation:e.disableModelInvocation??false,
@@ -1389,7 +1389,7 @@ Dynamic `argumentHint` (`AeS`):
 
 `kzr` (byte ~223,833,600) — the Skill-tool admission check:
 
-```js
+```fragment
 function kzr(e,t){
   let {commandName:r, userTypedThisTurn:n, isMainSession:o, permissionContext:i} = t;
   if (e.disableModelInvocation && !n)

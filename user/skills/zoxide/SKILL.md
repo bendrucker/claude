@@ -20,9 +20,9 @@ Invoke whenever:
 Raw `zoxide query` opens the database read-write to age scores and prune missing dirs. Under the sandbox it prints the correct path but also writes `could not write to database` to stderr and **sometimes returns rc=1 on a correct answer**. So copy `db.zo` into `$TMPDIR` once and query the copy through `_ZO_DATA_DIR`:
 
 ```bash
-ZO_SRC="$HOME/Library/Application Support/zoxide"
+ZO_SRC="${_ZO_DATA_DIR:-$HOME/Library/Application Support/zoxide}"   # honors a relocated db
 [ -d "$ZO_SRC" ] || ZO_SRC="${XDG_DATA_HOME:-$HOME/.local/share}/zoxide"
-ZO_TMP="$TMPDIR/zoxide.$$"; mkdir -p "$ZO_TMP"; cp "$ZO_SRC/db.zo" "$ZO_TMP/db.zo"
+ZO_TMP="${TMPDIR:-/tmp}/zoxide.$$"; mkdir -p "$ZO_TMP"; cp "$ZO_SRC/db.zo" "$ZO_TMP/db.zo"
 z() { _ZO_DATA_DIR="$ZO_TMP" zoxide query "$@"; }
 
 z honeycomb            # best match:  /Users/.../honeycomb-cli

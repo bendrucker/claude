@@ -50,6 +50,8 @@ DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` because `=` binds t
 
 `getDb` opens read-write, which needs an exclusive DuckDB file lock: the writers (`refresh.ts` past its stamp, `import.ts`, `forget.ts`, `hosts.ts`) must not run concurrently with each other or with readers. Read-only opens take a shared lock: any number coexist, but none can open mid-refresh and a refresh cannot start while readers hold the file. Either collision fails with `Could not set lock`. The workflow fan-out pattern is therefore "refresh once, then have every agent query with `duckdb -readonly` over the shared file" (documented in SKILL.md "Parallel Queries"). This is why the query path is the bare `duckdb` CLI rather than a wrapper: a read-only open at the stable path is all a caller needs, and a wrapper would force every parallel agent through it for no benefit.
 
+The four writers carry the `claude:dangerouslyDisableSandbox` marker after their shebang. The sandbox denies writes under `~/.claude/plugins`, which covers the plugin data dir holding the index, and the deny shadows any `filesystem.allowWrite` entry beneath it. See [`plugins/mac/README.md`](../../../mac/README.md) for the marker.
+
 ### Callers
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.

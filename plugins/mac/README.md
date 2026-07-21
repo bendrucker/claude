@@ -11,7 +11,7 @@ macOS-specific automation and system integration.
 
 ### Hooks
 
-- **sandbox** — Reads the invoked `bun`/`node` script for the `claude:dangerouslyDisableSandbox` marker and disables the command sandbox when present. Matches both `Bash` and `Monitor` tool calls.
+- **sandbox** — Reads the invoked script for the `claude:dangerouslyDisableSandbox` marker and disables the command sandbox when present. Matches both `Bash` and `Monitor` tool calls.
 
 ### Scripts
 
@@ -26,14 +26,18 @@ Apple Events and Launch Services handoff is different. Scripts that shell out to
 
 ### Sandbox bypass marker
 
-The `sandbox` hook disables the command sandbox for a `bun <script>` or `node <script>` invocation when the script's first 64KB contains the literal string `claude:dangerouslyDisableSandbox`. Add the marker after the shebang of any top-level wrapper that hands off to Apple Events or Launch Services:
+The `sandbox` hook disables the command sandbox when the invoked script's first 64KB contains the literal string `claude:dangerouslyDisableSandbox`. It finds the script two ways: as the argument to `bun` or `node`, or as the command itself when a script is executed directly by path through its shebang and its extension is `.ts`, `.js`, `.mjs`, `.cjs`, or `.sh`.
+
+Two situations warrant the marker. One is handing off to Apple Events or Launch Services, which does not survive the sandbox. The other is writing a plugin's own data dir: the sandbox profile denies writes under `~/.claude/plugins`, and that deny shadows any `filesystem.allowWrite` entry beneath it, so a plugin script cannot write `~/.claude/plugins/data/<plugin>-<marketplace>/` while sandboxed.
+
+Add the marker after the shebang:
 
 ```ts
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: hands off to osascript for JXA Apple Events
 ```
 
-The marker goes on the top-level entrypoint script only. The hook inspects the `bun`/`node` script argument, not imported modules, so a helper like `things/scripts/ensure-running.ts` carries no marker of its own; its callers do.
+The marker goes on the top-level entrypoint script only. The hook inspects the invoked script, not imported modules, so a helper like `things/scripts/ensure-running.ts` carries no marker of its own; its callers do.
 
 The marker is inert on Linux and inert when the `mac` plugin is not installed. It only activates when this hook runs on macOS.
 

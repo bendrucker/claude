@@ -1,12 +1,14 @@
 #!/usr/bin/env bun
 
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
 type ToolInput = { command: string };
 
 const SHELL_OPERATORS = /\s*(?:&&|\|\||[|;])\s*/;
 const SCRIPT_INTERPRETERS = new Set(["bun", "node"]);
+// Gating on extensions keeps the hook from reading the head of every binary it sees.
+const SCRIPT_EXTENSIONS = new Set([".ts", ".js", ".mjs", ".cjs", ".sh"]);
 const SCRIPT_MARKER = "claude:dangerouslyDisableSandbox";
 
 export type Invocation = { cmd: string; scriptArg?: string };
@@ -37,6 +39,8 @@ export function extractCommands(command: string): Invocation[] {
       if (next && !next.startsWith("-")) {
         invocation.scriptArg = next;
       }
+    } else if (SCRIPT_EXTENSIONS.has(extname(name))) {
+      invocation.scriptArg = cmd;
     }
     result.push(invocation);
   }

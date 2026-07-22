@@ -41,20 +41,13 @@ allowed-tools:
 
 ## Body
 
-The body conveys what the diff cannot: why this change, what you decided along the way, and how you know it works. The reviewer reads the diff for what changed, so don't restate it. Spend the body on intent and the decisions a reviewer can't reconstruct from the code.
+Lead with intent: why this change, the decisions a reviewer can't reconstruct from the diff, and how you know it works. Don't restate what the diff, git, or the status checks already carry. Mine the session for the substance that never reached the code (rejected alternatives, overturned theories, what you observed testing, scope added or dropped) and state each as a self-contained decision, not as a delta against a plan the reviewer never saw.
 
-Mine the conversation that produced this change. The substance lives there: decisions and the alternatives you rejected, the scope you added or dropped, theories you tried and overturned, what you observed testing locally, limitations you ruled out, naming or scope you settled by hand. Put it in the body as a self-contained decision, not as a delta against a plan the reviewer never saw. Keep it out of code comments.
+- Open with a bare verb ("Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when it needs justifying. Don't restate the title.
+- Default to prose. A small PR is a tight paragraph with no headers. Add `##` sections only when length earns them. Length tracks substance, not diff size.
+- Reference the motivating issue at the end of the opening (`Closes #N`, `Fixes #N`, or bare `#N` if not closing). Wrap code identifiers in backticks, but leave bare anything the platform auto-links: commit SHAs and issue/MR refs (`#N`, `!N`, `owner/repo#N`). Backticks kill the link.
 
-- Open with what changed (a bare verb: "Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when the change needs justifying. Don't restate the title.
-- Length tracks substance, not diff size. A subtle one-line fix may need paragraphs. A large mechanical change may need two sentences.
-- Restate nothing another surface already carries. The diff shows what changed, git shows which files, and the status checks show that lint, types, and tests pass. Name a check only when its result is not one CI will post: a manual observation, an intentional exclusion, a pre-existing warning you're leaving in place.
-- Shape prose so it reads. One thread per paragraph, and break a paragraph that runs past three or four sentences. A single sentence stacking clauses behind commas is a wall even when every clause is true. When items are parallel and merely co-occur (findings, cases covered, checks run), make them a list. Prose is for reasoning that connects one point to the next. "Default to prose" means don't add the reflexive scaffold, not cram an enumeration into one sentence.
-- Default to prose. Use `##` sections only when the body is long enough to need them. Small PRs are a tight paragraph with no headers.
-- Audience sets the bar (same owner-and-visibility probe as [Reviewers](#reviewers)). Owner is you: a personal repo you review through Claude, so stay concise and skip background you already hold. Private or org-owned: a corporate repo coworkers skim, so lead with intent at moderate detail. Public and not yours: an open-source repo under external scrutiny with the highest cost for unclear intent, so spend the most on decisions and evidence.
-- Reference the motivating issue at the end of the opening (`Closes #N`, `Fixes #N`, or `#N` if not closing). Related-for-context issues go in a `## References` section, never bare at the bottom.
-- Wrap code identifiers in backticks: function names, class names, file paths, endpoints, status codes. Do not backtick anything the platform auto-links: commit SHAs and issue/MR references (`#N`, `!N`, `owner/repo#N`). Backticks render them as code and kill the link. Write them bare.
-
-See [`sections.md`](sections.md) for the substance catalog (what to surface, by change type), optional-section guidance, how to ground claims in evidence, and the slop patterns to cut. Load the `writing` skill for the full set of tropes to avoid.
+Before drafting anything past a one-paragraph body, load [`sections.md`](sections.md): the substance catalog by change type, audience tiers, density and heading rules, evidence grounding, and slop to cut. Load the `writing` skill for the full set of tropes to avoid.
 
 ## Outline First
 
@@ -66,21 +59,7 @@ A wall of text is easier to prevent than to fix. For a large change, or any open
 
 ## Template
 
-When a PR template is provided in context above, follow its structure instead of the default body format:
-
-- Preserve all template sections, even if some are left empty
-- Leave checklists (checkbox items) untouched for the user to complete manually
-- Remove HTML comments (`<!-- ... -->`) that serve as placeholder instructions
-- Map skill-generated content into corresponding template sections:
-  - Description/summary sections: the opening plus the conversation substance (decisions, scope added or dropped, what you observed testing)
-  - Changes/what sections: follow the `## Changes` guidance in `sections.md`
-  - Testing/verification sections: follow the `## Testing` guidance in `sections.md`
-  - Issue/references sections: the motivating issue ref and `## References` content
-- For template sections with no skill equivalent (e.g., type-of-change dropdowns), fill them based on the diff context
-- Within each template section, follow the style rules from `sections.md`
-- If the template has a free-form description section, place the summary sentences there and add skill subsections within it as needed
-
-When no template is detected, use the default body format from the Body section above.
+When the context above shows a detected PR template, follow its structure instead of the default body format. Load [`template.md`](template.md) for how to preserve sections and map skill-generated content into them. With no template detected, use the default Body format above.
 
 ## Issue Handling
 
@@ -91,28 +70,7 @@ When an issue is referenced:
 
 ## Reviewers
 
-Reviewer suggestion is for corporate and internal work. On OSS the project author or maintainer triages incoming PRs, so suggesting reviewers there only adds noise. Gate this whole section on repository visibility:
-
-- **GitHub**: `gh repo view --json visibility -q .visibility`
-- **GitLab**: `glab api projects/:fullpath --jq .visibility`
-
-A public repository is OSS. Skip the rest of this section and let the maintainer triage. Any other visibility (private, internal) is corporate. Continue below.
-
-Suggest reviewers; never assign them. The user always chooses from the suggestions.
-
-Run the script to rank candidates from the git history of the changed files. It excludes you and needs no arguments:
-
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-reviewers.ts
-```
-
-- **Blame owners**: people who wrote the lines you're changing. Suggest the top one or two.
-- **Sole-author fallback**: when the output reports you're the sole author of the area, use the recent in-area PR/MR refs it prints—look up who you requested review from on those and suggest the recurring names.
-
-This runs after you create the PR/MR, so it never delays creation. Resolve names to platform usernames only after the user accepts, then assign them to the existing PR/MR:
-
-- **GitHub**: `gh pr edit --add-reviewer <user>` (resolve emails to logins with `mcp__github` if needed)
-- **GitLab**: load `gitlab:merge-request` for username resolution, then `glab mr update --reviewer <user>`
+Corporate and internal repos only. On OSS (a public repo you don't own) the maintainer triages, so skip this and add no noise. Suggest reviewers, never assign; the user always chooses. This runs after creation, so it never delays it. Load [`reviewers.md`](reviewers.md) for the visibility gate, the ranking script, and username resolution.
 
 ## Arguments
 

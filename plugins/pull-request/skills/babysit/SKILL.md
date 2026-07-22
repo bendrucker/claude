@@ -88,7 +88,7 @@ Lockfiles or generated files (`bun.lock`, etc.): regenerate per project conventi
 
 Real source conflicts: rebase on `origin/<base>` and delegate to the `git:conflicts` skill. Resolve, commit, and push where mechanically clear. Where ambiguous or semantic, report the conflicting hunks and call `TaskStop` (this runs unattended, so never guess a merge).
 
-In Merge Mode, after any push here, [re-arm](#re-arm) and count it as a submit attempt.
+In Merge Mode, after any push here, re-arm per [Merge Mode](#merge-mode) and count it as a submit attempt.
 
 #### mergeable-unknown
 
@@ -129,44 +129,11 @@ Report the event (include `minutes`) and the work done since the start SHA, then
 
 ## Reviews Hand-off
 
-With `--reviews`, after the first green invoke `pull-request:follow-up --auto <pr-url>` to triage AI-reviewer threads (fix, reply, resolve, loop until the reviewer is satisfied). follow-up calls back into babysit for each post-push CI wait, so let it own the review loop. When a bot review is expected but hasn't landed at green, follow-up waits for its first pass rather than reporting nothing to do.
-
-When it returns satisfied, re-request the **human** reviewers whose approval a push (follow-up's fixes or babysit's own) invalidated. Don't re-request bots; follow-up owns the `@bot` re-trigger.
-
-- **GitHub**: `gh pr edit <pr-url> --add-reviewer <user>`.
-- **GitLab**: delegate to `gitlab:merge-request` ([Re-request reviewers](../../../gitlab/skills/merge-request/SKILL.md#re-request-reviewers)).
-
-Then branch:
-
-- If `--merge` is also set, proceed to [Merge Mode](#merge-mode).
-- Otherwise report what was addressed and call `TaskStop`.
-
-This human re-request happens only in the `--reviews` flow. Review *threads* stay out of scope: follow-up lists them and leaves them for you.
+With `--reviews`, after the first green, hand off to `pull-request:follow-up --auto` for AI-reviewer triage, then re-request the human reviewers a push invalidated. Load [`reviews.md`](reviews.md) for the hand-off contract and the re-request commands.
 
 ## Merge Mode
 
-With `--merge`, don't stop at green; drive the PR to **merged**. CI green is the entry condition; from here, submit to the repo's merge mechanism and recover from kickouts until it lands. GitHub merges run through `gh` directly; delegate all GitLab merge behavior (trains, endpoint, squash) to `gitlab:merge-request`.
-
-First confirm the PR can merge on its own. Don't bypass blocks you can't resolve: missing **human** approval (you can't self-approve; if a bot was the blocker and `--reviews` ran, it's already handled), branch protection, draft state, or requested changes; report and `TaskStop`. Read state via `gh pr view --json mergeable,mergeStateStatus,reviewDecision,state` (GitLab: `gitlab:merge-request`).
-
-Submit by the most automated path the repo allows (merge queue/train, else auto-merge, else direct, valid since CI is green):
-
-- **GitHub**: `gh pr merge <pr-url> --auto --squash` enables auto-merge or queues the PR. If `--auto` is rejected, merge directly: `gh pr merge <pr-url> --squash`. Prefer squash → merge → rebase per `gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`.
-- **GitLab**: delegate to the `gitlab:merge-request` skill.
-
-### Re-arm
-
-A push drops the PR from the merge mechanism (GitLab: off the train; GitHub: clears queued auto-merge) and fires **no monitor event**. So in Merge Mode, after **every** push, re-submit by the same path as the initial submit above instead of waiting. Each re-arm counts toward the 3-attempt oscillation guard below.
-
-Then watch the merge through the monitor rather than polling by hand: invoke the provider's monitor skill again on the PR and react to its events. The watcher enforces the interval and the wall clock, so this phase stays bounded like the CI wait (see [Bounds](#bounds)) and babysit owns no loop here. React to:
-
-- `merged`: the PR landed. Report success and `TaskStop`.
-- `conflicts`: route through the [conflicts](#conflicts) handler, then [re-arm](#re-arm). Counts as a submit attempt.
-- `status: failing`: route through the [status: failing](#status-failing) handler; the pushed fix produces a new SHA, then [re-arm](#re-arm). Counts as a submit attempt.
-- `pr-closed`: the PR closed without merging. Report and `TaskStop`.
-- `max-time-reached`: report and `TaskStop`; do not re-arm.
-
-Stop re-submitting after 3 attempts (re-submits included, an oscillation guard) or an unrecoverable block (missing human approval, non-trivial CI failure, non-lockfile conflict, permissions).
+With `--merge`, don't stop at green; drive the PR to **merged**. Load [`merge-mode.md`](merge-mode.md) for the merge-submission paths, the re-arm-after-every-push rule, and the oscillation guard.
 
 ## Gotchas
 

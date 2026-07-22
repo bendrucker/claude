@@ -68,9 +68,8 @@ Populate only the keys you can infer: `title`, `type`, `labels`, `priority`,
 lists. The platform skill fills routing and workspace fields (team, assignee,
 state, estimate) at save time.
 
-Write the `title` in sentence case: capitalize the first word and proper nouns,
-and leave the rest lowercase. This sets it apart from the title-case body
-headings. Keep it to one line with no long parentheticals.
+Write the `title` in sentence case (not the title case used for body headings),
+one line, no long parentheticals.
 
 A related issue you found belongs under `relations` as a tracker link, kept out
 of the body. Mention another issue in the body only when it tells the reader
@@ -82,23 +81,15 @@ links the relation already expresses.
 
 Every section must tell the reader something they couldn't have guessed. Cut sections whose content is tautological ("tests must pass"), template residue ("no behavior change"), or obvious given the issue's size.
 
-For a substantial issue, the opening summary plus one type section plus `## Context` is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough.
-
-`--compact` forces that trivial body regardless of size: name the problem, point at the code, drop the `## Context` frame. Frontmatter is still emitted.
+For a substantial issue, the opening summary plus one type section plus `## Context` is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough. `--compact` forces that trivial body regardless of the issue's size.
 
 ## Style
 
-State facts and drop the hedging. Name the function, file, or behavior rather than describing it vaguely. Every sentence should add information. A section present only to match the template is filler, so earn each heading.
+Load the `writing` skill for tone and trope rules (hedging, em dashes, marketing vocabulary). The issue-specific rules on top of it:
 
-Section headings are title-case noun phrases. Keep them free of sentences, slogans, and "X, not Y" antithesis. Write "Connection Lifecycle" rather than "Pin, don't invalidate".
-
-Plain words over jargon and marketing. Drop terms like "spike" (as a verb), "seam", "disposition", "reality". Say what the thing does.
-
-Reference code by symbol. Name the function or type and quote the few relevant lines inline. Skip bare line ranges (`file.py:26-56`, `#L26-L56`): they go stale as the file changes. Use a SHA-pinned permalink only when a stable anchor is genuinely needed.
-
-Reference issues and PRs as tracker links that expand inline, never as bare numbers (`ENG-1970`, `!578`, `#123`) a reader can't resolve. The platform skill owns the link syntax.
-
-Don't use spaced em dashes. Split into two sentences without a semicolon or unspaced substitute.
+- Section headings are title-case noun phrases. Keep them free of sentences, slogans, and "X, not Y" antithesis. Write "Connection Lifecycle" rather than "Pin, don't invalidate".
+- Reference code by symbol. Name the function or type and quote the few relevant lines inline. Skip bare line ranges (`file.py:26-56`, `#L26-L56`): they go stale as the file changes. Use a SHA-pinned permalink only when a stable anchor is genuinely needed.
+- Reference issues and PRs as tracker links that expand inline, never as bare numbers (`ENG-1970`, `!578`, `#123`) a reader can't resolve. The platform skill owns the link syntax.
 
 ## Issue Trackers
 

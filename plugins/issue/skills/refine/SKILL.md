@@ -85,11 +85,17 @@ For a substantial issue, the opening summary plus one type section plus `## Cont
 
 ## Style
 
-Load the `writing` skill for tone and trope rules (hedging, em dashes, marketing vocabulary). The issue-specific rules on top of it:
+State facts and drop the hedging. Name the function, file, or behavior rather than describing it vaguely. Every sentence should add information. A section present only to match the template is filler, so earn each heading.
 
-- Section headings are title-case noun phrases. Keep them free of sentences, slogans, and "X, not Y" antithesis. Write "Connection Lifecycle" rather than "Pin, don't invalidate".
-- Reference code by symbol. Name the function or type and quote the few relevant lines inline. Skip bare line ranges (`file.py:26-56`, `#L26-L56`): they go stale as the file changes. Use a SHA-pinned permalink only when a stable anchor is genuinely needed.
-- Reference issues and PRs as tracker links that expand inline, never as bare numbers (`ENG-1970`, `!578`, `#123`) a reader can't resolve. The platform skill owns the link syntax.
+Section headings are title-case noun phrases. Keep them free of sentences, slogans, and "X, not Y" antithesis. Write "Connection Lifecycle" rather than "Pin, don't invalidate".
+
+Plain words over jargon and marketing. Drop terms like "spike" (as a verb), "seam", "disposition", "reality". Say what the thing does.
+
+Reference code by symbol. Name the function or type and quote the few relevant lines inline. Skip bare line ranges (`file.py:26-56`, `#L26-L56`): they go stale as the file changes. Use a SHA-pinned permalink only when a stable anchor is genuinely needed.
+
+Reference issues and PRs as tracker links that expand inline, never as bare numbers (`ENG-1970`, `!578`, `#123`) a reader can't resolve. The platform skill owns the link syntax.
+
+Don't use spaced em dashes. Split into two sentences without a semicolon or unspaced substitute.
 
 ## Issue Trackers
 

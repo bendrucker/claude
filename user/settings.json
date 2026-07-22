@@ -51,6 +51,7 @@
       "WebFetch(domain:claude.ai)",
       "WebFetch(domain:bun.sh)",
       "WebFetch(domain:bun.com)",
+      "WebFetch(domain:*.greptile.com)",
       "Edit(tmp/**)",
       "Edit(.git/config)",
       "Edit(.git/config.lock)",

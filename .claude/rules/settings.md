@@ -45,11 +45,13 @@ The sandbox is egress control, not filesystem lockdown. Credentials stay outside
 
 - Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `community-extensions.duckdb.org` (DuckDB community extensions `markdown`/`yaml`, fetched on first `INSTALL ... FROM community`).
 - Docs and source: `docs.anthropic.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`.
-- Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`. Trusted only because each secret lives outside the sandbox.
+- Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`, `*.greptile.com`. Trusted only because each secret lives outside the sandbox, except `gitlab.com` and `*.greptile.com` (see below).
 
 `api.anthropic.com` is the known exfil-capable host (it accepts uploads). It stays because the agent needs the model API.
 
 `gitlab.com` is a partial exception to the secrets-outside rule: `glab` stores its OAuth token in `~/.config/glab-cli/config.yml` (no keychain support), which the sandbox can read. A sandboxed process can therefore exfiltrate that token through any allowlisted egress host, and `gitlab.com` itself accepts uploads (snippets, repos). Accepted because the alternative was near-universal `dangerouslyDisableSandbox` on `glab` calls, which exposed far more. The write allowlist covers only `~/.config/glab-cli/recover` (`glab`'s crash-recovery files), not the config file itself.
+
+`*.greptile.com` is the same partial exception: the `greptile` CLI (run sandboxed by `pull-request:follow-up --local`) stores its token in `~/.greptile/auth.json`, which the sandbox can read, and reaches `api.`/`auth.`/`app.greptile.com` for login and reviews. The wildcard covers those subdomains without listing each. Accepted so `greptile review` runs sandboxed rather than escaped; the token is exfiltrable through any allowlisted host, and greptile's own hosts accept uploads.
 
 ### Sockets and Writes
 

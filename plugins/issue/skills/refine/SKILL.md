@@ -68,9 +68,8 @@ Populate only the keys you can infer: `title`, `type`, `labels`, `priority`,
 lists. The platform skill fills routing and workspace fields (team, assignee,
 state, estimate) at save time.
 
-Write the `title` in sentence case: capitalize the first word and proper nouns,
-and leave the rest lowercase. This sets it apart from the title-case body
-headings. Keep it to one line with no long parentheticals.
+Write the `title` in sentence case (not the title case used for body headings),
+one line, no long parentheticals.
 
 A related issue you found belongs under `relations` as a tracker link, kept out
 of the body. Mention another issue in the body only when it tells the reader
@@ -82,9 +81,7 @@ links the relation already expresses.
 
 Every section must tell the reader something they couldn't have guessed. Cut sections whose content is tautological ("tests must pass"), template residue ("no behavior change"), or obvious given the issue's size.
 
-For a substantial issue, the opening summary plus one type section plus `## Context` is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough.
-
-`--compact` forces that trivial body regardless of size: name the problem, point at the code, drop the `## Context` frame. Frontmatter is still emitted.
+For a substantial issue, the opening summary plus one type section plus `## Context` is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough. `--compact` forces that trivial body regardless of the issue's size.
 
 ## Style
 

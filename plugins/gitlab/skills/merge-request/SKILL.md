@@ -14,8 +14,6 @@ Working with GitLab merge requests via `glab mr`.
 
 Scripts directory (absolute, for invocations from other skills where `${CLAUDE_SKILL_DIR}` points elsewhere): !`mkdir -p /tmp/claude/gitlab-skill 2>/dev/null; touch "/tmp/claude/gitlab-skill/${CLAUDE_SESSION_ID}" 2>/dev/null; echo "${CLAUDE_SKILL_DIR}/scripts"`
 
-Loading this skill also stamps `/tmp/claude/gitlab-skill/<session>`, which tells the plugin's `hooks/lint.ts` to skip its load-this-skill nudge. Keep the path in sync with `MARKER_DIR` there.
-
 ## Arguments
 
 `$0` (optional verb) routes to a section below. With no verb, infer the operation from the request.
@@ -27,17 +25,6 @@ Loading this skill also stamps `/tmp/claude/gitlab-skill/<session>`, which tells
 - `block`: block an MR until another merges. See [Blocking](#blocking).
 
 Flag defaults: `--draft` off, `--auto` off, `--role reviewer`.
-
-## Key Commands
-
-```bash
-glab mr create --fill      # Create from commits (push branch first!)
-glab mr list               # List MRs
-glab mr view               # View current branch's MR
-glab mr checkout <id>      # Check out MR branch
-```
-
-Use `glab mr --help` and `glab mr <command> --help` for full options.
 
 ## Merging
 
@@ -57,16 +44,7 @@ A push also resets approvals when `reset_approvals_on_push` is on. Re-trigger re
 
 ### Inspect or Recover a Train
 
-`glab` has no merge-train command, so use the API directly:
-
-```bash
-# Active train for the project
-glab api "projects/:id/merge_trains?scope=active" | jq '.[] | {iid: .merge_request.iid, status, target_branch}'
-
-# Clear a stuck entry, then re-arm
-glab api --method DELETE "projects/:id/merge_trains/merge_requests/<iid>"
-glab api --method POST  "projects/:id/merge_trains/merge_requests/<iid>" --raw-field auto_merge=true
-```
+To inspect the active train or clear a stuck entry via the API (`glab` has no merge-train command), see [merge-trains.md](merge-trains.md).
 
 ## Patterns
 
@@ -89,18 +67,7 @@ glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<n
 
 ## Blocking
 
-Prevent an MR from merging until another MR merges first. Uses the REST API since `glab mr` has no blocking subcommand.
-
-```bash
-# Block MR !10 until MR !5 merges
-glab api projects/:id/merge_requests/10/blocks -X POST -f blocking_merge_request_iid=5
-
-# List blocks on an MR
-glab api projects/:id/merge_requests/10/blocks
-
-# Remove a block
-glab api projects/:id/merge_requests/10/blocks/<block-id> -X DELETE
-```
+Block an MR from merging until another MR merges first (`block` verb). See [blocking.md](blocking.md) for the REST API commands.
 
 ## Reviews
 
@@ -126,11 +93,4 @@ Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md
 
 ## Stacking
 
-`glab stack` manages stacked diffs — small changes that build on each other. See [stack.md](stack.md).
-
-## Reference Files
-
-- [review.md](review.md) - Draft notes review workflow
-- [review-state.md](review-state.md) - GraphQL mutations for review decisions, the cross-project review queue, and next-actor triage
-- [discussions.md](discussions.md) - Discussion threads and resolution
-- [stack.md](stack.md) - Stacked diff workflow
+`glab stack` manages stacked diffs, small changes that build on each other. See [stack.md](stack.md).

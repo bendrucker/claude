@@ -18,7 +18,6 @@ allowed-tools:
   - Bash(gh:*)
   - Bash(greptile:*)
   - Bash(coderabbit:*)
-  - Bash(cr:*)
   - Bash(jq:*)
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*)"
   - Skill(github:pr-comments)

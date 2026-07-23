@@ -5,17 +5,20 @@ description: >
   comments still need a response, investigate how threads were resolved (including silent
   resolves), and draft replies. With --auto, autonomously triage AI-reviewer (bot) threads and
   loop until the reviewer is satisfied, clearing a bot review hands-off. With --local, run the
-  same bot loop pre-push through the reviewer's CLI (Greptile) against unmerged commits, before
-  any PR exists. Use when reviewers commented on your PR and you need to respond or satisfy
-  them. Use --local proactively, without being asked, whenever you are about to push or open a
-  PR in a repo with a supported bot (bot config present, CLI installed). Triggers: "respond to
-  review comments on my PR", "address reviewer feedback", "make the bot reviewer pass",
-  "greptile review", "run the review bot locally", "bot review before pushing".
+  same bot loop pre-push through the reviewer's CLI (Greptile, CodeRabbit) against unmerged
+  commits, before any PR exists. Use when reviewers commented on your PR and you need to respond
+  or satisfy them. Use --local proactively, without being asked, whenever you are about to push
+  or open a PR in a repo with a supported bot (bot config present, CLI installed). Triggers:
+  "respond to review comments on my PR", "address reviewer feedback", "make the bot reviewer
+  pass", "greptile review", "coderabbit review", "run the review bot locally", "bot review
+  before pushing".
 argument-hint: "[pr-url] [--auto] [--include-human-nits] [--local [base]]"
 allowed-tools:
   - Bash(git:*)
   - Bash(gh:*)
   - Bash(greptile:*)
+  - Bash(coderabbit:*)
+  - Bash(cr:*)
   - Bash(jq:*)
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*)"
   - Skill(github:pr-comments)

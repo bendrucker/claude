@@ -20,9 +20,9 @@ Pass a query as the argument. Output is JSON on stdout; pipe through `jq` to ext
 linear api 'query { viewer { id name email } }' | jq '.data.viewer'
 ```
 
-## Non-null markers and the `!` escaping bug
+## Multi-line queries
 
-GraphQL non-null markers (`String!`) contain `!`, which the Bash tool escapes and corrupts inline. Pass any query containing `!` through a quoted heredoc on stdin so the marker survives verbatim:
+Pass multi-line queries through a quoted heredoc on stdin:
 
 ```bash
 linear api --variable id=ISSUE_ID <<'GRAPHQL'

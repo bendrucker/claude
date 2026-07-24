@@ -61,7 +61,6 @@ On success the script prints the absolute output path. Fit problems are warnings
 
 ## Gotchas
 
-- The Bash tool escapes `!` to `\!`, which corrupts flag values. If any text contains `!`, Write a spec file to `tmp/` and render with `--spec` instead of text flags.
 - Web search returns template *pages*, not image files, and meme-site pages are often JS-rendered so the image URL is not in the static HTML. Imgflip: the direct image is `https://i.imgflip.com/<id36>.jpg` where `<id36>` is the numeric template ID from the page URL in base36 (`(55311130).toString(36)` → `wxica`). Always `file` the download to confirm it is an image before rendering.
 - Multi-panel formats: set `"linkFontSizes": true` in the spec so all panels share one font size instead of each fitting independently.
 - Images narrower than 400px are auto-upscaled 2x before drawing, so tiny templates still get readable text. Expect output dimensions to differ from the input.

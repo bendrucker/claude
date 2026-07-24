@@ -27,7 +27,7 @@ Run searches in parallel. Infer the ecosystem from:
 Start with 2-3 most promising projects:
 1. Read README and high-level docs to assess relevance
 2. Examine code only when relevance is confirmed AND implementation details matter
-3. Dispatch parallel Task agents per project, with explicit focus areas
+3. Dispatch parallel `Agent` calls per project, with explicit focus areas
 
 If results don't satisfy the query, expand to more projects.
 

@@ -8,7 +8,7 @@ allowed-tools:
   - Grep
   - Glob
   - WebFetch
-  - Task
+  - Agent
   - Write
   - Skill(things:url)
   - mcp__claude_ai_Zapier__things_create_to-do
@@ -46,7 +46,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/fetch.ts --days 14 --source simon --source mario
 
 Turn posts into repo-mappable idea cards. The bar is high: a card must name a real surface in this repo it would refine, or make a clear case for a net-new artifact. See [references/mining.md](references/mining.md) for the card schema, the proven heuristics (per-source cap by depth, auto-demote 404 sources, dedupe against existing repo surfaces), and the fan-out flow.
 
-Fan out one mining `Task` agent per source (batch thin sources together). Give each the source's posts, the schema, the heuristics, and a read-only view of the repo so it can fill `repoOverlap` and dedupe. Collect the cards, verify each `sourceUrl` resolves (demote 404s), then dedupe across agents.
+Fan out one mining `Agent` call per source (batch thin sources together). Give each the source's posts, the schema, the heuristics, and a read-only view of the repo so it can fill `repoOverlap` and dedupe. Collect the cards, verify each `sourceUrl` resolves (demote 404s), then dedupe across agents.
 
 ## Synthesize
 

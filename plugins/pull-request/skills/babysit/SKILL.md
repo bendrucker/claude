@@ -141,8 +141,6 @@ The monitor script delivers structured JSON events. Do not pipe CLI output to `p
 
 CI may run on synthetic merge commits whose SHA never matches the branch tip. The watcher reports the source branch SHA in each event; compare against `git rev-parse HEAD`.
 
-The Bash tool escapes `!` to `\!`. Use `| not` in jq filters (e.g. `select(.x == null | not)`), or pass filters via heredoc.
-
 The watcher dedupes by `(sha, state)`. A `failing` event for a SHA older than `git rev-parse HEAD` means a fix was already pushed; ignore it.
 
 Babysit is session-scoped. If the session ends, the watcher process ends with it. Re-invoke this skill from a new session to resume.

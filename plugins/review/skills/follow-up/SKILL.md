@@ -104,7 +104,7 @@ status.
 
 Use the `github:pr-comments` skill's script with `--role reviewer --include-resolved` to get every thread you started, resolved and unresolved, each with its full comment chain so silent resolves are visible. Do not pass `--since`. Follow-up needs the whole history.
 
-If a query ever needs hand-authoring (fetching `reviewThreads` is the usual case), write it to a `.graphql` file with the Write tool and pass `gh api graphql -F query=@query.graphql`. Capital `-F` reads the query from a file. An inline `-f query=...` or a shell heredoc breaks because a `!` in a GraphQL non-null marker gets mangled by the Bash tool's escaping.
+If a query ever needs hand-authoring (fetching `reviewThreads` is the usual case), write it to a `.graphql` file with the Write tool and pass `gh api graphql -F query=@query.graphql`. Capital `-F` reads the query from a file, which keeps a long multi-line query out of the command line.
 
 #### GitLab
 

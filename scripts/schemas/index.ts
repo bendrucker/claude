@@ -18,6 +18,7 @@ const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 
 const check = command({ name: "check" }, async () => {
   let failed = false;
+  let warned = false;
   for (const source of await loadSources(SCHEMAS_DIR)) {
     const [base, patch] = await Promise.all([
       fetchBase(source.url),
@@ -42,12 +43,17 @@ const check = command({ name: "check" }, async () => {
       } else {
         console.log(
           `${yellow("⚠")} ${source.patch} op[${index}] (${path}) replaces a definition ` +
-            `upstream now ships. Reconcile the op against upstream or drop it.`,
+            `upstream now ships. Confirm the override is still intended, otherwise drop the op.`,
         );
+        warned = true;
       }
     }
   }
   if (failed) process.exit(1);
+  if (warned) {
+    console.log(yellow("\nSchema overlays apply, but some ops overwrite an upstream definition."));
+    return;
+  }
   console.log(green("\nAll schema overlays are current with upstream."));
 });
 

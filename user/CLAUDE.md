@@ -26,7 +26,7 @@ Every customization costs tokens on every session. Before adding one, define how
 ## Workflow
 
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.
-- For questions about Claude Code features or usage, use the Task tool with `subagent_type='claude-code-guide'` to consult official documentation.
+- For questions about Claude Code features or usage, use the `Agent` tool with `subagent_type='claude-code-guide'` to consult official documentation.
 - Prefer the `agent-browser` skill over `WebFetch`/`WebSearch` when a task needs a real browser — interacting with a page, screenshots, scraping JS-rendered content, or web-app QA/dogfooding. It loads the CLI's version-matched `skills get` workflows. Plain `WebFetch` stays fine for static page fetches.
 - Finish a branch with `/ship`: it runs the warranted review passes, opens the PR, babysits CI to green, triages bot comments, and refreshes the body. Don't hand-chain `EnterWorktree` + `pull-request:create` for a branch finish.
 - `pull-request:create` remains the skill for opening a PR directly (it is what `/ship` calls). If it's unavailable, create the PR with an empty body.
@@ -35,10 +35,6 @@ Every customization costs tokens on every session. Before adding one, define how
 - Store temporary files in `tmp/` directory.
 - The sandbox can write `/tmp`, `$TMPDIR`, and the repo. Never disable the sandbox for file writes; only bypass after a sandboxed run of that command actually failed.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
-
-### Bash `!` Escaping Bug
-
-The Bash tool escapes `!` to `\!` on every path, including single quotes and heredocs, breaking `jq !=`, `awk !~`, and similar operators ([#2941](https://github.com/anthropics/claude-code/issues/2941), [#10335](https://github.com/anthropics/claude-code/issues/10335)). For `jq`, use `| not` instead of `!=`. For anything else, author the content with the Write tool, then run it. No shell quoting or heredoc bypasses the escape.
 
 ## Check-ins
 

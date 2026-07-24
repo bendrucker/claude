@@ -37,7 +37,7 @@ function judgeShard(shard) {
     'It contains { "id": <shard id>, "comments": [{ "id", "path", "language", "kind", "text", "context" }] }.',
     'Judge every comment in the shard against the rubric. Produce exactly one verdict per comment, keyed by its "id".',
     `Write the object { "verdicts": [{ "id": <comment id>, "verdict": { ... } }] } to this exact path with the Write tool: ${job.verdictsDir}/verdict-${shard.id}.json`,
-    'Use the Write tool, not a Bash heredoc: the Bash tool escapes "!" to "\\!", which is not a valid JSON escape and corrupts the file.',
+    "Use the Write tool, not a Bash heredoc.",
     "Per verdict include: action (keep | trim | rewrite), category (the failing shape, null for keep), confidence (low | medium | high), rationale (one sentence), rewrite (the de-voiced comment text, only when action is rewrite, else null), and trimTo (only for a partial trim: the kept comment rewritten to read as complete sentences, delimiters included, no leading indentation; omit it to delete the whole comment).",
     'Your structured output is only the summary: { "total": <comments judged>, "flagged": <verdicts with action other than keep> }.',
   ].join("\n");

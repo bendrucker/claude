@@ -1,6 +1,6 @@
 #!/bin/bash
 # Emit the plan-mode injection: guidelines always, plus delegation guidance when
-# the session's latest assistant model is an expensive orchestrator (opus/fable).
+# the session's latest assistant model is an expensive orchestrator (opus/fable/mythos).
 # Fails open: any read/parse problem falls back to guidelines alone.
 transcript="$1"
 here=$(dirname "$0")
@@ -16,7 +16,7 @@ if [ -n "$transcript" ] && [ -f "$transcript" ]; then
 fi
 
 case "$model" in
-  *opus* | *fable*)
+  *opus* | *fable* | *mythos*)
     printf '\n'
     cat "$here/../references/delegation.md"
     ;;

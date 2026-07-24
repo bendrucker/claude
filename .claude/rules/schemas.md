@@ -17,4 +17,5 @@ paths:
   `schemas/<name>.schema.json` directly.
 
 `bun run schemas check` (CI) fetches current upstream, fails if an overlay stops
-applying, and flags overlay ops upstream has absorbed so they can be dropped.
+applying, and flags overlay ops upstream has absorbed so they can be dropped. It
+also warns when an `add` op overwrites a definition upstream now ships.

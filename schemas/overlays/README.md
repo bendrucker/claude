@@ -22,6 +22,9 @@ directly in `schemas/` and have no patch here.
 - **`bun run schemas check`** — CI guard. Fetches current upstream, fails if an
   overlay no longer applies (upstream restructured a path the patch targets) or
   if an overlay op is already in upstream (absorbed — drop the op).
+- It also warns, without failing, when an `add` op targets a path upstream now
+  defines with a different value. RFC 6902 `add` overwrites silently, so the op
+  replaces upstream's definition. Reconcile it against upstream or drop it.
 
 ## Editing
 

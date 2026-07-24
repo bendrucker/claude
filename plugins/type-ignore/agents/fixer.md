@@ -74,7 +74,7 @@ Include a brief explanation of why the fix requires manual intervention.
 
 1. Read the file and locate the type ignore (from hook: single ignore at specified line; from skill: all ignores in file)
 2. Understand the surrounding code and type error
-3. Determine if the fix is safe or requires consultation
+3. Determine if the fix is safe or requires approval you cannot obtain (follow [On Failure](#on-failure))
 4. Apply the fix or replace with TODO
 5. Run the type checker to verify success
 6. Report what was fixed

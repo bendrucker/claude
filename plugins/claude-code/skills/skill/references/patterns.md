@@ -265,7 +265,7 @@ The sub-agent starts with a **clean context** — it does not inherit the parent
 
 ### When Not to Fork
 
-`context: fork` loses all conversation history. If the skill needs awareness of what the user has been working on, run it inline and use Task agents to offload verbose work. The inline skill retains full context while keeping the heavy lifting out of the main conversation.
+`context: fork` loses all conversation history. If the skill needs awareness of what the user has been working on, run it inline and use `Agent` subagents to offload verbose work. The inline skill retains full context while keeping the heavy lifting out of the main conversation.
 
 ## Skill-Scoped Hooks
 

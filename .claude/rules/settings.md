@@ -5,7 +5,7 @@ paths:
 
 # Settings
 
-User-level settings live in `user/settings.json` (plugins, permissions, sandbox). Project-level settings live in `.claude/settings.json` (biome hook). See the [settings documentation](https://docs.anthropic.com/en/docs/claude-code/settings) for available options.
+User-level settings live in `user/settings.json` (plugins, permissions, sandbox). Project-level settings live in `.claude/settings.json` (biome hook). See the [settings documentation](https://code.claude.com/docs/en/settings) for available options.
 
 ## Permission Paths
 
@@ -44,8 +44,10 @@ The sandbox is egress control, not filesystem lockdown. Credentials stay outside
 ### Hosts (`WebFetch(domain:...)` Permissions)
 
 - Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `community-extensions.duckdb.org` (DuckDB community extensions `markdown`/`yaml`, fetched on first `INSTALL ... FROM community`).
-- Docs and source: `docs.anthropic.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`.
+- Docs and source: `platform.claude.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`. `docs.anthropic.com` stays as the legacy host that 301-redirects to the first two, so the first leg of a redirect still resolves without a prompt.
 - Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`, `*.greptile.com`, `*.coderabbit.ai`. Trusted only because each secret lives outside the sandbox, except `gitlab.com`, `*.greptile.com`, and `*.coderabbit.ai` (see below).
+
+`www.schemastore.org` is granted in `.claude/settings.json` rather than here, because only this repo fetches it, through `schemas/overlays/sources.json`. It is unauthenticated and read-only, so the secrets-outside rule needs no caveat for it.
 
 `api.anthropic.com` is the known exfil-capable host (it accepts uploads). It stays because the agent needs the model API.
 

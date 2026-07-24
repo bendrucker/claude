@@ -33,6 +33,7 @@
       "Bash(wt config:*)",
       "WebFetch(domain:modelcontextprotocol.io)",
       "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:platform.claude.com)",
       "WebFetch(domain:registry.npmjs.org)",
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:pypi.org)",

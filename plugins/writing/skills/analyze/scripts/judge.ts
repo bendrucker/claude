@@ -290,10 +290,26 @@ interface ModelPricing {
 
 const HAIKU_PRICING: ModelPricing = { input: 1, output: 5 };
 
-const PRICING_PER_MTOK: Record<string, ModelPricing> = {
-  "claude-haiku-4-5": HAIKU_PRICING,
-  "claude-sonnet-4-6": { input: 3, output: 15 },
-};
+/**
+ * Per-MTok USD rates matched by family substring, so a new model id in a known
+ * family needs no edit here. The family rows mirror `model_input_rate` and
+ * `model_output_rate` in
+ * `plugins/claude-code/skills/session/resources/schema/03_macros.sql`. Plugins
+ * cannot import across plugin boundaries, so a rate change has to touch both.
+ * Sonnet is held at the 3/15 standard rate rather than a promotional rate, since
+ * an estimate for a known family must not come in under the real bill.
+ *
+ * The no-match fallback in `modelPricing` is the one place the two deliberately
+ * diverge. The SQL defaults an unknown model to Opus rates, this defaults to
+ * Haiku and warns. Raising that floor is a behavioral change, not a rate sync.
+ */
+const FAMILY_PRICING: ReadonlyArray<readonly [string, ModelPricing]> = [
+  ["fable", { input: 10, output: 50 }],
+  ["mythos", { input: 10, output: 50 }],
+  ["opus", { input: 5, output: 25 }],
+  ["sonnet", { input: 3, output: 15 }],
+  ["haiku", HAIKU_PRICING],
+];
 
 /** Rough tokens-per-word multiplier for the offline fallback estimate. */
 const TOKENS_PER_WORD = 1.35;
@@ -350,8 +366,9 @@ export interface CostEstimate {
 }
 
 function modelPricing(model: string): ModelPricing {
-  const pricing = PRICING_PER_MTOK[model];
-  if (pricing) return pricing;
+  const id = model.toLowerCase();
+  const match = FAMILY_PRICING.find(([family]) => id.includes(family));
+  if (match) return match[1];
   console.error(
     `No pricing table entry for model "${model}"; cost estimate assumes Haiku-class rates and may understate the real cost.`,
   );

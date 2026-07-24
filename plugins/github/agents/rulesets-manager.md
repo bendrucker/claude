@@ -2,7 +2,7 @@
 name: rulesets-manager
 description: >-
   Manages GitHub repository rulesets. Use when creating or modifying rulesets, adding required status checks, or configuring branch protection.
-tools: Task, Bash(gh:*), Glob, Grep, LS, Read, TodoWrite, mcp__github
+tools: Bash(gh:*), Glob, Grep, Read, TodoWrite, mcp__github
 model: sonnet
 color: green
 ---
@@ -21,7 +21,7 @@ Core responsibilities:
 2. **Ruleset Selection**: When multiple rulesets exist, pick the most appropriate based on:
    - Target branches (prioritize default branch rulesets)
    - Existing rules and scope
-   - Ask the user to confirm when ambiguous
+   - When more than one ruleset could plausibly be the target, make no change. Return the candidates, the branches each covers, and what you would change in each, and stop.
 
 3. **Status Check Integration**: When adding required status checks:
    - Query recent check runs via `gh api repos/{owner}/{repo}/commits/{sha}/check-runs` or similar endpoints

@@ -52,6 +52,7 @@ model: sonnet                             # Optional: override model
 effort: low                               # Optional: reasoning effort
 context: fork                             # Optional: run in isolated subagent
 agent: Explore                            # Optional: agent type for fork
+background: false                         # Optional: block the turn on a fork
 user-invocable: false                     # Optional: hide from slash menu
 hooks:                                    # Optional: skill-scoped hooks
   PreToolUse:
@@ -74,6 +75,7 @@ hooks:                                    # Optional: skill-scoped hooks
 - `effort`: Reasoning effort while the skill is active. Pin `low` on mechanical skills such as monitoring, execution, and formatting. Defaults to the conversation's effort.
 - `context`: Set to `fork` to run in isolated subagent context
 - `agent`: Agent type when `context: fork` (`Explore`, `Plan`, `general-purpose`, or custom)
+- `background`: Only with `context: fork`. `false` waits for the fork's result in the invoking turn instead of backgrounding it. Default `true`.
 - `user-invocable`: Hide from slash menu when `false` (default: `true`)
 - `disable-model-invocation`: Block model (Skill-tool) invocation and drop the skill's name and description from the always-on catalog (zero recurring context cost); still slash-invocable. Opposite of `user-invocable: false`, which hides the slash menu but keeps the description loaded for the model.
 - `hooks`: Skill-scoped hooks (`PreToolUse`, `PostToolUse`, `Stop`)

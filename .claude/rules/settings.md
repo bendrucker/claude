@@ -19,6 +19,8 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 
 `excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. Go CLIs run sandboxed via `sandbox.network.allowMachLookup`; wrappers that hand off to Apple Events or Launch Services need a full skip via the `mac` plugin's `claude:dangerouslyDisableSandbox` marker hook. See [`scripts.md`](scripts.md).
 
+The same rule makes a `cd <dir> && <verb>` prefix silently forfeit the exemption. Take `cd <dir> && git push`. Its top-level token is `cd`, so the `git` entry in `excludedCommands` never matches and the whole compound runs sandboxed. The command then fails on egress, and the fallback is a full `dangerouslyDisableSandbox` skip. Prefer a tool's own directory-targeting flag so the exempt verb stays top-level: run `git -C <dir> <subcommand>` instead of `cd <dir> && git <subcommand>`, and the equivalent `-C`/`--cwd`/`--directory` where another tool offers one. This recovers the exemption for the common cross-worktree `git` case. It is guidance rather than enforcement, and it does not cover private-host egress, which belongs in a local-only layer.
+
 ## Plugin Data Dir
 
 The runtime sandbox profile denies writes under `~/.claude/plugins`, and that deny shadows any `filesystem.allowWrite` entry beneath it. `~/.claude/plugins/data` was listed in `allowWrite` for a while and never took effect, so do not re-add it. The failure surfaces as a bare `Operation not permitted`, naming neither the deny rule nor the entry it shadows.

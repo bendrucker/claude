@@ -38,6 +38,9 @@ test.each<{ name: string; models: string[]; delegation: boolean }>([
   { name: "fable includes delegation", models: ["claude-fable-5"], delegation: true },
   { name: "sonnet excludes delegation", models: ["claude-sonnet-5"], delegation: false },
   { name: "haiku excludes delegation", models: ["claude-haiku-4-5-20251001"], delegation: false },
+  { name: "opus 5 includes delegation", models: ["claude-opus-5"], delegation: true },
+  { name: "1m suffix includes delegation", models: ["claude-opus-5[1m]"], delegation: true },
+  { name: "mythos includes delegation", models: ["claude-mythos-5"], delegation: true },
   {
     name: "last assistant model wins (ends sonnet)",
     models: ["claude-opus-4-8", "claude-sonnet-5"],
@@ -70,6 +73,17 @@ describe("fail open", () => {
   test("guidelines only when the transcript is malformed", async () => {
     const path = join(dir, "bad.jsonl");
     await Bun.write(path, "not json\n{also not\n");
+    const out = await assemble(path);
+    expect(out).toContain("Planning Guidelines");
+    expect(out).not.toContain("# Delegation");
+  });
+
+  test("guidelines only when the transcript has no assistant entry", async () => {
+    const path = join(dir, "user-only.jsonl");
+    await Bun.write(
+      path,
+      `${JSON.stringify({ type: "user", message: { role: "user", content: [] } })}\n`,
+    );
     const out = await assemble(path);
     expect(out).toContain("Planning Guidelines");
     expect(out).not.toContain("# Delegation");

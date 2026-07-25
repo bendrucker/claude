@@ -10,9 +10,11 @@ CREATE OR REPLACE MACRO host_filter(host_col, host_val) AS
 
 CREATE OR REPLACE MACRO project_id(host, path) AS host || ':' || path;
 
--- Cost-rate table for token spend estimates, per-MTok USD from public API rates. Kept
--- here so every cost query shares one source; the per-tier weighting (cache read 0.1x
--- input, cache write 1.25x for 5m / 2x for 1h) lives in the queries that call these.
+-- Cost-rate table for token spend estimates, per-MTok USD from published API rates as of
+-- 2026-07-24. Rates are keyed by family, so a family arm can drift from a specific model's
+-- current rate. Kept here so every cost query shares one source. The per-tier weighting
+-- (cache read 0.1x input, cache write 1.25x for 5m / 2x for 1h) lives in the queries that
+-- call these.
 CREATE OR REPLACE MACRO model_input_rate(model) AS
   CASE
     WHEN model ILIKE '%fable%' OR model ILIKE '%mythos%' THEN 10.0

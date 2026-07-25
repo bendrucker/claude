@@ -1849,6 +1849,8 @@ describe("cost-rate macros", () => {
   it.each<[string, number, number]>([
     ["claude-fable-5", 10, 50],
     ["claude-mythos-1", 10, 50],
+    ["claude-opus-5", 5, 25],
+    ["claude-opus-5[1m]", 5, 25],
     ["claude-opus-4-8", 5, 25],
     ["claude-sonnet-5", 3, 15],
     ["claude-haiku-4", 1, 5],
@@ -1860,6 +1862,28 @@ describe("cost-rate macros", () => {
     );
     expect(Number(row?.i)).toBe(input);
     expect(Number(row?.o)).toBe(output);
+  });
+});
+
+describe("model_family macro", () => {
+  it.each<[string, string]>([
+    ["claude-fable-5", "fable"],
+    ["claude-mythos-1", "fable"],
+    ["claude-opus-5", "opus"],
+    ["claude-opus-5[1m]", "opus"],
+    ["claude-opus-4-8", "opus"],
+    ["opus", "opus"],
+    ["claude-sonnet-5", "sonnet"],
+    ["claude-haiku-4", "haiku"],
+    ["some-unknown-model", "other"],
+  ])("collapses %s to %s", async (model, family) => {
+    const [row] = await db.query<{ f: string }>("SELECT model_family($m) AS f", { m: model });
+    expect(row?.f).toBe(family);
+  });
+
+  it("returns NULL for a NULL model", async () => {
+    const [row] = await db.query<{ f: string | null }>("SELECT model_family(NULL) AS f");
+    expect(row?.f).toBeNull();
   });
 });
 

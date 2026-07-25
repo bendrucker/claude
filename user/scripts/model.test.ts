@@ -3,6 +3,7 @@ import { type ModelMarker, modelMarker } from "./model";
 
 describe("modelMarker", () => {
   test.each<[string, string | null, ModelMarker | null]>([
+    ["claude-opus-5", null, { letter: "o", isDefault: true }],
     ["claude-opus-4-8", null, { letter: "o", isDefault: true }],
     ["claude-opus-4-8[1m]", null, { letter: "o", isDefault: true }],
     ["claude-sonnet-5", null, { letter: "s", isDefault: false }],

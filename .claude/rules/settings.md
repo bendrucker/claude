@@ -27,6 +27,8 @@ This is an upstream defect, not a policy we chose. The write profile emits every
 
 So the fix belongs upstream, and nothing in this repo's settings can express it today.
 
+A second confirmed instance is `~/.claude/jobs/*/tmp`. The harness tells background-job sessions to write temp files under `$CLAUDE_JOB_DIR/tmp` (`~/.claude/jobs/<id>/tmp`), but `~/.claude/jobs` is a harness-injected `denyWithinAllow` entry, so an `allowWrite` for any subpath is inert for the same reason. The harness generates the deny, so `user/settings.json` cannot narrow it either. Background jobs fall back to `$TMPDIR` (`/tmp`), which is writable, at the cost of the cross-job clobbering the per-job directory was meant to prevent. Do not add a `~/.claude/jobs` subpath to `allowWrite`.
+
 Meanwhile, the four session-index writers carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker. That is a bridge around a bug, not the intended design, and it trades real sandbox coverage for a working toolchain.
 
 **Removal criterion.** Drop the markers when this probe succeeds under the sandbox:

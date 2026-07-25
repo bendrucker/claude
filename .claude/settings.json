@@ -10,6 +10,7 @@
       "Bash(npm view:*)",
       "Bash(shellcheck:*)",
       "Bash(brew info:*)",
+      "WebFetch(domain:www.schemastore.org)",
       "Skill(bun:bun)",
       "Skill(claude-code:agent-team)",
       "Skill(claude-code:hook)",

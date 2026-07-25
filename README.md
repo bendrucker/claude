@@ -1,6 +1,6 @@
 # claude
 
-> My personal plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Anthropic's AI coding assistant.
+> My personal plugin marketplace for [Claude Code](https://code.claude.com/docs), Anthropic's AI coding assistant.
 
 ## Overview
 

@@ -40,7 +40,7 @@ flowchart TD
 
 ## Effort Inference
 
-Infer `review:code` effort from the diff unless `--effort` overrides. `high` is routine for risky work. Reserve `max` for explicit requests.
+Infer `review:code` effort from the diff unless `--effort` overrides. `high` is routine for risky work. Reserve `xhigh` and `max` for explicit requests.
 
 | Diff shape | Effort |
 |---|---|
@@ -49,7 +49,7 @@ Infer `review:code` effort from the diff unless `--effort` overrides. `high` is 
 | Risky: multiple plugins, hooks, permissions, sandbox, or auth-shaped code | `high` |
 | Explicit request only | `max` |
 
-On Opus 4.8, only `max` fans out subagents. `medium`, `high`, and `xhigh` run every angle inline in one context with dedup and no verify pass, so stepping from `medium` to `high` buys two more findings' worth of cap rather than a separate verifier fleet. Budget `--effort high` accordingly and use `max` when a change genuinely warrants independent verification.
+`review:code` picks its fan-out shape from its own cell table, keyed on model family as well as effort level, which is why the same `--effort` can mean one inline pass in one family and a fleet of finders plus per-candidate verifiers in another. Do not infer cost from the effort name.
 
 `--effort ultra` is not inferrable and `review:code` cannot run it. It is a billed cloud review that only a user-typed `/code-review ultra` can launch. On `--effort ultra`, stop and say so rather than substituting a local level.
 

@@ -47,7 +47,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 ## Flags
 
 - `--merge`: drive to merged (babysit `--merge`). Default: green and ready.
-- `--effort <low|medium|high|max|ultra>`: override inferred `review:code` effort. `ultra` is a billed cloud review only a user-typed `/code-review ultra` can start, so ship stops and hands it back instead of substituting a local level.
+- `--effort <low|medium|high|xhigh|max|ultra>`: override inferred `review:code` effort. `ultra` is a billed cloud review only a user-typed `/code-review ultra` can start, so ship stops and hands it back instead of substituting a local level.
 - `--simplify`: force `simplify` over `review:code`.
 - `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `writing`, `verify`.
 - `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
@@ -92,8 +92,8 @@ Babysit owns the CI waits. Follow-up owns the wait for an expected review and it
 
 ## Refresh the Body
 
-Dispatch a background `general-purpose` Agent (cheaper model if set) to run `pull-request:update <url>`. Never `fork`: it must read the final PR and diff cold, not this session's transcript, so the body describes the finished change with no review narration.
+Dispatch a background `general-purpose` Agent (cheaper model if set) to run `pull-request:update <url>` on every run that opened a PR. Never `fork`: it must read the final PR and diff cold, not this session's transcript, so the body describes the finished change with no review narration. Rewriting the body inside this session is not a substitute.
 
 ## Report
 
-PR link, passes run and gated out, final state (green and ready, or merging).
+PR link, passes run and gated out, final state (green and ready, or merging), and whether the body refresh was dispatched.

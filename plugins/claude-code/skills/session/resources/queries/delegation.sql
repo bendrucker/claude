@@ -1,13 +1,16 @@
 -- Delegation observability: how well expensive orchestrator sessions push work down to
 -- cheaper models on Agent/Task spawns. One row per (parent main-model family, path,
 -- actual spawn-model family), where `path` splits `pinned` (frontmatter-pinned
--- purpose-built agents: `Explore`, `claude-code-guide`, `github:logs`, `gitlab:logs`,
+-- purpose-built agents: `claude-code-guide`, `github:logs`, `gitlab:logs`,
 -- `github:rulesets-manager`, the known agents that pin a `model:` in their definition)
 -- from `generic` (`general-purpose`, `Plan`, bare `claude`, no `subagent_type`, and any
--- subagent type not on the known-pinned list). Unrecognized types default to generic,
--- so the split undercounts `pinned` rather than overstating the generic-path miss. The
--- generic path is where delegation actually happens or fails: a purpose-built agent's
--- model is fixed by its definition, not by the parent's choice.
+-- subagent type not on the known-pinned list). `Explore` is generic, not pinned: since
+-- CLI v2.1.198 it inherits the main conversation model (capped at Opus) instead of
+-- pinning Haiku, so an Explore spawn under an expensive parent is a real delegation miss,
+-- not a free downgrade. Unrecognized types default to generic, so the split undercounts
+-- `pinned` rather than overstating the generic-path miss. The generic path is where
+-- delegation actually happens or fails: a purpose-built agent's model is fixed by its
+-- definition, not by the parent's choice.
 --
 -- `override_rate_pct` / `cheaper_override_rate_pct` are both fractions of every spawn
 -- in the (parent_family, path) group, not just the overridden ones, so they read
@@ -110,7 +113,7 @@ per_call AS (
     COALESCE(model_family(j.main_model), 'unknown') AS parent_family,
     CASE
       WHEN j.subagent_type IN (
-        'Explore', 'claude-code-guide', 'github:logs', 'gitlab:logs', 'github:rulesets-manager'
+        'claude-code-guide', 'github:logs', 'gitlab:logs', 'github:rulesets-manager'
       ) THEN 'pinned'
       ELSE 'generic'
     END AS path,

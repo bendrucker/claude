@@ -21,4 +21,4 @@ Match the model to the work, not to the orchestrator:
 
 - **Task-tool `model` override**: set `model` on the spawn. It wins over the subagent's frontmatter.
 - **Subagent frontmatter** `model:` (`haiku`/`sonnet`/`opus`/`fable`) and `effort:` (`low`/`medium`/`high`/`xhigh`/`max`): the default when a spawn sets neither.
-- **`subagent_type`**: a purpose-built agent that already pins a cheaper model (for example `Explore` on Haiku) delegates down with no per-spawn override.
+- **`subagent_type`**: a purpose-built agent that already pins a cheaper model (for example `github:logs` on Haiku) delegates down with no per-spawn override.

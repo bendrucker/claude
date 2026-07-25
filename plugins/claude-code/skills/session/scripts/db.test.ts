@@ -1030,13 +1030,15 @@ describe("outcomes query", () => {
 });
 
 describe("delegation query", () => {
-  // delegation-session (opus main model) spawns five Agent calls: a generic
-  // general-purpose call left to inherit (actual model opus, via its subagent
-  // transcript), a generic call with an explicit `model: haiku` override (actual
-  // haiku, a cheaper override), a pinned Explore call (actual haiku, no override
-  // needed), a fork (must be excluded entirely), and a generic call with an
-  // explicit `model: sonnet` override resolved via the tool result's
-  // `resolvedModel` rather than a transcript join (actual sonnet, cheaper override).
+  // delegation-session (opus main model) spawns five Agent calls: an Explore call
+  // left to inherit (actual model opus, via its subagent transcript), which lands
+  // on the generic path because Explore inherits the parent model (capped at Opus)
+  // rather than pinning Haiku, a generic call with an explicit `model: haiku`
+  // override (actual haiku, a cheaper override), a pinned `github:logs` call
+  // (actual haiku, no override needed), a fork (must be excluded entirely), and a
+  // generic call with an explicit `model: sonnet` override resolved via the tool
+  // result's `resolvedModel` rather than a transcript join (actual sonnet, cheaper
+  // override).
   type DelegationRow = {
     parent_family: string;
     path: string;
@@ -1070,6 +1072,20 @@ describe("delegation query", () => {
     expect(Number(generic[0]?.path_spawns)).toBe(3);
     expect(Number(pinned[0]?.path_spawns)).toBe(1);
     expect(pinned.map((r) => r.actual_family)).toEqual(["haiku"]);
+  });
+
+  it("counts an Explore spawn as generic, since it inherits the parent model rather than pinning Haiku", async () => {
+    const rows = await delegationRows();
+    // The Explore spawn ran on opus (inherited from the opus parent, capped) and
+    // carried no override, so it is a real delegation miss on the generic path.
+    // The only pinned spawn is github:logs on haiku. Nothing opus-family reaches
+    // the pinned path, which is what a pre-fix (Explore-pinned) query would show.
+    const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
+    expect(pinned.map((r) => r.actual_family)).toEqual(["haiku"]);
+    const genericOpus = rows.find(
+      (r) => r.parent_family === "opus" && r.path === "generic" && r.actual_family === "opus",
+    );
+    expect(Number(genericOpus?.spawns)).toBe(1);
   });
 
   it("resolves the actual model from the subagent transcript when the tool result carries no resolvedModel", async () => {

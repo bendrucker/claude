@@ -23,6 +23,8 @@
 
 Every customization costs tokens on every session. Before adding one, define how it gets removed: what shows it's working, what shows it isn't, and where that signal surfaces.
 
+Prefer accommodating Claude Code's native defaults over overriding them, since a changed default encodes usage and eval data you lack. Add a customization that fights one only as a light-touch experiment with evaluation and removal criteria.
+
 ## Workflow
 
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.

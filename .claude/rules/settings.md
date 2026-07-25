@@ -47,7 +47,23 @@ The sandbox is egress control, not filesystem lockdown. Credentials stay outside
 - Docs and source: `platform.claude.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`. `docs.anthropic.com` stays as the legacy host that 301-redirects to the first two, so the first leg of a redirect still resolves without a prompt.
 - Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`, `*.greptile.com`, `*.coderabbit.ai`. Trusted only because each secret lives outside the sandbox, except `gitlab.com`, `*.greptile.com`, and `*.coderabbit.ai` (see below).
 
+**Removal criterion.** The grant only buys the first leg of a redirect, so it dies with the redirect:
+
+```
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://docs.anthropic.com/en/docs/claude-code/settings
+```
+
+Today: `301 https://code.claude.com/docs/en/settings`. Once that is no longer a 3xx into a host already listed above, drop it.
+
 `www.schemastore.org` is granted in `.claude/settings.json` rather than here, because only this repo fetches it, through `schemas/overlays/sources.json`. It is unauthenticated and read-only, so the secrets-outside rule needs no caveat for it.
+
+**Removal criterion.** Drop it when no overlay resolves its base live:
+
+```
+jq -r '.schemas[].url' schemas/overlays/sources.json | grep schemastore.org
+```
+
+The overlay design fetches every base at validation time, so this only empties if the upstream-backed schemas become hand-authored or vendored. See [`schemas.md`](schemas.md).
 
 `api.anthropic.com` is the known exfil-capable host (it accepts uploads). It stays because the agent needs the model API.
 

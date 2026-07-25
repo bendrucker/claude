@@ -47,26 +47,37 @@ export function getPointer(value: unknown, pointer: string): unknown {
   return current;
 }
 
-export interface RedundantOp {
+/** How an overlay op relates to a base that already defines its target path. */
+export type OverlayConflictKind = "absorbed" | "diverged";
+
+export interface OverlayConflict {
   index: number;
   path: string;
+  kind: OverlayConflictKind;
 }
 
 /**
- * Identify overlay operations the base already satisfies — an add/replace whose
- * target already deep-equals the operation's value. These are edits upstream has
- * absorbed and can be dropped from the patch without changing the merged schema.
+ * Identify overlay operations whose target path the base already defines.
+ *
+ * `absorbed` is a base value deep-equal to the op's value, an edit upstream has
+ * caught up on. `diverged` is an `add` whose value differs, which RFC 6902 `add`
+ * silently replaces, so the overlay overwrites whatever upstream now ships. A
+ * `replace` that changes an existing value is its intended use and is not
+ * reported.
  */
-export function findRedundantOps(base: Schema, patch: Operation[]): RedundantOp[] {
-  const redundant: RedundantOp[] = [];
+export function findOverlayConflicts(base: Schema, patch: Operation[]): OverlayConflict[] {
+  const conflicts: OverlayConflict[] = [];
   for (const [index, op] of patch.entries()) {
     if (op.op !== "add" && op.op !== "replace") continue;
     const existing = getPointer(base, op.path);
-    if (existing !== undefined && Bun.deepEquals(existing, op.value)) {
-      redundant.push({ index, path: op.path });
+    if (existing === undefined) continue;
+    if (Bun.deepEquals(existing, op.value)) {
+      conflicts.push({ index, path: op.path, kind: "absorbed" });
+    } else if (op.op === "add") {
+      conflicts.push({ index, path: op.path, kind: "diverged" });
     }
   }
-  return redundant;
+  return conflicts;
 }
 
 /** Read the overlay registry. The `patch` path in each entry is relative to schemasDir. */

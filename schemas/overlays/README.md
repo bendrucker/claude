@@ -22,6 +22,11 @@ in `schemas/` and have no patch here.
 - **`bun run schemas check`** — CI guard. Fetches current upstream, fails if an
   overlay no longer applies (upstream restructured a path the patch targets) or
   if an overlay op is already in upstream (absorbed — drop the op).
+- **`check`** also warns, without failing, when an `add` op targets a path
+  upstream now defines with a different value. RFC 6902 `add` overwrites
+  silently, so the op replaces upstream's definition. Narrowing upstream this
+  way can be deliberate (see `marketplace.patch.json`), so the warning asks for
+  a decision rather than failing: confirm the override or drop the op.
 
 ## Editing
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
 import type { Operation } from "rfc6902";
-import { applyOverlay, findRedundantOps, getPointer, type RedundantOp } from "./overlay";
+import { applyOverlay, findOverlayConflicts, getPointer, type OverlayConflict } from "./overlay";
 
 describe("applyOverlay", () => {
   it("adds and replaces without mutating the base", () => {
@@ -39,23 +39,35 @@ describe("getPointer", () => {
   });
 });
 
-describe("findRedundantOps", () => {
+describe("findOverlayConflicts", () => {
   const changedReplace: Operation = { op: "replace", path: "/$id", value: "mine" };
   const removeOp: Operation = { op: "remove", path: "/properties/gone" };
 
-  test.each<[string, Record<string, unknown>, Operation[], RedundantOp[]]>([
+  test.each<[string, Record<string, unknown>, Operation[], OverlayConflict[]]>([
     [
-      "flags add/replace ops the base already satisfies",
+      "flags an op the base already satisfies as absorbed",
       { properties: { theme: { type: "string" }, name: { type: "string" } } },
       [
         { op: "add", path: "/properties/theme", value: { type: "string" } },
         { op: "add", path: "/properties/extra", value: { type: "boolean" } },
       ],
-      [{ index: 0, path: "/properties/theme" }],
+      [{ index: 0, path: "/properties/theme", kind: "absorbed" }],
+    ],
+    [
+      "flags an add over a richer upstream definition as diverged",
+      { properties: { theme: { type: "string", enum: ["dark", "light"] } } },
+      [{ op: "add", path: "/properties/theme", value: { type: "string" } }],
+      [{ index: 0, path: "/properties/theme", kind: "diverged" }],
     ],
     ["does not flag a replace that changes the value", { $id: "upstream" }, [changedReplace], []],
     ["ignores remove operations", { properties: {} }, [removeOp], []],
+    [
+      "ignores an add whose target is absent upstream",
+      { properties: {} },
+      [{ op: "add", path: "/properties/new", value: { type: "boolean" } }],
+      [],
+    ],
   ])("%s", (_name, base, patch, expected) => {
-    expect(findRedundantOps(base, patch)).toEqual(expected);
+    expect(findOverlayConflicts(base, patch)).toEqual(expected);
   });
 });

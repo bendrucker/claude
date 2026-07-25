@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import {
   aggregateVerdicts,
   CHUNK_WORD_LIMIT,
@@ -10,6 +10,7 @@ import {
   HEADING_BATCH_SIZE,
   HEADING_PROMPT_PATH,
   JUDGE_CRITERIA,
+  JUDGE_MODEL,
   type JudgeVerdict,
   judgeCorpus,
   judgeDocument,
@@ -242,6 +243,56 @@ describe("estimateCost", () => {
     const docs = Array(200).fill(Array(1000).fill("word").join(" "));
     const estimate = await estimateCost(docs, { promptText: prompt.text });
     expect(estimate.usd).toBeLessThan(1);
+  });
+});
+
+describe("modelPricing", () => {
+  test.each<[string, number]>([
+    ["claude-haiku-4-5", 0.0025],
+    ["claude-haiku-5-20260901", 0.0025],
+    ["claude-sonnet-4-6", 0.0075],
+    ["claude-sonnet-5", 0.0075],
+    ["claude-opus-5", 0.0125],
+    ["claude-opus-5[1m]", 0.0125],
+    ["claude-fable-5", 0.025],
+    ["claude-mythos-5", 0.025],
+  ])("prices %s from its family", async (model, usd) => {
+    const estimate = await estimateCost(["doc"], {
+      promptText: "prompt",
+      model,
+      countTokens: async () => 1000,
+    });
+    expect(estimate.usd).toBeCloseTo(usd, 6);
+  });
+
+  test("an unrecognized family falls back to haiku rates and warns", async () => {
+    const warn = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const estimate = await estimateCost(["doc"], {
+        promptText: "prompt",
+        model: "some-other-vendor-model",
+        countTokens: async () => 1000,
+      });
+      expect(estimate.usd).toBeCloseTo(0.0025, 6);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain("some-other-vendor-model");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("a matched family does not warn", async () => {
+    const warn = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await estimateCost(["doc"], {
+        promptText: "prompt",
+        model: JUDGE_MODEL,
+        countTokens: async () => 1000,
+      });
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

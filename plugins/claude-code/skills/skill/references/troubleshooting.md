@@ -6,7 +6,7 @@
 - Check YAML syntax (no tabs, proper `---` delimiters)
 - Confirm file location (`~/.claude/skills/` or `.claude/skills/`)
 - Test with explicit trigger phrases
-- For syntax questions, use Task tool with `subagent_type='claude-code-guide'`
+- For syntax questions, use the `Agent` tool with `subagent_type='claude-code-guide'`
 
 ## YAML Errors
 
@@ -58,5 +58,4 @@ Before deploying:
 - [ ] Clear workflows with steps
 - [ ] Scripts with explicit error handling
 - [ ] All package dependencies listed
-- [ ] Tested across Haiku/Sonnet/Opus
 - [ ] Real-world scenario validation

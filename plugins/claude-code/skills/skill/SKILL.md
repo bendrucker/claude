@@ -39,7 +39,6 @@ With neither flag, use the skill as an authoring reference. See [Validation](#va
 
 - **Conciseness**: Keep `SKILL.md` under 500 lines. Use progressive disclosure.
 - **Appropriate Freedom**: Text for flexible tasks, pseudocode for moderate variation, scripts for error-prone operations.
-- **Cross-Model Testing**: Validate across Haiku, Sonnet, and Opus.
 
 ## Skill Structure
 
@@ -49,7 +48,8 @@ name: plugin-name:skill-name
 description: Third-person capability description with trigger terms
 argument-hint: "[--flag] [<positional>]"  # Optional: arguments shown in slash menu
 allowed-tools: [Read, Grep, Glob]         # Optional: tool restrictions
-model: claude-sonnet-4-20250514           # Optional: override model
+model: sonnet                             # Optional: override model
+effort: low                               # Optional: reasoning effort
 context: fork                             # Optional: run in isolated subagent
 agent: Explore                            # Optional: agent type for fork
 user-invocable: false                     # Optional: hide from slash menu
@@ -70,7 +70,8 @@ hooks:                                    # Optional: skill-scoped hooks
 **Optional Fields**:
 - `argument-hint`: Arguments the skill accepts, shown in the slash menu after the skill name. See [Argument Hints](#argument-hints).
 - `allowed-tools`: Tools Claude can use without permission when skill is active
-- `model`: Override the conversation's model
+- `model`: Override the conversation's model. Prefer a tier alias (`haiku`, `sonnet`, `opus`, `fable`) or `inherit` over a dated model ID.
+- `effort`: Reasoning effort while the skill is active. Pin `low` on mechanical skills such as monitoring, execution, and formatting. Defaults to the conversation's effort.
 - `context`: Set to `fork` to run in isolated subagent context
 - `agent`: Agent type when `context: fork` (`Explore`, `Plan`, `general-purpose`, or custom)
 - `user-invocable`: Hide from slash menu when `false` (default: `true`)

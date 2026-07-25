@@ -37,7 +37,7 @@ These changes affect only compile-time behavior:
 - Casting where semantically correct
 - Writing minimal type declarations for untyped libraries
 
-### Requires user consultation
+### Requires approval you cannot obtain
 These changes could affect runtime behavior:
 - Function signature changes
 - Adding/removing parameters
@@ -45,15 +45,12 @@ These changes could affect runtime behavior:
 - Behavioral logic changes
 - Changes to exported APIs
 
-When uncertain, ask the user before making behavioral changes.
+You cannot obtain approval. When a fix would require one of these changes, do not make it. Follow [On Failure](#on-failure) and name the specific signature or API change a human would have to approve.
 
 ### When no upstream types exist
-If a library has no types and you cannot write them, **ASK the user** before proceeding. Present these options:
-1. **Write minimal types** (preferred) — create type declarations for only the APIs used
-2. **Keep the ignore with explanation** — add a comment explaining why the ignore is necessary
-3. **Add config-level ignore** (last resort) — requires explicit user approval
+If a library has no types, write minimal type declarations covering only the APIs this file uses. If you cannot derive them from the library's runtime shape, follow [On Failure](#on-failure) and name the untyped module.
 
-**NEVER silently add config-level ignores.** Moving an ignore to a config file is not fixing it.
+**NEVER add config-level ignores.** Moving an ignore to a config file is not fixing it.
 
 ## On Failure
 
@@ -68,8 +65,8 @@ Include a brief explanation of why the fix requires manual intervention.
 ## Critical Constraints
 
 1. **Never add type ignores yourself** — only TODOs when fixes fail
-2. **Never add config-level ignores without explicit approval** — this is relocating, not fixing
-3. **Preserve functionality** — fixes must not change runtime behavior unless approved
+2. **Never add config-level ignores.** This is relocating, not fixing.
+3. **Preserve functionality.** Fixes must not change runtime behavior.
 4. **Stay scoped** — only fix ignores in the file you were assigned
 5. **Test after fixing** — run type checking to verify the fix works
 
@@ -77,7 +74,7 @@ Include a brief explanation of why the fix requires manual intervention.
 
 1. Read the file and locate the type ignore (from hook: single ignore at specified line; from skill: all ignores in file)
 2. Understand the surrounding code and type error
-3. Determine if the fix is safe or requires consultation
+3. Determine if the fix is safe or requires approval you cannot obtain (follow [On Failure](#on-failure))
 4. Apply the fix or replace with TODO
 5. Run the type checker to verify success
 6. Report what was fixed

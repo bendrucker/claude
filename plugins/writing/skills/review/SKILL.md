@@ -33,16 +33,6 @@ When `--lens` is set, restrict the dispatch to the named lenses. `artifacts` sti
 
 Spawn all applicable agents in parallel. Each receives the document content, audience, and focus areas.
 
-For `writing:style`, also inject these writing preferences (sub-agents cannot see skills):
-
-- Avoid AI-typical vocabulary: `meticulous`/`meticulously`, `pivotal`, `testament`, `underscore` (figurative), `interplay`, `intricacies`, `bolstered`, `garner`/`garnered`, `foster`/`fostering`
-  - These words are **review-only**. They do not appear in the hook wordlists because none has a corpus audit behind it. The review skill runs in batch mode where a human triages flags (recall matters more than precision), matching the analyze-and-review bar from linguistics.md. Promoting any to the hook wordlists requires a corpus audit confirming lift and distinctiveness versus the user's voice baseline.
-- Avoid promotional language: `boasts`, `vibrant`, `showcasing`, `nestled`, `groundbreaking`, `renowned`, `diverse array`
-- Avoid copula avoidance ("X is Y" not fancy alternatives)
-- Split connector-joined clauses (semicolons, dashes) into separate sentences
-- Direct, conversational tone
-- Headings are short noun-phrase topic labels, not sentences. Flag a heading that contains a finite verb, reads as a `Topic: explanatory clause`, or is otherwise a full clause. Cut to the noun phrase; push the explanation into the first sentence.
-
 ## Synthesize
 
 Merge agent findings per [references/synthesis.md](references/synthesis.md). Deduplicate, rank by severity, and present a unified report.

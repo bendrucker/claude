@@ -14,8 +14,8 @@ URL and patch. `loadOverlaySchema` in
 base and applies the patch, and the validators reference a schema by name
 (`{ overlay: "settings" }`).
 
-Schemas with **no** upstream (`hook`, `plugin-hook`, `skill`) are hand-authored
-directly in `schemas/` and have no patch here.
+Schemas with **no** upstream (`hook`, `plugin-hook`) are hand-authored directly
+in `schemas/` and have no patch here.
 
 ## Commands
 

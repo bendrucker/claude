@@ -13,7 +13,7 @@ paths:
   at validation time** — no base or merged schema is vendored. To change one,
   edit the patch (add an `add` op for a field upstream lacks). See
   [`overlays/README.md`](../../schemas/overlays/README.md).
-- **Hand-authored** (`hook`, `plugin-hook`, `skill`): no upstream exists; edit
+- **Hand-authored** (`hook`, `plugin-hook`): no upstream exists; edit
   `schemas/<name>.schema.json` directly.
 
 `bun run schemas check` (CI) fetches current upstream, fails if an overlay stops

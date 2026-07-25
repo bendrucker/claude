@@ -9,7 +9,7 @@
       "expectations": [
         "Uses --role reviewer to fetch only threads started by the authenticated user",
         "Syncs to the latest pushed state before judging, preferring the gh API diff over a local checkout",
-        "Dispatches read-only Explore sub-agents (Task tool) to read the post-review diff and judge fix quality",
+        "Dispatches read-only Explore sub-agents (Agent tool) to read the post-review diff and judge fix quality",
         "Returns code-grounded per-thread verdicts (addressed / partial / not addressed / dismissed) rather than a uniform status table",
         "Treats resolution status as a signal and flags status-vs-code mismatches as findings",
         "Leads with what needs attention and collapses cleanly-addressed threads",

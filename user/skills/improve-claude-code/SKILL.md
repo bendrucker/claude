@@ -4,6 +4,7 @@ disable-model-invocation: true
 description: |
   Triage and batch-implement Claude-tagged Things todos as PRs for the claude config repo, discover improvement candidates from session history, or watch open PRs to implement review feedback and close shipped todos.
   Use when the user wants to work on their Claude Code improvement backlog, process Things todos tagged claude-code, batch-implement configuration changes, mine session history for grounded config-change candidates (Discover mode), or watch this skill's open PRs for review feedback and merges (Watch mode).
+argument-hint: "[discover [--scheduled] | watch | sweep]"
 allowed-tools:
   - Skill(things:jxa)
   - Skill(things:url)
@@ -27,6 +28,14 @@ The backlog has two sources. The user files todos tagged `claude-code` by hand (
 In every mode, the loop itself is in scope: this skill's own SKILL.md, the `claude-code:session` skill's queries and views, and the Things scripts the loop depends on. Findings in that class may be dispatched to background worktree agents immediately, even when everything else routes to planning or triage discussion.
 
 All Things interaction goes through the `things:jxa` and `things:url` skills (never inline JXA). PRs go through `pull-request:create` (never `gh pr create`).
+
+## Arguments
+
+`$0` (optional mode) routes to a workflow. With no mode, run the default backlog loop: [Fetch and Triage](#fetch-and-triage) the `claude-code` todos, then plan and implement the selection as PRs.
+
+- `discover`: mine session history for grounded improvement candidates, write a digest, and file the keepers. See [Discover](#discover). Interactive runs never auto-file. Pass `--scheduled` for the unattended weekly variant that auto-files `new`, grounded, high-confidence candidates and never prompts. See [Scheduled](#scheduled).
+- `watch`: track the open PRs this skill opened, implement review feedback, and close each backing todo on merge. Run it under `/loop /improve-claude-code watch`. See [Watch](#watch).
+- `sweep`: propose stale or graduated memories for retirement and delete only what you approve. Interactive only, never unattended. See [Sweep](#sweep).
 
 ## Discover
 

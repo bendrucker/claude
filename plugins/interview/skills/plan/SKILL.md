@@ -2,8 +2,6 @@
 name: interview:plan
 description: |
   Comprehensive interview for planning new features or changes. Use when the user wants thorough upfront planning before implementation, or when starting work on a complex feature.
-context: fork
-agent: Plan
 ---
 
 # Planning Interview

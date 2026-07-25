@@ -7,6 +7,7 @@ description: >-
 argument-hint: "[file path or text; omit to read input from the clipboard]"
 user-invocable: true
 context: fork
+background: false
 allowed-tools:
   - Bash
   - Read

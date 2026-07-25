@@ -263,6 +263,10 @@ agent: Explore
 
 The sub-agent starts with a **clean context** — it does not inherit the parent conversation. It sees only the skill content (with `!`shell`` injections expanded) and `CLAUDE.md`. Results are summarized and returned to the main conversation.
 
+Forks background by default. The result arrives as a later task notification rather than in the invoking turn, the fork runs with the narrower background-subagent tool set, and its edits fall outside session checkpoints so `/rewind` will not undo them. Set `background: false` when the caller needs the result in the turn that invoked the skill.
+
+A forked skill is a regular subagent. It never receives `AskUserQuestion`. `background: false` does not restore it. A skill whose steps depend on asking the user must run inline.
+
 ### When Not to Fork
 
 `context: fork` loses all conversation history. If the skill needs awareness of what the user has been working on, run it inline and use `Agent` subagents to offload verbose work. The inline skill retains full context while keeping the heavy lifting out of the main conversation.

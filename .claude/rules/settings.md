@@ -85,7 +85,7 @@ Treat this section as a trust model, not an exhaustive mirror of `settings.json`
 
 Run outside the sandbox; only the top-level command matches (see [Sandbox and Nested Commands](#sandbox-and-nested-commands)).
 
-- Self-authenticating network tools: `git`, `linear`, `aws`, `gcloud`, `az`, `ssh`, `scp`, `rsync`, `docker`. Each carries its own auth and already reaches the network.
+- Self-authenticating network tools: `git`, `linear`, `aws`, `gcloud`, `az`, `pulumi`, `ssh`, `scp`, `rsync`, `docker`. Each carries its own auth and already reaches the network.
 - macOS host integration (`mac` plugin): `open`, `osascript`, `shortcuts`, `pbcopy`, `pbpaste`, `security`, `defaults`, `screencapture`, `say`, `afplay`, `diskutil`, `networksetup`, `dscl`. Host APIs the sandbox cannot model.
 - Local session tooling: `wt`, `claude`, `agent-browser`, `code`. Worktree, session, and editor control that stays local.
 

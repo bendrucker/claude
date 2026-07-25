@@ -358,6 +358,7 @@
       "aws:*",
       "gcloud:*",
       "az:*",
+      "pulumi:*",
       "wt:*",
       "claude:*",
       "agent-browser:*",

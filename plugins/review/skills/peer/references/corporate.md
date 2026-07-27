@@ -14,4 +14,4 @@
 ## How to Comment
 
 - Use code snippets when they communicate the idea more clearly than prose. The goal is actionable advice, not a complete fix.
-- See [tone.md](../tone.md) for general comment style. Corporate-specific additions: blocking comments should be matter-of-fact about the risk, non-blocking suggestions should be collaborative ("what about...", "have you considered...", "worth adding").
+- See [tone.md](../tone.md) for comment style, including blocking vs non-blocking phrasing.

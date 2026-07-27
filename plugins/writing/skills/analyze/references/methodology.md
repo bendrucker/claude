@@ -94,7 +94,7 @@ Pulls two corpora:
 
 #### Deliverable prose
 
-`deliverable-prose.sql` extracts text from Write/Edit to prose files (`.md`, `.txt`, `.rst`, `.adoc`) and Bash commands with `--body`/`--message`/`--description`/`--title`/`-m`, pulling heredoc content and quoted flag values via regex. It excludes paths the hook skips (memory, plan, wordlist files). The all-assistant `text-export` corpus is still pulled for the structural audit and summary sizing.
+`deliverable-prose.sql` exists because the session DB's `text_content` view captures only conversational text blocks, not Write/Edit/Bash tool inputs. It extracts text from Write/Edit to prose files (`.md`, `.txt`, `.rst`, `.adoc`) and Bash commands with `--body`/`--message`/`--description`/`--title`/`-m`, pulling heredoc content and quoted flag values via regex. It excludes paths the hook skips (memory, plan, wordlist files). The all-assistant `text-export` corpus is still pulled for the structural audit and summary sizing.
 
 #### User text filtering
 

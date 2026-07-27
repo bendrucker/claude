@@ -36,7 +36,7 @@ Triage covers the whole queue before any review begins. Reviews are session-leng
 For each of your open PRs/MRs, flag:
 
 - Failing or stuck CI. Retrying a flaky job is safe. A real failure becomes a candidate focus item. Before planning around a red pipeline, confirm the failure is yours to fix. A shared build break or an upstream outage is not work, and the same job failing identically across several of your MRs is the tell.
-- Reviewer threads awaiting your reply. Judge first whether the thread needs a substantive response. Where a reaction or brief acknowledgement closes it, prefer that. Draft a reply only when it carries real content, keep it terse, and include it in the brief.
+- Reviewer threads awaiting your reply. Draft replies per the contract in `SKILL.md` and include them in the brief.
 - Ready for review but no reviewer assigned. Assigning per the config notes is safe.
 - Stale drafts. Recommend one of: finish today (focus item), send as-is (safe), or close (ask-first).
 
@@ -46,11 +46,9 @@ Triage each inbound item, whether a message, a tracker notification, or an email
 
 Read is not handled. Notification state records only what the user has seen, so judge each thread by who spoke last and what remains open, never by unread flags. Two states never collapse into background noise: a thread where the user's own most recent comment is unanswered, which is live work awaiting a reply rather than a closed loop, and active discussion on work that also has an open MR in the user's review queue, which is review context and merges into that review's entry, since the thread may be converging on a different fix than the diff shows.
 
-Inbox zero is the target. Each item leaves the day in a terminal state: handled, reacted to or briefly acknowledged, deferred, or archived. Before drafting a reply, judge whether the thread needs a substantive response. Where a reaction or brief acknowledgement closes it, prefer that over filler. Draft a reply only when it carries real content, and keep it terse.
-
 A blocked agent is an inbound item like any message or notification, and it gets the same terminal disposition: resumed by you, or deferred with a note recording what it is waiting on. Read is not handled applies here too. An agent you saw in `claude agents` and walked away from is still open work.
 
-Route what gets deferred by where it belongs. Work for the team backlog goes to the tracker, while personal next-steps and reminders go to the personal inbox when one is configured. "My inbox" means the personal inbox. When the destination is ambiguous, ask rather than defaulting to a tracker issue, and never create a tracker issue in place of a personal capture. Drafting a reply the user has read is safe, as is archiving something already handled. Sending a reply without review is ask-first.
+Route deferrals per the contract in `SKILL.md`: team work to the tracker, personal next-steps and reminders to the personal inbox. Drafting a reply the user has read is safe, as is archiving something already handled. Sending a reply without review is ask-first.
 
 ## Today Plan
 

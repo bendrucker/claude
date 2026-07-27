@@ -24,11 +24,7 @@ These select a team mode up front instead of toggling it interactively (see [Tea
 
 ## Team Lifecycle
 
-Describe the task and team structure in natural language. Claude creates the team, spawns teammates, and coordinates work.
-
-- **Delegate mode** (Shift+Tab): restricts the lead to coordination-only tools — no direct implementation
-- **Plan approval**: require teammates to plan before implementing. The teammate works read-only until the lead approves.
-- **Shutdown**: ask the lead to shut down teammates individually, then clean up the team. Always clean up via the lead.
+Describe the task and team structure in natural language. Claude creates the team, spawns teammates, and coordinates work. Delegate mode also toggles interactively with Shift+Tab. Always shut down via the lead: teammates individually, then the team.
 
 ## Task Management
 
@@ -69,7 +65,7 @@ Teammates inherit the lead's permission settings at spawn. Each loads project co
 
 ## References
 
-- [references/hooks.md](references/hooks.md) — `TeammateIdle` and `TaskCompleted` quality gate hooks
-- [references/practices.md](references/practices.md) — task sizing, spawn prompts, file conflicts, team structures, model selection
-- [references/interaction.md](references/interaction.md) — display modes, keyboard shortcuts, direct teammate interaction
+- [references/hooks.md](references/hooks.md): `TeammateIdle` and `TaskCompleted` quality gate hooks
+- [references/practices.md](references/practices.md): task sizing, when to use teams, decomposition, model selection, worktree dispatch
+- [references/interaction.md](references/interaction.md): display modes, keyboard shortcuts, direct teammate interaction
 - [Agent Teams Documentation](https://code.claude.com/docs/en/agent-teams)

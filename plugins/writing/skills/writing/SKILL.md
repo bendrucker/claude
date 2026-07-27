@@ -10,7 +10,7 @@ description: >-
 
 ## Patterns to Avoid
 
-The hook enforces these automatically. Vocabulary and marketing-verb lists are in [`wordlists/`](../../wordlists/). Refer to those files for specific words rather than memorizing them here.
+The hook enforces these automatically. Specific vocabulary and marketing-verb lists live in [`wordlists/`](../../wordlists/).
 
 #### Structure
 

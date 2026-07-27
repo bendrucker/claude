@@ -1,58 +1,13 @@
 # Skill Patterns
 
-## Progressive Disclosure
-
-### Pattern 1: High-level guide with references
-
-```markdown
-# PDF Processing
-
-## Quick start
-[code example]
-
-## Advanced features
-- **Form filling**: See [references/forms.md](references/forms.md)
-- **API reference**: See [references/api.md](references/api.md)
-```
-
-### Pattern 2: Domain-specific organization
-
-For skills with multiple domains or frameworks:
-
-```
-bigquery-skill/
-├── SKILL.md (overview and navigation)
-└── references/
-    ├── finance.md (revenue, billing)
-    ├── sales.md (pipeline, opportunities)
-    └── product.md (API usage)
-```
-
-When the user asks about sales, Claude reads only `sales.md`.
-
-### Pattern 3: Conditional details
-
-```markdown
-## Creating documents
-Use docx-js. See [references/docx-js.md](references/docx-js.md).
-
-## Editing documents
-For simple edits, modify XML directly.
-**For tracked changes**: See [references/redlining.md](references/redlining.md)
-```
-
 ## Dynamic Context Injection
 
-The bang-backtick syntax runs shell commands as preprocessing before Claude sees the skill content. The output replaces the placeholder inline, so Claude receives rendered data.
-
-### Syntax
+The bang-backtick syntax runs shell commands as preprocessing before Claude sees the skill content. The output replaces the placeholder inline, so Claude receives rendered data and never sees the command.
 
 ```markdown
 - Current branch: !`git branch --show-current`
 - Recent commits: !`git log --oneline -5`
 ```
-
-Each bang-backtick expression executes immediately and its stdout replaces the placeholder. Claude never sees the command — only the output.
 
 ### When to Use
 
@@ -64,73 +19,7 @@ Prefer bang-backtick over asking Claude to run the same command with Bash when:
 
 Keep using `allowed-tools` with Bash for commands Claude should decide whether/when to run.
 
-### Examples
-
-#### PR Review
-
-Fetch all PR context upfront:
-
-```yaml
----
-name: review-pr
-description: Review the current pull request
-context: fork
-agent: general-purpose
-allowed-tools: [Read, Grep, Glob, Bash(gh *)]
----
-
-## Context
-- Diff: !`gh pr diff`
-- PR description: !`gh pr view`
-- Changed files: !`gh pr diff --name-only`
-
-## Task
-Review this PR for correctness, style, and test coverage.
-```
-
-#### Deploy
-
-Inject environment state:
-
-```yaml
----
-name: deploy
-description: Deploy the current branch
-disable-model-invocation: true
----
-
-## Current state
-- Branch: !`git branch --show-current`
-- Unpushed commits: !`git log @{u}..HEAD --oneline 2>/dev/null || echo "no upstream"`
-- Dirty files: !`git status --porcelain`
-
-## Deploy $ARGUMENTS
-```
-
-#### Context-Aware Commit
-
-Combine with `$ARGUMENTS`:
-
-```yaml
----
-name: commit
-description: Create a commit with context-aware message
-disable-model-invocation: true
----
-
-## Changes
-!`git diff --cached`
-
-## Recent commit style
-!`git log --oneline -5`
-
-## Instructions
-Write a commit message for the staged changes. $ARGUMENTS
-```
-
 ### Combining with Other Features
-
-Dynamic context works alongside other skill features:
 
 - `$ARGUMENTS` is substituted separately from bang-backtick expressions. Both can appear in the same skill.
 - `context: fork` — commands run in the current working directory before the subagent starts. The subagent receives the rendered output.
@@ -138,98 +27,10 @@ Dynamic context works alongside other skill features:
 
 ### Gotchas
 
-- Commands run in the **project root**, not the skill directory. For plugin skills, use `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` to reference skill-local scripts. `${CLAUDE_SKILL_DIR}` also expands in `!` context, the body, and `allowed-tools`, but NOT in the frontmatter `hooks:` block (there it resolves to empty; reference bundled scripts by `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` in hook commands).
+- Commands run in the **project root**, not the skill directory. For plugin skills, use `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` to reference skill-local scripts. `${CLAUDE_SKILL_DIR}` also expands in `!` context (see the substitutions table in [SKILL.md](../SKILL.md) for where it does not).
 - **stderr is discarded** — only stdout replaces the placeholder.
 - Failed commands produce empty output. Handle this in the command itself with a fallback (e.g., `some-cmd 2>/dev/null || echo "unavailable"`).
 - Commands run **synchronously and sequentially**. Avoid slow commands that would delay skill loading.
-
-## Argument Substitutions
-
-### All Arguments
-
-`$ARGUMENTS` expands to the full argument string:
-
-```yaml
----
-name: fix-issue
-description: Fix a GitHub issue
----
-
-Fix GitHub issue $ARGUMENTS following our coding standards.
-```
-
-`/fix-issue 123` → Claude sees "Fix GitHub issue 123 following our coding standards."
-
-If `$ARGUMENTS` is absent from the content, arguments are appended as `ARGUMENTS: <value>`.
-
-### Positional Arguments
-
-`$ARGUMENTS[N]` or `$N` accesses arguments by 0-based index:
-
-```yaml
----
-name: migrate-component
-description: Migrate a component between frameworks
----
-
-Migrate the $0 component from $1 to $2.
-Preserve all existing behavior and tests.
-```
-
-`/migrate-component SearchBar React Vue` → `$0` = SearchBar, `$1` = React, `$2` = Vue.
-
-`$ARGUMENTS[0]` and `$0` are equivalent. Use whichever is more readable in context.
-
-## Output Patterns
-
-### Template Pattern
-
-**Strict requirements:**
-```markdown
-ALWAYS use this exact structure:
-# [Title]
-## Executive summary
-[One paragraph]
-## Key findings
-- Finding with data
-```
-
-**Flexible guidance:**
-```markdown
-Sensible default format, adapt as needed:
-# [Title]
-## Summary
-[Adapt based on findings]
-```
-
-### Examples Pattern
-
-Provide input/output pairs:
-
-```markdown
-**Example 1:**
-Input: Added user authentication with JWT
-Output: feat(auth): implement JWT-based authentication
-```
-
-## Workflow Patterns
-
-### Sequential
-
-```markdown
-1. Analyze form (run analyze_form.py)
-2. Create mapping (edit fields.json)
-3. Validate (run validate_fields.py)
-4. Fill form (run fill_form.py)
-```
-
-### Conditional
-
-```markdown
-1. Determine type:
-   **Creating?** → Follow creation workflow
-   **Editing?** → Follow editing workflow
-```
 
 ## Skills and Subagents
 
@@ -250,18 +51,7 @@ Skills listed here are injected into the subagent's context at startup. Built-in
 
 ### Run a skill in a subagent context
 
-Use `context: fork` to run a skill in an isolated subagent:
-
-```yaml
----
-name: code-analysis
-description: Analyze code quality and generate detailed reports
-context: fork
-agent: Explore
----
-```
-
-The sub-agent starts with a **clean context** — it does not inherit the parent conversation. It sees only the skill content (with `!`shell`` injections expanded) and `CLAUDE.md`. Results are summarized and returned to the main conversation.
+Use `context: fork` to run a skill in an isolated subagent. The sub-agent starts with a **clean context**. It does not inherit the parent conversation. It sees only the skill content (with `!`shell`` injections expanded) and `CLAUDE.md`. Results are summarized and returned to the main conversation.
 
 Forks background by default. The result arrives as a later task notification rather than in the invoking turn, the fork runs with the narrower background-subagent tool set, and its edits fall outside session checkpoints so `/rewind` will not undo them. Set `background: false` when the caller needs the result in the turn that invoked the skill.
 
@@ -273,32 +63,11 @@ A forked skill is a regular subagent. It never receives `AskUserQuestion`. `back
 
 ## Skill-Scoped Hooks
 
-Define hooks that run during the skill's lifecycle:
+Hooks in frontmatter run during the skill's lifecycle and are cleaned up when the skill finishes. `once: true` runs a hook only once per session, then removes it, useful for one-time validation or setup.
+
+Prefer specific matchers with tool argument patterns over generic tool names with internal filtering, combine related matchers with `|`, and use `jq -n` with YAML multi-line syntax for static JSON responses:
 
 ```yaml
----
-name: secure-operations
-description: Perform operations with additional security checks
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "./scripts/security-check.sh"
-          once: true
----
-```
-
-**`once: true`**: Run the hook only once per session. After first successful execution, the hook is removed. Useful for one-time validation or setup.
-
-Skill hooks are scoped to the skill's execution and cleaned up when the skill finishes.
-
-### Prefer Specific Matchers
-
-Use tool argument patterns instead of generic tool names with internal filtering. Combine multiple patterns with `|`:
-
-```yaml
-# Preferred: specific matchers, combined with pipe, readable multi-line YAML
 hooks:
   PreToolUse:
     - matcher: "Bash(osascript:*)|Bash(open:*)"
@@ -313,57 +82,12 @@ hooks:
             }'
 ```
 
-```yaml
-# Avoid: generic matcher with internal filtering
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "./scripts/maybe-disable-sandbox.sh"
-```
-
-**Best practices:**
-- Use specific matchers (`Bash(osascript:*)`) over generic ones (`Bash`)
-- Combine related matchers with `|` instead of duplicating hook entries
-- Use YAML multi-line syntax (`|`) for readable commands
-- Use `jq -n` for static JSON responses instead of escaped echo strings
-
-## Content Guidelines
-
-- **Consistent Terminology**: One term per concept
-- **Examples Over Description**: Input/output pairs show desired style
-- **Imperative Form**: Use "Run script" not "You should run"
-- **Avoid Time-Sensitive Info**: Use "Old Patterns" sections for deprecated methods
-
 ## Anti-Patterns
 
-### Tool Overlap Confuses the Model
+### Tool and Skill Overlap
 
-Exposing several near-duplicate tools makes Claude pick the wrong one. Three "fetch" variants or two "search" tools force a choice the model often gets wrong. Consolidate overlapping capabilities into a single parameterized tool where an argument selects behavior.
+Exposing several near-duplicate tools makes Claude pick the wrong one. Consolidate overlapping capabilities into a single parameterized tool where an argument selects behavior. The same overlap appears at the skill level: two skills whose `description` fields overlap compete to trigger. Prefer one skill with a `$ARGUMENTS`-selected mode over splitting it into rivals that race to activate.
 
-```yaml
-# Avoid: near-duplicate tools competing for the same job
-allowed-tools: [Bash(fetch-url:*), Bash(fetch-json:*), Bash(fetch-html:*)]
-```
+### Over-Prescription
 
-```yaml
-# Preferred: one tool, an argument selects behavior
-allowed-tools: [Bash(fetch:*)]
-```
-
-The same overlap appears at the skill level. Two near-duplicate skills whose `description` fields overlap compete to trigger, the activation equivalent of tool overlap. Prefer one skill with a `$ARGUMENTS`-selected mode over splitting it into rivals that race to activate.
-
-### Over-Prescription Lowers Quality
-
-Prompts that micromanage the exact sequence of tool calls degrade output and become brittle. Spelling out every call ties the skill to one path, so any upstream change breaks it. Prefer high-level guidance that states the goal and constraints, then trust the model to sequence the work.
-
-This is the operational elaboration of [Don't Railroad Claude](../SKILL.md) and the appropriate-freedom principle: give Claude the outcome and let it choose the steps. When a skill keeps accreting prescriptive steps to patch failures, the fix is usually a clearer goal or a helper script, not more steps.
-
-## Executable Code
-
-- Handle errors explicitly (don't punt to Claude)
-- Document constants with justification
-- Clarify intent: "Run script.py" (execute) vs "See script.py" (reference)
-- Use fully qualified MCP names: `ServerName:tool_name`
-- List package dependencies
+Prompts that micromanage the exact sequence of tool calls degrade output and become brittle. When a skill keeps accreting prescriptive steps to patch failures, the fix is usually a clearer goal or a helper script, not more steps.

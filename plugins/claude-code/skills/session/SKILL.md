@@ -11,13 +11,13 @@ allowed-tools:
 
 Search and analyze Claude Code conversation history via a DuckDB index over JSONL session files.
 
-**Current Session ID**: `${CLAUDE_SESSION_ID}`
+Current session ID: `${CLAUDE_SESSION_ID}`
 
 ## Arguments
 
 Map any arguments to the mechanisms below:
 
-- `--refresh`: force a rescan via `refresh.ts --refresh` before querying. Default: incremental refresh keyed on a per-file (mtime, size) catalog, skipped entirely while the freshness stamp is younger than `--max-age`.
+- `--refresh`: force a rescan via `refresh.ts --refresh` before querying. Default: the incremental refresh described in [Refresh](#refresh).
 - `--host <label>`: scope queries to one imported machine through the `host` param. Default: span every host, including `local`. See [Cross-Machine History](#cross-machine-history).
 - `--since <date>`: pass as the `after_date` param to scope queries from that date forward. Default: the full index.
 
@@ -31,7 +31,6 @@ Run `refresh.ts` before querying. It scans `~/.claude/projects/**/*.jsonl` plus 
 
 ```bash
 ${CLAUDE_SKILL_DIR}/scripts/refresh.ts
-${CLAUDE_SKILL_DIR}/scripts/refresh.ts --refresh
 ```
 
 ### Querying
@@ -51,14 +50,7 @@ DuckDB locks the database file per process. Read-only opens take a shared lock, 
 
 ### Parallel Queries (Workflows)
 
-To investigate the corpus with a fan-out of agents (breadth search for leads, then a depth pass per lead), refresh once up front, then have every agent open `${CLAUDE_PLUGIN_DATA}/session.duckdb` read-only. The path is stable, so agent prompts need no path threading.
-
-```bash
-${CLAUDE_SKILL_DIR}/scripts/refresh.ts --refresh                # orchestrator, once
-duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/activity.sql   # agents, in parallel
-```
-
-Read-only opens coexist, so agents never contend with each other. Never let a fanned-out agent call `refresh.ts`: past the stamp's `--max-age` it opens read-write, which collides with every reader. Queries read a shared file, so the agents need no worktree.
+To investigate the corpus with a fan-out of agents (breadth search for leads, then a depth pass per lead), the orchestrator runs `refresh.ts --refresh` once up front, then every agent opens `${CLAUDE_PLUGIN_DATA}/session.duckdb` read-only. Never let a fanned-out agent call `refresh.ts`: past the stamp's `--max-age` it opens read-write, which collides with every reader. Queries read a shared file, so the agents need no worktree.
 
 Params work the same from the CLI: `getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare read-only run of a query file runs unfiltered. Prepend `SET VARIABLE` lines to scope it:
 
@@ -72,7 +64,7 @@ SQL
 
 Breadth-first leads come from the survey surfaces (`records` taxonomy, `fields` for schema inference, `activity`, `hooks`, `diagnostics`, `skill-activity`); a depth pass is then custom read-only SQL over whatever table or view the survey pointed at.
 
-For self-improvement discovery (fanning out over the whole corpus to mine config-change candidates, then grounding them against the live config), [`references/discovery.md`](references/discovery.md) carries the full recipe: the dimension-to-query cheat sheet, the mandatory grounding pass, the host-safety rules, and the Tier-2 query catalog (six discovery queries shipped as SQL but kept out of the catalog above).
+For self-improvement discovery (fanning out over the whole corpus to mine config-change candidates, then grounding them against the live config), [`references/discovery.md`](references/discovery.md) carries the full recipe: the dimension-to-query cheat sheet, the mandatory grounding pass, the host-safety rules, and a Tier-2 catalog of discovery queries kept out of the catalog above.
 
 ## Named Queries
 
@@ -80,7 +72,7 @@ Built-in queries in `resources/queries/` run by name with `SET VARIABLE` params.
 
 The `project` param matches against the directory name (last path component) using glob syntax: `project=myapp` matches exactly, `project=myapp*` matches the repo and its worktrees.
 
-Every query also takes an optional `host` param. Omit it to span every machine (including `local`); pass `host=work` to scope to one imported machine. See [Cross-Machine History](#cross-machine-history).
+Every query also takes an optional `host` param (omit to span every machine, `host=work` to scope to one imported machine). See [Cross-Machine History](#cross-machine-history).
 
 Every query, grouped by category with a one-line gloss:
 
@@ -132,16 +124,12 @@ Full params and descriptions in [`references/catalog.md`](references/catalog.md)
 
 ### Markdown and YAML on Disk
 
-Two queries read files on disk through community extensions instead of the index. They need `markdown`/`yaml` loaded, so run them with `-init resources/extensions.sql`, which loads both in the same process before the piped query and runs under `-readonly`. The common-path queries above omit `-init` and pay nothing.
+Three queries (`plan-sections`, `frontmatter`, `skill-config-vs-observed`) read files on disk through the `markdown`/`yaml` community extensions instead of the index. Run them with `-init resources/extensions.sql`, which loads both in the same process before the piped query and runs under `-readonly`. The common-path queries above omit `-init` and pay nothing. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
 
 ```bash
 duckdb -readonly -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql ${CLAUDE_PLUGIN_DATA}/session.duckdb \
   < ${CLAUDE_SKILL_DIR}/resources/queries/plan-sections.sql
 ```
-
-Three queries use this path: `plan-sections`, `frontmatter`, and `skill-config-vs-observed`. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
-
-The reusable pattern for markdown/YAML on disk: a self-defaulting glob (`~` expands to home, override via `SET VARIABLE`) feeding a table function over files (`read_markdown_sections` for body structure, `read_yaml_frontmatter` for frontmatter), never materializing file bodies into a column, with extension setup centralized in `resources/extensions.sql` and pulled in via `-init`. Follow it for new markdown-on-disk needs rather than reinventing regex parsing.
 
 ## Cross-Machine History
 
@@ -209,4 +197,4 @@ sed -n '<source_line>p' <source_file>
 
 ## Session File Structure
 
-Session logs live in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`. The index lives at `${CLAUDE_PLUGIN_DATA}/session.duckdb`, refreshed incrementally from a per-file catalog of (mtime, size).
+Session logs live in `~/.claude/projects/<encoded-path>/<session-id>.jsonl` where the encoded path replaces `/` with `-`.

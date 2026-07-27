@@ -12,9 +12,7 @@ allowed-tools:
 
 # Handoff
 
-Hand the current work to a fresh background agent seeded with a summary of this conversation. The agent starts immediately in the current directory and returns control, so you can walk away and check on it later. Nothing is written to disk: the summary becomes the new agent's opening prompt.
-
-Use this to make backgrounding a natural next step, not a special ceremony. When the work is well-scoped and the user wants to step away or parallelize, offer the handoff.
+Hand the current work to a fresh background agent seeded with a summary of this conversation. The agent starts immediately in the current directory and returns control, so you can walk away and check on it later. Nothing is written to disk: the summary becomes the new agent's opening prompt. When the work is well-scoped and the user wants to step away or parallelize, offer the handoff.
 
 ## Write the Summary
 
@@ -28,9 +26,7 @@ Synthesize the conversation into a prompt that lets an agent with zero prior con
 - **Suggested skills**: a short list of skills the agent should invoke for this work (e.g. `pull-request:create`, `review:code`, a project skill). This is the biggest lever on whether the agent picks up your conventions.
 - **Constraints**: anything that would surprise a fresh agent, such as test commands, gotchas, or things not to touch.
 
-Keep it dense and specific. Do not duplicate content that already lives in an artifact (a plan, an ADR, an issue, a diff). Reference it by path or URL and let the agent read it.
-
-If the user passed an argument, treat it as the focus for the next session and shape the summary around it. With no argument, summarize the conversation as a whole.
+Keep it dense and specific. If the user passed an argument, treat it as the focus for the next session and shape the summary around it. With no argument, summarize the conversation as a whole.
 
 ## Redact
 
@@ -42,7 +38,7 @@ The agent runs unattended, so choose its horsepower and autonomy up front. Propo
 
 #### Model and Effort
 
-Match `--model` and `--effort` to the task rather than reflexively picking the biggest. A well-specified, mechanical task runs fine on `--model sonnet` at `--effort medium`. Reserve `--model opus` with `--effort high` (or `xhigh`/`max`) for open-ended, high-stakes, or reasoning-heavy work. `--effort` takes `low`, `medium`, `high`, `xhigh`, or `max`. `--model` takes an alias (`opus`, `sonnet`, `haiku`, `fable`) or a full model name.
+Match `--model` and `--effort` to the task. A well-specified, mechanical task runs fine on `--model sonnet` at `--effort medium`. Reserve `--model opus` with `--effort high` (or `xhigh`/`max`) for open-ended, high-stakes, or reasoning-heavy work. `--effort` takes `low`, `medium`, `high`, `xhigh`, or `max`. `--model` takes an alias (`opus`, `sonnet`, `haiku`, `fable`) or a full model name.
 
 #### Permission Mode
 
@@ -62,7 +58,6 @@ claude --bg --name "<descriptive name>" --model <model> --effort <level> --permi
 ```
 
 - Always pass `--name` (`-n`). It sets the display name in the agent list, session picker, and terminal title, so a glance tells the user which job is which.
-- Pass `--model`, `--effort`, and `--permission-mode` with the values chosen in [Size the Run](#size-the-run) so the run's horsepower and autonomy are set deliberately for this task.
 - The agent starts in the current working directory and returns control immediately.
 - Background sessions run in their own isolated git worktree by default (`worktree.bgIsolation`), so uncommitted changes in the current tree may not carry over. Commit first, or anchor the summary to a pushed branch, PR, or commit rather than unsaved edits.
 - `--bg` cannot be combined with `-p`.
@@ -77,9 +72,3 @@ Tell the user how to follow and steer the agent they just launched:
 - From inside any session, `/bg` backgrounds work and `/tasks` shows running agents.
 
 The agent view marks each session: green `✓` completed, red `✗` failed, yellow `✻` needs input, dim `∙` idle. There is no push notification, so the user checks back through the agent view. Sessions idle out after about an hour unless pinned.
-
-## Gotchas
-
-- **Zero shared memory.** The new agent sees only the summary, not this conversation. Anything you leave out is lost. When in doubt, name the file or artifact so the agent can read it itself.
-- **Isolated worktree.** The default `bgIsolation` means the agent works on a copy, not your live tree. Reference committed, pushed state for anything the agent must build on.
-- **No unattended autonomy by accident.** A summary that assumes approvals will happen stalls behind the first prompt. The chosen `--permission-mode` is what actually lets the agent finish while the user is away.

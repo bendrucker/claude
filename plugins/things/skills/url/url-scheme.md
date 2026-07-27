@@ -1,28 +1,12 @@
 # Things 3 URL Scheme Reference
 
-Things 3 automation via URL schemes.
+All commands follow the pattern: `things:///commandName?param1=value1&param2=value2`
 
 **Source**: [Things URL Scheme](https://culturedcode.com/things/support/articles/2803573/)
 
-## Table of Contents
+## add - Create To-dos
 
-1. [URL Scheme Commands](#url-scheme-commands)
-2. [URL Scheme Parameters](#url-scheme-parameters)
-3. [JSON Command Format](#json-command-format)
-4. [Data Types and Formats](#data-types-and-formats)
-5. [Limitations and Rate Limits](#limitations-and-rate-limits)
-
----
-
-## URL Scheme Commands
-
-All commands follow the pattern: `things:///commandName?param1=value1&param2=value2`
-
-### add - Create To-dos
-
-Creates new to-do items.
-
-**Parameters:**
+#### Parameters
 - `title` (string) - Todo title
 - `titles` (newline-separated) - Multiple todos (`%0a` separator)
 - `notes` (string, max 10,000 chars) - Todo notes
@@ -36,21 +20,11 @@ Creates new to-do items.
 - `canceled` (boolean) - Mark as canceled
 - `reveal` (boolean) - Navigate to new item after creation
 
-**Note on `list` vs `list-id`:**
-- `list` works with **project names** only
-- For **areas**, you must use `list-id` with the area's UUID
-- To find area IDs, use JXA: `app.areas().map(a => ({name: a.name(), id: a.id()}))`
+**Note on `list` vs `list-id`:** `list` works with **project names** only. For **areas**, you must use `list-id` with the area's UUID (query area IDs via the `things:jxa` skill).
 
-**Example:**
-```bash
-open -g "things:///add?title=Buy%20milk&notes=Low%20fat&when=evening&tags=Errand"
-```
+## add-project - Create Projects
 
-### add-project - Create Projects
-
-Creates projects with optional to-dos and areas.
-
-**Parameters:**
+#### Parameters
 - `title` (string) - Project title
 - `notes` (string) - Project notes
 - `when` (string) - Schedule start date
@@ -62,16 +36,11 @@ Creates projects with optional to-dos and areas.
 - `canceled` (boolean) - Mark as canceled
 - `reveal` (boolean) - Navigate to new project
 
-**Example:**
-```bash
-open -g "things:///add-project?title=Build%20treehouse&when=today&area=Home"
-```
+## update - Modify To-dos
 
-### update - Modify To-dos
+**Requires `auth-token` and `id`.**
 
-Updates to-do properties. **Requires `auth-token` and `id`.**
-
-**Parameters:**
+#### Parameters
 - `id` (string, required) - Todo ID
 - `auth-token` (string, required) - Authorization token from Settings
 - `title` (string) - New title (replaces existing)
@@ -91,104 +60,43 @@ Updates to-do properties. **Requires `auth-token` and `id`.**
 - `duplicate` (boolean) - Create copy before updating
 - `reveal` (boolean) - Navigate to updated item
 
-**Example:**
-```bash
-open -g "things:///update?id=4BE64FEA-8FEF-4F4F-B8B2-4E74605D5FA5&auth-token=YOUR_TOKEN&append-notes=Updated%20info"
-```
-
-**Notes:**
+#### Notes
 - Cannot update `when` or `deadline` on repeating to-dos
-- To move to an area, use `list-id` with the area ID (not `area-id`)
 - Projects require all child to-dos completed before marking complete
 
-### update-project - Modify Projects
+## update-project - Modify Projects
 
-Updates project properties. **Requires `auth-token` and `id`.**
+**Requires `auth-token` and `id`.** Supports the same parameters as `update` plus `area` or `area-id` to move to a different area.
 
-Supports same parameters as `update` plus:
-- `area` or `area-id` - Move to different area
+## show - Navigate & Display
 
-### show - Navigate & Display
-
-Navigates to items or built-in lists.
-
-**Parameters:**
+#### Parameters
 - `id` (string) - Item ID or built-in list name
 - `query` (string) - Search by name instead of ID
 - `filter` (comma-separated) - Filter results by tags
 
-**Built-in List IDs:**
-- `inbox` - Inbox
-- `today` - Today
-- `anytime` - Anytime
-- `upcoming` - Upcoming
-- `someday` - Someday
-- `logbook` - Logbook
-- `tomorrow` - Tomorrow
-- `deadlines` - Deadlines
-- `repeating` - Repeating
-- `all-projects` - All Projects
-- `logged-projects` - Logged Projects
+**Built-in List IDs:** `inbox`, `today`, `anytime`, `upcoming`, `someday`, `logbook`, `tomorrow`, `deadlines`, `repeating`, `all-projects`, `logged-projects`
 
-**Example:**
-```bash
-open -g "things:///show?id=today"
-open -g "things:///show?query=Weekly%20Review&filter=Work,Planning"
-```
+## search - Open Search
 
-### search - Open Search
-
-Opens the search interface.
-
-**Parameters:**
+#### Parameters
 - `query` (string, optional) - Pre-filled search text
 
-**Example:**
-```bash
-open -g "things:///search?query=meeting%20notes"
-```
+## version - Check Compatibility
 
-### version - Check Compatibility
+Returns app and URL scheme version information. No parameters.
 
-Returns app and URL scheme version information.
+## Parameter Types
 
-**Example:**
-```bash
-open -g "things:///version"
-```
-
----
-
-## URL Scheme Parameters
-
-### Common Parameter Types
-
-**String Parameters:**
-- Max 4,000 characters (unless specified)
-- Must be URL-encoded
-- Use `%20` for spaces, `%0a` for newlines
-
-**Date Parameters:**
-- Named values: `today`, `tomorrow`
-- ISO format: `yyyy-mm-dd`
-- Natural language: `in 3 days`, `next week`, `May 5`
-- Date-time: `yyyy-mm-dd@HH:MM`
-- ISO8601: Full timestamp support
-
-**Boolean Parameters:**
-- Values: `true` or `false`
-
-**List Parameters:**
-- Comma-separated: `tag1,tag2,tag3`
-- Newline-separated: `item1%0aitem2%0aitem3`
-
----
+- **Strings**: max 4,000 characters unless specified, URL-encoded (`%20` space, `%0a` newline). Encode with `jq -sRr @uri`.
+- **Dates**: named (`today`, `tomorrow`, `evening`), ISO (`yyyy-mm-dd`), date-time (`yyyy-mm-dd@HH:MM`), full ISO8601, or natural language (`in 3 days`, `next week`, `May 5`)
+- **Booleans**: `true` or `false`
+- **Lists**: comma-separated (`tag1,tag2`) or newline-separated (`item1%0aitem2`)
 
 ## JSON Command Format
 
 The `json` command creates complex structures with projects, to-dos, headings, and checklist items.
 
-**Basic Usage:**
 ```bash
 data='[{"type":"to-do","attributes":{"title":"Task name"}}]'
 open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
@@ -196,7 +104,7 @@ open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 
 ### Supported Object Types
 
-**to-do:**
+#### to-do
 ```json
 {
   "type": "to-do",
@@ -213,7 +121,7 @@ open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 }
 ```
 
-**project:**
+#### project
 ```json
 {
   "type": "project",
@@ -233,143 +141,14 @@ open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
 }
 ```
 
-**heading:**
-```json
-{
-  "type": "heading",
-  "attributes": {
-    "title": "Heading title"
-  }
-}
-```
-
-**checklist-item:**
-```json
-{
-  "type": "checklist-item",
-  "attributes": {
-    "title": "Checklist item title"
-  }
-}
-```
+**heading** and **checklist-item**: same shape, with only `title` in `attributes`.
 
 ### Operations
 
-**Create (default):**
-```json fragment
-{
-  "type": "to-do",
-  "operation": "create",
-  "attributes": {...}
-}
-```
+Each object takes an optional `"operation"`: `"create"` (default) or `"update"`. Updates also require a top-level `"id"` on the object and the `auth-token` URL parameter. `reveal` navigates to the created/updated item.
 
-**Update:**
-```json fragment
-{
-  "type": "to-do",
-  "operation": "update",
-  "id": "ABC-123",
-  "attributes": {...}
-}
-```
+## Limitations
 
-### Additional Parameters
-
-- `auth-token` - Required for update operations
-- `reveal` - Navigate to created/updated item
-
-**Complete Example:**
-```bash
-data='[
-  {
-    "type": "project",
-    "attributes": {
-      "title": "Shopping List",
-      "when": "today",
-      "items": [
-        {
-          "type": "to-do",
-          "attributes": {
-            "title": "Groceries",
-            "checklist-items": [
-              {"type": "checklist-item", "attributes": {"title": "Milk"}},
-              {"type": "checklist-item", "attributes": {"title": "Eggs"}}
-            ]
-          }
-        }
-      ]
-    }
-  }
-]'
-open -g "things:///json?data=$(echo "$data" | jq -sRr @uri)"
-```
-
----
-
-## Data Types and Formats
-
-### URL Encoding
-
-All URL parameters must be encoded:
-- Space → `%20`
-- Newline → `%0a`
-- Comma → `%2C` (if not used as separator)
-- `&` → `%26`
-- `#` → `%23`
-
-Use `jq -sRr @uri` or similar tools for encoding.
-
-### Date Formats
-
-**Named Values:**
-- `today` - Today
-- `tomorrow` - Tomorrow
-- `evening` - This evening
-
-**ISO Date:**
-- `yyyy-mm-dd` - e.g., `2025-10-21`
-
-**Date-Time:**
-- `yyyy-mm-dd@HH:MM` - e.g., `2025-10-21@14:30`
-
-**Natural Language:**
-- `in 3 days`
-- `next week`
-- `May 5`
-- `December 25, 2025`
-
-**ISO8601 Timestamps:**
-- Full ISO8601 format supported
-
-### When Values
-
-Controls when a to-do appears:
-- `today` - Today list
-- `tomorrow` - Scheduled for tomorrow
-- `evening` - This Evening in Today
-- `anytime` - Anytime list
-- `someday` - Someday list
-- Date string - Scheduled for specific date
-
----
-
-## Limitations and Rate Limits
-
-### Rate Limiting
-- Maximum **250 items** can be added within 10 seconds
-- Exceeding limit results in throttling
-
-### Item Limits
-- **Checklist items**: Maximum 100 per to-do
-- **Notes**: Maximum 10,000 characters
-- **Title**: Maximum 4,000 characters (URL params)
-
-### Update Restrictions
-- **Repeating to-dos**: Cannot update `when` or `deadline` fields
-- **Projects**: All child to-dos must be completed before marking project complete
-- **Auth token required**: All `update`, `update-project` operations and `json` updates require auth token from Things > Settings > General
-
-### Data Constraints
-- JSON payload size limited by URL length
-- Complex structures should use `json` command instead of individual `add` commands
+- **Rate limit**: maximum 250 items within 10 seconds. Exceeding it results in throttling.
+- **Auth token**: required for `update`, `update-project`, and `json` updates. From Things > Settings > General.
+- **JSON payload**: size limited by URL length. Prefer the `json` command over many individual `add` commands for complex structures.

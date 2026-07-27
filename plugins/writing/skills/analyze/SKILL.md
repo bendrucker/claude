@@ -56,15 +56,13 @@ Pass the DB path via `--session-db`:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH"
-bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --since 2026-04-01 --model '*opus*' --top 50
-bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --project bendrucker.me --min-lift 7
 ```
 
-Run with `--help` for all flags. `--data-dir` overrides where the voice baseline is read from (default: `CLAUDE_PLUGIN_DATA` or `~/.claude/plugins/data/writing-bendrucker`). Writes a markdown report to `tmp/trope-analysis-<date>.md` (override with `--out`). The report may quote any host in the combined index, so keep it under `tmp/` and never paste host-specific content into committed work.
+Run with `--help` for the remaining flags. Writes a markdown report to `tmp/trope-analysis-<date>.md`. The report may quote any host in the combined index, so keep it under `tmp/` and never paste host-specific content into committed work.
 
 ## Meaning-Layer Judge
 
-`--judge` adds an LLM-judge pass over the deliverable corpus (six binary criteria, information-density first). It requires `ANTHROPIC_API_KEY`, prints a cost estimate before any call, and caps documents with `--judge-limit` (default 100, cents per run on the default Haiku-class model):
+`--judge` adds an LLM-judge pass over the deliverable corpus. It requires `ANTHROPIC_API_KEY`, prints a cost estimate before any call, and caps documents with `--judge-limit` (default 100, cents per run on the default Haiku-class model):
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --judge
@@ -92,55 +90,18 @@ bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --since 2026-07-01 --json
 bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --log /path/to/log.jsonl
 ```
 
-It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, and per-category fire/suppress counts. The report ends with an opportunities list, each naming a concrete fix:
+It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, and per-category fire/suppress counts. The report ends with an opportunities list, each naming a concrete fix (including when a clean streak means flipping the `WRITING_HOOKS_LOG` default to off). Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
 
-- a category dominating injections points at a precision audit of that rule (sample its firings from session history, then demote, narrow, or retire)
-- a category suppressed as often as it fires means the reminder is not changing behavior within sessions
-- any `ask` outcome is a regression (the numbering demotion expected zero) and names a rule to demote
-- silent-run p95 over budget points at the dispatcher's checker order and prefilters
-- a high `skipped-scratch` share warrants checking recent Write paths against `isScratchPath` for swallowed durable prose
-- a clean report is itself the signal: after two consecutive stable audits, flip the `WRITING_HOOKS_LOG` default to off
+## Corpora and Verdicts
 
-Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
+Each rule is judged on the surface where the hook fires it: chat-surface rules against the user's chat, deliverable-surface rules (`flowery-phrases.txt`, `soft-phrasing.txt`) against the voice baseline. Lift gates new candidate phrases only (`--min-lift`, default 5.0, plus session count >= 3), never removals: the smoothed user baseline compresses lift for any word the user never types, which would flag the model's strongest tells for removal. Voice-delta features carry provenance labels (**skill-prescribed**, **skill-encouraged**, **ungoverned**) so drift points at the right fix, and they are aggregate trends only, never per-document flags.
 
-## Metrics
-
-**Lift**: how distinctive a phrase is to assistant output vs. user text. `lift = rate_assistant / rate_user_smoothed`, where rates are per-million-token frequencies. A lift of 10.0 means the assistant uses the phrase 10x more per token than the user. The `--min-lift` threshold (default 5.0) gates new candidate phrases only. Rule keep/remove uses a direct rate comparison plus `--min-count`, not lift (see methodology).
-
-**Session count**: distinct sessions containing a phrase. Candidates require session count >= 3 to filter project-specific jargon that dominates a single session.
-
-## Output
-
-- Summary stats (corpus sizes, voice-baseline size, rule count, model breakdown)
-- Voice delta (per-feature corpus rates beside the local baseline rates, each labeled **skill-prescribed**, **skill-encouraged**, or **ungoverned** so drift points at the right fix: tune the skill or build a detector; aggregate trends only, never per-document flags)
-- Proposed removals, each tagged **dead** (model produced it fewer than `--min-count` times on the surface where the hook fires it) or **not distinctive** (baseline uses it at least as often as the model)
-- Proposed additions (high-lift n-grams not already covered), each with its voice-baseline rate and a spot-checkable quote
-- Rule health table (every entry with type, audit surface, and `keep` / `remove (reason)`), plus deliverable quotes for the deliverable-surface tells
-- Structural pattern audit (the hook's regex patterns, hit counts across sessions)
-- Structural signatures (part-of-speech tag sequences distinctive to the model's deliverable prose; word-independent, so they survive vocabulary drift between model releases)
-- Meaning-layer audit (per-criterion judge flag rates with sampled spans, only when `--judge` is passed)
-- Corrective feedback (short human messages naming a writing problem, with the preceding model output)
-- Correction candidates (long-assistant, short-user pairs suggesting prose pushback)
-
-Each rule is judged on the surface where the hook fires it. Chat-surface rules (openers, sycophantic patterns, conversational vocabulary) compare the model's chat against the user's chat. Deliverable-surface rules (`flowery-phrases.txt`, `soft-phrasing.txt`) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as **keep**, not dead. A rule the model uses far more than the baseline is kept even when its lift reads low. Lift is not used for removal: the smoothed user baseline (see methodology) compresses it for any word the user never types, which would flag the model's strongest tells (`delve`, `comprehensive`, `robust`) for removal.
-
-## Corpora
-
-Four corpora, each serving a different purpose:
-
-- **All model-generated text**: conversational assistant text (`text-export`, role=assistant) combined with deliverable prose (`deliverable-prose.sql`). The session DB's `text_content` view captures only conversational text blocks, not tool inputs (Write/Edit/Bash); the deliverable query fills this gap. Used for n-gram candidates.
-- **Deliverable prose** (`deliverable-prose.sql`): Write/Edit to prose files, Bash commands with `--body`/`--message`/`-m`. The candidate-mining corpus and the model side of the deliverable-aware rule audit.
-- **Human-only user text** (`text-export`, role=user, filtered): the baseline for lift calculation. Filters out system-injected content (skill injections, context compaction summaries, task notifications, system reminders) and pasted model output (see methodology) that arrives as user-role messages but is machine-generated.
-- **Voice baseline** (local-only, `voice-profile.ts`): the user's hand-written, pre-AI pull requests. The baseline side of the deliverable-aware rule audit and the "absent from my baseline" signal for additions.
-
-The FTS rule health audit uses `text_content` (a view covering both roles) with its own FTS indexes for chat-surface rules. Deliverable-surface rules compare deliverable prose against the voice baseline.
+[references/methodology.md](references/methodology.md) is the single home for the corpora, metrics, queries, per-surface reasoning, and tuning behind each report section and verdict.
 
 ## Workflow
 
 Review the report. Edit `plugins/writing/wordlists/*.txt` by hand, then re-run to confirm. The skill never edits wordlists.
 
-## Methodology
-
-See [references/methodology.md](references/methodology.md) for query details, known gaps, and tuning guidance.
+## Linguistics
 
 See [references/linguistics.md](references/linguistics.md) for the part-of-speech tagger evaluation behind `scripts/headings-eval.ts`: classifier comparison, synthetic corpus generation, promotion criteria, and dependency earn/retire rules.

@@ -15,57 +15,26 @@ allowed-tools:
 
 # Rewrite
 
-Rewrite input text to match the style rules in [references/style-rules.md](references/style-rules.md). Preserve all functional information. Change only voice, word choice, and sentence structure.
+Rewrite input text to match the style rules in [references/style-rules.md](references/style-rules.md). Preserve all functional information. Change only voice, word choice, and sentence structure, conveying the same information in fewer, clearer words.
 
 ## Input
 
 $ARGUMENTS
 
-Read input from one of these sources:
-
-#### File Path
-
-If `$ARGUMENTS` is a path to an existing file, read the file contents.
-
-#### Inline Text
-
-If `$ARGUMENTS` contains text, use it directly.
-
-If `$ARGUMENTS` is empty, ask for the text to rewrite. You may offer to read it from the clipboard.
+If `$ARGUMENTS` is a path to an existing file, read the file. Otherwise treat it as the text itself. If empty, ask for the text to rewrite (you may offer to read it from the clipboard).
 
 ## Lint
 
-Before and after rewriting, run the scan script in single-input mode to find violations:
-
-```bash
-echo "<text>" | bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input
-```
-
-Or pass a file path directly:
+Before and after rewriting, run the scan script in single-input mode to find violations. It accepts a file path, inline text, or stdin and outputs one finding per line (`line:col: category: message`):
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input path/to/file.md
 ```
 
-The script outputs one finding per line (`line:col: category: message`).
-
 Fix every hard tell (em dash, copula avoidance, hedging, filler, vocabulary, and the other fixed-phrase categories), then re-run until those are clean.
 
 Treat `marketing verb` findings as advisory. The script flags each one, but the live hook only objects when their weighted sum is high enough, so a lone marketing verb may be fine. Consider each in context and replace the ones that read as promotional rather than driving the count to zero.
 
-## Rewriting
-
-Clear the lint findings as described above, then apply the structural rules from [references/style-rules.md](references/style-rules.md):
-
-- Breaking long compound sentences into shorter ones
-- Converting passive voice to active
-- Cutting sentences that restate previous ones
-- Removing filler phrases and hedging
-
-Do not add, remove, or restructure the content's meaning. Convey the same information in fewer, clearer words.
-
 ## Output
 
 Display the rewritten text directly. Do not wrap it in a code block unless the input was code.
-
-If the user asks, copy the result to the clipboard.

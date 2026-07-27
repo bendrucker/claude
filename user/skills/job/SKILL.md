@@ -38,10 +38,7 @@ Arguments beyond the mode are a focus hint ($ARGUMENTS). Weight the brief toward
 
 ## Delegation
 
-This skill never names platforms. The config declares which version-control platform, issue tracker, worktree tool, messaging platform, email account, and optional personal capture inbox the user works with. For each task:
-
-1. Find the installed skill covering the configured tool's task (the skill for the configured platform's merge requests, the skill for the configured tracker's issues, the skill or MCP for the configured messaging and email inboxes, the personal inbox's configured `access` for its captures, the skill that runs a review queue) and load it for mechanics.
-2. If no installed skill matches, use the configured CLI or MCP directly. Stay read-only until the user confirms actions.
+This skill never names platforms. The config declares which version-control platform, issue tracker, worktree tool, messaging platform, email account, and optional personal capture inbox the user works with. For each task, find the installed skill covering the configured tool's task and load it for mechanics, falling back to the configured CLI or MCP directly. Stay read-only until the user confirms actions.
 
 Platforms, hostnames, and usernames come only from the config or the user, never from this skill.
 
@@ -51,7 +48,7 @@ Both modes follow this contract.
 
 ### Gather
 
-Read-only first. The sources are independent (review queue, own PRs, tracker, messaging inbox, email inbox), so dispatch parallel read-only sub-agents and merge their results. Merge on shared identifiers: when items from different sources name the same issue or MR, they are one piece of work and become one brief entry carrying every source's state. Sub-agents cannot see each other's results. The join is the orchestrator's job, keyed on the cross-references each sub-agent returns.
+Read-only first. The sources are independent (review queue, own PRs, tracker, messaging inbox, email inbox), so dispatch parallel read-only sub-agents and merge their results. Merge on shared identifiers: when items from different sources name the same issue or MR, they are one piece of work and become one brief entry carrying every source's state. The join is the orchestrator's job, keyed on the cross-references each sub-agent returns.
 
 #### Agents
 
@@ -61,7 +58,7 @@ Join each record to a brief item in this order:
 
 1. A `name` matching the `job:<identifier>` convention below. Exact and structural, so it is the only join that never guesses.
 2. A full PR URL in `name`, or an issue key or `#`-prefixed PR number bounded by non-alphanumeric characters and confirmed against the repo `cwd` resolves to. This covers sessions launched by hand. Do not match a bare substring: `#42` occurs inside `#142`, and every repo has a PR numbered 42.
-3. `cwd` resolved to a repo, narrowing the candidate items, plus a semantic match of the name text against item titles. Both texts are already in the brief, so this costs nothing extra.
+3. `cwd` resolved to a repo, narrowing the candidate items, plus a semantic match of the name text against item titles.
 
 `cwd` is the directory the session launched from. A session that entered a worktree mid-run still reports its launch directory, usually a main checkout, occasionally a path that has since been pruned. Use it to scope candidates by repo. Never derive a branch from it, and never report it as the work.
 
@@ -94,16 +91,14 @@ Split recommended actions into two groups:
 - Safe: reversible or expected. Assign a reviewer, retry CI, add a reaction or brief acknowledgement, post a reply the user has seen drafted, update tracker status, archive a handled notification or email.
 - Ask-first: approve, close, merge, anything hard to walk back. Each needs its own confirmation.
 
-Drive inbound to zero. Every review request, message, notification, and email leaves the run with a terminal disposition: handled, reacted to or briefly acknowledged, deferred to the work tracker as a team-backlog item or to the personal inbox for your own next-steps and reminders when one is configured, or archived. Never stand up a tracker issue in place of a personal capture: when the user says "my inbox" that means the personal inbox, and when the destination is unclear, ask. Nothing stays in an ambiguous unread state.
+Drive inbound to zero. Every review request, message, notification, and email leaves the run with a terminal disposition: handled, reacted to or briefly acknowledged, deferred to the work tracker as a team-backlog item or to the personal inbox for your own next-steps and reminders when one is configured, or archived. Never stand up a tracker issue in place of a personal capture: when the user says "my inbox" that means the personal inbox, and when the destination is unclear, ask. Nothing stays in an ambiguous unread state. Where a reaction or brief acknowledgement closes a thread, prefer that over a filler reply. Draft a reply only when it carries real content, and keep it terse.
 
 Present safe actions via AskUserQuestion (execute all, pick a subset, or none). Execute through the delegated skills, then give a short summary of what changed.
 
 Run the quick safe actions and tracker corrections first. Session-length work like a review starts only at the end of the run, after the rest is cleared, and never before the approved order from triage.
 
-An item with a live session (`working`, `blocked`, or an interactive session whose `state` is null) is never dispatched again. Its recommended action is the resume command, which the user runs. Dispatching over live work is not safe, so do not offer it.
+Never dispatch over an item with a live session. Resuming it is a handoff: surface the resume command and let the user run it, since this skill runs in its own session and cannot attach to another.
 
 A prior session that is `done` or `failed` does not block a fresh dispatch, but when the work needs another pass, name that `sessionId` in the new prompt so the new session can look up what already happened.
 
 Every session this skill dispatches gets `--name "job:<identifier>"`, reusing the identifier from the brief. That is what lets tomorrow's run join by name alone.
-
-Resuming a blocked agent is a handoff: surface the command, let the user run it. This skill runs in its own session and cannot attach to another.

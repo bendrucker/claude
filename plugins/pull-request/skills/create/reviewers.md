@@ -1,6 +1,6 @@
 # Suggesting Reviewers
 
-Load this after creating the PR/MR on a corporate or internal repo. It runs after creation, so it never delays it.
+Load this after creating the PR/MR on a corporate or internal repo.
 
 Gate on repository visibility first:
 
@@ -8,8 +8,6 @@ Gate on repository visibility first:
 - **GitLab**: `glab api projects/:fullpath --jq .visibility`
 
 A public repository is OSS: skip reviewer suggestion and let the maintainer triage. Any other visibility (private, internal) is corporate: continue.
-
-Suggest reviewers, never assign them. The user always chooses from the suggestions.
 
 Rank candidates from the git history of the changed files. The script excludes you and needs no arguments:
 

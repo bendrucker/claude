@@ -30,8 +30,8 @@ Flag items that need collaboration lead time (a reviewer in another timezone, a 
 
 Review debt is inbound requests you did not reach today, unanswered threads on others' PRs/MRs, and any message, notification, or email still awaiting your reply or filing. Choose one path per item:
 
-- Reply now: judge whether the thread needs a substantive response first. Where a reaction or brief acknowledgement closes it, prefer that. Draft a reply only when it carries real content, keep it terse, and include it in the brief. Posting a draft the user approved is safe.
-- Carry to tomorrow: capture it where it belongs per Tracker Hygiene below (team work to the tracker, personal follow-ups to the personal inbox), so tomorrow's start gather surfaces it rather than a memory.
+- Reply now: draft per the contract in `SKILL.md` and include it in the brief. Posting a draft the user approved is safe.
+- Carry to tomorrow: capture it where it belongs per Tracker Hygiene below, so tomorrow's start gather surfaces it rather than a memory.
 
 Never silently drop an item.
 
@@ -48,14 +48,14 @@ Offer per worktree: commit and push as WIP (safe on your own branch), or record 
 
 ## Unattended Agents
 
-Every blocked or failed agent leaves the day resumed, stopped, or captured as a follow-up. Route captures per Tracker Hygiene below: team work to the tracker, personal follow-ups to the personal inbox. A blocked agent carries what it is waiting on in `waitingFor`, and that belongs in the capture, since tomorrow's answer is worthless without the question.
+Every blocked or failed agent leaves the day resumed, stopped, or captured as a follow-up. Route captures per Tracker Hygiene below. A blocked agent carries what it is waiting on in `waitingFor`, and that belongs in the capture, since tomorrow's answer is worthless without the question.
 
 A `working` agent can be left running overnight. That is a choice, so record it in the completion summary along with what it is expected to have finished by morning.
 
 ## Tracker Hygiene and Tomorrow
 
 - Make states match reality: merged work marked done, in-progress only for what is actually in progress. Corrections are safe actions.
-- Capture next steps where they belong. Work for the team backlog lands as tracker comments or new issues, including monitor and follow-up intents like "when X merges, rebase Y", so tomorrow's start run has a starting point instead of a memory. Personal next-steps and reminders go to the personal inbox when one is configured. When the user says "my inbox" that means the personal inbox, so route there rather than opening a tracker issue in its place, and ask when the destination is unclear.
+- Capture next steps where they belong per the contract in `SKILL.md`. Work for the team backlog lands as tracker comments or new issues, including monitor and follow-up intents like "when X merges, rebase Y", so tomorrow's start run has a starting point instead of a memory. Personal next-steps and reminders go to the personal inbox when one is configured.
 
 ## Brief and Act
 

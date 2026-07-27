@@ -27,9 +27,8 @@ Default to the working tree. Override with $ARGUMENTS (`staged`, `main..HEAD`, `
 
 ## Loop
 
-1. **Launch** via `review:tuicr`: open the target diff in a sibling tmux pane (`tuicr -w` for the
-   working tree, `tuicr -r <range>` for a range). Capture the session `slug` from
-   `tuicr review list`.
+1. **Launch** via `review:tuicr`: open the target diff in a sibling tmux pane and capture the
+   session `slug` from `tuicr review list`.
 2. **Self-critique (optional)**: offer to flag your own concerns as agent comments first
    (`tuicr review add --username ...`), so I see your read alongside mine. Skip if I decline.
 3. **Hand off**: I add comments at lines (the `c` key) in the tuicr pane.
@@ -39,18 +38,15 @@ Default to the working tree. Override with $ARGUMENTS (`staged`, `main..HEAD`, `
 4. **Collect**: `tuicr review comments --repo <repo> --session <slug>`.
 5. **Apply**: for each comment, read the referenced file and lines, then make the edit. tuicr
    reloads the diff as you go.
-6. **Resolve, don't delete**: tuicr exposes `lifecycle_state` but has no CLI to resolve a
-   comment, so mark each applied comment resolved with `review:tuicr`'s ledger CLI
-   (`ledger.ts resolve <id> --action ...`), keyed by the tuicr comment `id`. The comment stays
-   visible. The ledger is the source of truth for open vs resolved, since the diff reload orphans
-   rather than resolves. Sync the current comments with `ledger.ts upsert` first, and use
-   `ledger.ts list --open` to report what remains.
+6. **Resolve, don't delete**: mark each applied comment resolved with `review:tuicr`'s ledger CLI
+   (`ledger.ts resolve <id> --action ...`), keyed by the tuicr comment `id`. Sync the current
+   comments with `ledger.ts upsert` first, and use `ledger.ts list --open` to report what remains.
+   `review:tuicr`'s Reconciliation section explains why resolution state lives in the ledger.
 7. **Repeat** until I say done, then summarize what changed and what is still open (from the
    ledger).
 
 ## Guidelines
 
-- Apply comments in file order, but ask before any change that is ambiguous or that you would
-  push back on.
+- Apply comments in file order, asking before any change that is ambiguous or that you would push back on (per `review:tuicr`).
 - A comment you disagree with stays open: leave it and tell me why rather than resolving it.
 - When done, offer next steps (commit, peer review, PR) without taking them.

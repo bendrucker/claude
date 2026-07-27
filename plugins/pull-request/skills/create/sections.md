@@ -2,9 +2,9 @@
 
 What goes in the body, and what to leave out. The create and update skills both use this.
 
-The body conveys what the diff cannot. The reviewer reads the code for what changed. Use the body for why it changed, the decisions you made, and how you know it works. If a sentence only restates what the diff shows, cut it.
+The body conveys what the diff cannot. The reviewer reads the code for what changed. Use the body for why it changed, the decisions you made, and how you know it works.
 
-Write the body to stand on its own. The reviewer has the diff and the linked issue and nothing else — not your plan, not the issue you were handed, not the session that produced the change. Every reference must point to something they can open: a linked issue, a PR, a permalink. A phrase like "the plan", "as originally planned", or "the issue specified" points at an artifact they can't see, so it lands as a dead end. State the decision itself instead of the gap between it and an instruction only you saw.
+Write the body to stand on its own. The reviewer has the diff and the linked issue and nothing else: not your plan, not the issue you were handed, not the session that produced the change. Every reference must point to something they can open: a linked issue, a PR, a permalink. A phrase like "the plan", "as originally planned", "per the plan", or "the issue specified" (or a `## Deviations From the Plan` heading) points at an artifact they can't see, so it lands as a dead end. State the decision itself instead of the gap between it and an instruction only you saw.
 
 Write in active voice and first person for your own calls. "I chose X over Y because…", "I traced this to…". Don't write passively ("X was added", "the bug was caused by…"). Keep the prose plain. Technical terms are fine. Marketing and model flourishes (`source of truth`, `fail loudly`, `escape hatch`, `cleanly`, `wires up`) are not. Load the `writing` skill for the full set of tropes.
 
@@ -34,26 +34,21 @@ Default to prose, not a scaffold.
 
 ### Density
 
-Good substance still fails the reader when it arrives as a wall. The most common defect in real bodies is not the wrong content, it is the right content packed too tightly.
+The most common defect in real bodies is not the wrong content, it is the right content packed too tightly.
 
 - One thread per paragraph. A paragraph that runs past three or four sentences is doing too much. Split it.
 - One idea per sentence. A sentence that stacks clauses behind three or more commas is a list wearing prose clothing. It reads as a wall even when every clause is true.
-- Prose carries reasoning that connects one point to the next. A list carries items that merely co-occur: findings, cases a test covers, checks run, files touched for one reason. When the content is a set of parallel items, make it a list.
-- "Default to prose" is a rule against the reflexive `## Changes` plus `## Testing` scaffold. It is not a rule to compress an enumeration into a single sentence. The scaffold and the run-on are the same mistake from opposite directions.
+- Prose carries reasoning that connects one point to the next. A list carries items that merely co-occur: findings, cases a test covers, checks run, files touched for one reason. When the content is a set of parallel items, make it a list. "Default to prose" bans the reflexive `## Changes` plus `## Testing` scaffold, not lists: compressing an enumeration into a run-on sentence is the same mistake from the other direction.
 
 ## Headings
 
 A heading names the section's topic. It is not a sentence about the topic. Write a Title-Cased noun phrase, usually two or three words, and let the prose below carry the explanation.
 
-- Cut the qualifying tail: `Structural audit sourced from the hook` → `Structural Audit`. The clause explaining the head noun goes in the first sentence under it.
-- Drop parentheticals: `Context Tier (Soft Reminder Only)` → `Context Tier`. A parenthetical holding a clause or a file path is the body trying to live in the heading.
+- Cut the clause riding the head noun, whether a qualifying tail (`Structural audit sourced from the hook` → `Structural Audit`), a parenthetical (`Context Tier (Soft Reminder Only)` → `Context Tier`), or a colon-spliced status (`Not Yet Met: The Live Proof` → `Deferred Proof`). The explanation goes in the first sentence under the heading.
 - Let the parent frame the leaf: under `## Tiers`, `Deny Tier` → `Deny`; under `## Decisions`, `Why Not an N-Gram View in DuckDB` → `N-Gram View`. Nest so the child heading stays bare.
-- Keep the question out of the heading. The "why" is the prose, or the parent section (`## Decisions`, `## Alternatives`), not a `Why`/`What`/`How` heading.
-- Name the topic, not the meta-move: `What Changed` → `Changes`; `What I Didn't Do` → `Deferred Work`; `What I Didn't Change` → `Unchanged Behavior`.
+- Name the topic, not the question or the meta-move: `What Changed` → `Changes`; `What I Didn't Do` → `Deferred Work`; `What I Didn't Change` → `Unchanged Behavior`. The "why" is the prose, or the parent section (`## Decisions`, `## Alternatives`), never a `Why`/`What`/`How` heading.
 - Keep imperatives tight: `Hide the Inherited `--format` Flag` → `Hide Inherited `--format` Flag`. Drop the article, lose the trailing clause.
-- Use Title Case: `Two fixes found while testing the tmux calls` → `Two Fixes`.
-- Drop a colon that splices a status onto the topic: `Not Yet Met: The Live Proof` → `Deferred Proof`, with the status in the prose below. A colon carrying a clause is the parenthetical problem in another form.
-- Don't open with a `## Summary` heading when you aren't following a template. The first paragraph is the summary already. A `Summary` header names the section's obvious job instead of its topic.
+- Don't open with a `## Summary` heading when you aren't following a template. The first paragraph is the summary already.
 
 A heading has slipped into a sentence when it carries a comma, a colon, a trailing period or question mark, a linking verb (`is`, `are`, `exits`), a relative clause (`that`, `which`), or a subject pronoun (`this`, `it`).
 
@@ -62,7 +57,7 @@ A heading has slipped into a sentence when it carries a comma, a colon, a traili
 The most valuable content is the substance that lived in the session but never reached the code. Review the conversation that produced the change and surface what applies. This belongs in the PR body, not in code comments where Claude tends to leak it.
 
 - Decisions and the alternatives you rejected. Name what you chose against and why you didn't take it.
-- Scope you added or dropped, and decisions that took a different path than the obvious or specified one (an extra `allowed-tools` entry, a feature cut, files touched beyond the core change). Surface the substance — but state it as a self-contained decision, what you did and why, never as a delta against a plan or instruction the reader never saw. Write "I added a `Bash(git push:*)` entry because the workflow pushes the branch," not "I added an entry beyond what the plan listed." The reason makes it land; the comparison to an unseen plan does not.
+- Scope you added or dropped, and decisions that took a different path than the obvious or specified one (an extra `allowed-tools` entry, a feature cut, files touched beyond the core change). State each as a self-contained decision, what you did and why, never as a delta against a plan or instruction the reader never saw. Write "I added a `Bash(git push:*)` entry because the workflow pushes the branch," not "I added an entry beyond what the plan listed."
 - Overturned theories. A root cause you diagnosed then disproved, an approach you built then abandoned. The diff shows the destination. The reviewer benefits from the wrong turn you already ruled out.
 - What you observed testing locally. The actual result, surprise, or failure mode, not just "verified". Benchmark or cost numbers. What you couldn't test and the concrete reason ("brew install failed locally", not "needs a real machine").
 - Limitations you ruled out. A workaround you considered and rejected as too fragile, a feature deferred as structural. This explains non-changes a reviewer might otherwise question.
@@ -81,7 +76,7 @@ Not every PR has all of these. Include only what a reviewer would act on. True b
 
 Prefer showing to asserting. Link a permalink to the exact lines instead of paraphrasing code. Blockquote the doc or spec you reason from. Paste the real error, stack trace, or test output in a fence rather than describing it. "Reverting the fix makes `TestX` fail with `exit 2`" beats "added a test for the fix".
 
-Leave commit SHAs and issue/MR references bare. GitHub and GitLab auto-link a bare SHA and a bare `#N` / `!N` / `owner/repo#N`. Backticks render them as code and suppress the link, so write them unbacktick'd.
+Leave commit SHAs and issue/MR references (`#N`, `!N`, `owner/repo#N`) bare. Backticks render them as code and suppress the platform auto-link.
 
 ## Optional Sections
 
@@ -107,11 +102,7 @@ Related links, issues, or reviews that aren't the motivating issue. Use `Closes 
 
 ## Slop to Cut
 
-- The reflexive `## Changes` plus `## Testing` scaffold on every PR. Small PRs don't need it.
-- Sentence or fragment headings. A heading names the topic, it doesn't narrate it.
-- Bullets that narrate which file changed. If a bullet only says what the diff shows, delete it.
-- Test counts, "all tests pass", coverage inventories, and the roll-call of green checks (`lint passes`, `0 errors, 0 warnings`, `build green`). The status checks carry all of it.
-- A run-on paragraph, or a sentence stacking clauses behind commas, where a list belongs. Right content, wrong shape.
+Beyond what the sections above already ban:
+
 - Count-padding ("six detectors, three and three"). The number is rarely the point.
 - The consequence chain (`, so the…`) used as a filler connective, and the antithesis (`not just X but Y`, `X instead of Y`) used as framing. Both read as tics when habitual.
-- Indirect references to an artifact the reader can't open: "deviations from the plan", "as originally planned", "the plan assumed", "per the plan", "the issue specified", a `## Deviations From the Plan` heading. The deviation's substance is worth keeping; framing it as a gap against an unseen plan, issue, or conversation is the tell. Restate it as a decision that stands on its own.

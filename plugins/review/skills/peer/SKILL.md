@@ -29,14 +29,14 @@ Assist me in reviewing this PR: $ARGUMENTS
 
 ## Context
 
-Your own login as the reviewer. Everyone else in the diff and threads is either the author, addressed as "you", or a third party (see [tone.md](tone.md)). Whichever platform applies resolves. The other reads `unavailable`.
+Your own login as the reviewer (see [tone.md](tone.md) for how to address each party). Whichever platform applies resolves. The other reads `unavailable`.
 
 - GitHub user: !`gh api graphql -f query='{viewer{login}}' --jq .data.viewer.login 2>/dev/null | grep . || echo "unavailable"`
 - GitLab user: !`glab api user 2>/dev/null | jq -r .username 2>/dev/null | grep . || echo "unavailable"`
 
 ## Arguments
 
-- `--triage`: assess the PR for sequencing instead of reviewing it. Produce a one-line summary of what it changes and an estimated review effort, then stop. Default: off, which runs the full review workflow below.
+- `--triage`: assess the PR for sequencing instead of reviewing it (see [Triage Mode](#triage-mode)). Default: off, which runs the full review workflow below.
 
 ## Triage Mode
 
@@ -45,22 +45,20 @@ When `--triage` is set, stay read-only and assess the PR for sequencing. Gather 
 - What the PR changes, in one line.
 - The estimated review effort on the same scale step 4 uses for `review:code` (low, medium, high, xhigh, max), with one-line reasoning.
 
-If not on the branch, first run `gh pr checkout` to switch.
-
 ## Guardrails
 
 - **Must** check with me before submitting. Show file comments and review comment.
 - **Don't** insist on commenting on every PR. Propose approving with no comment if everything looks good.
-- **Don't** run Python, Ruby, or other interpreters for library introspection. Use Read for source files or WebFetch for documentation instead.
 - **Do** match my writing style. You're commenting as me, not a generic AI assistant.
-- **Do** present technical questions to me for ambiguous code. Don't proceed until you understand fully.
+- **Do** ask me about ambiguous code rather than guessing.
+- **Don't** run interpreter one-liners for library introspection. Read the source or fetch the docs.
 
 ## Workflow
 
 1. **Research** - Gather context and identify participants (see [research.md](research.md))
 2. **Context** - Determine review context using repository visibility. Private repositories use [corporate](references/corporate.md) defaults. Public repositories use [open-source](references/open-source.md) defaults. Check visibility via the platform API (`gh api repos/OWNER/REPO --jq .visibility` or `glab api projects/ENCODED_PATH | jq .visibility`). If ambiguous, ask me.
 3. **Review** - Examine changed files and existing comments
-4. **Delegate** - Run `review:code` for code-quality analysis. Summarize the diff (rough line count, files touched, sensitive areas) and signals from the PR body, propose an effort level with one-line reasoning, and confirm via `AskUserQuestion` before invoking. Skip the call for trivial PRs (docs-only, dep bumps). Effort heuristics:
+4. **Delegate** - Run `review:code` for code-quality analysis. `review:code` reads the local diff, so run `gh pr checkout` first if not already on the PR branch. Summarize the diff (rough line count, files touched, sensitive areas) and signals from the PR body, propose an effort level with one-line reasoning, and confirm via `AskUserQuestion` before invoking. Skip the call for trivial PRs (docs-only, dep bumps). Effort heuristics:
    - **low**: docs-only, dep bumps, config tweaks, trivial fixes (<50 lines)
    - **medium**: typical features or fixes, single module, ~50–500 lines
    - **high**: large refactors, multi-module, public API or schema changes, ~500–2000 lines
@@ -79,4 +77,4 @@ See [tone.md](tone.md) for comment style guidelines.
 
 This skill assumes GitHub. For GitLab merge requests, load `gitlab:merge-request` for the submission workflow; use `draft-note.ts submit` to publish draft notes with an optional summary and review decision.
 
-tuicr's own `:submit` is interactive and GitHub-only. When I curate a GitHub PR live in the pane, I submit it there and Claude posts nothing. Claude's programmatic path (`mcp__github` / `gh` / `glab`) covers the two cases tuicr can't: a GitLab MR (tuicr never posts to GitLab) and a headless GitHub run with no TUI. When tuicr is not running or I prefer to skip it, stage nothing and post directly the same way. On follow-up, resolution is native: resolve addressed threads on the platform (`review-threads.ts` for GitHub, the resolve flow in `gitlab:merge-request` for GitLab), not tuicr.
+When tuicr is not running or I prefer to skip it, stage nothing and post directly through the programmatic path (`mcp__github` / `gh` / `glab`). On follow-up, resolve addressed threads natively on the platform (`review-threads.ts` for GitHub, the resolve flow in `gitlab:merge-request` for GitLab), never in tuicr.

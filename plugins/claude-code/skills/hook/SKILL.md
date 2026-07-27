@@ -54,7 +54,8 @@ Reference for creating and configuring Claude Code hooks. When uncertain about s
 }
 ```
 
-**Matcher Patterns**:
+#### Matcher Patterns
+
 - Simple: `"Write"`, `"Edit"`
 - Multiple: `"Edit|Write|MultiEdit"`
 - With args: `"Bash(npm:*)"`, `"Bash(osascript:*)|Bash(open:*)"`
@@ -78,12 +79,6 @@ Commands receive JSON on stdin:
   "session_id": "...",
   "transcript_path": "..."
 }
-```
-
-Parse in shell:
-```bash
-input=$(cat)
-file_path=$(echo "$input" | jq -r '.tool_input.file_path')
 ```
 
 Parse in TypeScript:
@@ -112,16 +107,8 @@ Exit with no output to allow without modification.
 
 ## Script Storage
 
-Store complex hooks in `.claude/hooks/` or project `hooks/` directory:
+Store complex hooks in `.claude/hooks/` or a project `hooks/` directory, referenced with:
 
-```
-.claude/
-├── settings.json
-└── hooks/
-    └── my-hook.ts
-```
-
-Reference with:
 ```json fragment
 "command": "bun $CLAUDE_PROJECT_DIR/.claude/hooks/my-hook.ts"
 ```

@@ -1,6 +1,6 @@
 # Refactor
 
-## Sections (menu: include only those that earn their place)
+## Sections
 
 ### Motivation
 
@@ -17,10 +17,3 @@ Strategy (incremental vs. big bang), key transformations, risks. Skip for single
 ### Validation
 
 How to verify correctness. Test coverage, manual checks, metrics. Skip when the default test/lint/typecheck suite is the whole answer. Fold any added test into Scope.
-
-## Key Questions
-
-- Why now? What's the trigger?
-- Incremental or atomic?
-- Rollback plan?
-- How do we know it worked?

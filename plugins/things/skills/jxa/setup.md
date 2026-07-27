@@ -2,17 +2,11 @@
 
 Guide for writing JXA scripts for Things 3.
 
-## Running JXA
+## Script Structure
 
-Use `/mac:jxa-run` with inline `-e` for one-off queries:
+Run scripts via `/mac:jxa-run Things3 <script> [args...]` (inline expressions: `-e '<expr>'`).
 
-```
-/mac:jxa-run Things3 -e 'var app = Application("Things3"); var list = app.lists.byId("TMTodayListSource"); list.toDos().length;'
-
-/mac:jxa-run Things3 -e 'var app = Application("Things3"); var tags = app.tags(); var names = []; for (var i = 0; i < tags.length; i++) { names.push(tags[i].name()); } JSON.stringify(names);'
-```
-
-For script files, define a `run(argv)` function. `osascript` calls it automatically and prints the return value:
+Define a `run(argv)` function. `osascript` calls it automatically and prints the return value:
 
 ```javascript
 #!/usr/bin/env osascript -l JavaScript
@@ -22,32 +16,11 @@ function run(argv) {
 }
 ```
 
-Run script files: `/mac:jxa-run Things3 <script> [args...]`
-
-**Important**: The function must be named `run`, not `_run`. `osascript` does not call `_run`.
+The function must be named `run`, not `_run`. `osascript` does not call `_run`.
 
 ## JXA Arrays vs JavaScript Arrays
 
-**CRITICAL**: JXA arrays (from methods like `list.toDos()`) are NOT JavaScript arrays.
-
-JXA arrays have:
-- `.length` property
-- Can be indexed with `[i]`
-- **DO NOT** have `.filter()`, `.map()`, `.forEach()`, etc.
-
-Always use a for loop:
-
-```javascript
-// WRONG: JXA array doesn't have .map()
-// var names = list.toDos().map(function(t) { return t.name(); });
-
-// CORRECT: Use a for loop
-var items = list.toDos();
-var names = [];
-for (var i = 0; i < items.length; i++) {
-  names.push(items[i].name());
-}
-```
+Collections returned by JXA calls like `list.toDos()` are not JavaScript arrays. They have `.length` and `[i]` indexing but no `.map()`, `.filter()`, or `.forEach()`. Iterate with for loops.
 
 ## Type Definitions
 

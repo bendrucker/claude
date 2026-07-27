@@ -92,16 +92,7 @@ In Merge Mode, after any push here, re-arm per [Merge Mode](#merge-mode) and cou
 
 #### mergeable-unknown
 
-The platform could not determine mergeability after its own bounded re-polling, so run the authoritative local check with the same dry-run as [conflicts](#conflicts):
-
-```
-git fetch origin <base>
-git merge origin/<base> --no-commit --no-ff
-git diff --name-only --diff-filter=U
-git merge --abort
-```
-
-If the dry-run surfaces conflicting paths, route them through the [conflicts](#conflicts) handler: lockfiles and generated files regenerate, commit, and push; real source conflicts go to `git:conflicts`, resolving where mechanical and stopping where ambiguous. If the merge is clean, report that the PR is mergeable and keep watching.
+The platform could not determine mergeability after its own bounded re-polling, so run the authoritative local check: `git fetch origin <base>`, then the same dry-run as [conflicts](#conflicts). Conflicting paths route through that handler. If the merge is clean, report that the PR is mergeable and keep watching.
 
 #### queued-timeout
 
@@ -139,8 +130,6 @@ With `--merge`, don't stop at green; drive the PR to **merged**. Load [`merge-mo
 
 The monitor script delivers structured JSON events. Do not pipe CLI output to `python3 -c`, `bun -e`, `node -e`, or any inline interpreter for parsing.
 
-CI may run on synthetic merge commits whose SHA never matches the branch tip. The watcher reports the source branch SHA in each event; compare against `git rev-parse HEAD`.
-
-The watcher dedupes by `(sha, state)`. A `failing` event for a SHA older than `git rev-parse HEAD` means a fix was already pushed; ignore it.
+CI may run on synthetic merge commits whose SHA never matches the branch tip. The watcher reports the source branch SHA in each event. Compare against `git rev-parse HEAD`: a failing event for an older SHA is stale (a fix was already pushed) and should be ignored.
 
 Babysit is session-scoped. If the session ends, the watcher process ends with it. Re-invoke this skill from a new session to resume.

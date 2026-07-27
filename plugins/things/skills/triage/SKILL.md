@@ -28,7 +28,7 @@ Batch overdue repeating tasks (where `dueDate` or `activationDate` is before tod
 
 ## Grouping
 
-Group remaining items by area (primary) and tag (secondary) for batch triage. Read the JSON and form logical groups.
+Group remaining items by area (primary) and tag (secondary) for batch triage.
 
 ## Triage Questions
 

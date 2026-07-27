@@ -4,7 +4,7 @@ Per-reviewer "satisfied" signals for the `--auto` loop, plus how to add a review
 
 ## Satisfaction Signals
 
-Third-party reviewers converge on one shape: each leaves a single summary comment, edited in place across review cycles, holding the satisfaction signal and sometimes actionable items that never become inline threads. These bots deliver the verdict by editing that comment in place and submit no native GitHub review, so the reviews list (`gh api .../pulls/N/reviews` filtered to the bot) never populates and polling it hangs until timeout. Read the summary, not just the thread list or the reviews list:
+Third-party reviewers converge on one shape: each leaves a single summary comment, edited in place across review cycles, holding the satisfaction signal and sometimes actionable items that never become inline threads. They submit no native GitHub review, so the reviews list (`gh api .../pulls/N/reviews` filtered to the bot) never populates and polling it hangs until timeout. Read the summary, not just the thread list or the reviews list:
 
 - Select the summary comment by `updated_at`, not `created_at`. The current signal is an edit to a comment created rounds ago, so newest-created points at the wrong one.
 - Treat the summary body as a thread source. A thread-count check alone reads an unfinished review, with actionable items parked in the summary, as satisfied.

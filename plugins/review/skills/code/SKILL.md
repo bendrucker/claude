@@ -26,7 +26,7 @@ This is a port of Claude Code's built-in `/code-review`, which is user-invocable
 
 ## Arguments
 
-- **Effort level**: the first token, if it matches `^(low|med|hig|xhi|max)[a-z]*$` case-insensitively. Prefixes count: `med`, `hi`, `xh` all resolve. An unrecognized level-shaped token is ignored with a note (`Ignoring unrecognized effort "<token>"; valid: low, medium, high, xhigh, max. Using <level>.`) and is not treated as a target.
+- **Effort level**: the first token, if it matches `^(low|med|hig|xhi|max)[a-z]*$` case-insensitively. Prefixes count: `med`, `hi`, `xh` all resolve. Ignore an unrecognized level-shaped token with a brief note naming the valid levels. Do not treat it as a target.
 - **`--fix`**: apply findings to the working tree after reporting. May appear anywhere.
 - **`--base <ref>`**: review against this base instead of the resolved default.
 - **`<target>`**: everything else, free-form. A PR number, branch, ref range, path, or a plain-English scope restriction ("only `src/parser.ts`", "focus on error handling", "skip the test churn").
@@ -52,7 +52,7 @@ If nothing changed, say so and stop.
 
 ## Phase 1 — Find
 
-Pick the effort cell from [efforts.md](efforts.md). It fixes the angle count, the per-angle candidate cap, whether verify and sweep run, the output cap, and the precision/recall framing. Emit the framing before finding.
+Pick the effort cell from [efforts.md](efforts.md). It fixes the fan-out shape, the caps, and the precision/recall framing. Emit the framing before finding.
 
 At `low`, follow the low-cell instructions in `efforts.md` and skip the remaining phases.
 
@@ -68,7 +68,7 @@ Otherwise run the selected angles from [angles.md](angles.md). Each surfaces up 
 
 #### No `Agent` tool
 
-Every fan-out cell degrades to a single inline pass. Work through every angle yourself in one pass. Do not skip angles for lack of fan-out. Re-check each candidate against the diff before keeping it and drop anything you can't back with a concrete failure scenario. Say in the summary that this was a single-pass review without the `Agent` tool, not the full multi-agent fan-out, so nobody is misled about what ran.
+Every fan-out cell degrades to a single inline pass. Work through every angle yourself in one pass. Do not skip angles for lack of fan-out. Say in the summary that this was a single-pass review, not the full multi-agent fan-out, so nobody is misled about what ran.
 
 Pass every candidate with a nameable failure scenario through. Finders that silently drop half-believed candidates bypass the verify step and are the dominant cause of misses.
 

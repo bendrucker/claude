@@ -32,8 +32,8 @@ You launch and drive it in a sibling pane; the TUI is the user's. `review:self` 
 
 ## Session Discovery
 
-tuicr persists each review as a session with a `slug`. The CLI is the agent's interface; the TUI
-is the user's. List sessions and pick the active one by `slug`.
+tuicr persists each review as a session with a `slug`. List sessions and pick the active one by
+`slug`.
 
 ```bash
 tuicr review list --repo <repo>   # checkout path or owner/repo: local + PR sessions

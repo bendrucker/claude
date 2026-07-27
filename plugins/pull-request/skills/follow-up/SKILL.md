@@ -30,7 +30,7 @@ allowed-tools:
 
 Follow up on review feedback for: $ARGUMENTS
 
-Parse the URL and flags from `$ARGUMENTS`. GitHub URLs contain `github.com`; GitLab URLs contain the instance hostname. GitHub is primary: work through `gh`, `mcp__github`, and `github:*` skills directly. Delegate all GitLab behavior to `gitlab:merge-request` (no `glab` calls).
+Parse the URL and flags from `$ARGUMENTS`. GitHub is primary: work through `gh`, `mcp__github`, and `github:*` skills directly. Delegate all GitLab behavior to `gitlab:merge-request` (no `glab` calls).
 
 - `--auto`: autonomously triage **bot** threads, looping until the reviewer is satisfied (see [The Autonomous Loop](#the-autonomous-loop)).
 - `--include-human-nits`: under `--auto`, also act on **human** threads, but only trivial high-confidence changes (typos, renames, one-liners). Off by default.
@@ -69,9 +69,9 @@ Then run each round:
 
 Loop until: the reviewer's satisfaction signal hits on HEAD ([reviewers.md](reviewers.md)); no new bot threads for two rounds after a green push; max 4 rounds (oscillation guard); the idle timeout outlasts the re-trigger; or the PR closes/merges.
 
-When a bot review is **expected** ([reviewers.md](reviewers.md) defines the signals) but no summary has landed on HEAD, an empty thread list means the review is still pending. The two-round satisfied exit above doesn't apply yet: wait through the same wake and re-trigger for the first summary. The idle-timeout backstop still bounds that wait, so a review that never runs times out instead of looping past the round cap. With no bot reviewer expected, an empty result is nothing to do: stop.
+When a bot review is **expected** ([reviewers.md](reviewers.md) defines the signals) but no summary has landed on HEAD, an empty thread list means pending, not satisfied: wait through the same wake and re-trigger for the first summary, bounded by the idle timeout. With no bot reviewer expected, an empty result is nothing to do: stop.
 
-babysit and follow-up compose both directions: `babysit --reviews` hands off to this loop after its first green, and this loop calls babysit between rounds. The entry point is the outer one. "Wait for a bot review before merging" is exactly this pairing (`babysit --reviews --merge`, or this loop then merge), keyed on each reviewer's signal ([reviewers.md](reviewers.md)).
+babysit and follow-up compose both directions: `babysit --reviews` hands off to this loop after its first green, and this loop calls babysit between rounds. The entry point is the outer one. "Wait for a bot review before merging" is exactly this pairing (`babysit --reviews --merge`, or this loop then merge).
 
 On stop, report fixes, replies/resolves, and escalations. If the reviewer is satisfied, suggest the next action (human review, merge train, auto-merge) but don't perform it unless asked. `pull-request:babysit --merge` drives to merged.
 
@@ -97,6 +97,6 @@ Once a PR exists, triage the hosted bot's comments through the normal flow above
 The gated default requires checking before any post or resolve. `--auto` lifts this for **bot threads only**; human threads stay gated unless `--include-human-nits`. Always:
 
 - Resolve only after replying or reacting; silent resolves hide context.
-- Never name or thank the bot in a reply; write it as a note for any reader. The `@<bot>` re-trigger is the one exception. A thumbs up is the lighter-weight acknowledgement, preferred over a reply for straightforward changes.
+- Never name or thank the bot in a reply; write it as a note for any reader ([replies.md](replies.md)). The `@<bot>` re-trigger is the one exception.
 - Thumbs down is bot-only feedback. Never thumbs down a human thread, autonomously or otherwise.
 - Match my writing style; you're replying as me.

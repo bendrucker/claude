@@ -29,7 +29,7 @@ Dispatch inbound PR/MR reviews as background sessions. Each review runs as its o
 
 When `--queue` is set, another skill has already gathered, triaged, and ordered the reviews.
 
-Skip [Fetch Pending Reviews](#fetch-pending-reviews) and [Present Results](#present-results). Take the queue from the invoking context as given and dispatch each review in the order received. If the caller supplies a permission mode, forward it to `spawn.ts` via `--permission-mode`. Everything from [Dispatch Review Sessions](#dispatch-review-sessions) onward is unchanged.
+Skip [Fetch Pending Reviews](#fetch-pending-reviews) and [Present Results](#present-results). Take the queue from the invoking context as given and dispatch each review in the order received. Everything from [Dispatch Review Sessions](#dispatch-review-sessions) onward is unchanged.
 
 ## Fetch Pending Reviews
 
@@ -40,8 +40,6 @@ Both fetches return the `UNREVIEWED` bucket: PRs/MRs awaiting your first review.
 ```bash
 gh search prs --review-requested=@me --state=open --json number,title,url,repository
 ```
-
-`--review-requested=@me` already scopes to UNREVIEWED: GitHub drops a PR once you approve or request changes and re-adds it when re-requested.
 
 #### GitLab
 
@@ -96,8 +94,6 @@ When you have dispatched the selected queue, present a summary of what you sent 
 
 The interactive flow above is the default: fetch once, present, ask, dispatch. The loop is the opt-in hands-off mode. It polls the UNREVIEWED queues on an interval and dispatches a session for each newly-arrived review without prompting, so the queue drains itself while you work elsewhere.
 
-The `Monitor` command does the polling and emits one line per newly-arrived review. You react to each event by dispatching. `watch.ts` owns the loop: each interval it reads the dedup set, runs each `--queue` source command, and prints the URLs not already dispatched. `Monitor` is not a bare metronome.
-
 #### Wire the Review-Queue Sources
 
 `poll.ts` knows no platforms. Each `--queue` is a command that emits an UNREVIEWED queue as `[{ url }]` JSON. Pass one per platform you want polled, and omit the rest:
@@ -105,13 +101,9 @@ The `Monitor` command does the polling and emits one line per newly-arrived revi
 - GitHub: `gh search prs --review-requested=@me --state=open --json url`.
 - GitLab: load `gitlab:merge-request` and pass `bun <ABS>`, where `<ABS>` is the absolute path the gitlab docs resolve to for `scripts/review-queue.ts` (for example `/Users/you/.claude/plugins/cache/.../gitlab/skills/merge-request/scripts/review-queue.ts`). Write the resolved path out in full. Do not reuse `${CLAUDE_SKILL_DIR}` from the examples below: it points at this inbox skill, not gitlab, so it resolves to the wrong directory.
 
-A platform plugin that owns its queue keeps the query; the inbox only runs the command it hands back.
-
 #### Arm the Monitor
 
-Pass this command to `Monitor` with `persistent: true` and a descriptive label. `watch.ts` runs a single long-lived bun process: each iteration fetches all `--queue` sources and prints one URL per line per newly-arrived review. Each printed URL is one event.
-
-`${CLAUDE_SKILL_DIR}` below is the inbox's own directory (where `watch.ts` lives). The GitLab `--queue` uses a full absolute path instead, since it points into a different skill:
+Pass this command to `Monitor` with `persistent: true` and a descriptive label. `watch.ts` runs a single long-lived bun process: each iteration it reads the dedup set, fetches all `--queue` sources, and prints one URL per line per newly-arrived review. Each printed URL is one event. `${CLAUDE_SKILL_DIR}` below is the inbox's own directory, where `watch.ts` lives:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts \
@@ -132,10 +124,9 @@ Two rules for any command you hand `Monitor`:
 
 #### React to Each Event
 
-For each emitted URL, dispatch a session without prompting, reusing [Resolve the Local Repo Path](#resolve-the-local-repo-path). If the caller supplied a permission mode, forward it to `spawn.ts` via `--permission-mode`. In unattended runs there is no one to answer the clone prompt, so skip any review whose repo is not cloned locally and report it rather than blocking the loop. `spawn.ts` refuses a URL already dispatched, so a URL re-emitted before its `spawn.ts` lands is a no-op.
+For each emitted URL, dispatch a session without prompting, reusing [Resolve the Local Repo Path](#resolve-the-local-repo-path). In unattended runs there is no one to answer the clone prompt, so skip any review whose repo is not cloned locally and report it rather than blocking the loop.
 
 #### Pacing and Stopping
 
-- A 300s interval is a reasonable floor. Reviews arrive over minutes-to-hours, and the queue sources hit rate-limited remote APIs. Shorten only when you expect a burst.
-- Call `TaskStop` on the `Monitor` task to stop early.
-- The loop runs until you stop it. Surface a summary when the queue is empty across several consecutive intervals, but keep polling unless told otherwise (a re-request can re-add a review anytime).
+- A 300s interval is a reasonable floor: reviews arrive over minutes-to-hours and the queue sources hit rate-limited remote APIs.
+- Call `TaskStop` on the `Monitor` task to stop early. Otherwise keep polling until told to stop (a re-request can re-add a review anytime).

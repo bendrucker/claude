@@ -13,17 +13,6 @@ Structural rules for rewriting text. Vocabulary and pattern violations are caugh
 
 Don't join independent clauses with a semicolon or em dash. Split them into two sentences. Swapping one connector for another is not a fix. At most one connector-joined sentence per paragraph, and only when the clauses can't stand alone.
 
-## Filler
-
-Cut filler phrases that add no information:
-
-- "It's worth noting that"
-- "Importantly"
-- "Interestingly"
-- "It should be noted"
-- "As mentioned"
-- "In terms of"
-
 ## Tone
 
 Write as if the reader is a peer. Conversational, not formal. No marketing language. No excessive enthusiasm.

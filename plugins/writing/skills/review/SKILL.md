@@ -29,10 +29,10 @@ The first positional is the document path. If none is provided, ask the user. Op
 
 Read the document. Always spawn `writing:content` and `writing:style`. Spawn `writing:artifacts` only if the document contains URLs, markdown links, Mermaid code blocks, or markdown tables.
 
-When `--lens` is set, restrict the dispatch to the named lenses. `artifacts` still spawns only when the document actually contains links, diagrams, or tables, so a `--lens artifacts` run on a document with none spawns nothing.
+When `--lens` is set, restrict the dispatch to the named lenses. `artifacts` still spawns only when the document actually contains links, diagrams, or tables.
 
 Spawn all applicable agents in parallel. Each receives the document content, audience, and focus areas.
 
 ## Synthesize
 
-Merge agent findings per [references/synthesis.md](references/synthesis.md). Deduplicate, rank by severity, and present a unified report.
+Merge agent findings into one report. Deduplicate (keep the more detailed description), group by severity (Blocking > Important > Suggestions) rather than by agent, and order by document position within each severity. Each finding carries its section reference, issue, suggested fix, and which agent(s) flagged it.

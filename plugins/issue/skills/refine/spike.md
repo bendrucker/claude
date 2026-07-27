@@ -1,8 +1,8 @@
 # Spike
 
-A spike is a timeboxed investigation. The deliverable is a recommendation backed by findings. Any code written along the way is throwaway. Refine it so the reader knows the question, the budget, and what a good answer looks like.
+Any code written along the way is throwaway. Refine the issue so the reader knows the question, the budget, and what a good answer looks like.
 
-## Sections (menu: include only those that earn their place)
+## Sections
 
 ### Question
 
@@ -23,10 +23,3 @@ What the spike produces: a recommendation, the data behind it, a follow-up issue
 ### Timebox
 
 The budget and the exit condition. Skip when there's a team default.
-
-## Key Questions
-
-- What decision does this unblock?
-- What evidence would settle it?
-- What's the budget, and what happens when it's spent?
-- Is the output a recommendation, a prototype, or a number?

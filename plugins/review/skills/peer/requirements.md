@@ -1,6 +1,6 @@
 # Requirement Fulfillment
 
-Code quality and requirement fulfillment are separate axes. A well-written change can still implement the wrong thing, and a change that does the right thing can be sloppy about it. `review:code` reviews the diff alone and cannot judge the change against the ticket. That judgment is the peer reviewer's. Evaluate it on its own so a polished diff never hides a requirement it missed.
+`review:code` reviews the diff alone and cannot judge the change against the ticket. That judgment is the peer reviewer's. Evaluate it as its own axis so a polished diff never hides a requirement it missed.
 
 ## Locate the Spec
 
@@ -20,4 +20,4 @@ If none exists, evaluate against the PR's own stated intent and note that no ext
 
 ## Disposition
 
-This file covers what to check. Whether a gap blocks depends on context: [corporate.md](references/corporate.md) treats acceptance-criteria gaps as a blocking threshold, and [open-source.md](references/open-source.md) treats scope creep as grounds to request changes.
+Whether a gap blocks depends on the review context: see [corporate.md](references/corporate.md) and [open-source.md](references/open-source.md).

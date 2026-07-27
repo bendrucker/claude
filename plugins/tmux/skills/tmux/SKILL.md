@@ -21,17 +21,11 @@ hooks:
             cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow"}}'
 ---
 
-# tmux
+# Tmux
 
 ## Arguments
 
-`$0` (optional verb) routes to a section; pass the target pane, window, or session as the rest. With no verb, infer the operation from the request.
-
-- `capture`: print pane content. See [Capturing Pane Content](#capturing-pane-content).
-- `send`: send keys to a running pane. See [Starting Claude Sessions](#starting-claude-sessions).
-- `split`: open a pane. See [Opening Panes](#opening-panes).
-- `notify`: check which windows need attention (`bell`/`activity`). See [Session](#session).
-- `list`: inventory panes, windows, and sessions. See [Drilling Into Other Targets](#drilling-into-other-targets).
+`$0` (optional verb) routes to a section, with the target pane, window, or session as the rest: `capture` to [Capturing Pane Content](#capturing-pane-content), `send` to [Starting Claude Sessions](#starting-claude-sessions), `split` to [Opening Panes](#opening-panes), `notify` (which windows need attention) to [Session](#session), `list` to [Drilling Into Other Targets](#drilling-into-other-targets).
 
 ## Pane
 
@@ -43,17 +37,17 @@ Use `$TMUX_PANE` to identify the current pane and target adjacent ones.
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/window.sh`
 
-Each pane line ends with its geometry as `@<left>,<top> <width>x<height>`, in cell coordinates from the window's top-left. Resolve spatial references from these: LHS = lowest `left`, RHS = highest `left`, top = lowest `top`, bottom = highest `top`. When describing layouts, draw ASCII box diagrams from the positions and sizes.
+Each pane line ends with its geometry as `@<left>,<top> <width>x<height>`, in cell coordinates from the window's top-left. When describing layouts, draw ASCII box diagrams from the positions and sizes.
 
 ### Worktrees and Parallel Panes
 
-Panes in a git repo show their branch and whether the checkout is a linked `(worktree)` or the primary `(main)` one. When the user refers to work by branch or worktree ("the pane on the X branch", "the worktree for Y", "the other pane, which is ready"), match the reference to a pane's branch and dispatch to it with `send-keys` (or treat it as already running) rather than entering a worktree of your own. A pane already in a worktree is set up for parallel work; hand off to it instead of duplicating the checkout.
+Panes in a git repo show their branch and whether the checkout is a linked `(worktree)` or the primary `(main)` one. When the user refers to work by branch or worktree, match the reference to a pane and dispatch to it with `send-keys` rather than entering a worktree of your own. A pane already in a worktree is set up for parallel work. Hand off to it instead of duplicating the checkout.
 
 ## Session
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/session.sh`
 
-The `TITLE` column shows the active pane's title in each window. Claude sessions advertise their current task there, usually enough to identify a window without capturing its content. Windows marked `here` are the current window; `bell` or `activity` flags mean the window needs attention (a process finished, errored, or produced output).
+The `TITLE` column shows the active pane's title in each window. Claude sessions advertise their current task there, usually enough to identify a window without capturing its content. `bell` or `activity` flags mean the window needs attention.
 
 ## Sessions
 
@@ -61,30 +55,11 @@ The `TITLE` column shows the active pane's title in each window. Claude sessions
 
 ### Drilling Into Other Targets
 
-Each script accepts an optional target argument to inspect any pane, window, or session — not just the current one:
-
-```bash
-bash ${CLAUDE_SKILL_DIR}/scripts/session.sh other-session
-bash ${CLAUDE_SKILL_DIR}/scripts/window.sh other-session:2
-bash ${CLAUDE_SKILL_DIR}/scripts/pane.sh %12
-```
-
-Compose them to drill down: pick a session from `sessions.sh`, list its windows with `session.sh <name>`, then inspect a specific window with `window.sh <name>:<idx>`.
+Each script accepts an optional target argument to inspect any pane, window, or session, not just the current one: a session name for `session.sh`, `name:index` for `window.sh`, `%id` for `pane.sh`. Compose them to drill down from session to window to pane.
 
 ## Opening Panes
 
-Use `split-window` with `-t $TMUX_PANE` so new panes open relative to Claude's pane. Always pass `-d` to avoid switching Claude's own pane to the new one.
-
-### Layout Mapping
-
-| User intent | Flags | Notes |
-|---|---|---|
-| right / beside | `-h -d` | Horizontal split |
-| below / underneath | `-v -d` | Vertical split |
-| right sidebar | `-h -d -l 40%` | Narrow right pane |
-| left sidebar | `-h -d -b -l 40%` | Narrow left pane (`-b` = before) |
-| bottom panel | `-v -d -l 25%` | Short pane below |
-| top panel | `-v -d -b -l 25%` | Short pane above |
+Use `split-window` with `-t $TMUX_PANE` so new panes open relative to Claude's pane. Always pass `-d` to avoid switching Claude's own pane to the new one, and `-P -F '#{pane_id}'` to capture the new pane's ID at creation time. Sidebars are `-h` splits at `-l 40%`, top/bottom panels `-v` at `-l 25%`, and `-b` places the new pane before the current one (left or top).
 
 ### Running a Command
 
@@ -96,7 +71,7 @@ tmux split-window -h -d -t $TMUX_PANE 'tail -f logs/dev.log'
 
 The command runs in the new pane's shell. When it exits, the pane closes. Use `$SHELL` or omit the command to open an interactive shell.
 
-Anything past a bare command can make `split-window` silently fail: a `;`, quotes, an `exec` fallback, or other shell metacharacters. The failure is quiet: no pane opens, no error prints, and `-P -F '#{pane_id}'` returns nothing. It reads as the pane never appearing, not as the pane opening then disappearing. Split bare and `send-keys` the command instead. The new pane's shell runs the keys verbatim, past tmux's own parsing of the inline string:
+Anything past a bare command can make `split-window` silently fail: a `;`, quotes, an `exec` fallback, or other shell metacharacters. The failure is quiet: no pane opens, no error prints, and `-P -F '#{pane_id}'` returns nothing. Split bare and `send-keys` the command instead. The new pane's shell runs the keys verbatim, past tmux's own parsing of the inline string:
 
 ```bash
 pane=$(tmux split-window -h -d -t $TMUX_PANE -P -F '#{pane_id}')
@@ -111,7 +86,7 @@ Pass the initial prompt as a CLI argument rather than using `send-keys`:
 tmux split-window -h -d -t $TMUX_PANE 'claude "analyze the test failures"'
 ```
 
-A prompt with a `;`, nested quotes, or other metacharacters hits the same silent inline-parsing failure. Split bare and `send-keys` the whole `claude '...'` line instead (see [Running a Command](#running-a-command)). Use `send-keys` only for follow-up messages to an already-running session.
+A prompt with metacharacters hits the silent inline-parsing failure (see [Running a Command](#running-a-command)). Split bare and `send-keys` the whole `claude '...'` line. Use `send-keys` only for follow-up messages to an already-running session.
 
 ## Collaborative File Viewing
 
@@ -121,7 +96,7 @@ When collaborating on a file, open it in a sidebar pane so the user sees changes
 tmux split-window -h -d -l 40% -t $TMUX_PANE '<command> <file>'
 ```
 
-The inline form is safe only when both the command and the path are bare. A filename with a space, or a `$EDITOR` carrying flags (`code -w`), hits the same silent no-op. Split bare and `send-keys` the viewer line instead (see [Running a Command](#running-a-command)).
+Inline is safe only when both the command and the path are bare. A filename with a space, or a `$EDITOR` carrying flags (`code -w`), hits the silent no-op (see [Running a Command](#running-a-command)).
 
 #### Available Tools
 
@@ -154,18 +129,4 @@ Use the first available option. If the pane exits immediately, the tool is missi
 
 ## Capturing Pane Content
 
-Use `capture-pane -p` to print to stdout instead of a paste buffer.
-
-```bash
-tmux capture-pane -t $TARGET -p
-tmux capture-pane -t $TARGET -p -S -100
-```
-
-`-S -100` includes 100 lines of scrollback above the visible area.
-
-## Gotchas
-
-- Always use `-P -F '#{pane_id}'` to capture pane IDs at creation time
-- Always use `-d` on `split-window` to avoid switching Claude's pane
-- `split-window` with an inline command containing `;`, quotes, or metacharacters can silently no-op (no pane, no error). Split bare, then `send-keys` the command
-- Use `$TMUX_PANE` (set by tmux natively and injected by context hook) to target the current pane
+Use `capture-pane -t <target> -p` to print to stdout instead of a paste buffer, and `-S -100` to include 100 lines of scrollback above the visible area.

@@ -29,12 +29,7 @@ Write the raw output to `$TMPDIR/$CLAUDE_SESSION_ID/github/<run-id>.log`. Create
 
 ### Identify relevant lines
 
-Use the strategy in `plugins/github/skills/actions-monitor/references/log-parsing.md`:
-
-- GitHub Actions prefixes every log line with the step name. Filter to the failing step's lines to discard noise.
-- If a job is still large, take the last 100 to 200 lines. Most tools print a summary at the end.
-
-Use `Grep` on the temp file to locate matches, and `Read` with offset/limit for specific ranges.
+Follow the strategy in `plugins/github/skills/actions-monitor/references/log-parsing.md`. Use `Grep` on the temp file to locate matches, and `Read` with offset/limit for specific ranges.
 
 ### Return JSON
 
@@ -54,6 +49,5 @@ Keep `lines` short (10 to 50 lines per job). The caller can read `log_file` for 
 
 ## Notes
 
-- Log-parsing strategy lives in `plugins/github/skills/actions-monitor/references/log-parsing.md`. Keep this agent and that reference in sync.
 - Do not analyze root causes or suggest fixes. Extract and summarize.
 - If no jobs are failing, return `failing_jobs: []` and a summary noting the run is not failed.

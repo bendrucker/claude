@@ -20,36 +20,7 @@ This catalog is the smells I flag most often. Each is `smell → fix`.
 
 ## Magic Numbers
 
-A magic number is a bare numeric constant whose meaning is not obvious from context. Never hardcode a limit that should be sampled or derived, and never repeat the same literal in several places.
-
-### What to Flag
-
-- Numeric literals used in comparisons, thresholds, or configuration (e.g., `if retries > 3`, `timeout: 30000`)
-- Array indices beyond 0 (e.g., `parts[2]`)
-- Bitwise masks and shift amounts (e.g., `flags & 0x1F`)
-- Repeated identical literals across the diff
-
-### What to Skip
-
-- **0 and 1** in common idioms (loop init, increment, empty check)
-- **HTTP status codes** (200, 201, 204, 301, 400, 401, 403, 404, 500) when used with HTTP context
-- **Exit codes** (0, 1) in process exit calls
-- **Math constants** (100 for percentages, 1000 for ms conversion) when the intent is clear from context
-- **Test assertions** where the literal is the expected value being verified
-- **Enum-like definitions** where the constant is being given a name rather than used anonymously
-
-### Suggesting Fixes
-
-Suggest extracting to a named constant that explains the value's purpose:
-
-```
-const maxRetries = 3;
-if (retries > maxRetries) { ... }
-```
-
-For Go, suggest package-level constants. For Python, module-level constants. Match the project's existing naming convention.
-
-Magic numbers are an anti-pattern. Use `Nit:` for isolated cases. Escalate when multiple unexplained literals appear in one function or the value is non-obvious (e.g., `if size > 8192`).
+A magic number is a bare numeric constant whose meaning is not obvious from context: thresholds, timeouts, array indices past 0, bitmasks, or the same literal repeated across the diff. Idiomatic 0/1, HTTP status codes, exit codes, clear unit conversions (1000 for ms), test expectations, and constants being given a name are not magic. Suggest extracting to a named constant that explains the value's purpose, matching the project's naming convention (package-level in Go, module-level in Python). Never hardcode a limit that should be sampled or derived. Use `Nit:` for isolated cases and escalate when several unexplained literals share a function or the value is non-obvious (e.g., `if size > 8192`).
 
 ## Related
 

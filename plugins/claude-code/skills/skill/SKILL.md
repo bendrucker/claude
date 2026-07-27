@@ -24,21 +24,16 @@ hooks:
 
 # Claude Code Skills Development
 
-Reference for developing effective skills. The context window is a public good - only include information Claude doesn't already possess.
+Reference for developing effective skills.
 
 ## Arguments
 
 Run a check against a skill path in `$ARGUMENTS`, defaulting to the skill you just edited:
 
-- `--validate`: run `skill-lint` (`bun run skill-lint <path>`) for frontmatter, naming, and reference-depth validation.
+- `--validate`: run `skill-lint` (see [Validation](#validation)) for frontmatter, naming, and reference-depth validation.
 - `--structure`: run the directory-structure check (`${CLAUDE_SKILL_DIR}/scripts/check-structure.ts`) for the SKILL.md, `scripts/`, `references/`, `assets/` layout.
 
 With neither flag, use the skill as an authoring reference. See [Validation](#validation).
-
-## Core Principles
-
-- **Conciseness**: Keep `SKILL.md` under 500 lines. Use progressive disclosure.
-- **Appropriate Freedom**: Text for flexible tasks, pseudocode for moderate variation, scripts for error-prone operations.
 
 ## Skill Structure
 
@@ -46,15 +41,15 @@ With neither flag, use the skill as an authoring reference. See [Validation](#va
 ---
 name: plugin-name:skill-name
 description: Third-person capability description with trigger terms
-argument-hint: "[--flag] [<positional>]"  # Optional: arguments shown in slash menu
-allowed-tools: [Read, Grep, Glob]         # Optional: tool restrictions
-model: sonnet                             # Optional: override model
-effort: low                               # Optional: reasoning effort
-context: fork                             # Optional: run in isolated subagent
-agent: Explore                            # Optional: agent type for fork
-background: false                         # Optional: block the turn on a fork
-user-invocable: false                     # Optional: hide from slash menu
-hooks:                                    # Optional: skill-scoped hooks
+argument-hint: "[--flag] [<positional>]"
+allowed-tools: [Read, Grep, Glob]
+model: sonnet
+effort: low
+context: fork
+agent: Explore
+background: false
+user-invocable: false
+hooks:
   PreToolUse:
     - matcher: "Bash"
       hooks:
@@ -64,11 +59,13 @@ hooks:                                    # Optional: skill-scoped hooks
 ---
 ```
 
-**Required Fields**:
-- `name`: Lowercase letters, numbers, hyphens only (max 64 chars). Plugin skills use `plugin-name:skill-name` prefix for disambiguation. Skip the prefix when name equals plugin name.
+#### Required Fields
+
+- `name`: Lowercase letters, numbers, hyphens only (max 64 chars). See [Naming](#naming).
 - `description`: Third-person, includes trigger terms and use cases (max 1024 chars).
 
-**Optional Fields**:
+#### Optional Fields
+
 - `argument-hint`: Arguments the skill accepts, shown in the slash menu after the skill name. See [Argument Hints](#argument-hints).
 - `allowed-tools`: Tools Claude can use without permission when skill is active
 - `model`: Override the conversation's model. Prefer a tier alias (`haiku`, `sonnet`, `opus`, `fable`) or `inherit` over a dated model ID.
@@ -80,47 +77,47 @@ hooks:                                    # Optional: skill-scoped hooks
 - `disable-model-invocation`: Block model (Skill-tool) invocation and drop the skill's name and description from the always-on catalog (zero recurring context cost); still slash-invocable. Opposite of `user-invocable: false`, which hides the slash menu but keeps the description loaded for the model.
 - `hooks`: Skill-scoped hooks (`PreToolUse`, `PostToolUse`, `Stop`)
 
-**Naming**: Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab:ci`, `things:url`). The part after the colon should not repeat the plugin name. For standalone skills, use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`. Avoid vague names like `helper`, `utils`.
+#### Naming
 
-**Storage**: `~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
+Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab:ci`, `things:url`). The part after the colon should not repeat the plugin name. Skip the prefix when name equals plugin name. For standalone skills, use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`. Avoid vague names like `helper`, `utils`.
+
+#### Storage
+
+`~/.claude/skills/` (personal), `.claude/skills/` (project), plugins (bundled)
 
 ## Skill Authoring Best Practices
 
-#### Description Is a Trigger
+#### Descriptions
 
-The description field is not a summary. It's what Claude scans to decide whether to activate the skill. Write it for the model: trigger terms, use cases, and "Use when..." phrasing. Make it slightly pushy to combat under-triggering.
+The description field is a trigger, not a summary. It's what Claude scans to decide whether to activate the skill. Write it for the model: trigger terms, use cases, and "Use when..." phrasing. Make it slightly pushy to combat under-triggering.
 
 #### Skip the Obvious
 
-The context window is a public good. Don't restate what Claude already knows about coding or the codebase. Focus on information that pushes Claude out of its defaults — gotchas, internal conventions, non-obvious constraints.
-
-#### Build a Gotchas Section
-
-The highest-signal content in any skill is a `## Gotchas` section documenting failure modes Claude hits in practice. Start small and grow it over time as new edge cases surface. Every skill that wraps a library, API, or workflow should have one.
+The context window is a public good. Don't restate what Claude already knows. Spend tokens on what pushes Claude out of its defaults: gotchas, internal conventions, non-obvious constraints. The highest-signal content in any skill is a `## Gotchas` section documenting failure modes hit in practice; grow it as edge cases surface.
 
 #### Progressive Disclosure
 
-A skill is a folder, not just a markdown file. Keep `SKILL.md` concise (~30 lines for the hub) and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them; it loads them at the right times.
+A skill is a folder, not just a markdown file. Keep `SKILL.md` a concise hub and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. Organize references by domain and gate conditional detail behind a pointer, so a question about one domain loads only that file.
 
 #### Don't Railroad Claude
 
-Give Claude the information it needs but leave room to adapt. Prefer outcome-oriented instructions ("Cherry-pick the commit onto a clean branch. Resolve conflicts preserving intent.") over step-by-step scripts ("Step 1: Run git log. Step 2: Run git cherry-pick...").
+State the goal and constraints, then leave room to adapt. Prefer outcome-oriented instructions over step-by-step scripts.
 
 #### First-Run Setup
 
-Skills that depend on user-specific context should check for a `config.json` in `${CLAUDE_SKILL_DIR}` or `${CLAUDE_PLUGIN_DATA}`. If missing, prompt the user for setup (e.g., which Slack channel, which project). Store answers for future runs.
+Skills that depend on user-specific context should check for a `config.json` in `${CLAUDE_SKILL_DIR}` or `${CLAUDE_PLUGIN_DATA}`. If missing, prompt the user for setup and store answers for future runs.
 
 #### Store Persistent Data in `${CLAUDE_PLUGIN_DATA}`
 
-Skills can maintain state across runs: append-only logs, JSON records, SQLite databases. Use `${CLAUDE_PLUGIN_DATA}` for storage that survives plugin upgrades. Example: a standup skill keeps a `standups.log` so Claude can diff against yesterday.
+Skills can maintain state across runs: append-only logs, JSON records, SQLite databases. Use `${CLAUDE_PLUGIN_DATA}` for storage that survives plugin upgrades.
 
 #### Give Claude Code to Compose
 
-Include helper scripts and libraries that Claude can import and compose on the fly. This lets Claude spend turns on decisions, not reconstructing boilerplate. Document scripts with `"Run script.py"` (execute) vs `"See script.py"` (reference).
+Include helper scripts and libraries that Claude can import and compose on the fly. Document scripts with `"Run script.py"` (execute) vs `"See script.py"` (reference).
 
 #### On-Demand Hooks
 
-Skill-scoped hooks activate only when the skill is invoked and last for the session. Use these for opinionated guardrails that would be annoying globally but valuable in specific contexts (e.g., blocking destructive commands during prod operations).
+Skill-scoped hooks activate only when the skill is invoked and last for the session. Use these for guardrails that would be annoying globally but valuable in specific contexts (e.g., blocking destructive commands during prod operations).
 
 ## Content Features
 
@@ -145,11 +142,10 @@ These substitutions apply to skill content, not the frontmatter `hooks:` block. 
 - Mutually-exclusive alternatives are pipe-separated with surrounding spaces: `[staged | <range> | HEAD]`.
 - Boolean flags are `[--flag]`. Value flags are `[--flag value]`. Enumerated values pipe-join without inner spaces: `[--role author|reviewer]`.
 - Order tokens as required positionals, then optional positionals, then flags.
-- Keep the hint compact and push parsing heuristics into the body. The hint reminds the user which flags exist; the body documents them.
 
 #### Parsing
 
-A skill that declares an `argument-hint` must parse `$ARGUMENTS` (or `$0`/`$1` for positionals) and act on what it finds. Add an `## Arguments` section to the body mapping each token to its behavior and stating the default when the token is absent. Every flag needs a stated default so the no-argument invocation stays well-defined.
+A skill that declares an `argument-hint` must parse `$ARGUMENTS` (or `$0`/`$1` for positionals) and act on what it finds. Add an `## Arguments` section to the body mapping each token to its behavior, with a stated default for every flag so the no-argument invocation stays well-defined.
 
 ### Dynamic Context Injection
 
@@ -164,28 +160,16 @@ Skills follow the [Agent Skills](https://agentskills.io/specification#optional-d
 ```
 skill-name/
 ├── SKILL.md        # Required: instructions and frontmatter
-├── scripts/        # Executable code agents can run
-├── references/     # Documentation loaded on demand
+├── scripts/        # Executable code agents can run (self-contained, explicit errors)
+├── references/     # Documentation loaded on demand (focused, domain-named files)
 └── assets/         # Static resources (templates, images, data files)
 ```
 
 A PostToolUse hook validates writes to skill directories against this structure.
 
-### `scripts/`
-
-Executable code that agents run. Scripts should be self-contained, document dependencies, and include error messages.
-
-### `references/`
-
-Additional documentation loaded when needed. Keep files focused — smaller files mean less context usage. Use descriptive names matching the domain (`finance.md`, `api.md`).
-
-### `assets/`
-
-Static resources: templates, images, diagrams, lookup tables, schemas.
-
 ### File Naming
 
-Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use lowercase for all other files. Keep references one level deep. For files >100 lines, include a table of contents.
+Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use lowercase for all other files. Keep references one level deep.
 
 ## Validation
 
@@ -195,16 +179,8 @@ A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md fi
 
 Load detailed guides as needed:
 
-- **[references/patterns.md](references/patterns.md)** - Dynamic context injection, argument substitutions, progressive disclosure, workflows, subagent integration
-- **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, YAML errors, plugin cache, checklist
-
-## Quick Reference
-
-**Common Patterns**: Read-only (`[Read, Grep, Glob]`), Script-based (`[Read, Bash, Write]`), Template-based (`[Read, Write, Edit]`)
-
-**Content Features**: `$ARGUMENTS` / `$N` for arguments, bang-backtick for dynamic context injection
-
-**Anti-Patterns**: Windows paths, too many options, vague descriptions, nested references, scripts that punt errors
+- **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, skill-scoped hooks, anti-patterns
+- **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache
 
 ## Resources
 

@@ -38,6 +38,8 @@ Full parameters and descriptions for every named query, the on-disk markdown/YAM
 
 ## Markdown and YAML on Disk
 
+For new markdown/YAML-on-disk needs, follow the same pattern rather than reinventing regex parsing: a self-defaulting glob (`~` expands to home, override via `SET VARIABLE`) feeding `read_markdown_sections` or `read_yaml_frontmatter`, never materializing file bodies into a column.
+
 - `plan-sections`: one row per markdown section across plan files on disk, joined to the session that produced each plan (outcome, replan sequence). The glob self-defaults to `~/.claude/plans/*.md` and takes an optional `plans_glob` override. Reads plan structure rather than re-parsing headings by hand, e.g. "which plans have no Verification section":
 
   ```sql

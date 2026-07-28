@@ -81,7 +81,7 @@ The overlay design fetches every base at validation time, so this only empties i
 
 Treat this section as a trust model, not an exhaustive mirror of `settings.json`.
 
-- `allowUnixSockets` should be local IPC endpoints where secret material never leaves a dedicated agent (for example, signing daemons or tmux sockets).
+- `allowUnixSockets` should be local IPC endpoints where secret material never leaves a dedicated agent (for example, signing daemons or the tmux and herdr sockets). The multiplexer sockets (tmux, herdr) can inject keys into other panes, so they are command execution by another name. Accepted so layout, agent, and notification commands run sandboxed rather than escaped.
 - `allowLocalBinding` should stay loopback-only.
 - `filesystem.allowWrite` should allow only scratch/cache/worktree paths that tools must mutate, and never credential stores or broad home-directory globs. `~/.local/share/atuin` is a deliberate exception to the credential-store clause: the dir holds atuin's sync encryption key and the session tokens in `meta.db`. Atuin opens `meta.db` read-write on every command, including the history reads behind the `atuin:history` skill, and SQLite creates journal and WAL files beside its dbs, so a file-level grant would fail intermittently. The sandbox grants no egress to atuin's sync hosts, so the risk is local tampering: a swapped key or token would first reach the network through a later unsandboxed `atuin sync`.
 

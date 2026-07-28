@@ -1,8 +1,8 @@
-# session-limit
+# `session-limit`
 
 `UserPromptSubmit` hook that warns when the session is running out of usage budget, so work winds down before the block is exhausted instead of spilling into overage.
 
-## How it works
+## How It Works
 
 Claude Code pipes rate-limit data to the statusline, which mirrors it to the path in `CLAUDE_STATUSLINE_RATE_LIMITS_PATH` (set in `user/settings.json`). On each prompt this hook reads that file back and injects context when the usage percentage crosses a band:
 
@@ -17,7 +17,7 @@ Each band fires once. The highest band announced per window is recorded in `/tmp
 
 The hook is silent when the file is unconfigured or missing, or when it lacks a `five_hour` percentage, which covers accounts and sessions with no rate-limit data.
 
-## Writing the file
+## Writing the File
 
 `user/scripts/statusline.ts` does this alongside rendering the line, but the hook only needs `rate_limits` from the statusline's stdin copied to disk. Any statusline can do it. A shell one:
 

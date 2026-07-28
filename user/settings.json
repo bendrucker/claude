@@ -1,11 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "theme": "auto",
-  "skillOverrides": {
-    "dataviz": "user-invocable-only"
+  "agentPushNotifEnabled": true,
+  "alwaysThinkingEnabled": true,
+  "attribution": {
+    "commit": "",
+    "pr": ""
   },
-  "fallbackModel": ["sonnet"],
-  "cleanupPeriodDays": 90,
+  "autoCompactEnabled": true,
+  "autoCompactWindow": 400000,
   "autoMode": {
     "hard_deny": [
       "$defaults",
@@ -18,10 +20,304 @@
       "Do not create a pull request or merge request on a third-party repository (one I do not own or maintain) unless I explicitly asked for one; offer it for confirmation first."
     ]
   },
-  "attribution": {
-    "commit": "",
-    "pr": ""
+  "cleanupPeriodDays": 90,
+  "enabledPlugins": {
+    "agents-md@bendrucker": true,
+    "ast-grep@ast-grep-marketplace": true,
+    "atuin@bendrucker": true,
+    "bun@bendrucker": true,
+    "claude-code@bendrucker": true,
+    "comments@bendrucker": true,
+    "git@bendrucker": true,
+    "github@bendrucker": true,
+    "github@claude-plugins-official": true,
+    "gitlab@bendrucker": true,
+    "go@bendrucker": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "interview@bendrucker": true,
+    "issue@bendrucker": true,
+    "linear-cli@linear-cli": true,
+    "linear@bendrucker": true,
+    "mac@bendrucker": true,
+    "mermaid@bendrucker": true,
+    "newline@bendrucker": true,
+    "plan@bendrucker": true,
+    "pull-request@bendrucker": true,
+    "research@bendrucker": true,
+    "review@bendrucker": true,
+    "things@bendrucker": true,
+    "tmux@bendrucker": true,
+    "type-ignore@bendrucker": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "worktrunk@worktrunk": true,
+    "writing@bendrucker": true,
+    "x-callback-url@bendrucker": true
   },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_NO_FLICKER": "1",
+    "CLAUDE_STATUSLINE_RATE_LIMITS_PATH": "~/.vibe-island/cache/rl.json",
+    "TMPDIR": "/tmp",
+    "TMPPREFIX": "/tmp/claude/zsh",
+    "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}"
+  },
+  "extraKnownMarketplaces": {
+    "agent-browser": {
+      "source": {
+        "ref": "v0.31.1",
+        "repo": "vercel-labs/agent-browser",
+        "source": "github"
+      }
+    },
+    "ast-grep-marketplace": {
+      "source": {
+        "ref": "c2a9bc154f4ffe08b25d28d5e852dfac8c0d0d8a",
+        "repo": "ast-grep/agent-skill",
+        "source": "github"
+      }
+    },
+    "astral-sh": {
+      "source": {
+        "ref": "f3ce88a7ba830f53afd6d944c1d0278ed318e142",
+        "repo": "astral-sh/claude-code-plugins",
+        "source": "github"
+      }
+    },
+    "bendrucker": {
+      "source": {
+        "repo": "bendrucker/claude",
+        "source": "github"
+      }
+    },
+    "claude-plugins-official": {
+      "source": {
+        "ref": "87644d1355e6f08d55eb98dc2264d68fa226b6ac",
+        "repo": "anthropics/claude-plugins-official",
+        "source": "github"
+      }
+    },
+    "linear-cli": {
+      "source": {
+        "ref": "v2.1.1",
+        "repo": "schpet/linear-cli",
+        "source": "github"
+      }
+    },
+    "worktrunk": {
+      "source": {
+        "ref": "v0.68.0",
+        "repo": "max-sixty/worktrunk",
+        "source": "github"
+      }
+    }
+  },
+  "fallbackModel": [
+    "sonnet"
+  ],
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "timeout": 86400,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ],
+        "matcher": "manual|auto"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ],
+        "matcher": "manual|auto"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "bun ~/.claude/hooks/worktree",
+            "if": "Bash(git worktree *)",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "bun ~/.claude/hooks/webfetch-block",
+            "type": "command"
+          }
+        ],
+        "matcher": "WebFetch"
+      },
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bash \"$HOME/.claude/hooks/herdr-agent-state.sh\" session",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      },
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ],
+        "matcher": "startup|resume|clear"
+      },
+      {
+        "hooks": [
+          {
+            "command": "bash '/Users/ben/.claude/hooks/herdr-agent-state.sh' session",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
+            "type": "command"
+          },
+          {
+            "command": "bun ~/.claude/hooks/session-limit",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "command": "bash -c 'p=$(jq -er .worktree_path) || exit 1; [ -e \"$p\" ] && exit 1; exit 0'",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "inputNeededNotifEnabled": true,
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
@@ -77,289 +373,11 @@
     ],
     "deny": []
   },
-  "hooks": {
-    "WorktreeRemove": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'p=$(jq -er .worktree_path) || exit 1; [ -e \"$p\" ] && exit 1; exit 0'"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "PermissionRequest": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "timeout": 86400
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/worktree",
-            "if": "Bash(git worktree *)"
-          }
-        ]
-      },
-      {
-        "matcher": "WebFetch",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/webfetch-block"
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.claude/hooks/herdr-agent-state.sh\" session",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "StopFailure": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          },
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/session-limit"
-          }
-        ]
-      }
-    ]
-  },
-  "enabledPlugins": {
-    "go@bendrucker": true,
-    "mac@bendrucker": true,
-    "git@bendrucker": true,
-    "gitlab@bendrucker": true,
-    "linear@bendrucker": true,
-    "things@bendrucker": true,
-    "issue@bendrucker": true,
-    "review@bendrucker": true,
-    "newline@bendrucker": true,
-    "github@bendrucker": true,
-    "claude-code@bendrucker": true,
-    "pull-request@bendrucker": true,
-    "interview@bendrucker": true,
-    "github@claude-plugins-official": true,
-    "x-callback-url@bendrucker": true,
-    "research@bendrucker": true,
-    "writing@bendrucker": true,
-    "type-ignore@bendrucker": true,
-    "agents-md@bendrucker": true,
-    "ast-grep@ast-grep-marketplace": true,
-    "worktrunk@worktrunk": true,
-    "plan@bendrucker": true,
-    "linear-cli@linear-cli": true,
-    "tmux@bendrucker": true,
-    "bun@bendrucker": true,
-    "mermaid@bendrucker": true,
-    "typescript-lsp@claude-plugins-official": true,
-    "gopls-lsp@claude-plugins-official": true,
-    "atuin@bendrucker": true,
-    "comments@bendrucker": true
-  },
-  "extraKnownMarketplaces": {
-    "bendrucker": {
-      "source": {
-        "source": "github",
-        "repo": "bendrucker/claude"
-      }
-    },
-    "claude-plugins-official": {
-      "source": {
-        "source": "github",
-        "repo": "anthropics/claude-plugins-official",
-        "ref": "87644d1355e6f08d55eb98dc2264d68fa226b6ac"
-      }
-    },
-    "astral-sh": {
-      "source": {
-        "source": "github",
-        "repo": "astral-sh/claude-code-plugins",
-        "ref": "f3ce88a7ba830f53afd6d944c1d0278ed318e142"
-      }
-    },
-    "ast-grep-marketplace": {
-      "source": {
-        "source": "github",
-        "repo": "ast-grep/agent-skill",
-        "ref": "c2a9bc154f4ffe08b25d28d5e852dfac8c0d0d8a"
-      }
-    },
-    "worktrunk": {
-      "source": {
-        "source": "github",
-        "repo": "max-sixty/worktrunk",
-        "ref": "v0.68.0"
-      }
-    },
-    "linear-cli": {
-      "source": {
-        "source": "github",
-        "repo": "schpet/linear-cli",
-        "ref": "v2.1.1"
-      }
-    },
-    "agent-browser": {
-      "source": {
-        "source": "github",
-        "repo": "vercel-labs/agent-browser",
-        "ref": "v0.31.1"
-      }
-    }
-  },
+  "preferredNotifChannel": "terminal_bell",
   "sandbox": {
-    "enabled": true,
-    "autoAllowBashIfSandboxed": true,
     "allowAppleEvents": true,
-    "network": {
-      "allowLocalBinding": true,
-      "allowMachLookup": ["com.apple.trustd.agent"],
-      "allowUnixSockets": [
-        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
-        "~/.tmux",
-        "~/.config/herdr/herdr.sock",
-        "/tmp/claude"
-      ]
-    },
-    "filesystem": {
-      "allowWrite": [
-        "/tmp",
-        "~/.tmux",
-        "~/.terraform.d/plugin-cache",
-        "~/.cache",
-        "~/Library/Caches/go-build",
-        "~/src/go/pkg/mod",
-        "~/src/go/pkg/sumdb",
-        "~/.bun/install",
-        "~/.config/glab-cli/recover",
-        "~/.npm",
-        "~/.local/share/uv",
-        "~/.local/share/graphite",
-        "~/.local/share/atuin"
-      ]
-    },
+    "autoAllowBashIfSandboxed": true,
+    "enabled": true,
     "excludedCommands": [
       "docker:*",
       "ssh:*",
@@ -388,33 +406,52 @@
       "git:*",
       "linear:*",
       "code:*"
-    ]
+    ],
+    "filesystem": {
+      "allowWrite": [
+        "/tmp",
+        "~/.tmux",
+        "~/.terraform.d/plugin-cache",
+        "~/.cache",
+        "~/Library/Caches/go-build",
+        "~/src/go/pkg/mod",
+        "~/src/go/pkg/sumdb",
+        "~/.bun/install",
+        "~/.config/glab-cli/recover",
+        "~/.npm",
+        "~/.local/share/uv",
+        "~/.local/share/graphite",
+        "~/.local/share/atuin"
+      ]
+    },
+    "network": {
+      "allowLocalBinding": true,
+      "allowMachLookup": [
+        "com.apple.trustd.agent"
+      ],
+      "allowUnixSockets": [
+        "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
+        "~/.tmux",
+        "~/.config/herdr/herdr.sock",
+        "/tmp/claude"
+      ]
+    }
   },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/scripts/statusline.ts"
-  },
-  "subagentStatusLine": {
-    "type": "command",
-    "command": "~/.claude/scripts/subagent-statusline.ts"
+  "showClearContextOnPlanAccept": true,
+  "skillOverrides": {
+    "dataviz": "user-invocable-only"
   },
   "skipAutoPermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
-  "alwaysThinkingEnabled": true,
   "spinnerTipsEnabled": false,
-  "showClearContextOnPlanAccept": true,
-  "autoCompactEnabled": true,
-  "autoCompactWindow": 400000,
-  "preferredNotifChannel": "terminal_bell",
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
+  "statusLine": {
+    "command": "~/.claude/scripts/statusline.ts",
+    "type": "command"
+  },
+  "subagentStatusLine": {
+    "command": "~/.claude/scripts/subagent-statusline.ts",
+    "type": "command"
+  },
   "teammateMode": "in-process",
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_STATUSLINE_RATE_LIMITS_PATH": "~/.vibe-island/cache/rl.json",
-    "TMPDIR": "/tmp",
-    "TMPPREFIX": "/tmp/claude/zsh",
-    "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}",
-    "CLAUDE_CODE_NO_FLICKER": "1"
-  }
+  "theme": "auto"
 }

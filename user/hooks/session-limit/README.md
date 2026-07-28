@@ -4,7 +4,7 @@
 
 ## How it works
 
-Claude Code pipes rate-limit data to the statusline, which mirrors it to `~/.vibe-island/cache/rl.json`. On each prompt this hook reads that file and injects context when the usage percentage crosses a band:
+Claude Code pipes rate-limit data to the statusline, which mirrors it to the path in `CLAUDE_STATUSLINE_RATE_LIMITS_PATH` (set in `user/settings.json`). On each prompt this hook reads that file back and injects context when the usage percentage crosses a band:
 
 | Window | Threshold | Guidance |
 | --- | --- | --- |
@@ -15,11 +15,30 @@ Claude Code pipes rate-limit data to the statusline, which mirrors it to `~/.vib
 
 Each band fires once. The highest band announced per window is recorded in `/tmp/claude/<session-id>/session-limit.json`, keyed to that window's `resets_at`. A changed `resets_at` means the block rolled over, so the bands re-arm.
 
-The hook is silent when `rl.json` is missing or lacks a `five_hour` percentage, which covers accounts and sessions with no rate-limit data.
+The hook is silent when the file is unconfigured or missing, or when it lacks a `five_hour` percentage, which covers accounts and sessions with no rate-limit data.
+
+## Writing the file
+
+`user/scripts/statusline.ts` does this alongside rendering the line, but the hook only needs `rate_limits` from the statusline's stdin copied to disk. Any statusline can do it. A shell one:
+
+```sh
+#!/bin/sh
+input=$(cat)
+
+limits=$(printf '%s' "$input" | jq -c '.rate_limits // empty')
+if [ -n "$limits" ]; then
+  mkdir -p "$(dirname "$CLAUDE_STATUSLINE_RATE_LIMITS_PATH")"
+  printf '%s\n' "$limits" > "$CLAUDE_STATUSLINE_RATE_LIMITS_PATH"
+fi
+
+printf '%s' "$input" | jq -r '.model.display_name'
+```
+
+Guarding on a non-empty `limits` matters. A plain redirect truncates the file on any statusline render that carries no rate-limit data, and the hook then reads back an empty file.
 
 ## Configuration
 
-- `CLAUDE_STATUSLINE_RATE_LIMITS_PATH`: source of rate-limit data (default `~/.vibe-island/cache/rl.json`)
+- `CLAUDE_STATUSLINE_RATE_LIMITS_PATH`: where the statusline writes rate-limit data, and where this hook reads it. No default. Unset disables both.
 - `CLAUDE_SESSION_LIMIT_MARKER_ROOT`: root for per-session marker files (default `/tmp/claude`)
 
 Adding a band is one entry in `FIVE_HOUR_BANDS` or `SEVEN_DAY_BANDS`. The threshold and its message are paired in the same object, so a threshold cannot exist without a message.

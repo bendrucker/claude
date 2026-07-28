@@ -126,10 +126,11 @@ export function evaluate(
   };
 }
 
-function rateLimitsPath(): string {
-  return expandTilde(
-    process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH ?? "~/.vibe-island/cache/rl.json",
-  );
+// The same variable the statusline writer reads to decide where to mirror the
+// data. Unset means nothing is being written, so there is nothing to read.
+function rateLimitsPath(): string | null {
+  const path = process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH;
+  return path ? expandTilde(path) : null;
 }
 
 function markerPath(sessionId: string): string {
@@ -162,7 +163,10 @@ export async function processInput(
   const sessionId = input.session_id;
   if (!sessionId) return null;
 
-  const rl = await readJson<RateLimits>(rateLimitsPath());
+  const source = rateLimitsPath();
+  if (!source) return null;
+
+  const rl = await readJson<RateLimits>(source);
   if (!rl) return null;
 
   const path = markerPath(sessionId);

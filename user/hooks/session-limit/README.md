@@ -19,7 +19,7 @@ The hook is silent when the file is unconfigured or missing, or when it lacks a 
 
 ## Writing the File
 
-`user/scripts/statusline.ts` does this alongside rendering the line, but the hook only needs `rate_limits` from the statusline's stdin copied to disk. Any statusline can do it. A shell one:
+[My status line script](../../scripts/statusline.ts) handles this alongside actual rendering. A simplified shell version:
 
 ```sh
 #!/bin/sh
@@ -33,8 +33,6 @@ fi
 
 printf '%s' "$input" | jq -r '.model.display_name'
 ```
-
-Guarding on a non-empty `limits` matters. A plain redirect truncates the file on any statusline render that carries no rate-limit data, and the hook then reads back an empty file.
 
 ## Configuration
 

@@ -64,13 +64,13 @@ For a substantial issue, the opening summary plus one type section is the floor.
 
 ## Agent Context
 
-What you learned exploring the codebase, so the implementing agent doesn't explore it again. Last in the body, under a `## 🤖 Agent Context` heading. The platform skill turns that heading into a collapsible, collapsed by default. Without one, wrap it in GFM `<details>`.
+What you learned exploring the codebase, so the implementing agent doesn't explore it again. Last in the body, under a `## 🤖 Agent Context` heading. The platform skill turns that heading into a collapsible. Where no platform skill covers the tracker, wrap it in GFM `<details>` at save time.
 
 Write for an agent. Use lists of paths, symbols, and commands. [Style](#style) does not apply. Line numbers, ranges, and bare enumeration are fine when they save a search.
 
 Emit only what exploration produced. Drop subsections you can't fill, and the whole section when you explored nothing.
 
-Pin the block to the commit you read (`git rev-parse --short HEAD`) and pair every line number with its symbol, which survives drift.
+Open the block with the commit you read (`git rev-parse --short HEAD`) and today's date. Pair every line number with its symbol, which survives drift.
 
 ```markdown
 ## 🤖 Agent Context

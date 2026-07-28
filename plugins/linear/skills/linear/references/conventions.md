@@ -24,7 +24,7 @@ This matters when content moves between the two paths:
 
 ## Collapsible Sections
 
-A collapsible renders collapsed, and its marker differs by write path the way an issue reference does. The title sits on the opening marker, the closing marker is bare, and both need a blank line against the content. Markdown inside behaves normally, headings included.
+A collapsible renders collapsed, and its marker differs by write path the way [Issue References](#issue-references) do. The title sits on the opening marker. The closing marker is bare. Both need a blank line against the content. Markdown inside behaves normally, headings included.
 
 - **Connector `save_issue`**: `>>>`
 - **CLI / GraphQL API**: `+++` (the stored GFM form)

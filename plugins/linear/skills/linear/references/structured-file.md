@@ -17,6 +17,8 @@ Map the metadata keys these files tend to carry onto the connector `save_issue` 
 
 Relation params take the issue identifier from each entry's tracker URL. `blocks`, `blockedBy`, and `relatedTo` accept arrays. `duplicateOf` takes a single identifier. Each is append-only. A save never removes relations you did not name. For keys the file omits, or ones this table does not name, map them when Linear has a matching field and ask when the mapping is unclear.
 
+When the body ends with a `## 🤖 Agent Context` section, rewrite its heading as a collapsible before saving, per [Collapsible Sections](conventions.md#collapsible-sections).
+
 Routing fields (team, assignee, state) are not in the file. Take them from the user at save time. Default the state from assignment as in [Issue Status](conventions.md#issue-status). `getDefaultState` in `hooks/save-issue.ts` encodes that rule.
 
 ## Saving

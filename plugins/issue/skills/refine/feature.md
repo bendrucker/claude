@@ -24,7 +24,7 @@ High-level implementation. Reference existing patterns. Skip for trivially-desig
 
 #### Changes
 
-Files and components to modify. Skip when Related Code already names the files.
+Files and components to modify. Skip when Agent Context already names the files.
 
 #### Open Questions
 

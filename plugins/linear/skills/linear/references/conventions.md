@@ -22,6 +22,23 @@ This matters when content moves between the two paths:
 - Moving connector output to the CLI requires converting node markup to GFM first. Raw node markup written through the CLI is stored literally and corrupted. Reading the same issue via CLI/API returns GFM directly.
 - A `[ENG-123](url)` link read through the CLI loses its chip when written back through the connector, which `<>`-wraps it. To edit through the connector and keep chips, reference issues by bare identifier, or write through the CLI/API.
 
+## Collapsible Sections
+
+A collapsible renders collapsed, and its marker differs by write path the way [Issue References](#issue-references) do. The title sits on the opening marker. The closing marker is bare. Both need a blank line against the content. Markdown inside behaves normally, headings included.
+
+- **Connector `save_issue`**: `>>>`
+- **CLI / GraphQL API**: `+++` (the stored GFM form)
+
+```markdown
++++ 🤖 Agent Context
+
+Gathered at `a1b2c3d` on 1970-01-01.
+
++++
+```
+
+Issue refinement marks its collapsible as a `## 🤖 Agent Context` heading. Replace the heading with the opening marker for your path, keeping its text as the title, and close the block at the end of the body.
+
 ## Issue Status
 
 When creating issues, set status based on assignment:

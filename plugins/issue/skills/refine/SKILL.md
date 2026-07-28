@@ -49,24 +49,56 @@ time out, so downstream jobs read a partial snapshot as if it were complete.
 
 [Type-specific sections from guide (select, don't fill)]
 
-## Context
-
-### Related Code
-
-Files that need changes or inform the work.
+## 🤖 Agent Context
 ```
 
 Populate only the keys you can infer: `title`, `type`, `labels`, `priority`, `relations`. Omit any optional key you can't fill, and drop empty relation lists. The platform skill fills routing and workspace fields (team, assignee, state, estimate) at save time.
 
-A related issue you found belongs under `relations` as a tracker link, kept out of the body. Mention another issue in the body only when it tells the reader something the relation can't: what a prior attempt tried, why upstream work matters. Never append a standalone Related Issues section. It just restates links the relation already expresses.
+A related issue you found belongs under `relations` as a tracker link, kept out of the body. Mention another issue in the body only when it tells the reader something the relation can't: what a prior attempt tried, why upstream work matters. Never append a standalone Related Issues section. It just restates links the relation already expresses. Put links the tracker has no field for (cross-tracker issues, upstream bug reports) under [Agent Context](#agent-context).
 
 ## Section Selection
 
 Every section must tell the reader something they couldn't have guessed. Cut sections whose content is tautological ("tests must pass"), template residue ("no behavior change"), or obvious given the issue's size.
 
-For a substantial issue, the opening summary plus one type section plus `## Context` is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough.
+For a substantial issue, the opening summary plus one type section is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough.
+
+## Agent Context
+
+What you learned exploring the codebase, so the implementing agent doesn't explore it again. Last in the body, under a `## 🤖 Agent Context` heading. The platform skill turns that heading into a collapsible, collapsed by default. Without one, wrap it in GFM `<details>`.
+
+Write for an agent. Use lists of paths, symbols, and commands. [Style](#style) does not apply. Line numbers, ranges, and bare enumeration are fine when they save a search.
+
+Emit only what exploration produced. Drop subsections you can't fill, and the whole section when you explored nothing.
+
+Pin the block to the commit you read (`git rev-parse --short HEAD`) and pair every line number with its symbol, which survives drift.
+
+```markdown
+## 🤖 Agent Context
+
+Gathered at `a1b2c3d` on 1970-01-01.
+
+### Related Code
+
+- `acquire` at `src/pool.ts:88` blocks on an exhausted pool with no deadline
+- `release` at `src/pool.ts:140` early-returns on a closed connection, leaking the slot
+
+### Prior Art
+
+- `f0e9d8c` added the same deadline to the write pool. Mirror its test setup.
+```
+
+Subsections, in order:
+
+| Section | Content |
+|---------|---------|
+| Related Code | Files to change or read, with the symbol and why it matters |
+| Prior Art | Commits, PRs, or issues that solved a similar problem, and what to take |
+| Verification | Test file to extend, suite to run, gate covering this area |
+| Search Hints | Search patterns and entry points that found the code |
 
 ## Style
+
+Human-facing body only. [Agent Context](#agent-context) has its own rules.
 
 State facts and drop the hedging. Name the function, file, or behavior rather than describing it vaguely. Every sentence should add information.
 

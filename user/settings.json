@@ -290,7 +290,7 @@
       "source": {
         "source": "github",
         "repo": "anthropics/claude-plugins-official",
-        "ref": "f88d3717b7e6554fc3b9c1e98a3e09ab9fb0955a"
+        "ref": "87644d1355e6f08d55eb98dc2264d68fa226b6ac"
       }
     },
     "astral-sh": {

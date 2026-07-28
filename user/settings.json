@@ -180,6 +180,16 @@
             "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/hooks/herdr-agent-state.sh\" session",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
@@ -329,6 +339,7 @@
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
         "~/.tmux",
+        "~/.config/herdr/herdr.sock",
         "/tmp/claude"
       ]
     },
@@ -399,7 +410,6 @@
   "agentPushNotifEnabled": true,
   "teammateMode": "in-process",
   "env": {
-    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_STATUSLINE_RATE_LIMITS_PATH": "~/.vibe-island/cache/rl.json",
     "TMPDIR": "/tmp",

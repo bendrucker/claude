@@ -1,5 +1,8 @@
 .claude/settings.local.json
 .claude/hooks/logs/
+# Managed by `herdr integration install claude`; the settings.json hook entry
+# that invokes it is committed, the script itself is herdr's to overwrite.
+user/hooks/herdr-agent-state.sh
 .prek/
 node_modules/
 .DS_Store

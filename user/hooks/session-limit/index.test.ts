@@ -248,4 +248,10 @@ describe("processInput", () => {
     await Bun.write(rlPath, "");
     expect(await processInput(input("s5"), 0)).toBeNull();
   });
+
+  it("emits nothing when no rate-limit path is configured", async () => {
+    await writeLimits(92);
+    delete process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH;
+    expect(await processInput(input("s6"), 0)).toBeNull();
+  });
 });

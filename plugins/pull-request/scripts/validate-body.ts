@@ -176,9 +176,38 @@ export async function findBacktickedCommits(
   return results.filter((sha): sha is string => sha !== null);
 }
 
+// The hook now matches every Bash call and filters here, because the previous
+// `Bash(gh pr create:*)` matcher is a prefix match: it missed the majority of
+// real invocations, which lead with `cd <dir> &&`, an env assignment
+// (`GH_PAGER=cat`, `GIT_SSH_COMMAND=false`), or a heredoc writing the body.
+const PR_BODY_COMMAND_PATTERN = /\b(?:gh pr (?:create|edit)|glab mr (?:create|update))\b/;
+
+export function isPrBodyCommand(command: string): boolean {
+  return PR_BODY_COMMAND_PATTERN.test(command);
+}
+
+function unquote(value: string): string {
+  const match = value.match(/^(['"])(.*)\1$/s);
+  return match?.[2] ?? value;
+}
+
 export function extractBodyFilePath(command: string): string | null {
-  const match = command.match(/--body-file[=\s]([^\s]+)/);
-  return match?.[1] ?? null;
+  const match = command.match(/--body-file[=\s]("[^"]+"|'[^']+'|[^\s]+)/);
+  if (!match?.[1]) return null;
+  const path = unquote(match[1]);
+  const tmpdir = process.env.TMPDIR?.replace(/\/$/, "");
+  if (!tmpdir) return path;
+  return path.replace(/\$\{TMPDIR\}|\$TMPDIR/g, tmpdir);
+}
+
+// Inline bodies are a small share of invocations but bypass the file path
+// entirely. Only quoted forms are read: an unquoted `--body` value is a single
+// shell word, so it cannot hold the headings this validates.
+export function extractInlineBody(command: string): string | null {
+  const match = command.match(/(?:--body|(?<!\w)-b)[=\s]("(?:[^"\\]|\\.)*"|'[^']*')/);
+  if (!match?.[1]) return null;
+  const raw = unquote(match[1]);
+  return raw.replace(/\\(["`$\\])/g, "$1");
 }
 
 function warn(reasons: string[]): SyncHookJSONOutput {
@@ -255,23 +284,29 @@ export function validateBody(body: string): SyncHookJSONOutput | null {
   return reasons.length > 0 ? warn(reasons) : null;
 }
 
+async function resolveBody(command: string): Promise<string | null> {
+  const bodyFilePath = extractBodyFilePath(command);
+  if (bodyFilePath) {
+    const file = Bun.file(bodyFilePath);
+    return (await file.exists()) ? await file.text() : null;
+  }
+  return extractInlineBody(command);
+}
+
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   if (!hasBashCommand(input.tool_input)) {
     return null;
   }
   const { command } = input.tool_input;
 
-  const bodyFilePath = extractBodyFilePath(command);
-  if (!bodyFilePath) {
+  if (!isPrBodyCommand(command)) {
     return null;
   }
 
-  const file = Bun.file(bodyFilePath);
-  if (!(await file.exists())) {
+  const body = await resolveBody(command);
+  if (body === null) {
     return null;
   }
-
-  const body = await file.text();
 
   const deny = denyForTestCount(body);
   if (deny) {

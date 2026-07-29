@@ -1,79 +1,19 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { apStyleTitleCase } from "ap-style-title-case";
 import type { Heading, Paragraph, Strong, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { getExtension, isMarkdownFile } from "../detection/paths";
 import { classifyHeadingBaseline } from "../linguistics/heading";
+import { headingCaseViolations } from "./heading-case";
 import { type EditInput, formatContext, type HookResult, type WriteInput } from "./io";
 
-const PLACEHOLDER = "\0";
-
-// ap-style-title-case ships a stopword list missing two words AP lowercases:
-// `as` (a short conjunction/preposition) and `vs`/`vs.` (versus). Without
-// them the checker flags correct headings like "X as Y" and "A vs. B". The
-// library splits on commas and colons but not periods, so `vs.` is one token.
-const AP_STOPWORDS = [
-  "a",
-  "an",
-  "and",
-  "as",
-  "at",
-  "but",
-  "by",
-  "for",
-  "in",
-  "nor",
-  "of",
-  "on",
-  "or",
-  "so",
-  "the",
-  "to",
-  "up",
-  "vs",
-  "vs.",
-  "yet",
-];
-
+// Reports the exact re-casing rather than just naming the heading, so the fix
+// needs no second guess about which words AP lowercases.
 export function checkTitleCase(content: string): string | null {
-  const ast = fromMarkdown(content);
-  let result: string | null = null;
-
-  visit(ast, "heading", (node: Heading) => {
-    if (result) return;
-
-    const allCode = node.children.every((child) => child.type === "inlineCode");
-    if (allCode) return;
-
-    const parts: string[] = [];
-    for (const child of node.children) {
-      if (child.type === "text") {
-        parts.push(child.value);
-      } else if (child.type === "inlineCode") {
-        parts.push(PLACEHOLDER);
-      }
-    }
-
-    const combined = parts.join("");
-    const titleCased = apStyleTitleCase(combined, { stopwords: AP_STOPWORDS });
-
-    const originalParts = combined.split(PLACEHOLDER);
-    const titleParts = titleCased.split(PLACEHOLDER);
-
-    for (let i = 0; i < originalParts.length; i++) {
-      if (originalParts[i] !== titleParts[i]) {
-        const text = node.children
-          .filter((child): child is Text => child.type === "text")
-          .map((child) => child.value)
-          .join("");
-        result = `Heading "${text.trim()}" should be title case`;
-        return;
-      }
-    }
-  });
-
-  return result;
+  const violations = headingCaseViolations(content);
+  const first = violations[0];
+  if (!first) return null;
+  return `Heading "${first.text}" should be title case: "${first.suggested}"`;
 }
 
 export function checkBoldAsHeading(content: string): string | null {

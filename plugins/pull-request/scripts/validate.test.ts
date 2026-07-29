@@ -8,12 +8,14 @@ import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import {
   extractBacktickedHexCandidates,
   extractBodyFilePath,
+  extractInlineBody,
   findBacktickedCommits,
   hasBacktickedRef,
   hasCiStatusRollCall,
   hasFileTourBullets,
   hasReflexiveScaffold,
   hasRunOnProse,
+  isPrBodyCommand,
   processInput,
   validateBody,
 } from "./validate-body";
@@ -47,10 +49,43 @@ describe("extractBodyFilePath", () => {
     ["gh pr create --title 'Test'", null],
     ["gh pr create --body-file /tmp/body.md", "/tmp/body.md"],
     ["gh pr create --body-file=/tmp/body.md", "/tmp/body.md"],
-    ['gh pr create --body-file "/tmp/my file.md"', '"/tmp/my'],
+    ['gh pr create --body-file "/tmp/my file.md"', "/tmp/my file.md"],
     ["gh pr create --body-file /tmp/body.md --draft", "/tmp/body.md"],
   ])("extractBodyFilePath(%p) -> %p", (command, expected) => {
     expect(extractBodyFilePath(command)).toBe(expected);
+  });
+});
+
+// The prefix matcher these replace missed 503 of 843 real `gh pr create` calls,
+// because the command usually leads with something other than `gh`.
+describe("isPrBodyCommand", () => {
+  test.each<[string, boolean]>([
+    ["gh pr create --body-file body.md", true],
+    ["cd /repo && gh pr create --body-file body.md", true],
+    ["GH_PAGER=cat gh pr create --body-file body.md", true],
+    ["GIT_SSH_COMMAND=false gh pr create --title x", true],
+    ["gh pr edit 12 --body-file body.md", true],
+    ["glab mr create --body-file body.md", true],
+    ["glab mr update 3 --description x", true],
+    ["git status", false],
+    ["gh pr list", false],
+    ["gh pr view 12", false],
+  ])("isPrBodyCommand(%p) -> %p", (command, expected) => {
+    expect(isPrBodyCommand(command)).toBe(expected);
+  });
+});
+
+describe("extractInlineBody", () => {
+  test.each<[string, string | null]>([
+    ['gh pr create --body "## Known Follow-Up\n\nprose"', "## Known Follow-Up\n\nprose"],
+    ["gh pr create --body '## Open Item'", "## Open Item"],
+    ["gh pr create -b '## Open Item'", "## Open Item"],
+    ['gh pr create --body="## Open Item"', "## Open Item"],
+    ['gh pr create --body "a \\"quoted\\" word"', 'a "quoted" word'],
+    ["gh pr create --body-file body.md", null],
+    ["gh pr create --title 'x'", null],
+  ])("extractInlineBody(%p) -> %p", (command, expected) => {
+    expect(extractInlineBody(command)).toBe(expected);
   });
 });
 

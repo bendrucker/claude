@@ -1,5 +1,20 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import { extractHeadings, headingCaseViolations } from "./heading-case";
+
+// This file is a byte-for-byte copy of the pull-request plugin's checker. The
+// duplication is deliberate: plugins are distributed and installed one at a
+// time, so runtime code can only import published npm packages, which rules out
+// both a cross-plugin import and a `workspace:*` package. Read as text rather
+// than imported, so the plugin-boundary checker still passes.
+test("stays identical to the pull-request plugin's copy", async () => {
+  const root = join(import.meta.dirname, "..", "..", "..");
+  const [writing, pullRequest] = await Promise.all([
+    Bun.file(join(root, "plugins", "writing", "hooks", "heading-case.ts")).text(),
+    Bun.file(join(root, "plugins", "pull-request", "scripts", "heading-case.ts")).text(),
+  ]);
+  expect(writing).toBe(pullRequest);
+});
 
 describe("headingCaseViolations", () => {
   test.each<[string, string, { text: string; suggested: string }[]]>([

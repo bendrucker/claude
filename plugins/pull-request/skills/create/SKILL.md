@@ -91,6 +91,7 @@ If `--dry-run` (or `--body-only`) is set, follow [Dry Run](#dry-run) instead of 
 1. Create the PR/MR. Append `--draft` to the create command when `--draft` is set:
    - Write the body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
    - Include the branch name in the filename to avoid conflicts with concurrent agents
+   - Write the body in its own Bash call, then create in a second call that starts with `gh`/`glab`. The body-validation hook matches on that leading verb, so anything in front of it (a `cd`, a chained heredoc that writes the body, an env assignment) skips validation silently. Never `cd` to the directory you are already in
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
 1. Enable auto-merge when `--auto` is set, after the PR/MR exists:

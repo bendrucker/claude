@@ -53,7 +53,7 @@ export function skillGrants(allowedTools: string[]): string[] {
     const match = /^Skill\(([^)]*)\)$/.exec(entry.trim());
     if (!match) return [];
 
-    const [target] = match[1].trim().split(/\s+/);
+    const [target] = (match[1] ?? "").trim().split(/\s+/);
     return target ? [target] : [];
   });
 }

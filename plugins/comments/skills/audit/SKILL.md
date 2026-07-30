@@ -5,9 +5,10 @@ description: >-
   self-praise, docstring-scope, and section-divider banners. Audits a diff (the
   comments a change introduced) or a whole repo, ranks by intrinsic complexity,
   fans out judging agents, and applies the trims to a fresh branch. Use when
-  reviewing a branch or merge request, or sweeping a slop-heavy codebase.
+  asked to audit, trim, or clean up code comments, or as the comment pass of a
+  branch-finishing flow. Not a general code review: skip it when the change
+  added no comments.
 argument-hint: "[--all] [--base <ref>] [--mr <iid>] [--path <glob>] [--sort <key>] [--limit <n>] [--report] [--fix] [--format <template>]"
-disable-model-invocation: true
 allowed-tools:
   - Bash
   - Read
@@ -25,6 +26,9 @@ fact, delete or shorten it), or `rewrite` (it carries a real fact under AI voice
 strip the voice and keep the fact). A comment earns its place when it adds
 information not readily available in the adjacent code. See
 [`judge/prompt.md`](../../judge/prompt.md) for the full model and carve-outs.
+
+Model-invocable so `ship` can run it as its comment pass. The consent gate at
+[Preflight](#preflight) caps the cost of a misfire at one cheap extraction.
 
 The pipeline is three steps: `preflight` (extract, rank, build the job), the
 Workflow tool (judge), and `apply` (write the trims or report them).

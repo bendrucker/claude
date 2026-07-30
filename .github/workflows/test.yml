@@ -82,6 +82,9 @@ jobs:
       - name: Check skill hook path variables
         run: bun scripts/check-skill-hook-vars.ts
 
+      - name: Check skill invocability
+        run: bun scripts/check-skill-invocability.ts
+
       - name: Check embedded markdown code
         run: bun scripts/check-md-code.ts
 

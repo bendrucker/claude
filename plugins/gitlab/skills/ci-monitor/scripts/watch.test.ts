@@ -18,6 +18,7 @@ import {
   parseMrUrl,
   parsePipelineList,
   parseProject,
+  pipelineDurations,
   probeBranch,
   probeMr,
   probePipelineId,
@@ -217,6 +218,119 @@ describe("isNotFoundError", () => {
     ["500 internal server error", false],
   ])("%p is %p", (message, expected) => {
     expect(isNotFoundError(message)).toBe(expected);
+  });
+});
+
+describe("pipelineDurations", () => {
+  // The pipeline list endpoint returns none of `finished_at`, `started_at`, or
+  // `duration`, so the original `select(.finished_at != null)` filter matched
+  // nothing and every watch polled at the no-history rate. The fractional
+  // seconds below guard the trap underneath it: `fromdateiso8601` rejects them,
+  // so restoring the timing fields without moving the date math out of jq would
+  // have swapped a silent empty result for a hard jq failure.
+  test.each<{ name: string; raw: unknown[]; expected: number[] }>([
+    {
+      name: "measures elapsed wall time across fractional-second timestamps",
+      raw: [
+        {
+          status: "success",
+          created_at: "2026-07-30T19:00:00.123Z",
+          updated_at: "2026-07-30T19:02:05.456Z",
+        },
+      ],
+      expected: [125.333],
+    },
+    {
+      name: "keeps failed and canceled pipelines",
+      raw: [
+        {
+          status: "failed",
+          created_at: "2026-07-30T19:00:00Z",
+          updated_at: "2026-07-30T19:01:00Z",
+        },
+        {
+          status: "canceled",
+          created_at: "2026-07-30T19:00:00Z",
+          updated_at: "2026-07-30T19:00:30Z",
+        },
+      ],
+      expected: [60, 30],
+    },
+    {
+      name: "drops skipped and manual pipelines that never ran",
+      raw: [
+        {
+          status: "skipped",
+          created_at: "2026-07-30T19:00:00Z",
+          updated_at: "2026-07-30T19:00:01Z",
+        },
+        {
+          status: "manual",
+          created_at: "2026-07-30T19:00:00Z",
+          updated_at: "2026-07-30T19:00:01Z",
+        },
+      ],
+      expected: [],
+    },
+    {
+      name: "drops still-running pipelines",
+      raw: [
+        {
+          status: "running",
+          created_at: "2026-07-30T19:00:00Z",
+          updated_at: "2026-07-30T19:00:20Z",
+        },
+      ],
+      expected: [],
+    },
+    {
+      name: "drops entries with missing, malformed, or non-positive timing",
+      raw: [
+        { status: "success", created_at: "2026-07-30T19:00:00Z" },
+        { status: "success", created_at: "not a date", updated_at: "2026-07-30T19:01:00Z" },
+        {
+          status: "success",
+          created_at: "2026-07-30T19:01:00Z",
+          updated_at: "2026-07-30T19:01:00Z",
+        },
+        null,
+        "not an object",
+      ],
+      expected: [],
+    },
+  ])("$name", ({ raw, expected }) => {
+    const durations = pipelineDurations(raw);
+    expect(durations).toHaveLength(expected.length);
+    durations.forEach((seconds, index) => {
+      expect(seconds).toBeCloseTo(expected[index] as number, 2);
+    });
+  });
+
+  test("never yields a duration the clamped interval cannot consume", () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            status: fc.constantFrom("success", "failed", "canceled", "skipped", "running"),
+            createdMs: fc.integer({ min: 0, max: 4e12 }),
+            elapsedMs: fc.integer({ min: -5000, max: 3_600_000 }),
+          }),
+        ),
+        (entries) => {
+          const raw = entries.map(({ status, createdMs, elapsedMs }) => ({
+            status,
+            created_at: new Date(createdMs).toISOString(),
+            updated_at: new Date(createdMs + elapsedMs).toISOString(),
+          }));
+          const durations = pipelineDurations(raw);
+          expect(durations.every((seconds) => seconds > 0)).toBe(true);
+          expect(durations.length).toBeLessThanOrEqual(raw.length);
+          const interval = computeInterval(durations);
+          expect(interval).toBeGreaterThanOrEqual(30);
+          expect(interval).toBeLessThanOrEqual(600);
+        },
+      ),
+    );
   });
 });
 

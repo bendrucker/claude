@@ -10,12 +10,20 @@ import {
   type InternalState,
   initialState,
   isNotFoundError,
+  type JobRecord,
+  jobsContradictSuccess,
   normalizePipelineStatus,
+  type PipelineRecord,
   type Probe,
   parseMrUrl,
+  parsePipelineList,
   parseProject,
+  probeBranch,
+  probeMr,
+  probePipelineId,
   registerApiError,
   resolveMergeStatus,
+  selectPipeline,
 } from "./watch";
 
 function makeProbe(overrides: Partial<Probe> = {}): Probe {
@@ -56,7 +64,21 @@ function makeExec(scripted: Array<{ match: string; result: ExecResult }>): {
 }
 
 const ok = (stdout: string): ExecResult => ({ ok: true, stdout });
+const fail = (stderr: string): ExecResult => ({
+  ok: false,
+  stderr,
+  rateLimited: false,
+  retryAfter: "",
+});
 const noopSleep = (): Promise<void> => Promise.resolve();
+
+function makeRecord(overrides: Partial<PipelineRecord> = {}): PipelineRecord {
+  return { id: 1, status: "running", sha: "sha1", source: "push", ...overrides };
+}
+
+function makeJob(overrides: Partial<JobRecord> = {}): JobRecord {
+  return { name: "test", status: "success", allowFailure: false, ...overrides };
+}
 
 describe("parseMrUrl", () => {
   test.each<{
@@ -647,5 +669,365 @@ describe("resolveMergeStatus", () => {
       detailedMergeStatus: "checking",
     });
     expect(remaining()).toEqual([]);
+  });
+});
+
+describe("parsePipelineList", () => {
+  test.each<{ name: string; raw: unknown; expected: PipelineRecord[] | null }>([
+    {
+      name: "returns null for a non-array body",
+      raw: { message: "403 Forbidden" },
+      expected: null,
+    },
+    { name: "returns null for a null body", raw: null, expected: null },
+    { name: "returns an empty list for an empty array", raw: [], expected: [] },
+    {
+      name: "parses numeric and string ids alike",
+      raw: [
+        { id: 10, status: "success", sha: "abc", source: "push" },
+        { id: "11", status: "failed", sha: "def", source: "merge_request_event" },
+      ],
+      expected: [
+        { id: 10, status: "success", sha: "abc", source: "push" },
+        { id: 11, status: "failing", sha: "def", source: "merge_request_event" },
+      ],
+    },
+    {
+      name: "drops entries without a usable id",
+      raw: [{ status: "success" }, { id: null }, { id: "not-a-number" }, { id: "" }, { id: 12 }],
+      expected: [{ id: 12, status: "running", sha: "", source: "" }],
+    },
+    {
+      name: "defaults a missing sha and source to empty strings",
+      raw: [{ id: 13, status: "running" }],
+      expected: [{ id: 13, status: "running", sha: "", source: "" }],
+    },
+  ])("$name", ({ raw, expected }) => {
+    expect(parsePipelineList(raw)).toEqual(expected);
+  });
+});
+
+describe("selectPipeline", () => {
+  test.each<{
+    name: string;
+    records: PipelineRecord[];
+    prefer: "merge-request" | "branch";
+    expectedId: number | null;
+  }>([
+    {
+      name: "ignores a newer external success in favour of the MR pipeline",
+      records: [
+        makeRecord({ id: 200, status: "success", source: "external" }),
+        makeRecord({ id: 199, status: "failing", source: "merge_request_event" }),
+      ],
+      prefer: "merge-request",
+      expectedId: 199,
+    },
+    {
+      name: "prefers a running MR pipeline over a newer skipped push pipeline",
+      records: [
+        makeRecord({ id: 300, status: "success", source: "push" }),
+        makeRecord({ id: 299, status: "running", source: "merge_request_event" }),
+      ],
+      prefer: "merge-request",
+      expectedId: 299,
+    },
+    {
+      name: "prefers the push pipeline in branch mode when both kinds are present",
+      records: [
+        makeRecord({ id: 300, status: "success", source: "push" }),
+        makeRecord({ id: 299, status: "running", source: "merge_request_event" }),
+      ],
+      prefer: "branch",
+      expectedId: 300,
+    },
+    {
+      name: "ignores parent_pipeline children whose status the parent aggregates",
+      records: [
+        makeRecord({ id: 400, status: "success", source: "parent_pipeline" }),
+        makeRecord({ id: 398, status: "failing", source: "merge_request_event" }),
+      ],
+      prefer: "merge-request",
+      expectedId: 398,
+    },
+    {
+      name: "returns null when every candidate has an excluded source",
+      records: [
+        makeRecord({ id: 500, source: "external" }),
+        makeRecord({ id: 501, source: "parent_pipeline" }),
+      ],
+      prefer: "merge-request",
+      expectedId: null,
+    },
+    { name: "returns null for an empty list", records: [], prefer: "branch", expectedId: null },
+    {
+      name: "falls back to branch pipelines in MR mode when the project runs none",
+      records: [makeRecord({ id: 600, source: "push" }), makeRecord({ id: 601, source: "web" })],
+      prefer: "merge-request",
+      expectedId: 601,
+    },
+    {
+      name: "falls back to MR pipelines in branch mode when the project runs none",
+      records: [
+        makeRecord({ id: 700, source: "merge_request_event" }),
+        makeRecord({ id: 701, source: "merge_request_event" }),
+      ],
+      prefer: "branch",
+      expectedId: 701,
+    },
+    {
+      name: "orders single-digit against double-digit ids numerically",
+      records: [makeRecord({ id: 9, source: "push" }), makeRecord({ id: 10, source: "push" })],
+      prefer: "branch",
+      expectedId: 10,
+    },
+    {
+      name: "orders realistic ten-digit ids numerically",
+      records: [
+        makeRecord({ id: 2712763426, source: "push" }),
+        makeRecord({ id: 2712702628, source: "push" }),
+      ],
+      prefer: "branch",
+      expectedId: 2712763426,
+    },
+  ])("$name", ({ records, prefer, expectedId }) => {
+    expect(selectPipeline(records, prefer)?.id ?? null).toBe(expectedId);
+  });
+
+  const pipelineRecord = fc.record<PipelineRecord>({
+    id: fc.integer({ min: 1, max: 3_000_000_000 }),
+    status: fc.constantFrom<InternalState>("running", "queued", "failing", "success"),
+    sha: fc.string(),
+    source: fc.constantFrom(
+      "push",
+      "merge_request_event",
+      "external",
+      "parent_pipeline",
+      "web",
+      "schedule",
+    ),
+  });
+
+  test("picks an input record that is eligible and highest-id within its partition", () => {
+    fc.assert(
+      fc.property(
+        fc.array(pipelineRecord),
+        fc.constantFrom<"merge-request" | "branch">("merge-request", "branch"),
+        (records, prefer) => {
+          const selected = selectPipeline(records, prefer);
+          const eligible = records.filter(
+            (record) => record.source !== "external" && record.source !== "parent_pipeline",
+          );
+          if (eligible.length === 0) {
+            expect(selected).toBeNull();
+            return;
+          }
+          expect(selected).not.toBeNull();
+          if (!selected) return;
+          expect(records).toContain(selected);
+          const isMergeRequest = (record: PipelineRecord) =>
+            record.source === "merge_request_event";
+          const preferred = eligible.filter((record) =>
+            prefer === "merge-request" ? isMergeRequest(record) : !isMergeRequest(record),
+          );
+          if (preferred.length > 0) {
+            expect(preferred).toContain(selected);
+          }
+          const partition = eligible.filter(
+            (record) => isMergeRequest(record) === isMergeRequest(selected),
+          );
+          expect(selected.id).toBe(Math.max(...partition.map((record) => record.id)));
+        },
+      ),
+    );
+  });
+});
+
+describe("jobsContradictSuccess", () => {
+  test.each<{ name: string; jobs: JobRecord[]; contradicting: string[] }>([
+    {
+      name: "a failed required job contradicts the pipeline's success",
+      jobs: [makeJob(), makeJob({ name: "rspec", status: "failed" })],
+      contradicting: ["rspec"],
+    },
+    {
+      name: "a failed allow_failure job does not contradict",
+      jobs: [makeJob({ name: "flaky", status: "failed", allowFailure: true })],
+      contradicting: [],
+    },
+    {
+      name: "success, manual, and skipped jobs do not contradict",
+      jobs: [
+        makeJob({ name: "build" }),
+        makeJob({ name: "deploy", status: "manual" }),
+        makeJob({ name: "docs", status: "skipped" }),
+      ],
+      contradicting: [],
+    },
+    {
+      name: "an empty job list does not contradict (bridge jobs are absent from the jobs endpoint)",
+      jobs: [],
+      contradicting: [],
+    },
+    {
+      name: "a canceled job does not contradict (cancellation already turns the pipeline canceled)",
+      jobs: [makeJob({ name: "lint", status: "canceled" })],
+      contradicting: [],
+    },
+  ])("$name", ({ jobs, contradicting }) => {
+    expect(jobsContradictSuccess(jobs).map((job) => job.name)).toEqual(contradicting);
+  });
+});
+
+describe("probe pipeline selection", () => {
+  const mrJson = JSON.stringify({
+    sha: "head-sha",
+    source_branch: "feature",
+    merge_status: "can_be_merged",
+    detailed_merge_status: "mergeable",
+    state: "opened",
+  });
+
+  const pipelinesJson = (records: Array<Record<string, unknown>>): string =>
+    JSON.stringify(records);
+
+  // Regression: an `external` pipeline is a commit status posted by another tool.
+  // It is created green and carries no jobs, and because it is created last it
+  // wins any newest-first selection. Resolving the MR's pipeline by that ordering
+  // reported success while the real CI run was red, so the watcher exited green
+  // on a failing MR.
+  it("reports failing when an external success outranks the real MR pipeline", () => {
+    const { exec } = makeExec([
+      { match: "merge_requests/7", result: ok(mrJson) },
+      {
+        match: "merge_requests/7/pipelines",
+        result: ok(
+          pipelinesJson([
+            { id: 902, status: "success", sha: "head-sha", source: "external" },
+            { id: 901, status: "failed", sha: "merge-sha", source: "merge_request_event" },
+          ]),
+        ),
+      },
+    ]);
+    const probed = probeMr("group%2Fproject", 7, exec);
+    expect(probed.ok).toBe(true);
+    if (!probed.ok) return;
+    expect(probed.probe.state).toBe("failing");
+    expect(probed.probe.runId).toBe("901");
+    expect(probed.probe.sha).toBe("head-sha");
+  });
+
+  it("downgrades a claimed success when a required job failed", () => {
+    const { exec } = makeExec([
+      { match: "merge_requests/7", result: ok(mrJson) },
+      {
+        match: "merge_requests/7/pipelines",
+        result: ok(
+          pipelinesJson([{ id: 901, status: "success", sha: "s", source: "merge_request_event" }]),
+        ),
+      },
+      {
+        match: "pipelines/901/jobs",
+        result: ok(
+          JSON.stringify([
+            { name: "build", status: "success", allow_failure: false },
+            { name: "rspec", status: "failed", allow_failure: false },
+          ]),
+        ),
+      },
+    ]);
+    const probed = probeMr("group%2Fproject", 7, exec);
+    expect(probed.ok).toBe(true);
+    if (!probed.ok) return;
+    expect(probed.probe.state).toBe("failing");
+    expect(probed.probe.runId).toBe("901");
+  });
+
+  it("confirms a success against the jobs endpoint with exactly one extra call", () => {
+    const { exec, remaining } = makeExec([
+      { match: "merge_requests/7", result: ok(mrJson) },
+      {
+        match: "merge_requests/7/pipelines",
+        result: ok(
+          pipelinesJson([{ id: 901, status: "success", sha: "s", source: "merge_request_event" }]),
+        ),
+      },
+      {
+        match: "pipelines/901/jobs",
+        result: ok(JSON.stringify([{ name: "build", status: "success", allow_failure: false }])),
+      },
+    ]);
+    const probed = probeMr("group%2Fproject", 7, exec);
+    expect(probed.ok).toBe(true);
+    if (!probed.ok) return;
+    expect(probed.probe.state).toBe("success");
+    expect(remaining()).toEqual([]);
+  });
+
+  it("fails the probe rather than emitting a success it could not confirm", () => {
+    const { exec } = makeExec([
+      { match: "merge_requests/7", result: ok(mrJson) },
+      {
+        match: "merge_requests/7/pipelines",
+        result: ok(
+          pipelinesJson([{ id: 901, status: "success", sha: "s", source: "merge_request_event" }]),
+        ),
+      },
+      { match: "pipelines/901/jobs", result: fail("HTTP 500") },
+    ]);
+    expect(probeMr("group%2Fproject", 7, exec).ok).toBe(false);
+  });
+
+  it("keeps polling when every pipeline on the page is excluded", () => {
+    const { exec } = makeExec([
+      { match: "merge_requests/7", result: ok(mrJson) },
+      {
+        match: "merge_requests/7/pipelines",
+        result: ok(pipelinesJson([{ id: 902, status: "success", sha: "s", source: "external" }])),
+      },
+    ]);
+    const probed = probeMr("group%2Fproject", 7, exec);
+    expect(probed.ok).toBe(true);
+    if (!probed.ok) return;
+    expect(probed.probe.runId).toBeNull();
+    expect(probed.probe.state).toBe("running");
+  });
+
+  it("applies the job gate in pipeline-id mode as well", () => {
+    const { exec, remaining } = makeExec([
+      {
+        match: "pipelines/901'",
+        result: ok(JSON.stringify({ id: 901, status: "success", sha: "s" })),
+      },
+      {
+        match: "pipelines/901/jobs",
+        result: ok(JSON.stringify([{ name: "rspec", status: "failed", allow_failure: false }])),
+      },
+    ]);
+    const probed = probePipelineId("group%2Fproject", "901", exec);
+    expect(probed.ok).toBe(true);
+    if (!probed.ok) return;
+    expect(probed.probe.state).toBe("failing");
+    expect(remaining()).toEqual([]);
+  });
+
+  it("ignores an external success in branch mode too", () => {
+    const { exec } = makeExec([
+      {
+        match: "pipelines?ref=main",
+        result: ok(
+          pipelinesJson([
+            { id: 902, status: "success", sha: "a", source: "external" },
+            { id: 901, status: "failed", sha: "b", source: "push" },
+          ]),
+        ),
+      },
+    ]);
+    const probed = probeBranch("group%2Fproject", "main", exec);
+    expect(probed.ok).toBe(true);
+    if (!probed.ok) return;
+    expect(probed.probe.state).toBe("failing");
+    expect(probed.probe.runId).toBe("901");
+    expect(probed.probe.sha).toBe("b");
   });
 });

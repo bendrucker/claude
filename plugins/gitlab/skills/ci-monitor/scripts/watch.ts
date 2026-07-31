@@ -258,6 +258,109 @@ export function normalizePipelineStatus(status: string): InternalState {
   }
 }
 
+export type PipelineRecord = {
+  id: number;
+  status: InternalState;
+  sha: string;
+  source: string;
+};
+
+// `external` pipelines are commit-status reports posted by other tools: they
+// carry no CI jobs and go green the moment they are created. `parent_pipeline`
+// pipelines are children whose status the parent already aggregates, so a green
+// child says nothing about the run as a whole. Either one can outrank the real
+// pipeline by id and produce a false green.
+const EXCLUDED_PIPELINE_SOURCES = ["external", "parent_pipeline"];
+
+export function parsePipelineList(raw: unknown): PipelineRecord[] | null {
+  if (!Array.isArray(raw)) return null;
+  const records: PipelineRecord[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const fields = entry as Record<string, unknown>;
+    const rawId = fields.id;
+    if (typeof rawId !== "number" && typeof rawId !== "string") continue;
+    const id = Number(rawId);
+    // `Number("")` is 0, so an empty id would otherwise become a `run_id` of
+    // "0" and get handed to the logs agent as if it were a real pipeline.
+    if (!Number.isFinite(id) || id <= 0) continue;
+    records.push({
+      id,
+      status: normalizePipelineStatus(typeof fields.status === "string" ? fields.status : ""),
+      sha: typeof fields.sha === "string" ? fields.sha : "",
+      source: typeof fields.source === "string" ? fields.source : "",
+    });
+  }
+  return records;
+}
+
+// Both pipeline list endpoints mix pipeline kinds: the MR endpoint returns the
+// source branch's push pipelines alongside the MR's own, and the branch-ref
+// endpoint returns merge-request pipelines whose stored ref is that branch,
+// including ones belonging to other MRs. Preferring the caller's own kind, and
+// falling back to the other only when the preferred kind is absent, keeps
+// projects that run just one kind working.
+export function selectPipeline(
+  records: PipelineRecord[],
+  prefer: "merge-request" | "branch",
+): PipelineRecord | null {
+  const eligible = records.filter((record) => !EXCLUDED_PIPELINE_SOURCES.includes(record.source));
+  const mergeRequestPipelines = eligible.filter(
+    (record) => record.source === "merge_request_event",
+  );
+  const branchPipelines = eligible.filter((record) => record.source !== "merge_request_event");
+  const [preferred, fallback] =
+    prefer === "merge-request"
+      ? [mergeRequestPipelines, branchPipelines]
+      : [branchPipelines, mergeRequestPipelines];
+  const partition = preferred.length > 0 ? preferred : fallback;
+  return partition.reduce<PipelineRecord | null>(
+    (best, record) => (best === null || record.id > best.id ? record : best),
+    null,
+  );
+}
+
+export type JobRecord = { name: string; status: string; allowFailure: boolean };
+
+// Job data can only ever downgrade a claimed success, never confirm one: the
+// jobs endpoint omits bridge (trigger) jobs, so a pipeline whose work lives in
+// child pipelines legitimately reports zero jobs, as does a `skipped` pipeline.
+// A `canceled` job is left out on purpose, since cancellation already turns the
+// pipeline `canceled` and widening the rule risks rejecting healthy greens.
+export function jobsContradictSuccess(jobs: JobRecord[]): JobRecord[] {
+  return jobs.filter((job) => job.status === "failed" && !job.allowFailure);
+}
+
+// Statuses whose elapsed time reflects CI work actually running. `skipped` and
+// `manual` pipelines finish in about a second without doing anything, so
+// averaging them in would collapse the interval toward the floor.
+const TIMED_PIPELINE_STATUSES = new Set(["success", "failed", "canceled"]);
+
+// The pipeline list endpoint carries no `finished_at`, `started_at`, or
+// `duration`, so elapsed time has to come from `updated_at - created_at`. On a
+// finished pipeline the two agree to within about three seconds, and `duration`
+// would be wrong here regardless: it excludes queue time, which a poller waits
+// through. Dates are parsed here rather than in jq because `fromdateiso8601`
+// rejects the fractional seconds GitLab sends.
+export function pipelineDurations(raw: unknown[]): number[] {
+  const durations: number[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const status = record.status;
+    const createdAt = record.created_at;
+    const updatedAt = record.updated_at;
+    if (typeof status !== "string" || !TIMED_PIPELINE_STATUSES.has(status)) continue;
+    if (typeof createdAt !== "string" || typeof updatedAt !== "string") continue;
+    const started = Date.parse(createdAt);
+    const ended = Date.parse(updatedAt);
+    if (Number.isNaN(started) || Number.isNaN(ended)) continue;
+    const seconds = (ended - started) / 1000;
+    if (seconds > 0) durations.push(seconds);
+  }
+  return durations;
+}
+
 export function computeInterval(durationsSeconds: number[]): number {
   if (durationsSeconds.length === 0) return NO_HISTORY_INTERVAL_SECONDS;
   const avg = durationsSeconds.reduce((a, b) => a + b, 0) / durationsSeconds.length;
@@ -388,12 +491,6 @@ export async function resolveMergeStatus(
   return current;
 }
 
-type PipelineSummary = { id: string; status: InternalState; sha: string } | null;
-
-type PipelineResult =
-  | { ok: true; pipeline: PipelineSummary }
-  | { ok: false; rateLimited: boolean; retryAfter: string };
-
 function parsePipeline(
   parsed: Record<string, unknown>,
 ): { id: string; status: InternalState; sha: string } | null {
@@ -405,56 +502,170 @@ function parsePipeline(
   return { id, status: normalizePipelineStatus(status), sha };
 }
 
-function fetchPipeline(projectEncoded: string, branch: string): PipelineResult {
-  const filter = "[.[] | {id, status, sha}] | .[0] // null";
-  const result = exec(
-    `glab api 'projects/${projectEncoded}/pipelines?ref=${encodeURIComponent(branch)}&per_page=1' | jq -c '${filter}'`,
+export type PipelineTarget = { kind: "mr"; iid: number } | { kind: "branch"; branch: string };
+
+function pipelineListPath(projectEncoded: string, target: PipelineTarget, perPage: number): string {
+  return target.kind === "mr"
+    ? `projects/${projectEncoded}/merge_requests/${target.iid}/pipelines?per_page=${perPage}`
+    : `projects/${projectEncoded}/pipelines?ref=${encodeURIComponent(target.branch)}&per_page=${perPage}`;
+}
+
+function describeTarget(target: PipelineTarget): string {
+  return target.kind === "mr" ? `MR !${target.iid}` : `branch ${target.branch}`;
+}
+
+type PipelineListResult =
+  | { ok: true; records: PipelineRecord[] }
+  | { ok: false; rateLimited: boolean; retryAfter: string };
+
+function fetchPipelineList(
+  projectEncoded: string,
+  target: PipelineTarget,
+  run: ExecFn = exec,
+): PipelineListResult {
+  const filter = "[.[] | {id, status, sha, source}]";
+  const result = run(
+    `glab api '${pipelineListPath(projectEncoded, target, 20)}' | jq -c '${filter}'`,
   );
   if (!result.ok) {
     return { ok: false, rateLimited: result.rateLimited, retryAfter: result.retryAfter };
   }
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(result.stdout || "null") as Record<string, unknown> | null;
-    return { ok: true, pipeline: parsed ? parsePipeline(parsed) : null };
+    parsed = JSON.parse(result.stdout || "null");
   } catch (err) {
     console.error(
-      `glab api returned unparseable JSON for pipelines on ${branch}: ${err instanceof Error ? err.message : String(err)}`,
+      `glab api returned unparseable JSON for pipelines on ${describeTarget(target)}: ${err instanceof Error ? err.message : String(err)}`,
     );
     return { ok: false, rateLimited: false, retryAfter: "" };
   }
+  const records = parsePipelineList(parsed);
+  if (!records) {
+    console.error(
+      `glab api returned non-array JSON for pipelines on ${describeTarget(target)}; treating as probe failure`,
+    );
+    return { ok: false, rateLimited: false, retryAfter: "" };
+  }
+  return { ok: true, records };
 }
 
-type Probed =
-  | { ok: true; probe: Probe; sourceBranch: string }
+type JobsResult = { ok: true; jobs: JobRecord[] } | { ok: false };
+
+function fetchJobs(projectEncoded: string, pipelineId: string, run: ExecFn = exec): JobsResult {
+  const filter = "[.[] | {name, status, allow_failure}]";
+  const result = run(
+    `glab api 'projects/${projectEncoded}/pipelines/${encodeURIComponent(pipelineId)}/jobs?per_page=100' | jq -c '${filter}'`,
+  );
+  if (!result.ok) {
+    console.error(
+      `glab api failed while confirming success for pipeline ${pipelineId}: ${result.stderr.trim()}`,
+    );
+    return { ok: false };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.stdout || "null");
+  } catch (err) {
+    console.error(
+      `glab api returned unparseable JSON for jobs on pipeline ${pipelineId}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return { ok: false };
+  }
+  if (!Array.isArray(parsed)) {
+    console.error(`glab api returned non-array JSON for jobs on pipeline ${pipelineId}`);
+    return { ok: false };
+  }
+  const jobs: JobRecord[] = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object") continue;
+    const fields = entry as Record<string, unknown>;
+    jobs.push({
+      name: typeof fields.name === "string" ? fields.name : "",
+      status: typeof fields.status === "string" ? fields.status : "",
+      allowFailure: fields.allow_failure === true,
+    });
+  }
+  return { ok: true, jobs };
+}
+
+type VerifiedState = { ok: true; state: InternalState } | { ok: false };
+
+// Confirm a claimed success against the pipeline's jobs before letting it end
+// the watch. Only a claimed success pays for the extra call, so a watch that
+// ends green spends exactly one. An unreadable jobs response fails closed: the
+// caller turns it into a probe failure and re-polls rather than emitting an
+// unverified green.
+function verifyState(
+  projectEncoded: string,
+  pipeline: { id: string; status: InternalState },
+  run: ExecFn = exec,
+): VerifiedState {
+  if (pipeline.status !== "success") {
+    return { ok: true, state: pipeline.status };
+  }
+  const jobs = fetchJobs(projectEncoded, pipeline.id, run);
+  if (!jobs.ok) {
+    return { ok: false };
+  }
+  const contradicting = jobsContradictSuccess(jobs.jobs);
+  if (contradicting.length > 0) {
+    console.error(
+      `pipeline ${pipeline.id} reports success but required jobs failed: ${contradicting.map((job) => job.name).join(", ")}`,
+    );
+    return { ok: true, state: "failing" };
+  }
+  return { ok: true, state: "success" };
+}
+
+type Probed = { ok: true; probe: Probe } | { ok: false; rateLimited: boolean; retryAfter: string };
+
+type SelectedPipeline =
+  | { ok: true; runId: string | null; state: InternalState; sha: string }
   | { ok: false; rateLimited: boolean; retryAfter: string };
 
-function probeMr(projectEncoded: string, iid: number, cachedBranch: string | null): Probed {
-  const mr = fetchMrMetadata(projectEncoded, iid);
+function resolvePipeline(
+  projectEncoded: string,
+  target: PipelineTarget,
+  prefer: "merge-request" | "branch",
+  run: ExecFn,
+): SelectedPipeline {
+  const pipelines = fetchPipelineList(projectEncoded, target, run);
+  if (!pipelines.ok) {
+    return { ok: false, rateLimited: pipelines.rateLimited, retryAfter: pipelines.retryAfter };
+  }
+  const selected = selectPipeline(pipelines.records, prefer);
+  // No eligible pipeline leaves the state `running`, so a page of nothing but
+  // excluded sources degrades to "keep polling" instead of to a green.
+  if (!selected) {
+    return { ok: true, runId: null, state: "running", sha: "" };
+  }
+  const id = String(selected.id);
+  const verified = verifyState(projectEncoded, { id, status: selected.status }, run);
+  if (!verified.ok) {
+    return { ok: false, rateLimited: false, retryAfter: "" };
+  }
+  return { ok: true, runId: id, state: verified.state, sha: selected.sha };
+}
+
+export function probeMr(projectEncoded: string, iid: number, run: ExecFn = exec): Probed {
+  const mr = fetchMrMetadata(projectEncoded, iid, run);
   if (!mr.ok) {
     return { ok: false, rateLimited: mr.rateLimited, retryAfter: mr.retryAfter };
   }
-  const branch = mr.metadata.sourceBranch || cachedBranch || "";
 
-  let runId: string | null = null;
-  let pipelineState: InternalState = "running";
-  if (branch) {
-    const pipeline = fetchPipeline(projectEncoded, branch);
-    if (!pipeline.ok) {
-      return { ok: false, rateLimited: pipeline.rateLimited, retryAfter: pipeline.retryAfter };
-    }
-    if (pipeline.pipeline) {
-      runId = pipeline.pipeline.id;
-      pipelineState = pipeline.pipeline.status;
-    }
+  const pipeline = resolvePipeline(projectEncoded, { kind: "mr", iid }, "merge-request", run);
+  if (!pipeline.ok) {
+    return { ok: false, rateLimited: pipeline.rateLimited, retryAfter: pipeline.retryAfter };
   }
 
   return {
     ok: true,
-    sourceBranch: branch,
     probe: {
+      // The MR head sha, not the pipeline sha: a merged-results pipeline reports
+      // the ephemeral merge commit, and this sha keys event dedup.
       sha: mr.metadata.sha,
-      state: pipelineState,
-      runId,
+      state: pipeline.state,
+      runId: pipeline.runId,
       hasConflicts: mr.metadata.hasConflicts,
       mergeStatus: mr.metadata.mergeStatus,
       detailedMergeStatus: mr.metadata.detailedMergeStatus,
@@ -467,9 +678,13 @@ type PipelineByIdResult =
   | { ok: true; pipeline: { id: string; status: InternalState; sha: string } }
   | { ok: false; rateLimited: boolean; retryAfter: string; notFound: boolean };
 
-function fetchPipelineById(projectEncoded: string, pipelineId: string): PipelineByIdResult {
+function fetchPipelineById(
+  projectEncoded: string,
+  pipelineId: string,
+  run: ExecFn = exec,
+): PipelineByIdResult {
   const filter = "{id, status, sha}";
-  const result = exec(
+  const result = run(
     `glab api 'projects/${projectEncoded}/pipelines/${encodeURIComponent(pipelineId)}' | jq -c '${filter}'`,
   );
   if (!result.ok) {
@@ -505,8 +720,12 @@ type ProbedById =
   | { ok: true; probe: Probe }
   | { ok: false; rateLimited: boolean; retryAfter: string; notFound: boolean };
 
-function probePipelineId(projectEncoded: string, pipelineId: string): ProbedById {
-  const pipeline = fetchPipelineById(projectEncoded, pipelineId);
+export function probePipelineId(
+  projectEncoded: string,
+  pipelineId: string,
+  run: ExecFn = exec,
+): ProbedById {
+  const pipeline = fetchPipelineById(projectEncoded, pipelineId, run);
   if (!pipeline.ok) {
     return {
       ok: false,
@@ -515,11 +734,15 @@ function probePipelineId(projectEncoded: string, pipelineId: string): ProbedById
       notFound: pipeline.notFound,
     };
   }
+  const verified = verifyState(projectEncoded, pipeline.pipeline, run);
+  if (!verified.ok) {
+    return { ok: false, rateLimited: false, retryAfter: "", notFound: false };
+  }
   return {
     ok: true,
     probe: {
       sha: pipeline.pipeline.sha,
-      state: pipeline.pipeline.status,
+      state: verified.state,
       runId: pipeline.pipeline.id,
       hasConflicts: false,
       mergeStatus: "",
@@ -529,19 +752,17 @@ function probePipelineId(projectEncoded: string, pipelineId: string): ProbedById
   };
 }
 
-function probeBranch(projectEncoded: string, branch: string): Probed {
-  const pipeline = fetchPipeline(projectEncoded, branch);
+export function probeBranch(projectEncoded: string, branch: string, run: ExecFn = exec): Probed {
+  const pipeline = resolvePipeline(projectEncoded, { kind: "branch", branch }, "branch", run);
   if (!pipeline.ok) {
     return { ok: false, rateLimited: pipeline.rateLimited, retryAfter: pipeline.retryAfter };
   }
-  const p = pipeline.pipeline;
   return {
     ok: true,
-    sourceBranch: branch,
     probe: {
-      sha: p?.sha ?? "",
-      state: p?.status ?? "running",
-      runId: p?.id ?? null,
+      sha: pipeline.sha,
+      state: pipeline.state,
+      runId: pipeline.runId,
       hasConflicts: false,
       mergeStatus: "",
       detailedMergeStatus: "",
@@ -550,30 +771,30 @@ function probeBranch(projectEncoded: string, branch: string): Probed {
   };
 }
 
-function fetchInterval(projectEncoded: string, branch: string): number {
+function fetchInterval(projectEncoded: string, target: PipelineTarget): number {
   const filter =
-    "[.[] | select(.finished_at != null) | ((.finished_at | fromdateiso8601) - (.started_at // .created_at | fromdateiso8601))]";
+    '[.[] | select(.source != "external" and .source != "parent_pipeline") | {status, created_at, updated_at}]';
+  const label = describeTarget(target);
   const result = exec(
-    `glab api 'projects/${projectEncoded}/pipelines?ref=${encodeURIComponent(branch)}&per_page=5' | jq -c '${filter}'`,
+    `glab api '${pipelineListPath(projectEncoded, target, 20)}' | jq -c '${filter}'`,
   );
   if (!result.ok) {
     console.error(
-      `glab api failed while computing poll interval for ${branch}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${result.stderr.trim()}`,
+      `glab api failed while computing poll interval for ${label}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${result.stderr.trim()}`,
     );
     return DEFAULT_INTERVAL_SECONDS;
   }
   try {
     const parsed = JSON.parse(result.stdout || "[]");
     if (Array.isArray(parsed)) {
-      const numbers = parsed.filter((n): n is number => typeof n === "number" && n > 0);
-      return computeInterval(numbers);
+      return computeInterval(pipelineDurations(parsed));
     }
     console.error(
-      `glab api returned non-array JSON while computing poll interval for ${branch}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s`,
+      `glab api returned non-array JSON while computing poll interval for ${label}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s`,
     );
   } catch (err) {
     console.error(
-      `glab api returned unparseable JSON while computing poll interval for ${branch}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${err instanceof Error ? err.message : String(err)}`,
+      `glab api returned unparseable JSON while computing poll interval for ${label}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
   return DEFAULT_INTERVAL_SECONDS;
@@ -603,7 +824,7 @@ type RunOptions = {
 };
 
 type ProbeOutcome =
-  | { ok: true; probe: Probe; sourceBranch: string | null }
+  | { ok: true; probe: Probe }
   | { ok: false; rateLimited: boolean; retryAfter: string; notFound: boolean };
 
 function isTerminal(events: Event[], mode: RunTarget["mode"]): boolean {
@@ -628,20 +849,20 @@ async function run(options: RunOptions): Promise<void> {
     projectEncoded = encodeURIComponent(target.project);
   }
 
-  const doProbe = (cachedBranch: string | null): ProbeOutcome => {
+  const doProbe = (): ProbeOutcome => {
     if (target.mode === "mr" && iid !== null) {
-      const r = probeMr(projectEncoded, iid, cachedBranch);
+      const r = probeMr(projectEncoded, iid);
       if (!r.ok) {
         return { ok: false, rateLimited: r.rateLimited, retryAfter: r.retryAfter, notFound: false };
       }
-      return { ok: true, probe: r.probe, sourceBranch: r.sourceBranch };
+      return { ok: true, probe: r.probe };
     }
     if (target.mode === "branch") {
       const r = probeBranch(projectEncoded, target.branch);
       if (!r.ok) {
         return { ok: false, rateLimited: r.rateLimited, retryAfter: r.retryAfter, notFound: false };
       }
-      return { ok: true, probe: r.probe, sourceBranch: r.sourceBranch };
+      return { ok: true, probe: r.probe };
     }
     if (target.mode === "pipeline-id") {
       const r = probePipelineId(projectEncoded, target.pipelineId);
@@ -653,13 +874,19 @@ async function run(options: RunOptions): Promise<void> {
           notFound: r.notFound,
         };
       }
-      return { ok: true, probe: r.probe, sourceBranch: null };
+      return { ok: true, probe: r.probe };
     }
     throw new Error("Invalid watcher target state");
   };
 
+  const intervalTarget: PipelineTarget | null =
+    target.mode === "mr" && iid !== null
+      ? { kind: "mr", iid }
+      : target.mode === "branch"
+        ? { kind: "branch", branch: target.branch }
+        : null;
+
   let state = initialState();
-  let branch: string | null = null;
   let intervalSeconds: number | null = options.intervalSeconds;
   const deadline = Date.now() + options.maxMinutes * 60 * 1000;
 
@@ -670,7 +897,7 @@ async function run(options: RunOptions): Promise<void> {
       return;
     }
 
-    const result = doProbe(branch);
+    const result = doProbe();
     if (!result.ok) {
       if (target.mode === "pipeline-id" && result.notFound) {
         console.error(`Pipeline ${target.pipelineId} not found in project ${target.project}`);
@@ -684,7 +911,6 @@ async function run(options: RunOptions): Promise<void> {
       for (const event of errOutcome.events) emit(event);
     } else {
       state = clearApiErrors(state);
-      if (result.sourceBranch) branch = result.sourceBranch;
       // Settle merge status before deriving events so `conflicts` lands in the
       // same cycle as a stale `success`, ahead of the terminal return below.
       let probe = result.probe;
@@ -702,10 +928,9 @@ async function run(options: RunOptions): Promise<void> {
       for (const event of outcome.events) emit(event);
       if (isTerminal(outcome.events, target.mode)) return;
 
-      intervalSeconds ??=
-        target.mode === "pipeline-id" || !branch
-          ? DEFAULT_INTERVAL_SECONDS
-          : fetchInterval(projectEncoded, branch);
+      intervalSeconds ??= intervalTarget
+        ? fetchInterval(projectEncoded, intervalTarget)
+        : DEFAULT_INTERVAL_SECONDS;
     }
 
     await sleep((intervalSeconds ?? DEFAULT_INTERVAL_SECONDS) * 1000);

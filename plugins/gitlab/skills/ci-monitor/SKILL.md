@@ -43,13 +43,15 @@ Launch the watch script via the `Monitor` tool with `persistent: true`:
 
 Exactly one of `--mr`, `--branch`, or `--pipeline-id` is required. In branch and pipeline-id modes, `--project` is inferred from the current git remote when omitted. Pipeline-id mode queries `glab api projects/:id/pipelines/:pid` directly; if the pipeline does not exist the watcher exits non-zero on the first call.
 
+MR mode resolves the pipeline from `projects/:id/merge_requests/:iid/pipelines` and branch mode from `projects/:id/pipelines?ref=<branch>`. Both ignore `external` pipelines (commit statuses posted by other tools, which carry no CI jobs) and `parent_pipeline` pipelines (children the parent already aggregates), and each prefers its own kind: `merge_request_event` in MR mode, branch pipelines in branch mode.
+
 The script emits one JSON object per line on stdout. When the first probe is already green, it emits a single `status: success` event and exits, so there is no separate initial-green path. In pipeline-id mode it also exits after emitting `status: failing`, because a specific pipeline has a finite lifetime and will not restart on its own.
 
 #### Event schema
 
 Each line is one of:
 
-- `{"type":"status","state":"running|failing|success","sha":"...","run_id":"..."}`: `run_id` is the GitLab pipeline ID.
+- `{"type":"status","state":"running|failing|success","sha":"...","run_id":"..."}`: `run_id` is the GitLab pipeline ID. A `success` is confirmed against the pipeline's jobs before it is emitted, so a pipeline reporting `success` while a required job failed is reported as `failing`.
 - `{"type":"conflicts","sha":"..."}`: MR reports merge conflicts against the target branch. MR mode only.
 - `{"type":"mergeable-unknown","sha":"..."}`: GitLab could not settle merge status after bounded re-polling. MR mode only.
 - `{"type":"queued-timeout","minutes":N}`: pipeline has been queued longer than the threshold.
@@ -61,7 +63,7 @@ Each line is one of:
 
 In branch and pipeline-id modes, `conflicts`, `mergeable-unknown`, `pr-closed`, and `merged` are never emitted (there is no MR metadata to derive them from). `merged` and `pr-closed` are distinct terminal events: `merged` means the MR landed, `pr-closed` means it closed without merging.
 
-The script exits on `status: success` in every mode. In pipeline-id mode it also exits on `status: failing` (the pipeline is terminal).
+The script exits on `status: success` in every mode, but only once that success survives the job-level confirmation above. A pipeline whose jobs cannot be read keeps the watcher polling rather than exiting green, surfacing as `api-error` if it persists. In pipeline-id mode it also exits on `status: failing` (the pipeline is terminal).
 
 #### React to events
 

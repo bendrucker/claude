@@ -25,6 +25,13 @@ repos:
         files: ^plugins/[^/]+/skills/
         entry: scripts/prek-check.sh skill-lint
 
+      - id: skill-invocability
+        name: Skill invocability
+        language: system
+        files: ^(plugins/[^/]+/skills/|user/skills/|\.claude/skills/)
+        pass_filenames: false
+        entry: bun scripts/check-skill-invocability.ts
+
       - id: hook-test
         name: Hook tests
         language: system

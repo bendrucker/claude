@@ -13,9 +13,9 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
 | A supported review bot detected for the repo (config fast path, hosted signals otherwise; follow-up's `local.md` owns detection) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
-| A runtime surface | `verify` | Declines tests-only and docs-only itself |
+| A runtime surface | `run` | Ship declines docs-only and tests-only |
 
-Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `writing`, `verify`). `code-review` is still accepted for `review:code` so an old invocation does not silently run the pass it meant to skip.
+Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `writing`, `run`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
 
 ## Plan Review
 
@@ -26,10 +26,10 @@ It is read-only and writes nothing, so it runs as a background dispatch rather t
 ```mermaid
 flowchart TD
     S([ship start]) --> G{plan:review gated in?}
-    G -->|no| F1[fix passes: comments-audit, local bot, review:code or simplify, writing, verify]
+    G -->|no| F1[fix passes: comments-audit, local bot, review:code or simplify, writing, run]
     F1 --> C([create PR])
     G -->|yes| D[dispatch plan:review in background]
-    D --> F2[fix passes: comments-audit, local bot, review:code or simplify, writing, verify]
+    D --> F2[fix passes: comments-audit, local bot, review:code or simplify, writing, run]
     D -. concurrent .-> R[plan:review reasons over plan + diff]
     F2 --> J{join: findings?}
     R -.-> J
@@ -65,3 +65,4 @@ Rejected:
 
 - **`--report` plus inline apply**: pulls the full findings into ship's context, defeating the point of keeping bulk verdicts off the conversation.
 - **Running it after `review:code --fix`**: the fix pass dirties the tree, failing `comments:audit`'s clean-tree check.
+- **Invoking the audit's scripts directly from ship**: ship cannot resolve the comments plugin's install path, it would duplicate the three-step runbook, and it would widen ship's tool grant past `git diff` and `git status`. `comments:audit` was made model-invocable instead, the same remedy `review:code` applies to the built-in `/code-review`.

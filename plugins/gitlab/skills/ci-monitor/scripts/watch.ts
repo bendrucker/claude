@@ -331,6 +331,36 @@ export function jobsContradictSuccess(jobs: JobRecord[]): JobRecord[] {
   return jobs.filter((job) => job.status === "failed" && !job.allowFailure);
 }
 
+// Statuses whose elapsed time reflects CI work actually running. `skipped` and
+// `manual` pipelines finish in about a second without doing anything, so
+// averaging them in would collapse the interval toward the floor.
+const TIMED_PIPELINE_STATUSES = new Set(["success", "failed", "canceled"]);
+
+// The pipeline list endpoint carries no `finished_at`, `started_at`, or
+// `duration`, so elapsed time has to come from `updated_at - created_at`. On a
+// finished pipeline the two agree to within about three seconds, and `duration`
+// would be wrong here regardless: it excludes queue time, which a poller waits
+// through. Dates are parsed here rather than in jq because `fromdateiso8601`
+// rejects the fractional seconds GitLab sends.
+export function pipelineDurations(raw: unknown[]): number[] {
+  const durations: number[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const status = record.status;
+    const createdAt = record.created_at;
+    const updatedAt = record.updated_at;
+    if (typeof status !== "string" || !TIMED_PIPELINE_STATUSES.has(status)) continue;
+    if (typeof createdAt !== "string" || typeof updatedAt !== "string") continue;
+    const started = Date.parse(createdAt);
+    const ended = Date.parse(updatedAt);
+    if (Number.isNaN(started) || Number.isNaN(ended)) continue;
+    const seconds = (ended - started) / 1000;
+    if (seconds > 0) durations.push(seconds);
+  }
+  return durations;
+}
+
 export function computeInterval(durationsSeconds: number[]): number {
   if (durationsSeconds.length === 0) return NO_HISTORY_INTERVAL_SECONDS;
   const avg = durationsSeconds.reduce((a, b) => a + b, 0) / durationsSeconds.length;
@@ -743,10 +773,10 @@ export function probeBranch(projectEncoded: string, branch: string, run: ExecFn 
 
 function fetchInterval(projectEncoded: string, target: PipelineTarget): number {
   const filter =
-    '[.[] | select(.source != "external" and .source != "parent_pipeline") | select(.finished_at != null) | ((.finished_at | fromdateiso8601) - (.started_at // .created_at | fromdateiso8601))]';
+    '[.[] | select(.source != "external" and .source != "parent_pipeline") | {status, created_at, updated_at}]';
   const label = describeTarget(target);
   const result = exec(
-    `glab api '${pipelineListPath(projectEncoded, target, 5)}' | jq -c '${filter}'`,
+    `glab api '${pipelineListPath(projectEncoded, target, 20)}' | jq -c '${filter}'`,
   );
   if (!result.ok) {
     console.error(
@@ -757,8 +787,7 @@ function fetchInterval(projectEncoded: string, target: PipelineTarget): number {
   try {
     const parsed = JSON.parse(result.stdout || "[]");
     if (Array.isArray(parsed)) {
-      const numbers = parsed.filter((n): n is number => typeof n === "number" && n > 0);
-      return computeInterval(numbers);
+      return computeInterval(pipelineDurations(parsed));
     }
     console.error(
       `glab api returned non-array JSON while computing poll interval for ${label}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s`,

@@ -1,5 +1,5 @@
 ---
-name: writing
+name: writing:writing
 description: >-
   Enforce direct, concise prose style and catch writing slop. Use when writing or editing PR descriptions,
   issue bodies, commit messages, documentation, Slack messages, or any human-facing text.

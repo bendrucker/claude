@@ -51,7 +51,7 @@ If the block reports that herdr is not running, stop here and use ordinary tools
 
 Structured queries answer with a single-line JSON envelope. Pipe them through `jq -r '.result...'` rather than reading them raw:
 
-```json
+```fragment
 {"id":"cli:pane:list","result":{"panes":[...],"type":"pane_list"}}
 ```
 

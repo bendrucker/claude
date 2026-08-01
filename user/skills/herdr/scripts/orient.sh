@@ -8,10 +8,12 @@ if [ -z "${HERDR_PANE_ID:-}" ]; then
   exit 0
 fi
 
-if ! command -v herdr >/dev/null 2>&1; then
-  echo "herdr is not on PATH."
-  exit 0
-fi
+for tool in herdr jq; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "$tool is not on PATH."
+    exit 0
+  fi
+done
 
 if ! snapshot=$(herdr api snapshot 2>&1) || [ "${snapshot:0:1}" != "{" ]; then
   echo "herdr api snapshot failed: ${snapshot%%$'\n'*}"

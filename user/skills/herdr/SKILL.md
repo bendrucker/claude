@@ -109,6 +109,43 @@ Fall back to `glow -w 0` or `bat --paging always` when the preferred viewer is m
 
 `--source recent` reads accumulated output history and returns nothing for a pane created moments ago. Use `--source visible` when reading a pane you just made. On an established pane the sources agree.
 
+## Plugins
+
+herdr's own capabilities are extended by plugins, and they are discoverable the same way everything else is:
+
+```bash
+herdr plugin list
+herdr plugin action list | jq -r '.result.actions[] | "\(.plugin_id)  \(.action_id)  \(.title)"'
+herdr plugin action invoke <action_id> --plugin <plugin_id>
+```
+
+`herdr plugin log list` shows a plugin's command output, which is where to look when an action produces no visible effect. `herdr plugin config-dir <plugin_id>` locates its config.
+
+Filter the action list by platform. Plugins ship Windows variants of the same action, so an unfiltered list shows each one twice.
+
+### reviewr
+
+A review sidebar that shows the diff you just wrote and takes line comments on it. Its contract with you runs one direction, and misreading that direction is the main way to get this wrong.
+
+You never query reviewr and never poll it. When the user hits Send, reviewr injects the comment batch into your input and stops. It does not submit. The comments therefore reach you as part of an ordinary user turn, usually with their own remarks attached.
+
+Each block takes this shape, ordered by file then line:
+
+```fragment
+user/skills/herdr/SKILL.md:41-43
+-old line
++new line
+the reviewer's text, which may run to several lines
+```
+
+- Locate the code by matching the verbatim snippet lines. Your own edits shift line numbers, which makes the snippet the reliable anchor and the header a hint.
+- A ` (removed)` suffix on the header means the comment sits on a deleted line. Its snippet comes from the old side and will not be found in the current file.
+- Sending clears reviewr's list, and the store is in-memory only. The batch you receive is the only copy. Work through the whole set rather than acting on the first few.
+
+Two invariants worth knowing. reviewr never writes to the worktree, the index, or any branch, which rules it out as the explanation for an unexpected diff. Its one write is a baseline ref under `refs/reviewr/turn-base/`, deliberately outside `refs/heads`. Leave those refs alone.
+
+Its `last-turn` scope reads the same scraped `agent_status` described above, treating a resting-to-working transition as a turn boundary. A turn that finishes inside one poll interval is invisible to it, which is why a very fast edit can be missing from that view.
+
 ## Worktrees Belong to Worktrunk
 
 Create worktrees with `wt` through the `worktrunk:wt-switch-create` skill. `herdr worktree create` writes outside the sandbox's allowed paths and fails there. Opening a checkout that already exists is fine.

@@ -95,13 +95,17 @@ herdr pane run "$pane" markless --watch path/to/file.md
 
 Use `markless --watch` for markdown and `$EDITOR` for everything else. Keep `--no-focus` so the user's cursor stays where it is.
 
-`pane run` executes through an interactive shell, so quoting and shell syntax behave normally. That shell inherits the new pane's directory, and mise activates tools per directory. A mise-managed tool available elsewhere can still come back `command not found` here. Confirm the pane actually started the viewer before telling the user to look at it:
+`pane run` hands the command string to the pane's own interactive shell, which parses it a second time. One command with ordinary quoting survives that. A multi-statement script does not: the pane's zsh re-parses it and dies on a bare `parse error`, and that failure lands in the pane rather than in your tool result. Write anything past a single command to a file and run `bash <path>`.
+
+That shell also inherits the new pane's directory, and mise activates tools per directory. A mise-managed tool available elsewhere can still come back `command not found` here. Confirm the pane actually started the viewer before telling the user to look at it:
 
 ```bash
 herdr pane read "$pane" --source visible --lines 8
 ```
 
 Fall back to `glow -w 0` or `bat --paging always` when the preferred viewer is missing, both of which are installed outside mise.
+
+A pane opened for the user is theirs, so leave it. Close one you split for your own use (`herdr pane close`) once the work in it is done, rather than leaving the layout littered.
 
 ## Capturing Another Pane
 

@@ -1,0 +1,68 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renders the summary table 1`] = `
+"┌──────────┬────────┬──────┬─────────┬───────┬───────────┐
+│ kind     │ plugin │ user │ project │ total │ note      │
+├──────────┼────────┼──────┼─────────┼───────┼───────────┤
+│ plugins  │ 2      │ -    │ -       │ 2     │ 2 enabled │
+│ skills   │ 1      │ 1    │ 0       │ 2     │           │
+│ agents   │ 0      │ 1    │ 0       │ 1     │           │
+│ commands │ 0      │ 0    │ 0       │ 0     │           │
+│ rules    │ 0      │ 1    │ 1       │ 2     │           │
+│ hooks    │ 1      │ 0    │ 0       │ 1     │           │
+│ mcp      │ 1      │ -    │ -       │ 1     │           │
+└──────────┴────────┴──────┴─────────┴───────┴───────────┘"
+`;
+
+exports[`renders the plugins table 1`] = `
+"┌───────────┬─────┬────────┬────────┬────────┬──────┬───────┬─────┬───────────────────────┐
+│ plugin    │ on  │ listed │ skills │ agents │ cmds │ hooks │ mcp │ description           │
+├───────────┼─────┼────────┼────────┼────────┼──────┼───────┼─────┼───────────────────────┤
+│ git       │ yes │ yes    │ 1      │ 0      │ 0    │ 2     │ 0   │ Git workflow          │
+│ agents-md │ yes │ yes    │ -      │ -      │ -    │ -     │ -   │ Loads AGENTS.md files │
+└───────────┴─────┴────────┴────────┴────────┴──────┴───────┴─────┴───────────────────────┘"
+`;
+
+exports[`renders the skills table 1`] = `
+"┌───────────────┬────────────┬──────────────────────────────┬──────────────────────────────────────────┐
+│ skill         │ invoke     │ directory                    │ description                              │
+├───────────────┼────────────┼──────────────────────────────┼──────────────────────────────────────────┤
+│ git:conflicts │ model+user │ plugins/git/skills/conflicts │ Resolving git merge conflicts during re… │
+│ afk           │ user       │ user/skills/afk              │ Signal that you are stepping away.       │
+└───────────────┴────────────┴──────────────────────────────┴──────────────────────────────────────────┘"
+`;
+
+exports[`renders the agents table 1`] = `
+"┌────────┬───────┬───────────────────────┬───────────────────────────────┐
+│ agent  │ model │ path                  │ description                   │
+├────────┼───────┼───────────────────────┼───────────────────────────────┤
+│ review │ -     │ user/agents/review.md │ Review a pushed pull request. │
+└────────┴───────┴───────────────────────┴───────────────────────────────┘"
+`;
+
+exports[`renders the commands table 1`] = `"No commands found."`;
+
+exports[`renders the hooks table 1`] = `
+"┌────────────┬────────────────────┬──────────────────────────────┬─────────────────────────────────────────┐
+│ event      │ matcher            │ source                       │ command                                 │
+├────────────┼────────────────────┼──────────────────────────────┼─────────────────────────────────────────┤
+│ PreToolUse │ Bash(git commit:*) │ plugins/git/hooks/hooks.json │ bun plugins/git/scripts/block-commit.ts │
+└────────────┴────────────────────┴──────────────────────────────┴─────────────────────────────────────────┘"
+`;
+
+exports[`renders the rules table 1`] = `
+"┌────────┬─────────────────────────┬────────────┐
+│ rule   │ path                    │ applies to │
+├────────┼─────────────────────────┼────────────┤
+│ go     │ user/rules/go.md        │ **/*.go    │
+│ always │ .claude/rules/always.md │ always     │
+└────────┴─────────────────────────┴────────────┘"
+`;
+
+exports[`renders the mcp table 1`] = `
+"┌───────────┬───────────┐
+│ server    │ plugin    │
+├───────────┼───────────┤
+│ terraform │ terraform │
+└───────────┴───────────┘"
+`;

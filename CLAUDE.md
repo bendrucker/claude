@@ -10,6 +10,13 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `user/`: User-level configuration, symlinked to `~/.claude`
 - `.claude/`: Project-level configuration for this repository
 
+## Inventory
+
+`bun run inventory [kind]` lists the repository's Claude Code assets, so answering "which skills exist", "what registers a `Stop` hook", or "which plugins ship agents" takes one command instead of a glob sweep. Kinds are `summary` (the default, counts by scope), `plugins`, `skills`, `agents`, `commands`, `hooks`, `rules`, and `mcp`. Every row carries the asset's path, making a listing the starting point for a `Read` or a narrowed grep.
+
+- `--plugin <name>` and `--scope <plugin|user|project>` narrow every kind the same way. Scope is where Claude Code loads the asset from: `plugins/`, `user/`, or `.claude/`.
+- `--truncate <n>` sets the character budget for description and command columns (`0` keeps them whole). `--json` emits the underlying records.
+
 ## User
 
 The [`user/`](user/) directory contains user-level Claude Code configuration that gets symlinked to `~/.claude`. This includes global instructions (`CLAUDE.md`), settings (plugins, permissions, sandbox), and hooks that apply across all projects. Symlinks and other system setup are managed by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles.

@@ -4,7 +4,7 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR, including after committing changes.
 
-argument-hint: "[--draft] [--auto] [--watch] [--base <ref>] [--dry-run]"
+argument-hint: "[--draft] [--auto] [--watch] [--base <ref>] [--label <name>] [--dry-run]"
 allowed-tools:
   - mcp__github
   - Agent
@@ -75,6 +75,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a normal PR/MR that is rea
 - `--auto`: after creating, enable auto-merge so it merges once checks pass and required approvals land. Default: off.
 - `--watch`: after creating, spawn `pull-request:babysit` to actively shepherd the PR/MR (fix trivial red CI, drive the merge). When a bot review should gate the merge (asked to wait for a reviewer, or a review bot is configured on the repo), add `--reviews` so babysit hands the wait to `follow-up --auto`; a needless `--reviews` costs only one no-op hand-off. Distinct from `--auto`, which only flips on the platform's passive auto-merge. Default: off.
 - `--base <ref>`: parent branch for a stack layer. See [Stacking](#stacking). Default: the repo's default branch.
+- `--label <name>`: apply a label after creating, repeatable. Where a repo gates its hosted review bot on a label, this is how a review gets requested (see follow-up's `reviewers.md`). Applied in a second call rather than on `gh pr create`, because an unknown label fails the create outright and would lose the PR. Default: none.
 - `--dry-run` (alias `--body-only`): produce the body without creating anything. See [Dry Run](#dry-run). Default: off.
 
 ## Dry Run
@@ -88,7 +89,7 @@ If `--dry-run` (or `--body-only`) is set, follow [Dry Run](#dry-run) instead of 
 1. **Branch validation**: If the context above shows you're on a default branch (main/master), stop and ask the user to switch to a feature branch first.
 1. Stage changes if not already staged: `git add .`
 1. Commit if there are no commits yet on the branch. Follow the same format for the commit message as for the pull request title (conventional or subject-oriented based on repo standard): `git commit -m "..."`
-1. Local bot review, proactive: the Review bot line in Context above is the fast-path verdict. On a repo config hit, run `pull-request:follow-up --local` before pushing so its findings surface while the branch is still local. With no config, a bot may still review the repo: follow-up's `local.md` hosted signals decide. Skip when a local bot pass already ran on this branch in this session (`/ship` runs it as a gated pass), when detection comes up empty, or when the user declines.
+1. Local bot review, gated: the Review bot line in Context above is the fast-path verdict, covering repo config, CLI presence, and any live cooldown. On a repo config hit with no cooldown, decide whether the diff is worth a metered review (follow-up's SKILL.md defines the gate). When it is, run `pull-request:follow-up --local` before pushing so findings surface while the branch is still local. With no config, a bot may still review the repo: follow-up's `local.md` hosted signals decide. Skip when a local bot pass already ran on this branch in this session (`/ship` runs it as a gated pass), when the gate says skip, when the provider is paused, when detection comes up empty, or when the user declines.
 1. Push the branch to remote: `git push -u origin HEAD`
 1. Draft the body, outlining first for a large change or any open-source PR (see [Outline First](#outline-first)).
 1. Create the PR/MR. Append `--draft` to the create command when `--draft` is set:
@@ -99,6 +100,7 @@ If `--dry-run` (or `--body-only`) is set, follow [Dry Run](#dry-run) instead of 
    - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
    - Add `--base <parent>` on either when the branch is a stack layer (see [Stacking](#stacking))
 1. Link the stack when the branch is a GitHub stack layer, after the PR exists. See [Stacking](#stacking).
+1. Apply any `--label` values once the PR/MR exists: `gh pr edit <url> --add-label <name>` or `glab mr update <id> --label <name>`. A label the repo has not defined fails this call. Report it and carry on, since the PR is already open and `gh label create` recovers it.
 1. Enable auto-merge when `--auto` is set, after the PR/MR exists:
    - **GitHub**: `gh pr merge --auto` (add `--squash` or `--rebase` to match the repo's merge method when known)
    - **GitHub, stacked**: auto-merge has no equivalent. Say so and suggest `--watch`, which drives the stack merge at green.

@@ -30,6 +30,10 @@ Whether a review is expected decides how to read an absent summary: pending (kee
 
 The status-check signal only appears after the PR exists and the bot's webhook has fired, so a check made at creation time sees only the first and third. Re-evaluate against the live PR before merging, where the pending check has appeared. With none of these signals present, no review is expected: an empty result is nothing to do.
 
+A live cooldown disqualifies a provider outright, whatever the signals above say. `detect-bot.ts` reports one as `paused until <date> (<reason>)`. A bot that is out of reviews will not answer, so its absent summary is nothing to do.
+
+A bot comment reporting its own pause or rate limit ends the loop the same way. Record it to `~/.cache/claude/bot-review.json` per [local.md](local.md), then stop.
+
 ## Re-triggering an Idle Reviewer
 
 If a reviewer doesn't re-review within ~5 minutes of a green push, post **one** top-level comment mentioning it to re-trigger, then reset the idle timer:
@@ -39,6 +43,16 @@ If a reviewer doesn't re-review within ~5 minutes of a green push, post **one** 
 - Copilot: re-request via the PR's reviewers, or `@copilot review`
 
 This @-mention is the only place a bot is named. Thread replies never name or thank the reviewer (see [replies.md](replies.md)).
+
+## On-Demand Review
+
+A repo can be configured to review only on request, which changes an absent summary from pending to nothing-to-do. Greptile offers three levers, none of them visible in `.greptile/config.json` alone:
+
+- **Filters → `Labels / Include`** skips every PR without one of the named labels. This is the opt-in: `pull-request:create --label <name>` requests the review at creation, and adding the label later requests it after the fact.
+- **`triggerOnUpdates`** off stops the automatic re-review on each push. A pushed fix then needs an explicit re-trigger (see [The Autonomous Loop](SKILL.md#the-autonomous-loop)).
+- **`triggerOnDrafts`** off skips drafts entirely.
+
+`greptile config --json` prints the effective merge of repo config, dashboard, and org rules, so read the live values there rather than from the committed file. `@greptileai review` overrides all three.
 
 ## Adding a Reviewer
 

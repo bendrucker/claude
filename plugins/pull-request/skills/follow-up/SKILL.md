@@ -7,8 +7,8 @@ description: >
   loop until the reviewer is satisfied, clearing a bot review hands-off. With --local, run the
   same bot loop pre-push through the reviewer's CLI (Greptile, CodeRabbit) against unmerged
   commits, before any PR exists. Use when reviewers commented on your PR and you need to respond
-  or satisfy them. Use --local proactively, without being asked, whenever you are about to push
-  or open a PR in a repo with a supported bot (bot config present, CLI installed). Triggers:
+  or satisfy them. Use --local without being asked when you are about to push or open a PR in a
+  repo with an available bot and the diff warrants a metered review. Triggers:
   "respond to review comments on my PR", "address reviewer feedback", "make the bot reviewer
   pass", "greptile review", "coderabbit review", "run the review bot locally", "bot review
   before pushing".
@@ -65,7 +65,9 @@ Then run each round:
 2. Reply-and-resolve the noise threads (`github:pr-comments` or `gitlab:merge-request` do both in one call).
 3. Escalate the unsure threads and pause **that subset only**; actionable pushes proceed.
 4. Hand CI back to `pull-request:babysit` (it owns CI, stops at green). babysit's Monitor watcher re-invokes you on CI events, so don't wrap that wait in `ScheduleWakeup`; the harness wakes you.
-5. Wait for the bot to re-review the green SHA. No Monitor watcher tracks this, so self-pace with `ScheduleWakeup`: arm a tick (`prompt` set to this same `/pull-request:follow-up` invocation so the wake re-enters the loop) at ~270s for an idle wait before re-triggering, or 180-240s when a fast re-review is expected. Never 300s (the cache-expiry boundary). On wake, re-fetch bot threads and evaluate the loop-exit conditions below: if the reviewer is satisfied or another exit fires, stop; otherwise, if no re-review landed, post one top-level `@<bot>` re-trigger, then re-arm the next tick.
+5. Get the bot onto the green SHA. Where the repo re-reviews pushes automatically, wait for it. No Monitor watcher tracks this, so self-pace with `ScheduleWakeup`: arm a tick (`prompt` set to this same `/pull-request:follow-up` invocation so the wake re-enters the loop) at ~270s for an idle wait before re-triggering, or 180-240s when a fast re-review is expected. Never 300s (the cache-expiry boundary). On wake, re-fetch bot threads and evaluate the loop-exit conditions below: if the reviewer is satisfied or another exit fires, stop; otherwise, if no re-review landed, post one top-level `@<bot>` re-trigger, then re-arm the next tick.
+
+   On a repo that reviews only on request (Greptile with `triggerOnUpdates: false`, for one), that wait is dead time. No re-review is coming until you ask, so post the `@<bot>` re-trigger right after the green push and arm the tick only to collect the result. `greptile config --json` reports the live setting.
 
 Loop until: the reviewer's satisfaction signal hits on HEAD ([reviewers.md](reviewers.md)); no new bot threads for two rounds after a green push; max 4 rounds (oscillation guard); the idle timeout outlasts the re-trigger; or the PR closes/merges.
 
@@ -79,13 +81,15 @@ On stop, report fixes, replies/resolves, and escalations. If the reviewer is sat
 
 With `--local`, run the same reviewer against the branch's unmerged commits before anything is pushed. The criteria don't change with the channel. Findings arrive as CLI output instead of PR threads, and the exit is the same satisfaction signal in its local form ([local.md](local.md) maps it per provider). Post-PR thread mechanics (replies, resolves, re-triggers) don't exist here: a disagreement is surfaced in the report instead of a resolved thread.
 
-This mode is proactive: fire it unprompted whenever you are about to push or open a PR in a repo with a supported bot. `/ship` gates it as a pre-PR pass and `pull-request:create` runs it before pushing, so skip it when either already ran on this branch.
+Fire this mode unprompted when you are about to push or open a PR in a repo with an available bot **and** the diff warrants a review. Reviews are metered, and a local pass plus a hosted one costs two credits for one change, so spend one on a diff that carries risk: auth, permissions, sandbox config, secret handling, network egress, a new runtime surface, or a few hundred changed lines. Prose, config, dependency bumps, and reverts skip. A `ship` skill with its own Bot Review Gate overrides these defaults. An explicit `--local` request overrides everything.
+
+`/ship` runs this as a gated pass and `pull-request:create` runs it before pushing, so skip it when either already ran on this branch.
 
 - Local detection: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts`
 
-The line above is the injected fast path (repo config and CLI presence, no turn spent). Resolve it to a provider per [local.md](local.md), which also covers the hosted signals for repos with no config file. Then loop:
+The line above is the injected fast path (repo config, CLI presence, and any live cooldown, no turn spent). Resolve it to a provider per [local.md](local.md), which also covers the hosted signals for repos with no config file. A provider reported as paused is out: report the pause and stop. Then loop:
 
-1. Run the review. Summarize findings by severity, each with a `file:line` reference.
+1. Run the review per [local.md](local.md): backgrounded, with the 30-second liveness backstop. Summarize findings by severity, each with a `file:line` reference.
 2. Triage with the same partition as `--auto`: actionable → fix; noise or disagreement → surface it with your reasoning rather than silently skipping; unsure → escalate.
 3. Commit the fixes and re-run. Repeat until the satisfaction signal hits or I stop.
 4. Hand off: offer next steps (push, PR, `/ship`) without taking them.

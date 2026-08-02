@@ -38,7 +38,7 @@ Resolve the base to a **remote** ref so ship's view matches what the PR merges a
 - **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) *and* the session ran long or redirected enough that the diff could have drifted from it. No plan, or a small plan in a tight session, skips.
 - **Correctness and quality**: code changed. Exactly one of `review:code <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
 - **`comments:audit`**: diff adds code comments.
-- **`pull-request:follow-up --local`**: a supported review bot is detected for the repo. Follow-up's `local.md` owns detection (repo config fast path, hosted signals when no config is committed) and exits early when nothing is detected. Runs the hosted reviewer locally before the PR exists.
+- **`pull-request:follow-up --local`**: a supported review bot is available for the repo *and* the diff clears the Bot Review Gate. Reviews are metered, so availability alone is not enough. Follow-up's `local.md` owns detection (repo config fast path, live cooldowns, hosted signals when no config is committed) and exits early when nothing is available. Runs the hosted reviewer locally before the PR exists.
 - **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
 - **`run`**: diff has a runtime surface. Drive the change in the real app, not just tests. Skip on docs-only and tests-only.
 
@@ -80,6 +80,8 @@ The commit sits on `HEAD`, so the fast-forward is clean. It runs in the Agent to
 Join the background `plan:review` first if it was gated in. Act on fix-worthy drift before the PR exists, and carry any deferred follow-ups into the report. Then `pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
 
 Pass `--base <parent>` through when `/ship --base` named a stack parent. Create needs it to target the PR at the parent and to link the layer into the stack on GitHub. Without it the PR opens against the default branch and carries every lower layer's diff.
+
+When the Bot Review Gate said spend and the repo's hosted reviewer waits on a label, pass that label through (`--label review` on my repos, per follow-up's `reviewers.md`). The review then starts with the PR instead of needing a follow-up comment.
 
 ## Babysit
 

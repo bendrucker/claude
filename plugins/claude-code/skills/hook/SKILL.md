@@ -22,10 +22,14 @@ Reference for creating and configuring Claude Code hooks. When uncertain about s
 | PreToolUse | Before tool execution | Validate inputs, block operations, modify parameters |
 | PostToolUse | After tool completes | Check results, run linters, provide feedback |
 | UserPromptSubmit | When user sends message | Pre-process input, add context |
-| Stop | Session ends | Cleanup, save state |
-| SubagentStop | Subagent completes | Process results |
-| PreCompact | Before context compaction | Save important state |
+| PermissionRequest | Permission dialog appears | Return a decision, notify a remote approver |
+| Stop | Agent finishes a turn | Cleanup, save state |
+| StopFailure | Agent stops on failure | Report the failure |
+| SubagentStart / SubagentStop | Subagent spawns / completes | Process results |
+| SessionStart / SessionEnd | Session begins / ends | Inject context, export state |
+| PreCompact / PostCompact | Around context compaction | Save important state |
 | Notification | System notification | Log events |
+| TeammateIdle | Teammate about to go idle | Hand off work |
 
 ## Configuration Files
 
@@ -104,6 +108,21 @@ const input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
 ```
 
 Exit with no output to allow without modification.
+
+## Async
+
+`"async": true` on a command hook backgrounds it so the turn does not wait. Nothing above reaches the model: no `permissionDecision`, no `updatedInput`, no `additionalContext`, and exit code 2 does not block. Verified on 2.1.220 that stderr and a nonzero exit are both dropped. `"asyncRewake": true` backgrounds the hook but wakes the model on exit code 2, delivering stderr (or stdout when stderr is empty) as a system reminder. Neither field applies to `prompt` or `agent` hooks.
+
+Use `async` only for a hook that is a pure side effect: a notifier, a status bridge, a terminal bell, a state export. Keep it off when the hook returns any of the output above, mutates state a later step reads, or gates a tool call.
+
+Two events behave differently from the rest, measured on 2.1.220:
+
+- `Stop` kills the backgrounded process almost immediately. Anything past a few milliseconds never finishes. A `Stop` notifier must stay synchronous.
+- `SessionEnd` outlives the CLI. A backgrounded hook there runs to completion after the process exits, making it safe to background.
+
+`SubagentStop`, `SessionStart`, `UserPromptSubmit`, and `PostToolUse` all run to completion when backgrounded.
+
+Hooks on the same event already run concurrently with each other, so `async` only shortens the turn when the side-effect hook is the slowest one on its event. It is still worth setting on a hook that qualifies, because the payoff moves as sibling hooks change.
 
 ## Script Storage
 

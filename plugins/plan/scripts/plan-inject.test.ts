@@ -57,6 +57,21 @@ test("stays silent outside plan mode", async () => {
   expect(stdout).toBe("");
 });
 
+test("injects on EnterPlanMode, which still carries the pre-switch mode", async () => {
+  const stdout = await run({
+    permission_mode: "auto",
+    tool_name: "EnterPlanMode",
+    session_id: "t1",
+  });
+  const parsed = JSON.parse(stdout);
+  expect(parsed.hookSpecificOutput.additionalContext).toContain("Planning Guidelines");
+});
+
+test("stays silent on another tool call outside plan mode", async () => {
+  const stdout = await run({ permission_mode: "auto", tool_name: "Read", session_id: "t1" });
+  expect(stdout).toBe("");
+});
+
 test("stays silent without a session_id, since a high-frequency hook cannot dedup", async () => {
   const stdout = await run({ permission_mode: "plan" });
   expect(stdout).toBe("");

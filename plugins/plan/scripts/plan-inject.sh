@@ -4,10 +4,16 @@
 # permission_mode rides on every PreToolUse, so the first tool call in plan mode
 # is a reliable injection point. Shares the plan-injected marker with context.sh,
 # so whichever fires first wins and the other short-circuits.
+#
+# EnterPlanMode is the other injection point. It carries the pre-switch mode, so
+# a mode test alone would skip it, and a session that enters plan mode and writes
+# the plan in the same turn reaches its next tool call only at ExitPlanMode, by
+# which point the plan is already written.
 input=$(cat)
 
 mode=$(printf '%s' "$input" | jq -r '.permission_mode // empty')
-if [ "$mode" != "plan" ]; then
+tool=$(printf '%s' "$input" | jq -r '.tool_name // empty')
+if [ "$mode" != "plan" ] && [ "$tool" != "EnterPlanMode" ]; then
   exit 0
 fi
 

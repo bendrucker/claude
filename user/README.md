@@ -12,4 +12,5 @@ Run `scripts/install.sh` to create the symlinks.
   - `worktree/` - Validates bash commands in worktrunk worktrees
   - `webfetch-block/` - Steers WebFetch calls toward better tools
   - `session-limit/` - Warns when a session approaches its limit
+  - `permission-denied/` - Logs auto mode classifier denials so the `autoMode` rules stay measurable
   - `herdr-agent-state.sh` - Written by `herdr integration install claude` and gitignored; only its `settings.json` hook entry is committed (rewritten to `$HOME` form). Reinstall after cloning or a herdr version bump to restore the script, then discard the installer's `settings.json` edits: it re-sorts the file and appends a duplicate absolute-path entry it can't recognize as already present.

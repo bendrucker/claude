@@ -15,6 +15,27 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 - `Edit(//tmp/**)` → `/tmp/**` (absolute)
 - `Edit(~/.config/**)` → home directory (tilde expansion works)
 
+## Auto Mode
+
+`permissions.defaultMode` is `auto`, so the classifier is the gate on nearly every tool call. Two consequences shape where auto mode config can live and how to test it.
+
+The classifier reads `autoMode` from `~/.claude/settings.json` (this repo's `user/settings.json`), from managed settings, and from the `--settings` flag. It deliberately ignores `.claude/settings.json` and `.claude/settings.local.json`, because a checked-in repo or a build step could otherwise inject its own allow rules. So an `autoMode` block in project settings is silently inert. There is no per-repo layer for it.
+
+That also means `claude auto-mode config` and `claude auto-mode critique` resolve `~/.claude/settings.json` through its symlink to the deployed `~/.claude-repo` checkout. A worktree edit is invisible to them until it merges, so point them at the working copy explicitly:
+
+```sh
+claude --settings "$PWD/user/settings.json" auto-mode config
+claude --settings "$PWD/user/settings.json" auto-mode critique
+```
+
+Settings scopes combine rather than replace, so a `--settings` run still carries the deployed file's entries alongside the worktree's. Read a critique of a section you shortened with that in mind.
+
+Every array in `autoMode` replaces the built-in list for its section unless it contains the literal `"$defaults"`. Omitting it from `soft_deny` discards force push, `curl | bash`, and production-deploy protection; omitting it from `hard_deny` discards the data-exfiltration rule. Keep `"$defaults"` in every list.
+
+`useAutoModeDuringPlan` needs no entry. It defaults on as of v2.1.218 and routes plan-mode shell commands through the classifier instead of prompting, but only where `permissions.defaultMode` allows auto. Setting `defaultMode` is what activates it.
+
+Classifier denials reach no durable surface on their own. The [`permission-denied`](../../user/hooks/permission-denied) hook logs them so the rules stay measurable.
+
 ## Sandbox and Nested Commands
 
 `excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. Go CLIs run sandboxed via `sandbox.network.allowMachLookup`; wrappers that hand off to Apple Events or Launch Services need a full skip via the `mac` plugin's `claude:dangerouslyDisableSandbox` marker hook. See [`scripts.md`](scripts.md).

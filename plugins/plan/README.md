@@ -5,12 +5,14 @@ Planning mode guidelines and context injection for Claude Code.
 ## Contents
 
 - **Skill** `plan:review`: reviews how an implementation diverged from its approved plan, forking a clean-context agent over the plan and the diff to surface drift and follow-ups
-- **Hook**: Injects planning guidelines the first time a session is in plan mode, whether that first signal is a prompt or a tool call, and appends delegation guidance when the orchestrator runs on an expensive model
+- **Hook**: Injects planning guidelines the first time a session reaches plan mode, whether that first signal is the `EnterPlanMode` call, a prompt, or a tool call, and appends delegation guidance when the orchestrator runs on an expensive model
 - **Hook**: Gates `ExitPlanMode`, denying byte-identical plan re-presents, asking on an append-only re-present, asking once per session when a third or later present exceeds every earlier one, and asking once per session before presenting a plan over 12k characters
 
 ## How It Works
 
 Two hooks share one job: inject the guidelines exactly once per plan-mode session. The `UserPromptSubmit` hook (`scripts/context.sh`) catches a prompt submitted while already in plan mode. A `PreToolUse` hook (`scripts/plan-inject.sh`, matcher `*`) catches the case where a session toggles into plan mode after its last prompt, so no `UserPromptSubmit` fires before `ExitPlanMode`. `permission_mode` rides on every `PreToolUse`, so the first tool call in plan mode is a reliable injection point. Both read `permission_mode` and share a `plan-injected` marker under `$CLAUDE_PLAN_MARKER_ROOT/<session_id>/`, so whichever fires first wins and the other short-circuits.
+
+The `PreToolUse` hook also injects on `EnterPlanMode` regardless of mode. That call carries the pre-switch mode (`auto`, typically), which a mode test alone skips. A session that researches in auto mode, enters plan mode, and writes the plan in the same turn reaches its next tool call only at `ExitPlanMode`. The guidelines would arrive after the plan they were meant to shape. Injecting on the entry call puts them in context for the turn that authors the plan.
 
 Both paths call `scripts/injection-content.sh` to assemble the content. It emits `references/guidelines.md` always, and reads the latest assistant `model` from the transcript. When that model is an expensive orchestrator (opus, fable, mythos), it appends `references/delegation.md`, which requires the plan to carry a Delegation section laying out the agent/model/effort DAG. `UserPromptSubmit` returns the content on stdout; `PreToolUse` returns it as `hookSpecificOutput.additionalContext`. Any read or parse problem falls back to the guidelines alone.
 

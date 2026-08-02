@@ -77,6 +77,8 @@ The overlay design fetches every base at validation time, so this only empties i
 
 `*.coderabbit.ai` is the same partial exception: the `coderabbit` CLI (run sandboxed by `pull-request:follow-up --local`) stores its token in `~/.coderabbit/auth.json`, which the sandbox can read, and reaches `cli.`/`app.coderabbit.ai` for login and reviews. The wildcard covers those subdomains without listing each. Accepted so `coderabbit review` runs sandboxed rather than escaped. The token is exfiltrable through any allowlisted host, and coderabbit's own hosts accept uploads.
 
+Allowlisting those hosts is necessary but not sufficient. Both CLIs run on Node, and the sandbox blocks Node's `dns.lookup` for every host including allowlisted ones, so a plain `greptile whoami` fails `ENOTFOUND` before the allowlist is ever consulted. `NODE_USE_ENV_PROXY=1` in `env` is what actually makes them work. Node 24 then honors the `HTTPS_PROXY` the sandbox already exports, and that proxy enforces the same host allowlist. Outside the sandbox no proxy vars are set, and Node below 24 ignores the variable, so it costs nothing where it isn't needed. Prefer it over granting mDNS through `allowMachLookup`, which would let Node resolve anything.
+
 ### Sockets and Writes
 
 Treat this section as a trust model, not an exhaustive mirror of `settings.json`.

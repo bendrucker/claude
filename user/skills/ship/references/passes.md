@@ -11,11 +11,30 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | A substantial plan in context (`~/.claude/plans/` file) and a long or redirected session | `plan:review` | Read-only, non-blocking: background dispatch, joined before create |
 | Code changes | `review:code <effort> --fix` or `simplify` | Exactly one. Skip on docs/config-only |
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
-| A supported review bot detected for the repo (config fast path, hosted signals otherwise; follow-up's `local.md` owns detection) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
+| A supported review bot is available for the repo and the diff clears the [Bot Review Gate](#bot-review-gate) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
 | A runtime surface | `run` | Ship declines docs-only and tests-only |
 
 Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `writing`, `run`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
+
+## Bot Review Gate
+
+A bot review is metered, and both channels draw the same meter: running the local CLI and then letting the hosted bot review the pushed branch costs two of the same credits for one change. So one gate decides both, and it keys on the diff alone. There is no repo classification: churn is not worth a review anywhere.
+
+Availability comes first, and `pull-request:follow-up` owns it. Its `detect-bot.ts` fast path reports each provider's repo config, CLI presence, and any live cooldown. A paused provider is unavailable: skip the pass without probing it. `local.md` covers detection and `reviewers.md` covers what a cooldown means to a waiting loop.
+
+Then spend a review when any of these hold:
+
+- the diff touches auth, permissions, sandbox config, secret handling, or network egress
+- it adds or changes a runtime surface: a hook, a script entry point, a CLI command, an API
+- it is over roughly 200 changed lines or 8 files, excluding tests, docs, and lockfiles
+- `review:code` confirmed a real bug, or the session redirected enough that the diff wandered
+
+Skip otherwise. Always skip on prose-only, config-only, dependency bumps, and revert commits.
+
+On a repo where automatic hosted review is off, the gate also decides the hosted pass: when it says spend, post the on-demand trigger comment after the PR exists, then wait through the normal path in `reviewers.md`.
+
+Treat the thresholds as a starting calibration to tune. Removal trigger: if the gate is right, `free_reviews_limit_reached` goes to zero in the session index and credits last the billing period. Too tight shows up as manual `--local` requests on PRs the gate skipped, and the fix is to loosen the line count. Too loose and credits still run out early.
 
 ## Plan Review
 

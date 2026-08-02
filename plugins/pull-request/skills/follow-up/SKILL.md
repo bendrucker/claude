@@ -7,8 +7,8 @@ description: >
   loop until the reviewer is satisfied, clearing a bot review hands-off. With --local, run the
   same bot loop pre-push through the reviewer's CLI (Greptile, CodeRabbit) against unmerged
   commits, before any PR exists. Use when reviewers commented on your PR and you need to respond
-  or satisfy them. Use --local proactively, without being asked, whenever you are about to push
-  or open a PR in a repo with a supported bot (bot config present, CLI installed). Triggers:
+  or satisfy them. Use --local without being asked when you are about to push or open a PR in a
+  repo with an available bot and the diff warrants a metered review. Triggers:
   "respond to review comments on my PR", "address reviewer feedback", "make the bot reviewer
   pass", "greptile review", "coderabbit review", "run the review bot locally", "bot review
   before pushing".
@@ -79,13 +79,13 @@ On stop, report fixes, replies/resolves, and escalations. If the reviewer is sat
 
 With `--local`, run the same reviewer against the branch's unmerged commits before anything is pushed. The criteria don't change with the channel. Findings arrive as CLI output instead of PR threads, and the exit is the same satisfaction signal in its local form ([local.md](local.md) maps it per provider). Post-PR thread mechanics (replies, resolves, re-triggers) don't exist here: a disagreement is surfaced in the report instead of a resolved thread.
 
-This mode is proactive: fire it unprompted whenever you are about to push or open a PR in a repo with a supported bot. `/ship` gates it as a pre-PR pass and `pull-request:create` runs it before pushing, so skip it when either already ran on this branch.
+Fire this mode unprompted when you are about to push or open a PR in a repo with an available bot **and** the diff warrants a review. Reviews are metered, and a local pass plus a hosted one costs two credits for one change. The spend decision is therefore ship's Bot Review Gate (`~/.claude/skills/ship/references/passes.md`, Bot Review Gate) rather than a repo-has-a-bot check. An explicit `--local` request overrides the gate. `/ship` runs this as a gated pass and `pull-request:create` runs it before pushing, so skip it when either already ran on this branch.
 
 - Local detection: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts`
 
-The line above is the injected fast path (repo config and CLI presence, no turn spent). Resolve it to a provider per [local.md](local.md), which also covers the hosted signals for repos with no config file. Then loop:
+The line above is the injected fast path (repo config, CLI presence, and any live cooldown, no turn spent). Resolve it to a provider per [local.md](local.md), which also covers the hosted signals for repos with no config file. A provider reported as paused is out: say so and stop, rather than spending a turn confirming it. Then loop:
 
-1. Run the review. Summarize findings by severity, each with a `file:line` reference.
+1. Run the review per [local.md](local.md): backgrounded, with the 30-second liveness backstop. Summarize findings by severity, each with a `file:line` reference.
 2. Triage with the same partition as `--auto`: actionable → fix; noise or disagreement → surface it with your reasoning rather than silently skipping; unsure → escalate.
 3. Commit the fixes and re-run. Repeat until the satisfaction signal hits or I stop.
 4. Hand off: offer next steps (push, PR, `/ship`) without taking them.

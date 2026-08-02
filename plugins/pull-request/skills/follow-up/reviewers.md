@@ -30,6 +30,10 @@ Whether a review is expected decides how to read an absent summary: pending (kee
 
 The status-check signal only appears after the PR exists and the bot's webhook has fired, so a check made at creation time sees only the first and third. Re-evaluate against the live PR before merging, where the pending check has appeared. With none of these signals present, no review is expected: an empty result is nothing to do.
 
+A live cooldown disqualifies a provider outright, whatever the signals above say. `detect-bot.ts` reports one as `paused until <date> (<reason>)`. A configured bot that is out of reviews will not answer. Its absent summary is nothing to do, and waiting on it burns `ScheduleWakeup` ticks for nothing.
+
+A bot comment reporting its own pause or rate limit ends the loop the same way. Record it to `~/.cache/claude/bot-review.json` per [local.md](local.md). Stop. Don't re-trigger.
+
 ## Re-triggering an Idle Reviewer
 
 If a reviewer doesn't re-review within ~5 minutes of a green push, post **one** top-level comment mentioning it to re-trigger, then reset the idle timer:
@@ -39,6 +43,12 @@ If a reviewer doesn't re-review within ~5 minutes of a green push, post **one** 
 - Copilot: re-request via the PR's reviewers, or `@copilot review`
 
 This @-mention is the only place a bot is named. Thread replies never name or thank the reviewer (see [replies.md](replies.md)).
+
+## On-Demand Review
+
+My personal repos run Greptile with automatic review off. Nothing reviews a PR there until asked, and the asking is `@greptileai review`, the same phrase as the re-trigger above. `/ship` posts it once, after the PR exists, when the diff clears the Bot Review Gate (`~/.claude/skills/ship/references/passes.md`). Then wait for the summary through the path above, the same as on a repo that reviews automatically.
+
+On a diff the gate skips, post nothing. An on-demand review that fires on every PR costs exactly what automatic review cost.
 
 ## Adding a Reviewer
 

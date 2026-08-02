@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface Provider {
@@ -13,9 +14,69 @@ export const PROVIDERS: Provider[] = [
   { name: "coderabbit", configs: [".coderabbit.yaml", ".coderabbit.yml"], cli: "coderabbit" },
 ];
 
-export type Which = (cli: string) => string | null;
+export interface Cooldown {
+  provider: string;
+  remote?: string;
+  pausedUntil: string;
+  reason: string;
+}
 
-export async function detect(root: string, which: Which = Bun.which): Promise<string> {
+export type Which = (cli: string) => string | null;
+export type ReadCooldowns = () => Promise<Cooldown[]>;
+
+export const COOLDOWN_PATH = join(homedir(), ".cache", "claude", "bot-review.json");
+
+export function parseCooldowns(text: string): Cooldown[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((record): record is Cooldown => {
+    if (typeof record !== "object" || record === null) return false;
+    const { provider, pausedUntil, reason } = record as Record<string, unknown>;
+    return (
+      typeof provider === "string" &&
+      typeof pausedUntil === "string" &&
+      typeof reason === "string" &&
+      !Number.isNaN(Date.parse(pausedUntil))
+    );
+  });
+}
+
+export const readCooldowns: ReadCooldowns = async () =>
+  parseCooldowns(
+    await Bun.file(COOLDOWN_PATH)
+      .text()
+      .catch(() => ""),
+  );
+
+function pause(cooldowns: Cooldown[], provider: string, remote: string | null, now: Date) {
+  const live = cooldowns.filter(
+    (record) =>
+      record.provider === provider &&
+      Date.parse(record.pausedUntil) > now.getTime() &&
+      (record.remote === undefined || remote === null || record.remote === remote),
+  );
+  if (live.length === 0) return null;
+  const soonest = live.reduce((a, b) =>
+    Date.parse(a.pausedUntil) <= Date.parse(b.pausedUntil) ? a : b,
+  );
+  return `paused until ${soonest.pausedUntil.slice(0, 10)} (${soonest.reason})`;
+}
+
+export interface DetectOptions {
+  which?: Which;
+  cooldowns?: ReadCooldowns;
+  remote?: string | null;
+  now?: Date;
+}
+
+export async function detect(root: string, options: DetectOptions = {}): Promise<string> {
+  const { which = Bun.which, cooldowns = readCooldowns, remote = null, now = new Date() } = options;
+  const records = await cooldowns();
   const lines: string[] = [];
   for (const provider of PROVIDERS) {
     let config: string | null = null;
@@ -26,13 +87,22 @@ export async function detect(root: string, which: Which = Bun.which): Promise<st
       }
     }
     const cli = which(provider.cli) !== null;
-    if (config && cli) lines.push(`${provider.name}: repo config (${config}), CLI installed`);
-    else if (config) lines.push(`${provider.name}: repo config (${config}), CLI not installed`);
-    else if (cli) lines.push(`${provider.name}: CLI installed, no repo config`);
+    let presence: string;
+    if (config && cli) presence = `repo config (${config}), CLI installed`;
+    else if (config) presence = `repo config (${config}), CLI not installed`;
+    else if (cli) presence = "CLI installed, no repo config";
+    else continue;
+    const paused = pause(records, provider.name, remote, now);
+    lines.push(`${provider.name}: ${presence}${paused ? `, ${paused}` : ""}`);
   }
   return lines.length > 0 ? lines.join("\n") : "none: no bot config or CLI found locally";
 }
 
 if (import.meta.main) {
-  console.log(await detect(process.cwd()));
+  const remote = await Bun.$`git remote get-url origin`.quiet().nothrow();
+  console.log(
+    await detect(process.cwd(), {
+      remote: remote.exitCode === 0 ? remote.text().trim() : null,
+    }),
+  );
 }

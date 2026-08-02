@@ -67,6 +67,9 @@ jobs:
       - name: Check marketplace completeness
         run: bun scripts/check-marketplace.ts
 
+      - name: Check enabled plugin ids
+        run: bun scripts/check-plugin-ids.ts
+
       - name: Check MCP hook matchers
         run: bun scripts/check-mcp-matchers.ts
 

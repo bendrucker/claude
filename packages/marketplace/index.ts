@@ -85,8 +85,9 @@ interface MarketplaceFile {
   plugins: Array<{ name: string; source: PluginSource; description?: string }>;
 }
 
-interface SettingsFile {
+export interface SettingsFile {
   enabledPlugins?: Record<string, boolean>;
+  extraKnownMarketplaces?: Record<string, { source: unknown }>;
 }
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..", "..");
@@ -166,6 +167,12 @@ export async function loadPlugins(opts?: LoadOptions): Promise<Plugin[]> {
   }
 
   return [...plugins.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The settings file read for enabled state, or an empty object when absent. */
+export async function loadSettings(opts?: LoadOptions): Promise<SettingsFile> {
+  const root = repoRoot(opts);
+  return (await readJson<SettingsFile>(settingsPathFor(root, opts))) ?? {};
 }
 
 /**

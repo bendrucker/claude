@@ -436,8 +436,7 @@
     "claude-plugins-official": {
       "source": {
         "source": "github",
-        "repo": "anthropics/claude-plugins-official",
-        "ref": "87644d1355e6f08d55eb98dc2264d68fa226b6ac"
+        "repo": "anthropics/claude-plugins-official"
       }
     },
     "astral-sh": {

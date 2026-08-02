@@ -7,6 +7,8 @@ import { type Cooldown, detect, parseCooldowns } from "./detect-bot";
 const NOW = new Date("2026-08-02T00:00:00Z");
 const REMOTE = "git@github.com:bendrucker/claude.git";
 
+const none = async () => [];
+
 async function repo(files: string[]): Promise<string> {
   const root = mkdtempSync(join(tmpdir(), "detect-bot-"));
   for (const file of files) {
@@ -36,7 +38,7 @@ test.each([
   ],
 ] as [string[], string[], string][])("files %p, CLIs %p", async (files, clis, expected) => {
   const which = (cli: string) => (clis.includes(cli) ? `/bin/${cli}` : null);
-  expect(await detect(await repo(files), { which, now: NOW })).toBe(expected);
+  expect(await detect(await repo(files), { which, cooldowns: none, now: NOW })).toBe(expected);
 });
 
 const onlyGreptile = (cli: string) => (cli === "greptile" ? "/bin/greptile" : null);

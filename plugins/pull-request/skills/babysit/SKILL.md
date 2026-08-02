@@ -12,6 +12,7 @@ allowed-tools:
   - Bash(bunx:*)
   - Bash(gh:*)
   - Skill(pull-request:follow-up)
+  - Skill(github:stack)
   - Skill(gitlab:merge-request)
   - Skill(git:conflicts)
   - mcp__github

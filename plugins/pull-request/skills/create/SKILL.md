@@ -4,17 +4,19 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR, including after committing changes.
 
-argument-hint: "[--draft] [--auto] [--watch] [--dry-run]"
+argument-hint: "[--draft] [--auto] [--watch] [--base <ref>] [--dry-run]"
 allowed-tools:
   - mcp__github
   - Agent
   - Skill(pull-request:babysit)
   - Skill(pull-request:follow-up)
+  - Skill(github:stack)
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
   - "Bash(git push:*)"
   - "Bash(git remote get-url:*)"
   - "Bash(gh pr:*)"
+  - "Bash(gh stack:*)"
   - "Bash(glab mr:*)"
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/*)"
 ---
@@ -72,6 +74,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a normal PR/MR that is rea
 - `--draft`: open the PR/MR as a draft. Default: ready for review.
 - `--auto`: after creating, enable auto-merge so it merges once checks pass and required approvals land. Default: off.
 - `--watch`: after creating, spawn `pull-request:babysit` to actively shepherd the PR/MR (fix trivial red CI, drive the merge). When a bot review should gate the merge (asked to wait for a reviewer, or a review bot is configured on the repo), add `--reviews` so babysit hands the wait to `follow-up --auto`; a needless `--reviews` costs only one no-op hand-off. Distinct from `--auto`, which only flips on the platform's passive auto-merge. Default: off.
+- `--base <ref>`: parent branch for a stack layer. See [Stacking](#stacking). Default: the repo's default branch.
 - `--dry-run` (alias `--body-only`): produce the body without creating anything. See [Dry Run](#dry-run). Default: off.
 
 ## Dry Run
@@ -94,11 +97,27 @@ If `--dry-run` (or `--body-only`) is set, follow [Dry Run](#dry-run) instead of 
    - Write the body in its own Bash call, then create in a second call that starts with `gh`/`glab`. The body-validation hook matches on that leading verb, so anything in front of it (a `cd`, a chained heredoc that writes the body, an env assignment) skips validation silently. Never `cd` to the directory you are already in
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
+   - Add `--base <parent>` on either when the branch is a stack layer (see [Stacking](#stacking))
+1. Link the stack when the branch is a GitHub stack layer, after the PR exists. See [Stacking](#stacking).
 1. Enable auto-merge when `--auto` is set, after the PR/MR exists:
    - **GitHub**: `gh pr merge --auto` (add `--squash` or `--rebase` to match the repo's merge method when known)
+   - **GitHub, stacked**: auto-merge has no equivalent. Say so and suggest `--watch`, which drives the stack merge at green.
    - **GitLab**: load `gitlab:merge-request` and run its `merge.ts --auto-merge`, which handles merge trains and falls back to `glab mr merge` as needed
 1. Suggest reviewers on corporate repos (see [Reviewers](#reviewers)). Skip this step for OSS.
 1. Watch the PR/MR when `--watch` is set. Spawn a background `Agent` that invokes `pull-request:babysit <url> --merge` (add `--reviews` per the flag above). Babysit is session-scoped and owns its own `Monitor` watcher, so the backgrounded Agent gives it a session to live in while create returns immediately.
+
+## Stacking
+
+A branch whose parent is another topic branch rather than the default branch is a stack layer, and its PR has to target that parent. `--base <ref>` names the parent, and so does the user saying what this branch sits on. Nothing else does: the branch's own upstream ref points at its remote copy, not its parent. Without either signal, open against the default branch.
+
+On GitHub, create the PR with `--base <parent>`, then chain it into the stack:
+
+```
+gh stack link <bottom> ... <this-branch>   # bottom to top, creates or updates the stack
+gh stack link <stack-number> <this-branch> # append to an existing stack
+```
+
+Creating the PR first preserves the drafted title and body. `link` reuses the open PR it finds and would otherwise auto-generate both. Load `github:stack` for detection, merge behavior, and the local-tracking commands to avoid.
 
 ## GitLab Notes
 

@@ -46,9 +46,11 @@ This @-mention is the only place a bot is named. Thread replies never name or th
 
 ## On-Demand Review
 
-My personal repos run Greptile with automatic review off. Nothing reviews a PR there until asked, and the asking is `@greptileai review`, the same phrase as the re-trigger above. `/ship` posts it once, after the PR exists, when the diff clears the Bot Review Gate (`~/.claude/skills/ship/references/passes.md`). Then wait for the summary through the path above, the same as on a repo that reviews automatically.
+Greptile has no switch for reviewing nothing until asked. Its dashboard offers two trigger toggles, both now off and mirrored by `triggerOnUpdates` and `triggerOnDrafts` in `.greptile/config.json`, so a PR draws one review when it opens instead of one per push, and drafts draw none. The genuine on-demand lever is `fileChangeLimit`, a dashboard setting with no config-file equivalent: Greptile skips any PR over that many changed files unless someone tags `@greptileai`. It is set to 1 org-wide, which covers every personal repo. A one-file PR still reviews itself. Everything larger waits to be asked. Confirm the live values with `greptile config --json`, which prints the effective merge of repo config, dashboard, and org rules.
 
-On a diff the gate skips, post nothing. An on-demand review that fires on every PR costs exactly what automatic review cost.
+So `@greptileai review` does double duty. It is the re-trigger above, and it is how a filtered-out PR gets reviewed at all. `/ship` posts it once, after the PR exists, when the diff clears the Bot Review Gate (`~/.claude/skills/ship/references/passes.md`). Then wait for the summary through the path above.
+
+On a diff the gate skips, post nothing.
 
 ## Adding a Reviewer
 

@@ -35,7 +35,7 @@ function isFixture(path: string): boolean {
 export async function* assetPaths(patterns: string[]): AsyncGenerator<string> {
   for (const pattern of patterns) {
     // `dot` reaches the project scope under `.claude/`. A pattern whose
-    // directory is absent yields nothing rather than throwing.
+    // directory is absent yields nothing.
     for await (const path of new Bun.Glob(pattern).scan({ cwd: root, dot: true })) {
       if (!isFixture(path)) yield path;
     }
@@ -57,7 +57,6 @@ export function scopeOf(path: string): Scope {
   return "project";
 }
 
-/** The scope, path, and owning plugin every asset record carries. */
 export function origin(path: string): { scope: Scope; path: string; plugin?: string } {
   const plugin = path.startsWith("plugins/") ? path.split("/")[1] : undefined;
   return { scope: scopeOf(path), path, ...(plugin ? { plugin } : {}) };

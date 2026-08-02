@@ -13,7 +13,6 @@ import {
   skillName,
 } from "../assets";
 
-/** What every asset record carries, whatever its kind. */
 interface Origin {
   scope: Scope;
   path: string;
@@ -183,7 +182,6 @@ export interface Filters {
   scope?: Scope;
 }
 
-/** Narrows every asset list at once, so each kind honors the same flags. */
 export function filter(inventory: Inventory, { plugin, scope }: Filters): Inventory {
   const keep = (item: Origin): boolean =>
     (!plugin || item.plugin === plugin) && (!scope || item.scope === scope);

@@ -154,8 +154,8 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
 export function render({ kind, head, rows }: Section): string {
   if (rows.length === 0) return `No ${kind} found.`;
 
-  // Rules between every row would double the line count of a listing that lands
-  // in a context window rather than on a screen.
+  // Rules between every row would double the line count of a listing that
+  // lands in a context window.
   return table([head, ...rows], {
     border: getBorderCharacters("norc"),
     drawHorizontalLine: (index, size) => index === 0 || index === 1 || index === size,

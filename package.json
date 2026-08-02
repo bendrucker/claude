@@ -38,6 +38,7 @@
     "coverage": "bun scripts/coverage/index.ts",
     "format": "biome format --write",
     "format:check": "biome format",
+    "inventory": "bun scripts/inventory/index.ts",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
     "schemas": "bun scripts/schemas/index.ts",

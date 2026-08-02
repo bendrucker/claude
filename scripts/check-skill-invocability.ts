@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
-import { globSync } from "node:fs";
 import { join } from "node:path";
 import matter from "gray-matter";
+import { readAll, root, SKILL_GLOBS, skillName } from "./assets";
 import { runCheck } from "./check";
 
 // Bundled built-ins registered with `disableModelInvocation: true`, per section
@@ -11,40 +11,11 @@ import { runCheck } from "./check";
 // upstream later makes model-invocable goes stale as a false positive here.
 const USER_INVOCABLE_BUILTINS = new Set(["code-review", "verify", "batch"]);
 
-// Each scope globs from its own directory because node:fs globSync refuses to
-// descend into a dot directory even when the pattern names it literally:
-// globSync(".claude/skills/*/SKILL.md") matches nothing.
-export const SKILL_SCOPES = [
-  { dir: "plugins", pattern: "*/skills/*/SKILL.md" },
-  { dir: "user/skills", pattern: "*/SKILL.md" },
-  { dir: ".claude/skills", pattern: "*/SKILL.md" },
-];
-
-const root = join(import.meta.dirname, "..");
-
 export interface SkillFile {
   path: string;
   name: string;
   disabled: boolean;
   grants: string[];
-}
-
-/**
- * The name a skill is reachable by, which `Skill()` grants have to match.
- *
- * Frontmatter wins. Derivation covers the rest: a plugin skill namespaces as
- * `<plugin>:<skill>`, collapsing to `<plugin>` for the entry-skill pattern
- * where the two match. User and project skills carry no namespace.
- */
-export function skillName(path: string, frontmatterName?: string): string {
-  if (frontmatterName) return frontmatterName;
-
-  const segments = path.split("/");
-  const skill = segments.at(-2) ?? "";
-  if (segments[0] !== "plugins") return skill;
-
-  const plugin = segments[1];
-  return skill === plugin ? plugin : `${plugin}:${skill}`;
 }
 
 /** Skill names an `allowed-tools` list grants, dropping any trailing arguments. */
@@ -92,11 +63,7 @@ async function read(path: string): Promise<SkillFile> {
 }
 
 export async function skillFiles(): Promise<SkillFile[]> {
-  const paths = SKILL_SCOPES.flatMap(({ dir, pattern }) =>
-    globSync(pattern, { cwd: join(root, dir) }).map((match) => `${dir}/${match}`),
-  ).filter((path) => !path.includes("/test/"));
-
-  return Promise.all(paths.map(read));
+  return readAll(SKILL_GLOBS, read);
 }
 
 if (import.meta.main) {

@@ -1,17 +1,12 @@
 import { expect, it, test } from "bun:test";
-import {
-  SKILL_SCOPES,
-  type SkillFile,
-  skillFiles,
-  skillGrants,
-  skillName,
-  violations,
-} from "./check-skill-invocability";
+import { SKILL_GLOBS, skillName } from "./assets";
+import { type SkillFile, skillFiles, skillGrants, violations } from "./check-skill-invocability";
 
-test.each(SKILL_SCOPES)("discovers skills under $dir", async ({ dir }) => {
+test.each<string>([...SKILL_GLOBS])("discovers skills matching %s", async (pattern) => {
+  const root = pattern.split("/")[0];
   const paths = (await skillFiles()).map((file) => file.path);
 
-  expect(paths.filter((path) => path.startsWith(`${dir}/`))).not.toBeEmpty();
+  expect(paths.filter((path) => path.startsWith(`${root}/`))).not.toBeEmpty();
 });
 
 test.each<{ name: string; path: string; frontmatterName?: string; expected: string }>([

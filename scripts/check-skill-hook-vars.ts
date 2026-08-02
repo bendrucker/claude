@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
-import { globSync } from "node:fs";
 import { join } from "node:path";
 import matter from "gray-matter";
+import { assetPaths, root, SKILL_GLOBS } from "./assets";
 import { runCheck } from "./check";
 
 // The hooks engine substitutes only ${CLAUDE_PROJECT_DIR}, ${CLAUDE_PLUGIN_ROOT},
@@ -13,19 +13,14 @@ import { runCheck } from "./check";
 // Reference bundled scripts by ${CLAUDE_PLUGIN_ROOT}/skills/<skill>/... instead.
 const FORBIDDEN = /\$\{CLAUDE_SKILL_(?:DIR|ROOT)\}/;
 
-const root = join(import.meta.dirname, "..");
-
 interface MatcherEntry {
   hooks?: Array<{ command?: string; args?: string[] }>;
 }
 
 async function checkSkillHookVars(): Promise<string[]> {
-  const files = globSync("plugins/*/skills/*/SKILL.md", { cwd: root });
   const violations: string[] = [];
 
-  for (const file of files) {
-    if (file.includes("/test/")) continue;
-
+  for await (const file of assetPaths(SKILL_GLOBS)) {
     const raw = await Bun.file(join(root, file)).text();
     const { data } = matter(raw);
     const hooks = data.hooks as Record<string, MatcherEntry[]> | undefined;

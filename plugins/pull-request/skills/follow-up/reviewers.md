@@ -30,9 +30,11 @@ Whether a review is expected decides how to read an absent summary: pending (kee
 
 The status-check signal only appears after the PR exists and the bot's webhook has fired, so a check made at creation time sees only the first and third. Re-evaluate against the live PR before merging, where the pending check has appeared. With none of these signals present, no review is expected: an empty result is nothing to do.
 
-A live cooldown disqualifies a provider outright, whatever the signals above say. `detect-bot.ts` reports one as `paused until <date> (<reason>)`. A bot that is out of reviews will not answer, so its absent summary is nothing to do.
+Two things disqualify a provider outright, whatever the signals above say.
 
-A bot comment reporting its own pause or rate limit ends the loop the same way. Record it to `~/.cache/claude/bot-review.json` per [local.md](local.md), then stop.
+A live cooldown is the first. `detect-bot.ts` reports one as `paused until <date> (<reason>)`. A bot that is out of reviews will not answer, so its absent summary is nothing to do. A bot comment reporting its own pause or rate limit ends the loop the same way: record it to `~/.cache/claude/bot-review.json` per [local.md](local.md), then stop.
+
+An unrequested PR on a review-on-request repo is the second, and it is the easier one to miss, because the provider is available and only the PR was left out. The signals above all describe the repo, so on a repo configured per [On-Demand Review](#on-demand-review) they stay true for a PR nobody opted in. Read the opt-in instead: whether the PR carries the trigger label, or someone asked for a review in this session. Without one, no review is expected, an absent summary is nothing to do, and the re-trigger below must not be posted. That comment overrides every lever, so posting it spends the review the PR was deliberately not given.
 
 ## Re-triggering an Idle Reviewer
 

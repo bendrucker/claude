@@ -30,9 +30,17 @@ Then spend a review when any of these hold:
 - it is over roughly 200 changed lines or 8 files, excluding tests, docs, and lockfiles
 - `review:code` confirmed a real bug, or the session redirected enough that the diff wandered
 
-Skip otherwise. Always skip on prose-only, config-only, dependency bumps, and revert commits.
+Nothing else qualifies. Prose, dependency bumps, and reverts never do, and neither does a config diff that stays clear of the risk surfaces in the first bullet. Editing sandbox or permissions config is the strongest reason on the list to spend, so "config" alone decides nothing.
 
-The gate also decides the hosted pass. My Greptile org sets `Labels / Include / review`, which skips any PR without a `review` label. That label exists in `bendrucker/claude`, `dotfiles`, and `bendrucker.me`. With `triggerOnUpdates` and `triggerOnDrafts` both off, a labeled PR draws one review at open and drafts draw none. When the gate says spend, pass `--label review` to `pull-request:create`. The review then starts with the PR. `reviewers.md` covers the levers and the `@greptileai review` override.
+#### Which Channel
+
+A spend verdict buys **one** review through **one** channel. Both draw the same meter, so running the local CLI and then labeling the PR pays twice for one diff and puts credits back on the path that exhausted them.
+
+Default to the local pass. It reports before the PR exists, so fixes land in the branch instead of as follow-up commits under a bot thread. Skip `--label review` on that run.
+
+Fall back to the hosted pass when the local CLI cannot run: the provider's CLI is not installed, auth fails, or the liveness probe in `local.md` finds it dead. Then pass `--label review` to `pull-request:create` and let the hosted bot review the pushed branch. A live cooldown takes both channels away. That skips the pass entirely rather than switching.
+
+My Greptile org sets `Labels / Include / review`, which skips any PR without a `review` label. That label exists in `bendrucker/claude`, `dotfiles`, and `bendrucker.me`. With `triggerOnUpdates` and `triggerOnDrafts` both off, a labeled PR draws one review at open and drafts draw none. `reviewers.md` covers the levers and the `@greptileai review` override.
 
 These thresholds are a starting calibration to tune. Removal trigger: if the gate is right, `free_reviews_limit_reached` goes to zero in the session index and credits last the billing period. Too tight shows up as manual `--local` requests on PRs the gate skipped. Loosen the line count. Too loose and credits still run out early.
 

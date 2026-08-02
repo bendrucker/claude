@@ -8,6 +8,8 @@ const NOW = new Date("2026-08-02T00:00:00Z");
 const REMOTE = "git@github.com:bendrucker/claude.git";
 
 const none = async () => [];
+const origin = async () => REMOTE;
+const noOrigin = async () => null;
 
 async function repo(files: string[]): Promise<string> {
   const root = mkdtempSync(join(tmpdir(), "detect-bot-"));
@@ -91,18 +93,30 @@ test.each<{ name: string; records: unknown; expected: string }>([
     expected: "greptile: repo config (.greptile/config.json), CLI installed",
   },
   {
+    name: "an explicit null remote reads as unscoped",
+    records: [{ ...exhausted, remote: null }],
+    expected:
+      "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-08-07 (free credits exhausted)",
+  },
+  {
+    name: "a timezone-less date is not shifted",
+    records: [{ ...exhausted, pausedUntil: "September 1, 2026" }],
+    expected:
+      "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-09-01 (free credits exhausted)",
+  },
+  {
     name: "record for another provider",
     records: [{ ...exhausted, provider: "coderabbit" }],
     expected: "greptile: repo config (.greptile/config.json), CLI installed",
   },
   {
-    name: "soonest of several live records",
+    name: "overlapping pauses lift with the last one",
     records: [
-      exhausted,
       { ...exhausted, pausedUntil: "2026-08-04T00:00:00Z", reason: "rate limited" },
+      exhausted,
     ],
     expected:
-      "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-08-04 (rate limited)",
+      "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-08-07 (free credits exhausted)",
   },
   {
     name: "malformed file: not an array",
@@ -122,7 +136,7 @@ test.each<{ name: string; records: unknown; expected: string }>([
 ])("cooldown: $name", async ({ records, expected }) => {
   const cooldowns = async () => parseCooldowns(JSON.stringify(records));
   const root = await repo([".greptile/config.json"]);
-  expect(await detect(root, { which: onlyGreptile, cooldowns, remote: REMOTE, now: NOW })).toBe(
+  expect(await detect(root, { which: onlyGreptile, cooldowns, remote: origin, now: NOW })).toBe(
     expected,
   );
 });
@@ -142,7 +156,7 @@ test.each<{ name: string; records: Cooldown[]; expected: string }>([
 ])("unresolvable remote: $name", async ({ records, expected }) => {
   const cooldowns = async () => records;
   const root = await repo([".greptile/config.json"]);
-  expect(await detect(root, { which: onlyGreptile, cooldowns, remote: null, now: NOW })).toBe(
+  expect(await detect(root, { which: onlyGreptile, cooldowns, remote: noOrigin, now: NOW })).toBe(
     expected,
   );
 });
@@ -150,7 +164,7 @@ test.each<{ name: string; records: Cooldown[]; expected: string }>([
 test("cooldown: unparseable JSON", async () => {
   const cooldowns = async () => parseCooldowns("not json");
   const root = await repo([".greptile/config.json"]);
-  expect(await detect(root, { which: onlyGreptile, cooldowns, remote: REMOTE, now: NOW })).toBe(
+  expect(await detect(root, { which: onlyGreptile, cooldowns, remote: origin, now: NOW })).toBe(
     "greptile: repo config (.greptile/config.json), CLI installed",
   );
 });

@@ -46,11 +46,11 @@ This @-mention is the only place a bot is named. Thread replies never name or th
 
 ## On-Demand Review
 
-Greptile has no switch for reviewing nothing until asked. Its dashboard offers two trigger toggles, both now off and mirrored by `triggerOnUpdates` and `triggerOnDrafts` in `.greptile/config.json`. A PR therefore draws one review when it opens instead of one per push, and drafts draw none. The genuine on-demand lever is `fileChangeLimit`, a dashboard setting with no config-file equivalent: Greptile skips any PR over that many changed files unless someone tags `@greptileai`. It is set to 1 org-wide, which covers every personal repo. A one-file PR still reviews itself. Everything larger waits to be asked. Confirm the live values with `greptile config --json`, which prints the effective merge of repo config, dashboard, and org rules.
+Greptile has no switch for reviewing nothing until asked. The opt-in is a **label filter**. My org sets `Labels / Include / review` under Filters, which skips every PR not carrying a `review` label. That label exists in `bendrucker/claude`, `dotfiles`, and `bendrucker.me`. Two dashboard toggles handle the rest, both off and mirrored by `triggerOnUpdates` and `triggerOnDrafts` in `.greptile/config.json`. A labeled PR draws one review when it opens rather than one per push. Drafts draw none.
 
-So `@greptileai review` does double duty. It is the re-trigger above, and it is how a filtered-out PR gets reviewed at all. `/ship` posts it once, after the PR exists, when the diff clears the Bot Review Gate (`~/.claude/skills/ship/references/passes.md`). Then wait for the summary through the path above.
+`/ship` applies the label at creation, when the diff clears the Bot Review Gate (`~/.claude/skills/ship/references/passes.md`). The review starts with the PR, and you wait for the summary through the path above. On a diff the gate skips, the PR opens unlabeled and nothing reviews it. Adding the label later works too, and `@greptileai review` still forces a review past the filter.
 
-On a diff the gate skips, post nothing.
+Don't infer any of this from the config file. Filters live only in the effective merge, which `greptile config --json` prints.
 
 ## Adding a Reviewer
 

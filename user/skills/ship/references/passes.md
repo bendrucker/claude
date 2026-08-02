@@ -32,7 +32,7 @@ Then spend a review when any of these hold:
 
 Skip otherwise. Always skip on prose-only, config-only, dependency bumps, and revert commits.
 
-The gate also decides the hosted pass wherever the hosted bot waits to be asked: when it says spend, post the trigger comment after the PR exists, then wait through the normal path in `reviewers.md`. That file covers which Greptile settings actually make a repo on-demand, since turning automatic review off entirely is not one of them.
+The gate also decides the hosted pass wherever the bot waits to be asked. Greptile skips any PR on my repos without a `review` label. When the gate says spend, pass `--label review` to `pull-request:create`. The review then starts with the PR. When it says skip, the PR opens unlabeled and nothing reviews it. `reviewers.md` covers the filter and the manual override.
 
 Treat the thresholds as a starting calibration to tune. Removal trigger: if the gate is right, `free_reviews_limit_reached` goes to zero in the session index and credits last the billing period. Too tight shows up as manual `--local` requests on PRs the gate skipped, and the fix is to loosen the line count. Too loose and credits still run out early.
 

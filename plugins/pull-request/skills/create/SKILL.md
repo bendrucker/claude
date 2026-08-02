@@ -4,7 +4,7 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR, including after committing changes.
 
-argument-hint: "[--draft] [--auto] [--watch] [--base <ref>] [--dry-run]"
+argument-hint: "[--draft] [--auto] [--watch] [--base <ref>] [--label <name>] [--dry-run]"
 allowed-tools:
   - mcp__github
   - Agent
@@ -75,6 +75,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a normal PR/MR that is rea
 - `--auto`: after creating, enable auto-merge so it merges once checks pass and required approvals land. Default: off.
 - `--watch`: after creating, spawn `pull-request:babysit` to actively shepherd the PR/MR (fix trivial red CI, drive the merge). When a bot review should gate the merge (asked to wait for a reviewer, or a review bot is configured on the repo), add `--reviews` so babysit hands the wait to `follow-up --auto`; a needless `--reviews` costs only one no-op hand-off. Distinct from `--auto`, which only flips on the platform's passive auto-merge. Default: off.
 - `--base <ref>`: parent branch for a stack layer. See [Stacking](#stacking). Default: the repo's default branch.
+- `--label <name>`: apply a label at creation, repeatable. Some repos gate their hosted review bot on a label rather than reviewing every PR. On those, this is how a review gets requested (see follow-up's `reviewers.md`). The label must already exist. `gh` fails the whole create if it does not. Default: none.
 - `--dry-run` (alias `--body-only`): produce the body without creating anything. See [Dry Run](#dry-run). Default: off.
 
 ## Dry Run
@@ -91,7 +92,7 @@ If `--dry-run` (or `--body-only`) is set, follow [Dry Run](#dry-run) instead of 
 1. Local bot review, gated: the Review bot line in Context above is the fast-path verdict, covering repo config, CLI presence, and any live cooldown. On a repo config hit with no cooldown, apply ship's Bot Review Gate (`~/.claude/skills/ship/references/passes.md`, Bot Review Gate) to the diff. Both channels draw the same meter. A diff the gate skips gets no local pass. When it says spend, run `pull-request:follow-up --local` before pushing so findings surface while the branch is still local. With no config, a bot may still review the repo: follow-up's `local.md` hosted signals decide. Skip when a local bot pass already ran on this branch in this session (`/ship` runs it as a gated pass), when the provider is paused, when detection comes up empty, or when the user declines.
 1. Push the branch to remote: `git push -u origin HEAD`
 1. Draft the body, outlining first for a large change or any open-source PR (see [Outline First](#outline-first)).
-1. Create the PR/MR. Append `--draft` to the create command when `--draft` is set:
+1. Create the PR/MR. Append `--draft` when `--draft` is set, and `--label <name>` for each `--label` given:
    - Write the body to a temp file first (e.g., `tmp/pr-body-<branch>.md`)
    - Include the branch name in the filename to avoid conflicts with concurrent agents
    - Write the body in its own Bash call, then create in a second call that starts with `gh`/`glab`. The body-validation hook matches on that leading verb, so anything in front of it (a `cd`, a chained heredoc that writes the body, an env assignment) skips validation silently. Never `cd` to the directory you are already in

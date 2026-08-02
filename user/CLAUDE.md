@@ -68,7 +68,12 @@ I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 
 ## Stacked PRs
 
-I work in stacks routinely. Each branch lives in its own Worktrunk worktree (see Worktrees above). Restack with `wt sync`, a custom extension that rebases each branch onto its parent in dependency order. Useful flags: `--fetch` to pull the base first, `--push` to update remotes after rebasing, `--prune` to remove integrated worktrees. Run `wt sync --dry-run` to preview the plan.
+I work in stacks routinely, in one of two layouts, chosen per stack. Load `github:stack` before any `gh stack` command. `gitlab:merge-request` is the GitLab equivalent.
+
+- A worktree per branch (see Worktrees above) suits layers I work on in parallel or over a long stretch. `wt sync` rebases each branch onto its parent in dependency order: `--fetch` to pull the base first, `--push` to update remotes, `--prune` to remove integrated worktrees, `--dry-run` to preview the plan. Publish with `gh stack link`, after `wt sync --push`, because `link` pushes without force.
+- One worktree holding the whole stack suits a stack I'm actively reshaping, where reordering and folding layers matters more than working two layers at once. `gh stack` owns it end to end, and `gh stack sync` covers what `wt sync` and `gh stack link` do together in the other layout.
+
+Don't mix the two within one stack. The local-tracking commands silently do nothing to a branch checked out in another worktree. `gh stack merge` merges either layout. Pull the surviving layers afterward, since GitHub rebases everything left open above the merge.
 
 ## Personal Details
 

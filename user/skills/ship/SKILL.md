@@ -79,6 +79,8 @@ The commit sits on `HEAD`, so the fast-forward is clean. It runs in the Agent to
 
 Join the background `plan:review` first if it was gated in. Act on fix-worthy drift before the PR exists, and carry any deferred follow-ups into the report. Then `pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
 
+Pass `--base <parent>` through when `/ship --base` named a stack parent. Create needs it to target the PR at the parent and to link the layer into the stack on GitHub. Without it the PR opens against the default branch and carries every lower layer's diff.
+
 ## Babysit
 
 `pull-request:babysit <url>` watches CI and fixes trivial failures to green.

@@ -8,6 +8,7 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
   - `actions-monitor`: Watch a PR's CI and stream state events; invokes the logs agent on failures
   - `notifications`: Inbox management (list, filter, mark read/done, unsubscribe)
   - `pr-comments`: Fetch unresolved review comments from a pull request
+  - `stack`: Build, publish, and merge native stacked PRs with the `gh stack` extension
 - **Agents**:
   - `github-rulesets-manager`: Configure repository rulesets and branch protection
   - `logs`: Extracts relevant lines from failing-job logs (invoked by `actions-monitor`)

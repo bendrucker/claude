@@ -19,9 +19,9 @@ Gating is the cost lever: never run a reviewer the change does not warrant. `--s
 
 ## Bot Review Gate
 
-A bot review is metered, and both channels draw the same meter: running the local CLI and then letting the hosted bot review the pushed branch costs two of the same credits for one change. So one gate decides both, and it keys on the diff alone. There is no repo classification: churn is not worth a review anywhere.
+A bot review is metered, and both channels draw the same meter: the local CLI plus a hosted review of the pushed branch costs two credits for one change. So one gate decides both, keyed on the diff alone. Churn is not worth a review on any repo.
 
-Availability comes first, and `pull-request:follow-up` owns it. Its `detect-bot.ts` fast path reports each provider's repo config, CLI presence, and any live cooldown. A paused provider is unavailable: skip the pass without probing it. `local.md` covers detection and `reviewers.md` covers what a cooldown means to a waiting loop.
+Availability comes first, and `pull-request:follow-up` owns it. Its `detect-bot.ts` fast path reports each provider's repo config, CLI presence, and any live cooldown. Treat a paused provider as unavailable and skip the pass. `local.md` covers detection, `reviewers.md` covers what a cooldown means to a waiting loop.
 
 Then spend a review when any of these hold:
 
@@ -32,9 +32,9 @@ Then spend a review when any of these hold:
 
 Skip otherwise. Always skip on prose-only, config-only, dependency bumps, and revert commits.
 
-The gate also decides the hosted pass wherever the bot waits to be asked. Greptile skips any PR on my repos without a `review` label. When the gate says spend, pass `--label review` to `pull-request:create`. The review then starts with the PR. When it says skip, the PR opens unlabeled and nothing reviews it. `reviewers.md` covers the filter and the manual override.
+The gate also decides the hosted pass wherever the bot waits to be asked. Greptile skips any PR on my repos without a `review` label, so when the gate says spend, pass `--label review` to `pull-request:create` and the review starts with the PR. `reviewers.md` covers the filter and the manual override.
 
-Treat the thresholds as a starting calibration to tune. Removal trigger: if the gate is right, `free_reviews_limit_reached` goes to zero in the session index and credits last the billing period. Too tight shows up as manual `--local` requests on PRs the gate skipped, and the fix is to loosen the line count. Too loose and credits still run out early.
+These thresholds are a starting calibration to tune. Removal trigger: if the gate is right, `free_reviews_limit_reached` goes to zero in the session index and credits last the billing period. Too tight shows up as manual `--local` requests on PRs the gate skipped. Loosen the line count. Too loose and credits still run out early.
 
 ## Plan Review
 

@@ -79,6 +79,17 @@ test.each<{ name: string; records: unknown; expected: string }>([
       "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-08-07 (free credits exhausted)",
   },
   {
+    name: "non-ISO pausedUntil is normalized, not sliced",
+    records: [{ ...exhausted, pausedUntil: "August 7, 2026 00:00:00 UTC" }],
+    expected:
+      "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-08-07 (free credits exhausted)",
+  },
+  {
+    name: "malformed file: non-string remote",
+    records: [{ ...exhausted, remote: 42 }],
+    expected: "greptile: repo config (.greptile/config.json), CLI installed",
+  },
+  {
     name: "record for another provider",
     records: [{ ...exhausted, provider: "coderabbit" }],
     expected: "greptile: repo config (.greptile/config.json), CLI installed",
@@ -111,6 +122,26 @@ test.each<{ name: string; records: unknown; expected: string }>([
   const cooldowns = async () => parseCooldowns(JSON.stringify(records));
   const root = await repo([".greptile/config.json"]);
   expect(await detect(root, { which: onlyGreptile, cooldowns, remote: REMOTE, now: NOW })).toBe(
+    expected,
+  );
+});
+
+test.each<{ name: string; records: Cooldown[]; expected: string }>([
+  {
+    name: "an unscoped record still applies",
+    records: [{ ...exhausted, remote: undefined }],
+    expected:
+      "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-08-07 (free credits exhausted)",
+  },
+  {
+    name: "a repo-scoped record does not leak",
+    records: [exhausted],
+    expected: "greptile: repo config (.greptile/config.json), CLI installed",
+  },
+])("unresolvable remote: $name", async ({ records, expected }) => {
+  const cooldowns = async () => records;
+  const root = await repo([".greptile/config.json"]);
+  expect(await detect(root, { which: onlyGreptile, cooldowns, remote: null, now: NOW })).toBe(
     expected,
   );
 });

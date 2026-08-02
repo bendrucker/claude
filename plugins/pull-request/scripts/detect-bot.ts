@@ -36,11 +36,12 @@ export function parseCooldowns(text: string): Cooldown[] {
   if (!Array.isArray(parsed)) return [];
   return parsed.filter((record): record is Cooldown => {
     if (typeof record !== "object" || record === null) return false;
-    const { provider, pausedUntil, reason } = record as Record<string, unknown>;
+    const { provider, pausedUntil, reason, remote } = record as Record<string, unknown>;
     return (
       typeof provider === "string" &&
       typeof pausedUntil === "string" &&
       typeof reason === "string" &&
+      (remote === undefined || typeof remote === "string") &&
       !Number.isNaN(Date.parse(pausedUntil))
     );
   });
@@ -58,13 +59,14 @@ function pause(cooldowns: Cooldown[], provider: string, remote: string | null, n
     (record) =>
       record.provider === provider &&
       Date.parse(record.pausedUntil) > now.getTime() &&
-      (record.remote === undefined || remote === null || record.remote === remote),
+      (record.remote === undefined || record.remote === remote),
   );
   if (live.length === 0) return null;
   const soonest = live.reduce((a, b) =>
     Date.parse(a.pausedUntil) <= Date.parse(b.pausedUntil) ? a : b,
   );
-  return `paused until ${soonest.pausedUntil.slice(0, 10)} (${soonest.reason})`;
+  const until = new Date(Date.parse(soonest.pausedUntil)).toISOString().slice(0, 10);
+  return `paused until ${until} (${soonest.reason})`;
 }
 
 export interface DetectOptions {
@@ -99,10 +101,13 @@ export async function detect(root: string, options: DetectOptions = {}): Promise
 }
 
 if (import.meta.main) {
-  const remote = await Bun.$`git remote get-url origin`.quiet().nothrow();
+  const records = await readCooldowns();
+  const origin =
+    records.length > 0 ? await Bun.$`git remote get-url origin`.quiet().nothrow() : null;
   console.log(
     await detect(process.cwd(), {
-      remote: remote.exitCode === 0 ? remote.text().trim() : null,
+      cooldowns: async () => records,
+      remote: origin?.exitCode === 0 ? origin.text().trim() : null,
     }),
   );
 }

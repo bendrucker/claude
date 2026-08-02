@@ -30,9 +30,9 @@ Whether a review is expected decides how to read an absent summary: pending (kee
 
 The status-check signal only appears after the PR exists and the bot's webhook has fired, so a check made at creation time sees only the first and third. Re-evaluate against the live PR before merging, where the pending check has appeared. With none of these signals present, no review is expected: an empty result is nothing to do.
 
-A live cooldown disqualifies a provider outright, whatever the signals above say. `detect-bot.ts` reports one as `paused until <date> (<reason>)`. A configured bot that is out of reviews will not answer. Its absent summary is nothing to do, and waiting on it burns `ScheduleWakeup` ticks for nothing.
+A live cooldown disqualifies a provider outright, whatever the signals above say. `detect-bot.ts` reports one as `paused until <date> (<reason>)`. A bot that is out of reviews will not answer, so its absent summary is nothing to do.
 
-A bot comment reporting its own pause or rate limit ends the loop the same way. Record it to `~/.cache/claude/bot-review.json` per [local.md](local.md). Stop. Don't re-trigger.
+A bot comment reporting its own pause or rate limit ends the loop the same way. Record it to `~/.cache/claude/bot-review.json` per [local.md](local.md), then stop.
 
 ## Re-triggering an Idle Reviewer
 
@@ -46,11 +46,11 @@ This @-mention is the only place a bot is named. Thread replies never name or th
 
 ## On-Demand Review
 
-Greptile has no switch for reviewing nothing until asked. The opt-in is a **label filter**. My org sets `Labels / Include / review` under Filters, which skips every PR not carrying a `review` label. That label exists in `bendrucker/claude`, `dotfiles`, and `bendrucker.me`. Two dashboard toggles handle the rest, both off and mirrored by `triggerOnUpdates` and `triggerOnDrafts` in `.greptile/config.json`. A labeled PR draws one review when it opens rather than one per push. Drafts draw none.
+The opt-in on my repos is a **label filter**. Greptile's org settings set `Labels / Include / review`, which skips every PR not carrying a `review` label. That label exists in `bendrucker/claude`, `dotfiles`, and `bendrucker.me`. Two dashboard toggles handle the rest. Both are off, mirrored by `triggerOnUpdates` and `triggerOnDrafts` in `.greptile/config.json`. A labeled PR draws one review when it opens. Drafts draw none.
 
-`/ship` applies the label at creation, when the diff clears the Bot Review Gate (`~/.claude/skills/ship/references/passes.md`). The review starts with the PR, and you wait for the summary through the path above. On a diff the gate skips, the PR opens unlabeled and nothing reviews it. Adding the label later works too, and `@greptileai review` still forces a review past the filter.
+`/ship` applies the label at creation, when the diff clears the review gate in SKILL.md. The review starts with the PR, and you wait for the summary through the path above. A PR the gate skipped opens unlabeled; adding the label later still summons a review, as does `@greptileai review`.
 
-Don't infer any of this from the config file. Filters live only in the effective merge, which `greptile config --json` prints.
+Filters live only in the effective merge, so read the live values from `greptile config --json` rather than the repo config file.
 
 ## Adding a Reviewer
 

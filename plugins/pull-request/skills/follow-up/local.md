@@ -17,9 +17,15 @@ SKILL.md injects the fast path at load: `scripts/detect-bot.ts` reports each pro
 
 ## Running a Review
 
-Both CLIs take minutes, and CodeRabbit's own docs say 7-30+. Launch the review with `run_in_background`; the harness re-invokes you when it exits.
+Both CLIs take minutes, and CodeRabbit's own docs say 7-30+. Launch the review with `run_in_background`, redirecting both streams to a file. The harness re-invokes you when the run exits.
 
-Both print within a second or two of starting. Greptile prints `▸ Dispatching review…`. CodeRabbit `--agent` starts streaming NDJSON events. So read silence as a break: if nothing has arrived on stdout 30 seconds in, kill the run, report what you saw (usually an auth or network error swallowed on stderr), and stop. A retry costs another metered review.
+Both print within a second or two of starting: Greptile prints `▸ Dispatching review…`, CodeRabbit `--agent` starts streaming NDJSON events. Silence past 30 seconds means the CLI is broken rather than slow, and a broken run would otherwise sit backgrounded until the harness wakes you at exit that never comes. So follow the launch with a bounded liveness probe, which returns the moment output appears:
+
+```
+for i in $(seq 30); do [ -s <outfile> ] && break; sleep 1; done; head -5 <outfile>
+```
+
+An empty file at the end means dead. Kill the run, report what the file holds (usually an auth or network error), and stop. A retry costs another metered review.
 
 Record a pause to the availability cache and stop when a run reports one:
 
@@ -28,6 +34,8 @@ Record a pause to the availability cache and stop when a run reports one:
 - a hosted summary comment saying reviews are paused
 
 Merge it into `~/.cache/claude/bot-review.json`, a JSON array of `{provider, remote, pausedUntil, reason}`. `remote` is `git remote get-url origin`, `pausedUntil` is the resume date the message gives (fall back to the first of next month), and `reason` is a short phrase like `free credits exhausted`. `detect-bot.ts` reads the file. The next session's fast path then reports the pause instead of re-probing.
+
+**Removal criterion.** This step is model-instructed. The cache earns its parsing code and its load-time read only if the record actually gets written. The check: when the session index next shows a `free_reviews_limit_reached`, `~/.cache/claude/bot-review.json` should carry a matching record. A limit hit with no record means the instruction is inert. Replace the cache with a script the skill calls, or drop it.
 
 ## Greptile
 

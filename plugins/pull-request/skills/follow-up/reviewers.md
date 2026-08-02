@@ -46,11 +46,13 @@ This @-mention is the only place a bot is named. Thread replies never name or th
 
 ## On-Demand Review
 
-The opt-in on my repos is a **label filter**. Greptile's org settings set `Labels / Include / review`, which skips every PR not carrying a `review` label. That label exists in `bendrucker/claude`, `dotfiles`, and `bendrucker.me`. Two dashboard toggles handle the rest. Both are off, mirrored by `triggerOnUpdates` and `triggerOnDrafts` in `.greptile/config.json`. A labeled PR draws one review when it opens. Drafts draw none.
+A repo can be configured to review only on request, which changes an absent summary from pending to nothing-to-do. Greptile offers three levers, none of them visible in `.greptile/config.json` alone:
 
-`/ship` applies the label at creation, when the diff clears the review gate in SKILL.md. The review starts with the PR, and you wait for the summary through the path above. A PR the gate skipped opens unlabeled; adding the label later still summons a review, as does `@greptileai review`.
+- **Filters → `Labels / Include`** skips every PR without one of the named labels. This is the opt-in: `pull-request:create --label <name>` requests the review at creation, and adding the label later requests it after the fact.
+- **`triggerOnUpdates`** off stops the automatic re-review on each push. A pushed fix then needs an explicit re-trigger (see [The Autonomous Loop](SKILL.md#the-autonomous-loop)).
+- **`triggerOnDrafts`** off skips drafts entirely.
 
-Filters live only in the effective merge, so read the live values from `greptile config --json` rather than the repo config file.
+`greptile config --json` prints the effective merge of repo config, dashboard, and org rules, so read the live values there rather than from the committed file. `@greptileai review` overrides all three.
 
 ## Adding a Reviewer
 

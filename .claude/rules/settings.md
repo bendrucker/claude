@@ -79,6 +79,12 @@ The overlay design fetches every base at validation time, so this only empties i
 
 Allowlisting those hosts is necessary but not sufficient. The sandbox blocks Node's `dns.lookup` for every host including allowlisted ones, so a plain `greptile whoami` fails `ENOTFOUND` before the allowlist is consulted. `NODE_USE_ENV_PROXY=1` in `env` is what makes both CLIs work: Node 24 honors the `HTTPS_PROXY` the sandbox already exports, and that proxy enforces the same host allowlist. It is inert outside the sandbox and below Node 24.
 
+**Removal criterion.** Drop it when a sandboxed `greptile whoami` succeeds without it, which is the same probe that catches the harness or Node fixing DNS under Seatbelt:
+
+```
+env -u NODE_USE_ENV_PROXY greptile whoami
+```
+
 ### Sockets and Writes
 
 Treat this section as a trust model, not an exhaustive mirror of `settings.json`.
@@ -86,7 +92,7 @@ Treat this section as a trust model, not an exhaustive mirror of `settings.json`
 - `allowUnixSockets` should be local IPC endpoints where secret material never leaves a dedicated agent (for example, signing daemons or the tmux and herdr sockets). The multiplexer sockets (tmux, herdr) can inject keys into other panes, so they are command execution by another name. Accepted so layout, agent, and notification commands run sandboxed rather than escaped.
 - `allowLocalBinding` should stay loopback-only.
 - `filesystem.allowWrite` should allow only scratch/cache/worktree paths that tools must mutate, and never credential stores or broad home-directory globs. Two paths are deliberate exceptions to the credential-store clause, `~/.greptile` and `~/.local/share/atuin`.
-- `~/.greptile` holds the CLI's `auth.json` beside its `reviews.json` log, and `greptile review` writes both on every run. The grant covers the directory because the CLI chmods it, which a file-level grant leaves failing at `EPERM`. Accepted so `greptile review` runs sandboxed rather than escaped, the same trade as the `*.greptile.com` egress entry above. The added risk is tampering with a token that is already exfiltrable.
+- `~/.greptile` holds the CLI's `auth.json` beside its `reviews.json` log, and `greptile review` writes both on every run. The grant covers the directory because the CLI chmods it, which a file-level grant leaves failing at `EPERM`. Accepted so `greptile review` runs sandboxed rather than escaped, the same trade as the `*.greptile.com` egress entry above. The added risk is tampering with a token that is already exfiltrable. **Removal criterion:** narrow it back to `~/.greptile/reviews.json` once a sandboxed `greptile review` stops dying on the directory `chmod`.
 - `~/.local/share/atuin`: the dir holds atuin's sync encryption key and the session tokens in `meta.db`. Atuin opens `meta.db` read-write on every command, including the history reads behind the `atuin:history` skill, and SQLite creates journal and WAL files beside its dbs, so a file-level grant would fail intermittently. The sandbox grants no egress to atuin's sync hosts, so the risk is local tampering: a swapped key or token would first reach the network through a later unsandboxed `atuin sync`.
 
 ### Escaped Commands (`excludedCommands`)

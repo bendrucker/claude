@@ -1,0 +1,155 @@
+---
+name: herdr
+description: >-
+  Drive the herdr terminal workspace manager: inspect workspaces, tabs, and panes, hand work to sibling coding agents and read their results, split panes for collaborative file viewing, and correlate panes to Claude sessions. Use when coordinating with another agent, opening a file alongside the user, capturing another pane's output, or asking what else is running.
+argument-hint: "[orient | agents | view <file> | read <pane>]"
+allowed-tools:
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh)
+  - Bash(herdr api snapshot:*)
+  - Bash(herdr --help:*)
+  - Bash(herdr agent --help:*)
+  - Bash(herdr pane --help:*)
+  - Bash(herdr workspace --help:*)
+  - Bash(herdr tab --help:*)
+  - Bash(herdr worktree --help:*)
+  - Bash(herdr agent list:*)
+  - Bash(herdr agent get:*)
+  - Bash(herdr agent read:*)
+  - Bash(herdr agent explain:*)
+  - Bash(herdr pane list:*)
+  - Bash(herdr pane get:*)
+  - Bash(herdr pane read:*)
+  - Bash(herdr workspace list:*)
+  - Bash(herdr tab list:*)
+---
+
+# Herdr
+
+herdr manages the terminal workspace this session runs in. It knows every workspace, pane, and sibling coding agent, including which Claude session occupies which pane.
+
+## Arguments
+
+`$0` (optional verb) routes to a section: `orient` to [Current Workspace](#current-workspace), `agents` to [Working With Sibling Agents](#working-with-sibling-agents), `view <file>` to [Collaborative File Viewing](#collaborative-file-viewing), `read <pane>` to [Capturing Another Pane](#capturing-another-pane). With no verb, answer from the orientation block below.
+
+## Check Help Before Composing a Call
+
+herdr ships roughly weekly. This file deliberately does not restate its command surface, because a copy of `--help` output goes stale between releases.
+
+Before composing any call, run `herdr <group> --help` for the subcommand list and `herdr <group> <command> --help` for its arguments. Leaf help is complete: it prints defaults, enumerates valid values for every enum flag, and states preconditions. Where this file and the CLI disagree, the CLI is right and this file is stale.
+
+The orientation block below prints the running `version` and `protocol`. If either has moved well past what you see in the examples here, trust `--help` over the examples.
+
+## Current Workspace
+
+!`bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh`
+
+That view is a projection over `herdr api snapshot`, which returns workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls. When the projection looks wrong or omits something, read the source: `herdr api snapshot | jq .`
+
+If the block reports that herdr is not running, stop here and use ordinary tools. Nothing below will reach a server.
+
+## Reading the Output
+
+Structured queries answer with a single-line JSON envelope. Pipe them through `jq -r '.result...'` rather than reading them raw:
+
+```fragment
+{"id":"cli:pane:list","result":{"panes":[...],"type":"pane_list"}}
+```
+
+Commands that return terminal content or a human explanation print plain text instead, with no envelope. `pane read`, `agent read`, and `agent explain` are all in that group. Piping those through `jq` fails with a parse error.
+
+Your own identity comes from the environment, never from inference: `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`.
+
+## Working With Sibling Agents
+
+The most valuable thing herdr offers is a handle on the other agents running alongside you. Each agent pane carries `agent_session.value`, the Claude session UUID. That makes pane-to-session correlation exact, where a title match would only be a guess.
+
+The loop is find, hand off, wait, collect:
+
+```bash
+herdr agent list | jq -r '.result.agents[] | "\(.pane_id) \(.agent_status) \(.foreground_cwd)"'
+herdr agent prompt <target> "the request"
+herdr agent wait <target> --until idle --timeout 600000
+herdr agent read <target> --source recent --lines 80
+```
+
+`agent read` prints the pane's text directly. It needs no `jq`.
+
+A reference to work by branch, repo, or task usually names a pane already doing it. Match it against the `cwd` and `title` columns in the orientation block, then hand off to that pane instead of duplicating the checkout here.
+
+`herdr agent focus` brings a pane to the foreground for the user. `herdr agent attach` connects to it directly.
+
+### Where Agent Status Comes From
+
+For Claude, herdr's integration hook reports only session identity. The `idle`, `working`, `blocked`, and `done` states come from matching the pane's screen against a detection manifest. An unusual or suppressed terminal title therefore reads as `unknown`.
+
+Debug that with `herdr agent explain <pane>`. Do not paper over a detection gap by calling `herdr pane report-agent`, which claims lifecycle authority that belongs to the scraper for Claude panes.
+
+## Collaborative File Viewing
+
+When working through a file with the user, open it beside this pane so they watch it change:
+
+```bash
+pane=$(herdr pane split --direction right --ratio 0.4 --no-focus | jq -r '.result.pane.pane_id')
+herdr pane run "$pane" markless --watch path/to/file.md
+```
+
+Use `markless --watch` for markdown and `$EDITOR` for everything else. Keep `--no-focus` so the user's cursor stays where it is.
+
+`pane run` hands the command string to the pane's own interactive shell, which parses it a second time. One command with ordinary quoting survives that. A multi-statement script does not: the pane's zsh re-parses it and dies on a bare `parse error`, and that failure lands in the pane rather than in your tool result. Write anything past a single command to a file and run `bash <path>`.
+
+That shell also inherits the new pane's directory, and mise activates tools per directory. A mise-managed tool available elsewhere can still come back `command not found` here. Confirm the pane actually started the viewer before telling the user to look at it:
+
+```bash
+herdr pane read "$pane" --source visible --lines 8
+```
+
+Fall back to `glow -w 0` or `bat --paging always` when the preferred viewer is missing, both of which are installed outside mise.
+
+A pane opened for the user is theirs, so leave it. Close one you split for your own use (`herdr pane close`) once the work in it is done, rather than leaving the layout littered.
+
+## Capturing Another Pane
+
+`herdr pane read <pane_id>` replaces a terminal scrape. Check `--help` for the current `--source` values and line limits. To block until something appears, use `herdr pane wait-output` with `--match` or `--regex`.
+
+`--source recent` reads accumulated output history and returns nothing for a pane created moments ago. Use `--source visible` when reading a pane you just made. On an established pane the sources agree.
+
+## Plugins
+
+herdr's own capabilities are extended by plugins, and they are discoverable the same way everything else is:
+
+```bash
+herdr plugin list
+herdr plugin action list | jq -r '.result.actions[] | "\(.plugin_id)  \(.action_id)  \(.title)"'
+herdr plugin action invoke <action_id> --plugin <plugin_id>
+```
+
+`herdr plugin log list` shows a plugin's command output, which is where to look when an action produces no visible effect. `herdr plugin config-dir <plugin_id>` locates its config.
+
+Filter the action list by platform. Plugins ship Windows variants of the same action, so an unfiltered list shows each one twice.
+
+### reviewr
+
+A review sidebar that shows the diff you just wrote and takes line comments on it. Its contract with you runs one direction, and misreading that direction is the main way to get this wrong.
+
+You never query reviewr and never poll it. When the user hits Send, reviewr injects the comment batch into your input and stops. It does not submit. The comments therefore reach you as part of an ordinary user turn, usually with their own remarks attached.
+
+Each block takes this shape, ordered by file then line:
+
+```fragment
+user/skills/herdr/SKILL.md:41-43
+-old line
++new line
+the reviewer's text, which may run to several lines
+```
+
+- Locate the code by matching the verbatim snippet lines. Your own edits shift line numbers, which makes the snippet the reliable anchor and the header a hint.
+- A ` (removed)` suffix on the header means the comment sits on a deleted line. Its snippet comes from the old side and will not be found in the current file.
+- Sending clears reviewr's list, and the store is in-memory only. The batch you receive is the only copy. Work through the whole set rather than acting on the first few.
+
+Two invariants worth knowing. reviewr never writes to the worktree, the index, or any branch, which rules it out as the explanation for an unexpected diff. Its one write is a baseline ref under `refs/reviewr/turn-base/`, deliberately outside `refs/heads`. Leave those refs alone.
+
+Its `last-turn` scope reads the same scraped `agent_status` described above, treating a resting-to-working transition as a turn boundary. A turn that finishes inside one poll interval is invisible to it, which is why a very fast edit can be missing from that view.
+
+## Worktrees Belong to Worktrunk
+
+Create worktrees with `wt` through the `worktrunk:wt-switch-create` skill. `herdr worktree create` writes outside the sandbox's allowed paths and fails there. Opening a checkout that already exists is fine.

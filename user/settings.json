@@ -463,7 +463,8 @@
         "~/.npm",
         "~/.local/share/uv",
         "~/.local/share/graphite",
-        "~/.local/share/atuin"
+        "~/.local/share/atuin",
+        "~/.greptile"
       ]
     },
     "excludedCommands": [

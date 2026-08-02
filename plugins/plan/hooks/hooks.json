@@ -1,5 +1,5 @@
 {
-  "description": "Inject planning guidelines when entering plan mode and gate plan re-presents",
+  "description": "Inject planning guidelines when a session reaches plan mode and gate plan re-presents",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -7,6 +7,17 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context.sh\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "EnterPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-inject.sh\""
           }
         ]
       }

@@ -52,14 +52,39 @@ test("touches the marker so a second call short-circuits", async () => {
   expect(second).toBe("");
 });
 
-test("stays silent outside plan mode", async () => {
-  const stdout = await run({ permission_mode: "default", session_id: "t1" });
-  expect(stdout).toBe("");
+test.each<{ name: string; input: Record<string, unknown> }>([
+  { name: "outside plan mode", input: { permission_mode: "default", session_id: "t1" } },
+  {
+    name: "on a PreToolUse for EnterPlanMode, which has not landed yet",
+    input: { hook_event_name: "PreToolUse", permission_mode: "auto", session_id: "t1" },
+  },
+  {
+    name: "without a session_id, since a high-frequency hook cannot dedup",
+    input: { permission_mode: "plan" },
+  },
+  {
+    name: "for a subagent, whose session_id is the parent's",
+    input: { hook_event_name: "PostToolUse", session_id: "t1", agent_id: "sub1" },
+  },
+])("stays silent $name", async ({ input }) => {
+  expect(await run(input)).toBe("");
 });
 
-test("stays silent without a session_id, since a high-frequency hook cannot dedup", async () => {
-  const stdout = await run({ permission_mode: "plan" });
-  expect(stdout).toBe("");
+test("injects once EnterPlanMode has landed, whatever mode the call carried", async () => {
+  const stdout = await run({
+    hook_event_name: "PostToolUse",
+    permission_mode: "auto",
+    session_id: "t1",
+  });
+  const parsed = JSON.parse(stdout);
+  expect(parsed.hookSpecificOutput.hookEventName).toBe("PostToolUse");
+  expect(parsed.hookSpecificOutput.additionalContext).toContain("Planning Guidelines");
+});
+
+test("leaves the marker unspent when EnterPlanMode never lands", async () => {
+  await run({ hook_event_name: "PreToolUse", permission_mode: "auto", session_id: "t1" });
+  const later = await run({ permission_mode: "plan", session_id: "t1" });
+  expect(later).not.toBe("");
 });
 
 test("re-injects for a different session id", async () => {

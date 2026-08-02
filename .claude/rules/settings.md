@@ -15,6 +15,31 @@ Permission patterns starting with `/` are relative to the settings file, not abs
 - `Edit(//tmp/**)` → `/tmp/**` (absolute)
 - `Edit(~/.config/**)` → home directory (tilde expansion works)
 
+## Auto Mode
+
+`permissions.defaultMode` is `auto`, so the classifier is the gate on nearly every tool call. Two consequences shape where auto mode config can live and how to test it.
+
+The classifier reads `autoMode` from `~/.claude/settings.json` (this repo's `user/settings.json`), from managed settings, and from the `--settings` flag. It deliberately ignores `.claude/settings.json` and `.claude/settings.local.json`, because a checked-in repo or a build step could otherwise inject its own allow rules. So an `autoMode` block in project settings is silently inert. There is no per-repo layer for it.
+
+That also means `claude auto-mode config` and `claude auto-mode critique` resolve `~/.claude/settings.json` through its symlink to the deployed `~/.claude-repo` checkout. A worktree edit is invisible to them until it merges, so point them at the working copy explicitly:
+
+```sh
+claude --settings "$PWD/user/settings.json" auto-mode config
+claude --settings "$PWD/user/settings.json" auto-mode critique
+```
+
+Settings scopes combine rather than replace, so a `--settings` run still carries the deployed file's entries alongside the worktree's. Read a critique of a section you shortened with that in mind.
+
+Every array in `autoMode` replaces the built-in list for its section unless it contains the literal `"$defaults"`. Omitting it from `soft_deny` discards force push, `curl | bash`, and production-deploy protection. Omitting it from `hard_deny` discards the data-exfiltration rule. Keep `"$defaults"` in every list. Omitting a section's key entirely is safe and keeps that section's built-ins.
+
+`"$defaults"` appends rather than merging by key, so an `environment` override lands beside the built-in it supersedes and the classifier reads both. Write each override in the built-ins' `**Key**: value` form so the pairing is legible. Without it, a custom `Repository visibility` line sits next to `**Repository visibility**: assume private ...` with nothing marking which one governs.
+
+The four rule tiers resolve in a fixed order. `hard_deny` blocks unconditionally, then `soft_deny` blocks, then `allow` overrides matching `soft_deny` entries, and finally explicit user intent clears whatever is left. So a custom `soft_deny` cannot outrank a built-in `allow` by asserting that it does. A rule that must survive a built-in allow belongs in `hard_deny`, or in `permissions.ask`, which runs before the classifier.
+
+`useAutoModeDuringPlan` needs no entry. It defaults on as of v2.1.218 and routes plan-mode shell commands through the classifier instead of prompting them. The gate is that auto mode is *available* to the account, so this is not a reason to set `defaultMode`. The settings schema muddies it by saying the key "has no effect unless `permissions.defaultMode` allows auto", which reads as the availability gate rather than a requirement that the active mode be `auto`.
+
+Classifier denials reach no durable surface on their own. The [`permission-denied`](../../user/hooks/permission-denied) hook logs them so the rules stay measurable.
+
 ## Sandbox and Nested Commands
 
 `excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (e.g., `open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so adding `open:*` to `excludedCommands` does not exempt nested calls. Go CLIs run sandboxed via `sandbox.network.allowMachLookup`; wrappers that hand off to Apple Events or Launch Services need a full skip via the `mac` plugin's `claude:dangerouslyDisableSandbox` marker hook. See [`scripts.md`](scripts.md).

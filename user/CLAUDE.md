@@ -38,6 +38,13 @@ Prefer accommodating Claude Code's native defaults over overriding them, since a
 - The sandbox can write `/tmp`, `$TMPDIR`, and the repo. Never disable the sandbox for file writes; only bypass after a sandboxed run of that command actually failed.
 - Use `pbcopy` and `pbpaste` for clipboard interaction.
 
+## Planning
+
+Sessions default to auto mode, so investigating is cheap and plan mode is not needed to explore safely. Plan mode is where a settled approach gets written down. The research belongs before it.
+
+- Investigate in auto mode until the approach is settled, then enter plan mode to transcribe it. A plan that takes many tool calls to write was entered too early.
+- When I ask for a plan and something is still open, finish resolving it first and tell me what you are resolving. Do not enter plan mode and research from inside it.
+
 ## Check-ins
 
 Schedule `⏰` plan check-ins in Things with `things:url add`, which unlike inbox capture can set `when=<yyyy-mm-dd>`. Tag them `claude-code`. Things is the only tracker that can raise work on a future date, so work-tracked check-ins go there too, linking their Linear issue in the notes.

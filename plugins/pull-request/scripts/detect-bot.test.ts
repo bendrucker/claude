@@ -43,12 +43,13 @@ test.each([
 
 const onlyGreptile = (cli: string) => (cli === "greptile" ? "/bin/greptile" : null);
 
-const exhausted: Cooldown = {
+const unscoped: Cooldown = {
   provider: "greptile",
-  remote: REMOTE,
   pausedUntil: "2026-08-07T00:00:00Z",
   reason: "free credits exhausted",
 };
+
+const exhausted: Cooldown = { ...unscoped, remote: REMOTE };
 
 test.each<{ name: string; records: unknown; expected: string }>([
   {
@@ -74,7 +75,7 @@ test.each<{ name: string; records: unknown; expected: string }>([
   },
   {
     name: "record with no remote applies everywhere",
-    records: [{ ...exhausted, remote: undefined }],
+    records: [unscoped],
     expected:
       "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-08-07 (free credits exhausted)",
   },
@@ -129,7 +130,7 @@ test.each<{ name: string; records: unknown; expected: string }>([
 test.each<{ name: string; records: Cooldown[]; expected: string }>([
   {
     name: "an unscoped record still applies",
-    records: [{ ...exhausted, remote: undefined }],
+    records: [unscoped],
     expected:
       "greptile: repo config (.greptile/config.json), CLI installed, paused until 2026-08-07 (free credits exhausted)",
   },

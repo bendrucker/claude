@@ -1,26 +1,41 @@
 #!/bin/bash
-# PreToolUse injection: closes the gap where a session toggles into plan mode
-# after its last prompt, so no UserPromptSubmit fires before ExitPlanMode.
-# permission_mode rides on every PreToolUse, so the first tool call in plan mode
-# is a reliable injection point. Shares the plan-injected marker with context.sh,
-# so whichever fires first wins and the other short-circuits.
+# Injection on a tool event, from two hooks.json entries: PreToolUse with
+# matcher * closes the gap where a session toggles into plan mode after its last
+# prompt, so no UserPromptSubmit fires before ExitPlanMode. PostToolUse with
+# matcher EnterPlanMode covers the session that researches in auto mode and then
+# writes the plan in one turn, whose next tool call is ExitPlanMode itself.
 #
-# EnterPlanMode is the other injection point. It carries the pre-switch mode, so
-# a mode test alone would skip it, and a session that enters plan mode and writes
-# the plan in the same turn reaches its next tool call only at ExitPlanMode, by
-# which point the plan is already written.
+# permission_mode is the gate for the PreToolUse entry. The PostToolUse entry
+# needs no mode test: EnterPlanMode carries the pre-switch mode before it runs,
+# and reaching PostToolUse at all means it landed. Gating on the event keeps the
+# marker off a call the user interrupted, which would otherwise silence both
+# paths for the rest of the session.
+#
+# Shares the plan-injected marker with context.sh, so whichever fires first wins
+# and the other short-circuits.
 input=$(cat)
 
-mode=$(printf '%s' "$input" | jq -r '.permission_mode // empty')
-tool=$(printf '%s' "$input" | jq -r '.tool_name // empty')
-if [ "$mode" != "plan" ] && [ "$tool" != "EnterPlanMode" ]; then
+# Unit separator, not tab: tab is IFS whitespace, so `read` would collapse a run
+# of empty fields and shift every value left of the first absent key.
+IFS=$'\037' read -r event mode agent_id session_id transcript < <(
+  printf '%s' "$input" | jq -j '
+    [.hook_event_name, .permission_mode, .agent_id, .session_id, .transcript_path]
+    | map(. // "") | join("\u001f"), "\n"'
+)
+event="${event:-PreToolUse}"
+if [ "$event" != "PostToolUse" ] && [ "$mode" != "plan" ]; then
+  exit 0
+fi
+
+# A subagent's tool call carries the parent's session_id, so injecting here would
+# spend the parent's marker on context only the subagent sees.
+if [ -n "$agent_id" ]; then
   exit 0
 fi
 
 # PreToolUse fires on every tool call, so without a session_id to dedup against
 # we would re-inject on each one. Require it here (context.sh, once per prompt,
 # can afford to inject without dedup).
-session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
 if [ -z "$session_id" ]; then
   exit 0
 fi
@@ -33,10 +48,9 @@ if [ -f "$marker" ]; then
   exit 0
 fi
 
-transcript=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
 content=$("$(dirname "$0")/injection-content.sh" "$transcript")
 
-jq -n --arg ctx "$content" \
-  '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $ctx}}'
+jq -n --arg event "$event" --arg ctx "$content" \
+  '{hookSpecificOutput: {hookEventName: $event, additionalContext: $ctx}}'
 
 touch "$marker"

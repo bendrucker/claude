@@ -1,79 +1,74 @@
 #!/usr/bin/env bun
 
-import { mkdirSync } from "node:fs";
+// biome-ignore lint/style/noRestrictedImports: concurrent sessions append to one log, so writes need O_APPEND atomicity and rotation needs rename. Bun.write read-modify-write would drop lines.
+import { appendFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
-
-// The SDK version pinned here predates the PermissionDenied event, so its
-// input shape is declared locally.
-export type PermissionDeniedInput = {
-  session_id?: string;
-  cwd?: string;
-  tool_name?: string;
-  tool_input?: Record<string, unknown>;
-  tool_use_id?: string;
-  reason?: string;
-};
+import { dirname, join } from "node:path";
+import type { PermissionDeniedHookInput } from "@anthropic-ai/claude-agent-sdk";
 
 export type DenialRecord = {
-  timestamp: string;
+  ts: string;
   session_id: string;
   cwd: string;
-  tool_name: string;
+  tool: string;
   target: string;
   reason: string;
 };
 
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+const OFF_VALUES = new Set(["0", "false", "off"]);
+const ON_VALUES = new Set(["1", "true", "on"]);
 const TARGET_FIELDS = ["command", "file_path", "url", "path", "notebook_path", "prompt"];
 
-export function target(toolInput: Record<string, unknown> | undefined): string {
-  if (!toolInput) return "";
+export function target(toolInput: unknown): string {
+  if (!toolInput || typeof toolInput !== "object") return "";
+  const fields = toolInput as Record<string, unknown>;
   for (const field of TARGET_FIELDS) {
-    const value = toolInput[field];
+    const value = fields[field];
     if (typeof value === "string" && value.length > 0) return value;
   }
   return JSON.stringify(toolInput);
 }
 
-export function record(input: PermissionDeniedInput, timestamp: string): DenialRecord {
+export function record(input: Partial<PermissionDeniedHookInput>, ts: string): DenialRecord {
   return {
-    timestamp,
+    ts,
     session_id: input.session_id ?? "",
     cwd: input.cwd ?? "",
-    tool_name: input.tool_name ?? "",
+    tool: input.tool_name ?? "",
     target: target(input.tool_input),
     reason: input.reason ?? "",
   };
 }
 
-function slug(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]/g, "-");
+// CLAUDE_AUTO_MODE_DENIAL_LOG resolves in this one place: unset defaults to on
+// (current phase: collecting evidence), 0/false/off disables, and any other
+// value is a destination path override.
+export function resolveLogPath(
+  env: string | undefined = process.env.CLAUDE_AUTO_MODE_DENIAL_LOG,
+): string | null {
+  if (env !== undefined && OFF_VALUES.has(env.toLowerCase())) return null;
+  if (env && !ON_VALUES.has(env.toLowerCase())) return env;
+  return join(homedir(), ".claude", "auto-mode-denials.jsonl");
 }
 
-// Bun exposes no append primitive, and read-modify-write would drop records
-// when concurrent sessions are denied at the same moment.
-export function filename(input: PermissionDeniedInput, timestamp: string): string {
-  return `${slug(timestamp)}-${slug(input.tool_use_id || "unknown")}.json`;
-}
-
-export function logDir(): string {
-  return process.env.CLAUDE_AUTO_MODE_DENIAL_DIR ?? join(homedir(), ".claude", "auto-mode-denials");
-}
-
-export async function write(dir: string, input: PermissionDeniedInput, timestamp: string) {
-  mkdirSync(dir, { recursive: true });
-  await Bun.write(
-    join(dir, filename(input, timestamp)),
-    `${JSON.stringify(record(input, timestamp))}\n`,
-  );
+export function append(entry: DenialRecord, path: string | null = resolveLogPath()): void {
+  if (!path) return;
+  mkdirSync(dirname(path), { recursive: true });
+  if (Bun.file(path).size > MAX_LOG_BYTES) {
+    renameSync(path, `${path}.1`);
+  }
+  appendFileSync(path, `${JSON.stringify(entry)}\n`);
 }
 
 if (import.meta.main) {
   try {
-    const input: PermissionDeniedInput = JSON.parse(await Bun.stdin.text());
-    await write(logDir(), input, new Date().toISOString());
-  } catch {
-    // The denial already happened and this hook's exit code is ignored, so a
-    // logging failure must not surface as noise in the session.
+    const input: Partial<PermissionDeniedHookInput> = JSON.parse(await Bun.stdin.text());
+    append(record(input, new Date().toISOString()));
+  } catch (error) {
+    // The exit code is ignored on this event, so a logging failure cannot break
+    // the session. It still has to be visible: an empty log is the signal that
+    // retires this hook, and a silent failure forges that signal.
+    console.error(`[permission-denied] Failed to log denial: ${error}`);
   }
 }

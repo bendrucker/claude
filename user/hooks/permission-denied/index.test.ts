@@ -1,12 +1,17 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, readdirSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { filename, type PermissionDeniedInput, record, target, write } from "./index";
+import type { PermissionDeniedHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { append, record, resolveLogPath, target } from "./index";
 
 const STAMP = "2026-08-01T12:00:00.000Z";
 
-test.each<{ name: string; input: Record<string, unknown> | undefined; expected: string }>([
+function logPath(): string {
+  return join(mkdtempSync(join(tmpdir(), "denials-")), "nested", "log.jsonl");
+}
+
+test.each<{ name: string; input: unknown; expected: string }>([
   {
     name: "Bash command",
     input: { command: "rm -rf build", description: "clean" },
@@ -18,12 +23,13 @@ test.each<{ name: string; input: Record<string, unknown> | undefined; expected: 
   { name: "no known field", input: { model: "opus" }, expected: '{"model":"opus"}' },
   { name: "empty string is not a target", input: { command: "", file_path: "/a" }, expected: "/a" },
   { name: "missing input", input: undefined, expected: "" },
+  { name: "non-object input", input: "raw", expected: "" },
 ])("target: $name", ({ input, expected }) => {
   expect(target(input)).toBe(expected);
 });
 
 test("record captures the denial", () => {
-  const input: PermissionDeniedInput = {
+  const input: Partial<PermissionDeniedHookInput> = {
     session_id: "abc123",
     cwd: "/repo",
     tool_name: "Bash",
@@ -36,8 +42,8 @@ test("record captures the denial", () => {
   "reason": "Blocked by classifier",
   "session_id": "abc123",
   "target": "git push --force origin main",
-  "timestamp": "2026-08-01T12:00:00.000Z",
-  "tool_name": "Bash",
+  "tool": "Bash",
+  "ts": "2026-08-01T12:00:00.000Z",
 }
 `);
 });
@@ -49,39 +55,56 @@ test("record tolerates a payload missing every field", () => {
   "reason": "",
   "session_id": "",
   "target": "",
-  "timestamp": "2026-08-01T12:00:00.000Z",
-  "tool_name": "",
+  "tool": "",
+  "ts": "2026-08-01T12:00:00.000Z",
 }
 `);
 });
 
-test.each<{ name: string; input: PermissionDeniedInput; expected: string }>([
+test.each<{ name: string; env: string | undefined; expected: string | null }>([
+  { name: "unset defaults to on", env: undefined, expected: "DEFAULT" },
+  { name: "0 disables", env: "0", expected: null },
+  { name: "false disables", env: "false", expected: null },
+  { name: "OFF disables case-insensitively", env: "OFF", expected: null },
+  { name: "1 keeps the default path", env: "1", expected: "DEFAULT" },
+  { name: "empty string keeps the default path", env: "", expected: "DEFAULT" },
   {
-    name: "sorts by time and stays unique per call",
-    input: { tool_use_id: "toolu_01ABC" },
-    expected: "2026-08-01T12-00-00.000Z-toolu_01ABC.json",
+    name: "any other value is a path override",
+    env: "/custom/log.jsonl",
+    expected: "/custom/log.jsonl",
   },
-  {
-    name: "falls back when the payload carries no tool_use_id",
-    input: {},
-    expected: "2026-08-01T12-00-00.000Z-unknown.json",
-  },
-  {
-    name: "keeps an untrusted id inside a single path component",
-    input: { tool_use_id: "../../escape" },
-    expected: "2026-08-01T12-00-00.000Z-..-..-escape.json",
-  },
-])("filename: $name", ({ input, expected }) => {
-  expect(filename(input, STAMP)).toBe(expected);
+])("resolveLogPath: $name", ({ env, expected }) => {
+  const resolved = resolveLogPath(env);
+  if (expected === "DEFAULT") {
+    expect(resolved).toEndWith(".claude/auto-mode-denials.jsonl");
+  } else {
+    expect(resolved).toBe(expected);
+  }
 });
 
-test("write creates the directory and stores one file per denial", async () => {
-  const dir = join(mkdtempSync(join(tmpdir(), "denials-")), "nested");
-  await write(dir, { tool_name: "Bash", tool_use_id: "a", tool_input: { command: "x" } }, STAMP);
-  await write(dir, { tool_name: "Edit", tool_use_id: "b", tool_input: { file_path: "/y" } }, STAMP);
+test("append writes one JSON line per denial and creates the directory", async () => {
+  const path = logPath();
+  append(record({ tool_name: "Bash", tool_input: { command: "a" } }, STAMP), path);
+  append(record({ tool_name: "Edit", tool_input: { file_path: "/b" } }, STAMP), path);
 
-  const files = readdirSync(dir).sort();
-  expect(files).toHaveLength(2);
-  const first = await Bun.file(join(dir, files[0])).json();
-  expect(first.target).toBe("x");
+  const lines = (await Bun.file(path).text()).trimEnd().split("\n");
+  expect(lines.map((line) => JSON.parse(line).target)).toEqual(["a", "/b"]);
+});
+
+test("append writes nothing when logging is disabled", () => {
+  expect(() => append(record({}, STAMP), null)).not.toThrow();
+});
+
+test("append rotates once the log passes the size cap", async () => {
+  const path = logPath();
+  const filler = "x".repeat(1024);
+  append({ ...record({}, STAMP), target: filler }, path);
+  await Bun.write(path, filler.repeat(6 * 1024));
+
+  append(record({ tool_name: "Bash", tool_input: { command: "after" } }, STAMP), path);
+
+  expect(await Bun.file(`${path}.1`).exists()).toBe(true);
+  const lines = (await Bun.file(path).text()).trimEnd().split("\n");
+  expect(lines).toHaveLength(1);
+  expect(JSON.parse(lines[0]).target).toBe("after");
 });

@@ -30,7 +30,11 @@ claude --settings "$PWD/user/settings.json" auto-mode critique
 
 Settings scopes combine rather than replace, so a `--settings` run still carries the deployed file's entries alongside the worktree's. Read a critique of a section you shortened with that in mind.
 
-Every array in `autoMode` replaces the built-in list for its section unless it contains the literal `"$defaults"`. Omitting it from `soft_deny` discards force push, `curl | bash`, and production-deploy protection; omitting it from `hard_deny` discards the data-exfiltration rule. Keep `"$defaults"` in every list.
+Every array in `autoMode` replaces the built-in list for its section unless it contains the literal `"$defaults"`. Omitting it from `soft_deny` discards force push, `curl | bash`, and production-deploy protection. Omitting it from `hard_deny` discards the data-exfiltration rule. Keep `"$defaults"` in every list. Omitting a section's key entirely is safe and keeps that section's built-ins.
+
+`"$defaults"` appends rather than merging by key, so an `environment` override lands beside the built-in it supersedes and the classifier reads both. Write each override in the built-ins' `**Key**: value` form so the pairing is legible. Without it, a custom `Repository visibility` line sits next to `**Repository visibility**: assume private ...` with nothing marking which one governs.
+
+The four rule tiers resolve in a fixed order. `hard_deny` blocks unconditionally, then `soft_deny` blocks, then `allow` overrides matching `soft_deny` entries, and finally explicit user intent clears whatever is left. So a custom `soft_deny` cannot outrank a built-in `allow` by asserting that it does. A rule that must survive a built-in allow belongs in `hard_deny`, or in `permissions.ask`, which runs before the classifier.
 
 `useAutoModeDuringPlan` needs no entry. It defaults on as of v2.1.218 and routes plan-mode shell commands through the classifier instead of prompting, but only where `permissions.defaultMode` allows auto. Setting `defaultMode` is what activates it.
 

@@ -7,6 +7,10 @@
   "fallbackModel": ["sonnet"],
   "cleanupPeriodDays": 90,
   "autoMode": {
+    "hard_deny": [
+      "$defaults",
+      "Default Branch Push: pushing to a repository's default branch is blocked, whatever that branch is named. This has to outrank the built-in Git Push Destination allow exception, which otherwise blesses the default branch, and an allow exception cannot reach a hard rule. It covers every vehicle that lands a commit there: a bare `git push` while HEAD is on the default branch, `git push origin HEAD:main`, `git push origin +main`, `git push --all`, and `git push --mirror`, on any remote. Two things are outside it. Committing locally on the default branch is not a push. Merging an approved pull or merge request through `gh pr merge` or `glab mr merge` is a server-side merge, judged by Merge Without Review instead."
+    ],
     "environment": [
       "$defaults",
       "**Organization**: an individual developer, working both on personal projects and inside an employer's repositories. Primary use of Claude Code: software development, plus authoring the Claude Code plugins and personal automation in the configuration repo at github.com/bendrucker/claude.",
@@ -27,7 +31,6 @@
     ],
     "soft_deny": [
       "$defaults",
-      "Default Branch Push [named+specifics — **must name:** pushing to the default branch, and the repository]: pushing to a repository's default branch is blocked. This overrides the built-in Git Push Destination allow exception, which otherwise blesses the default branch. It covers every vehicle that lands a commit there: a bare `git push` while HEAD is on the default branch, `git push origin HEAD:main`, `git push origin +main`, `git push --all`, and `git push --mirror`, on any remote. Committing locally on the default branch is not covered, and neither is merging an approved pull or merge request through `gh pr merge` or `glab mr merge`, which is a server-side merge rather than a push.",
       "Unowned Force Push [named+specifics — **must name:** the branch being force-pushed]: force-pushing (`git push --force`, `--force-with-lease`, or a `+ref` refspec) is allowed on a branch this session owns and blocked on any other. A branch is owned when the transcript shows this session created the commits on it, when the session created the branch or its worktree, or when it is a topic branch of the session's own repository whose pull or merge request lists `bendrucker` as author. A repository's default branch is never owned, and neither is a branch whose commits pre-date the session with no evidence of who wrote them.",
       "Third-Party Public Surface [named+specifics — **must name:** the target repository]: opening a pull or merge request against a repository owned by anyone other than `bendrucker` is blocked, whoever granted write access. Two tests, either of which makes the target outside. Structural: `gh pr create --repo`, `glab mr create --target-project`, a `gh api` or `glab api` call, or a browser-driven creation points somewhere other than the `origin` remote of the session's own repository. Implicit: a bare `gh pr create` in a clone whose `origin` is a fork resolves its base to the parent repository, so it targets the parent even with no flag. Forking an outside repository and pushing a branch to that fork is covered the same way, since it is the step before the request. Contributing upstream is fine once the user names the target repository."
     ]

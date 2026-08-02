@@ -36,7 +36,7 @@ Every array in `autoMode` replaces the built-in list for its section unless it c
 
 The four rule tiers resolve in a fixed order. `hard_deny` blocks unconditionally, then `soft_deny` blocks, then `allow` overrides matching `soft_deny` entries, and finally explicit user intent clears whatever is left. So a custom `soft_deny` cannot outrank a built-in `allow` by asserting that it does. A rule that must survive a built-in allow belongs in `hard_deny`, or in `permissions.ask`, which runs before the classifier.
 
-`useAutoModeDuringPlan` needs no entry. It defaults on as of v2.1.218 and routes plan-mode shell commands through the classifier instead of prompting, but only where `permissions.defaultMode` allows auto. Setting `defaultMode` is what activates it.
+`useAutoModeDuringPlan` needs no entry. It defaults on as of v2.1.218 and routes plan-mode shell commands through the classifier instead of prompting them. The gate is that auto mode is *available* to the account, so this is not a reason to set `defaultMode`. The settings schema muddies it by saying the key "has no effect unless `permissions.defaultMode` allows auto", which reads as the availability gate rather than a requirement that the active mode be `auto`.
 
 Classifier denials reach no durable surface on their own. The [`permission-denied`](../../user/hooks/permission-denied) hook logs them so the rules stay measurable.
 

@@ -81,7 +81,7 @@ Join the background `plan:review` first if it was gated in. Act on fix-worthy dr
 
 Pass `--base <parent>` through when `/ship --base` named a stack parent. Create needs it to target the PR at the parent and to link the layer into the stack on GitHub. Without it the PR opens against the default branch and carries every lower layer's diff.
 
-When the Bot Review Gate said spend and the repo's hosted reviewer waits on a label, pass that label through (`--label review` on my repos, per follow-up's `reviewers.md`). The review then starts with the PR instead of needing a follow-up comment.
+Pass the hosted reviewer's label through (`--label review` on my repos) only when the Bot Review Gate routed to the hosted channel, which happens when it said spend and the local CLI could not run. The review then starts with the PR. A local pass already covered the diff, so labeling after it pays a second credit for the same review.
 
 ## Babysit
 

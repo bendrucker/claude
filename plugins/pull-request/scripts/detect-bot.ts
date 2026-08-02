@@ -23,6 +23,7 @@ export interface Cooldown {
 
 export type Which = (cli: string) => string | null;
 export type ReadCooldowns = () => Promise<Cooldown[]>;
+export type ReadRemote = () => Promise<string | null>;
 
 export const COOLDOWN_PATH = join(homedir(), ".cache", "claude", "bot-review.json");
 
@@ -34,17 +35,18 @@ export function parseCooldowns(text: string): Cooldown[] {
     return [];
   }
   if (!Array.isArray(parsed)) return [];
-  return parsed.filter((record): record is Cooldown => {
-    if (typeof record !== "object" || record === null) return false;
-    const { provider, pausedUntil, reason, remote } = record as Record<string, unknown>;
-    return (
-      typeof provider === "string" &&
-      typeof pausedUntil === "string" &&
-      typeof reason === "string" &&
-      (remote === undefined || typeof remote === "string") &&
-      !Number.isNaN(Date.parse(pausedUntil))
-    );
-  });
+  const records: Cooldown[] = [];
+  for (const entry of parsed) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const { provider, pausedUntil, reason, remote } = entry as Record<string, unknown>;
+    if (typeof provider !== "string") continue;
+    if (typeof reason !== "string") continue;
+    if (typeof pausedUntil !== "string" || Number.isNaN(Date.parse(pausedUntil))) continue;
+    if (typeof remote === "string") records.push({ provider, pausedUntil, reason, remote });
+    else if (remote === undefined || remote === null)
+      records.push({ provider, pausedUntil, reason });
+  }
+  return records;
 }
 
 export const readCooldowns: ReadCooldowns = async () =>
@@ -54,6 +56,27 @@ export const readCooldowns: ReadCooldowns = async () =>
       .catch(() => ""),
   );
 
+export const readRemote: ReadRemote = async () => {
+  const origin = await Bun.$`git remote get-url origin`.quiet().nothrow();
+  return origin.exitCode === 0 ? origin.text().trim() : null;
+};
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
+const ZONED = /(?:Z|UTC|GMT|[+-]\d{2}:?\d{2})$/i;
+
+// `pausedUntil` holds a calendar date, so render it in whatever zone the writer implied:
+// a leading ISO date already is one, an explicit zone reads as UTC, and Date.parse takes
+// everything else as local. Formatting all three as UTC moves the date a day either way.
+function resumeDate(pausedUntil: string): string {
+  const iso = ISO_DATE.exec(pausedUntil);
+  if (iso) return iso[0];
+  const parsed = new Date(Date.parse(pausedUntil));
+  if (ZONED.test(pausedUntil.trim())) return parsed.toISOString().slice(0, 10);
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${parsed.getFullYear()}-${month}-${day}`;
+}
+
 function pause(cooldowns: Cooldown[], provider: string, remote: string | null, now: Date) {
   const live = cooldowns.filter(
     (record) =>
@@ -62,23 +85,29 @@ function pause(cooldowns: Cooldown[], provider: string, remote: string | null, n
       (record.remote === undefined || record.remote === remote),
   );
   if (live.length === 0) return null;
-  const soonest = live.reduce((a, b) =>
-    Date.parse(a.pausedUntil) <= Date.parse(b.pausedUntil) ? a : b,
+  // Overlapping pauses are conjunctive: the provider is back only once the last one lifts.
+  const latest = live.reduce((a, b) =>
+    Date.parse(a.pausedUntil) >= Date.parse(b.pausedUntil) ? a : b,
   );
-  const until = new Date(Date.parse(soonest.pausedUntil)).toISOString().slice(0, 10);
-  return `paused until ${until} (${soonest.reason})`;
+  return `paused until ${resumeDate(latest.pausedUntil)} (${latest.reason})`;
 }
 
 export interface DetectOptions {
   which?: Which;
   cooldowns?: ReadCooldowns;
-  remote?: string | null;
+  remote?: ReadRemote;
   now?: Date;
 }
 
 export async function detect(root: string, options: DetectOptions = {}): Promise<string> {
-  const { which = Bun.which, cooldowns = readCooldowns, remote = null, now = new Date() } = options;
+  const {
+    which = Bun.which,
+    cooldowns = readCooldowns,
+    remote = readRemote,
+    now = new Date(),
+  } = options;
   const records = await cooldowns();
+  const origin = records.length > 0 ? await remote() : null;
   const lines: string[] = [];
   for (const provider of PROVIDERS) {
     let config: string | null = null;
@@ -94,20 +123,12 @@ export async function detect(root: string, options: DetectOptions = {}): Promise
     else if (config) presence = `repo config (${config}), CLI not installed`;
     else if (cli) presence = "CLI installed, no repo config";
     else continue;
-    const paused = pause(records, provider.name, remote, now);
+    const paused = pause(records, provider.name, origin, now);
     lines.push(`${provider.name}: ${presence}${paused ? `, ${paused}` : ""}`);
   }
   return lines.length > 0 ? lines.join("\n") : "none: no bot config or CLI found locally";
 }
 
 if (import.meta.main) {
-  const records = await readCooldowns();
-  const origin =
-    records.length > 0 ? await Bun.$`git remote get-url origin`.quiet().nothrow() : null;
-  console.log(
-    await detect(process.cwd(), {
-      cooldowns: async () => records,
-      remote: origin?.exitCode === 0 ? origin.text().trim() : null,
-    }),
-  );
+  console.log(await detect(process.cwd()));
 }

@@ -33,7 +33,9 @@ Record a pause to the availability cache and stop when a run reports one:
 - a CodeRabbit fair-usage or rate-limit message
 - a hosted summary comment saying reviews are paused
 
-Merge it into `~/.cache/claude/bot-review.json`, a JSON array of `{provider, remote, pausedUntil, reason}`. `remote` is `git remote get-url origin`, `pausedUntil` is the resume date the message gives (fall back to the first of next month), and `reason` is a short phrase like `free credits exhausted`. `detect-bot.ts` reads the file. The next session's fast path then reports the pause instead of re-probing.
+Merge it into `~/.cache/claude/bot-review.json`, a JSON array of `{provider, remote, pausedUntil, reason}`. `pausedUntil` is the resume date the message gives as `YYYY-MM-DD` (fall back to the first of next month), and `reason` is a short phrase like `free credits exhausted`. `detect-bot.ts` reads the file. The next session's fast path then reports the pause instead of re-probing.
+
+`remote` scopes the record, and the message says which scope fits. A quota or plan limit is charged to the account and stops reviews everywhere. Omit `remote` and one record covers every repo. Reserve `git remote get-url origin` for a pause that names this repo, like a per-repo rate limit. Scope an account-wide pause to one repo and the next session in a sibling repo rediscovers it the expensive way.
 
 **Removal criterion.** This step is model-instructed. The cache earns its parsing code and its load-time read only if the record actually gets written. The check: when the session index next shows a `free_reviews_limit_reached`, `~/.cache/claude/bot-review.json` should carry a matching record. A limit hit with no record means the instruction is inert. Replace the cache with a script the skill calls, or drop it.
 

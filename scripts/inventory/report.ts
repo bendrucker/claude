@@ -125,8 +125,14 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
       };
     case "agents":
       return {
-        head: ["agent", "model", "path", "description"],
-        rows: inventory.agents.map((a) => [a.name, a.model || "-", a.path, cut(a.description)]),
+        head: ["agent", "model", "tools", "path", "description"],
+        rows: inventory.agents.map((a) => [
+          a.name,
+          a.model || "-",
+          cut(a.tools) || "all",
+          a.path,
+          cut(a.description),
+        ]),
       };
     case "commands":
       return {
@@ -135,8 +141,14 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
       };
     case "hooks":
       return {
-        head: ["event", "matcher", "source", "command"],
-        rows: inventory.hooks.map((h) => [h.event, cut(h.matcher), h.path, cut(h.command)]),
+        head: ["event", "matcher", "when", "source", "command"],
+        rows: inventory.hooks.map((h) => [
+          h.event,
+          cut(h.matcher),
+          cut(h.condition) || "-",
+          h.path,
+          cut(h.command),
+        ]),
       };
     case "rules":
       return {
@@ -145,10 +157,17 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
       };
     case "mcp":
       return {
-        head: ["server", "plugin"],
-        rows: inventory.mcpServers.map((m) => [m.name, m.plugin]),
+        head: ["server", "plugin", "path"],
+        rows: inventory.mcpServers.map((m) => [m.name, m.plugin, m.path]),
       };
   }
+}
+
+/** The records behind a kind, for `--json`. */
+export function records(inventory: Inventory, kind: Kind): unknown {
+  if (kind === "summary") return inventory;
+  if (kind === "mcp") return inventory.mcpServers;
+  return inventory[kind];
 }
 
 export function render({ kind, head, rows }: Section): string {

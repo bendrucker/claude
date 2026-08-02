@@ -1,9 +1,11 @@
 import { basename, join } from "node:path";
 import matter from "gray-matter";
-import { loadPlugins, type MatcherEntry } from "../../packages/marketplace/index";
+import { loadPlugins } from "../../packages/marketplace/index";
 import {
   AGENT_GLOBS,
   COMMAND_GLOBS,
+  namespaced,
+  type Origin,
   origin,
   RULE_GLOBS,
   readAll,
@@ -12,12 +14,6 @@ import {
   SKILL_GLOBS,
   skillName,
 } from "../assets";
-
-interface Origin {
-  scope: Scope;
-  path: string;
-  plugin?: string;
-}
 
 export interface Skill extends Origin {
   name: string;
@@ -41,6 +37,8 @@ export interface Command extends Origin {
 export interface Hook extends Origin {
   event: string;
   matcher: string;
+  /** The `if` guard that decides whether the command runs, empty when unguarded. */
+  condition: string;
   command: string;
 }
 
@@ -52,6 +50,7 @@ export interface Rule extends Origin {
 export interface McpServer {
   name: string;
   plugin: string;
+  path: string;
 }
 
 export interface PluginSummary {
@@ -93,18 +92,30 @@ function toolList(value: unknown): string {
   return Array.isArray(value) ? value.map(text).join(", ") : text(value);
 }
 
+/**
+ * Only `hooks.json` is schema-validated. Skill frontmatter and the settings
+ * files reach here as raw YAML and JSON, so nothing below the event key is
+ * guaranteed to exist or to have the right shape.
+ */
+type HookEvents = Record<
+  string,
+  Array<{ matcher?: string; hooks?: Array<{ type: string; command?: string; if?: string }> }>
+>;
+
 /** Every hook a settings, plugin, or skill manifest registers, one row per command. */
-export function* hookEntries(
-  source: string,
-  events: Record<string, MatcherEntry[]>,
-): Generator<Hook> {
+export function* hookEntries(source: string, events: HookEvents): Generator<Hook> {
+  const from = origin(source);
+
   for (const [event, entries] of Object.entries(events)) {
+    if (!Array.isArray(entries)) continue;
+
     for (const entry of entries) {
-      for (const hook of entry.hooks) {
+      for (const hook of entry?.hooks ?? []) {
         yield {
-          ...origin(source),
+          ...from,
           event,
           matcher: entry.matcher ?? "*",
+          condition: text(hook.if),
           command: text(hook.command) || hook.type,
         };
       }
@@ -115,7 +126,7 @@ export function* hookEntries(
 /** A skill's own record plus any hooks its frontmatter registers, from one parse. */
 async function readSkill(path: string): Promise<{ skill: Skill; hooks: Hook[] }> {
   const data = await frontmatter(path);
-  const events = data.hooks as Record<string, MatcherEntry[]> | undefined;
+  const events = data.hooks as HookEvents | undefined;
 
   return {
     skill: {
@@ -136,18 +147,27 @@ async function readAgent(path: string): Promise<Agent> {
 
   return {
     ...origin(path),
-    name: text(data.name) || basename(path, ".md"),
+    name: namespaced(path, text(data.name) || basename(path, ".md")),
     description: text(data.description),
     model: text(data.model),
     tools: allowed || (denied ? `all except ${denied}` : ""),
   };
 }
 
+/** Subdirectories under `commands/` are colons in the name Claude Code registers. */
+function commandName(path: string): string {
+  const segments = path.split("/");
+  return segments
+    .slice(segments.indexOf("commands") + 1)
+    .join(":")
+    .replace(/\.md$/, "");
+}
+
 async function readCommand(path: string): Promise<Command> {
   const data = await frontmatter(path);
   return {
     ...origin(path),
-    name: text(data.name) || basename(path, ".md"),
+    name: namespaced(path, text(data.name) || commandName(path)),
     description: text(data.description),
   };
 }
@@ -173,7 +193,7 @@ async function settingsHooks(path: string): Promise<Hook[]> {
   const file = Bun.file(join(root, path));
   if (!(await file.exists())) return [];
 
-  const settings = (await file.json()) as { hooks?: Record<string, MatcherEntry[]> };
+  const settings = (await file.json()) as { hooks?: HookEvents };
   return [...hookEntries(path, settings.hooks ?? {})];
 }
 
@@ -248,7 +268,11 @@ export async function collect(): Promise<Inventory> {
     hooks,
     rules: byName(rules),
     mcpServers: plugins.flatMap((plugin) =>
-      plugin.mcpServers.map((name) => ({ name, plugin: plugin.name })),
+      plugin.mcpServers.map((name) => ({
+        name,
+        plugin: plugin.name,
+        path: `plugins/${plugin.name}/.mcp.json`,
+      })),
     ),
   };
 }

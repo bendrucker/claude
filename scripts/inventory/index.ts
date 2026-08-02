@@ -2,8 +2,8 @@
 
 import { cli } from "cleye";
 import { isScope, SCOPES } from "../assets";
-import { collect, filter, type Inventory } from "./collect";
-import { isKind, KINDS, type Kind, render, section } from "./report";
+import { collect, filter } from "./collect";
+import { isKind, KINDS, records, render, section } from "./report";
 
 const argv = cli({
   name: "inventory",
@@ -44,6 +44,13 @@ if (scope !== undefined && !isScope(scope)) {
   process.exit(1);
 }
 
+// cleye coerces with Number(), so a missing or non-numeric value arrives as NaN,
+// which every comparison in truncate() fails and blanks the column it budgets.
+if (!Number.isFinite(truncate)) {
+  console.error("--truncate takes a number of characters, or 0 to disable.");
+  process.exit(1);
+}
+
 const inventory = filter(await collect(), {
   ...(plugin ? { plugin } : {}),
   ...(scope ? { scope } : {}),
@@ -53,10 +60,4 @@ if (json) {
   console.log(JSON.stringify(records(inventory, kind), null, 2));
 } else {
   console.log(render(section(inventory, kind, truncate)));
-}
-
-function records(inventory: Inventory, kind: Kind): unknown {
-  if (kind === "summary") return inventory;
-  if (kind === "mcp") return inventory.mcpServers;
-  return inventory[kind];
 }

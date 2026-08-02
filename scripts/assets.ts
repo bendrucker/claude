@@ -57,9 +57,26 @@ export function scopeOf(path: string): Scope {
   return "project";
 }
 
-export function origin(path: string): { scope: Scope; path: string; plugin?: string } {
+/** What every asset record carries, whatever its kind. */
+export interface Origin {
+  scope: Scope;
+  path: string;
+  plugin?: string;
+}
+
+export function origin(path: string): Origin {
   const plugin = path.startsWith("plugins/") ? path.split("/")[1] : undefined;
   return { scope: scopeOf(path), path, ...(plugin ? { plugin } : {}) };
+}
+
+/**
+ * The name an asset is reachable by. A plugin namespaces its assets as
+ * `<plugin>:<name>`, so a listing that drops the prefix names something the
+ * caller cannot dispatch. Frontmatter that already carries a namespace wins.
+ */
+export function namespaced(path: string, name: string): string {
+  const plugin = path.startsWith("plugins/") ? path.split("/")[1] : undefined;
+  return plugin && !name.includes(":") ? `${plugin}:${name}` : name;
 }
 
 /**

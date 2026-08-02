@@ -3,6 +3,7 @@ import {
   AGENT_GLOBS,
   assetPaths,
   isScope,
+  namespaced,
   origin,
   RULE_GLOBS,
   SKILL_GLOBS,
@@ -75,6 +76,7 @@ const fixture: Inventory = {
       plugin: "git",
       event: "PreToolUse",
       matcher: "Bash(git commit:*)",
+      condition: "",
       command: "bun plugins/git/scripts/block-commit.ts",
     },
   ],
@@ -82,7 +84,7 @@ const fixture: Inventory = {
     { name: "go", scope: "user", path: "user/rules/go.md", paths: ["**/*.go"] },
     { name: "always", scope: "project", path: ".claude/rules/always.md", paths: [] },
   ],
-  mcpServers: [{ name: "terraform", plugin: "terraform" }],
+  mcpServers: [{ name: "terraform", plugin: "terraform", path: "plugins/terraform/.mcp.json" }],
 };
 
 test.each<Kind>([...KINDS])("renders the %s table", (kind) => {
@@ -142,6 +144,7 @@ test("hookEntries flattens every command and defaults a missing matcher", () => 
     [
       {
         "command": "a",
+        "condition": "",
         "event": "PostToolUse",
         "matcher": "Write|Edit",
         "path": "user/settings.json",
@@ -149,6 +152,7 @@ test("hookEntries flattens every command and defaults a missing matcher", () => 
       },
       {
         "command": "b",
+        "condition": "",
         "event": "PostToolUse",
         "matcher": "Write|Edit",
         "path": "user/settings.json",
@@ -156,6 +160,7 @@ test("hookEntries flattens every command and defaults a missing matcher", () => 
       },
       {
         "command": "c",
+        "condition": "",
         "event": "Stop",
         "matcher": "*",
         "path": "user/settings.json",
@@ -163,6 +168,49 @@ test("hookEntries flattens every command and defaults a missing matcher", () => 
       },
     ]
   `);
+});
+
+test("hookEntries survives a manifest that declares an event with no commands", () => {
+  const entries = [
+    ...hookEntries("user/settings.json", {
+      Stop: [{ matcher: "*" }],
+      PostToolUse: [{ hooks: [{ type: "command", command: "a", if: "Bash(gh *)" }] }],
+    }),
+  ];
+
+  expect(entries.map((entry) => [entry.event, entry.condition])).toEqual([
+    ["PostToolUse", "Bash(gh *)"],
+  ]);
+});
+
+test.each<{ name: string; path: string; frontmatterName: string; expected: string }>([
+  {
+    name: "plugin agent",
+    path: "plugins/github/agents/logs.md",
+    frontmatterName: "logs",
+    expected: "github:logs",
+  },
+  {
+    name: "user agent",
+    path: "user/agents/review.md",
+    frontmatterName: "review",
+    expected: "review",
+  },
+  {
+    name: "frontmatter that already namespaces",
+    path: "plugins/github/agents/logs.md",
+    frontmatterName: "github:logs",
+    expected: "github:logs",
+  },
+])("namespaced: $name", ({ path, frontmatterName, expected }) => {
+  expect(namespaced(path, frontmatterName)).toBe(expected);
+});
+
+test("plugin agents keep the namespace they are dispatched by", async () => {
+  const { agents } = await collect();
+  const logs = agents.filter((agent) => agent.path.endsWith("/agents/logs.md"));
+
+  expect(logs.map((agent) => agent.name).sort()).toEqual(["github:logs", "gitlab:logs"]);
 });
 
 test("filter narrows every kind to one plugin", () => {

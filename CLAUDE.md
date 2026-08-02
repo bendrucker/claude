@@ -12,10 +12,7 @@ This repository contains my personal Claude Code configuration and a plugin mark
 
 ## Inventory
 
-`bun run inventory [kind]` lists the repository's Claude Code assets, so answering "which skills exist", "what registers a `Stop` hook", or "which plugins ship agents" takes one command instead of a glob sweep. Kinds are `summary` (the default, counts by scope), `plugins`, `skills`, `agents`, `commands`, `hooks`, `rules`, and `mcp`. Every row carries the asset's path, making a listing the starting point for a `Read` or a narrowed grep.
-
-- `--plugin <name>` and `--scope <plugin|user|project>` narrow every kind the same way. Scope is where Claude Code loads the asset from: `plugins/`, `user/`, or `.claude/`.
-- `--truncate <n>` sets the character budget for description and command columns (`0` keeps them whole). `--json` emits the underlying records.
+`bun run inventory [kind]` lists the repository's Claude Code assets, so "which skills exist", "what registers a `Stop` hook", or "which plugins ship agents" takes one command instead of a glob sweep. Kinds: `summary` (default), `plugins`, `skills`, `agents`, `commands`, `hooks`, `rules`, `mcp`. Rows carry the asset's path and its scope (`plugins/`, `user/`, or `.claude/`), so a listing is the starting point for a `Read` or a narrowed `grep`. `--help` covers the flags.
 
 ## User
 

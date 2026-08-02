@@ -22,21 +22,17 @@ Submit by the most automated path the repo allows (merge queue/train, else auto-
 
 Load `github:stack` for the full command surface. Submit with `gh stack merge <pr-number> --yes --squash`, which merges every PR at or below this one atomically and leaves the layers above open for GitHub to retarget and rebase. Match the method to the repo the same way as the unstacked path.
 
-Run the pre-flight block check against every PR at or below this one. The merge is all-or-nothing. A lower layer that is red, draft, or short an approval sinks the whole call. Read the members from the stack `entries` and check each with `position` at or below yours:
-
-```
-gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){stackEntry{position stack{entries(first:50){nodes{position pullRequest{number state isDraft reviewDecision mergeStateStatus}}}}}}}}' -F owner=<owner> -F repo=<repo> -F number=<n>
-```
+Run the pre-flight block check against every PR at or below this one. The merge is all-or-nothing. A lower layer that is draft, short an approval, or blocked on its own checks sinks the whole call. `github:stack` has the entries query and what `position` and `mergeStateStatus` mean.
 
 A block on another layer is unrecoverable from here: babysit watches one PR and can't fix a sibling's CI. Report which layer blocks and `TaskStop`.
 
-The watcher still follows this PR alone. `merged` means this PR landed and stays the success terminal. Under a merge queue the stack enters as a unit and lands as the queue processes it, possibly in separate groups. Treat lower layers merging first as progress and keep waiting for the watcher's own terminal. A warning that the queue ignored the method flag reports the queue picking its own method, and the submit stands.
+The watcher still follows this PR alone. `merged` means this PR landed and stays the success terminal. Under a merge queue the stack enters as a unit and lands as the queue processes it, possibly in separate groups. Treat lower layers merging first as progress and keep waiting for the watcher's own terminal. The queue also picks its own merge method and warns that it ignored the flag you passed, which is a successful submit rather than a rejection.
 
 ## Re-arm
 
 A push drops the PR from the merge mechanism (GitLab: off the train; GitHub: clears queued auto-merge) and fires **no monitor event**. So after **every** push in Merge Mode, re-submit by the same path as the initial submit above instead of waiting. Each re-arm counts toward the 3-attempt oscillation guard below.
 
-A stacked PR re-arms on the next `status: success` instead. `gh stack merge` submits immediately and has no `--auto` to arm ahead of green. Run it straight after a push and it either fails the branch-protection check or lands unverified code. The push has already dropped the stack from any queue it was in and nothing is waiting on it. The delay costs only the CI wait that would have happened anyway. It still counts as an attempt.
+On a stacked PR, don't re-submit after the push. Wait for the watcher's next `status: success` and re-submit there. `gh stack merge` submits immediately and has no `--auto` to arm ahead of green, so running it straight after a push either fails the branch-protection check or lands unverified code. The push has already dropped the stack from any queue it was in and nothing is waiting on it. The wait still counts as an attempt.
 
 Then watch the merge through the monitor rather than polling by hand: invoke the provider's monitor skill again on the PR and react to its events. The watcher enforces the interval and the wall clock, so this phase stays bounded like the CI wait (see [Bounds](SKILL.md#bounds)) and babysit owns no loop here. React to:
 

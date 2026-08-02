@@ -70,7 +70,7 @@ I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 
 I work in stacks routinely. Each branch lives in its own Worktrunk worktree (see Worktrees above). Restack with `wt sync`, a custom extension that rebases each branch onto its parent in dependency order. Useful flags: `--fetch` to pull the base first, `--push` to update remotes after rebasing, `--prune` to remove integrated worktrees. Run `wt sync --dry-run` to preview the plan.
 
-`wt sync` owns the local side and GitHub owns the published side. `gh stack link <bottom> ... <top>` chains the PR bases and creates the stack object without writing local tracking state, which is what makes it fit one worktree per branch. Run `wt sync --push` first, since `link` pushes without force. `gh stack merge <pr-number>` lands everything up to that PR atomically and leaves the layers above for GitHub to retarget, and a stack number works with nothing checked out. `gh pr merge` does not work on a stacked PR. Skip the local-tracking half of `gh stack` (`init`, `add`, `checkout`, `sync`, `rebase`, `submit`, and the navigation commands): it assumes the whole stack sits in one working tree. Load `github:stack` before any `gh stack` command, `gitlab:merge-request` for the GitLab equivalent.
+`wt sync` owns the local side. GitHub owns the published side, through `gh stack link` and `gh stack merge`. Run `wt sync --push` before linking, and `wt sync --fetch` after a merge, since GitHub rebases the layers left open and every one of them is a stale worktree until you pull. Most of `gh stack` assumes the whole stack sits in one working tree and is wrong here, so load `github:stack` before any `gh stack` command. `gitlab:merge-request` is the GitLab equivalent.
 
 ## Personal Details
 

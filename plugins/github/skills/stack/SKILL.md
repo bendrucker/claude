@@ -13,7 +13,9 @@ allowed-tools:
 
 The remote half (`link`, `merge`, `unstack`) goes through the GitHub API and writes no local state. Use it. The local-tracking half (`init`, `add`, `submit`, `push`, `sync`, `rebase`, `checkout`, `modify`, and the navigation commands) assumes every layer is checked out in one working tree. Skip it and let whatever manages the branches own the rebases. `gh stack rebase` prints `✓ Rebased <branch>` and changes nothing when that branch is checked out in another worktree ([gh-stack#35](https://github.com/github/gh-stack/issues/35)).
 
-Exit code 9 means the repository doesn't have stacked PRs enabled.
+Exit code 9 means the repository doesn't have stacked PRs enabled. Code 6 means a branch belongs to more than one stack, or more than one remote is configured with no `remote.pushDefault` set. `link` takes `--remote` for that second case.
+
+Stack numbers and PR numbers come from one sequence per repository and never overlap. A bare number is unambiguous wherever a command takes either.
 
 ## Detection
 
@@ -21,10 +23,19 @@ Stack membership lives on the API, and this query answers with nothing checked o
 
 ```bash
 gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){stack{number size}}}}' \
-  -F owner=OWNER -F repo=REPO -F number=N
+  -F owner=<owner> -F repo=<repo> -F number=<n>
 ```
 
 `"stack": null` means the PR isn't stacked. Otherwise `number` is the stack number and `size` its PR count.
+
+To read the other layers, ask for the entries. `position` counts up from the base, so position 1 is the bottom of the stack and the layers below yours are the ones with a lower position.
+
+```bash
+gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){stackEntry{position stack{entries(first:50){nodes{position pullRequest{number state isDraft reviewDecision mergeStateStatus}}}}}}}}' \
+  -F owner=<owner> -F repo=<repo> -F number=<n>
+```
+
+There is no CI field here. `mergeStateStatus` is the proxy. `CLEAN` is mergeable and passing. `BLOCKED` is blocked by a rule or a missing review, `UNSTABLE` is a non-passing commit status, `DIRTY` is a conflict, and `BEHIND` is a stale head ref.
 
 ## Publishing
 
@@ -44,14 +55,14 @@ Open the PR yourself with `gh pr create --base <parent>` before linking whenever
 
 ## Merging
 
-`gh pr merge` does not work on a stacked PR. Use `gh stack merge`, which takes a stack number or a PR number (not a URL), resolving a bare number as a stack first.
+`gh pr merge` does not work on a stacked PR. Use `gh stack merge`, which takes a stack number or a PR number, never a URL.
 
 ```bash
-gh stack merge 42 --yes --squash  # everything up to and including PR #42
-gh stack merge 7 --yes --squash   # stack 7, no local checkout needed
+gh stack merge 42 --yes --<method>  # everything up to and including PR #42
+gh stack merge 7 --yes --<method>   # stack 7, no local checkout needed
 ```
 
-`--yes` runs it headlessly. Name the method too, since the default is whichever one you used last. With no argument it takes the stack for the current branch. Give it a number instead. The merge should not turn on what happens to be checked out.
+`--yes` runs it headlessly. Name the method rather than inheriting the default, which is whichever one you used last, and take it from the repo (`gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`). With no argument it takes the stack for the current branch. Give it a number instead. The merge should not turn on what happens to be checked out.
 
 The merge is all-or-nothing across every PR at or below the target. One layer that can't merge sinks the call, and the reason comes back on stderr. Layers above stay open, and GitHub retargets and rebases them onto the new base.
 

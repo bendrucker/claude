@@ -4,8 +4,8 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// The SDK version pinned here predates the PermissionDenied event, so its input
-// shape is declared locally rather than imported.
+// The SDK version pinned here predates the PermissionDenied event, so its
+// input shape is declared locally.
 export type PermissionDeniedInput = {
   session_id?: string;
   cwd?: string;
@@ -50,9 +50,8 @@ function slug(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
-// One file per denial rather than an append to a shared log: Bun exposes no
-// append primitive, and read-modify-write would drop records when concurrent
-// sessions are denied at the same moment.
+// Bun exposes no append primitive, and read-modify-write would drop records
+// when concurrent sessions are denied at the same moment.
 export function filename(input: PermissionDeniedInput, timestamp: string): string {
   return `${slug(timestamp)}-${slug(input.tool_use_id || "unknown")}.json`;
 }

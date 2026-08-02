@@ -105,6 +105,5 @@ test("append rotates once the log passes the size cap", async () => {
 
   expect(await Bun.file(`${path}.1`).exists()).toBe(true);
   const lines = (await Bun.file(path).text()).trimEnd().split("\n");
-  expect(lines).toHaveLength(1);
-  expect(JSON.parse(lines[0]).target).toBe("after");
+  expect(lines.map((line) => JSON.parse(line).target)).toEqual(["after"]);
 });

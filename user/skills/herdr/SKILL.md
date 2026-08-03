@@ -173,4 +173,4 @@ Its `last-turn` scope reads the same scraped `agent_status` described above, tre
 Every read command works under the sandbox. Three writes do not, and all three come back `Operation not permitted`:
 
 - `herdr worktree create` writes a checkout outside the allowed paths. Create worktrees with `wt` through the `worktrunk:wt-switch-create` skill instead, then `herdr worktree open` the result. Opening a checkout that already exists is fine.
-- `herdr plugin install` and `herdr integration install` write into herdr's own state directories. Both are install-time operations that dotfiles owns, so hand them to the user rather than retrying with the sandbox off.
+- `herdr plugin install` writes into herdr's plugin store and `herdr integration install` writes into the agent's own config tree. Both are install-time operations that dotfiles owns, so hand them to the user rather than retrying with the sandbox off.

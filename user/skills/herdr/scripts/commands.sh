@@ -6,7 +6,12 @@ set -uo pipefail
 
 command -v herdr >/dev/null 2>&1 || exit 0
 
-groups=(api config workspace worktree tab notification agent pane session integration plugin channel server)
+# Top-level help advertises most groups but omits some, so union the two.
+groups=$(
+  { herdr --help 2>/dev/null | awk '/^ +herdr [a-z-]+ <subcommand>/ { print $2 }'
+    printf '%s\n' plugin server
+  } | sort -u
+)
 hot=(
   "agent prompt"
   "agent wait"
@@ -19,7 +24,7 @@ hot=(
   "worktree open"
 )
 
-for g in "${groups[@]}"; do
+for g in $groups; do
   herdr "$g" --help 2>/dev/null |
     awk -v group="$g" '
       /^Commands:/ { inside = 1; next }

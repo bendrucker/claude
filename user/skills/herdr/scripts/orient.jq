@@ -16,6 +16,7 @@
           + (if .agent_session.value then "  \(.agent_session.value)" else "" end)
           + (if $cwd != "" and $cwd != $root then "  \($cwd)" else "" end)
           + ( ((.terminal_title_stripped // "") | sub(" · [0-9a-f-]+$"; "")) as $title
-              | if .agent and $title != "" then "  \"\($title)\"" else "" end )
+              | ($title | if startswith("~") then (env.HOME // "") + .[1:] else . end) as $titled
+              | if $title != "" and $titled != $cwd then "  \"\($title)\"" else "" end )
       )
   )

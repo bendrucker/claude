@@ -1,10 +1,11 @@
 ---
 name: herdr
 description: >-
-  Drive the herdr terminal workspace manager: inspect workspaces, tabs, and panes, hand work to sibling coding agents and read their results, split panes for collaborative file viewing, and correlate panes to Claude sessions. Use when coordinating with another agent, opening a file alongside the user, capturing another pane's output, or asking what else is running.
+  Drive the herdr terminal workspace manager: inspect workspaces, tabs, and panes, hand work to sibling coding agents and read their results, split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Use when coordinating with another agent, opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running.
 argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
   - Bash(herdr api snapshot:*)
   - Bash(herdr --help:*)
   - Bash(herdr agent --help:*)
@@ -15,12 +16,18 @@ allowed-tools:
   - Bash(herdr agent list:*)
   - Bash(herdr agent get:*)
   - Bash(herdr agent read:*)
+  - Bash(herdr agent wait:*)
   - Bash(herdr agent explain:*)
   - Bash(herdr pane list:*)
   - Bash(herdr pane get:*)
+  - Bash(herdr pane current:*)
   - Bash(herdr pane read:*)
+  - Bash(herdr pane layout:*)
+  - Bash(herdr pane wait-output:*)
   - Bash(herdr workspace list:*)
+  - Bash(herdr worktree list:*)
   - Bash(herdr tab list:*)
+  - Bash(herdr plugin list:*)
 ---
 
 # Herdr
@@ -29,56 +36,56 @@ herdr manages the terminal workspace this session runs in. It knows every worksp
 
 ## Arguments
 
-`$0` (optional verb) routes to a section: `orient` to [Current Workspace](#current-workspace), `agents` to [Working With Sibling Agents](#working-with-sibling-agents), `view <file>` to [Collaborative File Viewing](#collaborative-file-viewing), `read <pane>` to [Capturing Another Pane](#capturing-another-pane). With no verb, answer from the orientation block below.
+`$0` (optional verb) routes to a section: `orient` to [Current Workspace](#current-workspace), `agents` to [Sibling Agents](#sibling-agents), `view <file>` to [Collaborative File Viewing](#collaborative-file-viewing), `read <pane>` to [Reading Another Pane](#reading-another-pane). With no verb, answer from the orientation block below.
 
-## Check Help Before Composing a Call
+## Command Surface
 
-herdr ships roughly weekly. This file deliberately does not restate its command surface, because a copy of `--help` output goes stale between releases.
+herdr ships roughly weekly. This file therefore states no command table of its own. The block below is generated from `--help` at load time and cannot go stale. It lists every group with its subcommands, then the full signature of the handful used most.
 
-Before composing any call, run `herdr <group> --help` for the subcommand list and `herdr <group> <command> --help` for its arguments. Leaf help is complete: it prints defaults, enumerates valid values for every enum flag, and states preconditions. Where this file and the CLI disagree, the CLI is right and this file is stale.
+!`bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh`
 
-The orientation block below prints the running `version` and `protocol`. If either has moved well past what you see in the examples here, trust `--help` over the examples.
+For a command whose flags are not shown above, `herdr <group> <command> --help` is complete: it prints defaults, enumerates valid values for every enum flag, and states preconditions. Where the CLI and this file disagree, the CLI is right and this file is stale.
 
 ## Current Workspace
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh`
 
-That view is a projection over `herdr api snapshot`, which returns workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls. When the projection looks wrong or omits something, read the source: `herdr api snapshot | jq .`
+Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view is a projection over `herdr api snapshot`, which returns workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls. When the projection looks wrong or omits something, read the source: `herdr api snapshot | jq .`
 
 If the block reports that herdr is not running, stop here and use ordinary tools. Nothing below will reach a server.
 
-## Reading the Output
+## Output Formats
 
-Structured queries answer with a single-line JSON envelope. Pipe them through `jq -r '.result...'` rather than reading them raw:
+Most commands answer with a single-line JSON envelope. Pipe them through `jq -r '.result...'` rather than reading them raw:
 
 ```fragment
 {"id":"cli:pane:list","result":{"panes":[...],"type":"pane_list"}}
 ```
 
-Commands that return terminal content or a human explanation print plain text instead, with no envelope. `pane read`, `agent read`, and `agent explain` are all in that group. Piping those through `jq` fails with a parse error.
+Others print plain text, and `jq` on those dies with `Invalid numeric literal`. Two kinds do it. Terminal content and human explanations are one: `pane read`, `agent read`, `agent explain`. Anything reporting local installation instead of live session state is the other: `plugin list`, `plugin config-dir`, `config check`, `integration status`, `server agent-manifests`. The split runs between siblings, so `plugin action list` returns an envelope while `plugin list` does not.
 
 Your own identity comes from the environment, never from inference: `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`.
 
-## Working With Sibling Agents
+## Sibling Agents
 
 The most valuable thing herdr offers is a handle on the other agents running alongside you. Each agent pane carries `agent_session.value`, the Claude session UUID. That makes pane-to-session correlation exact, where a title match would only be a guess.
 
-The loop is find, hand off, wait, collect:
+A reference to work by branch, repo, or task usually names a pane already doing it. Match it against the `cwd` and `title` columns in the orientation block, then hand off to that pane instead of duplicating the checkout here.
+
+`agent prompt --wait` blocks through the other agent's turn. A handoff therefore costs two calls:
 
 ```bash
-herdr agent list | jq -r '.result.agents[] | "\(.pane_id) \(.agent_status) \(.foreground_cwd)"'
-herdr agent prompt <target> "the request"
-herdr agent wait <target> --until idle --timeout 600000
-herdr agent read <target> --source recent --lines 80
+herdr agent prompt <target> "the request" --wait --timeout 900000
+herdr agent read <target> --lines 80
 ```
 
-`agent read` prints the pane's text directly. It needs no `jq`.
+Timeouts are milliseconds. `--wait` matches idle, done, or blocked unless you name states with `--until`. It does not track turns, so an agent that was already working can match on the turn it was in the middle of. Submitting to a resting agent returns `agent_prompt_stalled` when no state change shows up within 5s.
 
-A reference to work by branch, repo, or task usually names a pane already doing it. Match it against the `cwd` and `title` columns in the orientation block, then hand off to that pane instead of duplicating the checkout here.
+Never poll for a state change with `sleep` and a `pane get` loop. `agent wait` blocks server-side on an agent's state, and `pane wait-output` blocks on text appearing in a plain pane.
 
 `herdr agent focus` brings a pane to the foreground for the user. `herdr agent attach` connects to it directly.
 
-### Where Agent Status Comes From
+### Agent Status
 
 For Claude, herdr's integration hook reports only session identity. The `idle`, `working`, `blocked`, and `done` states come from matching the pane's screen against a detection manifest. An unusual or suppressed terminal title therefore reads as `unknown`.
 
@@ -107,11 +114,20 @@ Fall back to `glow -w 0` or `bat --paging always` when the preferred viewer is m
 
 A pane opened for the user is theirs, so leave it. Close one you split for your own use (`herdr pane close`) once the work in it is done, rather than leaving the layout littered.
 
-## Capturing Another Pane
+## Long-Running Processes
 
-`herdr pane read <pane_id>` replaces a terminal scrape. Check `--help` for the current `--source` values and line limits. To block until something appears, use `herdr pane wait-output` with `--match` or `--regex`.
+A dev server, log tail, build, or REPL the user should watch belongs in a sibling pane instead of `run_in_background`:
 
-`--source recent` reads accumulated output history and returns nothing for a pane created moments ago. Use `--source visible` when reading a pane you just made. On an established pane the sources agree.
+```bash
+pane=$(herdr pane split --direction down --ratio 0.3 --no-focus --cwd "$PWD" | jq -r '.result.pane.pane_id')
+herdr pane run "$pane" "bun run dev"
+```
+
+The same single-command limit applies. Reserve `run_in_background` for work the user has no reason to see.
+
+## Reading Another Pane
+
+`herdr pane read <pane_id>` replaces a terminal scrape. The default `--source recent` reads accumulated output history and returns nothing for a pane created moments ago, so use `--source visible` when reading a pane you just made. On an established pane the sources agree. `--source detection` returns the slice the status scraper matches against, which is what to compare when a pane's status looks wrong.
 
 ## Plugins
 
@@ -126,6 +142,8 @@ herdr plugin action invoke <action_id> --plugin <plugin_id>
 `herdr plugin log list` shows a plugin's command output, which is where to look when an action produces no visible effect. `herdr plugin config-dir <plugin_id>` locates its config.
 
 Filter the action list by platform. Plugins ship Windows variants of the same action, so an unfiltered list shows each one twice.
+
+`herdr plugin pane open` takes a `--placement` of `overlay`, `split`, `tab`, or `zoomed`. The `split` and `zoomed` placements attach to an existing pane. Both need `--target-pane` and fail with `invalid_params` without it.
 
 ### reviewr
 
@@ -150,6 +168,9 @@ Two invariants worth knowing. reviewr never writes to the worktree, the index, o
 
 Its `last-turn` scope reads the same scraped `agent_status` described above, treating a resting-to-working transition as a turn boundary. A turn that finishes inside one poll interval is invisible to it, which is why a very fast edit can be missing from that view.
 
-## Worktrees Belong to Worktrunk
+## Sandbox Limits
 
-Create worktrees with `wt` through the `worktrunk:wt-switch-create` skill. `herdr worktree create` writes outside the sandbox's allowed paths and fails there. Opening a checkout that already exists is fine.
+Every read command works under the sandbox. Three writes do not, and all three come back `Operation not permitted`:
+
+- `herdr worktree create` writes a checkout outside the allowed paths. Create worktrees with `wt` through the `worktrunk:wt-switch-create` skill instead, then `herdr worktree open` the result. Opening a checkout that already exists is fine.
+- `herdr plugin install` writes into herdr's plugin store and `herdr integration install` writes into the agent's own config tree. Both are install-time operations that dotfiles owns, so hand them to the user rather than retrying with the sandbox off.

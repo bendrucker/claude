@@ -28,6 +28,7 @@ Prefer accommodating Claude Code's native defaults over overriding them, since a
 ## Workflow
 
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.
+- A skill that instructs a subagent fan-out or a background dispatch already carries the user's authorization for `Agent`. Run the dispatch as the skill writes it, and degrade to an inline pass only when `Agent` is absent from the tool set, saying in the output that it ran inline.
 - For questions about Claude Code features or usage, use the `Agent` tool with `subagent_type='claude-code-guide'` to consult official documentation.
 - Prefer the `agent-browser` skill over `WebFetch`/`WebSearch` when a task needs a real browser — interacting with a page, screenshots, scraping JS-rendered content, or web-app QA/dogfooding. It loads the CLI's version-matched `skills get` workflows. Plain `WebFetch` stays fine for static page fetches.
 - Finish a branch with `/ship`: it runs the warranted review passes, opens the PR, babysits CI to green, triages bot comments, and refreshes the body. Don't hand-chain `EnterWorktree` + `pull-request:create` for a branch finish.

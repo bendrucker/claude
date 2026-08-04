@@ -60,7 +60,7 @@ Otherwise run the selected angles from [angles.md](angles.md). Each surfaces up 
 
 #### Fan-out cells
 
-`medium`, `high`, `xhigh`, and `max` on the default and Sonnet families, plus `max` on Opus 4.8. Run each angle as an independent `Agent`. Give every agent the scope block, its single angle text, and the cleanup-precedence block if it carries a cleanup lens.
+`medium`, `high`, `xhigh`, and `max` on the default and Sonnet families, plus `max` on Opus 4.8. Run each angle as an independent `Agent`. Invoking this skill is the request for that fan-out, so run it whenever `Agent` is in the tool set. Give every agent the scope block, its single angle text, and the cleanup-precedence block if it carries a cleanup lens.
 
 #### Inline cells
 
@@ -68,7 +68,7 @@ Otherwise run the selected angles from [angles.md](angles.md). Each surfaces up 
 
 #### No `Agent` tool
 
-Every fan-out cell degrades to a single inline pass. Work through every angle yourself in one pass. Do not skip angles for lack of fan-out. Say in the summary that this was a single-pass review, not the full multi-agent fan-out, so nobody is misled about what ran.
+Only a missing `Agent` tool degrades a fan-out cell to a single inline pass. Work through every angle yourself in one pass. Do not skip angles for lack of fan-out. Say in the summary that this was a single-pass review, not the full multi-agent fan-out, so nobody is misled about what ran.
 
 Pass every candidate with a nameable failure scenario through. Finders that silently drop half-believed candidates bypass the verify step and are the dominant cause of misses.
 

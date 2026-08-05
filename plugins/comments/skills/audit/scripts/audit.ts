@@ -219,11 +219,15 @@ const applyCmd = command(
         description:
           "Format each edited file through this shell template ({} = path, content on stdin)",
       },
+      maxWidth: {
+        type: Number,
+        description: "Refuse a splice past this line width (unchecked when omitted)",
+      },
     },
   },
   async (parsed) => {
     await chdirToRepoRoot();
-    const { job, report, fix, format } = parsed.flags;
+    const { job, report, fix, format, maxWidth } = parsed.flags;
     if (!job) {
       console.error("--job <dir> is required.");
       process.exit(1);
@@ -257,7 +261,6 @@ const applyCmd = command(
     const matched = new Set<string>();
     const manualSkips: string[] = [];
     const skippedComments = new Set<string>();
-    const editWarnings: { path: string; line: number; detail: string }[] = [];
 
     // Re-extract each judged file and match verdicts by id at the comment's
     // current range. A verdict whose id no longer re-extracts has drifted.
@@ -279,24 +282,20 @@ const applyCmd = command(
           editItems.push(toEditItem(match.comment, match.verdict));
       }
       if (editItems.length > 0) {
-        const result = computeFileEdits(source, editItems);
+        const result = computeFileEdits(source, editItems, { maxWidth });
         for (const skip of result.skips) {
           manualSkips.push(`${path}:${skip.startLine}  ${skip.detail}`);
           skippedComments.add(`${path}:${skip.startLine}`);
         }
-        for (const warning of result.warnings)
-          editWarnings.push({ path, line: warning.line, detail: warning.detail });
         if (result.content !== source) editsByPath.set(path, result.content);
       }
     }
 
-    const formattedPaths = new Set<string>();
     if (format && !report) {
       for (const [path, content] of editsByPath) {
         const formatted = await formatContent(format, path, content);
         if (formatted.formatted) {
           editsByPath.set(path, formatted.content);
-          formattedPaths.add(path);
         } else {
           console.error(
             color.yellow(
@@ -342,14 +341,6 @@ const applyCmd = command(
     if (manualSkips.length > 0) {
       console.error(color.yellow(`Left ${manualSkips.length} comment(s) for manual handling:`));
       for (const skip of manualSkips) console.error(`  ${skip}`);
-    }
-    // A formatter that succeeded owns line wrapping for its file, so its
-    // over-length warnings are stale.
-    const remainingWarnings = editWarnings.filter((warning) => !formattedPaths.has(warning.path));
-    if (remainingWarnings.length > 0) {
-      console.error(color.yellow(`Applied ${remainingWarnings.length} edit(s) worth re-checking:`));
-      for (const warning of remainingWarnings)
-        console.error(`  ${warning.path}:${warning.line}  ${warning.detail}`);
     }
   },
 );

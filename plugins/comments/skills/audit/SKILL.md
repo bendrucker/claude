@@ -8,7 +8,7 @@ description: >-
   asked to audit, trim, or clean up code comments, or as the comment pass of a
   branch-finishing flow. Not a general code review: skip it when the change
   added no comments.
-argument-hint: "[--all] [--base <ref>] [--mr <iid>] [--path <glob>] [--sort <key>] [--limit <n>] [--report] [--fix] [--format <template>]"
+argument-hint: "[--all] [--base <ref>] [--mr <iid>] [--path <glob>] [--sort <key>] [--limit <n>] [--report] [--fix] [--format <template>] [--max-width <n>]"
 allowed-tools:
   - Bash
   - Read
@@ -54,6 +54,8 @@ and license headers never reach the judge.
 - `--report`: at apply time, print findings instead of writing a branch.
 - `--format <template>`: at apply time, pipe each edited file through a
   formatter before committing.
+- `--max-width <n>`: at apply time, refuse a splice that would exceed `n`
+  columns. Width goes unchecked when the flag is absent.
 
 ## Preflight
 
@@ -99,7 +101,7 @@ verdicts stay on disk, off the conversation, for `apply` to read.
 ## Apply
 
 ```bash
-bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [--fix] [--format <template>]
+bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [--fix] [--format <template>] [--max-width <n>]
 ```
 
 Default apply re-extracts the judged files and matches verdicts to comments by
@@ -141,10 +143,27 @@ Pick the formatter from the target repo's own configuration and pass it
 explicitly, or omit the flag. NEVER guess at, auto-discover, or auto-execute a
 formatter the repo does not configure.
 
+Without `--format`, `--max-width` is the only guard on wrapping. Set it to the
+limit the target repo already enforces (its formatter config, `.editorconfig`,
+or linter rule). Never invent one: a limit below the repo's real width refuses
+edits that would have been fine.
+
 ### Manual Handling
 
 Comments the applier cannot change safely are left in place and listed for
-manual handling: a comment interleaved with code, a trim that would break a
-block delimiter, and a line-range trim whose kept line would open mid-sentence.
-Applier-produced lines that exceed the width limit are applied but listed as
-warnings to re-wrap by hand.
+manual handling:
+
+- a comment interleaved with code;
+- a `trimToLines` range that would drop a block's opening or closing delimiter,
+  or whose kept line would open mid-sentence;
+- a `trimTo` or `rewrite` whose text carries a comment form the site cannot
+  host, such as `//` text replacing a `/** */` block;
+- a `trimTo` or `rewrite` at a comment whose own delimiters the applier does
+  not recognize, such as Ruby's `=begin`/`=end`;
+- a `trimTo` or `rewrite` that would produce a line past `--max-width`.
+
+For a `trimTo` or `rewrite`, the applier reads the delimiters the comment
+already uses and re-emits them, so text that arrives as bare prose still
+splices as a valid comment at the right indentation. Doc-comment markers
+(`/**`, `///`, `//!`) survive the round trip rather than decaying to their
+plain form.

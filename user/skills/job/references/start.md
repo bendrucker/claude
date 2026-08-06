@@ -46,7 +46,7 @@ Triage each inbound item, whether a message, a tracker notification, or an email
 
 Read is not handled. Notification state records only what the user has seen, so judge each thread by who spoke last and what remains open, never by unread flags. Two states never collapse into background noise: a thread where the user's own most recent comment is unanswered, which is live work awaiting a reply rather than a closed loop, and active discussion on work that also has an open MR in the user's review queue, which is review context and merges into that review's entry, since the thread may be converging on a different fix than the diff shows.
 
-A blocked agent is an inbound item like any message or notification, and it gets the same terminal disposition: resumed by you, or deferred with a note recording what it is waiting on. Read is not handled applies here too. An agent you saw in `claude agents` and walked away from is still open work.
+A blocked agent is an inbound item like any message or notification, and it gets the same terminal disposition: resumed by you, focused into its herdr pane when one matched, or deferred with a note recording what it is waiting on. Read is not handled applies here too. An agent you saw in `claude agents` and walked away from is still open work.
 
 Route deferrals per the contract in `SKILL.md`: team work to the tracker, personal next-steps and reminders to the personal inbox. Drafting a reply the user has read is safe, as is archiving something already handled. Sending a reply without review is ask-first.
 

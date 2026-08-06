@@ -48,7 +48,7 @@ Offer per worktree: commit and push as WIP (safe on your own branch), or record 
 
 ## Unattended Agents
 
-Every blocked or failed agent leaves the day resumed, stopped, or captured as a follow-up. Route captures per Tracker Hygiene below. A blocked agent carries what it is waiting on in `waitingFor`, and that belongs in the capture, since tomorrow's answer is worthless without the question.
+Every blocked or failed agent leaves the day resumed, focused into its herdr pane when one matched, stopped, or captured as a follow-up. Route captures per Tracker Hygiene below. A blocked agent carries what it is waiting on in `waitingFor`, and that belongs in the capture, since tomorrow's answer is worthless without the question.
 
 A `working` agent can be left running overnight. That is a choice, so record it in the completion summary along with what it is expected to have finished by morning.
 

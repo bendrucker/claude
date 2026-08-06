@@ -12,6 +12,8 @@ allowed-tools:
   - Read(${CLAUDE_SKILL_DIR}/references/*)
   - Bash(claude agents:*)
   - Bash(claude --bg:*)
+  - Bash(herdr agent list:*)
+  - Bash(herdr agent focus:*)
 ---
 
 # Job
@@ -54,6 +56,8 @@ Read-only first. The sources are independent (review queue, own PRs, tracker, me
 
 Background Claude sessions may already be working items in the brief. Run `claude agents --json --all` inline in the orchestrator rather than in a sub-agent: it is one command, and the join needs the raw records that a sub-agent summary would flatten. Each record carries `id`, `sessionId`, `name`, `cwd`, `kind`, `startedAt`, `status`, `state`, and, when blocked, `waitingFor`. `state` is `working`, `blocked`, `done`, or `failed`, and is null for interactive sessions.
 
+When `HERDR_PANE_ID` is set, a second inline call, `herdr agent list`, maps live sessions to the terminal panes running them. Join its agents to the `claude agents` records on `sessionId == agent_session.value` and record the matched `pane_id` on the brief item. That join is exact, so never fall back to a title or `cwd` comparison. When `HERDR_PANE_ID` is unset there is no herdr server to ask, so skip the call and the resume command below carries the handoff. Load the `herdr` skill for the mechanics and for which commands answer with JSON.
+
 Join each record to a brief item in this order:
 
 1. A `name` matching the `job:<identifier>` convention below. Exact and structural, so it is the only join that never guesses.
@@ -78,7 +82,7 @@ An item with a matched agent gains one line under its existing entry:
 agent `<short id>` · <state>[ (<waitingFor>)] · <age>
 ```
 
-A live session (`working`, `blocked`, or an interactive session whose `state` is null) adds a second line, `→ claude --resume <sessionId>`, because resuming it is the action. A `done` or `failed` session gets no resume line. It is history, so the item keeps the action it already had, and the entry carries the `sessionId` as the prior attempt worth reading.
+A live session (`working`, `blocked`, or an interactive session whose `state` is null) adds a second line naming how to get back into it, because that is the action. With a matched pane the line is `→ herdr agent focus <pane_id>`, and `herdr agent attach <pane_id>` is the variant that connects to the pane directly. Without one it is `→ claude --resume <sessionId>`. A `done` or `failed` session gets no action line either way. It is history, so the item keeps the action it already had, and the entry carries the `sessionId` as the prior attempt worth reading.
 
 An unmatched agent becomes its own entry only when it still wants something: `blocked`, `failed`, or `working`. Since gather runs with `--all`, unmatched `done` records are completed history and get dropped. Keeping them would fill a prioritized brief with finished work. Group what remains by the repo `cwd` resolves to, or `Misc` when it resolves to none. A blocked agent is blocking work and sorts with it under the ordering rule above.
 
@@ -97,7 +101,7 @@ Present safe actions via AskUserQuestion (execute all, pick a subset, or none). 
 
 Run the quick safe actions and tracker corrections first. Session-length work like a review starts only at the end of the run, after the rest is cleared, and never before the approved order from triage.
 
-Never dispatch over an item with a live session. Resuming it is a handoff: surface the resume command and let the user run it, since this skill runs in its own session and cannot attach to another.
+Never dispatch over an item with a live session. When the item's session resolved to a herdr pane, `herdr agent focus <pane_id>` hands the user the running session rather than a command to paste. Confirm before focusing, since it moves the user's foreground away from this session, and treat it as the last action in the run for that item. Without a matched pane, surface the resume command and let the user run it.
 
 A prior session that is `done` or `failed` does not block a fresh dispatch, but when the work needs another pass, name that `sessionId` in the new prompt so the new session can look up what already happened.
 

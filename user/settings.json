@@ -464,7 +464,7 @@
       "source": {
         "source": "github",
         "repo": "schpet/linear-cli",
-        "ref": "v2.1.1"
+        "ref": "v2.3.0"
       }
     },
     "agent-browser": {

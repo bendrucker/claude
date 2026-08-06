@@ -14,8 +14,11 @@ import { scoreBody } from "./score";
 const GEN_MODEL = "claude-opus-5";
 
 // claude-opus-5: $5/M input, $25/M output.
-const INPUT_COST_PER_TOKEN = 5 / 1_000_000;
-const OUTPUT_COST_PER_TOKEN = 25 / 1_000_000;
+const GEN_RATES: TokenRates = { input: 5 / 1_000_000, output: 25 / 1_000_000 };
+
+// The SDK's own retry budget covers 429s, 5xx, and connection failures with
+// exponential backoff, honoring retry-after when the API sends it.
+const MAX_RETRIES = 3;
 
 export const ARMS = ["a", "b"] as const;
 export type Arm = (typeof ARMS)[number];
@@ -47,7 +50,56 @@ export interface GenerationRow {
 
 export interface Usage {
   input: number;
+  cacheWrite: number;
+  cacheRead: number;
   output: number;
+}
+
+/** USD per token. Cache writes and reads bill as multiples of the input rate. */
+export interface TokenRates {
+  input: number;
+  output: number;
+}
+
+const CACHE_WRITE_MULTIPLIER = 1.25;
+const CACHE_READ_MULTIPLIER = 0.1;
+
+export function emptyUsage(): Usage {
+  return { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 };
+}
+
+export function toUsage(usage: Anthropic.Usage): Usage {
+  return {
+    input: usage.input_tokens,
+    cacheWrite: usage.cache_creation_input_tokens ?? 0,
+    cacheRead: usage.cache_read_input_tokens ?? 0,
+    output: usage.output_tokens,
+  };
+}
+
+export function addUsage(total: Usage, row: Usage): void {
+  total.input += row.input;
+  total.cacheWrite += row.cacheWrite;
+  total.cacheRead += row.cacheRead;
+  total.output += row.output;
+}
+
+export function costUsd(usage: Usage, rates: TokenRates): number {
+  return (
+    usage.input * rates.input +
+    usage.cacheWrite * CACHE_WRITE_MULTIPLIER * rates.input +
+    usage.cacheRead * CACHE_READ_MULTIPLIER * rates.input +
+    usage.output * rates.output
+  );
+}
+
+export function formatUsage(usage: Usage): string {
+  return [
+    `${usage.input} input`,
+    `${usage.cacheWrite} cache write`,
+    `${usage.cacheRead} cache read`,
+    `${usage.output} output`,
+  ].join(" + ");
 }
 
 export interface RunManifest {
@@ -188,7 +240,7 @@ async function generate(
   return {
     title: draft.title,
     body: draft.body,
-    usage: { input: response.usage.input_tokens, output: response.usage.output_tokens },
+    usage: toUsage(response.usage),
   };
 }
 
@@ -235,6 +287,15 @@ function buildJobs(scenarios: Scenario[], seeds: number): Job[] {
     }
   }
   return jobs;
+}
+
+function rowKey(scenarioId: string, arm: Arm | "original", seed: number): string {
+  return `${scenarioId}::${arm}::${seed}`;
+}
+
+/** Rows a previous invocation of the same --run-id already paid for. */
+async function readRecorded(runDir: string): Promise<GenerationRow[]> {
+  return (await Bun.file(generationsPath(runDir)).exists()) ? await readGenerations(runDir) : [];
 }
 
 function defaultRunId(): string {
@@ -304,16 +365,29 @@ async function main(): Promise<void> {
   await Bun.write(join(runDir, "arm-a.md"), guidance.a);
   await Bun.write(join(runDir, "arm-b.md"), guidance.b);
 
+  const recorded = await readRecorded(runDir);
+  const done = new Set(recorded.map((row) => rowKey(row.scenarioId, row.arm, row.seed)));
+
+  // The sink truncates on open, so the rows carried over are written back first.
   const writer = Bun.file(generationsPath(runDir)).writer();
-  const total: Usage = { input: 0, output: 0 };
-  const emit = (row: GenerationRow): void => {
-    writer.write(`${JSON.stringify(row)}\n`);
-    writer.flush();
+  const total = emptyUsage();
+  const emit = async (row: GenerationRow): Promise<void> => {
+    await writer.write(`${JSON.stringify(row)}\n`);
+    await writer.flush();
   };
+
+  for (const row of recorded) {
+    addUsage(total, row.usage);
+    await emit(row);
+  }
+  if (recorded.length > 0) {
+    console.error(`resuming ${runId}: ${recorded.length} rows already recorded`);
+  }
 
   if (!argv.flags.skipBaseline) {
     for (const scenario of scenarios) {
-      emit({
+      if (done.has(rowKey(scenario.id, "original", 0))) continue;
+      await emit({
         scenarioId: scenario.id,
         arm: "original",
         seed: 0,
@@ -321,14 +395,18 @@ async function main(): Promise<void> {
         title: scenario.title,
         body: scenario.originalBody,
         score: scoreBody(scenario.originalBody, scenario.title),
-        usage: { input: 0, output: 0 },
+        usage: emptyUsage(),
       });
     }
   }
 
-  const client = new Anthropic();
-  const jobs = buildJobs(scenarios, argv.flags.seeds);
-  let done = 0;
+  const client = new Anthropic({ maxRetries: MAX_RETRIES });
+  const planned = buildJobs(scenarios, argv.flags.seeds);
+  const jobs = planned.filter((job) => !done.has(rowKey(job.scenario.id, job.arm, job.seed)));
+  if (jobs.length < planned.length) {
+    console.error(`skipping ${planned.length - jobs.length} generations already on disk`);
+  }
+  let generated = 0;
 
   await mapPool(jobs, argv.flags.concurrency, async (job) => {
     const draft = await generate(
@@ -338,9 +416,8 @@ async function main(): Promise<void> {
       job.seed,
       argv.flags.model,
     );
-    total.input += draft.usage.input;
-    total.output += draft.usage.output;
-    emit({
+    addUsage(total, draft.usage);
+    await emit({
       scenarioId: job.scenario.id,
       arm: job.arm,
       seed: job.seed,
@@ -350,13 +427,15 @@ async function main(): Promise<void> {
       score: scoreBody(draft.body, draft.title),
       usage: draft.usage,
     });
-    done++;
-    console.error(`[${done}/${jobs.length}] ${job.scenario.id} arm ${job.arm} seed ${job.seed}`);
+    generated++;
+    console.error(
+      `[${generated}/${jobs.length}] ${job.scenario.id} arm ${job.arm} seed ${job.seed}`,
+    );
   });
 
   await writer.end();
 
-  const costUsd = total.input * INPUT_COST_PER_TOKEN + total.output * OUTPUT_COST_PER_TOKEN;
+  const cost = costUsd(total, GEN_RATES);
   const manifest: RunManifest = {
     runId,
     createdAt: new Date().toISOString(),
@@ -365,13 +444,13 @@ async function main(): Promise<void> {
     scenarioIds: scenarios.map((s) => s.id),
     armFiles: { a: basename(armA), b: basename(armB) },
     usage: total,
-    costUsd,
+    costUsd: cost,
   };
   await Bun.write(manifestPath(runDir), `${JSON.stringify(manifest, null, 2)}\n`);
 
   console.log(runDir);
   console.error(
-    `${jobs.length} generations, ${total.input} input + ${total.output} output tokens, $${costUsd.toFixed(4)}`,
+    `${generated} new generations (${planned.length} total), ${formatUsage(total)} tokens, $${cost.toFixed(4)}`,
   );
 }
 

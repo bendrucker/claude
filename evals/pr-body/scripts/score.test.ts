@@ -16,6 +16,8 @@ const stub: ScoreOptions = {
 
 const RUN_ON = `${"alpha ".repeat(60)}end.`;
 const COMMA_SPLICE = `${"beta ".repeat(44)}alpha, bravo, charlie, delta.`;
+const FOUR_SENTENCES = "One thing. Two things. Three things. Four things.";
+const FIVE_SENTENCES = `${FOUR_SENTENCES} Five things.`;
 
 const FENCED = `Prose line here.
 
@@ -29,7 +31,12 @@ Tail line.`;
 type Metrics = Partial<
   Pick<
     ScoreRow,
-    "wordCount" | "headingCaseViolations" | "sentenceHeadings" | "longSentences" | "narrationTells"
+    | "wordCount"
+    | "headingCaseViolations"
+    | "sentenceHeadings"
+    | "longSentences"
+    | "longParagraphs"
+    | "narrationTells"
   >
 > & { tells?: Partial<Record<NarrationTell, number>> };
 
@@ -42,6 +49,7 @@ test.each<{ name: string; body: string; expected: Metrics }>([
       headingCaseViolations: 0,
       sentenceHeadings: 0,
       longSentences: 0,
+      longParagraphs: 0,
       narrationTells: 0,
     },
   },
@@ -79,6 +87,23 @@ test.each<{ name: string; body: string; expected: Metrics }>([
     name: "list items are not prose sentences",
     body: `- ${RUN_ON}\n`,
     expected: { longSentences: 0 },
+  },
+  {
+    name: "paragraph past the sentence budget",
+    body: `${FIVE_SENTENCES}\n`,
+    expected: { longParagraphs: 1, longSentences: 0 },
+  },
+  {
+    name: "paragraph at the sentence budget",
+    body: `${FOUR_SENTENCES}\n`,
+    expected: { longParagraphs: 0 },
+  },
+  {
+    name: "a long list is not a long paragraph",
+    body: FIVE_SENTENCES.split(". ")
+      .map((sentence) => `- ${sentence}`)
+      .join("\n"),
+    expected: { longParagraphs: 0 },
   },
   {
     name: "narration tells, case-insensitive",

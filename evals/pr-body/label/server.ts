@@ -12,18 +12,18 @@ const argv = cli({
     port: { type: Number, default: 4319, description: "Port to listen on" },
     data: {
       type: String,
-      default: `${import.meta.dir}/../data/samples.json`,
+      default: join(import.meta.dirname, "..", "data", "samples.json"),
       description: "Mined samples to review",
     },
     feedback: {
       type: String,
-      default: `${import.meta.dir}/../feedback`,
+      default: join(import.meta.dirname, "..", "feedback"),
       description: "Directory for saved feedback",
     },
   },
 });
 
-const html = join(import.meta.dir, "index.html");
+const html = join(import.meta.dirname, "index.html");
 
 async function readAllFeedback(): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};

@@ -1,17 +1,20 @@
 #!/usr/bin/env bun
 import { cli } from "cleye";
 import { headingCaseViolations } from "../../../plugins/pull-request/scripts/heading-case";
+import {
+  COMMA_SPLICE_MIN_CHARS,
+  COMMA_SPLICE_MIN_COMMAS,
+  MAX_SENTENCES_PER_PARAGRAPH,
+  proseParagraphs,
+  RUN_ON_CHARS,
+  splitSentences,
+} from "../../../plugins/pull-request/scripts/validate-body";
 import { classifyPrHeading } from "../classifier";
 
 // Deterministic metrics for one generated PR body. Everything here is
-// mechanical: the LLM judge scores the rest.
-
-// Thresholds copied from plugins/pull-request/scripts/validate-body.ts
-// (RUN_ON_CHARS, COMMA_SPLICE_MIN_COMMAS, COMMA_SPLICE_MIN_CHARS), which does
-// not export them.
-const RUN_ON_CHARS = 280;
-const COMMA_SPLICE_MIN_COMMAS = 3;
-const COMMA_SPLICE_MIN_CHARS = 220;
+// mechanical: the LLM judge scores the rest. The prose-density thresholds and
+// splitters come from the hook that enforces them, so the scorer and the hook
+// measure the same thing.
 
 const TITLE_LENGTH_LIMIT = 50;
 
@@ -53,6 +56,7 @@ export interface ScoreRow {
   sentenceHeadingDetail: SentenceHeading[];
   longSentences: number;
   longSentenceDetail: string[];
+  longParagraphs: number;
   narrationTells: number;
   narrationTellCounts: Record<NarrationTell, number>;
   title: TitleMetrics | null;
@@ -95,31 +99,6 @@ export function extractHeadings(body: string): string[] {
     if (match?.[1]) headings.push(match[1].trim());
   }
   return headings;
-}
-
-// Prose paragraphs: fenced code, headings, list items, tables, and blockquotes
-// drop out, so sentence density is measured on prose alone.
-function proseParagraphs(body: string): string[] {
-  const paragraphs: string[] = [];
-  let buffer: string[] = [];
-  const flush = () => {
-    const joined = buffer.join(" ").trim();
-    if (joined.length > 0) paragraphs.push(joined);
-    buffer = [];
-  };
-  for (const line of linesOutsideFences(body)) {
-    if (line.trim() === "" || /^\s*(#{1,6}\s|[-*]\s|\d+[.)]\s|\||>)/.test(line)) {
-      flush();
-      continue;
-    }
-    buffer.push(line.trim());
-  }
-  flush();
-  return paragraphs;
-}
-
-function splitSentences(text: string): string[] {
-  return text.split(/(?<=[.!?])\s+(?=[A-Z`(])/).filter((sentence) => sentence.trim().length > 0);
 }
 
 function isLongSentence(sentence: string): boolean {
@@ -174,7 +153,11 @@ export function scoreBody(body: string, title?: string, options: ScoreOptions = 
     if (result.flagged) sentenceHeadingDetail.push({ text: heading, signals: result.signals });
   }
 
-  const longSentenceDetail = proseParagraphs(body).flatMap(splitSentences).filter(isLongSentence);
+  const paragraphs = proseParagraphs(body).map(splitSentences);
+  const longSentenceDetail = paragraphs.flat().filter(isLongSentence);
+  const longParagraphs = paragraphs.filter(
+    (sentences) => sentences.length > MAX_SENTENCES_PER_PARAGRAPH,
+  ).length;
 
   const narrationTellCounts = countNarrationTells(body);
   const narrationTells = Object.values(narrationTellCounts).reduce((sum, n) => sum + n, 0);
@@ -187,6 +170,7 @@ export function scoreBody(body: string, title?: string, options: ScoreOptions = 
     sentenceHeadingDetail,
     longSentences: longSentenceDetail.length,
     longSentenceDetail,
+    longParagraphs,
     narrationTells,
     narrationTellCounts,
     title: title === undefined ? null : scoreTitle(title),
@@ -217,6 +201,8 @@ function report(row: ScoreRow): string {
   for (const sentence of row.longSentenceDetail) {
     lines.push(`  ${sentence.slice(0, 100)}…`);
   }
+
+  lines.push(`long paragraphs: ${row.longParagraphs}`);
 
   lines.push(`narration tells: ${row.narrationTells}`);
   for (const [tell, count] of Object.entries(row.narrationTellCounts)) {

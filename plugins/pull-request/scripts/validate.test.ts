@@ -473,7 +473,10 @@ describe("parseRemote", () => {
     ["https://github.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
     ["ssh://git@github.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
     ["https://gitlab.com/group/subgroup/project.git", { host: "gitlab.com", owner: "group" }],
-    ["git@github.mycorp.com:bendrucker/service.git", { host: "github.mycorp.com", owner: "bendrucker" }],
+    [
+      "git@github.mycorp.com:bendrucker/service.git",
+      { host: "github.mycorp.com", owner: "bendrucker" },
+    ],
     ["https://GitHub.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
     ["/Users/ben/src/claude", null],
   ])("parseRemote(%p) -> %p", (url, expected) => {

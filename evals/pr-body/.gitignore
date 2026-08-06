@@ -1,0 +1,4 @@
+# Generated and local-only: mined samples, reviewer feedback, eval runs.
+data/
+feedback/
+results/

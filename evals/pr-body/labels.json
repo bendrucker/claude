@@ -1,0 +1,929 @@
+[
+  {
+    "text": "Why a Time Window and Not an Event Hook on Pane Start",
+    "words": 12,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/837",
+    "verdict": "bad",
+    "notes": "Run on sentence fragment, pushy and marketing heavy",
+    "rewrite": ""
+  },
+  {
+    "text": "Suspect Cases (Follow-Up Issues, Not Part of This PR)",
+    "words": 9,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/640",
+    "verdict": "bad",
+    "notes": "lengthy parenthetical run on",
+    "rewrite": ""
+  },
+  {
+    "text": "Why `text_content` Is a View, Not a Materialized Table",
+    "words": 9,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/636",
+    "verdict": "bad",
+    "notes": "Sentence, with punctuation ",
+    "rewrite": ""
+  },
+  {
+    "text": "GitLab Review Queue (Owned by the `gitlab` Plugin)",
+    "words": 8,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/706",
+    "verdict": "bad",
+    "notes": "sentence parenthetical",
+    "rewrite": ""
+  },
+  {
+    "text": "Two fixes found while testing the tmux calls",
+    "words": 8,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/825",
+    "verdict": "bad",
+    "notes": "sentence, sentence case",
+    "rewrite": ""
+  },
+  {
+    "text": "Kept (Obviously Need the Bypass, Not Exhaustively Probed)",
+    "words": 8,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/680",
+    "verdict": "bad",
+    "notes": "sentence with comma in parens",
+    "rewrite": ""
+  },
+  {
+    "text": "`auth status` Exits Non-Zero on Invalid Keys",
+    "words": 7,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/230",
+    "verdict": "bad",
+    "notes": "`auth status` Error would be better",
+    "rewrite": ""
+  },
+  {
+    "text": "Grouping Commands Exit Non-Zero Without a Subcommand",
+    "words": 7,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/230",
+    "verdict": "bad",
+    "notes": "ideally the rewrite would be under ## Fixes subhead",
+    "rewrite": "Bare Grouping Commands"
+  },
+  {
+    "text": "Deny Tier (Single Hit Blocks or Reminds)",
+    "words": 7,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Deny (under ## Tiers)"
+  },
+  {
+    "text": "Made user-invocable (added to the slash menu)",
+    "words": 7,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/672",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "User Invocable"
+  },
+  {
+    "text": "Why Not an N-Gram View in DuckDB",
+    "words": 7,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/636",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "N-Gram View (under ## Decisions or ## Alternatives header)"
+  },
+  {
+    "text": "Out of scope / follow-ups considered",
+    "words": 6,
+    "kind": "noun-phrase",
+    "url": "https://github.com/teaguesterling/duckdb_webbed/pull/75",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Out of Scope"
+  },
+  {
+    "text": "Deferred to PR B (Separate Session)",
+    "words": 6,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Deferred"
+  },
+  {
+    "text": "Autonomous Loop (Documented, No New Script)",
+    "words": 6,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/706",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Autonomous Loop"
+  },
+  {
+    "text": "Structural audit sourced from the hook",
+    "words": 6,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/642",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Structural Audit"
+  },
+  {
+    "text": "Candidate miner scoped to deliverable prose",
+    "words": 6,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/642",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Candidate Miner"
+  },
+  {
+    "text": "Why Not `wt config shell install`?",
+    "words": 6,
+    "kind": "interrogative",
+    "url": "https://github.com/max-sixty/worktrunk/pull/3105",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Versus `wt config shell install`"
+  },
+  {
+    "text": "Why Trope Queries Join Through `sessions`",
+    "words": 6,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/636",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": "`sessions` Join"
+  },
+  {
+    "text": "Prior Art In Git History",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/640",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": "Prior Art"
+  },
+  {
+    "text": "Items Worth a Careful Look",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/640",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Callouts"
+  },
+  {
+    "text": "The blind spot this fixes",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/664",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Blind Spot"
+  },
+  {
+    "text": "Hide the Inherited `--format` Flag",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/214",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": "Hide Inherited `--format` Flag"
+  },
+  {
+    "text": "Notes on gh CLI quirks",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/dotfiles/pull/383",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Notes: `gh` CLI"
+  },
+  {
+    "text": "Shared \"Open in Things\" action",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/raycast/extensions/pull/28298",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "\"Open in Things\" Action"
+  },
+  {
+    "text": "`key list` Key Type Filter",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/218",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "What this does NOT add",
+    "words": 5,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/365",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Unchanged"
+  },
+  {
+    "text": "Porter Stemmer for Vocabulary Matching",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": "Porter Stemmer"
+  },
+  {
+    "text": "Context Tier (Soft Reminder Only)",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": "Context Tier"
+  },
+  {
+    "text": "Hook Skip for Wordlist Files",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Report all matches per tier",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/767",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Report All Matches"
+  },
+  {
+    "text": "Flag \"X, not Y\" contrast",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/767",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": "Flag \"X, not Y\""
+  },
+  {
+    "text": "Keep/remove no longer uses lift",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/642",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Stop sending the config key",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/226",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "OAuth via the mcp-go transport",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/226",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Actionable errors and experimental marking",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/226",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Drop the Standalone Git Skill",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/824",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Speed Up the Commit Hook",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/824",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Windows Credential Manager via FFI",
+    "words": 5,
+    "kind": "noun-phrase",
+    "url": "https://github.com/schpet/linear-cli/pull/136",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Decision: `-F`, not `-f`",
+    "words": 4,
+    "kind": "clause",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/234",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Also in this change",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/664",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Route Errors to Stderr",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/214",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Normalize the Success-Path Newline",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/214",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Skills with `disable-model-invocation: true`",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/641",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Calibration Pending (User Checkpoint)",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/798",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Why This Supersedes #685",
+    "words": 4,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/699",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Auth Token Error Handling",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/190",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Main status line (`user/scripts/statusline.sh`)",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/658",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Subagent status line (`user/scripts/subagent-statusline.sh`)",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/658",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "`slo history` SLO IDs",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/218",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Repo config applied out-of-band",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/azure-blob-to-s3/pull/90",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Conversational vs. Document Scoping",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Worktree Cleanup via Worktrunk",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/706",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Made slash-only (`disable-model-invocation: true`)",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/672",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Missing Permissions and Environment",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/222",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Dead Matchers, Handled Separately",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/722",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "What changed and why",
+    "words": 4,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/736",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Why a pane option",
+    "words": 4,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/dotfiles/pull/477",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Headless fallback for CI",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/226",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "What's different from #750",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/825",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Note for the reviewer",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/737",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Removed (Run Cleanly Sandboxed)",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/680",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Kept (Break Sandboxed, Confirmed)",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/680",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Permission Entries Left Unchanged",
+    "words": 4,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/680",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Message and Docs",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/765",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "What This Adds",
+    "words": 3,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/640",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Summary by Sourcery",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/alberti42/tmux-fzf-links/pull/20",
+    "verdict": "skip",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "What this fixes",
+    "words": 3,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/683",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "On the MCP",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/683",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Voice Baseline Docs",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/793",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "`openers.txt` Now Empty",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/793",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Tuning Against History",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/744",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "`--version` (Closes #157)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/163",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "GoReleaser (Refs #158)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/163",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "What and Why",
+    "words": 3,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/740",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Out of scope",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/665",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "List action panel",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/raycast/extensions/pull/28298",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "`theme/` topic (new)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/dotfiles/pull/397",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Per-tool flavor application",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/dotfiles/pull/397",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Why This Happens",
+    "words": 3,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/668",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "What it finds",
+    "words": 3,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/639",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "How it works",
+    "words": 3,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/639",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "New CLI Flag",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/241",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "New JSON Fields",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/241",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "What and why",
+    "words": 3,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/claude/pull/739",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Weighted (Marketing Verbs)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "References (Working Notes)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/638",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "DCR client-id persistence",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/229",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Window Bell Color",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/dotfiles/pull/490",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "How It Works",
+    "words": 3,
+    "kind": "interrogative",
+    "url": "https://github.com/bendrucker/dotfiles/pull/490",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Lint script (`scripts/lint.ts`)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/642",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Skill definition (`SKILL.md`)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/642",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Style rules (`references/style-rules.md`)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/642",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Prune and refine",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/642",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Setting the option",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/dotfiles/pull/477",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Experimental / Follow-up",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/honeycomb-cli/pull/226",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Dashboard State Directory",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/570",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Peer Review Guardrails",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/570",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "The `text_content` View",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/636",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Visible Poll Failures",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/727",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Single Long-Lived Process",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/727",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Consolidate Conflict Tooling",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/824",
+    "verdict": "good",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Auth List (`src/commands/auth/auth-list.ts`)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/schpet/linear-cli/pull/136",
+    "verdict": "bad",
+    "notes": "",
+    "rewrite": ""
+  },
+  {
+    "text": "Eval Snapshot (Historical)",
+    "words": 3,
+    "kind": "noun-phrase",
+    "url": "https://github.com/bendrucker/claude/pull/746",
+    "verdict": "good",
+    "notes": "parenthetical I could take or leave, Eval Snapshot is good.",
+    "rewrite": ""
+  }
+]

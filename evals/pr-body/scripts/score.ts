@@ -14,8 +14,10 @@ import {
   MAX_SENTENCES_PER_PARAGRAPH,
   NARRATION_TELLS,
   type NarrationTell,
+  narrationTellSource,
   proseParagraphs,
   RUN_ON_CHARS,
+  type SentenceHeading,
   splitSentences,
   TITLE_LENGTH_LIMIT,
 } from "../../../plugins/pull-request/scripts/validate-body";
@@ -26,16 +28,11 @@ import { classifyPrHeading } from "../classifier";
 // wordlists come from the hook that enforces them, so the scorer and the hook
 // measure the same thing.
 
-export type { NarrationTell };
+export type { NarrationTell, SentenceHeading };
 
 export interface HeadingCaseViolation {
   text: string;
   suggested: string;
-}
-
-export interface SentenceHeading {
-  text: string;
-  signals: string[];
 }
 
 export interface TitleMetrics {
@@ -74,7 +71,7 @@ export function countNarrationTells(body: string): Record<NarrationTell, number>
   const prose = linesOutsideFences(body).join("\n");
   const counts = {} as Record<NarrationTell, number>;
   for (const tell of NARRATION_TELLS) {
-    const pattern = new RegExp(`\\b${tell.replace(/ /g, "\\s+")}\\b`, "gi");
+    const pattern = new RegExp(narrationTellSource(tell), "gi");
     counts[tell] = (prose.match(pattern) ?? []).length;
   }
   return counts;

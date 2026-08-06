@@ -13,18 +13,17 @@ import {
   extractTitle,
   findBacktickedCommits,
   findNarrationTells,
-  gitRemoteReader,
   hasBacktickedRef,
   hasCiStatusRollCall,
   hasFileTourBullets,
   hasReflexiveScaffold,
   hasRunOnProse,
+  isPersonalRepo,
   isPrBodyCommand,
   type NarrationTell,
   parseGhLogin,
-  parseRemoteOwner,
+  parseRemote,
   processInput,
-  resolvePersonalRepo,
   sentenceShapedHeadings,
   validateBody,
 } from "./validate-body";
@@ -432,13 +431,16 @@ describe("findNarrationTells", () => {
 describe("sentenceShapedHeadings", () => {
   test.each<[string, string, string[]]>([
     ["flags an interrogative label", "## Why This Happens", ["Why This Happens"]],
-    ["flags a predicate verb", "## The Hook Blocks the Push", ["The Hook Blocks the Push"]],
+    ["flags a linking verb", "## The Cache Is Cold on Boot", ["The Cache Is Cold on Boot"]],
     [
       "reads a heading through its emphasis",
-      "## **The Hook Blocks the Push**",
-      ["**The Hook Blocks the Push**"],
+      "## **The Cache Is Cold on Boot**",
+      ["The Cache Is Cold on Boot"],
     ],
     ["ignores a noun-phrase label", "## Changes", []],
+    ["ignores a deverbal compound", "## Future Work", []],
+    ["ignores a plural deverbal compound", "## Bug Fixes", []],
+    ["ignores the guidance's own heading", "## Deferred Work", []],
     ["ignores a heading the case checker already owns", "## Changes to the cache", []],
     ["ignores a code-led label", "## `validate.ts` Rewrite", []],
     ["ignores a heading inside a fence", "```\n## Why This Happens\n```", []],
@@ -457,20 +459,25 @@ describe("extractTitle", () => {
     ['gh pr create --title "a \\"quoted\\" word"', 'a "quoted" word'],
     ['glab mr create --title "Add an LRU Cache" --description x', "Add an LRU Cache"],
     ["gh pr edit 12 --body-file body.md", null],
+    ['BODY=$(mktemp -t pr) && gh pr create --title "Real Title" --body-file "$BODY"', "Real Title"],
+    ['gh pr create --body "use tar -t archive.tar to list" --title "Real Title"', "Real Title"],
+    ['gh pr edit 12 --body "documents the --title flag for the scaffolder"', null],
   ])("extractTitle(%p) -> %p", (command, expected) => {
     expect(extractTitle(command)).toBe(expected);
   });
 });
 
-describe("parseRemoteOwner", () => {
-  test.each<[string, string | null]>([
-    ["git@github.com:bendrucker/claude.git", "bendrucker"],
-    ["https://github.com/bendrucker/claude.git", "bendrucker"],
-    ["ssh://git@github.com/bendrucker/claude.git", "bendrucker"],
-    ["https://gitlab.com/group/subgroup/project.git", "group"],
+describe("parseRemote", () => {
+  test.each<[string, { host: string; owner: string } | null]>([
+    ["git@github.com:bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
+    ["https://github.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
+    ["ssh://git@github.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
+    ["https://gitlab.com/group/subgroup/project.git", { host: "gitlab.com", owner: "group" }],
+    ["git@github.mycorp.com:bendrucker/service.git", { host: "github.mycorp.com", owner: "bendrucker" }],
+    ["https://GitHub.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
     ["/Users/ben/src/claude", null],
-  ])("parseRemoteOwner(%p) -> %p", (url, expected) => {
-    expect(parseRemoteOwner(url)).toBe(expected);
+  ])("parseRemote(%p) -> %p", (url, expected) => {
+    expect(parseRemote(url)).toEqual(expected);
   });
 });
 
@@ -495,14 +502,25 @@ describe("parseGhLogin", () => {
   });
 });
 
-describe("resolvePersonalRepo", () => {
-  const reader = (value: string | null) => () => Promise.resolve(value);
+describe("isPersonalRepo", () => {
   const hosts = "github.com:\n    user: bendrucker\n";
 
   test.each<[string, string | null, string | null, boolean]>([
     ["matches the authenticated login", "git@github.com:bendrucker/claude.git", hosts, true],
     ["matches regardless of case", "git@github.com:BenDrucker/claude.git", hosts, true],
     ["rejects another owner", "git@github.com:anthropics/claude.git", hosts, false],
+    [
+      "rejects a matching owner on another host",
+      "git@github.mycorp.com:bendrucker/service.git",
+      hosts,
+      false,
+    ],
+    [
+      "rejects a matching namespace on gitlab",
+      "git@gitlab.com:bendrucker/service.git",
+      hosts,
+      false,
+    ],
     ["skips without a remote", null, hosts, false],
     ["skips without a gh config", "git@github.com:bendrucker/claude.git", null, false],
     [
@@ -511,8 +529,8 @@ describe("resolvePersonalRepo", () => {
       "ghe.example.com:\n    user: someone\n",
       false,
     ],
-  ])("%s", async (_name, remote, hostsYaml, expected) => {
-    expect(await resolvePersonalRepo(reader(remote), reader(hostsYaml))).toBe(expected);
+  ])("%s", (_name, remote, hostsYaml, expected) => {
+    expect(isPersonalRepo(remote, hostsYaml)).toBe(expected);
   });
 });
 
@@ -636,16 +654,22 @@ describe("processInput", () => {
     expect(getAdditionalContext(result)).toContain("characters");
   });
 
-  test.each<[string, string, string | null]>([
-    ["reads the origin remote", repoRoot, "claude"],
-    ["returns null outside a repo", os.tmpdir(), null],
-  ])("gitRemoteReader %s", async (_name, cwd, expected) => {
-    const url = await gitRemoteReader(cwd)();
-    if (expected === null) {
-      expect(url).toBeNull();
-      return;
-    }
-    expect(url).toContain(expected);
+  it("warns on the title when the body file does not exist yet", async () => {
+    const result = await processInput(
+      createInput(
+        `gh pr create --title "Add an LRU Cache to the Resolver and Wire It Through" --body-file ${path.join(tempDir, "missing.md")}`,
+        repoRoot,
+      ),
+    );
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("characters");
+  });
+
+  it("stays silent on a title-only command with a clean title", async () => {
+    const result = await processInput(
+      createInput('gh pr edit 12 --title "Add an LRU Cache"', repoRoot),
+    );
+    expect(result).toBeNull();
   });
 
   it("carries warnings inside the deny instead of a separate warn", async () => {

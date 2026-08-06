@@ -38,8 +38,8 @@ allowed-tools:
 - Check the log in the context above to determine the repo's commit style:
   - **subject** (default): `${subject}: ${summary}` (e.g., `api: add timeout to request`)
   - **conventional**: `${type}: ${summary}` (e.g., `fix: add timeout to request`)
-- Name the primary change. A title that wants a serial comma is an enumeration: find the theme the changes share, or name the biggest one and let the body carry the rest.
-- Keep under 50 characters. Past that, cut scope from the title, not letters.
+- Name the primary change. A title that wants a serial comma is an enumeration. Find the theme the changes share, or name the biggest one and let the body carry the rest.
+- Keep under 50 characters. Past that, cut scope from the title rather than truncating words.
 - Use imperative mood, lowercase except proper nouns
 
 ## Body

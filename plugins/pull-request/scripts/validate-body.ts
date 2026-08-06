@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { headingCaseViolations } from "./heading-case";
+import { LINKING_VERBS } from "./linguistics/heading";
 import { countProseWords, headingTexts, linesOutsideFences, stripEmphasis } from "./markdown";
 import { classifyPrHeading } from "./sentence-heading";
 
@@ -51,10 +52,6 @@ const BOLD_LABEL_BULLET_PATTERN = /^\s*[-*]\s+\*\*([^*]+?)\*\*:/gm;
 const FILE_EXTENSION_PATTERN =
   /\.(ts|tsx|js|jsx|mjs|cjs|json|md|txt|py|rb|go|rs|java|c|h|cpp|sh|yml|yaml|toml|css|html|sql)$/i;
 
-function countWords(text: string): number {
-  return text.split(/\s+/).filter(Boolean).length;
-}
-
 function looksLikeFilePath(label: string): boolean {
   const trimmed = label
     .trim()
@@ -66,7 +63,7 @@ function looksLikeFilePath(label: string): boolean {
 }
 
 export function hasReflexiveScaffold(body: string): boolean {
-  if (countWords(body) >= SMALL_BODY_WORD_LIMIT) return false;
+  if (countProseWords(body) >= SMALL_BODY_WORD_LIMIT) return false;
   return CHANGES_HEADING_PATTERN.test(body) && TESTING_HEADING_PATTERN.test(body);
 }
 
@@ -92,22 +89,17 @@ export const COMMA_SPLICE_MIN_CHARS = 220;
 export const MAX_SENTENCES_PER_PARAGRAPH = 4;
 
 // Join the body into prose paragraphs, dropping fenced code, tables, headings,
-// list items, and blockquotes so density is measured on prose alone.
+// list items, and blockquotes so density is measured on prose alone. Fence
+// tracking lives in `linesOutsideFences`, which yields a blank line per fenced
+// block so the paragraphs around it stay separate.
 export function proseParagraphs(body: string): string[] {
   const paras: string[] = [];
   let buf: string[] = [];
-  let inFence = false;
   const flush = () => {
     if (buf.length > 0) paras.push(buf.join(" ").trim());
     buf = [];
   };
-  for (const line of body.split("\n")) {
-    if (/^\s*```/.test(line)) {
-      flush();
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
+  for (const line of linesOutsideFences(body)) {
     if (line.trim() === "" || /^\s*(#{1,6}\s|[-*]\s|\d+[.)]\s|\||>)/.test(line)) {
       flush();
       continue;
@@ -151,11 +143,18 @@ export const NARRATION_TELLS = [
 
 export type NarrationTell = (typeof NARRATION_TELLS)[number];
 
+/** Regex source for one tell, shared with the eval scorer so both match identically. */
+export function narrationTellSource(tell: string): string {
+  return `\\b${tell.replace(/ /g, "\\s+")}\\b`;
+}
+
+const TELL_PATTERNS = NARRATION_TELLS.map(
+  (tell) => [tell, new RegExp(narrationTellSource(tell), "i")] as const,
+);
+
 export function findNarrationTells(body: string): NarrationTell[] {
   const prose = linesOutsideFences(body).join("\n");
-  return NARRATION_TELLS.filter((tell) =>
-    new RegExp(`\\b${tell.replace(/ /g, "\\s+")}\\b`, "i").test(prose),
-  );
+  return TELL_PATTERNS.filter(([, pattern]) => pattern.test(prose)).map(([tell]) => tell);
 }
 
 export interface SentenceHeading {
@@ -165,14 +164,25 @@ export interface SentenceHeading {
 
 // The classifier's sentence-case signal restates what the AP title-case deny
 // already reports, so a heading needs a shape signal beyond its casing to be
-// worth a second note.
+// worth a second note. A bare non-linking predicate verb is also too weak on
+// its own here: deverbal noun compounds ("Future Work", "Bug Fixes", "Use
+// Cases") hit it constantly, so the hook warns only when a linking verb or a
+// second signal class confirms the sentence shape. The eval scorer keeps the
+// raw classifier.
+function isBareNonLinkingVerb(signal: string): boolean {
+  const match = signal.match(/^predicate verb "(.+)"$/);
+  return match !== null && !LINKING_VERBS.has(match[1] ?? "");
+}
+
 export function sentenceShapedHeadings(body: string): SentenceHeading[] {
   const flagged: SentenceHeading[] = [];
   for (const text of headingTexts(body)) {
     const signals = classifyPrHeading(stripEmphasis(text)).signals.filter(
       (signal) => !signal.startsWith("sentence case"),
     );
-    if (signals.length > 0) flagged.push({ text, signals });
+    if (signals.length > 0 && !signals.every(isBareNonLinkingVerb)) {
+      flagged.push({ text, signals });
+    }
   }
   return flagged;
 }
@@ -185,15 +195,23 @@ export function isLongBody(body: string): boolean {
   return countProseWords(body) > PERSONAL_BODY_WORD_LIMIT;
 }
 
-const SSH_REMOTE = /^[\w.+-]+@[\w.-]+:(.+)$/;
-const URL_REMOTE = /^[a-z][\w+.-]*:\/\/(?:[^@/]+@)?[^/]+\/(.+)$/i;
+const SSH_REMOTE = /^[\w.+-]+@([\w.-]+):(.+)$/;
+const URL_REMOTE = /^[a-z][\w+.-]*:\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/(.+)$/i;
 
-export function parseRemoteOwner(remoteUrl: string): string | null {
+export interface ParsedRemote {
+  host: string;
+  owner: string;
+}
+
+export function parseRemote(remoteUrl: string): ParsedRemote | null {
   const trimmed = remoteUrl.trim();
-  const path = trimmed.match(SSH_REMOTE)?.[1] ?? trimmed.match(URL_REMOTE)?.[1];
-  if (path === undefined) return null;
+  const match = trimmed.match(SSH_REMOTE) ?? trimmed.match(URL_REMOTE);
+  const host = match?.[1];
+  const path = match?.[2];
+  if (host === undefined || path === undefined) return null;
   const owner = path.replace(/^\/+/, "").split("/")[0];
-  return owner === undefined || owner.length === 0 ? null : owner;
+  if (owner === undefined || owner.length === 0) return null;
+  return { host: host.toLowerCase(), owner };
 }
 
 // `hosts.yml` is two levels deep (host, then per-host keys), so a line-oriented
@@ -212,47 +230,42 @@ export function parseGhLogin(hostsYaml: string): string | null {
   return null;
 }
 
-export function gitRemoteReader(cwd: string): () => Promise<string | null> {
-  return async () => {
-    try {
-      const proc = Bun.spawn(["git", "remote", "get-url", "origin"], {
-        cwd,
-        stdout: "pipe",
-        stderr: "ignore",
-      });
-      const url = await new Response(proc.stdout).text();
-      return (await proc.exited) === 0 ? url.trim() : null;
-    } catch {
-      return null;
-    }
-  };
+async function readGitRemote(cwd: string): Promise<string | null> {
+  try {
+    const proc = Bun.spawn(["git", "remote", "get-url", "origin"], {
+      cwd,
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    const url = await new Response(proc.stdout).text();
+    return (await proc.exited) === 0 ? url.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
-export function ghHostsReader(): () => Promise<string | null> {
-  return async () => {
-    try {
-      return await Bun.file(join(homedir(), ".config", "gh", "hosts.yml")).text();
-    } catch {
-      return null;
-    }
-  };
+async function readGhHosts(): Promise<string | null> {
+  try {
+    return await Bun.file(join(homedir(), ".config", "gh", "hosts.yml")).text();
+  } catch {
+    return null;
+  }
 }
 
-export async function resolvePersonalRepo(
-  readRemote: () => Promise<string | null>,
-  readHosts: () => Promise<string | null>,
-): Promise<boolean> {
-  const [remote, hosts] = await Promise.all([readRemote(), readHosts()]);
-  if (remote === null || hosts === null) return false;
-  const owner = parseRemoteOwner(remote);
-  const login = parseGhLogin(hosts);
-  if (owner === null || login === null) return false;
-  return owner.toLowerCase() === login.toLowerCase();
+// The login comes from `hosts.yml`'s github.com entry, so the owner comparison
+// only means anything on a github.com remote. A GitLab or GHES remote whose
+// namespace happens to match the github.com handle is someone else's repo.
+export function isPersonalRepo(remote: string | null, hostsYaml: string | null): boolean {
+  if (remote === null || hostsYaml === null) return false;
+  const parsed = parseRemote(remote);
+  const login = parseGhLogin(hostsYaml);
+  if (parsed === null || login === null) return false;
+  return parsed.host === "github.com" && parsed.owner.toLowerCase() === login.toLowerCase();
 }
 
 export const TITLE_LENGTH_LIMIT = 50;
 
-// All three stack clauses onto a title that should carry one.
+// Each pattern stacks clauses onto a title that should carry one.
 export function hasClauseStacking(title: string): boolean {
   if (/,\s*(?:and|or|but|nor|for|so|yet)\b/i.test(title)) return true;
   if ((title.match(/,/g) ?? []).length >= 2) return true;
@@ -337,8 +350,16 @@ export function extractInlineBody(command: string): string | null {
   return raw.replace(/\\(["`$\\])/g, "$1");
 }
 
+// Anchored to the `gh pr`/`glab mr` verb with the body values blanked first:
+// an unanchored scan reads a ` -t ` from an earlier command in a compound
+// (`mktemp -t`), and a `--title` mentioned inside an inline `--body` string,
+// as the PR title.
 export function extractTitle(command: string): string | null {
-  const match = command.match(/(?:--title|(?<![\w-])-t)[=\s]("(?:[^"\\]|\\.)*"|'[^']*'|[^\s]+)/);
+  const start = command.search(PR_BODY_COMMAND_PATTERN);
+  const scope = (start === -1 ? command : command.slice(start))
+    .replace(/(?:--body|(?<!\w)-b)[=\s]("(?:[^"\\]|\\.)*"|'[^']*')/g, " ")
+    .replace(/--body-file[=\s]("[^"]+"|'[^']+'|[^\s]+)/g, " ");
+  const match = scope.match(/(?:--title|(?<![\w-])-t)[=\s]("(?:[^"\\]|\\.)*"|'[^']*'|[^\s]+)/);
   if (!match?.[1]) return null;
   return unquote(match[1]).replace(/\\(["`$\\])/g, "$1");
 }
@@ -449,10 +470,13 @@ function warnReasons(body: string, context: BodyContext): string[] {
       `Headings read as sentences instead of labels: ${detail}. A heading names its section. Move the claim into the prose under it.`,
     );
   }
-  if (context.personalRepo && isLongBody(body)) {
-    reasons.push(
-      `The body runs ${countProseWords(body)} words on a repo you own and merge yourself. Nobody else is reading this. Keep what you would want on a bisect six months out and cut the rest.`,
-    );
+  if (context.personalRepo) {
+    const words = countProseWords(body);
+    if (words > PERSONAL_BODY_WORD_LIMIT) {
+      reasons.push(
+        `The body runs ${words} words on a repo you own and merge yourself. Nobody else is reading this. Keep what you would want on a bisect six months out and cut the rest.`,
+      );
+    }
   }
   if (context.title !== null) {
     if (context.title.length > TITLE_LENGTH_LIMIT) {
@@ -498,9 +522,14 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
     return null;
   }
 
+  const title = extractTitle(command);
   const body = await resolveBody(command);
+
+  // A title-only command (`gh pr edit --title ...`, or a --body-file not yet
+  // written at PreToolUse time) still gets its title checked.
   if (body === null) {
-    return null;
+    if (title === null) return null;
+    return decide([], warnReasons("", { title, personalRepo: false }));
   }
 
   const cwd = input.cwd ?? process.cwd();
@@ -514,12 +543,11 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
     }
   }
 
-  const context: BodyContext = {
-    title: extractTitle(command),
-    personalRepo: isLongBody(body)
-      ? await resolvePersonalRepo(gitRemoteReader(cwd), ghHostsReader())
-      : false,
-  };
+  let personalRepo = false;
+  if (isLongBody(body)) {
+    const [remote, hosts] = await Promise.all([readGitRemote(cwd), readGhHosts()]);
+    personalRepo = isPersonalRepo(remote, hosts);
+  }
 
-  return decide(denies, warnReasons(body, context));
+  return decide(denies, warnReasons(body, { title, personalRepo }));
 }

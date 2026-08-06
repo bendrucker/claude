@@ -32,7 +32,7 @@ export interface TaggedToken {
   tag: CoarseTag;
   /**
    * True for tensed verb forms (VBZ/VBD/VBP, finite copulas, modals).
-   * A finite verb is the unambiguous clause signal; infinitives,
+   * A finite verb is the unambiguous clause signal. Infinitives,
    * gerunds, and participles are not.
    */
   finite: boolean;
@@ -48,7 +48,7 @@ export interface TaggedSentence {
 /**
  * Replacement token for code identifiers (paths, camelCase, snake_case,
  * inline code). A plain lowercase word so every tokenizer passes it
- * through intact and tags it noun-like; adapters map it to CODE by
+ * through intact and tags it noun-like. Adapters map it to CODE by
  * matching the normal form.
  */
 export const CODE_SENTINEL = "codeterm";

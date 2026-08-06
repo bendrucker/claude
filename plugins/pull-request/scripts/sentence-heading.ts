@@ -8,8 +8,8 @@ export interface PrHeadingResult {
 
 /**
  * Code-identifier shapes. A heading made mostly of these (plus a short
- * label) is fine; we replace them with a sentinel so case/verb checks do
- * not read `auth status`, `--format`, or `text_content` as English.
+ * label) is fine. Each match is replaced with a sentinel so case/verb checks
+ * do not read `auth status`, `--format`, or `text_content` as English.
  */
 const CODE_PATTERNS: RegExp[] = [
   /`[^`]+`/g,
@@ -165,7 +165,7 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
     const inner = parenMatch[1] ?? "";
     const innerMasked = maskCode(inner);
     const innerWords = tokens(innerMasked).map(normalize);
-    const hasComma = /,/.test(maskCode(inner).replace(/"[^"]*"/g, CODE_SENTINEL));
+    const hasComma = /,/.test(innerMasked.replace(/"[^"]*"/g, CODE_SENTINEL));
     const hasPredicate = innerWords.some((w) => PREDICATE_VERBS.has(w));
     if (hasComma) signals.push("parenthetical clause (comma)");
     else if (hasPredicate) signals.push("parenthetical clause (verb)");

@@ -8,13 +8,13 @@ Write the body to stand on its own. The reviewer has the diff and the linked iss
 
 Write in active voice and first person for your own calls. "I chose X over Y because…", "I traced this to…". Don't write passively ("X was added", "the bug was caused by…"). Keep the prose plain. Technical terms are fine. Marketing and model flourishes (`source of truth`, `fail loudly`, `escape hatch`, `cleanly`, `wires up`) are not. Load the `writing` skill for the full set of tropes to avoid.
 
-Never quote this document's own vocabulary in the body. Instruction words describe what to select, not how to phrase it. A body that says a detail is subtle, or names its own restraint about what it left out, is narrating its instructions instead of the change.
+Never quote this document's own vocabulary in the body. Instruction words describe what to select. They are not phrasing to reuse. A body that says a detail is subtle, or names its own restraint about what it left out, is narrating its instructions instead of the change.
 
 ## Audience
 
 How much a body earns depends on who reads it. Read the tier from the repo's owner and visibility, the same probe the create skill runs for reviewers.
 
-- **Personal** (a repo you own, public or private): you review it through Claude, and no one else reads the body. Budget one to three paragraphs. State the intent and the decisions a reviewer should re-examine, and skip background you already carry. Go past three paragraphs only when the change carries that many real decisions, and spend the extra length on the decisions alone.
+- **Personal** (a repo you own, public or private): you review it through Claude, and no one else reads the body. Budget one to three paragraphs. State the intent and the decisions a reviewer should re-examine, and skip background you already carry. Go past three paragraphs only when the change carries that much real substance, and spend the extra length on decisions and their evidence.
 - **Corporate** (a private or org-owned repo): coworkers skim it. Lead with intent so the skim lands, and keep supporting detail moderate.
 - **Open source** (a public repo you don't own): external maintainers scrutinize it, and unclear intent has the widest blast radius. Spend the most here on decisions, alternatives ruled out, and evidence.
 
@@ -56,7 +56,7 @@ A heading has slipped into a sentence when it carries a comma, a colon, a traili
 
 ## Mine the Conversation
 
-The best content is substance that lived in the session but never reached the code. Review the conversation and pick the two or three items that would change how someone reviews the change. State each in one or two sentences, as a self-contained decision: what you did and why, never a delta against a plan or instruction the reader never saw. Write "I added a `Bash(git push:*)` entry because the workflow pushes the branch," not "I added an entry beyond what the plan listed."
+The best content is substance that lived in the session but never reached the code. Review the conversation and pick the two or three items, across every category in this section, that would change how someone reviews the change. State each in one or two sentences, as a self-contained decision: what you did and why, never a delta against a plan or instruction the reader never saw. Write "I added a `Bash(git push:*)` entry because the workflow pushes the branch," not "I added an entry beyond what the plan listed."
 
 Draw from, in rough order of value:
 
@@ -65,7 +65,7 @@ Draw from, in rough order of value:
 - What you observed testing: the actual result, surprise, or failure mode, with the real numbers or output when they exist. Name what you could not test and the concrete blocker ("brew install failed locally", not "needs a real machine").
 - A follow-up, named concretely ("follow-up in #N to…"), not a vague TODO.
 
-A theory you disproved on the way gets one sentence, and only when it changes how someone reads the diff. A workaround you rejected as fragile, or a name the user settled by hand, earns its sentence by the same test. Everything else is padding: an item that would not change the review does not go in, and the body never mentions the items it left out.
+A theory you disproved on the way gets one sentence, and only when it changes how someone reviews the change. A workaround you rejected as fragile, or a name the user settled by hand, earns its sentence by the same test. Everything else is padding. An item that would not change the review does not go in, and the body never mentions the items it left out.
 
 When the work ran through sub-agents, the substance is in their returned summaries. Pull it forward before it gets smoothed away.
 
@@ -89,7 +89,7 @@ Use these only when the body is long enough to earn them. A small PR stays a par
 
 Organize by concept, not by file. Each bullet is one conceptual shift, even when it spans files. Never write `**path**: description`. Reference an identifier only when it adds something the diff doesn't. Don't pair a count with an enumeration ("all three X (a, b, c)"). Enumerate or summarize, not both. Omit cleanup that follows from the main change (dead imports). The diff shows it.
 
-For a schema change, name the tables and columns touched, because a file name rarely reveals them. Two limits keep this from becoming a diff transcript. Past roughly ten columns, naming each one is rote, so summarize the change and name only the columns that carry a decision. And when the schema is generated from a model whose name maps to the table, the changed model already tells the reviewer which table moved, so add only what that mapping doesn't. A hand-written, date-prefixed migration deserves description. A regenerated schema file does not.
+For a schema change, name the tables and columns touched, because a file name rarely reveals them. Two limits keep this from becoming a diff transcript. Past roughly ten columns, naming each one is rote, so summarize the change and name only the columns that carry a decision. And when the schema is generated from a model whose name maps to the table, the changed model already tells the reviewer which table moved, so add only what that mapping doesn't. Describe a hand-written, date-prefixed migration. Skip a regenerated schema file.
 
 ### Testing
 
@@ -101,7 +101,7 @@ Include this only when a test or a hand check tells the reviewer something the s
 
 ### References
 
-Related links, issues, or reviews that aren't the motivating issue. Use `Closes #N` for what this resolves and `Relates to #N` for context, keeping the two distinct. Every link must resolve for the reviewer. On a corporate or open-source repo, a private task-tracker URL (a Things link, an internal note) is a dead end: drop it or replace it with the openable artifact it points to. On a personal repo the reviewer is the owner, so an `Original Task:` Things link resolves for exactly the person reading it and stays.
+Related links, issues, or reviews that aren't the motivating issue. Use `Closes #N` for what this resolves and `Relates to #N` for context, keeping the two distinct. Every link must resolve for the reviewer. On a corporate or open-source repo, a private task-tracker URL (a Things link, an internal note) is a dead end. Drop it or replace it with the openable artifact it points to. On a personal repo the reviewer is the owner, so an `Original Task:` Things link resolves for exactly the person reading it and stays.
 
 ## Slop to Cut
 

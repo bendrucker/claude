@@ -66,8 +66,7 @@ export const INTERROGATIVE_OPENERS = new Set([
 const NOUN_PHRASE: HeadingVerdict = { kind: "noun-phrase", flagged: false, evidence: [] };
 
 /**
- * Tuned heuristic operating on the heading display text. Behavior matches
- * checkSentenceHeading exactly.
+ * Tuned heuristic operating on the heading display text.
  */
 export function classifyHeadingBaseline(heading: string): HeadingVerdict {
   const analysis = heading

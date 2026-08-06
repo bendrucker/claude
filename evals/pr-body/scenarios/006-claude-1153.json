@@ -1,0 +1,16 @@
+{
+  "id": "006-claude-1153",
+  "url": "https://github.com/bendrucker/claude/pull/1153",
+  "title": "job: focus a live session's herdr pane",
+  "repo": "bendrucker/claude",
+  "tier": "personal",
+  "diffSummary": "Replaces the job skill's copy-paste claude --resume command with herdr agent focus when running under herdr, using an exact session-UUID join from herdr agent list. All new behavior is guarded on HERDR_PANE_ID so the tmux path is untouched. Prose-only changes to SKILL.md. 3 files changed, +8/-4.",
+  "substance": [
+    "The job skill previously handed over a claude --resume <sessionId> command for every item with a live session, requiring a manual copy, paste, and run.",
+    "herdr agent list returns agent_session.value, which carries the Claude session UUID, giving an exact join to a claude agents record with no title guessing.",
+    "Gather makes one extra inline call when HERDR_PANE_ID is set; a matched pane turns the brief's action line into herdr agent focus <pane_id>.",
+    "Act can run the focus command directly after confirming, since focus moves the foreground off the job session; herdr agent attach stays out of allowed-tools and is instead named in the brief for a manual run because it takes over the terminal.",
+    "Every branch is guarded on HERDR_PANE_ID, so the tmux work machine, where both multiplexers remain operational, keeps its existing resume path unchanged."
+  ],
+  "originalBody": "The `job` skill handed you `claude --resume <sessionId>` for every item with a live session, justified by the skill \"runs in its own session and cannot attach to another.\" Off herdr that holds. Under herdr it doesn't: `herdr agent list` returns `agent_session.value` per pane, so the join to a `claude agents` record is exact on session UUID with no title guessing, and `herdr agent focus <pane_id>` puts you in the running session instead of in a command to paste.\n\nGather makes one extra inline call when `HERDR_PANE_ID` is set. A matched pane turns the brief's action line into `herdr agent focus <pane_id>`, and Act can run that itself after confirming, since focus moves your foreground off the `job` session. `herdr agent attach` stays out of `allowed-tools`. It takes over the terminal, so the brief names it and you run it.\n\nEvery branch is guarded on `HERDR_PANE_ID`. On the tmux work machine nothing calls herdr, and the resume path reads complete on its own rather than as a degraded reference to the herdr branch.\n\nOriginal Task: [job: focus a live session with herdr instead of handing over a resume command](https://things.bendrucker.me/show?id=R69VFoDJLT64QVGmMjbaNz)"
+}

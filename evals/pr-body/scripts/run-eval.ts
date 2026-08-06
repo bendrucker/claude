@@ -1,0 +1,380 @@
+#!/usr/bin/env bun
+import { mkdir, readdir } from "node:fs/promises";
+import { basename, join } from "node:path";
+import Anthropic from "@anthropic-ai/sdk";
+import { cli } from "cleye";
+import { scoreBody } from "./score";
+
+// A/B runner for `pull-request:create` guidance. Each arm is a markdown file
+// holding the guidance text under test; the harness cannot load the skill, so
+// the text is inlined into the generation prompt. Every (scenario, arm, seed)
+// triple produces one body, which the deterministic scorer then grades. The
+// blinded LLM judge (judge.ts) reads the rows this writes.
+
+const GEN_MODEL = "claude-opus-5";
+
+// claude-opus-5: $5/M input, $25/M output.
+const INPUT_COST_PER_TOKEN = 5 / 1_000_000;
+const OUTPUT_COST_PER_TOKEN = 25 / 1_000_000;
+
+export const ARMS = ["a", "b"] as const;
+export type Arm = (typeof ARMS)[number];
+
+export interface Scenario {
+  id: string;
+  url: string;
+  title: string;
+  repo: string;
+  tier: "personal";
+  diffSummary: string;
+  substance: string[];
+  originalBody: string;
+}
+
+export type ScoreRow = ReturnType<typeof scoreBody>;
+
+export interface GenerationRow {
+  scenarioId: string;
+  /** "original" rows carry the shipped body as a baseline; no model produced them. */
+  arm: Arm | "original";
+  seed: number;
+  model: string | null;
+  title: string;
+  body: string;
+  score: ScoreRow;
+  usage: Usage;
+}
+
+export interface Usage {
+  input: number;
+  output: number;
+}
+
+export interface RunManifest {
+  runId: string;
+  createdAt: string;
+  model: string;
+  seeds: number;
+  scenarioIds: string[];
+  armFiles: Record<Arm, string>;
+  usage: Usage;
+  costUsd: number;
+}
+
+export function generationsPath(runDir: string): string {
+  return join(runDir, "generations.jsonl");
+}
+
+export function manifestPath(runDir: string): string {
+  return join(runDir, "run.json");
+}
+
+export async function loadScenarios(dir: string): Promise<Scenario[]> {
+  const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).sort();
+  const scenarios: Scenario[] = [];
+  for (const name of names) {
+    const parsed: unknown = await Bun.file(join(dir, name)).json();
+    scenarios.push(asScenario(parsed, join(dir, name)));
+  }
+  if (scenarios.length === 0) throw new Error(`No scenario JSON files in ${dir}`);
+  return scenarios;
+}
+
+function asScenario(value: unknown, path: string): Scenario {
+  if (typeof value !== "object" || value === null) {
+    throw new Error(`${path}: scenario must be a JSON object`);
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of ["id", "url", "title", "repo", "tier", "diffSummary", "originalBody"]) {
+    if (typeof record[key] !== "string") {
+      throw new Error(`${path}: missing string field "${key}"`);
+    }
+  }
+  if (!Array.isArray(record.substance) || record.substance.some((s) => typeof s !== "string")) {
+    throw new Error(`${path}: "substance" must be an array of strings`);
+  }
+  return value as Scenario;
+}
+
+export async function readGenerations(runDir: string): Promise<GenerationRow[]> {
+  const text = await Bun.file(generationsPath(runDir)).text();
+  return text
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as GenerationRow);
+}
+
+/** JSON schema the generation call is constrained to. */
+export function draftSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      body: { type: "string" },
+    },
+    required: ["title", "body"],
+    additionalProperties: false,
+  };
+}
+
+export function systemPrompt(guidance: string): string {
+  return [
+    "You are the author of a change to your own repository, opening the pull request for it.",
+    "",
+    "The text between the guidance tags is the standing house style for pull request descriptions in this repository.",
+    "",
+    "<guidance>",
+    guidance.trim(),
+    "</guidance>",
+    "",
+    "Write the title and the body you would ship for the change described in the next message.",
+    "The body is GitHub-flavored markdown, returned raw rather than inside a code fence.",
+    "Return the JSON object the response schema requires.",
+  ].join("\n");
+}
+
+export function userPrompt(scenario: Scenario, seed: number): string {
+  const substance =
+    scenario.substance.length > 0
+      ? scenario.substance.map((s) => `- ${s}`).join("\n")
+      : "(none recorded)";
+  return [
+    `Repository: ${scenario.repo}`,
+    `Audience tier: ${scenario.tier}`,
+    "",
+    "What changed:",
+    scenario.diffSummary.trim(),
+    "",
+    "Material from the session that produced the change. Decisions, evidence, rejected",
+    "alternatives, and deferred work, in no particular order. Use what serves a reviewer.",
+    substance,
+    "",
+    `Draft seed: ${seed}. Two authors drafting the same description land in different places; this number identifies which draft this is.`,
+  ].join("\n");
+}
+
+interface Draft {
+  title: string;
+  body: string;
+  usage: Usage;
+}
+
+async function generate(
+  client: Anthropic,
+  system: string,
+  scenario: Scenario,
+  seed: number,
+  model: string,
+): Promise<Draft> {
+  const response = await client.messages.create({
+    model,
+    max_tokens: 16000,
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+    output_config: { effort: "medium", format: { type: "json_schema", schema: draftSchema() } },
+    messages: [{ role: "user", content: userPrompt(scenario, seed) }],
+  });
+  const block = response.content.find((b) => b.type === "text");
+  if (block?.type !== "text") {
+    throw new Error(`${scenario.id} seed ${seed}: no text block (stop: ${response.stop_reason})`);
+  }
+  const parsed: unknown = JSON.parse(block.text);
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(`${scenario.id} seed ${seed}: draft was not a JSON object`);
+  }
+  const draft = parsed as Record<string, unknown>;
+  if (typeof draft.title !== "string" || typeof draft.body !== "string") {
+    throw new Error(`${scenario.id} seed ${seed}: draft is missing title or body`);
+  }
+  return {
+    title: draft.title,
+    body: draft.body,
+    usage: { input: response.usage.input_tokens, output: response.usage.output_tokens },
+  };
+}
+
+export async function mapPool<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = cursor++;
+        const item = items[index];
+        if (index >= items.length || item === undefined) return;
+        results[index] = await fn(item);
+      }
+    }),
+  );
+  return results;
+}
+
+export function requireApiKey(): void {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY is not set. The runner only works with live credentials.");
+  }
+}
+
+interface Job {
+  scenario: Scenario;
+  arm: Arm;
+  seed: number;
+}
+
+function buildJobs(scenarios: Scenario[], seeds: number): Job[] {
+  const jobs: Job[] = [];
+  for (const scenario of scenarios) {
+    for (const arm of ARMS) {
+      for (let seed = 1; seed <= seeds; seed++) {
+        jobs.push({ scenario, arm, seed });
+      }
+    }
+  }
+  return jobs;
+}
+
+function defaultRunId(): string {
+  return new Date().toISOString().replace(/[:.]/g, "-").replace("Z", "");
+}
+
+async function main(): Promise<void> {
+  const dir = join(import.meta.dirname, "..");
+  const argv = cli({
+    name: "run-eval",
+    help: {
+      description:
+        "Generate PR bodies for every (scenario, arm, seed) triple, score them, and write the run.",
+    },
+    flags: {
+      scenarios: {
+        type: String,
+        default: join(dir, "scenarios"),
+        description: "Directory of scenario JSON files",
+      },
+      armA: { type: String, description: "Markdown file holding arm A's guidance text" },
+      armB: { type: String, description: "Markdown file holding arm B's guidance text" },
+      seeds: { type: Number, default: 2, description: "Drafts per scenario per arm" },
+      out: { type: String, default: join(dir, "results"), description: "Results base directory" },
+      runId: { type: String, description: "Run directory name (default: UTC timestamp)" },
+      concurrency: { type: Number, default: 5, description: "API calls in flight" },
+      model: { type: String, default: GEN_MODEL, description: "Generation model" },
+      scenario: {
+        type: [String],
+        description: "Restrict the run to these scenario ids (repeatable)",
+      },
+      skipBaseline: {
+        type: Boolean,
+        default: false,
+        description: "Skip scoring each scenario's shipped body as a baseline row",
+      },
+    },
+  });
+
+  const { armA, armB } = argv.flags;
+  if (!armA || !armB) {
+    console.error("Both --arm-a and --arm-b are required.\n");
+    argv.showHelp();
+    process.exit(1);
+  }
+  requireApiKey();
+
+  const all = await loadScenarios(argv.flags.scenarios);
+  const wanted = new Set(argv.flags.scenario);
+  const scenarios = wanted.size > 0 ? all.filter((s) => wanted.has(s.id)) : all;
+  if (scenarios.length === 0) {
+    throw new Error(`No scenarios matched: ${[...wanted].join(", ")}`);
+  }
+
+  const guidance: Record<Arm, string> = {
+    a: await Bun.file(armA).text(),
+    b: await Bun.file(armB).text(),
+  };
+  const systems: Record<Arm, string> = {
+    a: systemPrompt(guidance.a),
+    b: systemPrompt(guidance.b),
+  };
+
+  const runId = argv.flags.runId ?? defaultRunId();
+  const runDir = join(argv.flags.out, runId);
+  await mkdir(runDir, { recursive: true });
+  await Bun.write(join(runDir, "arm-a.md"), guidance.a);
+  await Bun.write(join(runDir, "arm-b.md"), guidance.b);
+
+  const writer = Bun.file(generationsPath(runDir)).writer();
+  const total: Usage = { input: 0, output: 0 };
+  const emit = (row: GenerationRow): void => {
+    writer.write(`${JSON.stringify(row)}\n`);
+    writer.flush();
+  };
+
+  if (!argv.flags.skipBaseline) {
+    for (const scenario of scenarios) {
+      emit({
+        scenarioId: scenario.id,
+        arm: "original",
+        seed: 0,
+        model: null,
+        title: scenario.title,
+        body: scenario.originalBody,
+        score: scoreBody(scenario.originalBody, scenario.title),
+        usage: { input: 0, output: 0 },
+      });
+    }
+  }
+
+  const client = new Anthropic();
+  const jobs = buildJobs(scenarios, argv.flags.seeds);
+  let done = 0;
+
+  await mapPool(jobs, argv.flags.concurrency, async (job) => {
+    const draft = await generate(
+      client,
+      systems[job.arm],
+      job.scenario,
+      job.seed,
+      argv.flags.model,
+    );
+    total.input += draft.usage.input;
+    total.output += draft.usage.output;
+    emit({
+      scenarioId: job.scenario.id,
+      arm: job.arm,
+      seed: job.seed,
+      model: argv.flags.model,
+      title: draft.title,
+      body: draft.body,
+      score: scoreBody(draft.body, draft.title),
+      usage: draft.usage,
+    });
+    done++;
+    console.error(`[${done}/${jobs.length}] ${job.scenario.id} arm ${job.arm} seed ${job.seed}`);
+  });
+
+  await writer.end();
+
+  const costUsd = total.input * INPUT_COST_PER_TOKEN + total.output * OUTPUT_COST_PER_TOKEN;
+  const manifest: RunManifest = {
+    runId,
+    createdAt: new Date().toISOString(),
+    model: argv.flags.model,
+    seeds: argv.flags.seeds,
+    scenarioIds: scenarios.map((s) => s.id),
+    armFiles: { a: basename(armA), b: basename(armB) },
+    usage: total,
+    costUsd,
+  };
+  await Bun.write(manifestPath(runDir), `${JSON.stringify(manifest, null, 2)}\n`);
+
+  console.log(runDir);
+  console.error(
+    `${jobs.length} generations, ${total.input} input + ${total.output} output tokens, $${costUsd.toFixed(4)}`,
+  );
+}
+
+if (import.meta.main) {
+  await main();
+}

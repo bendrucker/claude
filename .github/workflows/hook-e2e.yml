@@ -1,0 +1,46 @@
+name: hook-e2e
+
+on:
+  pull_request:
+    paths:
+      - plugins/*/hooks/**
+      - plugins/*/scripts/**
+      - .github/workflows/hook-e2e.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install Claude Code CLI
+        id: cli
+        background: true
+        run: curl -fsSL https://claude.ai/install.sh | bash
+
+      - uses: ./.github/actions/bun-install
+
+      - name: Wait for CLI
+        wait: cli
+
+      - name: Run hook E2E tests
+        run: |
+          found=0
+          while IFS= read -r -d '' test; do
+            found=1
+            echo "::group::$test"
+            bun "$test"
+            echo "::endgroup::"
+          done < <(find plugins/*/scripts -maxdepth 1 -name 'e2e-*.ts' -print0 | sort -z)
+          if [[ "$found" == "0" ]]; then
+            echo "No hook E2E tests found"
+            exit 1
+          fi

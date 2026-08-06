@@ -17,6 +17,7 @@ After making changes to plugin scripts, run them directly to verify they work en
 - **Prefix dotdir paths with `./` in `bun test`**: A positional arg is a *filter* (substring match against discovered test paths), not a path. Discovery skips dotdirs, so `bun test .claude/hooks` matches nothing and silently runs 0 tests. Writing `bun test ./.claude/hooks` makes bun read it as a path and run the tests under it. Always use a `./` prefix for hidden-dir paths in CI and local test commands.
 - **No `.js` imports in TypeScript**: Import from `./module` not `./module.js`. The bundler/runtime handles resolution.
 - **Prefer skills over agents**: Skills are invocable via the `Skill` tool. Agents require the `Agent` tool. If something should be directly invocable, make it a skill.
+- **Hook E2E tests drive the real dispatcher**: A unit test over a hook script proves the script's logic, not that Claude Code ever dispatches to it. To prove dispatch, run headless `claude -p` with `--plugin-dir` against a throwaway repo with the external CLI (`gh`, `glab`) stubbed onto `PATH`, then assert on what the stub recorded. These live at `plugins/<name>/scripts/e2e-*.ts`. Each run spends API tokens, so they stay out of `bun test` and run in CI only from a path-filtered workflow holding the `CLAUDE_CODE_OAUTH_TOKEN` secret.
 
 ## Technique Selection
 

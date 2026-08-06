@@ -176,10 +176,10 @@ export async function findBacktickedCommits(
   return results.filter((sha): sha is string => sha !== null);
 }
 
-// The hook now matches every Bash call and filters here, because the previous
-// `Bash(gh pr create:*)` matcher is a prefix match: it missed the majority of
-// real invocations, which lead with `cd <dir> &&`, an env assignment
-// (`GH_PAGER=cat`, `GIT_SSH_COMMAND=false`), or a heredoc writing the body.
+// The `if` rules in hooks.json scope dispatch to `gh pr create`/`edit` and
+// `glab mr create`/`update`, covering compound (`cd <dir> && gh pr create ...`)
+// and env-prefixed (`GH_PAGER=cat gh pr create ...`) forms. This guard repeats
+// the check in-script so the validator is inert under any other dispatch.
 const PR_BODY_COMMAND_PATTERN = /\b(?:gh pr (?:create|edit)|glab mr (?:create|update))\b/;
 
 export function isPrBodyCommand(command: string): boolean {
@@ -210,34 +210,66 @@ export function extractInlineBody(command: string): string | null {
   return raw.replace(/\\(["`$\\])/g, "$1");
 }
 
-function warn(reasons: string[]): SyncHookJSONOutput {
+function bullets(reasons: string[]): string {
+  return reasons.map((reason) => `- ${reason}`).join("\n");
+}
+
+// A deny reason carries an exact fix, so the whole set is worth reporting at
+// once: the model would otherwise rewrite the body, retry, and be blocked again
+// by the next one. Warnings ride along on a deny for the same reason.
+function decide(denies: string[], warns: string[]): SyncHookJSONOutput | null {
+  if (denies.length > 0) {
+    const alsoWorth =
+      warns.length > 0 ? `\nAlso worth addressing in the same edit:\n${bullets(warns)}` : "";
+    return {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: `Fix the PR body before retrying:\n${bullets(denies)}${alsoWorth}`,
+      },
+    };
+  }
+  if (warns.length === 0) {
+    return null;
+  }
   const intro =
-    reasons.length === 1
+    warns.length === 1
       ? "PR body has a structural-slop pattern:"
       : "PR body has structural-slop patterns:";
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      additionalContext: `${intro}\n${reasons.map((reason) => `- ${reason}`).join("\n")}`,
+      additionalContext: `${intro}\n${bullets(warns)}`,
     },
   };
 }
 
-function denyForTestCount(body: string): SyncHookJSONOutput | null {
-  if (!TEST_COUNT_PATTERN.test(body)) {
-    return null;
+// Patterns with a mechanical fix the body can't argue its way out of.
+function denyReasons(body: string): string[] {
+  const reasons: string[] = [];
+  if (TEST_COUNT_PATTERN.test(body)) {
+    reasons.push(
+      "Testing section should not mention test counts. Describe what is covered instead.",
+    );
   }
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason:
-        "Testing section should not mention test counts. Describe what is covered instead.",
-    },
-  };
+  const headingViolations = headingCaseViolations(body);
+  if (headingViolations.length > 0) {
+    const suggestions = headingViolations
+      .map((violation) => `"${violation.text}" → "${violation.suggested}"`)
+      .join("; ");
+    reasons.push(
+      `Section headings should use AP title case. Apply: ${suggestions}. A heading that is intentionally cased (proper noun, code identifier) can be reworded so it satisfies AP case.`,
+    );
+  }
+  if (hasBacktickedRef(body)) {
+    reasons.push(AUTOLINK_REASON);
+  }
+  return reasons;
 }
 
-function structuralReasons(body: string): string[] {
+// Patterns whose fix is a judgment call, so the author gets the note and keeps
+// the decision.
+function warnReasons(body: string): string[] {
   const reasons: string[] = [];
   if (hasReflexiveScaffold(body)) {
     reasons.push(
@@ -259,36 +291,21 @@ function structuralReasons(body: string): string[] {
       "A prose paragraph runs long: over four sentences, a sentence past 280 characters, or several clauses stacked behind commas. Split the thread, or move an enumeration into a list.",
     );
   }
-  if (hasBacktickedRef(body)) {
-    reasons.push(AUTOLINK_REASON);
-  }
-  const headingViolations = headingCaseViolations(body);
-  if (headingViolations.length > 0) {
-    const suggestions = headingViolations
-      .map((violation) => `"${violation.text}" → "${violation.suggested}"`)
-      .join("; ");
-    reasons.push(
-      `Section headings should use AP title case. Suggested: ${suggestions}. Adjust unless a heading is intentionally cased (proper noun, code identifier).`,
-    );
-  }
   return reasons;
 }
 
 export function validateBody(body: string): SyncHookJSONOutput | null {
-  const deny = denyForTestCount(body);
-  if (deny) {
-    return deny;
-  }
-
-  const reasons = structuralReasons(body);
-  return reasons.length > 0 ? warn(reasons) : null;
+  return decide(denyReasons(body), warnReasons(body));
 }
 
 async function resolveBody(command: string): Promise<string | null> {
   const bodyFilePath = extractBodyFilePath(command);
   if (bodyFilePath) {
-    const file = Bun.file(bodyFilePath);
-    return (await file.exists()) ? await file.text() : null;
+    try {
+      return await Bun.file(bodyFilePath).text();
+    } catch {
+      return null;
+    }
   }
   return extractInlineBody(command);
 }
@@ -308,19 +325,16 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
     return null;
   }
 
-  const deny = denyForTestCount(body);
-  if (deny) {
-    return deny;
+  const denies = denyReasons(body);
+
+  if (!denies.includes(AUTOLINK_REASON)) {
+    const cwd = input.cwd ?? process.cwd();
+    const candidates = extractBacktickedHexCandidates(body);
+    const commits = await findBacktickedCommits(candidates, gitCommitVerifier(cwd));
+    if (commits.length > 0) {
+      denies.push(AUTOLINK_REASON);
+    }
   }
 
-  const reasons = structuralReasons(body);
-
-  const cwd = input.cwd ?? process.cwd();
-  const candidates = extractBacktickedHexCandidates(body);
-  const commits = await findBacktickedCommits(candidates, gitCommitVerifier(cwd));
-  if (commits.length > 0 && !reasons.includes(AUTOLINK_REASON)) {
-    reasons.push(AUTOLINK_REASON);
-  }
-
-  return reasons.length > 0 ? warn(reasons) : null;
+  return decide(denies, warnReasons(body));
 }

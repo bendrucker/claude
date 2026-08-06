@@ -4,6 +4,8 @@ import { join } from "node:path";
 export interface HookCommand {
   type: string;
   command: string;
+  /** Permission rule scoping the command, e.g. `Bash(gh pr create:*)`. */
+  if?: string;
 }
 
 export interface MatcherEntry {

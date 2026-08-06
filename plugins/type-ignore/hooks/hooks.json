@@ -8,7 +8,22 @@
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/detect.ts\"",
-            "if": "Edit(**/*.ts)|Edit(**/*.tsx)|Write(**/*.ts)|Write(**/*.tsx)"
+            "if": "Edit(**/*.ts)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/detect.ts\"",
+            "if": "Edit(**/*.tsx)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/detect.ts\"",
+            "if": "Write(**/*.ts)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/detect.ts\"",
+            "if": "Write(**/*.tsx)"
           }
         ]
       }

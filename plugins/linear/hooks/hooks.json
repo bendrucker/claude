@@ -3,11 +3,12 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "WebFetch(domain:linear.app)",
+        "matcher": "WebFetch",
         "hooks": [
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/fetch.ts\"",
+            "if": "WebFetch(domain:linear.app)",
             "timeout": 10
           }
         ]

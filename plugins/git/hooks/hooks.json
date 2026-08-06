@@ -3,11 +3,12 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash(git commit:*)",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/block-default-branch-commit.ts\""
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/block-default-branch-commit.ts\"",
+            "if": "Bash(git commit:*)"
           }
         ]
       }

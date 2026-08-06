@@ -73,6 +73,9 @@ jobs:
       - name: Check MCP hook matchers
         run: bun scripts/check-mcp-matchers.ts
 
+      - name: Check hook matchers
+        run: bun scripts/check-hook-matchers.ts
+
       - name: Check plugin dependencies
         run: bun scripts/check-plugin-deps.ts
 

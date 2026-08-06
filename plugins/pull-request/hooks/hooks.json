@@ -3,11 +3,27 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash(gh pr create:*)|Bash(gh pr edit:*)|Bash(glab mr create:*)|Bash(glab mr update:*)",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/validate.ts\""
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/validate.ts\"",
+            "if": "Bash(gh pr create:*)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/validate.ts\"",
+            "if": "Bash(gh pr edit:*)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/validate.ts\"",
+            "if": "Bash(glab mr create:*)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/validate.ts\"",
+            "if": "Bash(glab mr update:*)"
           }
         ]
       }

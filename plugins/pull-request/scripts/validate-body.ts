@@ -1,5 +1,9 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { headingCaseViolations } from "./heading-case";
+import { countProseWords, headingTexts, linesOutsideFences, stripEmphasis } from "./markdown";
+import { classifyPrHeading } from "./sentence-heading";
 
 function hasBashCommand(input: unknown): input is { command: string } {
   return (
@@ -132,6 +136,132 @@ export function hasRunOnProse(body: string): boolean {
   return false;
 }
 
+// Vocabulary that leaks the instructions into the output: the body claims a
+// choice was made on purpose, or that a fact is worth the reader's attention,
+// instead of stating the choice and the fact.
+export const NARRATION_TELLS = [
+  "deliberately",
+  "on purpose",
+  "worth noting",
+  "worth naming",
+  "worth knowing",
+  "non-obvious",
+  "left alone",
+  "leaves alone",
+] as const;
+
+export type NarrationTell = (typeof NARRATION_TELLS)[number];
+
+export function findNarrationTells(body: string): NarrationTell[] {
+  const prose = linesOutsideFences(body).join("\n");
+  return NARRATION_TELLS.filter((tell) =>
+    new RegExp(`\\b${tell.replace(/ /g, "\\s+")}\\b`, "i").test(prose),
+  );
+}
+
+export interface SentenceHeading {
+  text: string;
+  signals: string[];
+}
+
+// The classifier's sentence-case signal restates what the AP title-case deny
+// already reports, so a heading needs a shape signal beyond its casing to be
+// worth a second note.
+export function sentenceShapedHeadings(body: string): SentenceHeading[] {
+  const flagged: SentenceHeading[] = [];
+  for (const text of headingTexts(body)) {
+    const signals = classifyPrHeading(stripEmphasis(text)).signals.filter(
+      (signal) => !signal.startsWith("sentence case"),
+    );
+    if (signals.length > 0) flagged.push({ text, signals });
+  }
+  return flagged;
+}
+
+// A body past this length is a document. On a repo the author owns and merges
+// alone, nobody is going to read it.
+export const PERSONAL_BODY_WORD_LIMIT = 450;
+
+export function isLongBody(body: string): boolean {
+  return countProseWords(body) > PERSONAL_BODY_WORD_LIMIT;
+}
+
+const SSH_REMOTE = /^[\w.+-]+@[\w.-]+:(.+)$/;
+const URL_REMOTE = /^[a-z][\w+.-]*:\/\/(?:[^@/]+@)?[^/]+\/(.+)$/i;
+
+export function parseRemoteOwner(remoteUrl: string): string | null {
+  const trimmed = remoteUrl.trim();
+  const path = trimmed.match(SSH_REMOTE)?.[1] ?? trimmed.match(URL_REMOTE)?.[1];
+  if (path === undefined) return null;
+  const owner = path.replace(/^\/+/, "").split("/")[0];
+  return owner === undefined || owner.length === 0 ? null : owner;
+}
+
+// `hosts.yml` is two levels deep (host, then per-host keys), so a line-oriented
+// read is enough and keeps a YAML parser out of the hook's startup path.
+export function parseGhLogin(hostsYaml: string): string | null {
+  let inGitHub = false;
+  for (const line of hostsYaml.split("\n")) {
+    if (/^\S/.test(line)) {
+      inGitHub = line.trim().replace(/:$/, "") === "github.com";
+      continue;
+    }
+    if (!inGitHub) continue;
+    const match = line.match(/^\s+user:\s*(.+?)\s*$/);
+    if (match?.[1]) return match[1].replace(/^["']|["']$/g, "");
+  }
+  return null;
+}
+
+export function gitRemoteReader(cwd: string): () => Promise<string | null> {
+  return async () => {
+    try {
+      const proc = Bun.spawn(["git", "remote", "get-url", "origin"], {
+        cwd,
+        stdout: "pipe",
+        stderr: "ignore",
+      });
+      const url = await new Response(proc.stdout).text();
+      return (await proc.exited) === 0 ? url.trim() : null;
+    } catch {
+      return null;
+    }
+  };
+}
+
+export function ghHostsReader(): () => Promise<string | null> {
+  return async () => {
+    try {
+      return await Bun.file(join(homedir(), ".config", "gh", "hosts.yml")).text();
+    } catch {
+      return null;
+    }
+  };
+}
+
+export async function resolvePersonalRepo(
+  readRemote: () => Promise<string | null>,
+  readHosts: () => Promise<string | null>,
+): Promise<boolean> {
+  const [remote, hosts] = await Promise.all([readRemote(), readHosts()]);
+  if (remote === null || hosts === null) return false;
+  const owner = parseRemoteOwner(remote);
+  const login = parseGhLogin(hosts);
+  if (owner === null || login === null) return false;
+  return owner.toLowerCase() === login.toLowerCase();
+}
+
+export const TITLE_LENGTH_LIMIT = 50;
+
+// A comma before a coordinating conjunction, two or more commas, or a colon
+// followed by a comma: all three stack clauses onto a title that should carry
+// one.
+export function hasClauseStacking(title: string): boolean {
+  if (/,\s*(?:and|or|but|nor|for|so|yet)\b/i.test(title)) return true;
+  if ((title.match(/,/g) ?? []).length >= 2) return true;
+  return /:[^,]*,/.test(title);
+}
+
 // Backticked hex run that could be a commit SHA. Only a filter: the git object
 // database settles whether a candidate is a real commit.
 const BACKTICKED_HEX_PATTERN = /`([0-9a-f]{7,40})`/g;
@@ -210,6 +340,12 @@ export function extractInlineBody(command: string): string | null {
   return raw.replace(/\\(["`$\\])/g, "$1");
 }
 
+export function extractTitle(command: string): string | null {
+  const match = command.match(/(?:--title|(?<![\w-])-t)[=\s]("(?:[^"\\]|\\.)*"|'[^']*'|[^\s]+)/);
+  if (!match?.[1]) return null;
+  return unquote(match[1]).replace(/\\(["`$\\])/g, "$1");
+}
+
 function bullets(reasons: string[]): string {
   return reasons.map((reason) => `- ${reason}`).join("\n");
 }
@@ -234,8 +370,8 @@ function decide(denies: string[], warns: string[]): SyncHookJSONOutput | null {
   }
   const intro =
     warns.length === 1
-      ? "PR body has a structural-slop pattern:"
-      : "PR body has structural-slop patterns:";
+      ? "This PR has a structural-slop pattern:"
+      : "This PR has structural-slop patterns:";
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
@@ -267,9 +403,18 @@ function denyReasons(body: string): string[] {
   return reasons;
 }
 
+export interface BodyContext {
+  /** Title the command sets, or null when it sets none. */
+  title: string | null;
+  /** The repo is owned by the authenticated user, so the PR is self-reviewed. */
+  personalRepo: boolean;
+}
+
+const NO_CONTEXT: BodyContext = { title: null, personalRepo: false };
+
 // Patterns whose fix is a judgment call, so the author gets the note and keeps
 // the decision.
-function warnReasons(body: string): string[] {
+function warnReasons(body: string, context: BodyContext): string[] {
   const reasons: string[] = [];
   if (hasReflexiveScaffold(body)) {
     reasons.push(
@@ -291,11 +436,47 @@ function warnReasons(body: string): string[] {
       "A prose paragraph runs long: over four sentences, a sentence past 280 characters, or several clauses stacked behind commas. Split the thread, or move an enumeration into a list.",
     );
   }
+  const tells = findNarrationTells(body);
+  if (tells.length > 0) {
+    const quoted = tells.map((tell) => `"${tell}"`).join(", ");
+    reasons.push(
+      `The body narrates its own writing (${quoted}). A reader who was not in the session cannot tell a deliberate choice from an accidental one, and saying a fact is worth noting is not the same as stating it. Drop the framing and keep the fact.`,
+    );
+  }
+  const sentenceHeadings = sentenceShapedHeadings(body);
+  if (sentenceHeadings.length > 0) {
+    const detail = sentenceHeadings
+      .map((heading) => `"${heading.text}" (${heading.signals.join("; ")})`)
+      .join(", ");
+    reasons.push(
+      `Headings read as sentences instead of labels: ${detail}. A heading names its section. Move the claim into the prose under it.`,
+    );
+  }
+  if (context.personalRepo && isLongBody(body)) {
+    reasons.push(
+      `The body runs ${countProseWords(body)} words on a repo you own and merge yourself. Nobody else is reading this. Keep what you would want on a bisect six months out and cut the rest.`,
+    );
+  }
+  if (context.title !== null) {
+    if (context.title.length > TITLE_LENGTH_LIMIT) {
+      reasons.push(
+        `The title runs ${context.title.length} characters. Under ${TITLE_LENGTH_LIMIT} keeps it readable in a PR list and in \`git log --oneline\`.`,
+      );
+    }
+    if (hasClauseStacking(context.title)) {
+      reasons.push(
+        "The title enumerates several changes. Name the change the PR makes and leave the parts to the body.",
+      );
+    }
+  }
   return reasons;
 }
 
-export function validateBody(body: string): SyncHookJSONOutput | null {
-  return decide(denyReasons(body), warnReasons(body));
+export function validateBody(
+  body: string,
+  context: BodyContext = NO_CONTEXT,
+): SyncHookJSONOutput | null {
+  return decide(denyReasons(body), warnReasons(body, context));
 }
 
 async function resolveBody(command: string): Promise<string | null> {
@@ -325,10 +506,10 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
     return null;
   }
 
+  const cwd = input.cwd ?? process.cwd();
   const denies = denyReasons(body);
 
   if (!denies.includes(AUTOLINK_REASON)) {
-    const cwd = input.cwd ?? process.cwd();
     const candidates = extractBacktickedHexCandidates(body);
     const commits = await findBacktickedCommits(candidates, gitCommitVerifier(cwd));
     if (commits.length > 0) {
@@ -336,5 +517,12 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
     }
   }
 
-  return decide(denies, warnReasons(body));
+  const context: BodyContext = {
+    title: extractTitle(command),
+    personalRepo: isLongBody(body)
+      ? await resolvePersonalRepo(gitRemoteReader(cwd), ghHostsReader())
+      : false,
+  };
+
+  return decide(denies, warnReasons(body, context));
 }

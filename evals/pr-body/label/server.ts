@@ -3,7 +3,8 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { cli } from "cleye";
 
-// Local labeling server. Serves the review UI, hands the browser the mined samples, and persists reviewer feedback to feedback/<id>.json so a later analysis pass can read it back off disk.
+// Local labeling server. Serves the review UI, hands the browser the mined samples, and persists
+// reviewer feedback to feedback/<id>.json so a later analysis pass can read it back off disk.
 
 const argv = cli({
   name: "label-server",

@@ -151,13 +151,15 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
   if (/\?\s*$/.test(raw)) signals.push("trailing question mark");
   if (/[.](?<!\.\.\.)\s*$/.test(raw) && !/\b[A-Z]\.$/.test(raw)) signals.push("trailing period");
 
-  // A comma outside code/quotes signals list/clause structure. The contrast idiom ", not Y" is a tight label device the user keeps ("`-F`, not `-f`"), so it is exempt.
+  // A comma outside code/quotes signals list/clause structure. The contrast idiom ", not Y" is a
+  // tight label device the user keeps ("`-F`, not `-f`"), so it is exempt.
   const maskedForComma = maskCode(raw)
     .replace(/"[^"]*"/g, CODE_SENTINEL)
     .replace(/,\s*not\b/gi, "");
   if (/,/.test(maskedForComma)) signals.push("comma (clause/list)");
 
-  // A short label parenthetical is fine ("(Historical)", "(Working Notes)"). Flag parentheticals that contain a comma or a predicate verb (a clause).
+  // A short label parenthetical is fine ("(Historical)", "(Working Notes)"). Flag parentheticals
+  // that contain a comma or a predicate verb (a clause).
   const parenMatch = raw.match(/\(([^)]*)\)/);
   if (parenMatch) {
     const inner = parenMatch[1] ?? "";
@@ -176,7 +178,9 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
   const toks = tokens(masked);
   const lower = toks.map(normalize);
 
-  // "Why / What / How ..." headings are rationale-section labels in this corpus and the user marks the overwhelming majority bad. Flag them, but require a real verb/object tail so a bare "How It Works" idiom still gets caught (it is also bad here) while not over-firing on noun labels.
+  // "Why / What / How ..." headings are rationale-section labels in this corpus and the user marks
+  // the overwhelming majority bad. Flag them, but require a real verb/object tail so a bare "How It
+  // Works" idiom still gets caught (it is also bad here) while not over-firing on noun labels.
   const firstStem = lower[0]?.replace(/'s$/, "");
   if (firstStem && INTERROGATIVE_OPENERS.has(firstStem) && lower.length >= 2) {
     signals.push(`interrogative opener "${firstStem}"`);
@@ -193,7 +197,10 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
     signals.push("sentence subject pronoun");
   }
 
-  // A good heading Title-Cases content words. A lowercase content word past the first position means the heading is sentence case. One such word is enough ("Headless fallback", "Note for the reviewer"); the first word is weighted separately because some good labels open lowercase by accident.
+  // A good heading Title-Cases content words. A lowercase content word past the first position
+  // means the heading is sentence case. One such word is enough ("Headless fallback", "Note for the
+  // reviewer"); the first word is weighted separately because some good labels open lowercase by
+  // accident.
   const lowercaseContent = toks.slice(1).filter((t) => isContentWord(t) && /^[a-z]/.test(t));
   const firstLower = toks[0] && isContentWord(toks[0]) && /^[a-z]/.test(toks[0]) ? [toks[0]] : [];
   const lowered = [...firstLower, ...lowercaseContent];
@@ -201,7 +208,8 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
     signals.push(`sentence case (${lowered.length} lowercase content words)`);
   }
 
-  // Very long headings read as sentences. Count prose tokens (exclude code sentinel) so a code-heavy label is not penalized.
+  // Very long headings read as sentences. Count prose tokens (exclude code sentinel) so a code-
+  // heavy label is not penalized.
   const proseLen = toks.filter((t) => t !== CODE_SENTINEL).length;
   if (proseLen >= 8) signals.push(`long (${proseLen} prose words)`);
 

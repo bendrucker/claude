@@ -30,7 +30,7 @@ Substance per word. Judge against the size and difficulty of the change describe
 
 - 5: every paragraph carries information the reviewer did not already have from the title and the diff stat.
 - 3: correct but padded with restatement of the diff, a summary of what was just said, or filler qualifiers.
-- 1: length uncorrelated with the change; the reviewer must hunt for the point.
+- 1: length uncorrelated with the change. The reviewer must hunt for the point.
 
 Brevity alone does not score 5. A one-line body for a change with real decisions behind it is a verbosity 5 only if nothing was worth saying, which is rare.
 
@@ -44,10 +44,10 @@ Whether a reviewer with the diff, the repository, and nothing else can read the 
 
 ### `substanceRetention`
 
-How much of the `Substance` pool that a reviewer would want survives into the body. This axis guards against over-pruning: a body can be clean, tight, and self-contained while having discarded the decision that makes the change reviewable.
+How much of the `Substance` pool that a reviewer would want survives into the body. This axis guards against over-pruning: a body can be clean, tight, and self-contained while missing the decision that makes the change reviewable.
 
 - 5: the load-bearing decisions, the evidence behind them, rejected alternatives that a reviewer would otherwise re-propose, and deferred work are present.
-- 3: the change is described but its reasoning is not; a reviewer would have to ask why.
+- 3: the change is described but its reasoning is not. A reviewer would have to ask why.
 - 1: substance the reviewer needs is absent, or asserted without the evidence that supports it.
 
 Omitting a `Substance` item that would not change a reviewer's reading is correct pruning, not a loss.

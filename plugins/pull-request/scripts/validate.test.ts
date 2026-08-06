@@ -6,17 +6,25 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import {
+  type BodyContext,
   extractBacktickedHexCandidates,
   extractBodyFilePath,
   extractInlineBody,
+  extractTitle,
   findBacktickedCommits,
+  findNarrationTells,
   hasBacktickedRef,
   hasCiStatusRollCall,
   hasFileTourBullets,
   hasReflexiveScaffold,
   hasRunOnProse,
+  isPersonalRepo,
   isPrBodyCommand,
+  type NarrationTell,
+  parseGhLogin,
+  parseRemote,
   processInput,
+  sentenceShapedHeadings,
   validateBody,
 } from "./validate-body";
 
@@ -44,13 +52,16 @@ function getDenyReason(result: Awaited<ReturnType<typeof validateBody>>) {
   return undefined;
 }
 
-// Long enough to clear SMALL_BODY_WORD_LIMIT, but shaped as short paragraphs so
-// it doesn't itself trip the run-on detector when a test needs a large body.
-const LONG_PROSE = Array(6)
-  .fill(
-    "The cache stores frequently accessed records in memory. It evicts the oldest entry when full. A configurable TTL bounds staleness. Reads fall back to the database on a miss.",
-  )
-  .join("\n\n");
+// Four short sentences, 29 words. Bulk for a test that needs a large body,
+// without tripping the run-on detector on its own.
+const PROSE_PARAGRAPH =
+  "The cache stores frequently accessed records in memory. It evicts the oldest entry when full. A configurable TTL bounds staleness. Reads fall back to the database on a miss.";
+
+// Clears SMALL_BODY_WORD_LIMIT.
+const LONG_PROSE = Array(6).fill(PROSE_PARAGRAPH).join("\n\n");
+
+// Clears PERSONAL_BODY_WORD_LIMIT.
+const OVERLONG_PROSE = Array(16).fill(PROSE_PARAGRAPH).join("\n\n");
 
 describe("extractBodyFilePath", () => {
   test.each<[string, string | null]>([
@@ -225,6 +236,54 @@ describe("validateBody", () => {
       ),
     ).toBeNull();
   });
+
+  it("names the narration tells it found", () => {
+    const context = getAdditionalContext(
+      validateBody("The retry count is deliberately low. Left alone: the socket timeout."),
+    );
+    expect(context).toContain('"deliberately"');
+    expect(context).toContain('"left alone"');
+  });
+
+  it("warns on a heading that reads as a sentence", () => {
+    const result = validateBody("## Why the Cache Is Cold\n\nAdds an LRU cache to the resolver.");
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("read as sentences");
+  });
+
+  test.each<[string, BodyContext, boolean]>([
+    ["a long body on a personal repo", { title: null, personalRepo: true }, true],
+    ["a long body on a shared repo", { title: null, personalRepo: false }, false],
+  ])("warns on %s: %p", (_name, context, warns) => {
+    const result = validateBody(OVERLONG_PROSE, context);
+    expect(getAdditionalContext(result)?.includes("repo you own") ?? false).toBe(warns);
+  });
+
+  it("does not warn on a short body in a personal repo", () => {
+    expect(
+      validateBody("Adds an LRU cache to the resolver.", { title: null, personalRepo: true }),
+    ).toBeNull();
+  });
+
+  test.each<[string, string, string | undefined]>([
+    [
+      "a title past the length limit",
+      "Add an LRU Cache to the Resolver and Wire It Through",
+      "characters",
+    ],
+    ["an enumerating title", "Add a Cache, Wire It Up, and Log Misses", "enumerates"],
+    ["a single-clause title", "Add an LRU Cache", undefined],
+  ])("warns on %s", (_name, title, fragment) => {
+    const result = validateBody("Adds an LRU cache to the resolver.", {
+      title,
+      personalRepo: false,
+    });
+    if (fragment === undefined) {
+      expect(result).toBeNull();
+      return;
+    }
+    expect(getAdditionalContext(result)).toContain(fragment);
+  });
 });
 
 describe("hasCiStatusRollCall", () => {
@@ -355,6 +414,129 @@ describe("hasBacktickedRef", () => {
   });
 });
 
+describe("findNarrationTells", () => {
+  test.each<[string, string, NarrationTell[]]>([
+    ["flags a deliberate-choice claim", "The retry count is deliberately low.", ["deliberately"]],
+    ["flags a worth-noting frame", "Worth noting: the cache is cold on boot.", ["worth noting"]],
+    ["flags a hyphenated tell", "The ordering here is non-obvious.", ["non-obvious"]],
+    ["flags a tell split across a line break", "Timeouts are left\nalone.", ["left alone"]],
+    ["ignores a tell inside a fence", "```\ndeliberately\n```", []],
+    ["ignores a longer word that contains a tell", "The deliberateness of it.", []],
+    ["ignores plain prose", "Adds an LRU cache to the resolver.", []],
+  ])("%s", (_name, body, expected) => {
+    expect(findNarrationTells(body)).toEqual(expected);
+  });
+});
+
+describe("sentenceShapedHeadings", () => {
+  test.each<[string, string, string[]]>([
+    ["flags an interrogative label", "## Why This Happens", ["Why This Happens"]],
+    ["flags a linking verb", "## The Cache Is Cold on Boot", ["The Cache Is Cold on Boot"]],
+    [
+      "reads a heading through its emphasis",
+      "## **The Cache Is Cold on Boot**",
+      ["The Cache Is Cold on Boot"],
+    ],
+    ["ignores a noun-phrase label", "## Changes", []],
+    ["ignores a deverbal compound", "## Future Work", []],
+    ["ignores a plural deverbal compound", "## Bug Fixes", []],
+    ["ignores the guidance's own heading", "## Deferred Work", []],
+    ["ignores a heading the case checker already owns", "## Changes to the cache", []],
+    ["ignores a code-led label", "## `validate.ts` Rewrite", []],
+    ["ignores a heading inside a fence", "```\n## Why This Happens\n```", []],
+  ])("%s", (_name, body, expected) => {
+    expect(sentenceShapedHeadings(body).map((heading) => heading.text)).toEqual(expected);
+  });
+});
+
+describe("extractTitle", () => {
+  test.each<[string, string | null]>([
+    ['gh pr create --title "Add an LRU Cache"', "Add an LRU Cache"],
+    ["gh pr create --title 'Add an LRU Cache'", "Add an LRU Cache"],
+    ['gh pr create --title="Add an LRU Cache"', "Add an LRU Cache"],
+    ["gh pr create -t 'Add an LRU Cache'", "Add an LRU Cache"],
+    ["gh pr create --title cache", "cache"],
+    ['gh pr create --title "a \\"quoted\\" word"', 'a "quoted" word'],
+    ['glab mr create --title "Add an LRU Cache" --description x', "Add an LRU Cache"],
+    ["gh pr edit 12 --body-file body.md", null],
+    ['BODY=$(mktemp -t pr) && gh pr create --title "Real Title" --body-file "$BODY"', "Real Title"],
+    ['gh pr create --body "use tar -t archive.tar to list" --title "Real Title"', "Real Title"],
+    ['gh pr edit 12 --body "documents the --title flag for the scaffolder"', null],
+  ])("extractTitle(%p) -> %p", (command, expected) => {
+    expect(extractTitle(command)).toBe(expected);
+  });
+});
+
+describe("parseRemote", () => {
+  test.each<[string, { host: string; owner: string } | null]>([
+    ["git@github.com:bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
+    ["https://github.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
+    ["ssh://git@github.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
+    ["https://gitlab.com/group/subgroup/project.git", { host: "gitlab.com", owner: "group" }],
+    [
+      "git@github.mycorp.com:bendrucker/service.git",
+      { host: "github.mycorp.com", owner: "bendrucker" },
+    ],
+    ["https://GitHub.com/bendrucker/claude.git", { host: "github.com", owner: "bendrucker" }],
+    ["/Users/ben/src/claude", null],
+  ])("parseRemote(%p) -> %p", (url, expected) => {
+    expect(parseRemote(url)).toEqual(expected);
+  });
+});
+
+describe("parseGhLogin", () => {
+  test.each<[string, string, string | null]>([
+    [
+      "reads the user under github.com",
+      "github.com:\n    user: bendrucker\n    git_protocol: ssh\n",
+      "bendrucker",
+    ],
+    ["strips quotes around the value", 'github.com:\n    user: "bendrucker"\n', "bendrucker"],
+    [
+      "skips another host's user",
+      "ghe.example.com:\n    user: someone\ngithub.com:\n    user: bendrucker\n",
+      "bendrucker",
+    ],
+    ["returns null without a github.com block", "ghe.example.com:\n    user: someone\n", null],
+    ["returns null when the block has no user", "github.com:\n    git_protocol: ssh\n", null],
+    ["returns null for an empty file", "", null],
+  ])("%s", (_name, hosts, expected) => {
+    expect(parseGhLogin(hosts)).toBe(expected);
+  });
+});
+
+describe("isPersonalRepo", () => {
+  const hosts = "github.com:\n    user: bendrucker\n";
+
+  test.each<[string, string | null, string | null, boolean]>([
+    ["matches the authenticated login", "git@github.com:bendrucker/claude.git", hosts, true],
+    ["matches regardless of case", "git@github.com:BenDrucker/claude.git", hosts, true],
+    ["rejects another owner", "git@github.com:anthropics/claude.git", hosts, false],
+    [
+      "rejects a matching owner on another host",
+      "git@github.mycorp.com:bendrucker/service.git",
+      hosts,
+      false,
+    ],
+    [
+      "rejects a matching namespace on gitlab",
+      "git@gitlab.com:bendrucker/service.git",
+      hosts,
+      false,
+    ],
+    ["skips without a remote", null, hosts, false],
+    ["skips without a gh config", "git@github.com:bendrucker/claude.git", null, false],
+    [
+      "skips when the config holds no github.com login",
+      "git@github.com:bendrucker/claude.git",
+      "ghe.example.com:\n    user: someone\n",
+      false,
+    ],
+  ])("%s", (_name, remote, hostsYaml, expected) => {
+    expect(isPersonalRepo(remote, hostsYaml)).toBe(expected);
+  });
+});
+
 describe("processInput", () => {
   let tempDir: string;
 
@@ -461,6 +643,36 @@ describe("processInput", () => {
     const reason = getDenyReason(result);
     expect(reason).toContain("- Testing section should not mention test counts");
     expect(reason).toContain("- Commit SHAs and issue/MR refs");
+  });
+
+  it("warns on the title the command sets", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    await Bun.write(bodyFile, "Adds an LRU cache to the resolver.");
+    const result = await processInput(
+      createInput(
+        `gh pr create --title "Add an LRU Cache to the Resolver and Wire It Through" --body-file ${bodyFile}`,
+        repoRoot,
+      ),
+    );
+    expect(getAdditionalContext(result)).toContain("characters");
+  });
+
+  it("warns on the title when the body file does not exist yet", async () => {
+    const result = await processInput(
+      createInput(
+        `gh pr create --title "Add an LRU Cache to the Resolver and Wire It Through" --body-file ${path.join(tempDir, "missing.md")}`,
+        repoRoot,
+      ),
+    );
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain("characters");
+  });
+
+  it("stays silent on a title-only command with a clean title", async () => {
+    const result = await processInput(
+      createInput('gh pr edit 12 --title "Add an LRU Cache"', repoRoot),
+    );
+    expect(result).toBeNull();
   });
 
   it("carries warnings inside the deny instead of a separate warn", async () => {

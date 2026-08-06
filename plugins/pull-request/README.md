@@ -20,3 +20,9 @@ Both skills support targeting branches in separate git worktrees. When invoking 
 ```
 
 The skills resolve the branch to its worktree path and run git/gh commands there. When already in a feature branch worktree, the argument is optional.
+
+## Tests
+
+```
+bun test plugins/pull-request
+```

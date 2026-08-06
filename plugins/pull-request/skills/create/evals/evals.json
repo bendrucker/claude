@@ -8,7 +8,7 @@
       "files": [],
       "expectations": [
         "The body leads with intent or the real root cause, not a file-by-file summary",
-        "It surfaces the overturned theory that was discussed in the session, not just the final fix",
+        "It states the overturned theory in about a sentence, without a paragraph-length narrative of the wrong turn",
         "It notes the dropped test and the concrete reason it was dropped",
         "A small fix is a tight paragraph with no reflexive ## Changes plus ## Testing scaffold",
         "No test counts and no 'all tests pass' phrasing"
@@ -49,6 +49,29 @@
         "No heading carries a qualifying tail, a trailing clause, or a parenthetical that belongs in the body",
         "Deferred and unchanged work is named by topic (e.g. Deferred Work, Unchanged Behavior), not as a What Changed or What I Didn't Do meta-heading",
         "No Why/What/How question headings and no sentence-case headings"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Open a PR for this config change on my personal repo. In the session we decided against a shared package on purpose, cut a flag that seemed non-obvious, and left the legacy path alone.",
+      "expected_output": "A body that states each decision in plain prose about the change, without echoing instruction vocabulary or describing its own selection process.",
+      "files": [],
+      "expectations": [
+        "The body never uses instruction-leak vocabulary: 'deliberately', 'on purpose', 'non-obvious', 'worth noting', 'left alone'",
+        "Decisions are stated as facts about the change ('a shared package would have required X, so each plugin carries its own copy'), free of meta-commentary about what the author chose to mention",
+        "The body does not name its own restraint (no 'I left out', 'omitted for brevity', or a list of things it isn't covering)"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Create the PR. This is my own repo. The change swaps the retry backoff to jitter and bumps the cap. I measured p99 at 410ms before and 230ms after. Original task: things:///show?id=Fk3aX2mQ",
+      "expected_output": "A one-to-three-paragraph body carrying the decision and the measured numbers, with the Things link kept under References.",
+      "files": [],
+      "expectations": [
+        "The body is one to three paragraphs for this personal-tier change, with no section scaffold",
+        "The measured p99 numbers appear, and the decision to add jitter carries its reason",
+        "Every paragraph adds something beyond the title and diff, with no restatement of what the diff shows",
+        "An Original Task Things link is kept on this personal repo rather than dropped as a dead end"
       ]
     }
   ]

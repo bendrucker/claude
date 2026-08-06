@@ -82,14 +82,14 @@ export function hasCiStatusRollCall(body: string): boolean {
 // more than one thread. A sentence past RUN_ON_CHARS is a wall. A sentence with
 // COMMA_SPLICE_MIN_COMMAS commas past COMMA_SPLICE_MIN_CHARS is an enumeration
 // that belongs in a list.
-const RUN_ON_CHARS = 280;
-const COMMA_SPLICE_MIN_COMMAS = 3;
-const COMMA_SPLICE_MIN_CHARS = 220;
-const MAX_SENTENCES_PER_PARAGRAPH = 4;
+export const RUN_ON_CHARS = 280;
+export const COMMA_SPLICE_MIN_COMMAS = 3;
+export const COMMA_SPLICE_MIN_CHARS = 220;
+export const MAX_SENTENCES_PER_PARAGRAPH = 4;
 
 // Join the body into prose paragraphs, dropping fenced code, tables, headings,
 // list items, and blockquotes so density is measured on prose alone.
-function proseParagraphs(body: string): string[] {
+export function proseParagraphs(body: string): string[] {
   const paras: string[] = [];
   let buf: string[] = [];
   let inFence = false;
@@ -114,7 +114,7 @@ function proseParagraphs(body: string): string[] {
   return paras.filter((p) => p.length > 0);
 }
 
-function splitSentences(text: string): string[] {
+export function splitSentences(text: string): string[] {
   return text.split(/(?<=[.!?])\s+(?=[A-Z`(])/).filter((s) => s.trim().length > 0);
 }
 

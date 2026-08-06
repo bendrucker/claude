@@ -1,0 +1,16 @@
+{
+  "id": "001-claude-1127",
+  "url": "https://github.com/bendrucker/claude/pull/1127",
+  "title": "session-limit: drop the hardcoded rate-limits path",
+  "repo": "bendrucker/claude",
+  "tier": "personal",
+  "diffSummary": "Removes a machine-specific default path (~/.vibe-island/cache/rl.json) from the session-limit hook so it matches the statusline writer's contract, requiring CLAUDE_STATUSLINE_RATE_LIMITS_PATH to be set explicitly. Adds a test for the unset case and fixes a README heading. 3 files changed, +37/-8.",
+  "substance": [
+    "The hardcoded machine-specific path exposed a private setup in both the README and the source.",
+    "The fix matches the statusline writer's contract: the hook reads only from the env var, so unset means nothing is being written and the hook stays silent.",
+    "Behavior is unchanged in practice because user/settings.json already sets CLAUDE_STATUSLINE_RATE_LIMITS_PATH.",
+    "End-to-end verification confirmed the shell writer's output drives the hook to inject a band message, and a render carrying no rate_limits leaves the file intact.",
+    "Added test coverage for the unset-variable case to ensure graceful degradation."
+  ],
+  "originalBody": "Follow-up to #1126. The hook fell back to a machine-specific path (`~/.vibe-island/cache/rl.json`) when `CLAUDE_STATUSLINE_RATE_LIMITS_PATH` was unset, which put a private setup in the source and the README.\n\nThe statusline that writes the file has no such default, so the reader now matches it: unset means nothing is being written, and the hook stays silent. `user/settings.json` already sets the variable, so behavior here is unchanged.\n\nThe README documents a shell statusline that writes the file, so the hook reads as depending on the contract rather than on one statusline implementation. Verified end-to-end: the shell writer's output drives the hook to inject a band message, and a render carrying no `rate_limits` leaves the file intact."
+}

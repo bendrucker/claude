@@ -30,7 +30,8 @@
     "plugins/review",
     "plugins/comments",
     "plugins/meme",
-    ".claude/skills/agent-ideas"
+    ".claude/skills/agent-ideas",
+    "evals/pr-body"
   ],
   "scripts": {
     "build": "tsc --noEmit",

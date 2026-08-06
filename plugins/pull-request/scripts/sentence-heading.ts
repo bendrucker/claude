@@ -171,8 +171,6 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
     else if (hasPredicate) signals.push("parenthetical clause (verb)");
   }
 
-  // Work on the body with the trailing label-parenthetical removed and code
-  // masked, so verb/case checks see the prose skeleton.
   const noParen = raw.replace(/\s*\([^)]*\)\s*$/, "").trim();
   const masked = maskCode(noParen);
   const toks = tokens(masked);

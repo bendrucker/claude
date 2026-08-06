@@ -137,8 +137,7 @@ export function hasRunOnProse(body: string): boolean {
 }
 
 // Vocabulary that leaks the instructions into the output: the body claims a
-// choice was made on purpose, or that a fact is worth the reader's attention,
-// instead of stating the choice and the fact.
+// choice was made on purpose, or that a fact is worth the reader's attention.
 export const NARRATION_TELLS = [
   "deliberately",
   "on purpose",
@@ -253,9 +252,7 @@ export async function resolvePersonalRepo(
 
 export const TITLE_LENGTH_LIMIT = 50;
 
-// A comma before a coordinating conjunction, two or more commas, or a colon
-// followed by a comma: all three stack clauses onto a title that should carry
-// one.
+// All three stack clauses onto a title that should carry one.
 export function hasClauseStacking(title: string): boolean {
   if (/,\s*(?:and|or|but|nor|for|so|yet)\b/i.test(title)) return true;
   if ((title.match(/,/g) ?? []).length >= 2) return true;

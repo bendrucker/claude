@@ -3,10 +3,8 @@ name: hook-e2e
 on:
   pull_request:
     paths:
-      - plugins/pull-request/hooks/**
-      - plugins/pull-request/scripts/validate*
-      - plugins/pull-request/scripts/e2e-*
-      - plugins/pull-request/scripts/e2e-fixtures/**
+      - plugins/*/hooks/**
+      - plugins/*/scripts/**
       - .github/workflows/hook-e2e.yml
 
 concurrency:
@@ -14,9 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pull-request:
+  e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
@@ -33,5 +31,16 @@ jobs:
       - name: Wait for CLI
         wait: cli
 
-      - name: Fire the PR body hook
-        run: bun plugins/pull-request/scripts/e2e-hook-fire.ts
+      - name: Run hook E2E tests
+        run: |
+          found=0
+          while IFS= read -r -d '' test; do
+            found=1
+            echo "::group::$test"
+            bun "$test"
+            echo "::endgroup::"
+          done < <(find plugins/*/scripts -maxdepth 1 -name 'e2e-*.ts' -print0 | sort -z)
+          if [[ "$found" == "0" ]]; then
+            echo "No hook E2E tests found"
+            exit 1
+          fi

@@ -38,12 +38,13 @@ allowed-tools:
 - Check the log in the context above to determine the repo's commit style:
   - **subject** (default): `${subject}: ${summary}` (e.g., `api: add timeout to request`)
   - **conventional**: `${type}: ${summary}` (e.g., `fix: add timeout to request`)
-- Keep under 50 characters, max 100
+- Name the primary change. A title that wants a serial comma is an enumeration: find the theme the changes share, or name the biggest one and let the body carry the rest.
+- Keep under 50 characters. Past that, cut scope from the title, not letters.
 - Use imperative mood, lowercase except proper nouns
 
 ## Body
 
-Lead with intent: why this change, the decisions a reviewer can't reconstruct from the diff, and how you know it works. Don't restate what the diff, git, or the status checks already carry. Mine the session for the substance that never reached the code (rejected alternatives, overturned theories, what you observed testing, scope added or dropped) and state each as a self-contained decision, not as a delta against a plan the reviewer never saw.
+Lead with intent: why this change, the decisions a reviewer can't reconstruct from the diff, and how you know it works. Don't restate what the diff, git, or the status checks already carry. Mine the session for the substance that never reached the code (rejected alternatives, scope added or dropped, what you observed testing) and state each as a self-contained decision, not as a delta against a plan the reviewer never saw.
 
 - Open with a bare verb ("Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when it needs justifying. Don't restate the title.
 - Default to prose. A small PR is a tight paragraph with no headers. Add `##` sections only when length earns them. Length tracks substance, not diff size.

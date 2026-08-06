@@ -216,28 +216,30 @@ function bullets(reasons: string[]): string {
 
 // A deny reason carries an exact fix, so the whole set is worth reporting at
 // once: the model would otherwise rewrite the body, retry, and be blocked again
-// by the next one.
-function decide(denyReasons: string[], warnReasons: string[]): SyncHookJSONOutput | null {
-  if (denyReasons.length > 0) {
+// by the next one. Warnings ride along on a deny for the same reason.
+function decide(denies: string[], warns: string[]): SyncHookJSONOutput | null {
+  if (denies.length > 0) {
+    const alsoWorth =
+      warns.length > 0 ? `\nAlso worth addressing in the same edit:\n${bullets(warns)}` : "";
     return {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
-        permissionDecisionReason: `Fix the PR body before retrying:\n${bullets(denyReasons)}`,
+        permissionDecisionReason: `Fix the PR body before retrying:\n${bullets(denies)}${alsoWorth}`,
       },
     };
   }
-  if (warnReasons.length === 0) {
+  if (warns.length === 0) {
     return null;
   }
   const intro =
-    warnReasons.length === 1
+    warns.length === 1
       ? "PR body has a structural-slop pattern:"
       : "PR body has structural-slop patterns:";
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      additionalContext: `${intro}\n${bullets(warnReasons)}`,
+      additionalContext: `${intro}\n${bullets(warns)}`,
     },
   };
 }
@@ -299,8 +301,11 @@ export function validateBody(body: string): SyncHookJSONOutput | null {
 async function resolveBody(command: string): Promise<string | null> {
   const bodyFilePath = extractBodyFilePath(command);
   if (bodyFilePath) {
-    const file = Bun.file(bodyFilePath);
-    return (await file.exists()) ? await file.text() : null;
+    try {
+      return await Bun.file(bodyFilePath).text();
+    } catch {
+      return null;
+    }
   }
   return extractInlineBody(command);
 }

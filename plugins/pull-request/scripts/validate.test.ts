@@ -142,12 +142,15 @@ describe("validateBody", () => {
     expect(reason).toContain("proper noun, code identifier");
   });
 
-  it("lets a deny short-circuit the structural warnings", () => {
+  it("folds structural warnings into the deny reason", () => {
     const result = validateBody(
       "## Changes to the cache\n\n- **src/cache.ts**: adds a cache\n\n## Testing\n\nManual.",
     );
     expect(getPermissionDecision(result)).toBe("deny");
     expect(getAdditionalContext(result)).toBeUndefined();
+    const reason = getDenyReason(result);
+    expect(reason).toContain("Also worth addressing in the same edit:");
+    expect(reason).toContain("file by file");
   });
 
   it("warns on a CI-status roll-call", () => {
@@ -460,7 +463,7 @@ describe("processInput", () => {
     expect(reason).toContain("- Commit SHAs and issue/MR refs");
   });
 
-  it("suppresses warnings when the body also earns a deny", async () => {
+  it("carries warnings inside the deny instead of a separate warn", async () => {
     const bodyFile = path.join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Changes to the cache\n\n- **src/cache.ts**: adds a cache");
     const result = await processInput(
@@ -468,5 +471,6 @@ describe("processInput", () => {
     );
     expect(getPermissionDecision(result)).toBe("deny");
     expect(getAdditionalContext(result)).toBeUndefined();
+    expect(getDenyReason(result)).toContain("Also worth addressing in the same edit:");
   });
 });

@@ -2,9 +2,9 @@
 
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
-const PLUGIN_DIR = resolve(import.meta.dirname, "..");
+const PLUGIN_DIR = join(import.meta.dirname, "..");
 const FIXTURE_DIR = join(import.meta.dirname, "e2e-fixtures");
 const RUN_TIMEOUT_MS = 3 * 60 * 1000;
 const DENY_REASON_FRAGMENT = "test counts";

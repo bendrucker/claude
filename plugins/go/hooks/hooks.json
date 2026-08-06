@@ -8,7 +8,17 @@
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/check.ts\"",
-            "if": "Edit(**/*.go)|MultiEdit(**/*.go)|Write(**/*.go)"
+            "if": "Edit(**/*.go)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/check.ts\"",
+            "if": "MultiEdit(**/*.go)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/check.ts\"",
+            "if": "Write(**/*.go)"
           }
         ]
       }

@@ -1,5 +1,6 @@
 import type { CommentKind } from "../detection/types";
 import type { Verdict } from "../judge/schema";
+import { type CommentStyle, conformToStyle, detectStyle, hasDelimiters } from "./comment-syntax";
 
 /** One comment's range plus the verdict that decides how it is trimmed. */
 export interface EditItem {
@@ -18,21 +19,18 @@ export interface EditSkip {
   detail: string;
 }
 
-/** A line the applier produced that a human should re-check, not a refusal. */
-export interface EditWarning {
-  line: number;
-  detail: string;
-}
-
 export interface FileEditResult {
   content: string;
   skips: EditSkip[];
-  warnings: EditWarning[];
 }
 
 export interface FileEditOptions {
-  /** Applier-produced lines longer than this are flagged in `warnings`. */
-  maxWidth?: number;
+  /**
+   * Refuse a splice that would produce a line longer than this. Opt-in: with no
+   * value, width is not checked, because a limit guessed below the target
+   * repo's own would refuse edits that are in fact fine.
+   */
+  maxWidth?: number | undefined;
 }
 
 /**
@@ -176,13 +174,33 @@ function applyFull(
   });
 }
 
+/** Why judge text could not be conformed to the comment it would replace. */
+function conformRefusal(style: CommentStyle): string {
+  if (!hasDelimiters(style)) {
+    return "comment uses delimiters the applier does not recognize; rewrite by hand";
+  }
+  const markers = style.form === "line" ? style.linePrefix : `${style.open} ${style.close}`;
+  return `replacement text does not match the ${markers} comment it replaces; rewrite by hand`;
+}
+
+/** The refusal detail for a splice that would exceed `maxWidth`, else null. */
+function widthRefusal(produced: string[], maxWidth: number | undefined): string | null {
+  if (maxWidth === undefined) return null;
+  const over = produced.find((line) => line.length > maxWidth);
+  if (!over) return null;
+  return `replacement would produce a ${over.length}-character line (over ${maxWidth}); re-wrap by hand`;
+}
+
 /**
  * Replace a comment's span with judge-authored text (a `rewrite` or a partial
- * trim's `trimTo`). The text carries the delimiters but no leading indentation;
- * the applier owns it. For a full-line comment the span's lines become the
- * indented text lines. For a trailing line comment the text is spliced after
- * the code, one space apart. Anything else (a trailing block, code interleaved
- * on the line) is skipped and flagged, the same conservative bar trims use.
+ * trim's `trimTo`). The text is conformed to the delimiters the site actually
+ * uses and de-indented before the applier adds the site's indentation, so text
+ * that arrives as bare prose or carrying its own indentation still splices as a
+ * valid comment. For a full-line comment the span's lines become the indented
+ * text lines. For a trailing line comment the text is spliced after the code,
+ * one space apart. A form the site cannot host, an over-width result, or code
+ * interleaved on the line is skipped and flagged, the same conservative bar
+ * trims use.
  */
 function replaceSpan(
   item: EditItem,
@@ -191,26 +209,47 @@ function replaceSpan(
   deletions: Set<number>,
   spanInserts: Map<number, string[]>,
   skips: EditSkip[],
+  maxWidth: number | undefined,
 ): void {
   const before = (lines[item.startLine - 1] ?? "").slice(0, item.startColumn);
   const after = (lines[item.endLine - 1] ?? "").slice(item.endColumn);
   const wsBefore = before.trim().length === 0;
   const wsAfter = after.trim().length === 0;
-  const textLines = text.split("\n");
+
+  const style = detectStyle(lines, item);
+  const conformed = conformToStyle(text, style);
+  if (conformed == null) {
+    skips.push({
+      startLine: item.startLine,
+      reason: "manual",
+      detail: conformRefusal(style),
+    });
+    return;
+  }
+  const textLines = conformed.split("\n");
 
   if (wsBefore && wsAfter) {
     const indent = before;
-    spanInserts.set(
-      item.startLine,
-      textLines.map((line) => `${indent}${line}`.replace(/\s+$/, "")),
-    );
+    const produced = textLines.map((line) => `${indent}${line}`.replace(/\s+$/, ""));
+    const tooWide = widthRefusal(produced, maxWidth);
+    if (tooWide) {
+      skips.push({ startLine: item.startLine, reason: "manual", detail: tooWide });
+      return;
+    }
+    spanInserts.set(item.startLine, produced);
     for (let n = item.startLine; n <= item.endLine; n++) deletions.add(n);
     return;
   }
 
   if (!wsBefore && wsAfter && item.kind === "line" && item.startLine === item.endLine) {
     const code = before.replace(/\s+$/, "");
-    spanInserts.set(item.startLine, [`${code} ${textLines.join(" ")}`.replace(/\s+$/, "")]);
+    const produced = [`${code} ${textLines.join(" ")}`.replace(/\s+$/, "")];
+    const tooWide = widthRefusal(produced, maxWidth);
+    if (tooWide) {
+      skips.push({ startLine: item.startLine, reason: "manual", detail: tooWide });
+      return;
+    }
+    spanInserts.set(item.startLine, produced);
     deletions.add(item.startLine);
     return;
   }
@@ -228,6 +267,7 @@ function applyRewrite(
   deletions: Set<number>,
   spanInserts: Map<number, string[]>,
   skips: EditSkip[],
+  maxWidth: number | undefined,
 ): void {
   const rewrite = item.verdict.rewrite;
   if (!rewrite) {
@@ -238,7 +278,7 @@ function applyRewrite(
     });
     return;
   }
-  replaceSpan(item, rewrite, lines, deletions, spanInserts, skips);
+  replaceSpan(item, rewrite, lines, deletions, spanInserts, skips, maxWidth);
 }
 
 /**
@@ -257,20 +297,18 @@ function applyRewrite(
  *
  * Overlapping verdicts on one line resolve with deletion winning over a replace.
  * A span insert at a line takes precedence over its own span's deletions.
- * Applier-produced lines longer than `maxWidth` are flagged in `warnings`.
  */
 export function computeFileEdits(
   source: string,
   items: EditItem[],
   options: FileEditOptions = {},
 ): FileEditResult {
-  const { maxWidth = 100 } = options;
+  const { maxWidth } = options;
   const lines = source.split("\n");
   const deletions = new Set<number>();
   const replacements = new Map<number, string>();
   const spanInserts = new Map<number, string[]>();
   const skips: EditSkip[] = [];
-  const warnings: EditWarning[] = [];
 
   for (const item of items) {
     switch (item.verdict.action) {
@@ -278,7 +316,7 @@ export function computeFileEdits(
         break;
       case "trim": {
         if (item.verdict.trimTo) {
-          replaceSpan(item, item.verdict.trimTo, lines, deletions, spanInserts, skips);
+          replaceSpan(item, item.verdict.trimTo, lines, deletions, spanInserts, skips, maxWidth);
           break;
         }
         const keep = keepLines(item);
@@ -290,19 +328,8 @@ export function computeFileEdits(
         break;
       }
       case "rewrite":
-        applyRewrite(item, lines, deletions, spanInserts, skips);
+        applyRewrite(item, lines, deletions, spanInserts, skips, maxWidth);
         break;
-    }
-  }
-
-  for (const [n, insert] of spanInserts) {
-    for (const line of insert) {
-      if (line.length > maxWidth) {
-        warnings.push({
-          line: n,
-          detail: `applier produced a ${line.length}-character line (over ${maxWidth}); re-wrap by hand`,
-        });
-      }
     }
   }
 
@@ -338,5 +365,5 @@ export function computeFileEdits(
     lastPushed = line;
     lastPushedBlank = isBlank(line);
   }
-  return { content: out.join("\n"), skips, warnings };
+  return { content: out.join("\n"), skips };
 }

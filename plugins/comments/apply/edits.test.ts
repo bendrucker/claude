@@ -40,8 +40,6 @@ describe("computeFileEdits", () => {
     skipsEmpty?: boolean;
     skipsLength?: number;
     skipDetail?: RegExp;
-    warningsLength?: number;
-    warningDetail?: RegExp;
   }>([
     {
       name: "case (a): deletes a single full-line comment",
@@ -306,7 +304,26 @@ describe("computeFileEdits", () => {
       skipsEmpty: true,
     },
     {
-      name: "warnings: flags an applier-produced line over maxWidth",
+      name: "width: refuses a splice over an explicit maxWidth",
+      source: "count += 1; // note",
+      items: [
+        item({
+          startLine: 1,
+          endLine: 1,
+          startColumn: 12,
+          endColumn: "count += 1; // note".length,
+          verdict: verdict({
+            trimTo: "// a kept clause long enough to overflow the configured width limit",
+          }),
+        }),
+      ],
+      expected: "count += 1; // note",
+      options: { maxWidth: 40 },
+      skipsLength: 1,
+      skipDetail: /over 40/,
+    },
+    {
+      name: "width: applies the same splice when no maxWidth is passed",
       source: "count += 1; // note",
       items: [
         item({
@@ -320,9 +337,106 @@ describe("computeFileEdits", () => {
         }),
       ],
       expected: "count += 1; // a kept clause long enough to overflow the configured width limit",
-      options: { maxWidth: 40 },
-      warningsLength: 1,
-      warningDetail: /over 40/,
+      skipsEmpty: true,
+    },
+    {
+      name: "syntax: a trimTo of bare prose regains the site's javadoc delimiters",
+      source:
+        "class A {\n    /**\n     * Walks the loop and retries.\n     * The broker rate-limits per key.\n     */\n    void f() {}\n}",
+      items: [
+        item({
+          startLine: 2,
+          endLine: 5,
+          startColumn: 4,
+          endColumn: 7,
+          kind: "docstring",
+          verdict: verdict({ trimTo: "The broker rate-limits per key." }),
+        }),
+      ],
+      expected: "class A {\n    /** The broker rate-limits per key. */\n    void f() {}\n}",
+      skipsEmpty: true,
+    },
+    {
+      name: "syntax: a multi-line trimTo of bare prose regains star continuations",
+      source: "  /**\n   * One.\n   * Two.\n   * Three.\n   */\n  b();",
+      items: [
+        item({
+          startLine: 1,
+          endLine: 5,
+          startColumn: 2,
+          endColumn: 5,
+          kind: "docstring",
+          verdict: verdict({ trimTo: "One.\nThree." }),
+        }),
+      ],
+      expected: "  /**\n   * One.\n   * Three.\n   */\n  b();",
+      skipsEmpty: true,
+    },
+    {
+      name: "syntax: a trailing line comment in a chain keeps its marker",
+      source: "        .retryOn(RATE_LIMIT) // the broker rate-limits per key",
+      items: [
+        item({
+          startLine: 1,
+          endLine: 1,
+          startColumn: 28,
+          endColumn: "        .retryOn(RATE_LIMIT) // the broker rate-limits per key".length,
+          verdict: verdict({ trimTo: "rate-limited per key" }),
+        }),
+      ],
+      expected: "        .retryOn(RATE_LIMIT) // rate-limited per key",
+      skipsEmpty: true,
+    },
+    {
+      name: "syntax: a rust doc comment keeps its doc marker through a trimTo",
+      source: "/// This method walks the loop and retries.\nfn retry() {}",
+      items: [
+        item({
+          startLine: 1,
+          endLine: 1,
+          startColumn: 0,
+          endColumn: "/// This method walks the loop and retries.".length,
+          verdict: verdict({ trimTo: "Retries reuse the first backoff." }),
+        }),
+      ],
+      expected: "/// Retries reuse the first backoff.\nfn retry() {}",
+      skipsEmpty: true,
+    },
+    {
+      name: "syntax: refuses a trimTo at a site whose delimiters go unrecognized",
+      source:
+        "=begin\nThis method walks the loop.\nThe broker rate-limits per key.\n=end\ndef retry; end",
+      items: [
+        item({
+          startLine: 1,
+          endLine: 4,
+          startColumn: 0,
+          endColumn: 4,
+          kind: "block",
+          verdict: verdict({ trimTo: "The broker rate-limits per key." }),
+        }),
+      ],
+      expected:
+        "=begin\nThis method walks the loop.\nThe broker rate-limits per key.\n=end\ndef retry; end",
+      skipsLength: 1,
+      skipDetail: /delimiters the applier does not recognize/,
+    },
+    {
+      name: "syntax: refuses a trimTo carrying a form the site cannot host",
+      source: "  /**\n   * Walks the loop.\n   */\n  b();",
+      items: [
+        item({
+          startLine: 1,
+          endLine: 3,
+          startColumn: 2,
+          endColumn: 5,
+          kind: "docstring",
+          verdict: verdict({ trimTo: "// Walks the loop." }),
+        }),
+      ],
+      expected: "  /**\n   * Walks the loop.\n   */\n  b();",
+      skipsLength: 1,
+      skipDetail: /does not match the \/\*\* \*\//,
     },
     {
       name: "blank collapse: drops the blank left under a block opener by a deleted docstring",
@@ -433,17 +547,7 @@ describe("computeFileEdits", () => {
       expected: "x = 1; /* note */ y = 2;",
       skipDetail: /interleaved/,
     },
-  ])("$name", ({
-    source,
-    items,
-    expected,
-    options,
-    skipsEmpty,
-    skipsLength,
-    skipDetail,
-    warningsLength,
-    warningDetail,
-  }) => {
+  ])("$name", ({ source, items, expected, options, skipsEmpty, skipsLength, skipDetail }) => {
     const result = computeFileEdits(source, items, options);
     expect(result.content).toBe(expected);
     if (skipsEmpty) {
@@ -455,10 +559,40 @@ describe("computeFileEdits", () => {
     if (skipDetail) {
       expect(result.skips[0]?.detail).toMatch(skipDetail);
     }
-    expect(result.warnings).toHaveLength(warningsLength ?? 0);
-    if (warningDetail) {
-      expect(result.warnings[0]?.detail).toMatch(warningDetail);
-    }
+  });
+
+  test("a rewrite carrying its own indentation lands at the site's indentation", () => {
+    const source = [
+      "class Broker {",
+      "    /**",
+      "     * This method walks the loop and retries.",
+      "     */",
+      "    void retry() {}",
+      "}",
+    ].join("\n");
+    const result = computeFileEdits(source, [
+      item({
+        startLine: 2,
+        endLine: 4,
+        startColumn: 4,
+        endColumn: 7,
+        kind: "docstring",
+        verdict: verdict({
+          action: "rewrite",
+          category: "voice",
+          rewrite: "    /**\n     * Retries until the broker's per-key limit clears.\n     */",
+        }),
+      }),
+    ]);
+    expect(result.skips).toEqual([]);
+    expect(result.content).toMatchInlineSnapshot(`
+      "class Broker {
+          /**
+           * Retries until the broker's per-key limit clears.
+           */
+          void retry() {}
+      }"
+    `);
   });
 });
 

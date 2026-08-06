@@ -44,6 +44,23 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 - `bun run schemas check`: fetches current upstream and verifies the upstream-backed schema overlays still apply, flagging overlay edits that upstream has absorbed and warning on edits that overwrite an upstream definition. Runs in CI.
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 
+## Evals
+
+Per-skill harnesses live in [`evals/`](evals/), one directory each for `pr-body`, `issue-refine`, `review-voice`, and `writing`, with a README per harness covering its loop. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, and some hold work-repo content that must not land here.
+
+- `bun evals/pr-body/scripts/run-eval.ts --arm-a <current.md> --arm-b <revised.md>`, then `bun evals/pr-body/scripts/judge.ts <run-dir>` for the blinded judge. Also `scripts/mine.ts`, `label/server.ts`, and `calibrate.ts` for the heading screen
+- `bun evals/issue-refine/scripts/build-dataset.ts`, then `label/server.ts`, then `scripts/ab-report.ts` and `scripts/judge.ts`
+- `bun evals/review-voice/scripts/mine.ts`, then `label/server.ts`, then `scripts/report.ts`
+- `bun evals/writing/scripts/mine.ts`, then `label/server.ts` (scorer and judge are not built yet)
+
+Runners that make live API calls read `ANTHROPIC_API_KEY` from the environment. Source it from 1Password per command:
+
+```bash
+ANTHROPIC_API_KEY=$(op item get jx63slqb27yjg6lo7db6s42bde --fields credential --reveal) bun evals/pr-body/scripts/run-eval.ts --arm-a <current.md> --arm-b <revised.md>
+```
+
+The same prefix serves `plugins/comments/evals/eval.ts --gate` and `plugins/writing/skills/analyze` with `--judge`. Separately, `plugins/*/skills/*/evals/evals.json` holds prompt-and-expectation sets consumed by the external skill A/B harness.
+
 ## Workflow
 
 - The `user/` directory is symlinked to `~/.claude/`. New files are immediately available.

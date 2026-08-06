@@ -36,6 +36,14 @@ function getAdditionalContext(result: Awaited<ReturnType<typeof validateBody>>) 
   return undefined;
 }
 
+function getDenyReason(result: Awaited<ReturnType<typeof validateBody>>) {
+  const output = result?.hookSpecificOutput;
+  if (output && "permissionDecisionReason" in output) {
+    return output.permissionDecisionReason;
+  }
+  return undefined;
+}
+
 // Long enough to clear SMALL_BODY_WORD_LIMIT, but shaped as short paragraphs so
 // it doesn't itself trip the run-on detector when a test needs a large body.
 const LONG_PROSE = Array(6)
@@ -56,8 +64,6 @@ describe("extractBodyFilePath", () => {
   });
 });
 
-// The prefix matcher these replace missed 503 of 843 real `gh pr create` calls,
-// because the command usually leads with something other than `gh`.
 describe("isPrBodyCommand", () => {
   test.each<[string, boolean]>([
     ["gh pr create --body-file body.md", true],
@@ -96,18 +102,52 @@ describe("validateBody", () => {
     ).toBeNull();
   });
 
-  test.each<[string, string]>([
-    ["'Added N tests' pattern", "## Test plan\nAdded 5 tests for the new feature"],
-    ["'Added N unit tests' pattern", "## Test plan\nAdded 3 unit tests"],
-    ["'Added N integration tests' pattern", "## Test plan\nAdded 2 integration tests"],
-    ["'N tests' pattern", "## Test plan\n5 tests verify the behavior"],
-    ["lowercase 'added' pattern", "## Test plan\nadded 10 tests"],
-    ["assertion count", "## Testing\nThe suite runs 1165 assertions."],
-    ["pass/fail count", "## Testing\n`bun test`: 193 pass, 0 fail."],
-  ])("denies body with %s", (_name, body) => {
+  test.each<[string, string, string]>([
+    ["'Added N tests' pattern", "## Testing\nAdded 5 tests for the new feature", "test counts"],
+    ["'Added N unit tests' pattern", "## Testing\nAdded 3 unit tests", "test counts"],
+    ["'Added N integration tests' pattern", "## Testing\nAdded 2 integration tests", "test counts"],
+    ["'N tests' pattern", "## Testing\n5 tests verify the behavior", "test counts"],
+    ["lowercase 'added' pattern", "## Testing\nadded 10 tests", "test counts"],
+    ["assertion count", "## Testing\nThe suite runs 1165 assertions.", "test counts"],
+    ["pass/fail count", "## Testing\n`bun test`: 193 pass, 0 fail.", "test counts"],
+    [
+      "a sentence-case section heading",
+      "## Two fixes found while testing\n\nReshapes the resolver.",
+      '"Two fixes found while testing" → "Two Fixes Found While Testing"',
+    ],
+    [
+      "a heading whose inline code must survive the suggestion",
+      "## changes to `validate.ts`\n\nReshapes the resolver.",
+      '"changes to `validate.ts`" → "Changes to `validate.ts`"',
+    ],
+    ["a backticked issue ref", "Closes `#123`.", "auto-link"],
+    ["a backticked MR ref", "Supersedes `!45`.", "auto-link"],
+  ])("denies body with %s", (_name, body, fragment) => {
     const result = validateBody(body);
-    expect(result).not.toBeNull();
     expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain(fragment);
+  });
+
+  it("lists every deny reason as a bullet in one decision", () => {
+    const result = validateBody("## Two fixes found while testing\n\nAdded 5 tests. Closes `#12`.");
+    expect(getPermissionDecision(result)).toBe("deny");
+    const reason = getDenyReason(result);
+    expect(reason).toContain("- Testing section should not mention test counts");
+    expect(reason).toContain("- Section headings should use AP title case");
+    expect(reason).toContain("- Commit SHAs and issue/MR refs");
+  });
+
+  it("keeps the AP-case escape note in the deny reason", () => {
+    const reason = getDenyReason(validateBody("## Two fixes found while testing\n\nReshapes it."));
+    expect(reason).toContain("proper noun, code identifier");
+  });
+
+  it("lets a deny short-circuit the structural warnings", () => {
+    const result = validateBody(
+      "## Changes to the cache\n\n- **src/cache.ts**: adds a cache\n\n## Testing\n\nManual.",
+    );
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getAdditionalContext(result)).toBeUndefined();
   });
 
   it("warns on a CI-status roll-call", () => {
@@ -173,21 +213,6 @@ describe("validateBody", () => {
       "## Changes\n\n- **Caching**: stores records in memory\n- **Eviction**: drops the oldest entry",
     );
     expect(result).toBeNull();
-  });
-
-  it("warns on a sentence-case section heading", () => {
-    const result = validateBody("## Two fixes found while testing\n\nReshapes the resolver.");
-    expect(getPermissionDecision(result)).toBeUndefined();
-    expect(getAdditionalContext(result)).toContain("AP title case");
-    expect(getAdditionalContext(result)).toContain("Two Fixes Found While Testing");
-  });
-
-  it("keeps a heading's inline code intact in the suggestion", () => {
-    const result = validateBody("## changes to `validate.ts`\n\nReshapes the resolver.");
-    expect(getPermissionDecision(result)).toBeUndefined();
-    expect(getAdditionalContext(result)).toContain(
-      '"changes to `validate.ts`" → "Changes to `validate.ts`"',
-    );
   });
 
   it("does not warn on AP-cased headings with an acronym", () => {
@@ -384,14 +409,24 @@ describe("processInput", () => {
     expect(getPermissionDecision(result)).toBe("deny");
   });
 
-  it("warns on a backticked real commit SHA", async () => {
+  it("denies a backticked real commit SHA", async () => {
     const bodyFile = path.join(tempDir, "body.md");
     await Bun.write(bodyFile, `Builds on \`${headSha}\`.`);
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
     );
-    expect(getPermissionDecision(result)).toBeUndefined();
-    expect(getAdditionalContext(result)).toContain("auto-link");
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("auto-link");
+  });
+
+  it("reports a verified SHA once when the body also has a backticked ref", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    await Bun.write(bodyFile, `Builds on \`${headSha}\`. Closes \`#12\`.`);
+    const result = await processInput(
+      createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
+    );
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)?.match(/auto-link/g)).toHaveLength(1);
   });
 
   it("does not warn on a bare commit SHA", async () => {
@@ -403,22 +438,35 @@ describe("processInput", () => {
     expect(result).toBeNull();
   });
 
-  it("warns on a sentence-case heading in a body file", async () => {
+  it("denies a sentence-case heading in a body file", async () => {
     const bodyFile = path.join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Two fixes found while testing\n\nReshapes the resolver.");
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
     );
-    expect(getPermissionDecision(result)).toBeUndefined();
-    expect(getAdditionalContext(result)).toContain("Two Fixes Found While Testing");
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
   });
 
-  it("lets a test-count deny precede a backticked SHA warning", async () => {
+  it("combines a test-count and a backticked SHA into one deny", async () => {
     const bodyFile = path.join(tempDir, "body.md");
     await Bun.write(bodyFile, `Builds on \`${headSha}\`.\n\nAdded 5 tests`);
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
     );
     expect(getPermissionDecision(result)).toBe("deny");
+    const reason = getDenyReason(result);
+    expect(reason).toContain("- Testing section should not mention test counts");
+    expect(reason).toContain("- Commit SHAs and issue/MR refs");
+  });
+
+  it("suppresses warnings when the body also earns a deny", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    await Bun.write(bodyFile, "## Changes to the cache\n\n- **src/cache.ts**: adds a cache");
+    const result = await processInput(
+      createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
+    );
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getAdditionalContext(result)).toBeUndefined();
   });
 });

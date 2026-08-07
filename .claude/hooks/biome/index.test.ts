@@ -10,6 +10,7 @@ import type {
   StopHookInput,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
+  invokesGitCommit,
   parseTranscript,
   processInput,
   processPostToolUse,
@@ -413,13 +414,35 @@ describe("biome hook", () => {
   });
 
   describe("processPreToolUse", () => {
-    // Note: Command filtering is handled by the hook matcher in settings.json
-    // The hook itself just checks staged files when invoked
-
     it("returns null when no staged files", async () => {
       // In test environment, there are no staged git files
       const input = mockPreToolUseInput("git commit -m 'test'");
       expect(await processPreToolUse(input)).toBeNull();
+    });
+
+    // The `Bash(git commit:*)` matcher fails open on shell metacharacters, so
+    // these reach the hook and must not be able to block.
+    test.each<[string]>([
+      ["echo hi > $TMPDIR/probe.txt"],
+      ["{ echo one; echo two; }"],
+      ["for f in *.ts; do wc -l $f; done"],
+      ["cat <<'EOF' > notes.md\nnothing here\nEOF"],
+    ])("returns null for %p", async (command) => {
+      expect(await processPreToolUse(mockPreToolUseInput(command))).toBeNull();
+    });
+  });
+
+  describe("invokesGitCommit", () => {
+    test.each<[string, boolean]>([
+      ["git commit", true],
+      ["git -C /repo commit -m x", true],
+      ["git -c user.name=x commit", true],
+      ["git add . && git commit -m x", true],
+      ["echo hi > $TMPDIR/probe.txt", false],
+      ["git log --grep commit", false],
+      ["echo 'run git commit next'", false],
+    ])("%p → %p", (command, expected) => {
+      expect(invokesGitCommit(command)).toBe(expected);
     });
   });
 

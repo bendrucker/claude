@@ -4,6 +4,28 @@ import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/clau
 import { $ } from "bun";
 import { getDefaultBranch } from "./default-branch";
 
+type BashInput = { command?: string };
+
+// Flags git accepts between the executable and its subcommand. Enumerated
+// rather than matched as a generic `-\S+` so that a value which happens to be
+// the word `commit` (`git log --grep commit`) cannot be read as the subcommand.
+const VALUE_FLAG = String.raw`(?:-[cC]|--(?:git-dir|work-tree|namespace|exec-path|config-env))(?:=\S+|\s+\S+)`;
+const BOOLEAN_FLAG =
+  "--(?:no-pager|paginate|bare|literal-pathspecs|no-replace-objects|no-optional-locks)";
+const GIT_COMMIT_PATTERN = new RegExp(
+  String.raw`\bgit\s+(?:(?:${VALUE_FLAG}|${BOOLEAN_FLAG})\s+)*commit(?![\w-])`,
+);
+
+// Quoted spans carry commit messages, grep patterns, and here-doc prose, where
+// the literal text `git commit` is data rather than an invocation.
+function stripQuoted(command: string): string {
+  return command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, " ");
+}
+
+export function invokesGitCommit(command: string): boolean {
+  return GIT_COMMIT_PATTERN.test(stripQuoted(command));
+}
+
 export function formatDenyOutput(branch: string): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
@@ -15,9 +37,17 @@ export function formatDenyOutput(branch: string): SyncHookJSONOutput {
 }
 
 export async function processInput(
-  _input: PreToolUseHookInput,
+  input: PreToolUseHookInput,
   cwd?: string,
 ): Promise<SyncHookJSONOutput | null> {
+  // The `Bash(git commit:*)` condition only narrows which calls spawn this hook.
+  // It fails open on shell metacharacters, so the deny decision rests on the
+  // command this hook reads for itself.
+  const { command } = input.tool_input as BashInput;
+  if (!command || !invokesGitCommit(command)) {
+    return null;
+  }
+
   const dir = cwd ?? process.cwd();
 
   // One rev-parse yields both the repo root (cache key) and current branch.

@@ -3,6 +3,12 @@
 -- discovery lesson: measure your own config, not a project's `make test-unit`. Per-repo
 -- hooks dominating total_s means the latency isn't yours to fix. Hooks run in parallel,
 -- so read total_s as aggregate process work, not the wall-clock the user waits on.
+--
+-- shared_config is what travels with you: plugin/skill hooks (CLAUDE_PLUGIN_ROOT,
+-- CLAUDE_SKILL_DIR) and the user-level hook dir under $HOME/~. A `.claude/hooks/` path
+-- rooted at CLAUDE_PROJECT_DIR (or relative to the repo) is a per-repo hook that happens
+-- to share the directory name, so it belongs to project_local: a repo's own hooks are not
+-- portable config, and counting them as such buries your own latency under someone else's.
 -- Params: after_date, before_date, project, host.
 WITH ev AS (
   SELECT he.command, he.duration_ms
@@ -14,9 +20,10 @@ WITH ev AS (
 )
 SELECT
   CASE
-    WHEN command LIKE '%CLAUDE_PLUGIN_ROOT%' OR command LIKE '%CLAUDE_SKILL_DIR%'
-      OR command LIKE '%/.claude/hooks/%' THEN 'shared_config'
     WHEN command IS NULL THEN 'null'
+    WHEN command LIKE '%CLAUDE_PLUGIN_ROOT%' OR command LIKE '%CLAUDE_SKILL_DIR%'
+      OR command LIKE '%$HOME/.claude/hooks/%' OR command LIKE '%~/.claude/hooks/%'
+      THEN 'shared_config'
     ELSE 'project_local'
   END AS origin,
   COUNT(*)                                     AS fires,

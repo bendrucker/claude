@@ -1,6 +1,6 @@
 # AI Reviewers
 
-Per-reviewer "satisfied" signals for the `--auto` loop, plus how to add a reviewer and re-trigger an idle one.
+Per-reviewer scores for the `--auto` loop's [acceptance bar](SKILL.md#acceptance-bar), plus how to add a reviewer and re-trigger an idle one.
 
 ## Satisfaction Signals
 
@@ -9,12 +9,14 @@ Third-party reviewers converge on one shape: each leaves a single summary commen
 - Select the summary comment by `updated_at`, not `created_at`. The current signal is an edit to a comment created rounds ago, so newest-created points at the wrong one.
 - Treat the summary body as a thread source. A thread-count check alone reads an unfinished review, with actionable items parked in the summary, as satisfied.
 
-A reviewer is done when its latest summary on the current HEAD reports nothing actionable and no unresolved bot threads remain. A stale signal from an earlier SHA does not count. An **absent** summary on HEAD means the review is still pending, so when a review is expected, wait for the summary to land before reading it. Each vendor phrases "none left" differently; use the string as a fast path, fall back to the thread count:
+A reviewer is done when its latest summary on the current HEAD carries the reviewer's maximum score and no unresolved bot threads remain. A stale score from an earlier SHA does not count. An **absent** summary on HEAD means the review is still running, so when a review is expected, wait for the summary to land before reading it. Each vendor states its maximum differently; use the string as a fast path, fall back to the thread count:
 
 - **CodeRabbit** (GitHub `coderabbitai`, GitLab `group_<id>_bot_<hash>`): `Actionable comments posted: 0`. Nitpick and LGTM notes are noise unless obviously correct.
-- **Greptile** (GitHub `greptile-apps[bot]` / `greptileai`): top confidence score (e.g. `5/5`); actionable items live in its "fix all with AI" section.
+- **Greptile** (GitHub `greptile-apps[bot]` / `greptileai`): confidence score at its maximum, `5/5`; actionable items live in its "fix all with AI" section.
 
-> Verify these strings against recent PR history when a reviewer's wording drifts. The reliable cross-cutting signal is **zero new actionable bot threads on the current HEAD after a re-review**.
+Below the maximum, the [acceptance bar](SKILL.md#acceptance-bar) holds the loop open until each comment still standing carries a written reason for declining it.
+
+> Verify these strings against recent PR history when a reviewer's wording drifts. Where a vendor's wording can't be matched at all, fall back to **zero new actionable bot threads on the current HEAD after a re-review** and report the score you couldn't read.
 
 #### Copilot
 

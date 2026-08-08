@@ -27,6 +27,15 @@
 --   host-staleness (alert): an imported host whose newest record lags the corpus.
 --     Cross-host queries silently read a dead snapshot and conclude that machine
 --     went idle; re-sync per SKILL.md "Re-syncing".
+--   hook-deny-invisible: PreToolUse denies recovered from tool_results (the
+--     `hook_denies` view) measured against the PreToolUse blocks hook_events actually
+--     recorded over the same window. A hook denying a call writes no hook record, so
+--     every hook_events-only reading (hooks.sql's blocks/friction_pct, any custom SQL
+--     over hook_blocks) under-reports blocking by the recovered count. Alert when
+--     recovery exceeds the denies hook_events did record, meaning the deny channel is
+--     mostly dark, info otherwise. Zero recovered is itself ambiguous: either nothing was
+--     denied, or the hand-maintained pattern map in views.sql has fallen behind a
+--     reworded hook, which is why this row is emitted even when the count is zero.
 --   null-timestamp-kinds (info): kinds whose rows carry no timestamp. date_filter
 --     excludes them from EVERY date-scoped query (NULL >= x is NULL), so a date
 --     window hides these rows entirely.
@@ -44,7 +53,8 @@
 --
 -- Params (all optional): min_active_days (stream-silent eligibility, default 5),
 -- new_days (stream-new window, default 14), stale_days (host-staleness
--- threshold, default 2), projects_glob (disk check, default
+-- threshold, default 2), deny_window_days (hook-deny-invisible window, default 30),
+-- projects_glob (disk check, default
 -- '~/.claude/projects/**/*.jsonl'; pass the same override given to refresh.ts if
 -- CLAUDE_PROJECTS_DIR is customized).
 WITH corpus AS (
@@ -186,6 +196,46 @@ stale_hosts AS (
     AND DATE_DIFF('day', h.last_ts, c.max_ts)
         > COALESCE(TRY_CAST(getvariable('stale_days') AS INTEGER), 2)
 ),
+deny_window AS (
+  SELECT
+    COALESCE(TRY_CAST(getvariable('deny_window_days') AS INTEGER), 30) AS days,
+    c.max_ts - INTERVAL (COALESCE(TRY_CAST(getvariable('deny_window_days') AS INTEGER), 30)) DAY AS since
+  FROM corpus c
+),
+deny_by_hook AS (
+  SELECT hd.hook_name, COUNT(*) AS cnt
+  FROM hook_denies hd, deny_window w
+  WHERE hd.timestamp >= w.since
+  GROUP BY hd.hook_name
+),
+deny_recovered AS (
+  SELECT
+    (SELECT COALESCE(SUM(cnt), 0) FROM deny_by_hook) AS n,
+    (SELECT string_agg(hook_name || ' (' || cnt || ')', ', ' ORDER BY cnt DESC)
+     FROM (SELECT hook_name, cnt FROM deny_by_hook ORDER BY cnt DESC LIMIT 5)) AS top_hooks
+),
+deny_observed AS (
+  SELECT
+    COUNT(*) FILTER (WHERE hb.decision = 'deny') AS denies,
+    COUNT(*) AS blocks
+  FROM hook_blocks hb, deny_window w
+  WHERE hb.hook_event = 'PreToolUse' AND hb.timestamp >= w.since
+),
+deny_visibility AS (
+  SELECT
+    'hook-deny-invisible' AS check_name,
+    CASE WHEN r.n > o.denies THEN 'alert' ELSE 'info' END AS status,
+    r.n || ' denies recovered' AS subject,
+    'over the last ' || w.days || ' days, against ' || o.denies
+      || ' denies and ' || o.blocks
+      || ' PreToolUse blocks of any kind that hook_events recorded. A hook returning '
+      || 'permissionDecision deny writes no hook record, so a hook_events-only reading '
+      || 'under-reports blocking by the recovered count. Read the hook_denies view '
+      || 'alongside hook_blocks (hook-blocks.sql does). A zero here means either no '
+      || 'denies or a stale pattern map in views.sql'
+      || COALESCE('; top: ' || r.top_hooks, '') AS detail
+  FROM deny_recovered r, deny_observed o, deny_window w
+),
 null_ts AS (
   SELECT kind, COUNT(*) AS n
   FROM records
@@ -258,6 +308,7 @@ combined AS (
   SELECT check_name, status, subject, detail FROM silent_streams
   UNION ALL SELECT * FROM stale_hosts
   UNION ALL SELECT * FROM disk_missing
+  UNION ALL SELECT * FROM deny_visibility
   UNION ALL SELECT * FROM new_kinds
   UNION ALL SELECT * FROM null_ts_summary
   UNION ALL SELECT * FROM disk_vanished

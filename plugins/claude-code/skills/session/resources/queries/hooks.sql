@@ -6,6 +6,13 @@
 -- every other hook that ran on the same host in the same hour. A hook with a high
 -- p95_ms, a high ambient_p50_ms, and a near-zero excess_p95_ms was slow because
 -- the machine was slow. Both columns are NULL when no hour had enough peers.
+--
+-- `blocks` and `friction_pct` count only what hook_events recorded, which excludes
+-- every PreToolUse permissionDecision "deny": that path writes no hook record, so a
+-- hook that mostly denies reads as frictionless here. The recovered volume lives in
+-- the `hook_denies` view (hook-blocks.sql reports it, index-health.sql sizes the gap).
+-- It is not folded in here because a recovered deny carries no command and no duration,
+-- so it cannot key to a row or contribute to the latency columns.
 -- Params: after_date, before_date, project, host, event (hook_event filter), hook
 -- (GLOB on command/name). Pass null to skip any filter.
 WITH scoped AS (

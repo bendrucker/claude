@@ -480,6 +480,55 @@ SELECT
 FROM hook_events
 WHERE blocked OR decision IN ('ask', 'deny');
 
+-- Hook denies recovered from the denied call's tool_result, because hook_blocks cannot
+-- see them. A PreToolUse hook returning permissionDecision "deny" writes no hook record
+-- at all: the surviving trace is a tool_result with is_error set and the
+-- permissionDecisionReason as its entire content. `ask` decisions and exit-2 blocks are
+-- recorded normally, so this view covers denies only and hook_blocks stays authoritative
+-- for the rest.
+--
+-- A denied tool_result is structurally identical to any other failed call, so recovery is
+-- text matching and `patterns` is MAINTAINED BY HAND. Hook scripts build their reason at
+-- runtime (`permissionDecisionReason: reason`), so the strings cannot be extracted from
+-- source, and they drift as hooks are reworded. To extend the map, group `tool_errors` by
+-- the head of `error_content` and look for messages that read as guidance rather than tool
+-- output (a genuine failure carries an `Exit code N` or `<tool_use_error>` prefix), then
+-- confirm the string against the hook script that emits it. Patterns anchor at the start
+-- of the message, so a scanner printing the same phrase inside its own output does not
+-- register as a deny. Rows whose tool_use_id already appears in hook_blocks are dropped:
+-- an `ask` the user declined leaves both a hook record and an error, and counting both
+-- would inflate every hook that asks. `hook_name` is the map's label rather than a command
+-- string, since the deny path records no command.
+CREATE OR REPLACE VIEW hook_denies AS
+WITH patterns(hook_name, pattern) AS (
+  VALUES
+    ('git:block-default-branch-commit', 'Cannot commit directly to %'),
+    ('user:worktree',                   'Use the worktrunk skill%'),
+    ('writing:check-tropes',            'Spaced em dashes%'),
+    ('gitlab:lint',                     'This repository''s origin remote is GitLab%'),
+    ('pull-request:validate-body',      'Fix the PR body before retrying%'),
+    ('linear:cli-create',               '`linear issue create` without%')
+)
+SELECT
+  te.host,
+  te.session_id,
+  te.project_path,
+  te.timestamp,
+  'PreToolUse'     AS hook_event,
+  p.hook_name,
+  te.tool_id       AS tool_use_id,
+  tc.tool_name     AS denied_tool,
+  tc.command       AS denied_command,
+  te.error_content AS reason
+FROM tool_errors te
+JOIN patterns p ON te.error_content LIKE p.pattern
+JOIN tool_calls tc ON tc.host = te.host AND tc.tool_id = te.tool_id
+WHERE te.error_type = 'failure'
+  AND NOT EXISTS (
+    SELECT 1 FROM hook_blocks hb
+    WHERE hb.host = te.host AND hb.tool_use_id = te.tool_id
+  );
+
 -- LSP / type-checker / linter diagnostics surfaced in-session, one row per diagnostic.
 -- The richest signal for "what errors do I keep introducing": group by code/source to
 -- find recurring failure classes, or by file to find trouble spots.
@@ -537,7 +586,9 @@ GROUP BY host, session_id, pr_number, repository, url;
 
 -- Plan-mode calls: one row per ExitPlanMode tool_use, joined with its tool_result to
 -- classify the outcome. `plan_seq` is 1-based within the session ordered by timestamp.
--- Outcome classification: 'approved' when the result contains "approved your plan";
+-- Outcome classification: 'approved' when the result contains "approved your plan" or
+-- "approved exiting plan mode" (the harness has shipped both wordings, and matching only
+-- the first drops the second into 'unknown', reading as an unapproved plan);
 -- 'handoff' when the session's last plan was rejected and no file edits follow it in
 -- that session (the user deliberately ends the session on the plan and implements
 -- from the plan file in a fresh one); 'redirected' for any other rejection (the user
@@ -585,7 +636,8 @@ SELECT
   plan_file,
   plan_chars,
   CASE
-    WHEN (result_content) LIKE '%approved your plan%'              THEN 'approved'
+    WHEN (result_content) LIKE '%approved your plan%'
+      OR (result_content) LIKE '%approved exiting plan mode%'      THEN 'approved'
     WHEN (result_content) LIKE '%want to proceed%'
       OR (result_content) LIKE '%was rejected%'                    THEN
       CASE

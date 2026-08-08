@@ -206,8 +206,9 @@ describe("errors", () => {
     for (const row of rows) {
       expect(row.error_content).toBeTruthy();
       expect(row.tool_name).toBeTruthy();
-      expect(row.session_id).toBe("tools-session");
+      expect(row.session_id).toBeTruthy();
     }
+    expect(rows.some((r) => r.session_id === "tools-session")).toBe(true);
   });
 
   it("classifies rejection and failure error types", async () => {
@@ -882,6 +883,48 @@ describe("hook-blocks query", () => {
     expect(Number(emdash?.storm_sessions)).toBe(1);
     expect(Number(emdash?.max_burst)).toBe(2);
   });
+
+  it("recovers a PreToolUse deny that left no hook record", async () => {
+    const rows = await runQuery<{
+      hook: string;
+      blocks: bigint;
+      denies: bigint;
+      recovered_denies: bigint;
+    }>(db, "hook-blocks", filterParams({ hook: null }));
+    const denied = rows.find((r) => r.hook === "git:block-default-branch-commit");
+    expect(Number(denied?.blocks)).toBe(1);
+    expect(Number(denied?.denies)).toBe(1);
+    expect(Number(denied?.recovered_denies)).toBe(1);
+  });
+
+  it("does not recount an ask the user declined as a recovered deny", async () => {
+    // A declined ask leaves both a hook record and an error carrying the same reason
+    // text. Counting both would inflate every hook that asks.
+    const rows = await runQuery<{ hook: string; recovered_denies: bigint }>(
+      db,
+      "hook-blocks",
+      filterParams({ hook: null }),
+    );
+    const emdash = rows.find((r) => r.hook.includes("check-tropes"));
+    expect(Number(emdash?.recovered_denies)).toBe(0);
+  });
+});
+
+describe("hook-origin-split query", () => {
+  it("counts a project-dir .claude/hooks script as project_local, not shared config", async () => {
+    const rows = await runQuery<{ origin: string; fires: bigint; total_s: number }>(
+      db,
+      "hook-origin-split",
+      filterParams(),
+    );
+    const local = rows.find((r) => r.origin === "project_local");
+    const shared = rows.find((r) => r.origin === "shared_config");
+    expect(Number(local?.fires)).toBeGreaterThan(0);
+    // The ruff.sh fire is the slowest hook in the fixture at 2.4s. Landing it in
+    // shared_config would put a repo's latency on the portable config's bill.
+    expect(Number(local?.total_s)).toBeGreaterThanOrEqual(2.4);
+    expect(Number(shared?.fires)).toBeGreaterThan(0);
+  });
 });
 
 describe("fields discovery query", () => {
@@ -1006,7 +1049,7 @@ describe("outcomes query", () => {
       "sessions: ongoing": 1,
       "sessions: handed-off": 1,
       "sessions: abandoned-with-edits": 2,
-      "sessions: no-artifact": 12,
+      "sessions: no-artifact": 13,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1022,7 +1065,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 16,
+      "sessions: ongoing": 17,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1330,6 +1373,53 @@ describe("attribution and skill-activity query", () => {
   });
 });
 
+describe("skill-auto-vs-explicit query", () => {
+  type Split = {
+    skill_name: string;
+    model_auto: bigint;
+    chained: bigint;
+    explicit: bigint;
+    total: bigint;
+  };
+
+  it("counts a Skill call carrying args as model routing, not an explicit invocation", async () => {
+    const rows = await runQuery<Split>(
+      db,
+      "skill-auto-vs-explicit",
+      filterParams({ min_calls: null }),
+    );
+    const peer = rows.find((r) => r.skill_name === "review:peer");
+    // Both review:peer calls pass args and neither was typed as a slash command.
+    expect(Number(peer?.model_auto)).toBe(2);
+    expect(Number(peer?.chained)).toBe(0);
+  });
+
+  it("counts a typed slash command as explicit and a skill-attributed call as chained", async () => {
+    const rows = await runQuery<Split>(
+      db,
+      "skill-auto-vs-explicit",
+      filterParams({ min_calls: null }),
+    );
+    const peer = rows.find((r) => r.skill_name === "review:peer");
+    expect(Number(peer?.explicit)).toBe(1);
+    const create = rows.find((r) => r.skill_name === "pull-request:create");
+    expect(Number(create?.model_auto)).toBe(1);
+    expect(Number(create?.chained)).toBe(1);
+    expect(Number(create?.explicit)).toBe(0);
+  });
+
+  it("keeps an unnamespaced skill from absorbing unparsed command markers", async () => {
+    const rows = await runQuery<Split>(
+      db,
+      "skill-auto-vs-explicit",
+      filterParams({ min_calls: null }),
+    );
+    const solo = rows.find((r) => r.skill_name === "solo");
+    expect(Number(solo?.explicit)).toBe(0);
+    expect(Number(solo?.total)).toBe(1);
+  });
+});
+
 describe("plan_calls view and plans query", () => {
   it("classifies a redirected plan as outcome=redirected with plan_seq=1", async () => {
     const rows = await db.query<{
@@ -1400,6 +1490,17 @@ describe("plan_calls view and plans query", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.outcome).toBe("handoff");
+  });
+
+  it("classifies the 'approved exiting plan mode' wording as outcome=approved", async () => {
+    // The harness has shipped more than one approval string. Matching only "approved
+    // your plan" dropped this one into 'unknown', which reads as a plan the user never
+    // approved. A new wording should fail here rather than silently misclassify.
+    const rows = await db.query<{ outcome: string }>(
+      "SELECT outcome FROM plan_calls WHERE session_id = 'plan-approve-variant-session'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.outcome).toBe("approved");
   });
 
   it("keeps a terminal rejection followed by file edits as outcome=redirected", async () => {
@@ -1756,9 +1857,25 @@ describe("index-health query", () => {
       min_active_days: null,
       new_days: null,
       stale_days: null,
+      deny_window_days: null,
       ...overrides,
     };
   }
+
+  it("alerts when recovered hook denies outnumber the denies hook_events recorded", async () => {
+    // A window wide enough to cover the whole fixture corpus, so the check reads the
+    // same rows regardless of when the newest fixture record is dated.
+    const rows = await runQuery<Health>(
+      db,
+      "index-health",
+      healthParams({ deny_window_days: "100000" }),
+    );
+    const deny = rows.find((r) => r.check_name === "hook-deny-invisible");
+    expect(deny?.status).toBe("alert");
+    expect(deny?.subject).toBe("2 denies recovered");
+    expect(deny?.detail).toContain("git:block-default-branch-commit (1)");
+    expect(deny?.detail).toContain("user:worktree (1)");
+  });
 
   it("flags a kind that went silent beyond its own historical gap", async () => {
     const rows = await runQuery<Health>(db, "index-health", healthParams());

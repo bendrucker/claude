@@ -8,9 +8,24 @@ The review's shape is chosen by `(model family, effort level)`. Read the active 
 | --- | --- | --- | --- | --- | --- |
 | `default` | `low` | `medium` | `high` | `xhigh` | `max` |
 | `claude-sonnet-5` | `low-sonnet5` | `medium` | `high` + finder budget | `xhigh` + finder budget | `max` + finder budget |
-| `claude-opus-4-8` | `o48-low` | `o48-med` | `o48-high` | `o48-xhigh` | `max` |
+| `claude-opus-4-8` | `inline-low` | `inline-med` | `inline-high` | `inline-xhigh` | `max` |
+| `claude-fable-5` | `inline-low` | `inline-med` | `inline-high` | `xhigh` | `max` |
 
-The `o48-*` cells run every angle **inline in this context** with no subagent fan-out and no verify pass. Only `max` reaches the full multi-agent fan-out on Opus 4.8. That is the upstream calibration, kept as-is.
+The `inline-*` cells run every angle **inline in this context** with no subagent fan-out and no verify pass. They are upstream's `o48-*` cells under a family-neutral name, since two families now select them. [references/upstream-2.1.215.md](references/upstream-2.1.215.md) maps each one back to its upstream identifier.
+
+A capable orchestrator reviews better working through the angles itself than it does splitting them across agents, so both Opus 4.8 and Fable 5 stay inline through the middle of the ladder. The families part at `xhigh`. Opus 4.8 keeps upstream's inline calibration there, unchanged. Fable 5 fans out instead, at Sonnet rates, which buys breadth without paying Fable rates per angle.
+
+## Cheap and Expensive Modes
+
+The fan-out cells come in two modes, and the difference is which model the subagents run on. `review:angle`, `review:verifier`, and `review:architect` pin no model of their own, so each spawn decides.
+
+**Cheap mode** is every fan-out cell below `max`. On Fable 5 and Opus 4.8 that means `xhigh`. Angles, verifiers, and the sweep spawn with `model: sonnet`. What these tiers buy is breadth, and breadth comes from many independent readers of the same diff. Paying the orchestrator's own rate for each of those readers buys nothing extra.
+
+**Expensive mode** is `max`, on every family. Angles, verifiers, and the sweep spawn with no model override and inherit the session model, and the architecture pass runs on top.
+
+Expensive mode exists for the relationship between reviewer and author. A reviewer below the authoring model's tier finds what a careful line-by-line reader finds. It rarely disputes the shape of the change, because seeing the shape takes the same capability that produced it. That makes `max` the level for structurally significant work authored by Opus or Fable, where the shape carries the risk. It puts the reviewer at or above the author's tier and adds a pass that reads the design.
+
+Cheap mode stays the right default. Most diffs fail on lines, and lines are what Sonnet reads well and cheaply.
 
 ## Budgets
 
@@ -18,14 +33,14 @@ The `o48-*` cells run every angle **inline in this context** with no subagent fa
 | --- | --- | --- | --- | --- | --- | --- |
 | `low` | 1 diff pass | — | none | no | <=4 | terse, hunk-only, skips test/fixture hunks |
 | `low-sonnet5` | 1 diff pass | — | none | no | floor `min(files, 4)` | same, plus a second pass if under the floor |
-| `o48-low` | 1 diff pass | — | none | no | <=8, floor `min(files, 4)` | no test-hunk skip |
+| `inline-low` | 1 diff pass | — | none | no | <=8, floor `min(files, 4)` | no test-hunk skip |
 | `medium` | 3 correctness + 3 cleanup + altitude + conventions = 8 | 6 | 1-vote, 3-state | no | <=8 | precision |
 | `high` | 8 | 6 | 1-vote, recall-biased | no | <=10 | recall |
 | `xhigh` | 5 correctness + 5 cleanup/altitude/conventions = 10 | 8 | 1-vote, single non-REFUTED carries | yes | <=15 | recall |
-| `max` | 10 | 8 | same as `xhigh` | yes | <=15 | recall, maximum |
-| `o48-med` | 8, inline | 6 | dedup only | no | <=8, floor 4 | recall |
-| `o48-high` | 8, inline | 6 | dedup only | no | <=10, floor 5 | recall |
-| `o48-xhigh` | 10, inline | 8 | dedup only | yes | <=15, floor 7 | recall |
+| `max` | 10 + architecture pass | 8 | same as `xhigh` | yes | <=15 | recall, maximum |
+| `inline-med` | 8, inline | 6 | dedup only | no | <=8, floor 4 | recall |
+| `inline-high` | 8, inline | 6 | dedup only | no | <=10, floor 5 | recall |
+| `inline-xhigh` | 10, inline | 8 | dedup only | yes | <=15, floor 7 | recall |
 
 "8 angles" means Angles A, B, C plus Reuse, Simplification, Efficiency, Altitude, Conventions. "10 angles" adds Angles D and E.
 
@@ -39,31 +54,31 @@ Emit the framing for the selected cell before Phase 1. It sets the precision/rec
 
 > You are reviewing for **precision** at medium effort: every finding you surface should be one a maintainer would act on.
 
-### `high`, `o48-med`, `o48-high`
+### `high`, `inline-med`, `inline-high`
 
 > You are reviewing for **recall** at high effort: catch every real bug a careful reviewer would catch in one sitting. At this level, catching real bugs matters more than avoiding false positives. Err on the side of surfacing.
 
-`o48-med` deliberately uses recall framing rather than the precision framing the default-family `medium` uses.
+`inline-med` deliberately uses recall framing rather than the precision framing the default-family `medium` uses.
 
-### `xhigh`, `o48-xhigh`
+### `xhigh`, `inline-xhigh`
 
 > You are reviewing for **recall** at extra-high effort: catch every real bug. At this level, catching real bugs matters more than avoiding false positives — a missed bug ships. Err on the side of surfacing.
 
 ### `max`
 
-Same as `xhigh` with "maximum" in place of "extra-high". The fan-out is identical. Only the reasoning effort differs.
+Same as `xhigh` with "maximum" in place of "extra-high". The angle set is identical. What `max` adds is the expensive spawn model, the architecture pass, and the reasoning effort.
 
 ## Low Cells
 
 The `low` cells skip the phase structure entirely: one diff read, then findings.
 
-Read the unified diff in one tool call. `low` and `low-sonnet5` skip test/fixture hunks (`test/`, `spec/`, `__tests__/`, `*_test.*`, `*.test.*`, `fixtures/`, `testdata/`), which are not reviewed at those levels. `o48-low` reviews them. No subagents, no full-file reads.
+Read the unified diff in one tool call. `low` and `low-sonnet5` skip test/fixture hunks (`test/`, `spec/`, `__tests__/`, `*_test.*`, `*.test.*`, `fixtures/`, `testdata/`), which are not reviewed at those levels. `inline-low` reviews them. No subagents, no full-file reads.
 
 Flag runtime-correctness bugs visible from the hunk alone: inverted/wrong condition, off-by-one, null/undefined deref where adjacent lines show the value can be absent, removed guard, falsy-zero check, missing `await`, wrong-variable copy-paste, error swallowed in a catch that should propagate. Also flag — still from the hunk alone — new code that duplicates an existing helper visible in the diff context, and dead code the diff leaves behind.
 
 Do **not** flag style, naming, perf, missing tests, or anything outside the hunk.
 
-Output one line per finding, most-severe first: `path/to/file.ext:123 — what's wrong and the concrete failure`. `low` outputs at most 4 and emits exactly `(none)` when nothing qualifies. `low-sonnet5` targets `min(files_changed, 4)` and does one more pass over the largest changed file and any removed blocks before settling for fewer. `o48-low` outputs at most 8, targeting at least `min(files_changed, 4)` and widening to other hunks before stopping.
+Output one line per finding, most-severe first: `path/to/file.ext:123 — what's wrong and the concrete failure`. `low` outputs at most 4 and emits exactly `(none)` when nothing qualifies. `low-sonnet5` targets `min(files_changed, 4)` and does one more pass over the largest changed file and any removed blocks before settling for fewer. `inline-low` outputs at most 8, targeting at least `min(files_changed, 4)` and widening to other hunks before stopping.
 
 `low` never reports through `ReportFindings`. It prints its findings as text.
 
@@ -79,6 +94,6 @@ Spawn about that many finder subagents. The committed-range count is a floor: un
 
 No other model family gets this hint.
 
-## Floors on the Opus 4.8 Cells
+## Floors on the Inline Cells
 
-The `o48-med`, `o48-high`, and `o48-xhigh` cells carry an output floor of `floor(cap / 2)`: target at least that many findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+The `inline-med`, `inline-high`, and `inline-xhigh` cells carry an output floor of `floor(cap / 2)`: target at least that many findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.

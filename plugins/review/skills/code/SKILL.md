@@ -60,11 +60,24 @@ Otherwise run the selected angles from [angles.md](angles.md). Each surfaces up 
 
 #### Fan-out cells
 
-`medium`, `high`, `xhigh`, and `max` on the default and Sonnet families, plus `max` on Opus 4.8. Run each angle as an independent `Agent`. Invoking this skill is the request for that fan-out, so run it whenever `Agent` is in the tool set. Give every agent the scope block, its single angle text, and the cleanup-precedence block if it carries a cleanup lens.
+`medium`, `high`, `xhigh`, and `max` on the default and Sonnet families, `xhigh` and `max` on Fable 5, plus `max` on Opus 4.8. Run each angle as an independent `Agent` with `subagent_type: review:angle`. Invoking this skill is the request for that fan-out, so run it whenever `Agent` is in the tool set. Give every agent the scope block, its single angle text, its candidate cap, and the cleanup-precedence block if it carries a cleanup lens.
+
+The spawn model is a property of the tier, not of the agent. `review:angle` and `review:verifier` pin no model, so they take whatever the spawn passes:
+
+- **Cheap mode** covers every fan-out cell below `max`. Pass `model: sonnet` on every angle, verifier, and sweep spawn. Breadth costs Sonnet rates whatever model is orchestrating.
+- **Expensive mode** is `max`. Pass no model at all, so each agent inherits the session model and reviews at the tier the code was authored at.
+
+That rule governs the spawns in Phase 2 and Phase 3 too.
+
+#### Architecture pass
+
+Only at `max`. Alongside the angle fan-out, run one `Agent` with `subagent_type: review:architect` and no model override. Give it the scope block and the changed-file list. It reads the affected modules whole and judges the change as a design: interface shape, cross-file coherence, layering, naming, whether the change follows the codebase's grain, and what it costs the next change.
+
+It returns two lists. Its line-anchored defects join the candidate pool and go through Phase 2 with everything else. Its judgments have no line to check, so they bypass verify and carry through to the report as judgments.
 
 #### Inline cells
 
-`o48-med`, `o48-high`, and `o48-xhigh`. Work through the angles in sequence yourself, in this context. Do not spawn subagents for them.
+`inline-med`, `inline-high`, and `inline-xhigh`. Work through the angles in sequence yourself, in this context. Do not spawn subagents for them.
 
 #### No `Agent` tool
 
@@ -80,7 +93,9 @@ Inline cells stop here: dedup only, no verify, no re-judging. Same defect, same 
 
 Degraded cells with no `Agent` tool dedup, then re-check each remaining candidate against the diff in this context.
 
-Fan-out cells verify: for each remaining candidate, run one verifier `Agent`. Give it the scope block, the relevant files, and the candidate. Group candidates that share a location into one verifier returning one verdict per candidate, each judged independently on its own claim. A candidate the verifier renders no verdict on is dropped, never reported as an unverified PLAUSIBLE.
+Fan-out cells verify: for each remaining candidate, run one `Agent` with `subagent_type: review:verifier`, under the tier's spawn model. Give it the scope block, the relevant files, the candidate, and the ladder below. Group candidates that share a location into one verifier returning one verdict per candidate, each judged independently on its own claim. A candidate the verifier renders no verdict on is dropped, never reported as an unverified PLAUSIBLE.
+
+Architecture-pass judgments carry no line to check against, so they skip this phase entirely. Only the architecture pass's line-anchored defects go to a verifier.
 
 Each verdict is exactly one of:
 
@@ -100,9 +115,9 @@ At `xhigh` and `max`, a single non-REFUTED vote carries the finding. Do not drop
 
 ## Phase 3 — Sweep
 
-Only at `xhigh`, `max`, and `o48-xhigh`.
+Only at `xhigh`, `max`, and `inline-xhigh`.
 
-Take one more pass as a fresh reviewer holding the verified list. On fan-out cells this is one more finder `Agent`. On inline and degraded cells it is one more pass in this context.
+Take one more pass as a fresh reviewer holding the verified list. On fan-out cells this is one more `review:angle` `Agent` under the tier's spawn model, carrying the sweep gap focus as its angle. On inline and degraded cells it is one more pass in this context.
 
 Re-read the diff and the enclosing functions looking ONLY for defects not already listed. Do not re-derive or re-confirm anything already there. The job is gaps. Focus on what the first pass tends to miss (see the sweep gap focus in [angles.md](angles.md)).
 
@@ -112,7 +127,9 @@ Surface up to 8 additional candidates, each naming a defect not already on the l
 
 Merge findings that share a root cause, keeping the best-described one as the primary and noting the others as `[same root cause also at: <loc>, <loc>]`. When a merged member is CONFIRMED, the primary carries CONFIRMED.
 
-Rank most-severe first. Correctness bugs always outrank cleanup, altitude, and conventions findings. Within a severity group, CONFIRMED outranks PLAUSIBLE.
+Rank most-severe first. Correctness bugs always outrank cleanup, altitude, conventions, and architecture findings. Within a severity group, CONFIRMED outranks PLAUSIBLE.
+
+Architecture judgments rank with altitude. Each states the shape it objects to and the cost it imposes on the next change, so a reader can weigh it without a failure scenario.
 
 Cap at the cell's limit. Beyond the cap, omit the least severe. Nothing gets silently dropped while there is room under the cap.
 
@@ -126,8 +143,10 @@ Each entry carries:
 
 - `file`, `line`, `summary`, `failure_scenario`
 - `short_summary` — the claim compressed to 60 characters or fewer, no rationale or consequence clause
-- `category` — a short kebab-case slug for the angle that produced it: `correctness`, `simplification`, `efficiency`, `reuse`, `altitude`, `conventions`, or something more specific like `test-coverage` when it fits better
+- `category` — a short kebab-case slug for the angle that produced it: `correctness`, `simplification`, `efficiency`, `reuse`, `altitude`, `conventions`, `architecture`, or something more specific like `test-coverage` when it fits better
 - `verdict` — only when a verify pass produced one. Inline cells run no verify, so they omit it.
+
+An architecture judgment reports under `category: architecture` with no `verdict`, and its `failure_scenario` states the maintenance cost instead of a runtime failure. Open that text with `Judgment:` so a reader can tell a design call from a defect at a glance.
 
 If nothing survives, call it with an empty array.
 
@@ -144,6 +163,8 @@ If nothing survives, say so in one line.
 After producing the findings list, apply them to the working tree instead of stopping at the report. Fix each one directly: correctness bugs and reuse/simplification/efficiency cleanups alike.
 
 Skip any finding whose fix would change intended behavior, require changes well outside the reviewed diff, or that you judge to be a false positive. Note the skip rather than arguing with it.
+
+Architecture judgments are always reported and never applied. Reshaping a design is the author's call, so mark each one `skipped`.
 
 With `ReportFindings`, call it again with the same findings, each carrying an `outcome`: `fixed`, `no_change_needed` (the finding was wrong or already handled), or `skipped` (real but not applied). Do not repeat the findings as text. After the call, give one line per skipped finding saying why. Without it, finish with a brief summary of what was fixed and what was skipped.
 

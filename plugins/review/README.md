@@ -13,6 +13,14 @@ Code review workflows for Claude Code.
 - **`follow-up`**: Follow up on a PR/MR you reviewed: check if your comments were addressed, find silent resolves, decide whether to re-approve
 - **`inbox`**: Dispatch inbound PR/MR reviews as background sessions that collect in `claude agents` (GitHub and GitLab)
 
+### Agents
+
+- **`angle`**: Runs one finder angle over a diff and returns candidates. The unit of `code`'s find fan-out and its sweep pass.
+- **`verifier`**: Judges candidates against the code as CONFIRMED, PLAUSIBLE, or REFUTED. The unit of `code`'s verify phase.
+- **`architect`**: Reviews a change as a design rather than a diff. Runs once at `max` effort.
+
+None pins a model. `code` picks one per effort tier: Sonnet below `max`, the session model at `max`.
+
 ## Testing
 
 ```sh

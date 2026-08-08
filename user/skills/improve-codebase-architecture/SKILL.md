@@ -73,6 +73,6 @@ Do NOT propose interfaces yet. After the file is written, ask the user: "Which o
 
 ### 3. Refine the chosen candidate
 
-Once the user picks a candidate, walk the decision tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive. Load `interview:plan` for a structured interview.
+Once the user picks a candidate, walk the decision tree with them via `AskUserQuestion` — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
 
 If they want to explore alternative interfaces for the deepened module, see [INTERFACE-DESIGN.md](INTERFACE-DESIGN.md).

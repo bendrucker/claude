@@ -36,7 +36,7 @@ Scan for:
 
 ### Planning Interview
 
-Invoke `interview:plan` to clarify requirements. Guide the interview toward:
+Interview the user through `AskUserQuestion`, batching up to 4 questions per call by topic and refining later batches based on prior answers. Guide the interview toward:
 
 - Requirements clarification
 - Scope boundaries (what's in, what's out)

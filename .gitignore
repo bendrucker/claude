@@ -10,8 +10,6 @@ node_modules/
 
 # Generated coverage output (bun test --coverage)
 /coverage/
-# The coverage tooling lives in directories named `coverage`. Re-include them
+# The coverage tooling lives in a directory named `coverage`. Re-include it
 # against a global `coverage` ignore so the source stays tracked.
 !scripts/coverage/
-!.claude/hooks/coverage/
-!.claude/skills/coverage/

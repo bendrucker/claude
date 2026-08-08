@@ -22,6 +22,8 @@ The [`user/`](user/) directory contains user-level Claude Code configuration tha
 
 Every customization (skill, hook, wordlist entry, agent, rule, permission) costs tokens on every session that touches it. Adding is cheap, accumulation is silent, and removal has no natural trigger. Before adding one, define how it gets removed: what evidence shows it's earning its cost, what evidence shows it isn't, and where that evidence surfaces. Detectors of model behavior need particular care: models drift and rules lose value, so pair detection with a path to evolve or retire.
 
+An invoked skill's body is re-injected in full at every compaction, so `SKILL.md` size is a recurring per-compaction cost rather than a one-time load. Author bodies under roughly 4k tokens and keep the detail in `references/`.
+
 A customization must also stay harmonious with Claude Code's native behavior. When the harness changes a default or an application-level behavior, assume the change encodes aggregate usage data and evaluation knowledge you do not have, and default to accommodating that direction rather than overriding it. So before adding a customization that touches native behavior, apply the harmony test: ask whether it works with the harness's intent or against it, and prefer accommodation. Add a customization that pushes back on a native behavior only as a light-touch experiment, carrying explicit forward evaluation criteria and a removal trigger. When Claude Code v2.1.198 made the built-in `Explore` agent inherit the conversation model (capped at Opus) instead of running on Haiku, hard-pinning it back to Haiku would contravene that intent, so any Explore steering stays a soft default and gets removed if it proves inert after a couple of weeks.
 
 ## Rules

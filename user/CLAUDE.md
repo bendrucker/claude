@@ -11,7 +11,7 @@
 - Prefer meaningful anchor text over raw URLs.
 - Use bullet points for lists, checklists if I ask for tasks.
 - Use code comments ONLY to clarify code that is not self-explanatory to OTHER readers. If you need to explain the code, do so in a separate message before editing.
-- Load the `writing:writing` skill before writing any long-form prose for others (PR comments, review feedback, documents, issue descriptions, Slack messages). The skill enforces tone and style rules that must be followed.
+- Load the `writing:writing` skill before the first long-form prose you write for others in a context (PR comments, review feedback, documents, issue descriptions, Slack messages). Its tone and style rules must be followed, and they stay in effect for the rest of the session, so one load covers every later piece.
 
 ## Organization
 
@@ -30,6 +30,8 @@ Prefer accommodating Claude Code's native defaults over overriding them, since a
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.
 - A skill that instructs a subagent fan-out or a background dispatch already carries the user's authorization for `Agent`. Run the dispatch as the skill writes it, and degrade to an inline pass only when `Agent` is absent from the tool set, saying in the output that it ran inline.
 - For questions about Claude Code features or usage, use the `Agent` tool with `subagent_type='claude-code-guide'` to consult official documentation.
+- A scoped read-only lookup dispatched via `Agent` should carry an explicit cheap `model` (`haiku` or `sonnet`). Subagents otherwise inherit this session's model, so a lookup bills at orchestrator rates.
+- A cross-model or GPT review runs through `herdr`, dispatched into the `copilot-gpt` worktree in the claude workspace, which is the path to GPT and Codex reviews. "Consult fable" asks for the same adversarial second opinion from a Fable session.
 - Prefer the `agent-browser` skill over `WebFetch`/`WebSearch` when a task needs a real browser — interacting with a page, screenshots, scraping JS-rendered content, or web-app QA/dogfooding. It loads the CLI's version-matched `skills get` workflows. Plain `WebFetch` stays fine for static page fetches.
 - Finish a branch with `/ship`: it runs the warranted review passes, opens the PR, babysits CI to green, triages bot comments, and refreshes the body. Don't hand-chain `EnterWorktree` + `pull-request:create` for a branch finish.
 - `pull-request:create` remains the skill for opening a PR directly (it is what `/ship` calls). If it's unavailable, create the PR with an empty body.
@@ -67,6 +69,8 @@ claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 - For commit messages, use multiple `-m` flags for a simple subject and body. Each `-m` is a separate paragraph. For complex messages, pass the message through a heredoc.
 
 ## Worktrees
+
+Any change intended to become its own PR starts in a worktree, created with `worktrunk:wt-switch-create`. Stay put only when the session is already on a topic branch inside one.
 
 I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 

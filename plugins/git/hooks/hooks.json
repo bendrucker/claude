@@ -1,5 +1,5 @@
 {
-  "description": "Blocks direct commits to the default branch",
+  "description": "Blocks direct commits to the default branch and recovers SSH-agent auth failures over HTTPS",
   "hooks": {
     "PreToolUse": [
       {
@@ -9,6 +9,18 @@
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/block-default-branch-commit.ts\"",
             "if": "Bash(git commit:*)"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/https-fallback.ts\"",
+            "if": "Bash(git *)"
           }
         ]
       }

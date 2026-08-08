@@ -85,6 +85,9 @@ jobs:
       - name: Check hook quoting
         run: bun scripts/check-hook-quoting.ts
 
+      - name: Check hook command paths
+        run: bun scripts/check-hook-paths.ts
+
       - name: Check skill hook path variables
         run: bun scripts/check-skill-hook-vars.ts
 

@@ -1,17 +1,10 @@
 ---
 name: pull-request:follow-up
 description: >
-  Follow up as the author on review feedback left on your own PR/MR: check which reviewer
-  comments still need a response, investigate how threads were resolved (including silent
-  resolves), and draft replies. With --auto, autonomously triage AI-reviewer (bot) threads and
-  loop until the reviewer is satisfied, clearing a bot review hands-off. With --local, run the
-  same bot loop pre-push through the reviewer's CLI (Greptile, CodeRabbit) against unmerged
-  commits, before any PR exists. Use when reviewers commented on your PR and you need to respond
-  or satisfy them. Use --local without being asked when you are about to push or open a PR in a
-  repo with an available bot and the diff warrants a metered review. Triggers:
-  "respond to review comments on my PR", "address reviewer feedback", "make the bot reviewer
-  pass", "greptile review", "coderabbit review", "run the review bot locally", "bot review
-  before pushing".
+  Follow up as the author on review feedback on your PR/MR: triage and draft replies, catch
+  silent resolves, and drive bot reviewers to a passing score. Triggers: "address reviewer
+  feedback", "make the bot reviewer pass", "greptile/coderabbit review", "bot review before
+  pushing".
 argument-hint: "[pr-url] [--auto] [--include-human-nits] [--local [base]]"
 allowed-tools:
   - Bash(git:*)
@@ -32,9 +25,13 @@ Follow up on review feedback for: $ARGUMENTS
 
 Parse the URL and flags from `$ARGUMENTS`. GitHub is primary: work through `gh`, `mcp__github`, and `github:*` skills directly. Delegate all GitLab behavior to `gitlab:merge-request` (no `glab` calls).
 
-- `--auto`: autonomously triage **bot** threads, looping until the reviewer is satisfied (see [The Autonomous Loop](#the-autonomous-loop)).
+## Arguments
+
+- `--auto`: autonomously triage **bot** threads, looping until the acceptance bar is met (see [The Autonomous Loop](#the-autonomous-loop)). Human threads stay gated.
 - `--include-human-nits`: under `--auto`, also act on **human** threads, but only trivial high-confidence changes (typos, renames, one-liners). Off by default.
 - `--local [base]`: run the bot loop pre-push through the reviewer's CLI instead of PR threads, against the branch's unmerged commits (see [Local Mode](#local-mode-pre-push)). The optional base overrides what the review runs against. No PR is involved, so `pr-url` and the other flags don't apply.
+
+With no flags, run the gated default.
 
 ## Default Workflow (Gated)
 
@@ -59,42 +56,31 @@ Triage each bot thread:
 - **Noise / false positive** → reply with a one-line reason and resolve, or thumbs down a clearly wrong bot comment
 - **Unsure** → collect to escalate; don't guess
 
-Then run each round:
+Each round: apply the batched fixes and push once, reply-and-resolve the noise, escalate the unsure threads and pause that subset only, then get CI green and the bot onto the green SHA. [auto.md](auto.md) has the round mechanics: the babysit handoff, the wake cadence while a re-review lands, and repos that review only on request.
 
-1. Apply batched fixes, commit, push **once** (one new SHA to re-review).
-2. Reply-and-resolve the noise threads (`github:pr-comments` or `gitlab:merge-request` do both in one call).
-3. Escalate the unsure threads and pause **that subset only**; actionable pushes proceed.
-4. Hand CI back to `pull-request:babysit` (it owns CI, stops at green). babysit's Monitor watcher re-invokes you on CI events, so don't wrap that wait in `ScheduleWakeup`; the harness wakes you.
-5. Get the bot onto the green SHA. Where the repo re-reviews pushes automatically, wait for it. No Monitor watcher tracks this, so self-pace with `ScheduleWakeup`: arm a tick (`prompt` set to this same `/pull-request:follow-up` invocation so the wake re-enters the loop) at ~270s for an idle wait before re-triggering, or 180-240s when a fast re-review is expected. Never 300s (the cache-expiry boundary). On wake, re-fetch bot threads and evaluate the loop-exit conditions below: if the reviewer is satisfied or another exit fires, stop; otherwise, if no re-review landed, post one top-level `@<bot>` re-trigger, then re-arm the next tick.
+### Acceptance Bar
 
-   On a repo that reviews only on request (Greptile with `triggerOnUpdates: false`, for one), that wait is dead time. No re-review is coming until you ask, so post the `@<bot>` re-trigger right after the green push and arm the tick only to collect the result. `greptile config --json` reports the live setting.
+The loop ends when the reviewer's own score on the current HEAD is at its maximum (Greptile `5/5`, CodeRabbit `Actionable comments posted: 0`), or when every comment still standing below that maximum carries a written reply giving the reason it was declined. Read the score off the summary comment on HEAD ([reviewers.md](reviewers.md)): a score from an earlier SHA is stale, and an absent summary where a review is expected means the review is still running, so keep waiting for it.
 
-Loop until: the reviewer's satisfaction signal hits on HEAD ([reviewers.md](reviewers.md)); no new bot threads for two rounds after a green push; max 4 rounds (oscillation guard); the idle timeout outlasts the re-trigger; or the PR closes/merges.
+A score short of the maximum with a silently skipped comment behind it does not clear the bar. Fix the comment or write the reason.
 
-When a bot review is **expected** ([reviewers.md](reviewers.md) defines the signals) but no summary has landed on HEAD, an empty thread list means pending, not satisfied: wait through the same wake and re-trigger for the first summary, bounded by the idle timeout. With no bot reviewer expected, an empty result is nothing to do: stop.
+Guards stop a loop that can't converge: no new bot threads for two rounds after a green push, four rounds total, an idle timeout that outlasts the re-trigger, or the PR closing or merging. A guard ends the run without clearing the bar, so report the score reached and each comment left standing without a reason.
 
-babysit and follow-up compose both directions: `babysit --reviews` hands off to this loop after its first green, and this loop calls babysit between rounds. The entry point is the outer one. "Wait for a bot review before merging" is exactly this pairing (`babysit --reviews --merge`, or this loop then merge).
-
-On stop, report fixes, replies/resolves, and escalations. If the reviewer is satisfied, suggest the next action (human review, merge train, auto-merge) but don't perform it unless asked. `pull-request:babysit --merge` drives to merged.
+On stop, report fixes, replies/resolves, and escalations. Once the bar is clear, suggest the next action (human review, merge train, auto-merge) but don't perform it unless asked. `pull-request:babysit --merge` drives to merged.
 
 ## Local Mode (Pre-Push)
 
-With `--local`, run the same reviewer against the branch's unmerged commits before anything is pushed. The criteria don't change with the channel. Findings arrive as CLI output instead of PR threads, and the exit is the same satisfaction signal in its local form ([local.md](local.md) maps it per provider). Post-PR thread mechanics (replies, resolves, re-triggers) don't exist here: a disagreement is surfaced in the report instead of a resolved thread.
+With `--local`, run the same reviewer against the branch's unmerged commits before anything is pushed. Criteria and acceptance bar don't change with the channel: findings arrive as CLI output instead of PR threads, and the score in its local form ([local.md](local.md)) is still the exit. A declined finding goes in the report with its reason instead of a resolved thread.
 
-Fire this mode unprompted when you are about to push or open a PR in a repo with an available bot **and** the diff warrants a review. Reviews are metered, and a local pass plus a hosted one costs two credits for one change. A diff earns one review through one channel. Spend it when the diff carries risk (auth, permissions, sandbox config, secret handling, network egress), adds a runtime surface, or runs past roughly 200 changed lines or 8 files excluding tests, docs, and lockfiles. Prose, dependency bumps, and reverts never qualify, and a config diff qualifies only through the risk surfaces just named. A `ship` skill with its own Bot Review Gate overrides these defaults, and tuning belongs there first. An explicit `--local` request overrides everything.
-
-`/ship` runs this as a gated pass and `pull-request:create` runs it before pushing, so skip it when either already ran on this branch.
+Fire this mode unprompted when you are about to push or open a PR in a repo with an available bot and the diff warrants a metered review ([local.md](local.md) sets that gate). `/ship` runs this as a gated pass and `pull-request:create` runs it before pushing, so skip it when either already ran on this branch.
 
 - Local detection: !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/detect-bot.ts`
 
-The line above is the injected fast path (repo config, CLI presence, and any live cooldown, no turn spent). Resolve it to a provider per [local.md](local.md), which also covers the hosted signals for repos with no config file. A provider reported as paused is out: report the pause and stop. Then loop:
+The line above is the injected fast path (repo config, CLI presence, and any live cooldown, no turn spent). Resolve it to a provider per [local.md](local.md), which also covers the CLI mechanics and the hosted signals for repos with no config file. A provider reported as paused is out: report the pause and stop.
 
-1. Run the review per [local.md](local.md): backgrounded, with the 30-second liveness backstop. Summarize findings by severity, each with a `file:line` reference.
-2. Triage with the same partition as `--auto`: actionable → fix; noise or disagreement → surface it with your reasoning rather than silently skipping; unsure → escalate.
-3. Commit the fixes and re-run. Repeat until the satisfaction signal hits or I stop.
-4. Hand off: offer next steps (push, PR, `/ship`) without taking them.
+Then loop: run the review per [local.md](local.md), summarize findings by severity with a `file:line` reference each, triage with the same partition as `--auto`, commit the fixes, and re-run until the bar is clear or I stop. Surface a disagreement with your reasoning rather than skipping it silently. Finish by offering next steps (push, PR, `/ship`) without taking them.
 
-Once a PR exists, triage the hosted bot's comments through the normal flow above.
+Once a PR exists, triage the hosted bot's comments through the flow above.
 
 ## Guardrails
 

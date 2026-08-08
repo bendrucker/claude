@@ -1,6 +1,12 @@
 # Local Review CLI
 
-Mechanics for running a hosted reviewer's CLI locally in [Local Mode](SKILL.md#local-mode-pre-push). Triage criteria and the loop live in SKILL.md; satisfaction signals live in [reviewers.md](reviewers.md). This file is only the channel: how to detect the provider and drive its CLI.
+Mechanics for running a hosted reviewer's CLI locally in [Local Mode](SKILL.md#local-mode-pre-push). Triage criteria and the [acceptance bar](SKILL.md#acceptance-bar) live in SKILL.md; per-reviewer scores live in [reviewers.md](reviewers.md). This file is the channel: when a local review is worth its credit, how to detect the provider, and how to drive its CLI.
+
+## When the Diff Warrants a Review
+
+Reviews are metered, and a local pass plus a hosted one costs two credits for one change. A diff earns one review through one channel. Spend it when the diff carries risk (auth, permissions, sandbox config, secret handling, network egress), adds a runtime surface, or runs past roughly 200 changed lines or 8 files excluding tests, docs, and lockfiles. Prose, dependency bumps, and reverts never qualify, and a config diff qualifies only through the risk surfaces just named.
+
+A `ship` skill with its own Bot Review Gate overrides these defaults, and tuning belongs there first. An explicit `--local` request overrides everything.
 
 ## Provider Detection
 
@@ -45,7 +51,7 @@ Preflight: confirm you are in a git repo. If the CLI is missing, offer to instal
 
 Run `greptile review --json` backgrounded, adding `-b <base>` only when a base was given. The base flag is `-b`/`--branch`. Absent a base, the CLI reviews against the repository's default branch. Fall back to `--agent` (plain-text output for agents) if `--json` fails. For an interrupted run, `greptile review --resume` continues it and `greptile review status` reports the most recent review. For other flags, check `greptile review --help`.
 
-The `--json` output carries `comments` (each with file, line, severity) plus `confidence` and `summary`. The satisfaction signal is the local form of the hosted one in reviewers.md: zero comments at top confidence.
+The `--json` output carries `comments` (each with file, line, severity) plus `confidence` and `summary`. The acceptance bar is the local form of the hosted one in [reviewers.md](reviewers.md): `confidence` at its maximum with no comments left, or a written reason in the report for each comment you declined.
 
 ## CodeRabbit
 
@@ -53,4 +59,4 @@ Preflight: confirm you are in a git repo. If the CLI is missing, offer to instal
 
 Run `coderabbit review --agent --light` backgrounded, adding `--base <base>` only when a base was given. `--light` trades depth for turnaround, which is the point of the local pass. Absent a base, the CLI reviews against a resolved default base and errors asking for `--base` when it can't find one. Fall back to `--plain` (human-readable output) if the `--agent` output can't be parsed; `coderabbit review findings` re-prints the last local review without re-running. For other flags, check `coderabbit review --help`.
 
-`--agent` emits newline-delimited JSON events. Parse the `finding` events (`severity` = `critical`|`warning`|`info`, `fileName`, `codegenInstructions`) and the terminal `complete` event (`findings` count, `reviewedFiles`). The satisfaction signal is the local form of the hosted one in reviewers.md: a terminal `complete` event with no critical or warning `finding` events. Info-level findings are noise, the local form of the hosted nitpick/LGTM notes, so they don't block satisfaction (a `complete` with `findings: 0` is the clean case, but info-only findings still count as satisfied).
+`--agent` emits newline-delimited JSON events. Parse the `finding` events (`severity` = `critical`|`warning`|`info`, `fileName`, `codegenInstructions`) and the terminal `complete` event (`findings` count, `reviewedFiles`). The acceptance bar is the local form of the hosted one in [reviewers.md](reviewers.md): a terminal `complete` event with no critical or warning `finding` events, or a written reason in the report for each one you declined. Info-level findings are noise, the local form of the hosted nitpick/LGTM notes, so they don't hold the bar (a `complete` with `findings: 0` is the clean case, and info-only findings clear it too).

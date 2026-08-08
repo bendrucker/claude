@@ -45,6 +45,7 @@ const PLACEHOLDER = String.fromCharCode(0xe000);
 
 export interface Heading {
   children: PhrasingContent[];
+  depth: number;
   text: string;
 }
 
@@ -124,6 +125,7 @@ function caseWord(original: string, cased: string): string {
 
 interface ParsedHeading {
   children: PhrasingContent[];
+  depth: number;
   combined: string;
   codeSpans: string[];
 }
@@ -133,14 +135,15 @@ function parseHeadings(body: string): ParsedHeading[] {
   const headings: ParsedHeading[] = [];
   visit(tree, "heading", (node: MdastHeading) => {
     const { combined, codeSpans } = reconstruct(node.children);
-    headings.push({ children: node.children, combined, codeSpans });
+    headings.push({ children: node.children, depth: node.depth, combined, codeSpans });
   });
   return headings;
 }
 
 export function extractHeadings(body: string): Heading[] {
-  return parseHeadings(body).map(({ children, combined, codeSpans }) => ({
+  return parseHeadings(body).map(({ children, depth, combined, codeSpans }) => ({
     children,
+    depth,
     text: restore(combined.trim(), codeSpans),
   }));
 }

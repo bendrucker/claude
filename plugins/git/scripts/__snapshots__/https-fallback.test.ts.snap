@@ -1,0 +1,40 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`rewriteCommand bare pull 1`] = `"git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' pull"`;
+
+exports[`rewriteCommand fetch with remote 1`] = `"git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' fetch origin"`;
+
+exports[`rewriteCommand push with upstream 1`] = `"git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' push -u origin HEAD"`;
+
+exports[`rewriteCommand clone over ssh 1`] = `"git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' clone git@github.com:owner/repo.git"`;
+
+exports[`rewriteCommand -C prefix preserved 1`] = `"git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' -C /repo fetch --all"`;
+
+exports[`rewriteCommand chained after cd 1`] = `"cd /repo && git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' push origin main"`;
+
+exports[`formatContext names the retry command and forbids mutating remotes 1`] = `
+"The SSH agent refused to sign, so this git operation could not authenticate over SSH.
+Retry the exact same operation over HTTPS, which authenticates through gh's credential helper:
+
+git -c foo=bar fetch origin
+
+The url.insteadOf rewrite keeps the remote name and refspecs, so remote-tracking refs update as they would have over SSH. Do not change the repository's configured remote URLs."
+`;
+
+exports[`processInput suggests the HTTPS retry for a Secretive refusal on a GitHub SSH clone 1`] = `
+{
+  "hookSpecificOutput": {
+    "additionalContext": 
+"The SSH agent refused to sign, so this git operation could not authenticate over SSH.
+Retry the exact same operation over HTTPS, which authenticates through gh's credential helper:
+
+git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' clone git@github.com:owner/repo.git
+
+The url.insteadOf rewrite keeps the remote name and refspecs, so remote-tracking refs update as they would have over SSH. Do not change the repository's configured remote URLs."
+,
+    "hookEventName": "PostToolUseFailure",
+  },
+}
+`;
+
+exports[`rewriteCommand targets the network op, not an earlier git 1`] = `"git status && git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' push origin main"`;

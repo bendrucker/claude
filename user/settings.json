@@ -216,6 +216,15 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ~/.claude/hooks/sandbox-discipline"
+          }
+        ]
+      },
+      {
         "matcher": "WebFetch",
         "hooks": [
           {

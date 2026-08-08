@@ -29,8 +29,8 @@ test.each<{ name: string; path: string; frontmatterName?: string; expected: stri
   { name: "user skill carries no namespace", path: "user/skills/ship/SKILL.md", expected: "ship" },
   {
     name: "project skill carries no namespace",
-    path: ".claude/skills/coverage/SKILL.md",
-    expected: "coverage",
+    path: ".claude/skills/cleye/SKILL.md",
+    expected: "cleye",
   },
 ])("$name", ({ path, frontmatterName, expected }) => {
   expect(skillName(path, frontmatterName)).toBe(expected);

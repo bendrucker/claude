@@ -27,7 +27,9 @@
       "$defaults",
       "Scratch Cleanup: deleting or overwriting files under a repository's `tmp/` directory, or under this session's own scratchpad directory beneath `/tmp/claude-*/`, is routine. Both are disposable by convention, so the usual protection for files that pre-date the session does not apply within them. This does not extend to `/tmp`, `/var/tmp`, or `$TMPDIR` as a whole, which other sessions and processes share: a wildcard or age-filtered sweep of those stays blocked.",
       "Worktree Removal: removing a git worktree the session created, through `wt remove` or `git worktree remove`, is routine cleanup rather than destruction of work. A worktree the session did not create may hold another session's uncommitted branch and is not covered. Neither is any removal that forces past a dirty tree (`wt remove --force`, `wt sync --prune --force`, `-F`), whatever created the worktree: the force flag exists to discard uncommitted work.",
-      "Stack Restack: `wt sync --push` rebases the session's own stack of dependent topic branches onto their parents and force-pushes each one, which is how a stack stays consistent. This covers only branches the Unowned Force Push rule would treat as owned. It does not cover `wt sync --all`, which reaches every worktree in the repository including branches another session or machine is working on."
+      "Stack Restack: `wt sync --push` rebases the session's own stack of dependent topic branches onto their parents and force-pushes each one, which is how a stack stays consistent. This covers only branches the Unowned Force Push rule would treat as owned. It does not cover `wt sync --all`, which reaches every worktree in the repository including branches another session or machine is working on.",
+      "Own-PR Merge: merging a pull request through `gh pr merge` or `glab mr merge` is routine when the repository is owned by `bendrucker`, the pull request's author is `bendrucker`, and its required checks have passed. This narrows the built-in Merge Without Review rule for the user's own repositories, where branch protection is the merge gate rather than a second human. It does not cover repositories under any other owner, and it does not cover forcing past failed or pending checks (`--admin`, merging red).",
+      "Cloudflare Read-Only: in a repository owned by `bendrucker`, Cloudflare inspection through `wrangler` that mutates nothing is routine work: `wrangler d1 execute` whose `--command` is a SELECT, `d1` reads with `--json`, and `wrangler kv key list`. Deploys, queue consumer changes, and every other mutation stay governed by the built-in production-deploy rules."
     ],
     "soft_deny": [
       "$defaults",
@@ -409,7 +411,6 @@
     "github@bendrucker": true,
     "claude-code@bendrucker": true,
     "pull-request@bendrucker": true,
-    "github@claude-plugins-official": true,
     "x-callback-url@bendrucker": true,
     "research@bendrucker": true,
     "writing@bendrucker": true,
@@ -505,7 +506,9 @@
         "~/.local/share/uv",
         "~/.local/share/graphite",
         "~/.local/share/atuin",
-        "~/.greptile"
+        "~/.greptile",
+        "/dev/fd",
+        "/var/folders/*/*/T"
       ]
     },
     "excludedCommands": [
@@ -552,7 +555,7 @@
   "spinnerTipsEnabled": false,
   "showClearContextOnPlanAccept": true,
   "autoCompactEnabled": true,
-  "autoCompactWindow": 400000,
+  "autoCompactWindow": 280000,
   "preferredNotifChannel": "terminal_bell",
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,

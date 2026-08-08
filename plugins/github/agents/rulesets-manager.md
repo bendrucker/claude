@@ -2,7 +2,7 @@
 name: rulesets-manager
 description: >-
   Manages GitHub repository rulesets. Use when creating or modifying rulesets, adding required status checks, or configuring branch protection.
-tools: Bash(gh:*), Glob, Grep, Read, TodoWrite, mcp__github
+tools: Bash(gh:*), Glob, Grep, Read, TodoWrite
 model: sonnet
 color: green
 ---

@@ -35,7 +35,7 @@ ${CLAUDE_SKILL_DIR}/scripts/refresh.ts
 
 ### Querying
 
-After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`: querying never writes, and a read-write open would block refreshes and other readers. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works; `getvariable('limit')` is unaffected.
+After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`. Querying never writes, and a read-write open would block refreshes and other readers. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works. `getvariable('limit')` is unaffected either way.
 
 ```bash
 duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb "SELECT model, SUM(output_tokens) FROM message_usage GROUP BY model"
@@ -46,25 +46,13 @@ duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb < ${CLAUDE_SKILL_DIR}/reso
 
 ### Locking
 
-DuckDB locks the database file per process. Read-only opens take a shared lock, and any number of them coexist. A write open (a refresh that has work to do) needs exclusive access: it cannot start while readers hold the file, and a reader cannot open mid-refresh. Either collision fails with `Could not set lock`; retry after the other side finishes. `refresh.ts` retries briefly on its own, and when a concurrent refresh holds the lock it prints the path and exits 0, since the other run is doing the same work.
+DuckDB locks the database file per process. Read-only opens take a shared lock, and any number of them coexist. A write open (a refresh that has work to do) needs exclusive access. It cannot start while readers hold the file, and a reader cannot open mid-refresh. Either collision fails with `Could not set lock`. Retry after the other side finishes. `refresh.ts` retries briefly on its own, and when a concurrent refresh holds the lock it prints the path and exits 0, since the other run is doing the same work.
 
 ### Parallel Queries (Workflows)
 
-To investigate the corpus with a fan-out of agents (breadth search for leads, then a depth pass per lead), the orchestrator runs `refresh.ts --refresh` once up front, then every agent opens `${CLAUDE_PLUGIN_DATA}/session.duckdb` read-only. Never let a fanned-out agent call `refresh.ts`: past the stamp's `--max-age` it opens read-write, which collides with every reader. Queries read a shared file, so the agents need no worktree.
+For a fan-out of agents investigating the corpus, the orchestrator runs `refresh.ts --refresh` once up front, then every agent opens `${CLAUDE_PLUGIN_DATA}/session.duckdb` read-only. Never let a fanned-out agent call `refresh.ts`: past the stamp's `--max-age` it opens read-write and collides with every reader. Queries read a shared file, so the agents need no worktree. Worked example (param scoping via `SET VARIABLE`, breadth-first survey surfaces) in [`references/workflows.md`](references/workflows.md).
 
-Params work the same from the CLI: `getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare read-only run of a query file runs unfiltered. Prepend `SET VARIABLE` lines to scope it:
-
-```bash
-duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb <<'SQL'
-SET VARIABLE after_date = '2026-05-01';
-SET VARIABLE hook = '*tropes*';
-.read ${CLAUDE_SKILL_DIR}/resources/queries/hook-blocks.sql
-SQL
-```
-
-Breadth-first leads come from the survey surfaces (`records` taxonomy, `fields` for schema inference, `activity`, `hooks`, `diagnostics`, `skill-activity`); a depth pass is then custom read-only SQL over whatever table or view the survey pointed at.
-
-For self-improvement discovery (fanning out over the whole corpus to mine config-change candidates, then grounding them against the live config), [`references/discovery.md`](references/discovery.md) carries the full recipe: the dimension-to-query cheat sheet, the mandatory grounding pass, the host-safety rules, and a Tier-2 catalog of discovery queries kept out of the catalog above.
+For self-improvement discovery (fanning out over the whole corpus to mine config-change candidates, then grounding them against the live config), [`references/discovery.md`](references/discovery.md) carries the full recipe.
 
 ## Named Queries
 
@@ -135,13 +123,7 @@ duckdb -readonly -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql ${CLAUDE_PLU
 
 Session history copied from another machine is queryable alongside this machine's. Each machine is a `host`: this one is always `local`, and every imported machine gets a label you choose. With nothing imported, the index behaves exactly as the single-machine case.
 
-### Listing Hosts
-
-```bash
-${CLAUDE_SKILL_DIR}/scripts/hosts.ts
-```
-
-Shows each host with its import time, egress policy, last index, rsync source, and a ready-to-run re-sync command. The import, re-sync, and forget procedures live in [`references/cross-machine.md`](references/cross-machine.md); read it when the user asks to import, re-sync, or remove a machine.
+`${CLAUDE_SKILL_DIR}/scripts/hosts.ts` lists every imported host. The listing, import, re-sync, and forget procedures live in [`references/cross-machine.md`](references/cross-machine.md). Read it when the user asks to list, import, re-sync, or remove a machine.
 
 ### Privacy
 
@@ -155,35 +137,18 @@ Every table and view carries a `host` column (`local` for this machine, the labe
 
 ## Known Blind Spots
 
-The `index-health` query detects drift the corpus can show; these absences are structural, so no query can surface them. State them when an analysis depends on what they hide.
+The `index-health` query detects drift the corpus can show. These absences are structural, so no query can surface them. State them when an analysis depends on what they hide. Full elaboration in [`references/blind-spots.md`](references/blind-spots.md).
 
-- **Thinking text**: Claude Code persists thinking blocks as signature-only stubs. `content_items` rows with `type = 'thinking'` exist but carry no text; reasoning is unsearchable from transcripts and must be intercepted at runtime (hooks) if needed.
-- **Retention floor**: `cleanupPeriodDays` deletes old session files, and the index rebuilds from surviving JSONL on migration, so the corpus floor ratchets forward (see `corpus-window`). `~/.claude/history.jsonl` holds prompt-level history much further back but is not ingested.
-- **Cloud and mobile sessions**: claude.ai web/mobile chats and cloud routines write no local JSONL. A `bridge-session` record marks only that a cloud bridge existed; the cloud side's content stays remote.
-- **Approved permission prompts**: only rejections leave a trace (`"User rejected tool use"` results). A prompt the user approved is indistinguishable from a call that never prompted, so prompting friction is undercountable.
-- **Offloaded tool results**: large outputs are truncated to a `<persisted-output>` preview pointing at a sidecar file under `tool-results/`; the full output never enters the index.
-- **Other machines**: only imported hosts exist. A machine never imported, or one gone stale (see `host-staleness`), is invisible rather than empty.
+- **Thinking text**: persisted as signature-only stubs, unsearchable from transcripts.
+- **Retention floor**: `cleanupPeriodDays` deletes old sessions, so the corpus floor ratchets forward. `~/.claude/history.jsonl` goes further back but isn't ingested.
+- **Cloud and mobile sessions**: claude.ai web/mobile and cloud routines write no local JSONL.
+- **Approved permission prompts**: only rejections leave a trace, so prompting friction is undercountable.
+- **Offloaded tool results**: large outputs truncate to a sidecar preview. The full output never enters the index.
+- **Other machines**: only imported hosts exist, so a never-imported or stale host is invisible rather than empty.
 
 ## Discovery
 
-Don't memorize column lists. Ask DuckDB.
-
-```sql
-SELECT * FROM information_schema.columns WHERE table_schema = 'main';
-DESCRIBE messages;
-DESCRIBE content_items;
-```
-
-For fields not in the pinned columns, reach into `data` directly with JSON path operators.
-
-```sql
-SELECT (data->>'$.message.model') AS model
-FROM messages
-WHERE type = 'assistant' AND (data->>'$.message.model') IS NOT NULL
-GROUP BY model;
-```
-
-Wrap `data->>'$.path'` in parens before any comparison. DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` (boolean array index) and fails.
+Don't memorize column lists. Ask DuckDB (`DESCRIBE <table>`, `information_schema.columns`) or reach into `data` directly with JSON path operators. Wrap `data->>'$.path'` in parens before any comparison: DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` and fails. Worked examples in [`references/schema-discovery.md`](references/schema-discovery.md).
 
 ## Source Lookup
 

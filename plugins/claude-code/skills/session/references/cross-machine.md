@@ -1,6 +1,14 @@
 # Cross-Machine Import
 
-Procedures for importing, re-syncing, and forgetting another machine's session history. Host semantics and the egress policy live in [`SKILL.md`](../SKILL.md) "Cross-Machine History"; read that first.
+Procedures for listing, importing, re-syncing, and forgetting another machine's session history. Host semantics and the egress policy live in [`SKILL.md`](../SKILL.md) "Cross-Machine History". Read that first.
+
+## Listing Hosts
+
+```bash
+${CLAUDE_SKILL_DIR}/scripts/hosts.ts
+```
+
+Shows each host with its import time, egress policy, last index, rsync source, and a ready-to-run re-sync command.
 
 ## Importing a Machine
 

@@ -48,9 +48,36 @@ describe("processInput", () => {
     );
   });
 
-  it("denies git worktree add to a path that merely contains tmp/", () => {
+  it("denies git worktree add to a path with a tmp-lookalike segment", () => {
     expect(processInput(bashInput("git worktree add notmp/foo"))).toEqual(formatDenyOutput("add"));
-    expect(processInput(bashInput("git worktree add a/tmp/foo"))).toEqual(formatDenyOutput("add"));
+    expect(processInput(bashInput("git worktree add tmpfoo/x"))).toEqual(formatDenyOutput("add"));
+  });
+
+  it("allows git worktree add under a nested tmp/ segment", () => {
+    expect(processInput(bashInput("git worktree add a/tmp/foo"))).toBeNull();
+  });
+
+  it("allows git worktree add under an absolute /tmp/ path", () => {
+    expect(
+      processInput(bashInput("git worktree add /tmp/claude-baseline-check")),
+    ).toBeNull();
+  });
+
+  it("allows git worktree add under an absolute /private/tmp/ path", () => {
+    expect(
+      processInput(bashInput("git worktree add /private/tmp/claude-baseline-check")),
+    ).toBeNull();
+  });
+
+  it("allows git worktree add under a repo-absolute tmp/ path", () => {
+    expect(
+      processInput(bashInput("git worktree add /Users/me/repo/tmp/verify")),
+    ).toBeNull();
+  });
+
+  it("allows git worktree add under an unexpanded $TMPDIR", () => {
+    expect(processInput(bashInput("git worktree add $TMPDIR/verify"))).toBeNull();
+    expect(processInput(bashInput("git worktree add ${TMPDIR}/verify"))).toBeNull();
   });
 
   it("denies git worktree add under .worktrees/", () => {
@@ -68,9 +95,9 @@ describe("processInput", () => {
   });
 
   it("allows git worktree remove of agent worktrees", () => {
-    expect(processInput(bashInput("git worktree remove .claude/worktrees/agent-x"))).toBeNull();
+    expect(processInput(bashInput("git worktree remove .worktrees/agent-x"))).toBeNull();
     expect(
-      processInput(bashInput("git worktree remove /Users/me/repo/.claude/worktrees/agent-x")),
+      processInput(bashInput("git worktree remove /Users/me/repo/.worktrees/agent-x")),
     ).toBeNull();
   });
 
@@ -120,12 +147,33 @@ describe("isThrowawayAdd", () => {
     expect(isThrowawayAdd("git worktree add ./tmp/x")).toBe(true);
   });
 
+  it("matches an absolute /tmp/ target", () => {
+    expect(isThrowawayAdd("git worktree add /tmp/claude-baseline-check")).toBe(true);
+  });
+
+  it("matches an absolute /private/tmp/ target", () => {
+    expect(isThrowawayAdd("git worktree add /private/tmp/claude-baseline-check")).toBe(true);
+  });
+
+  it("matches a repo-absolute tmp/ target", () => {
+    expect(isThrowawayAdd("git worktree add /Users/me/repo/tmp/verify")).toBe(true);
+  });
+
+  it("matches a tmp/ target nested below another directory", () => {
+    expect(isThrowawayAdd("git worktree add a/tmp/x")).toBe(true);
+  });
+
+  it("matches an unexpanded $TMPDIR target", () => {
+    expect(isThrowawayAdd("git worktree add $TMPDIR/x")).toBe(true);
+    expect(isThrowawayAdd("git worktree add ${TMPDIR}/x")).toBe(true);
+  });
+
   it("does not match a tmp-prefixed sibling directory", () => {
     expect(isThrowawayAdd("git worktree add tmpfoo/x")).toBe(false);
   });
 
-  it("does not match tmp/ nested below another directory", () => {
-    expect(isThrowawayAdd("git worktree add a/tmp/x")).toBe(false);
+  it("does not match a path that merely contains the substring tmp", () => {
+    expect(isThrowawayAdd("git worktree add notmp/x")).toBe(false);
   });
 });
 
@@ -138,14 +186,20 @@ describe("isThrowawayRemove", () => {
     expect(isThrowawayRemove("git worktree remove ./tmp/x")).toBe(true);
   });
 
-  it("matches a relative .claude/worktrees/ target", () => {
-    expect(isThrowawayRemove("git worktree remove .claude/worktrees/agent-x")).toBe(true);
+  it("matches an absolute /tmp/ target", () => {
+    expect(isThrowawayRemove("git worktree remove /tmp/claude-baseline-check")).toBe(true);
   });
 
-  it("matches an absolute .claude/worktrees/ target", () => {
-    expect(isThrowawayRemove("git worktree remove /Users/me/repo/.claude/worktrees/agent-x")).toBe(
-      true,
-    );
+  it("matches an unexpanded $TMPDIR target", () => {
+    expect(isThrowawayRemove("git worktree remove $TMPDIR/x")).toBe(true);
+  });
+
+  it("matches a relative .worktrees/ target", () => {
+    expect(isThrowawayRemove("git worktree remove .worktrees/agent-x")).toBe(true);
+  });
+
+  it("matches an absolute .worktrees/ target", () => {
+    expect(isThrowawayRemove("git worktree remove /Users/me/repo/.worktrees/agent-x")).toBe(true);
   });
 
   it("skips flags and matches a later tmp/ target", () => {
@@ -156,11 +210,7 @@ describe("isThrowawayRemove", () => {
     expect(isThrowawayRemove("git worktree remove tmpfoo/x")).toBe(false);
   });
 
-  it("does not match tmp/ nested below another directory", () => {
-    expect(isThrowawayRemove("git worktree remove a/tmp/x")).toBe(false);
-  });
-
-  it("does not match a worktrees dir outside .claude/", () => {
+  it("does not match a worktrees dir outside the .worktrees/ segment", () => {
     expect(isThrowawayRemove("git worktree remove worktrees/x")).toBe(false);
   });
 

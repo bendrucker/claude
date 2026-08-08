@@ -35,10 +35,10 @@ Default end state **green and ready**: CI green, bot comments triaged, body refr
 
 Resolve the base to a **remote** ref so ship's view matches what the PR merges against. From the base branch (default `main`, or `--base <parent>` on a stack), take its tracking ref via `git rev-parse --abbrev-ref --symbolic-full-name <base>@{u}`, falling back to `origin/<base>`. Fetch it first (`git fetch`) so a stale local `<base>` never inflates the diff with already-merged commits. Diff `git diff <resolved>...HEAD`, plus a plain `git diff` for uncommitted work, and thread the resolved ref as `--base` to every gated pass (including `review:code`). Gate each pass on the file set, its size, and the content behind any judgment call (new comments, refactor or new behavior). Full matrix and heuristics: [`references/passes.md`](references/passes.md).
 
-- **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) *and* the session ran long or redirected enough that the diff could have drifted from it. No plan, or a small plan in a tight session, skips.
+- **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) *and* the session ran long or redirected enough that the diff could have drifted from it. Skip otherwise ([full gate](references/passes.md)).
 - **Correctness and quality**: code changed. Exactly one of `review:code <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
 - **`comments:audit`**: diff adds code comments.
-- **`pull-request:follow-up --local`**: a supported review bot is available for the repo *and* the diff clears the Bot Review Gate. Reviews are metered, so availability alone is not enough. Follow-up's `local.md` owns detection (repo config fast path, live cooldowns, hosted signals when no config is committed) and exits early when nothing is available. Runs the hosted reviewer locally before the PR exists.
+- **`pull-request:follow-up --local`**: a supported review bot is available for the repo *and* the diff clears the [Bot Review Gate](references/passes.md). Runs the hosted reviewer locally before the PR exists.
 - **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
 - **`run`**: diff has a runtime surface. Drive the change in the real app, not just tests. Skip on docs-only and tests-only.
 
@@ -66,14 +66,12 @@ Dirty tree at the comment pass: ask whether to commit first. `comments:audit` op
 
 #### Comment Trims
 
-`comments:audit` commits trims to a fresh `comments/audit-<hash>` branch off `HEAD`, leaving the tree untouched. Run `comments:audit --base <base> --fix` and capture the branch name. No branch means nothing to trim: skip. Otherwise dispatch a short-lived `general-purpose` Agent with that name to fast-forward and delete it:
+`comments:audit` commits trims to a fresh `comments/audit-<hash>` branch off `HEAD`, leaving the tree untouched. Run `comments:audit --base <base> --fix` and capture the branch name. No branch means nothing to trim: skip. Otherwise dispatch a short-lived `general-purpose` Agent with that name to fast-forward and delete it (rationale and rejected alternatives: [`references/passes.md`](references/passes.md)):
 
 ```
 git merge --ff-only comments/audit-<hash>
 git branch -d comments/audit-<hash>
 ```
-
-The commit sits on `HEAD`, so the fast-forward is clean. It runs in the Agent to keep ship's own commands to `git diff` and `git status`. Rejected alternatives: [`references/passes.md`](references/passes.md).
 
 ## Create
 
@@ -81,16 +79,14 @@ Join the background `plan:review` first if it was gated in. Act on fix-worthy dr
 
 Pass `--base <parent>` through when `/ship --base` named a stack parent. Create needs it to target the PR at the parent and to link the layer into the stack on GitHub. Without it the PR opens against the default branch and carries every lower layer's diff.
 
-Pass the hosted reviewer's label through (`--label review` on my repos) only when the Bot Review Gate routed to the hosted channel, which happens when it said spend and the local CLI could not run. The review then starts with the PR. A local pass already covered the diff, so labeling after it pays a second credit for the same review.
+Pass `--label review` only when the [Bot Review Gate](references/passes.md) routed to the hosted channel (local CLI unavailable); the review then starts with the PR. A local pass already covered the diff, so labeling after it pays a second credit for the same review.
 
 ## Babysit
 
 `pull-request:babysit <url>` watches CI and fixes trivial failures to green.
 
-- `--reviews` (default on): after first green, hand bot comments to `pull-request:follow-up --auto`.
+- `--reviews` (default on): after first green, hand bot comments to `pull-request:follow-up --auto`. Covers a bot review landing after the green push with no CI event to key off ([why](references/passes.md)).
 - `--merge`: only when `/ship --merge` was passed; else stop at green.
-
-A bot review often lands after the green push with no CI event to key off. `--reviews` covers this: follow-up waits for an expected review's first pass, then triages it. Babysit owns the CI waits. Follow-up owns which reviews are expected (the signals in its `reviewers.md`) and the wait for them, so ship never restates them or hand-rolls a reviews-API poll. With none expected, the hand-off returns at once and ship stops at green.
 
 ## Refresh the Body
 

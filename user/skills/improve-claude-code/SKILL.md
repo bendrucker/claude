@@ -45,21 +45,13 @@ Ask the user which items to work on (numbers, ranges like `1-3`, or `all`). The 
 
 ## Session Context
 
-Each todo's notes embed the originating session as `Session: <uuid>`. For every selected todo, parse that UUID and use the `claude-code:session` skill to pull the original context: what you were doing, the commands that ran, and the errors that prompted the todo. This is richer than the todo's prose summary and grounds each plan in the real failure.
-
-Refresh the index once (`refresh.ts --refresh`), then look up each todo's session over the shared file with `duckdb -readonly` at the stable DB path (see the session skill's "Parallel Queries" section). Read-only opens coexist, so a batch of lookups runs concurrently without contending; never re-refresh per todo. Query `messages` / `content_items` / `text_content` filtered by `WHERE session_id = '<uuid>'`. Do not filter by `host`: many todos come from the work machine, whose corpus is imported as a separate host, and omitting the filter spans every machine. Distill the result to a few lines per todo and pass it, with the title and notes, to the matching agent in the [Plan](#plan) workflow. Agents receive the stable DB path for any further read-only lookup but never refresh.
-
-If the UUID is absent from the index (not yet imported, or the index needs a refresh), proceed with notes only and say so for that todo.
-
-#### Egress
-
-Session context informs local planning only. Imported hosts may be marked `block_egress`, so never paste session-derived content into PR bodies or any other output that leaves the machine.
+Each todo's notes embed the originating session as `Session: <uuid>`. For every selected todo, use the `claude-code:session` skill to pull the original context (what you were doing, the commands that ran, the errors that prompted the todo) before planning: richer than the todo's prose summary and grounds each plan in the real failure. Session context informs local planning only: never paste session-derived content into PR bodies or any other output that leaves the machine. Index refresh, DuckDB lookup mechanics, host filtering, and the full egress rule: [references/session-context.md](references/session-context.md).
 
 ## Plan
 
 The mechanical fan-out runs as a **Workflow**. Instructing `Workflow` from inside this user-invoked skill is a sanctioned opt-in under the Workflow tool's own rules, so author and run the script rather than refusing mid-run.
 
-Run one Workflow (`parallel`) with one agent per selected todo. Give each agent its todo title, full notes, and the distilled session context, and have it explore the repo and produce an implementation plan. Point agents at the relevant domain skills: `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts. Preserve the [egress](#egress) rule inside the workflow: session-derived context stays local and never enters agent output that leaves the machine.
+Run one Workflow (`parallel`) with one agent per selected todo. Give each agent its todo title, full notes, and the distilled session context, and have it explore the repo and produce an implementation plan. Point agents at the relevant domain skills: `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts. Preserve the [egress rule](references/session-context.md) inside the workflow: session-derived context stays local and never enters agent output that leaves the machine.
 
 Each agent returns a structured plan:
 
@@ -71,69 +63,7 @@ The workflow returns the plans to the main loop. Present them there and collect 
 
 ## Implement
 
-Feed the approved plans into a second Workflow shaped as `pipeline(approvedPlans, implement, ciGate)`:
-
-- `implement`: an `agent` with `agentType: 'general-purpose'` and `isolation: "worktree"` implements the plan, runs `bun test`, runs `review:code <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with the [`Original Task`](#pr-body) backlink. Returns `{ thingsId, prUrl, branch }`.
-- `ciGate`: a fast initial CI check with one trivial-failure fix pass. Returns `{ thingsId, prUrl, ciStatus }`.
-
-Do not hold worktree agents open on long CI waits: the gate catches trivial breakage, then Watch handles the rest. Back in the main loop, [Annotate Things](#annotate-things) and [Summary](#summary) consume the pipeline results unchanged.
-
-The Workflow tool delivers `args` as a JSON string, so normalize it before use (the `parallel` plan workflow takes no args). The pipeline shape and each stage's result schema (`meta` must be a pure literal):
-
-```javascript
-export const meta = {
-  name: 'improve-cc-implement',
-  description: 'Implement each approved plan as a PR, then fast-gate CI',
-  phases: [{ title: 'Implement' }, { title: 'CI gate' }],
-}
-
-const { approved } = typeof args === 'string' ? JSON.parse(args) : args
-
-const IMPLEMENTED = {
-  type: 'object',
-  required: ['thingsId', 'prUrl', 'branch'],
-  properties: {
-    thingsId: { type: 'string' },
-    prUrl: { type: 'string' },
-    branch: { type: 'string' },
-  },
-}
-
-const CI_GATE = {
-  type: 'object',
-  required: ['thingsId', 'prUrl', 'ciStatus'],
-  properties: {
-    thingsId: { type: 'string' },
-    prUrl: { type: 'string' },
-    ciStatus: { type: 'string' },
-  },
-}
-
-const results = await pipeline(
-  approved,
-  (plan) =>
-    agent(implementPrompt(plan), {
-      agentType: 'general-purpose',
-      isolation: 'worktree',
-      phase: 'Implement',
-      schema: IMPLEMENTED,
-    }),
-  (built, plan) =>
-    agent(ciGatePrompt(built), {
-      label: `ci:${plan.thingsId}`,
-      phase: 'CI gate',
-      schema: CI_GATE,
-    }),
-)
-```
-
-#### PR body
-
-Include an `Original Task` link so the PR traces back to the Things todo:
-
-```
-Original Task: [<todo-title>](https://things.bendrucker.me/show?id=<todo-id>)
-```
+Feed the approved plans into a pipeline Workflow: `implement` (a worktree `general-purpose` agent implements the plan, runs `bun test` and `review:code <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with an `Original Task` backlink) then `ciGate` (a fast initial CI check with one trivial-failure fix pass). Do not hold worktree agents open on long CI waits: the gate catches trivial breakage, then Watch handles the rest. Back in the main loop, [Annotate Things](#annotate-things) and [Summary](#summary) consume the pipeline results unchanged. Pipeline shape, stage schemas, and the PR body format: [references/implement.md](references/implement.md).
 
 ## Monitor CI and Fix Failures
 

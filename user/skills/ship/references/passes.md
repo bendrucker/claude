@@ -84,6 +84,10 @@ Infer `review:code` effort from the diff unless `--effort` overrides. `high` is 
 
 Alternatives, not a pair. Pick `simplify` for a pure refactor or cleanup with no new behavior: extraction, renaming, dedup, dead-code removal, moving code. It covers reuse, simplification, efficiency, and altitude, and does not hunt bugs. Pick `review:code` for anything with new behavior, a bug fix, or a feature, which need the correctness coverage `simplify` skips. `--simplify` forces the `simplify` path.
 
+## Babysit and Reviews
+
+A bot review often lands after the green push with no CI event to key off. `--reviews` covers this: follow-up waits for an expected review's first pass, then triages it. Babysit owns the CI waits. Follow-up owns which reviews are expected (the signals in its `reviewers.md`) and the wait for them, so ship never restates them or hand-rolls a reviews-API poll. With none expected, the hand-off returns at once and ship stops at green.
+
 ## Comment Trims
 
 `comments:audit` commits trims to a fresh `comments/audit-<hash>` branch off `HEAD` via git plumbing, and its apply requires a clean tree. Ship needs the trims on the shipping branch, so it runs the audit first (clean tree) and fast-forwards the shipping branch onto the audit commit. A clean audit writes no branch, so skip the fast-forward when none was printed.

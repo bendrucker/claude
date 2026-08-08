@@ -1,5 +1,7 @@
 # Planning Guidelines
 
+The deliverable is one plan file a fresh context can implement. Presenting it ends this session's job: the plan is handed to a session with no transcript, no research, and no memory of what was ruled out. It will not be revised interactively. Everything the implementer needs is in the file, and nothing in the file is there for the reader who was here.
+
 Most rejected plans miss something the code already contains or the request already states. Read the relevant code and restate the request's hard constraints before writing the plan.
 
 ## Grounding
@@ -28,7 +30,7 @@ This relaxes when the user asked for thorough upfront planning (`interview:plan`
 
 ## Direction Before Detail
 
-Confirm the approach before specifying file lists, line numbers, signatures, or test cases. If more than one viable approach exists, present the choice as a short tradeoff or an `AskUserQuestion` rather than a finished plan built around one option. A plan thrown out wholesale on first rejection was detailed too early.
+Settle the approach before the file exists, not by presenting a thin plan and waiting for a redirect. When more than one viable approach is live, fire an `AskUserQuestion` and write into the answer. A plan presented to elicit direction spends the presentation on a question one `AskUserQuestion` answers first, and what comes back is a rewrite rather than an edit.
 
 ## New Terms
 
@@ -46,7 +48,7 @@ Defer naming to implementation when the deliverable is not the code itself (an i
 
 ## Plan Shape
 
-The plan is a do-now spec:
+The plan is a do-now spec for a session that reads nothing else:
 
 - Open with the non-negotiable conventions and a stop condition (implement, ship, end). Without a stop condition, the implementing session absorbs the next job too.
 - Deferred design goes to a separate linked file the implementer is told not to open, with one pointer line in the plan. A handoff plan heavy with deferred design forces the implementing session to re-plan work the original session never resolved.
@@ -69,7 +71,7 @@ Layer verification through the plan. A criterion parked only at the end catches 
 
 ## Revision
 
-A redirect is new input scoped to what it names. The plan is the standalone execution document: a session holding only the plan file, with no access to this conversation, must be able to execute it. Every rule below is that test applied.
+A redirect is new input scoped to what it names. Rework the file toward the standalone test above rather than patching the text that was presented. A re-present carrying the rejected plan nearly intact has absorbed nothing: the feedback lives in this conversation, and the conversation does not travel with the file. Every rule below is that test applied.
 
 - Revise the sections the feedback covers. Untouched sections stay untouched. If a rejection arrives with no feedback, ask what to change instead of guessing at a revision.
 - When feedback supersedes a decision, delete the superseded text. Do not write around it, soften it, or annotate it.

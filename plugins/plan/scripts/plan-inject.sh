@@ -15,6 +15,17 @@
 # and the other short-circuits.
 input=$(cat)
 
+# The PreToolUse entry has to keep matcher * (no matcher expresses "whichever
+# tool comes first in plan mode"), so this runs on every tool call in every
+# session. Test the raw payload before spawning jq, so a call outside plan mode
+# exits without the parse. Loose substring matches, so a payload that merely
+# mentions the word falls through and the checks below decide as before.
+case "$input" in
+  *PostToolUse*) ;;
+  *'"permission_mode"'*'"plan"'*) ;;
+  *) exit 0 ;;
+esac
+
 # Unit separator, not tab: tab is IFS whitespace, so `read` would collapse a run
 # of empty fields and shift every value left of the first absent key.
 IFS=$'\037' read -r event mode agent_id session_id transcript < <(

@@ -52,9 +52,16 @@ describe("first presentation", () => {
 });
 
 describe("unchanged re-present", () => {
+  // Equal-length prefixes keep the rewrite the same size as the original, so the
+  // sustained-growth branch stays out of tests about the hash check.
+  const body = (prefix: string) =>
+    Array.from({ length: 20 }, (_, i) => `${prefix} line ${i}`).join("\n");
+  const plan = body("alpha");
+  const rewritten = body("bravo");
+
   it("denies a byte-identical resubmission", async () => {
-    await decision("My plan");
-    expect(await decision("My plan")).toEqual({
+    await decision(plan);
+    expect(await decision(plan)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
       permissionDecisionReason: expect.stringContaining("byte-identical"),
@@ -62,17 +69,17 @@ describe("unchanged re-present", () => {
   });
 
   it("denies repeatedly until the text changes", async () => {
-    await decision("My plan");
-    expect((await decision("My plan"))?.permissionDecision).toBe("deny");
-    expect((await decision("My plan"))?.permissionDecision).toBe("deny");
-    expect(await decision("My plan, revised")).toBeNull();
+    await decision(plan);
+    expect((await decision(plan))?.permissionDecision).toBe("deny");
+    expect((await decision(plan))?.permissionDecision).toBe("deny");
+    expect(await decision(rewritten)).toBeNull();
   });
 
   it.each<{ name: string; changedPlan: string }>([
-    { name: "allows a changed plan", changedPlan: "My revised plan" },
-    { name: "treats trailing-whitespace-only changes as changed", changedPlan: "My plan \n" },
+    { name: "allows a changed plan", changedPlan: rewritten },
+    { name: "treats trailing-whitespace-only changes as changed", changedPlan: `${plan} \n` },
   ])("$name", async ({ changedPlan }) => {
-    await decision("My plan");
+    await decision(plan);
     expect(await decision(changedPlan)).toBeNull();
   });
 
@@ -108,7 +115,7 @@ describe("append-only re-present", () => {
     expect(await decision(grown)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: expect.stringContaining("keeps nearly every prior line"),
+      permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
     });
   });
 
@@ -175,36 +182,50 @@ describe("append-only re-present", () => {
     expect(await decision(appended)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: expect.stringContaining("keeps nearly every prior line"),
+      permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
+    });
+  });
+
+  it("asks on a line swap that carries the document at zero net growth", async () => {
+    const base = lines(50).join("\n");
+    await decision(base);
+    // Trade 3 lines for 3 new ones: carry-over 0.94, no net size change.
+    const swapped = [...lines(47), ...lines(3, "swapped")].join("\n");
+    expect(await decision(swapped)).toEqual({
+      hookEventName: "PreToolUse",
+      permissionDecision: "ask",
+      permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
     });
   });
 
   it("returns null for a genuine revision with low carry-over", async () => {
     await decision(initial);
-    const revised = lines(10, "revised").join("\n");
+    // Same prefix length, so the rewrite does not trip the growth branch.
+    const revised = lines(10, "note").join("\n");
     expect(await decision(revised)).toBeNull();
   });
 
-  it("does not ask when growth is zero even with full carry-over", async () => {
+  it("does not ask when the re-present adds no new lines", async () => {
     await decision(initial);
-    // Same lines, reordered: full carry-over but no net new lines.
+    // Same lines, reordered: full carry-over, nothing introduced.
     const reordered = [...lines(10)].reverse().join("\n");
     expect(await decision(reordered)).toBeNull();
   });
 
   it("does not ask when more than the incidental-drop allowance is removed", async () => {
-    const big = lines(20).join("\n");
+    const big = lines(100).join("\n");
     await decision(big);
-    // Drop 2 prior lines and add 3 new ones: carry-over is still >= 0.9, but
+    // Drop 4 prior lines and add 5 new ones: carry-over is still >= 0.9, but
     // removal exceeds the incidental-drop allowance, so this is a real edit.
-    const trimmedAndGrown = [...lines(18), ...lines(3, "new")].join("\n");
+    const trimmedAndGrown = [...lines(96), ...lines(5, "new")].join("\n");
     expect(await decision(trimmedAndGrown)).toBeNull();
   });
 
   it("allows and skips state when the stored line set is corrupt", async () => {
     await decision(initial);
     await Bun.write(join(stateRoot, "session-1", "exit-plan-lines"), "not json");
-    expect(await decision(`${initial}\nline 10`)).toBeNull();
+    // A one-line swap the append-only check would ask on, at unchanged length.
+    expect(await decision(initial.replace("line 9", "line X"))).toBeNull();
   });
 
   it("prefers deny when the append-only re-present is byte-identical", async () => {
@@ -226,7 +247,7 @@ describe("append-only re-present", () => {
     expect(await decision(grown)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
-      permissionDecisionReason: expect.stringContaining("keeps nearly every prior line"),
+      permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
     });
     // Append-only asks before the size check, so the size branch never runs and
     // records no marker: one prompt for append-only, no second prompt for size.
@@ -244,31 +265,27 @@ describe("sustained growth", () => {
   const grown = rewrite("bravo", 12);
   const grownAgain = rewrite("charlie", 30);
 
-  it("stays silent on a second present that grows", async () => {
+  it("asks on a second present above the high-water mark", async () => {
     await decision(skeletal);
-    expect(await decision(grown)).toBeNull();
-  });
-
-  it("asks on a third present above the high-water mark", async () => {
-    await decision(skeletal);
-    await decision(grown);
-    expect(await decision(grownAgain)).toEqual({
+    expect(await decision(grown)).toEqual({
       hookEventName: "PreToolUse",
       permissionDecision: "ask",
       permissionDecisionReason: expect.stringContaining(
-        `Presentation 3 is larger than any before it (${grown.length} -> ${grownAgain.length} chars)`,
+        `Presentation 2 is larger than any before it (${skeletal.length} -> ${grown.length} chars)`,
       ),
     });
   });
 
-  it("stays silent when the third present comes in under the high-water mark", async () => {
-    await decision(skeletal);
+  it("does not ask on a first presentation, which has no high-water mark", async () => {
+    expect(await decision(grownAgain)).toBeNull();
+  });
+
+  it("stays silent when a later present comes in under the high-water mark", async () => {
     await decision(grownAgain);
     expect(await decision(grown)).toBeNull();
   });
 
   it("measures against the high-water mark, not the previous present", async () => {
-    await decision(skeletal);
     await decision(grownAgain);
     await decision(rewrite("delta", 6));
     // Larger than the present before it, still under the high-water mark.
@@ -277,41 +294,40 @@ describe("sustained growth", () => {
 
   it("asks at most once per session", async () => {
     await decision(skeletal);
-    await decision(grown);
-    expect((await decision(grownAgain))?.permissionDecision).toBe("ask");
+    expect((await decision(grown))?.permissionDecision).toBe("ask");
     expect(await decision(rewrite("delta", 60))).toBeNull();
   });
 
   it("counts a present the append-only check asked on, and reports its ordinal", async () => {
-    await decision(skeletal);
+    await decision(grownAgain);
     await decision(grown);
     // An append-only third present returns before the growth branch, so the
     // growth ask is still available when a genuine rewrite lands fourth.
     expect((await decision(`${grown}\nbravo tail`))?.permissionDecision).toBe("ask");
-    expect((await decision(grownAgain))?.permissionDecisionReason).toContain("Presentation 4");
+    expect((await decision(rewrite("delta", 60)))?.permissionDecisionReason).toContain(
+      "Presentation 4",
+    );
   });
 
   it("allows and skips the check when the stored history is corrupt", async () => {
     await decision(skeletal);
-    await decision(grown);
     await Bun.write(join(stateRoot, "session-1", "exit-plan-presents"), "not json");
-    expect(await decision(grownAgain)).toBeNull();
+    expect(await decision(grown)).toBeNull();
   });
 
   it("still denies a byte-identical re-present after the growth ask has fired", async () => {
     await decision(skeletal);
-    await decision(grown);
-    await decision(grownAgain);
-    expect((await decision(grownAgain))?.permissionDecision).toBe("deny");
+    expect((await decision(grown))?.permissionDecision).toBe("ask");
+    expect((await decision(grown))?.permissionDecision).toBe("deny");
   });
 
   it("does not spend the ask on a plan that barely clears the high-water mark", async () => {
-    await decision(skeletal);
-    await decision(grown);
+    await decision(grownAgain);
     // One character over the high-water mark falls inside the noise margin.
-    expect(await decision(`${grown}x`)).toBeNull();
+    const barelyOver = rewrite("delta", 4).padEnd(grownAgain.length + 1, "x");
+    expect(await decision(barelyOver)).toBeNull();
     // The ask is still available for growth that reads as accumulation.
-    expect((await decision(grownAgain))?.permissionDecision).toBe("ask");
+    expect((await decision(rewrite("echo", 60)))?.permissionDecision).toBe("ask");
   });
 });
 

@@ -10,43 +10,43 @@ const SIZE_THRESHOLD = 12_000;
 // A re-present that keeps nearly every prior line and drops almost none regrew
 // the document instead of consolidating superseded design and revising it.
 const APPEND_ONLY_MIN_CARRYOVER = 0.9;
-// Zero net growth is a no-op edit (or whitespace-only), not the regrowth pattern.
-const APPEND_ONLY_MIN_GROWTH = 1;
-// Allow one incidental drop (e.g. a stray line) without losing the append-only signal.
-const APPEND_ONLY_MAX_REMOVED = 1;
+// Count lines the re-present introduced, not net size. A swap that trades a few
+// lines for a few new ones nets zero while carrying the whole prior document.
+const APPEND_ONLY_MIN_ADDED = 1;
+// Tolerate a handful of dropped lines: past the carry-over floor, a small removal
+// count is line churn inside an otherwise intact document, not a revision. Binding
+// only on plans over 30 unique lines, since below that the 0.9 floor is stricter.
+const APPEND_ONLY_MAX_REMOVED = 3;
 
-// Direction Before Detail prescribes a skeletal first plan, so growth into the
-// second present is the workflow working. Sustained growth starts at the third.
-const GROWTH_MIN_PRESENTS = 3;
 // Only one growth ask fires per session, so a plan that lands a hair over the
 // high-water mark must not spend it. Require a margin that reads as accumulation.
 const GROWTH_MIN_EXCESS_RATIO = 0.05;
 
 const DENY_REASON =
-  "Plan text is byte-identical to the presentation that was just rejected. Re-read " +
-  "the user's messages since that presentation and revise the sections they name, " +
-  "deleting anything they superseded. If the rejection carried no feedback, use " +
-  "AskUserQuestion to get direction instead of resubmitting.";
+  "Plan text is byte-identical to the presentation that was just rejected. The plan " +
+  "is the whole brief a fresh session implements from, so resubmitting it unchanged " +
+  "cannot land. Rework it against the feedback since that presentation, deleting what " +
+  "the feedback superseded. If the rejection carried none, ask with AskUserQuestion.";
 
 const APPEND_ONLY_ASK_REASON =
-  "This re-present keeps nearly every prior line and only adds new ones. Find what " +
-  "the feedback superseded and delete it instead of writing around it. The plan is " +
-  "the standalone execution document, not a record of this conversation. Approve to " +
-  "present anyway.";
+  "This re-present carries nearly every prior line. A plan this close to the rejected " +
+  "one needs reworking, not re-presenting. It will not be revised interactively. It " +
+  "goes whole to a fresh session, so delete what the feedback superseded instead of " +
+  "writing around it.";
 
 function growthAskReason(ordinal: number, previousMax: number, length: number): string {
   return (
     `Presentation ${ordinal} is larger than any before it (${previousMax} -> ${length} chars). ` +
-    "If redirects added scope, that growth is right. Otherwise it is residue: delete " +
-    "superseded design, move resolved research to <plan>-decisions.md, and keep only " +
-    "what the implementer builds from. Approve to present anyway."
+    "If redirects added scope, that growth is right. Otherwise it is residue the fresh " +
+    "session pays for: delete superseded design, move resolved research to " +
+    "<plan>-decisions.md, and keep only what the implementer builds from."
   );
 }
 
 const ASK_REASON =
-  "This plan exceeds 12k characters. Plans this large are rarely approved. " +
-  "Consolidate superseded content into <plan>-decisions.md or split the scope. " +
-  "Approve to present anyway.";
+  "This plan exceeds 12k characters. The session that implements it reads it cold and " +
+  "reads nothing else. Consolidate superseded content into <plan>-decisions.md or " +
+  "split the scope.";
 
 function formatDecision(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
   return {
@@ -116,11 +116,11 @@ function isAppendOnlyRevision(previous: Set<string>, current: Set<string>): bool
   }
   const carryOverRatio = carriedOver / previous.size;
   const removed = previous.size - carriedOver;
-  const growth = current.size - previous.size;
+  const added = current.size - carriedOver;
 
   return (
     carryOverRatio >= APPEND_ONLY_MIN_CARRYOVER &&
-    growth >= APPEND_ONLY_MIN_GROWTH &&
+    added >= APPEND_ONLY_MIN_ADDED &&
     removed <= APPEND_ONLY_MAX_REMOVED
   );
 }
@@ -176,9 +176,11 @@ export async function processInput(
     return formatDecision("ask", APPEND_ONLY_ASK_REASON);
   }
 
+  // A non-null history means this is at least the second present, which is the
+  // gate: the plan travels to a fresh session rather than looping in this one,
+  // so there is no draft-then-detail round for growth to be part of.
   if (
     history !== null &&
-    ordinal >= GROWTH_MIN_PRESENTS &&
     plan.length > history.maxLength * (1 + GROWTH_MIN_EXCESS_RATIO) &&
     (await readState(growthAskedPath)) === null
   ) {

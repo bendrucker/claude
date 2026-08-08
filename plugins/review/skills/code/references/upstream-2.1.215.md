@@ -2,6 +2,8 @@
 
 Binary: `/opt/homebrew/Caskroom/claude-code@latest/2.1.215/claude` (247 MB, Bun single-file executable).
 
+Cell names here are upstream's. The `inline-low`, `inline-med`, `inline-high`, and `inline-xhigh` cells in [efforts.md](../efforts.md) are upstream's `o48-low-v1`, `o48-med-v1`, `o48-high-v1`, and `o48-xhigh-v1`, renamed because more than one model family now selects them.
+
 ## Method note (important correction)
 
 There is **no UTF-16LE content** in this binary (`strings -e l -n 6` returns 0 lines). Everything is plain ASCII/UTF-8 minified JavaScript. The reason `grep` on `cc-strings.txt` "missed" parts of the body is that `strings` splits on newlines *and drops runs shorter than the minimum length*, so blank lines and short lines (`hunk.`, `}`, `]`, "```json") vanish. The fix is to read **raw byte windows out of the binary** — which is what everything below is taken from.

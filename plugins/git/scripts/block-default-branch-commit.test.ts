@@ -7,7 +7,7 @@ import type {
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
-import { formatDenyOutput, processInput } from "./block-default-branch-commit";
+import { formatDenyOutput, invokesGitCommit, processInput } from "./block-default-branch-commit";
 
 function mockInput(command: string): PreToolUseHookInput {
   return {
@@ -29,6 +29,30 @@ async function getOutput(
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
+
+describe("invokesGitCommit", () => {
+  test.each<[string, boolean]>([
+    ["git commit", true],
+    ['git commit -m "test"', true],
+    ["git -C /repo commit -m x", true],
+    ["git -c user.name=x commit", true],
+    ["git --no-pager commit --amend", true],
+    ["git -C /repo -c commit.gpgsign=false commit", true],
+    ["git add . && git commit -m x", true],
+    ["git status | tee log && git commit", true],
+    ["echo hi > $TMPDIR/probe.txt", false],
+    ["{ echo one; echo two; }", false],
+    ["for f in *.ts; do wc -l $f; done", false],
+    ["cat <<'EOF' > notes.md\nnothing here\nEOF", false],
+    ["git log --oneline | head -20 | awk '{print $1}' | sort | uniq", false],
+    ["git log --grep commit", false],
+    ["git commit-tree $tree", false],
+    ["echo 'run git commit next'", false],
+    ['gh pr create --body "then git commit"', false],
+  ])("%p → %p", (command, expected) => {
+    expect(invokesGitCommit(command)).toBe(expected);
+  });
+});
 
 describe("formatDenyOutput", () => {
   it("formats deny output with branch name", () => {
@@ -77,6 +101,19 @@ describe("processInput", () => {
   ])("blocks %p on main branch", async (command) => {
     const output = await getOutput(mockInput(command), testRepo);
     expect(output?.permissionDecision).toBe("deny");
+  });
+
+  // The matcher fails open on shell metacharacters, so these reach the hook on
+  // the default branch even though none of them commits.
+  test.each<[string]>([
+    ["echo hi > $TMPDIR/probe.txt"],
+    ["{ echo one; echo two; }"],
+    ["for f in *.ts; do wc -l $f; done"],
+    ["cat <<'EOF' > notes.md\nnothing here\nEOF"],
+    ["git log --oneline | head -20 | awk '{print $1}' | sort | uniq"],
+  ])("allows %p on main branch", async (command) => {
+    const output = await processInput(mockInput(command), testRepo);
+    expect(output).toBeNull();
   });
 
   it("allows commit in detached HEAD state", async () => {

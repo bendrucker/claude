@@ -12,6 +12,12 @@ Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under
 
 Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Matcher fields are not shell commands and should not be quoted. Run `bun scripts/check-hook-quoting.ts` to validate.
 
+## Bash Matchers
+
+A `Bash(...)` matcher or `if` condition is a spawn-reducing pre-filter, never the authorization decision. It fails open on shell metacharacters: under CLI 2.1.223, `Bash(git commit:*)` matched `echo hi > $TMPDIR/probe.txt` while the same command with a literal path passed, and brace groups, for-loops, here-docs, and long pipelines match the same way.
+
+So every Bash-matched hook script must re-read `input.tool_input.command` and confirm the command really invokes what the hook governs before it denies, blocks, or rewrites. `plugins/git/scripts/block-default-branch-commit.ts` (`invokesGitCommit`), `user/hooks/worktree/index.ts` (`/\bgit\s+worktree\s+(\w+)/`), and `plugins/shortcuts/hooks/open.ts` (a quote-aware `tokenize` that yields no target for a compound) are the working examples. A script that decides purely on ambient state, without reading the command, denies unrelated Bash calls the moment the matcher overfires.
+
 ## Async
 
 The `claude-code:hook` skill covers `async` and `asyncRewake`: what they drop, which events kill or outlive a backgrounded process, and when to use them. Read it before marking a hook async here.

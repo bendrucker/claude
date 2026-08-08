@@ -18,6 +18,30 @@ const BIOME_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "json", "jsonc"]);
 
 type HookInput = PostToolUseHookInput | PreToolUseHookInput | StopHookInput;
 
+type BashInput = { command?: string };
+
+// Flags git accepts between the executable and its subcommand. Enumerated
+// rather than matched as a generic `-\S+` so that a value which happens to be
+// the word `commit` (`git log --grep commit`) cannot be read as the subcommand.
+// The git plugin's block-default-branch-commit hook keeps its own copy: it
+// ships to other machines and cannot import repo-internal code.
+const VALUE_FLAG = String.raw`(?:-[cC]|--(?:git-dir|work-tree|namespace|exec-path|config-env))(?:=\S+|\s+\S+)`;
+const BOOLEAN_FLAG =
+  "--(?:no-pager|paginate|bare|literal-pathspecs|no-replace-objects|no-optional-locks)";
+const GIT_COMMIT_PATTERN = new RegExp(
+  String.raw`\bgit\s+(?:(?:${VALUE_FLAG}|${BOOLEAN_FLAG})\s+)*commit(?![\w-])`,
+);
+
+// Quoted spans carry commit messages, grep patterns, and here-doc prose, where
+// the literal text `git commit` is data rather than an invocation.
+function stripQuoted(command: string): string {
+  return command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, " ");
+}
+
+export function invokesGitCommit(command: string): boolean {
+  return GIT_COMMIT_PATTERN.test(stripQuoted(command));
+}
+
 interface TranscriptEntry {
   type?: string;
   message?: {
@@ -293,8 +317,16 @@ function formatPreToolUseBlockOutput(issues: Map<string, string>): SyncHookJSONO
 }
 
 export async function processPreToolUse(
-  _input: PreToolUseHookInput,
+  input: PreToolUseHookInput,
 ): Promise<SyncHookJSONOutput | null> {
+  // The `Bash(git commit:*)` matcher only narrows which calls spawn this hook.
+  // It fails open on shell metacharacters, and this path can return a `block`,
+  // so the command is re-read here rather than trusted from the matcher.
+  const { command } = input.tool_input as BashInput;
+  if (!command || !invokesGitCommit(command)) {
+    return null;
+  }
+
   if (!(await hasBiome())) {
     return null;
   }

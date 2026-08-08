@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { timeHook } from "../../scripts/hook-metrics";
 
 export type WebFetchInput = { url: string; prompt: string };
 
@@ -67,7 +68,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = processInput(input);
+  const output = await timeHook("webfetch-block", input, () => processInput(input));
   if (output) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }

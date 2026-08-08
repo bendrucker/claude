@@ -3,6 +3,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { SyncHookJSONOutput, UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { timeHook } from "../../scripts/hook-metrics";
 import { expandTilde, type RateLimits } from "../../scripts/rate-limits";
 
 // Highest announced band per window, keyed to the block it applies to. A changed
@@ -206,7 +207,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = await processInput(input, Date.now());
+  const output = await timeHook("session-limit", input, () => processInput(input, Date.now()));
   if (output) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }

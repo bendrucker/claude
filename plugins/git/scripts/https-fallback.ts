@@ -37,21 +37,47 @@ const VALUE_OPTIONS = new Set([
   "--exec-path",
 ]);
 
-const SSH_GITHUB_PATTERNS = [/\bgit@github\.com:/, /\bssh:\/\/git@github\.com[:/]/];
+export interface Provider {
+  host: string;
+  cli: string;
+  patterns: RegExp[];
+}
 
-const HTTPS_CONFIG = [
-  "-c credential.helper=",
-  "-c 'credential.helper=!gh auth git-credential'",
-  "-c 'url.https://github.com/.insteadOf=git@github.com:'",
-  "-c 'url.https://github.com/.insteadOf=ssh://git@github.com/'",
-].join(" ");
+function provider(host: string, cli: string): Provider {
+  const escaped = host.replaceAll(".", String.raw`\.`);
+  return {
+    host,
+    cli,
+    patterns: [
+      new RegExp(String.raw`\bgit@${escaped}:`),
+      new RegExp(String.raw`\bssh://git@${escaped}[:/]`),
+    ],
+  };
+}
+
+/**
+ * Hosts whose CLI holds credentials that grant HTTPS push access. A host absent
+ * here (self-hosted forges, enterprise domains) has no known credential helper,
+ * so the hook stays silent rather than suggest a retry that cannot authenticate.
+ */
+const PROVIDERS = [provider("github.com", "gh"), provider("gitlab.com", "glab")];
+
+function httpsConfig({ host, cli }: Provider): string {
+  return [
+    "-c credential.helper=",
+    `-c 'credential.helper=!${cli} auth git-credential'`,
+    `-c 'url.https://${host}/.insteadOf=git@${host}:'`,
+    `-c 'url.https://${host}/.insteadOf=ssh://git@${host}/'`,
+  ].join(" ");
+}
 
 export function hasSshAuthFailure(output: string): boolean {
   return SSH_AUTH_SIGNATURES.some((signature) => output.includes(signature));
 }
 
-export function usesSshGithub(text: string): boolean {
-  return SSH_GITHUB_PATTERNS.some((pattern) => pattern.test(text));
+/** Returns the provider whose SSH remote form appears in the text, or null. */
+export function sshProviderOf(text: string): Provider | null {
+  return PROVIDERS.find((p) => p.patterns.some((pattern) => pattern.test(text))) ?? null;
 }
 
 const GIT_INVOCATION = /(?:^|[;&|]\s*|\s)git(?=\s)/g;
@@ -100,18 +126,18 @@ export function gitNetworkSubcommand(command: string): string | null {
  * through `insteadOf` keeps the remote name, refspecs, and remote-tracking ref
  * updates identical to the SSH attempt.
  */
-export function rewriteCommand(command: string): string | null {
+export function rewriteCommand(command: string, target: Provider): string | null {
   const invocation = findNetworkInvocation(command);
   if (!invocation) return null;
 
   const { insertAt } = invocation;
-  return `${command.slice(0, insertAt)} ${HTTPS_CONFIG}${command.slice(insertAt)}`;
+  return `${command.slice(0, insertAt)} ${httpsConfig(target)}${command.slice(insertAt)}`;
 }
 
-export function formatContext(retryCommand: string): string {
+export function formatContext(retryCommand: string, cli: string): string {
   return [
     "The SSH agent refused to sign, so this git operation could not authenticate over SSH.",
-    "Retry the exact same operation over HTTPS, which authenticates through gh's credential helper:",
+    `Retry the exact same operation over HTTPS, which authenticates through ${cli}'s credential helper:`,
     "",
     retryCommand,
     "",
@@ -119,7 +145,7 @@ export function formatContext(retryCommand: string): string {
   ].join("\n");
 }
 
-/** Reads the repo's remote URLs so a bare `git pull` still resolves to a GitHub SSH remote. */
+/** Reads the repo's remote URLs so a bare `git pull` still resolves to a provider's SSH remote. */
 export async function readRemoteUrls(cwd: string): Promise<string> {
   // Interpolated so Bun's shell escapes the pattern instead of glob-expanding it.
   const pattern = String.raw`^remote\..*\.url$`;
@@ -138,15 +164,16 @@ export async function processInput(
   if (!hasSshAuthFailure(input.error ?? "")) return null;
 
   const cwd = input.cwd ?? process.cwd();
-  if (!usesSshGithub(command) && !usesSshGithub(await readRemotes(cwd))) return null;
+  const target = sshProviderOf(command) ?? sshProviderOf(await readRemotes(cwd));
+  if (!target) return null;
 
-  const retryCommand = rewriteCommand(command);
+  const retryCommand = rewriteCommand(command, target);
   if (!retryCommand) return null;
 
   return {
     hookSpecificOutput: {
       hookEventName: "PostToolUseFailure",
-      additionalContext: formatContext(retryCommand),
+      additionalContext: formatContext(retryCommand, target.cli),
     },
   };
 }

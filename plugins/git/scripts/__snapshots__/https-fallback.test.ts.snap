@@ -38,3 +38,21 @@ The url.insteadOf rewrite keeps the remote name and refspecs, so remote-tracking
 `;
 
 exports[`rewriteCommand targets the network op, not an earlier git 1`] = `"git status && git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url.https://github.com/.insteadOf=git@github.com:' -c 'url.https://github.com/.insteadOf=ssh://git@github.com/' push origin main"`;
+
+exports[`rewriteCommand gitlab push routes through glab 1`] = `"git -c credential.helper= -c 'credential.helper=!glab auth git-credential' -c 'url.https://gitlab.com/.insteadOf=git@gitlab.com:' -c 'url.https://gitlab.com/.insteadOf=ssh://git@gitlab.com/' push -u origin HEAD"`;
+
+exports[`processInput suggests the glab-backed retry for a GitLab SSH push 1`] = `
+{
+  "hookSpecificOutput": {
+    "additionalContext": 
+"The SSH agent refused to sign, so this git operation could not authenticate over SSH.
+Retry the exact same operation over HTTPS, which authenticates through glab's credential helper:
+
+git -c credential.helper= -c 'credential.helper=!glab auth git-credential' -c 'url.https://gitlab.com/.insteadOf=git@gitlab.com:' -c 'url.https://gitlab.com/.insteadOf=ssh://git@gitlab.com/' push -u origin HEAD git@gitlab.com:owner/repo.git
+
+The url.insteadOf rewrite keeps the remote name and refspecs, so remote-tracking refs update as they would have over SSH. Do not change the repository's configured remote URLs."
+,
+    "hookEventName": "PostToolUseFailure",
+  },
+}
+`;

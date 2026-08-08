@@ -11,8 +11,12 @@ import {
   processInput,
   readRemoteUrls,
   rewriteCommand,
-  usesSshGithub,
+  sshProviderOf,
 } from "./https-fallback";
+
+const github = sshProviderOf("git@github.com:owner/repo.git");
+const gitlab = sshProviderOf("git@gitlab.com:owner/repo.git");
+if (!github || !gitlab) throw new Error("provider table missing github.com or gitlab.com");
 
 const SECRETIVE_FAILURE = [
   'sign_and_send_pubkey: signing failed for RSA "SHA256:abc" from agent: agent refused operation',
@@ -100,26 +104,52 @@ describe("gitNetworkSubcommand", () => {
   });
 });
 
-describe("usesSshGithub", () => {
-  test.each<{ name: string; text: string; expected: boolean }>([
-    { name: "scp-style remote", text: "git@github.com:bendrucker/claude.git", expected: true },
-    { name: "ssh:// remote", text: "ssh://git@github.com/bendrucker/claude.git", expected: true },
+describe("sshProviderOf", () => {
+  test.each<{ name: string; text: string; expected: string | null }>([
+    {
+      name: "scp-style github remote",
+      text: "git@github.com:bendrucker/claude.git",
+      expected: "gh",
+    },
+    {
+      name: "ssh:// github remote",
+      text: "ssh://git@github.com/bendrucker/claude.git",
+      expected: "gh",
+    },
     {
       name: "ssh:// with port",
       text: "ssh://git@github.com:22/bendrucker/claude.git",
-      expected: true,
+      expected: "gh",
     },
-    { name: "https remote", text: "https://github.com/bendrucker/claude.git", expected: false },
-    { name: "gitlab ssh remote", text: "git@gitlab.com:bendrucker/claude.git", expected: false },
-    { name: "enterprise host", text: "git@github.example.com:owner/repo.git", expected: false },
-    { name: "no remote", text: "", expected: false },
+    {
+      name: "scp-style gitlab remote",
+      text: "git@gitlab.com:bendrucker/claude.git",
+      expected: "glab",
+    },
+    {
+      name: "ssh:// gitlab remote",
+      text: "ssh://git@gitlab.com/bendrucker/claude.git",
+      expected: "glab",
+    },
+    { name: "https remote", text: "https://github.com/bendrucker/claude.git", expected: null },
+    {
+      name: "unknown enterprise host",
+      text: "git@github.example.com:owner/repo.git",
+      expected: null,
+    },
+    {
+      name: "lookalike subdomain of a known host",
+      text: "git@gitlab.com.evil.example:owner/repo.git",
+      expected: null,
+    },
+    { name: "no remote", text: "", expected: null },
   ])("$name", ({ text, expected }) => {
-    expect(usesSshGithub(text)).toBe(expected);
+    expect(sshProviderOf(text)?.cli ?? null).toBe(expected);
   });
 });
 
 describe("rewriteCommand", () => {
-  test.each<{ name: string; command: string }>([
+  test.each<{ name: string; command: string; target?: typeof gitlab }>([
     { name: "bare pull", command: "git pull" },
     { name: "fetch with remote", command: "git fetch origin" },
     { name: "push with upstream", command: "git push -u origin HEAD" },
@@ -130,26 +160,31 @@ describe("rewriteCommand", () => {
       name: "targets the network op, not an earlier git",
       command: "git status && git push origin main",
     },
-  ])("$name", ({ command }) => {
-    expect(rewriteCommand(command)).toMatchSnapshot();
+    {
+      name: "gitlab push routes through glab",
+      command: "git push -u origin HEAD",
+      target: gitlab,
+    },
+  ])("$name", ({ command, target }) => {
+    expect(rewriteCommand(command, target ?? github)).toMatchSnapshot();
   });
 
   test("returns null when the line has no git invocation", () => {
-    expect(rewriteCommand("gh pr create")).toBeNull();
+    expect(rewriteCommand("gh pr create", github)).toBeNull();
   });
 
   test("does not match a word merely containing git", () => {
-    expect(rewriteCommand("legit fetch")).toBeNull();
+    expect(rewriteCommand("legit fetch", github)).toBeNull();
   });
 
   test("returns null when no segment runs a network operation", () => {
-    expect(rewriteCommand("git add -A && git commit -m x")).toBeNull();
+    expect(rewriteCommand("git add -A && git commit -m x", github)).toBeNull();
   });
 });
 
 describe("formatContext", () => {
   test("names the retry command and forbids mutating remotes", () => {
-    expect(formatContext("git -c foo=bar fetch origin")).toMatchSnapshot();
+    expect(formatContext("git -c foo=bar fetch origin", "gh")).toMatchSnapshot();
   });
 });
 
@@ -165,6 +200,14 @@ describe("processInput", () => {
     expect(result).toMatchSnapshot();
   });
 
+  test("suggests the glab-backed retry for a GitLab SSH push", async () => {
+    const result = await processInput(
+      mockInput("git push -u origin HEAD git@gitlab.com:owner/repo.git", SECRETIVE_FAILURE),
+      noRemotes,
+    );
+    expect(result).toMatchSnapshot();
+  });
+
   test.each<{ name: string; command: string; error: string }>([
     { name: "non-network git subcommand", command: "git status", error: SECRETIVE_FAILURE },
     {
@@ -174,9 +217,9 @@ describe("processInput", () => {
     },
     { name: "non-git command", command: "ssh git@github.com", error: SECRETIVE_FAILURE },
     {
-      name: "non-github host",
-      command: "git fetch git@gitlab.com:owner/repo.git",
-      error: "git@gitlab.com: Permission denied (publickey).",
+      name: "host with no known CLI",
+      command: "git fetch git@git.example.com:owner/repo.git",
+      error: "git@git.example.com: Permission denied (publickey).",
     },
   ])("stays silent for $name", async ({ command, error }) => {
     expect(await processInput(mockInput(command, error), noRemotes)).toBeNull();
@@ -187,16 +230,30 @@ describe("processInput", () => {
     expect(await processInput(input, githubSshRemote)).toBeNull();
   });
 
-  test("stays silent when a bare pull fails against a non-GitHub remote", async () => {
-    const gitlabRemote = async () => "remote.origin.url git@gitlab.com:owner/repo.git\n";
-    expect(await processInput(mockInput("git pull", SECRETIVE_FAILURE), gitlabRemote)).toBeNull();
+  test("stays silent when a bare pull fails against an unrecognized remote", async () => {
+    const unknownRemote = async () => "remote.origin.url git@git.example.com:owner/repo.git\n";
+    expect(await processInput(mockInput("git pull", SECRETIVE_FAILURE), unknownRemote)).toBeNull();
   });
 
-  test("resolves the remote from the repo when the command names none", async () => {
-    const result = await processInput(mockInput("git pull", SECRETIVE_FAILURE), githubSshRemote);
+  test.each<{ name: string; remotes: () => Promise<string>; expected: string }>([
+    {
+      name: "github remote routes through gh",
+      remotes: githubSshRemote,
+      expected: "url.https://github.com/.insteadOf=git@github.com:",
+    },
+    {
+      name: "gitlab remote routes through glab",
+      remotes: async () => "remote.origin.url git@gitlab.com:owner/repo.git\n",
+      expected: "url.https://gitlab.com/.insteadOf=git@gitlab.com:",
+    },
+  ])("resolves the remote from the repo when the command names none: $name", async ({
+    remotes,
+    expected,
+  }) => {
+    const result = await processInput(mockInput("git pull", SECRETIVE_FAILURE), remotes);
     expect(result).not.toBeNull();
     const context = (result?.hookSpecificOutput as { additionalContext: string }).additionalContext;
-    expect(context).toContain("url.https://github.com/.insteadOf=git@github.com:");
+    expect(context).toContain(expected);
   });
 });
 

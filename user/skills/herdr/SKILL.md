@@ -76,6 +76,8 @@ Failures separate by exit status. A server error exits 1 with a JSON error on st
 
 ## Addressing
 
+A pane exists whether or not an agent runs in it. `pane` commands drive the raw terminal, and `agent` commands drive the recognized process inside one, addressed by agent name or pane ID.
+
 Your own identity comes from the environment, never from inference: `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`. `HERDR_ENV=1` marks a pane herdr launched. Whether the server still answers is a separate question, which the orientation block above already settled.
 
 Name a target on every command that takes one. Use `--current` for the calling pane, an explicit ID otherwise. A pane command with no target may resolve to the UI-focused pane, and that pane can belong to the user or to another client.
@@ -95,11 +97,11 @@ herdr agent prompt <target> "the request" --wait --timeout 900000
 herdr agent read <target> --source recent-unwrapped --lines 80
 ```
 
-Timeouts are milliseconds. `--wait` matches `idle`, `done`, or `blocked` unless you name states with `--until`. It does not track turns, so an agent that was already working can match on the turn it was in the middle of. Submitting to a resting agent returns `agent_prompt_stalled` when no state change shows up within 5s.
+Timeouts are milliseconds. `--wait` matches `idle`, `done`, or `blocked` unless you name states with `--until`, which repeats to accept several (`--until idle --until done`) and on `prompt` requires `--wait`. It does not track turns, so an agent that was already working can match on the turn it was in the middle of. Submitting to a resting agent returns `agent_prompt_stalled` when no state change shows up within 5s.
 
 Never poll for a state change with `sleep` and a `pane get` loop. `agent wait` blocks server-side on an agent's state, and `pane wait-output` does the same for text in a plain pane.
 
-An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. herdr validates the whole sequence before writing a byte.
+An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. herdr validates the whole sequence before writing a byte. For staging literal text in a plain pane without submitting it, `pane send-text` is the counterpart, and `pane run` is the one that also presses Enter.
 
 `herdr agent focus` brings a pane to the foreground for the user. `herdr agent attach` connects to it directly.
 
@@ -174,7 +176,7 @@ herdr pane wait-output "$pane" --match "Listening on" --timeout 120000
 
 Add `--format ansi` when color is the evidence, as in a diff or a test summary. Otherwise take the text.
 
-`--lines` draws on the pane's screen and the host's scrollback. An agent painting the terminal's alternate screen feeds neither. Rows that scroll away there are gone, so a larger `--lines` returns the same truncated read. Once a read has failed that way, ask the agent to write its full response as markdown under a temp directory and reply with nothing but the path. Then read the file yourself. Hold that fallback until a read has actually come up short.
+`pane read --lines` draws on the pane's screen and the host's scrollback. An agent painting the terminal's alternate screen feeds neither, so its scrolled-away rows sit beyond `pane read` at any `--lines`. `agent read` recovers them for a recognized agent at rest: past the visible screen, herdr pages the history out through the agent's own mouse-scroll interface. That path needs the agent resting, so a deep read during `working`, `blocked`, or `unknown` comes back truncated or as an `agent_not_idle` error. When the history is unreachable either way, ask the agent to write its full response as markdown under a temp directory and reply with nothing but the path, then read the file yourself. Hold that fallback until a read has actually come up short.
 
 ## Plugins
 

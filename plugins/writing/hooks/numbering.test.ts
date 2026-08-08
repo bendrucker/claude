@@ -114,8 +114,8 @@ describe("checkMarkdown", () => {
       "## 2. AskUserQuestion Misalignment (7 of 8)",
       null,
     ],
-  ])("%s", (_name, content, expected) => {
-    const match = checkMarkdown(content);
+  ])("%s", async (_name, content, expected) => {
+    const match = await checkMarkdown(content);
     expected === null ? expect(match).toBeNull() : expect(match).toContain(expected);
   });
 });

@@ -1,9 +1,14 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
+import {
+  getExtension,
+  isMarkdownFile,
+  isMemoryPath,
+  isPlanPath,
+  isScratchPath,
+} from "../detection/paths";
 import * as tropes from "./check-tropes";
-import * as headings from "./headings";
 import { type HookResult, isPlanMode, type SyncHookJSONOutput, tierOf } from "./io";
 import * as numbering from "./numbering";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
@@ -24,6 +29,18 @@ function filePathOf(input: PreToolUseHookInput): string | undefined {
   return typeof filePath === "string" ? filePath : undefined;
 }
 
+// Every heading check is markdown-only: `headings.check` returns null for any
+// other extension and for the Bash surface, which is most of what this hook
+// sees. Its module graph is not free, though. It reaches an AP title-case
+// library, the heading classifier, and the markdown parser, together the
+// largest block of the ~40ms this dispatcher spent parsing modules before it
+// could read its input. Loading it from the markdown branch is the only way to
+// keep a runtime-conditional graph out of an unconditional import.
+async function headingResult(input: PreToolUseHookInput): Promise<HookResult | null> {
+  const headings = await import("./headings");
+  return headings.check(input);
+}
+
 // One dispatcher run sequences all checkers in-process and emits at most one
 // output. Priority is deny > ask > context, and within a tier the earliest
 // checker in numbering → headings → tropes order wins.
@@ -33,12 +50,13 @@ export async function dispatch(
 ): Promise<DispatchResult> {
   const start = performance.now();
   const filePath = filePathOf(input);
+  const ext = filePath ? getExtension(filePath) : "";
 
   const base = {
     ts: new Date(now).toISOString(),
     session_id: input.session_id,
     tool: input.tool_name,
-    ext: filePath ? getExtension(filePath) : "",
+    ext,
   };
 
   const finish = (
@@ -57,7 +75,7 @@ export async function dispatch(
   const mode: numbering.Mode = input.tool_name === "Edit" ? "edit" : "write";
   const checkers = [
     () => numbering.check(input, mode),
-    () => headings.check(input),
+    () => (isMarkdownFile(ext) ? headingResult(input) : null),
     () => tropes.check(input),
   ];
 

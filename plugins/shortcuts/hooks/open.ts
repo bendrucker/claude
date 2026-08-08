@@ -5,27 +5,90 @@ import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/clau
 
 type BashInput = { command: string };
 
-function unquote(arg: string): string {
-  const match = arg.match(/^(["'])(.+)\1$/);
-  return match ? match[2]! : arg;
+// Characters that end a simple command, splice another one into it, or hide a
+// word from it. A command carrying any of them outside quotes is not a lone
+// `open`, so the target this hook reads from it does not describe what the shell
+// would actually run. `#` earns its place with the rest: the shell discards the
+// comment it opens, so a trailing `#x.shortcut` would name a target `open` never
+// receives.
+const OPERATORS = new Set([";", "&", "|", "<", ">", "(", ")", "{", "}", "`", "$", "#", "\n"]);
+
+// Split a command into shell words, or return null when it is not a single
+// simple command: an unbalanced quote, an operator, or any substitution
+// (`$(...)`, `${x}`, backticks) whose value is unknowable here.
+function tokenize(command: string): string[] | null {
+  const tokens: string[] = [];
+  let current: string | null = null;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command.charAt(i);
+
+    if (/\s/.test(char)) {
+      if (char === "\n") return null;
+      if (current !== null) {
+        tokens.push(current);
+        current = null;
+      }
+      continue;
+    }
+
+    if (char === "'") {
+      const end = command.indexOf("'", i + 1);
+      if (end === -1) return null;
+      current = (current ?? "") + command.slice(i + 1, end);
+      i = end;
+      continue;
+    }
+
+    if (char === '"') {
+      let value = "";
+      let j = i + 1;
+      for (; j < command.length && command[j] !== '"'; j++) {
+        const inner = command.charAt(j);
+        if (inner === "$" || inner === "`") return null;
+        if (inner === "\\") {
+          const escaped = command[j + 1];
+          if (escaped === undefined) return null;
+          value += escaped;
+          j++;
+          continue;
+        }
+        value += inner;
+      }
+      if (j >= command.length) return null;
+      current = (current ?? "") + value;
+      i = j;
+      continue;
+    }
+
+    if (char === "\\") {
+      const escaped = command[i + 1];
+      if (escaped === undefined || escaped === "\n") return null;
+      current = (current ?? "") + escaped;
+      i++;
+      continue;
+    }
+
+    if (OPERATORS.has(char)) return null;
+    current = (current ?? "") + char;
+  }
+
+  if (current !== null) tokens.push(current);
+  return tokens;
 }
 
+// The `Bash(open:*)` rule only narrows which calls spawn this hook. It fails
+// open on shell metacharacters, so `open notes.txt && echo done.shortcut`
+// reaches here, and the extension of the last word would describe the `echo`
+// rather than what `open` receives. Since this hook can hand back a sandbox
+// bypass, it decides on its own parse: a compound yields no target, and the call
+// falls through to normal permissions.
 function extractTarget(command: string): string | null {
-  const trimmed = command.trim();
-  if (!trimmed.startsWith("open ")) {
+  const tokens = tokenize(command) ?? [];
+  if (tokens.length < 2 || tokens[0] !== "open") {
     return null;
   }
-
-  const args = trimmed.slice("open ".length).trim();
-
-  // Match the last quoted or unquoted argument, skipping flags
-  const tokens = args.match(/"[^"]+"|'[^']+'|\S+/g);
-  if (!tokens) {
-    return null;
-  }
-
-  const lastToken = tokens[tokens.length - 1]!;
-  return unquote(lastToken);
+  return tokens.at(-1) ?? null;
 }
 
 export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {

@@ -1383,7 +1383,11 @@ describe("skill-auto-vs-explicit query", () => {
   };
 
   it("counts a Skill call carrying args as model routing, not an explicit invocation", async () => {
-    const rows = await runQuery<Split>(db, "skill-auto-vs-explicit", filterParams({ min_calls: null }));
+    const rows = await runQuery<Split>(
+      db,
+      "skill-auto-vs-explicit",
+      filterParams({ min_calls: null }),
+    );
     const peer = rows.find((r) => r.skill_name === "review:peer");
     // Both review:peer calls pass args and neither was typed as a slash command.
     expect(Number(peer?.model_auto)).toBe(2);
@@ -1391,7 +1395,11 @@ describe("skill-auto-vs-explicit query", () => {
   });
 
   it("counts a typed slash command as explicit and a skill-attributed call as chained", async () => {
-    const rows = await runQuery<Split>(db, "skill-auto-vs-explicit", filterParams({ min_calls: null }));
+    const rows = await runQuery<Split>(
+      db,
+      "skill-auto-vs-explicit",
+      filterParams({ min_calls: null }),
+    );
     const peer = rows.find((r) => r.skill_name === "review:peer");
     expect(Number(peer?.explicit)).toBe(1);
     const create = rows.find((r) => r.skill_name === "pull-request:create");
@@ -1401,7 +1409,11 @@ describe("skill-auto-vs-explicit query", () => {
   });
 
   it("keeps an unnamespaced skill from absorbing unparsed command markers", async () => {
-    const rows = await runQuery<Split>(db, "skill-auto-vs-explicit", filterParams({ min_calls: null }));
+    const rows = await runQuery<Split>(
+      db,
+      "skill-auto-vs-explicit",
+      filterParams({ min_calls: null }),
+    );
     const solo = rows.find((r) => r.skill_name === "solo");
     expect(Number(solo?.explicit)).toBe(0);
     expect(Number(solo?.total)).toBe(1);
@@ -1853,7 +1865,11 @@ describe("index-health query", () => {
   it("alerts when recovered hook denies outnumber the denies hook_events recorded", async () => {
     // A window wide enough to cover the whole fixture corpus, so the check reads the
     // same rows regardless of when the newest fixture record is dated.
-    const rows = await runQuery<Health>(db, "index-health", healthParams({ deny_window_days: "100000" }));
+    const rows = await runQuery<Health>(
+      db,
+      "index-health",
+      healthParams({ deny_window_days: "100000" }),
+    );
     const deny = rows.find((r) => r.check_name === "hook-deny-invisible");
     expect(deny?.status).toBe("alert");
     expect(deny?.subject).toBe("2 denies recovered");

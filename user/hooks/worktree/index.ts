@@ -9,19 +9,24 @@ export type BashInput = {
 
 const ALLOWED_SUBCOMMANDS = new Set(["list", "prune", "unlock"]);
 const REPLACED_SUBCOMMANDS = new Set(["add", "remove"]);
-const TMP_TARGET = /^(\.\/)?tmp\//;
-const AGENT_WORKTREE_TARGET = /(^|\/)\.claude\/worktrees\//;
+const TMP_TARGET = /(^|\/)tmp\//;
+const UNEXPANDED_VAR_TARGET = /^\$\{?\w+\}?\//;
+const AGENT_WORKTREE_TARGET = /(^|\/)\.worktrees\//;
+
+function isExemptTarget(token: string): boolean {
+  return TMP_TARGET.test(token) || UNEXPANDED_VAR_TARGET.test(token);
+}
 
 export function isThrowawayAdd(command: string): boolean {
   const after = command.split(/\bgit\s+worktree\s+add\b/)[1];
   if (after === undefined) return false;
-  return after.split(/\s+/).some((tok) => TMP_TARGET.test(tok));
+  return after.split(/\s+/).some(isExemptTarget);
 }
 
 export function isThrowawayRemove(command: string): boolean {
   const after = command.split(/\bgit\s+worktree\s+remove\b/)[1];
   if (after === undefined) return false;
-  return after.split(/\s+/).some((tok) => TMP_TARGET.test(tok) || AGENT_WORKTREE_TARGET.test(tok));
+  return after.split(/\s+/).some((tok) => isExemptTarget(tok) || AGENT_WORKTREE_TARGET.test(tok));
 }
 
 export function formatDenyOutput(subcommand: string): SyncHookJSONOutput {
@@ -30,7 +35,7 @@ export function formatDenyOutput(subcommand: string): SyncHookJSONOutput {
     subcommand === "add"
       ? `${base} For a throwaway verification checkout, add it under \`tmp/\`.`
       : subcommand === "remove"
-        ? `${base} Throwaway worktrees under \`tmp/\` or \`.claude/worktrees/\` may be removed directly.`
+        ? `${base} Throwaway worktrees under \`tmp/\` or \`.worktrees/\` may be removed directly.`
         : base;
   return {
     hookSpecificOutput: {

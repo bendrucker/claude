@@ -319,7 +319,8 @@ export async function findBacktickedCommits(
 // The `if` rules in hooks.json scope dispatch to `gh pr create`/`edit` and
 // `glab mr create`/`update`, covering compound (`cd <dir> && gh pr create ...`)
 // and env-prefixed (`GH_PAGER=cat gh pr create ...`) forms. This guard repeats
-// the check in-script so the validator is inert under any other dispatch.
+// the check in-script so the validator is inert under any other dispatch, and
+// runs before the hook reads a body file or shells out to git.
 const PR_BODY_COMMAND_PATTERN = /\b(?:gh pr (?:create|edit)|glab mr (?:create|update))\b/;
 
 export function isPrBodyCommand(command: string): boolean {

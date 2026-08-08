@@ -87,6 +87,10 @@ describe("isPrBodyCommand", () => {
     ["git status", false],
     ["gh pr list", false],
     ["gh pr view 12", false],
+    ["ls -la", false],
+    ["{ echo one; echo two; }", false],
+    ["for f in *.ts; do wc -l $f; done", false],
+    ["cat <<'EOF' > notes.md\nnothing here\nEOF", false],
   ])("isPrBodyCommand(%p) -> %p", (command, expected) => {
     expect(isPrBodyCommand(command)).toBe(expected);
   });
@@ -564,6 +568,16 @@ describe("processInput", () => {
   it("returns null when command has no --body-file", async () => {
     const result = await processInput(createInput("gh pr create --title 'Test'"));
     expect(result).toBeNull();
+  });
+
+  // A dispatch that escapes the `if` rules must stay inert, including one that
+  // names a body file the hook must not read.
+  test.each<[string]>([
+    ["ls -la"],
+    ["cat /tmp/body.md"],
+    ["{ echo one; echo two; }"],
+  ])("returns null for unrelated command %p", async (command) => {
+    expect(await processInput(createInput(command))).toBeNull();
   });
 
   it("returns null when tool_input has no command", async () => {

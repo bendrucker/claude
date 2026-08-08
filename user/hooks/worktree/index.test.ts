@@ -58,9 +58,7 @@ describe("processInput", () => {
   });
 
   it("allows git worktree add under an absolute /tmp/ path", () => {
-    expect(
-      processInput(bashInput("git worktree add /tmp/claude-baseline-check")),
-    ).toBeNull();
+    expect(processInput(bashInput("git worktree add /tmp/claude-baseline-check"))).toBeNull();
   });
 
   it("allows git worktree add under an absolute /private/tmp/ path", () => {
@@ -70,9 +68,7 @@ describe("processInput", () => {
   });
 
   it("allows git worktree add under a repo-absolute tmp/ path", () => {
-    expect(
-      processInput(bashInput("git worktree add /Users/me/repo/tmp/verify")),
-    ).toBeNull();
+    expect(processInput(bashInput("git worktree add /Users/me/repo/tmp/verify"))).toBeNull();
   });
 
   it("allows git worktree add under an unexpanded $TMPDIR", () => {

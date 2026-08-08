@@ -12,7 +12,9 @@ allowed-tools:
   - Bash(bunx:*)
   - Bash(gh:*)
   - Skill(pull-request:follow-up)
+  - Skill(github:actions-monitor)
   - Skill(github:stack)
+  - Skill(gitlab:ci-monitor)
   - Skill(gitlab:merge-request)
   - Skill(git:conflicts)
   - mcp__github
@@ -65,7 +67,7 @@ For non-trivial failures (logic bugs, design issues, flaky tests, environment-de
 
 #### status: success
 
-Green on a conflicting PR is stale: if a `conflicts` or unresolved `mergeable-unknown` event arrived for the current SHA, address it (per [conflicts](#conflicts) or [mergeable-unknown](#mergeable-unknown)) before treating green as done.
+Green on a conflicting PR is stale: if a `conflicts` or unresolved `mergeable-unknown` event arrived for the current SHA, address it per [`references/events.md`](references/events.md) before treating green as done.
 
 Summarize the session: run `git log ${start-sha}..HEAD --oneline` for the commits pushed while babysitting.
 
@@ -75,49 +77,9 @@ Then branch on the `$ARGUMENTS` flags:
 - **`--merge`**: don't stop here. Drive the PR to merged. See [Merge Mode](#merge-mode).
 - **neither**: report the summary and call `TaskStop`.
 
-#### conflicts
+#### other events
 
-Reproduce the conflict locally to identify the conflicting files:
-
-```
-git merge origin/<base> --no-commit --no-ff
-git diff --name-only --diff-filter=U
-git merge --abort
-```
-
-Lockfiles or generated files (`bun.lock`, etc.): regenerate per project convention (e.g. `rm bun.lock && bun install`), commit, push.
-
-Real source conflicts: rebase on `origin/<base>` and delegate to the `git:conflicts` skill. Resolve, commit, and push where mechanically clear. Where ambiguous or semantic, report the conflicting hunks and call `TaskStop` (this runs unattended, so never guess a merge).
-
-In Merge Mode, after any push here, re-arm per [Merge Mode](#merge-mode) and count it as a submit attempt.
-
-#### mergeable-unknown
-
-The platform could not determine mergeability after its own bounded re-polling, so run the authoritative local check: `git fetch origin <base>`, then the same dry-run as [conflicts](#conflicts). Conflicting paths route through that handler. If the merge is clean, report that the PR is mergeable and keep watching.
-
-#### queued-timeout
-
-Report the event (include `minutes`) and wait. The watcher continues polling.
-
-#### api-error
-
-Report the event (include `consecutive`). If consecutive errors continue past a second threshold event, call `TaskStop`.
-
-#### rate-limited
-
-Report `retry_after` and wait. The watcher resumes polling once the window elapses.
-
-#### pr-closed
-
-The PR closed without merging, or its source branch no longer exists. Report and stop. The watcher has already exited.
-
-#### merged
-
-The PR landed. In [Merge Mode](#merge-mode) this is the success terminal: report the merge and the work done since the start SHA, then stop. The watcher has already exited.
-
-#### max-time-reached
-
-Report the event (include `minutes`) and the work done since the start SHA, then stop. The watcher has already exited; do not re-arm (see [Bounds](#bounds)).
+The watcher also emits `conflicts`, `mergeable-unknown`, `queued-timeout`, `api-error`, `rate-limited`, `pr-closed`, `merged`, and `max-time-reached`. Load [`references/events.md`](references/events.md) for those handlers when one of these arrives.
 
 ## Reviews Hand-off
 

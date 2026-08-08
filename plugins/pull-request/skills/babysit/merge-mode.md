@@ -37,7 +37,7 @@ On a stacked PR, don't re-submit after the push. Wait for the watcher's next `st
 Then watch the merge through the monitor rather than polling by hand: invoke the provider's monitor skill again on the PR and react to its events. The watcher enforces the interval and the wall clock, so this phase stays bounded like the CI wait (see [Bounds](SKILL.md#bounds)) and babysit owns no loop here. React to:
 
 - `merged`: the PR landed. Report success and `TaskStop`.
-- `conflicts`: route through the [conflicts](SKILL.md#conflicts) handler, then re-arm. Counts as a submit attempt.
+- `conflicts`: route through the [conflicts](references/events.md#conflicts) handler, then re-arm. Counts as a submit attempt.
 - `status: failing`: route through the [status: failing](SKILL.md#status-failing) handler; the pushed fix produces a new SHA, then re-arm. Counts as a submit attempt.
 - `pr-closed`: the PR closed without merging. Report and `TaskStop`.
 - `max-time-reached`: report and `TaskStop`; do not re-arm.

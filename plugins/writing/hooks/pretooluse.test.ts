@@ -4,6 +4,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { check as headingCheck } from "./headings";
 import { dispatch } from "./pretooluse";
 
 // Session-state files land in $TMPDIR. Redirect it so test runs do not litter
@@ -242,6 +243,36 @@ describe("scratch paths", () => {
     );
     await rm(dir, { recursive: true, force: true });
     expect(contextOf(output)).toContain("delve");
+  });
+});
+
+// The dispatcher loads the heading checker only for markdown, so its own
+// extension test has to agree with the checker's for every extension the hook
+// sees. Where they disagree the hook quietly stops reporting findings it used
+// to report, and nothing else fails.
+describe("heading checker gate", () => {
+  // A lowercase heading over clean prose. Only the heading checker has a rule
+  // for it, so the dispatcher's winning category names that checker exactly
+  // when it ran.
+  const HEADING_VIOLATION = "# the cache layer\n\nStores records in memory.\n";
+
+  test.each([
+    "md",
+    "markdown",
+    "mdx",
+    "txt",
+    "rst",
+    "adoc",
+    "ts",
+    "go",
+    "yml",
+    "json",
+    "vue",
+  ])("agrees with headings.check on .%s", async (ext) => {
+    const toolInput = { file_path: `docs/note.${ext}`, content: HEADING_VIOLATION };
+    const direct = await headingCheck(mockInput("Write", toolInput));
+    const { log } = await dispatch(mockInput("Write", toolInput));
+    expect(log.category ?? null).toBe(direct?.category ?? null);
   });
 });
 

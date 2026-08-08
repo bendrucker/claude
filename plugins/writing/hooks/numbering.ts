@@ -6,8 +6,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import type { Heading, Text } from "mdast";
-import { fromMarkdown } from "mdast-util-from-markdown";
-import { visit } from "unist-util-visit";
 import { getExtension, isMarkdownFile } from "../detection/paths";
 import {
   type EditInput,
@@ -16,6 +14,7 @@ import {
   type HookResult,
   type WriteInput,
 } from "./io";
+import { loadMarkdown } from "./mdast";
 
 export type Mode = "write" | "edit";
 
@@ -44,7 +43,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // so only explicit step labels count.
 const STEP_HEADING = /^(Step|Phase|Part)\s+[0-9]+/i;
 
-export function checkMarkdown(content: string): string | null {
+export async function checkMarkdown(content: string): Promise<string | null> {
+  const { fromMarkdown, visit } = await loadMarkdown();
   const ast = fromMarkdown(content);
   const matches: MarkdownMatch[] = [];
 
@@ -123,7 +123,9 @@ async function fileAlreadyNumbered(filePath: string, ext: string): Promise<boole
     return false;
   }
 
-  const match = isMarkdownFile(ext) ? checkMarkdown(existing) : await checkCode(existing, ext);
+  const match = isMarkdownFile(ext)
+    ? await checkMarkdown(existing)
+    : await checkCode(existing, ext);
   return match !== null;
 }
 
@@ -151,7 +153,7 @@ export async function check(input: PreToolUseHookInput, mode: Mode): Promise<Hoo
   let match: string | null = null;
 
   if (isMarkdownFile(ext)) {
-    match = checkMarkdown(content);
+    match = await checkMarkdown(content);
   } else {
     match = await checkCode(content, ext);
   }

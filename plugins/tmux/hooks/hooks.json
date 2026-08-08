@@ -1,5 +1,5 @@
 {
-  "description": "Inject tmux context, persist the session's resume command for tmux-resurrect, and ring terminal bell for notifications",
+  "description": "Inject tmux context and ring terminal bell for background notifications",
   "hooks": {
     "SessionStart": [
       {
@@ -7,14 +7,6 @@
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/context.ts\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -n \"$TMUX_PANE\" ] && tmux set-option -p -t \"$TMUX_PANE\" @resume-command \"claude --resume $CLAUDE_CODE_SESSION_ID\" || true"
           }
         ]
       }
@@ -26,27 +18,6 @@
           {
             "type": "command",
             "command": "[ -z \"$TMUX\" ] || { [ -n \"$TMUX_PANE\" ] && [ -z \"$(tmux show-options -gqv \"@claude_notification_${TMUX_PANE#%}\")\" ]; } || bun \"${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts\" --clear"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/target.ts\"",
-            "if": "Bash(tmux:*)"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "permission_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/notification.ts\""
           }
         ]
       }

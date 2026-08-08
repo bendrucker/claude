@@ -409,7 +409,6 @@
     "github@bendrucker": true,
     "claude-code@bendrucker": true,
     "pull-request@bendrucker": true,
-    "interview@bendrucker": true,
     "github@claude-plugins-official": true,
     "x-callback-url@bendrucker": true,
     "research@bendrucker": true,

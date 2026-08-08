@@ -26,8 +26,6 @@ Investigate to convergence first. Plan mode transcribes findings that are alread
 
 When the request names a vague noun ("a skill", "a few rules", "a workflow"), state the smallest change that satisfies the literal ask, then offer heavier work as named tiers. A guard, rule, or test that catches zero existing cases is speculative: ask before adding it.
 
-This relaxes when the user asked for thorough upfront planning (`interview:plan`). There, depth is the point.
-
 ## Direction Before Detail
 
 Settle the approach before the file exists, not by presenting a thin plan and waiting for a redirect. When more than one viable approach is live, fire an `AskUserQuestion` and write into the answer. A plan presented to elicit direction spends the presentation on a question one `AskUserQuestion` answers first, and what comes back is a rewrite rather than an edit.

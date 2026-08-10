@@ -52,15 +52,23 @@ Both modes follow this contract.
 
 Read-only first. The sources are independent (review queue, own PRs, tracker, messaging inbox, email inbox), so dispatch parallel read-only sub-agents and merge their results. Merge on shared identifiers: when items from different sources name the same issue or MR, they are one piece of work and become one brief entry carrying every source's state. The join is the orchestrator's job, keyed on the cross-references each sub-agent returns.
 
+#### Reporting
+
+End every gather prompt by naming the report as the agent's final action: send it to the orchestrator before going idle. An agent that goes idle carrying no report gets one nudge, never a second. When the nudge produces nothing, treat that source as timed out.
+
+Gather runs against a five-minute deadline from dispatch. Past it, stop the outstanding agent (`TaskStop` for an `Agent` dispatch) and run its source inline.
+
+Surface each source's findings as it lands, so a stalled source delays one entry instead of the brief. Hold the merge and the brief entries themselves until every source has reported or been run inline.
+
 #### Agents
 
-Background Claude sessions may already be working items in the brief. Run `claude agents --json --all` inline in the orchestrator rather than in a sub-agent: it is one command, and the join needs the raw records that a sub-agent summary would flatten. Each record carries `id`, `sessionId`, `name`, `cwd`, `kind`, `startedAt`, `status`, `state`, and, when blocked, `waitingFor`. `state` is `working`, `blocked`, `done`, or `failed`, and is null for interactive sessions.
+Background Claude sessions may already be working items in the brief. Run `claude agents --json --all` inline in the orchestrator rather than in a sub-agent: it is one command, and the join needs the raw records that a sub-agent summary would flatten. Every record carries `sessionId`, `name`, `cwd`, `kind`, and `startedAt`. The rest is keyed to `kind`: a `background` record adds `id` and `state` (`working`, `blocked`, `done`, or `failed`, plus `waitingFor` when blocked), and an `interactive` record adds `pid` and `status` instead. Join on `sessionId`, the one field both kinds share.
 
 When `HERDR_PANE_ID` is set, a second inline call, `herdr agent list`, maps live sessions to the terminal panes running them. Join its agents to the `claude agents` records on `sessionId == agent_session.value` and record the matched `pane_id` on the brief item. That join is exact, so never fall back to a title or `cwd` comparison. When `HERDR_PANE_ID` is unset there is no herdr server to ask, so skip the call and the resume command below carries the handoff. Load the `herdr` skill for the mechanics and for which commands answer with JSON.
 
 Join each record to a brief item in this order:
 
-1. A `name` matching the `job:<identifier>` convention below. Exact and structural, so it is the only join that never guesses.
+1. A `name` matching the `job-<identifier>` convention below, with the identifier in its sanitized form. Exact and structural, so it is the only join that never guesses.
 2. A full PR URL in `name`, or an issue key or `#`-prefixed PR number bounded by non-alphanumeric characters and confirmed against the repo `cwd` resolves to. This covers sessions launched by hand. Do not match a bare substring: `#42` occurs inside `#142`, and every repo has a PR numbered 42.
 3. `cwd` resolved to a repo, narrowing the candidate items, plus a semantic match of the name text against item titles.
 
@@ -92,10 +100,22 @@ Close with the mode's cross-project synthesis: the day's sequence, or the night'
 
 Split recommended actions into two groups:
 
-- Safe: reversible or expected. Assign a reviewer, retry CI, add a reaction or brief acknowledgement, post a reply the user has seen drafted, update tracker status, archive a handled notification or email.
-- Ask-first: approve, close, merge, anything hard to walk back. Each needs its own confirmation.
+- Safe: reversible or expected. Assign a reviewer, retry CI, add a reaction or brief acknowledgement, post a reply the user has seen drafted, correct a tracker status, archive a handled notification or email.
+- Ask-first: approve, merge, close without the evidence below, anything hard to walk back. Each needs its own confirmation.
+
+Closing a tracker issue is safe only on evidence the orchestrator checked itself: that issue's own MR merged, or its acceptance criteria met in the code. A sub-agent reporting a merged MR is evidence about the MR. Confirm the MR belongs to the issue before it becomes evidence about the issue, since a linked MR may belong to a sibling.
 
 Drive inbound to zero. Every review request, message, notification, and email leaves the run with a terminal disposition: handled, reacted to or briefly acknowledged, deferred to the work tracker as a team-backlog item or to the personal inbox for your own next-steps and reminders when one is configured, or archived. Never stand up a tracker issue in place of a personal capture: when the user says "my inbox" that means the personal inbox, and when the destination is unclear, ask. Nothing stays in an ambiguous unread state. Where a reaction or brief acknowledgement closes a thread, prefer that over a filler reply. Draft a reply only when it carries real content, and keep it terse.
+
+#### Questions
+
+A question that blocks a dispatch goes into a running list the moment it arises, ranked by how many dispatches its answer releases. Write the list to a file and name its path in the brief. It survives an interrupted turn, and the user can read it before returning. Everything the list does not block keeps moving meanwhile.
+
+Ask in one pass, top blockers first, when the user is available.
+
+A background agent's idle notification arrives as a user turn and cancels an open question, so prefer to ask while nothing is mid-flight. When a notification does cancel a question, re-ask it. The interrupt is not an answer.
+
+#### Execution
 
 Present safe actions via AskUserQuestion (execute all, pick a subset, or none). Execute through the delegated skills, then give a short summary of what changed.
 
@@ -105,4 +125,6 @@ Never dispatch over an item with a live session. When the item's session resolve
 
 A prior session that is `done` or `failed` does not block a fresh dispatch, but when the work needs another pass, name that `sessionId` in the new prompt so the new session can look up what already happened.
 
-Every session this skill dispatches gets `--name "job:<identifier>"`, reusing the identifier from the brief. That is what lets tomorrow's run join by name alone.
+Every session this skill dispatches is named `job-<identifier>`, reusing the identifier from the brief. That is what lets tomorrow's run join by name alone.
+
+The `Agent` tool sets the constraint: its `name` accepts letters, digits, underscores, and hyphens, must start with a letter or digit, and caps at 64 characters. `claude --bg --name` is looser, so sanitizing to the `Agent` set yields one form that serves both. Sanitize the identifier and truncate it to fit. `ENG-2408` survives as written, and MR 789 in `acme/api` becomes `job-api-mr-789`, since a bare `job-789` says nothing about which repo it belongs to. The sanitized name is what `claude agents --json` reports back, so it is also what the join above matches.

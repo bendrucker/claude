@@ -2,6 +2,7 @@
 import { mkdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { styleText } from "node:util";
+import { type ContextToken, type DialReport, reportContextDial } from "./context-dial";
 import { effortMarker } from "./effort";
 import { dialGlyph } from "./glyphs";
 import { modelMarker } from "./model";
@@ -15,6 +16,7 @@ interface CurrentUsage {
 }
 
 interface StatusInput {
+  session_id?: string;
   model?: { id?: string; display_name?: string } | null;
   effort?: { level?: string } | null;
   context_window?: { used_percentage?: number | null; current_usage?: CurrentUsage | null };
@@ -117,13 +119,31 @@ export function effortSegment(input: StatusInput): string | null {
   return marker ? configMarker(marker.glyph, marker.isDefault) : null;
 }
 
-export function dialSegment(input: StatusInput): string | null {
+function dialState(input: StatusInput): { color: DialColor; glyph: string } | null {
   const pct = input.context_window?.used_percentage;
   if (pct == null) return null;
 
   const intPct = Math.round(pct);
-  const color = dialColor(intPct, exceeds200k(input));
-  return styleText(color, dialGlyph(dialIndex(intPct)));
+  return { color: dialColor(intPct, exceeds200k(input)), glyph: dialGlyph(dialIndex(intPct)) };
+}
+
+export function dialSegment(input: StatusInput): string | null {
+  const dial = dialState(input);
+  return dial ? styleText(dial.color, dial.glyph) : null;
+}
+
+const DIAL_TOKENS: Record<DialColor, ContextToken> = {
+  green: "ctx_low",
+  yellow: "ctx_mid",
+  redBright: "ctx_high",
+  red: "ctx_crit",
+};
+
+// The same dial herdr's sidebar shows, named by color rather than styled: see
+// `context-dial.ts` for why the color rides on the token name.
+export function contextDial(input: StatusInput): DialReport | null {
+  const dial = dialState(input);
+  return dial ? { token: DIAL_TOKENS[dial.color], value: dial.glyph } : null;
 }
 
 export function linesSegment(input: StatusInput): string | null {
@@ -333,5 +353,14 @@ if (import.meta.main) {
     const parsed = Number(process.env.COLUMNS);
     const columns = Number.isInteger(parsed) && parsed > 0 ? parsed : 80;
     process.stdout.write(buildStatusLine(input, columns, resolveWorktree()));
+
+    const dial = contextDial(input);
+    if (dial && input.session_id) {
+      try {
+        await reportContextDial(input.session_id, dial);
+      } catch {
+        // The sidebar mirror is best-effort, and the line is already written.
+      }
+    }
   }
 }

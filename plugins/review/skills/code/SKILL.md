@@ -2,7 +2,7 @@
 name: review:code
 description: |
   Review the current diff for correctness bugs and reuse/simplification/efficiency cleanups at a given effort level. Use for "review my changes", "review the diff", "find bugs in my changes", or as the correctness pass before opening a PR. Low/medium surface fewer, high-confidence findings. High and xhigh broaden coverage and may include uncertain findings. Pass --fix to apply the findings to the working tree after the review.
-argument-hint: "[low|medium|high|xhigh] [--fix] [--base <ref>] [<target>]"
+argument-hint: "[low|medium|high|xhigh] [--effort <level>] [--fix] [--base <ref>] [<target>]"
 allowed-tools:
   - Agent
   - ReportFindings
@@ -26,7 +26,7 @@ This is a port of Claude Code's built-in `/code-review`, which is user-invocable
 
 ## Arguments
 
-- **Effort level**: the first token, if it matches `^(low|med|hig|xhi|max)[a-z]*$` case-insensitively. Prefixes count: `med`, `hi`, `xh` all resolve. `xhigh` is the top of the ladder, and `max` resolves to it. Ignore an unrecognized level-shaped token with a brief note naming the valid levels. Do not treat it as a target.
+- **Effort level**: the first token, if it matches `^(low|med|hig|xhi|max)[a-z]*$` case-insensitively. Prefixes count: `med`, `hi`, `xh` all resolve. `xhigh` is the top of the ladder, and `max` resolves to it. `--effort <level>` is an alias, valid anywhere in the arguments, and its value goes through the same match. Ignore an unrecognized level-shaped token with a brief note naming the valid levels. Do not treat it as a target.
 - **`--fix`**: apply findings to the working tree after reporting. May appear anywhere.
 - **`--base <ref>`**: review against this base instead of the resolved default.
 - **`<target>`**: everything else, free-form. A PR number, branch, ref range, path, or a plain-English scope restriction ("only `src/parser.ts`", "focus on error handling", "skip the test churn").

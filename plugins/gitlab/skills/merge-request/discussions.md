@@ -15,6 +15,9 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid>
 # Filter by author
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --author username
 
+# Only review bots
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --bots
+
 # Only unresolved resolvable discussions
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --unresolved
 
@@ -29,6 +32,8 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 Three output formats: `json` (default), `digest`, and `table`.
 
 To filter `--author` to yourself, resolve your username with `glab api user 2>/dev/null | jq -r .username`. The `glab api user --jq .username` form returns empty on glab 1.102.0.
+
+`--bots` matches by username shape, since GitLab exposes nothing that marks an account as a bot: a `-bot`/`_bot` suffix, or a `group_<id>_bot_<hash>`/`project_<id>_bot_<hash>` token service account. Bots that break those conventions, and humans whose threads should be treated the same way, go one per line in `$CLAUDE_PLUGIN_DATA/reviewers.txt`.
 
 The script resolves the project from the current directory's git remote. Run it from a checkout of the MR's repo; from an unrelated directory it returns `[]`.
 
@@ -79,12 +84,6 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 ```bash
 # Resolve specific discussions
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id> [<discussion-id>...]
-
-# Resolve all by a specific author
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> --all-by username
-
-# Unresolve
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id> --unresolve
 ```
 
 Or directly via the API:
@@ -121,25 +120,7 @@ Diff refs are fetched automatically. Positioned comments are validated against d
 
 ### Suggestions
 
-Use GitLab's suggestion syntax in the body. The `-N+M` offset replaces N lines above and M lines below the commented line:
-
-````markdown
-```suggestion:-0+0
-replacement code
-```
-````
-
-For multi-line replacements (replace commented line plus 2 below):
-
-````markdown
-```suggestion:-0+2
-first line
-second line
-third line
-```
-````
-
-Combine with the `create` command by writing the suggestion to a file first:
+For GitLab's suggestion syntax and its `-N+M` offsets, see [Code Suggestions](review.md#code-suggestions) in review.md. Write the suggestion to a file, then pass it to `create`:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/suggestion.md

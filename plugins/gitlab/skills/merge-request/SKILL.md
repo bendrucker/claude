@@ -90,7 +90,3 @@ Re-trigger a review after a push reset approvals. The `mergeRequestReviewerRerev
 ## Discussions
 
 Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md](discussions.md) for the discussions script, resolution workflow, and pagination pitfalls.
-
-## Stacking
-
-`glab stack` manages stacked diffs, small changes that build on each other. See [stack.md](stack.md).

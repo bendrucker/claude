@@ -15,4 +15,4 @@ gh stack link <bottom> ... <this-branch>   # parent isn't: list the chain bottom
 
 Exit code 9 means the repo doesn't have stacked PRs enabled. Leave the PR as it is: `--base <parent>` already targets the right branch, and with no stack object the merge takes the ordinary `gh pr merge` path. Say so and move on.
 
-Load `github:stack` for the two layouts, the queries, and the merge behavior. For advanced GitLab features (stacking, username lookup), load `gitlab:merge-request`.
+Load `github:stack` for the two layouts, the queries, and the merge behavior. For advanced GitLab features (username lookup), load `gitlab:merge-request`.

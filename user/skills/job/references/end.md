@@ -4,7 +4,7 @@ The day ends with decisions. Nothing leaves it unsent, unanswered, unfiled, unpu
 
 ## Gather
 
-Dispatch parallel read-only sub-agents:
+Dispatch parallel read-only sub-agents, under the reporting contract and deadline in `SKILL.md`:
 
 - Outbox: your own PRs/MRs created or pushed today, with reviewer assignment, CI state, draft state, and whether the body still matches the diff.
 - Inbound: review requests still open against you, and threads on others' PRs/MRs awaiting your reply.

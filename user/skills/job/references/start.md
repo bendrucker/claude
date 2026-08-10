@@ -4,7 +4,7 @@ Start-of-work triage: what needs review, what is stuck in your outbox, what came
 
 ## Gather
 
-Dispatch parallel read-only sub-agents:
+Dispatch parallel read-only sub-agents, under the reporting contract and deadline in `SKILL.md`:
 
 - Inbound: PRs/MRs where the configured username is a requested reviewer or approver, with age, author, and whether you reviewed before.
 - Outbox: your own open PRs/MRs, with CI status, unresolved threads, reviewer assignment, and draft state.

@@ -51,7 +51,7 @@ Lead with intent: why this change, the decisions a reviewer can't reconstruct fr
 - Reference the motivating issue at the end of the opening (`Closes #N`, `Fixes #N`, or bare `#N` if not closing). Never touch the issue itself: no comments, labels, milestones, or assignees.
 - Wrap code identifiers in backticks, but leave bare anything the platform auto-links: commit SHAs and issue/MR refs (`#N`, `!N`, `owner/repo#N`). Backticks kill the link.
 
-Before drafting anything past a one-paragraph body, load [`references/sections.md`](references/sections.md): the substance catalog by change type, audience tiers, density and heading rules, evidence grounding, and slop to cut. Load the `writing` skill for the full set of tropes to avoid.
+Load the `writing` skill for the full set of tropes to avoid.
 
 When the context above shows a detected PR template, follow its structure instead of the default body format and load [`references/template.md`](references/template.md) for mapping content into its sections.
 
@@ -76,7 +76,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 1. Local bot review, gated: the Review bot line in Context above is the fast-path verdict, covering repo config, CLI presence, and any live cooldown. On a repo config hit with no cooldown, decide whether the diff is worth a metered review (follow-up's SKILL.md defines the gate). When it is, run `pull-request:follow-up --local` before pushing so findings surface while the branch is still local. With no config, a bot may still review the repo: follow-up's `local.md` hosted signals decide. Skip when a local bot pass already ran on this branch in this session (`/ship` runs it as a gated pass), when the gate says skip, when the provider is paused, when detection comes up empty, or when the user declines.
 1. Push the branch to remote: `git push -u origin HEAD`
 1. Resolve any `--label` values against the repo before creating (see [`references/labels.md`](references/labels.md)).
-1. Draft the body.
+1. Draft the body. Past a single paragraph, read [`references/sections.md`](references/sections.md) first: audience tiers, the substance catalog by change type, density and heading rules, evidence grounding, optional sections, and slop to cut.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`

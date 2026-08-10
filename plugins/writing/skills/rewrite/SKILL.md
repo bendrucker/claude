@@ -11,11 +11,18 @@ background: false
 allowed-tools:
   - Bash
   - Read
+  - Skill
 ---
 
 # Rewrite
 
-Rewrite input text to match the style rules in [references/style-rules.md](references/style-rules.md). Preserve all functional information. Change only voice, word choice, and sentence structure, conveying the same information in fewer, clearer words.
+Load the `writing:writing` skill for the style rules, then rewrite the input to match them. Preserve all functional information. Change only voice, word choice, and sentence structure, conveying the same information in fewer, clearer words.
+
+These rules apply on top of that skill:
+
+- Specific verbs over vague ones. "Generates a report" not "handles report generation."
+- No marketing language.
+- No excessive enthusiasm.
 
 ## Input
 

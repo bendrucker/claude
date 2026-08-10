@@ -17,8 +17,6 @@ The hook enforces these automatically. Specific vocabulary and marketing-verb li
 - Never use spaced em dashes (` — `).
 - Avoid "not just X, but also Y" parallelism. Simplify.
 - Don't join independent clauses with em dashes, semicolons, or hyphens. Write two sentences. Swapping one connector for another is not a fix. A rare semicolon is fine only when the clauses genuinely can't stand alone.
-- Don't structure bullets as `- **path/to/file**: description`.
-- Use `####` headers instead of `**Label:**` for labeled subsections.
 - Headings name the topic in a couple of words. No verbs, no `Topic: clause`, no sentence-shaped headings. Move the explanation into the body.
 
 #### Word Choice
@@ -34,6 +32,8 @@ The hook enforces these automatically. Specific vocabulary and marketing-verb li
 - Not "Tests cover X" but "Added tests covering X."
 - No trailing hedge adverbs ("regardless.", "nonetheless.").
 - No cross-sentence negation ("It isn't X. It is Y."). Combine or drop the negation.
+- No test counts, pass/fail tallies, or CI status. Describe what the tests cover.
+- No `X, not Y` contrast. State the positive directly.
 
 #### Outbound Email and Messages
 

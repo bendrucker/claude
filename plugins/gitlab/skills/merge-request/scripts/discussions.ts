@@ -276,37 +276,13 @@ const resolveCmd = command(
   {
     name: "resolve",
     parameters: ["<iid>", "[ids...]"],
-    flags: {
-      allBy: {
-        type: String,
-        description: "Resolve all discussions by this author",
-      },
-      unresolve: {
-        type: Boolean,
-        description: "Unresolve instead of resolve",
-        default: false,
-      },
-    },
   },
   async (parsed) => {
     const iid = parsed._.iid;
-    const resolvedValue = parsed.flags.unresolve ? "false" : "true";
-    let ids = parsed._.ids ?? [];
 
-    if (parsed.flags.allBy) {
-      const raw =
-        await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
-      const discussions = parseGlabPaginated(raw) as Discussion[];
-      ids = filterDiscussions(discussions, {
-        author: parsed.flags.allBy,
-        resolvable: true,
-        unresolved: !parsed.flags.unresolve,
-      }).map((d) => d.id);
-    }
-
-    for (const id of ids) {
-      await $`glab api projects/:id/merge_requests/${iid}/discussions/${id} -X PUT -f resolved=${resolvedValue}`.text();
-      console.error(`${parsed.flags.unresolve ? "Unresolved" : "Resolved"}: ${id}`);
+    for (const id of parsed._.ids ?? []) {
+      await $`glab api projects/:id/merge_requests/${iid}/discussions/${id} -X PUT -f resolved=true`.text();
+      console.error(`Resolved: ${id}`);
     }
   },
 );

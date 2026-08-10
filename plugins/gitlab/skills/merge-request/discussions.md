@@ -79,12 +79,6 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 ```bash
 # Resolve specific discussions
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id> [<discussion-id>...]
-
-# Resolve all by a specific author
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> --all-by username
-
-# Unresolve
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id> --unresolve
 ```
 
 Or directly via the API:
@@ -121,25 +115,7 @@ Diff refs are fetched automatically. Positioned comments are validated against d
 
 ### Suggestions
 
-Use GitLab's suggestion syntax in the body. The `-N+M` offset replaces N lines above and M lines below the commented line:
-
-````markdown
-```suggestion:-0+0
-replacement code
-```
-````
-
-For multi-line replacements (replace commented line plus 2 below):
-
-````markdown
-```suggestion:-0+2
-first line
-second line
-third line
-```
-````
-
-Combine with the `create` command by writing the suggestion to a file first:
+For GitLab's suggestion syntax and its `-N+M` offsets, see [Code Suggestions](review.md#code-suggestions) in review.md. Write the suggestion to a file, then pass it to `create`:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/suggestion.md

@@ -89,4 +89,16 @@ Re-trigger a review after a push reset approvals. The `mergeRequestReviewerRerev
 
 ## Discussions
 
-Fetch, filter, resolve, and summarize MR discussion threads. See [discussions.md](discussions.md) for the discussions script, resolution workflow, and pagination pitfalls.
+Fetch, filter, resolve, and summarize MR discussion threads.
+
+```bash
+# Open threads, one line each
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --unresolved --format digest
+
+# Only review-bot threads
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --bots
+
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id>...
+```
+
+See [discussions.md](discussions.md) for the other commands, output formats, and pagination pitfalls.

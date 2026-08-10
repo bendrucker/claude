@@ -26,20 +26,13 @@ Restating the diff has a subtle form that passes for substance: narrating the co
 
 Intent is what the code cannot state about itself: why the change exists, the requirement it satisfies, the constraint that forced this shape, the alternative it beat. Test each sentence. If a reader could reconstruct it by reading the changed code, it is narration, so cut it or replace it with the reason behind it. Quote or point to the issue requirement the change satisfies rather than paraphrasing what the code now does.
 
-## Shape
-
-Default to prose, not a scaffold.
-
-- Open with what changed (a bare verb: "Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when the change needs justifying. Don't restate the title. Don't open with "This PR introduces".
-- Length tracks substance, not diff size. A subtle one-line fix may need paragraphs of root-cause reasoning. A large mechanical change may need two sentences.
-- Use `##` sections only when the body is long enough to need them. A small PR is a tight paragraph with no headers. Past four or five paragraphs, unsectioned prose becomes hard to scan, so give it headings.
-
-### Density
+## Density
 
 The most common defect in real bodies is not the wrong content, it is the right content packed too tightly.
 
 - One thread per paragraph. A paragraph that runs past three or four sentences is doing too much. Split it.
 - One idea per sentence. A sentence that stacks clauses behind three or more commas is a list wearing prose clothing. It reads as a wall even when every clause is true.
+- Past four or five paragraphs, unsectioned prose gets hard to scan. Give it headings.
 - Prose carries reasoning that connects one point to the next. A list carries items that merely co-occur: findings, cases a test covers, checks run, files touched for one reason. When the content is a set of parallel items, make it a list. "Default to prose" bans the reflexive `## Changes` plus `## Testing` scaffold, not lists: compressing an enumeration into a run-on sentence is the same mistake from the other direction.
 
 ## Headings
@@ -79,8 +72,6 @@ When the work ran through sub-agents, the substance is in their returned summari
 
 Prefer showing to asserting. Link a permalink to the exact lines instead of paraphrasing code. Blockquote the doc or spec you reason from. Paste the real error, stack trace, or test output in a fence rather than describing it. "Reverting the fix makes `TestX` fail with `exit 2`" beats "added a test for the fix".
 
-Leave commit SHAs and issue/MR references (`#N`, `!N`, `owner/repo#N`) bare. Backticks render them as code and suppress the platform auto-link.
-
 ## Optional Sections
 
 Use these only when the body is long enough to earn them. A small PR stays a paragraph.
@@ -107,5 +98,6 @@ Related links, issues, or reviews that aren't the motivating issue. Use `Closes 
 
 Beyond what the sections above already ban:
 
+- The "This PR introduces" opening. Lead with the change or the problem.
 - Count-padding ("six detectors, three and three"). The number is rarely the point.
 - The consequence chain (`, so the…`) used as a filler connective, and the antithesis (`not just X but Y`, `X instead of Y`) used as framing. Both read as tics when habitual.

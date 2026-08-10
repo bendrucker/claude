@@ -3,8 +3,10 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { ContextToken } from "./context-dial";
 import {
   buildStatusLine,
+  contextDial,
   dialColor,
   dialIndex,
   dialSegment,
@@ -244,6 +246,35 @@ describe("exceeds200k", () => {
     expect(strip(before ?? "")).not.toBe(strip(after ?? ""));
     // The post-compaction dial uses the un-escalated color for its low percentage.
     expect(after).toBe(dialSegment({ context_window: { used_percentage: 10 } }));
+  });
+});
+
+describe("contextDial", () => {
+  test.each<[number, ContextToken]>([
+    [0, "ctx_low"],
+    [39, "ctx_low"],
+    [40, "ctx_mid"],
+    [64, "ctx_mid"],
+    [65, "ctx_high"],
+    [79, "ctx_high"],
+    [80, "ctx_crit"],
+    [100, "ctx_crit"],
+  ])("%i%% reports %s", (pct, token) => {
+    const input = { context_window: { used_percentage: pct } };
+    // The sidebar shows the same glyph the status line renders, minus the color.
+    expect(contextDial(input)).toEqual({ token, value: strip(dialSegment(input) ?? "") });
+  });
+
+  test("carries the exceeds_200k escalation the rendered dial uses", () => {
+    const input = {
+      context_window: { used_percentage: 30, current_usage: { input_tokens: 250_000 } },
+    };
+    expect(contextDial(input)?.token).toBe("ctx_mid");
+    expect(contextDial({ context_window: { used_percentage: 30 } })?.token).toBe("ctx_low");
+  });
+
+  test("reports nothing without a percentage", () => {
+    expect(contextDial({})).toBeNull();
   });
 });
 

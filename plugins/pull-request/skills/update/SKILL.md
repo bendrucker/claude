@@ -49,4 +49,4 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## GitLab Notes
 
-For advanced GitLab features (stacking, username lookup), load `gitlab:merge-request`.
+For advanced GitLab features (username lookup), load `gitlab:merge-request`.

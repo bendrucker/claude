@@ -4,28 +4,20 @@ The review's shape is chosen by `(model family, effort level)`. Read the active 
 
 ## Cell Selection
 
-| Model family | low | medium | high | xhigh | max |
-| --- | --- | --- | --- | --- | --- |
-| `default` | `low` | `medium` | `high` | `xhigh` | `max` |
-| `claude-sonnet-5` | `low-sonnet5` | `medium` | `high` + finder budget | `xhigh` + finder budget | `max` + finder budget |
-| `claude-opus-4-8` | `inline-low` | `inline-med` | `inline-high` | `inline-xhigh` | `max` |
-| `claude-fable-5` | `inline-low` | `inline-med` | `inline-high` | `xhigh` | `max` |
+| Model family | low | medium | high | xhigh |
+| --- | --- | --- | --- | --- |
+| `default` | `low` | `medium` | `high` | `xhigh` |
+| `claude-sonnet-5` | `low-sonnet5` | `medium` | `high` + finder budget | `xhigh` + finder budget |
+| `claude-opus-4-8` | `inline-low` | `inline-med` | `inline-high` | `inline-xhigh` |
+| `claude-fable-5` | `inline-low` | `inline-med` | `inline-high` | `xhigh` |
 
 The `inline-*` cells run every angle **inline in this context** with no subagent fan-out and no verify pass. They are upstream's `o48-*` cells under a family-neutral name, since two families now select them. [references/upstream-2.1.215.md](references/upstream-2.1.215.md) maps each one back to its upstream identifier.
 
 A capable orchestrator reviews better working through the angles itself than it does splitting them across agents, so both Opus 4.8 and Fable 5 stay inline through the middle of the ladder. The families part at `xhigh`. Opus 4.8 keeps upstream's inline calibration there, unchanged. Fable 5 fans out instead, at Sonnet rates, which buys breadth without paying Fable rates per angle.
 
-## Cheap and Expensive Modes
+## Spawn Model
 
-The fan-out cells come in two modes, and the difference is which model the subagents run on. `review:angle`, `review:verifier`, and `review:architect` pin no model of their own, so each spawn decides.
-
-**Cheap mode** is every fan-out cell below `max`. On Fable 5 and Opus 4.8 that means `xhigh`. Angles, verifiers, and the sweep spawn with `model: sonnet`. What these tiers buy is breadth, and breadth comes from many independent readers of the same diff. Paying the orchestrator's own rate for each of those readers buys nothing extra.
-
-**Expensive mode** is `max`, on every family. Angles, verifiers, and the sweep spawn with no model override and inherit the session model, and the architecture pass runs on top.
-
-Expensive mode exists for the relationship between reviewer and author. A reviewer below the authoring model's tier finds what a careful line-by-line reader finds. It rarely disputes the shape of the change, because seeing the shape takes the same capability that produced it. That makes `max` the level for structurally significant work authored by Opus or Fable, where the shape carries the risk. It puts the reviewer at or above the author's tier and adds a pass that reads the design.
-
-Cheap mode stays the right default. Most diffs fail on lines, and lines are what Sonnet reads well and cheaply.
+Every fan-out spawn passes `model: sonnet`. What a fan-out cell buys is breadth, and breadth comes from many independent readers of the same diff. Paying the orchestrator's own rate for each of those readers buys nothing extra. Most diffs fail on lines, and lines are what Sonnet reads well and cheaply.
 
 ## Budgets
 
@@ -37,7 +29,6 @@ Cheap mode stays the right default. Most diffs fail on lines, and lines are what
 | `medium` | 3 correctness + 3 cleanup + altitude + conventions = 8 | 6 | 1-vote, 3-state | no | <=8 | precision |
 | `high` | 8 | 6 | 1-vote, recall-biased | no | <=10 | recall |
 | `xhigh` | 5 correctness + 5 cleanup/altitude/conventions = 10 | 8 | 1-vote, single non-REFUTED carries | yes | <=15 | recall |
-| `max` | 10 + architecture pass | 8 | same as `xhigh` | yes | <=15 | recall, maximum |
 | `inline-med` | 8, inline | 6 | dedup only | no | <=8, floor 4 | recall |
 | `inline-high` | 8, inline | 6 | dedup only | no | <=10, floor 5 | recall |
 | `inline-xhigh` | 10, inline | 8 | dedup only | yes | <=15, floor 7 | recall |
@@ -64,10 +55,6 @@ Emit the framing for the selected cell before Phase 1. It sets the precision/rec
 
 > You are reviewing for **recall** at extra-high effort: catch every real bug. At this level, catching real bugs matters more than avoiding false positives — a missed bug ships. Err on the side of surfacing.
 
-### `max`
-
-Same as `xhigh` with "maximum" in place of "extra-high". The angle set is identical. What `max` adds is the expensive spawn model, the architecture pass, and the reasoning effort.
-
 ## Low Cells
 
 The `low` cells skip the phase structure entirely: one diff read, then findings.
@@ -84,7 +71,7 @@ Output one line per finding, most-severe first: `path/to/file.ext:123 — what's
 
 ## Finder Budget Hint
 
-On Sonnet 5 at `high`, `xhigh`, or `max`, scale the fleet to the diff size instead of using a fixed one-agent-per-angle fan-out. Run `git diff --numstat` over the review range, sum the changed lines, and compute:
+On Sonnet 5 at `high` or `xhigh`, scale the fleet to the diff size instead of using a fixed one-agent-per-angle fan-out. Run `git diff --numstat` over the review range, sum the changed lines, and compute:
 
 ```
 budget = clamp(ceil(lines / 150), 2, 8)

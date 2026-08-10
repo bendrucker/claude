@@ -43,7 +43,7 @@ Your own login as the reviewer (see [tone.md](tone.md) for how to address each p
 When `--triage` is set, stay read-only and assess the PR for sequencing. Gather just enough to judge scope: the PR body, the diff stat, and the files touched. Then report two things and stop.
 
 - What the PR changes, in one line.
-- The estimated review effort on the same scale step 4 uses for `review:code` (low, medium, high, xhigh, max), with one-line reasoning.
+- The estimated review effort on the same scale step 4 uses for `review:code` (low, medium, high, xhigh), with one-line reasoning.
 
 ## Guardrails
 
@@ -62,8 +62,7 @@ When `--triage` is set, stay read-only and assess the PR for sequencing. Gather 
    - **low**: docs-only, dep bumps, config tweaks, trivial fixes (<50 lines)
    - **medium**: typical features or fixes, single module, ~50–500 lines
    - **high**: large refactors, multi-module, public API or schema changes, ~500–2000 lines
-   - **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations
-   - **max**: rare — incident hotfix or change with extreme blast radius
+   - **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations, or a change with extreme blast radius
 5. **Think** - Evaluate along two axes. Requirement fulfillment: does the change deliver what was asked (see [requirements.md](requirements.md))? Code quality: evaluate against priorities (see [priorities.md](priorities.md)) and smells (see [smells.md](smells.md)), incorporating `review:code` findings. Keep the axes separate so a clean diff does not mask a missed requirement.
 6. **Stage** - Open the PR diff in tuicr via `review:tuicr` (`tuicr pr <N>` for GitHub, `tuicr mr <N>` for GitLab) and seed proposed comments with `tuicr review add` (pass `--username` so they read as agent comments). Capture the PR head SHA (and base/start SHAs for GitLab, from the MR `diff_refs`) for mapping. Skip staging when approving with no comments.
 7. **Revise** - I curate in the tuicr pane: delete comments I reject, reword, and add my own at any line. The surviving set gets posted.

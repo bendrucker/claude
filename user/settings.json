@@ -291,6 +291,16 @@
         ]
       },
       {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c '[ \"$HERDR_ENV\" = 1 ] && [ -n \"$HERDR_PANE_ID\" ] && command -v herdr >/dev/null && herdr pane report-metadata \"$HERDR_PANE_ID\" --source claude-brand --display-agent \"\"; exit 0'",
+            "async": true
+          }
+        ]
+      },
+      {
         "matcher": "*",
         "hooks": [
           {

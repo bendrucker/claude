@@ -2,6 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "theme": "auto",
   "skillOverrides": {
+    "code-review": "name-only",
     "dataviz": "user-invocable-only"
   },
   "fallbackModel": ["sonnet"],

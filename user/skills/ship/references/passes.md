@@ -67,18 +67,16 @@ flowchart TD
 
 ## Effort Inference
 
-Infer `review:code` effort from the diff unless `--effort` overrides. `high` is routine for risky work. Reserve `xhigh` and `max` for explicit requests.
+Infer `review:code` effort from the diff unless `--effort` overrides. `high` is routine for risky work. Reserve `xhigh` for explicit requests.
 
 | Diff shape | Effort |
 |---|---|
 | Tiny: one file, a handful of lines | `low` |
 | Ordinary change | `medium` |
 | Risky: multiple plugins, hooks, permissions, sandbox, or auth-shaped code | `high` |
-| Explicit request only | `max` |
+| Explicit request only | `xhigh` |
 
 `review:code` picks its fan-out shape from its own cell table, keyed on model family as well as effort level, which is why the same `--effort` can mean one inline pass in one family and a fleet of finders plus per-candidate verifiers in another. Do not infer cost from the effort name.
-
-`--effort ultra` is not inferrable and `review:code` cannot run it. It is a billed cloud review that only a user-typed `/code-review ultra` can launch. On `--effort ultra`, stop and say so rather than substituting a local level.
 
 ## Code-Review Versus Simplify
 

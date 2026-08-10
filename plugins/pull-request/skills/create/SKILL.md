@@ -65,7 +65,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 
 - `--draft`: open the PR/MR as a draft. Default: ready for review.
 - `--no-auto`: skip auto-merge. Default: auto-merge on a repo you own, off on a third-party repo and off under `--draft`. See [`references/merge.md`](references/merge.md).
-- `--base <ref>`: parent branch for a stack layer, per [`references/stacking.md`](references/stacking.md). Default: the repo's default branch.
+- `--base <ref>`: parent branch to target. A branch whose parent is another topic branch is a stack layer, and this flag or the user saying so are the only signals for that, since a branch's upstream ref tracks its own remote copy. Default: the repo's default branch.
 - `--label <name>`: apply a label, repeatable. Where a repo gates its hosted review bot on a label, this is how a review gets requested (see follow-up's `reviewers.md`). Confirm each label exists before creating, per [`references/labels.md`](references/labels.md). Default: none.
 
 ## Workflow
@@ -81,6 +81,6 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
    - Write the body to the temp file in its own Bash call, with the branch name in the filename so concurrent agents don't collide. The create call has to *start* with `gh`/`glab`: the body-validation hook matches on that leading verb, so anything in front of it (a `cd`, a chained heredoc that writes the body, an env assignment) skips validation silently. Never `cd` to the directory you are already in.
-1. Link the stack when the branch is a GitHub stack layer, after the PR exists (see [`references/stacking.md`](references/stacking.md)).
+1. Chain a GitHub stack layer into its stack once the PR exists. Load `github:stack` for the `gh stack link` forms, the detection query that picks between them, and what an exit code 9 means.
 1. Arm auto-merge after the PR/MR exists, unless `--no-auto` or `--draft` is set. On a repo you own (the Remote URL above names the owner), run `gh pr merge --auto`. On a third-party repo, leave the merge to the maintainer. GitLab, stacked PRs, and a repo that rejects `--auto` take the paths in [`references/merge.md`](references/merge.md).
 1. Suggest reviewers on corporate repos (see [Reviewers](#reviewers)). Skip this step for OSS.

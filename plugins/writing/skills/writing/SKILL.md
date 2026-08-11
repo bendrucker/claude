@@ -10,7 +10,7 @@ description: >-
 
 ## Patterns to Avoid
 
-The hook enforces these automatically. Specific vocabulary and marketing-verb lists live in [`wordlists/`](../../wordlists/).
+The hook enforces most of these automatically; the rest ship in the scan and review skills. Specific vocabulary and marketing-verb lists live in [`wordlists/`](../../wordlists/).
 
 #### Structure
 
@@ -25,6 +25,7 @@ The hook enforces these automatically. Specific vocabulary and marketing-verb li
 - Don't write "reaching for X." Use "use X" or "prefer X over Y."
 - Don't write "dig into" / "dive into." Name what you're looking at.
 - Hedging verbs ("looks like", "appears to", "seems to") are vague. State directly or name the uncertainty.
+- No gravity markers. "Load-bearing", "the honest answer", "worth noting/flagging", "the full picture", and "the cleanup story" all assert that something matters instead of saying why. Replace each with its substance: name what breaks without the dependency, state the fact plainly, make the point without announcing it.
 
 #### PR and Review Prose
 

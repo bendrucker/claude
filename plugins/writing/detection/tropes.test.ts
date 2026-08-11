@@ -678,7 +678,7 @@ describe("scan", () => {
 
   describe("filler", () => {
     it.each([
-      "It's worth noting that the cache is cold.",
+      "Importantly, the test was skipped.",
       "In terms of latency, it improved.",
     ])("flags: %j", (text) => {
       expect(firstByTier(scan(text), "context")?.category).toBe("filler");
@@ -686,6 +686,23 @@ describe("scan", () => {
 
     it("allows prose without filler markers", () => {
       expect(scan("The cache starts cold.").find((m) => m.category === "filler")).toBeUndefined();
+    });
+  });
+
+  describe("gravity markers", () => {
+    it.each<{ text: string; category: string | undefined }>([
+      { text: "The ordering here is load-bearing.", category: "load-bearing" },
+      { text: "Removing the check breaks the parser.", category: undefined },
+      { text: "The honest answer is the cache never worked.", category: "honest qualifier" },
+      { text: "The prefix keeps the test honest.", category: undefined },
+      { text: "Be honest about the coverage limits.", category: undefined },
+      { text: "Two things worth flagging before this merges.", category: "attention-flag worth" },
+      { text: "It's worth noting that the cache is cold.", category: "attention-flag worth" },
+      { text: "One caveat worth your attention.", category: "attention-flag worth" },
+      { text: "The refactor is worth doing before the freeze.", category: undefined },
+      { text: "The fix is worth confirming against staging.", category: undefined },
+    ])("$text -> $category", ({ text, category }) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe(category);
     });
   });
 

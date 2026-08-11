@@ -777,6 +777,104 @@ export const PATTERNS: PatternDef[] = [
   },
   {
     tier: "context",
+    layer: "vocabulary",
+    category: "load-bearing",
+    test: /\bload[- ]bearing\b/gi,
+    message: (matched) =>
+      `"${matched}" asserts importance by metaphor. Name the dependency instead: say what breaks or changes without it.`,
+    positives: [
+      "That comment is load-bearing for the retry logic.",
+      "The ordering here is load bearing.",
+    ],
+    negatives: [
+      "Removing the check breaks the parser.",
+      "The retry logic depends on this ordering.",
+    ],
+    evidence:
+      "User-flagged 2026-08 as the flagship gen-5 tell. Corpus audit (gen-5 era, 10.3M assistant chars): 287 hits at 27.8/M versus 3.4/M in typed user text, and several of the user hits are complaints about the word itself. A verify pass judged 43% of sampled uses bare gravity markers with no named load path; even the precise uses read better as a stated dependency.",
+    retire:
+      "Remove when the gen-5+ assistant rate falls under 5/M in a corpus audit window, or when a labeling pass shows most surviving uses name the dependency in-sentence.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "honest qualifier",
+    test: /\bhonest\s+(?:(?:caveat|answer|statement|framing|read|assessment|version|number|timeline|headline|option|alternative|take)s?|summar(?:y|ies))\b/gi,
+    message: (matched) =>
+      `"${matched}" claims candor instead of showing it. Drop "honest" and state the fact; if a competing version is wrong, say what it gets wrong.`,
+    positives: [
+      "The honest answer is the cache never worked.",
+      "One honest caveat: the benchmark only ran once.",
+    ],
+    negatives: ["The prefix keeps the test honest.", "Be honest about the coverage limits."],
+    evidence:
+      "Gen-5 corpus audit 2026-08: bare 'honest' runs 16.8/M assistant versus 3.7/M user, and 59 of 174 hits are the self-crediting noun frame (honest caveat/answer/statement/framing). Every sampled instance of the frame survived deletion of the adjective with no loss. The frame regex targets that shape and structurally spares the precise idioms ('keeps X honest', 'be honest about') and the instructed manner adverb ('report that honestly').",
+    retire:
+      "Remove when the noun-frame rate falls under 2/M in a corpus audit window. Extend the noun list only from corpus hits, never speculatively.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "attention-flag worth",
+    test: /\bworth\s+(?:noting|knowing|flagging|mentioning|saying|stating|naming|recording|remembering|a\s+look|your\s+(?:attention|awareness|time|call))\b/gi,
+    message: (matched) =>
+      `"${matched}" announces that a point matters instead of making it. Cut the wrapper and state the point.`,
+    positives: [
+      "Two things worth flagging before this merges.",
+      "Also worth noting for the rollout: the flag defaults off.",
+      "One caveat worth your attention.",
+    ],
+    negatives: [
+      "The refactor is worth doing before the freeze.",
+      "That tradeoff is not worth it.",
+      "The fix is worth confirming against staging.",
+    ],
+    evidence:
+      "Gen-5 corpus audit 2026-08: the attention-flag frame (worth noting/knowing/flagging/your attention) runs 52.6/M assistant versus 2.9/M typed user (16.6x) across 166 sessions, and a verify pass found the wrapper deletable in every sampled case. The frame regex targets the flag lead-in and leaves cost-benefit judgments (worth doing/fixing/checking/it) unmatched. Subsumes the retired 'it's worth noting that' filler alternative.",
+    retire:
+      "Remove when the frame rate falls to the typed-user baseline in a corpus audit window, or when a labeling pass shows the frame mostly preceding genuinely optional asides.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "full picture",
+    test: /\b(?:(?:full|complete|whole|real|bigger|clearer?)\s+picture|(?:chang(?:es?|ed|ing)|shift(?:s|ed|ing)?|complet(?:es?|ed|ing))\s+the\s+picture)\b/gi,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" is a transition marker that defers the substance. Say what you learned or what changed.`,
+    positives: [
+      "After the third log read I have a complete picture.",
+      "That stack trace changed the picture.",
+    ],
+    negatives: ["The picture shows the login screen.", "A reviewer would picture the whole flow."],
+    evidence:
+      "Gen-5 corpus audit 2026-08: 96 of 159 'picture' hits sit in two fixed frames (full/complete/whole picture, changes the picture), running 15.4/M assistant versus 3.7/M user, almost always as preamble before the actual finding. Zero hits in the deliverable sample, so it ships skillOnly: the hook never sees the chat surface where it lives.",
+    retire:
+      "Remove if a later corpus pass shows the frame rate collapsed, or fold into a chat-voice rewrite pass if one ships. Do not promote to hook while deliverable hits stay near zero.",
+  },
+  {
+    tier: "context",
+    layer: "vocabulary",
+    category: "abstract story",
+    test: /\b(?:rollback|cleanup|migration|error|consumer|state|budget|ingest|deletion|upgrade|onboarding|testing|deploy(?:ment)?|win)\s+stor(?:y|ies)\b/gi,
+    skillOnly: true,
+    message: (matched) =>
+      `"${matched}" dresses up a plain referent. Name the thing: the rollback plan, the cleanup path, the error handling.`,
+    positives: [
+      "The migration story gets messy across major versions.",
+      "This improves the rollback story.",
+    ],
+    negatives: [
+      "The Storybook story renders the grid.",
+      "The user story covers the checkout flow.",
+    ],
+    evidence:
+      "Gen-5 corpus audit 2026-08: raw 'story' hits (415) are dominated by Storybook and agile user-story senses, so the noun list enumerates the abstraction frame's observed heads (rollback/cleanup/budget/ingest/consumer/state story, ~30 hits, chat-dominant). Ships skillOnly: low volume and no deliverable presence.",
+    retire:
+      "Drop head nouns that stop appearing in corpus audits. Remove the pattern when the frame stops recurring in chat output, or if the enumerated list needs constant extension to keep up (allowlist churn signals the wrong detector shape).",
+  },
+  {
+    tier: "context",
     layer: "grammar",
     category: "hedging observation",
     test: /\b(?:looks|appears|seems)\s+(?:like|to)\b/gi,
@@ -793,12 +891,12 @@ export const PATTERNS: PatternDef[] = [
     tier: "context",
     layer: "vocabulary",
     category: "filler",
-    test: /\b(?:it's worth noting that|importantly|interestingly|it should be noted|as mentioned|in terms of)\b/gi,
+    test: /\b(?:importantly|interestingly|it should be noted|as mentioned|in terms of)\b/gi,
     message: (matched) => `"${matched}" is filler. Cut it.`,
-    positives: ["It's worth noting that the cache is cold.", "Importantly, the test was skipped."],
+    positives: ["Interestingly, the cache is cold.", "Importantly, the test was skipped."],
     negatives: ["The cache is cold.", "Note that the test was skipped."],
     evidence:
-      "Pre-dates the curation principle; no corpus evidence recorded. Retained as a vocabulary-level filler gate covering common AI preamble phrases.",
+      "Pre-dates the curation principle; no corpus evidence recorded. Retained as a vocabulary-level filler gate covering common AI preamble phrases. The 'it's worth noting that' alternative moved to the attention-flag worth pattern, whose frame regex covers it with corpus evidence.",
     retire:
       "Remove or migrate individual entries to vocabulary.txt after per-entry corpus audit confirms distinctiveness.",
   },

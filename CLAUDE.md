@@ -12,7 +12,7 @@ This repository contains my personal Claude Code configuration and a plugin mark
 
 ## Inventory
 
-`bun run inventory [kind]` lists the repository's Claude Code assets, so "which skills exist", "what registers a `Stop` hook", or "which plugins ship agents" takes one command instead of a glob sweep. Kinds: `summary` (default), `plugins`, `skills`, `agents`, `commands`, `hooks`, `rules`, `mcp`. Rows carry the asset's path and its scope (`plugins/`, `user/`, or `.claude/`), so a listing is the starting point for a `Read` or a narrowed `grep`. `--help` covers the flags.
+Answer any repo-wide "which X exists" question with `bun run inventory [kind]` before globbing or grepping `plugins/`, `skills/`, `hooks/`, or `agents/`. Rows carry each asset's path and scope, so the listing is where a `Read` or a narrowed `grep` starts. `bun run inventory --help` covers the kinds and flags.
 
 ## User
 

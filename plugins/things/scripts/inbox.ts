@@ -4,7 +4,7 @@
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
 import { mergeTags, parseTags } from "./tags";
-import { dispatch } from "./url";
+import { dispatch, warnFallback } from "./url";
 
 const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-items"]);
 
@@ -78,6 +78,7 @@ if (import.meta.main) {
     if (result.id) {
       console.log(`https://things.bendrucker.me/show?id=${result.id}`);
     } else {
+      warnFallback(result);
       printCaptured(params);
     }
   } catch (error) {

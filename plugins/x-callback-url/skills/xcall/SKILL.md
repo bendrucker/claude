@@ -17,6 +17,14 @@ Send [x-callback-url](https://x-callback-url.com/) requests from the command lin
 
 Claude Code exports `CLAUDE_PLUGIN_DATA` to hooks and MCP servers but not to Bash tool calls, and `run.sh` is reached both ways. A consuming skill closes that gap by setting the variable on the command it documents, where the substitution has already resolved it. `things:url` does this on every `url.ts`, `inbox.ts`, and `reorder.ts` invocation. `build.sh` never guesses a location of its own, because a second bundle would take the `xcall-claude://` scheme from the first and `lsregister -f` does not take it back.
 
+## Sandbox
+
+Neither half of the bridge survives the command sandbox. `swiftc` cannot write the bundle under `~/.claude/plugins`, and a compiled `xcall` cannot complete the URL-scheme round trip. So `run.sh` and `build.sh` both carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker, which runs them outside it.
+
+The marker hook reads the script named at the head of a command, past any `VAR=value` prefixes. A wrapper token in front of it (`time`, `env`, `timeout`) hides the script from the hook, the command runs sandboxed, and the callback is lost. Invoke `run.sh` by path with at most environment assignments ahead of it.
+
+A sandboxed `xcall` hangs rather than failing, because its own deadline is scheduled inside `applicationDidFinishLaunching`, which AppKit never calls when it cannot reach the WindowServer. `run.sh` therefore holds the deadline that always runs: it kills the process after `XCALL_TIMEOUT_SECONDS` (default 20) and exits 4.
+
 ## Usage
 
 ```bash
@@ -25,7 +33,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "<url>"
 
 **stdout**: `x-success` query string on success
 **stderr**: `x-error` query string or timeout message
-**Exit codes**: 0 = success, 1 = error, 2 = cancel, 3 = build failed
+**Exit codes**: 0 = success, 1 = error, 2 = cancel, 3 = build failed, 4 = timed out waiting for the callback
 
 ## Examples
 
@@ -83,4 +91,4 @@ Apps with their own CLI (e.g., Shortcuts via `shortcuts run`) don't need xcall â
 - `Info.plist`: `CFBundleTypeRole=Editor`, `LSUIElement=true`. `LSBackgroundOnly` is intentionally not set: combining it with `LSUIElement` causes macOS to refuse to route URL scheme callbacks to the app, surfacing as a "no application set" dialog.
 - After building, `build.sh` calls `lsregister -f` and verifies the scheme handler is the freshly built bundle. A bundle left behind at a path an earlier version built into keeps the scheme, and `lsregister -f` does not take it back, so `build.sh` unregisters and deletes that copy before verifying. If verification still fails it exits non-zero.
 - Build is cached â€” recompiles only if `main.swift` is newer than the binary
-- Timeout: 10 seconds
+- Timeouts: `xcall` gives up on the callback after 10 seconds, and `run.sh` kills it after `XCALL_TIMEOUT_SECONDS` (default 20) if it never gets that far

@@ -173,11 +173,55 @@ export function buildJsonPayload(ids: string[], attributes: Record<string, strin
   return JSON.stringify(data);
 }
 
+/** run.sh statuses that mean the bridge never reached the app. */
+const XCALL_BUILD_FAILED = 3;
+const XCALL_TIMED_OUT = 4;
+
+/**
+ * Backstop for a runner that dies without honoring its own watchdog. It must
+ * exceed a cold Swift build plus run.sh's XCALL_TIMEOUT_SECONDS, or it preempts
+ * the runner's own bounded failure and hides the reason.
+ */
+const XCALL_BACKSTOP_MS = 45_000;
+
+export class XcallError extends Error {
+  constructor(
+    readonly exitCode: number,
+    readonly stderr: string,
+  ) {
+    super(`xcall failed (exit ${exitCode})`);
+    this.name = "XcallError";
+  }
+}
+
+/** Names an xcall failure in one clause, for a "no id because ..." sentence. */
+export function describeXcallFailure(error: unknown): string {
+  if (!(error instanceof XcallError)) {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  switch (error.exitCode) {
+    case XCALL_BUILD_FAILED:
+      return "the x-callback-url bridge failed to build";
+    case XCALL_TIMED_OUT:
+      return "the x-callback-url bridge timed out waiting for Things to call back";
+    default:
+      return `xcall exited ${error.exitCode}`;
+  }
+}
+
 async function xcall(runner: string, url: string): Promise<string> {
-  const proc = Bun.spawn([runner, url], { stdout: "pipe", timeout: 10_000 });
-  const text = await new Response(proc.stdout).text();
+  const proc = Bun.spawn([runner, url], {
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: XCALL_BACKSTOP_MS,
+  });
+  const [text, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   const code = await proc.exited;
-  if (code !== 0) throw new Error(`xcall failed (exit ${code})`);
+  if (code !== 0) throw new XcallError(code, stderr);
   return text.trim();
 }
 
@@ -193,6 +237,10 @@ export interface DispatchResult {
   output: string | null;
   /** Whether the call ran via xcall (true) or fell back to Launch Services open (false). */
   viaXcall: boolean;
+  /** Why the call degraded to Launch Services open, or null when it did not. */
+  fallbackReason: string | null;
+  /** Runner stderr behind a degraded call, when it wrote any. */
+  fallbackDetail: string | null;
 }
 
 /**
@@ -210,7 +258,9 @@ const defaultActions: DispatchActions = { findXcallRunner, xcall, openUrl };
 /**
  * Builds the Things URL for an action, runs it through xcall when the
  * x-callback-url runner is available, and falls back to a Launch Services open
- * on any xcall failure. Returns the parsed todo id when xcall surfaced one.
+ * on any xcall failure. Returns the parsed todo id when xcall surfaced one, and
+ * a fallbackReason when it did not, so the caller can say the write landed
+ * without an id instead of degrading silently.
  */
 export async function dispatch(
   command: string,
@@ -218,18 +268,40 @@ export async function dispatch(
   actions: DispatchActions = defaultActions,
 ): Promise<DispatchResult> {
   const runner = await actions.findXcallRunner();
+  let fallbackReason = "the x-callback-url runner was not found";
+  let fallbackDetail: string | null = null;
+
   if (runner) {
     const url = await buildUrl(command, params);
     try {
       const result = await actions.xcall(runner, url);
-      return { id: parseThingsId(result), output: result, viaXcall: true };
-    } catch {
-      // fall through to Launch Services
+      return {
+        id: parseThingsId(result),
+        output: result,
+        viaXcall: true,
+        fallbackReason: null,
+        fallbackDetail: null,
+      };
+    } catch (error) {
+      fallbackReason = describeXcallFailure(error);
+      fallbackDetail = error instanceof XcallError ? error.stderr.trim() || null : null;
     }
   }
 
   await actions.openUrl(command, params);
-  return { id: null, output: null, viaXcall: false };
+  return { id: null, output: null, viaXcall: false, fallbackReason, fallbackDetail };
+}
+
+/**
+ * Reports a degraded dispatch on stderr. The write still landed through Launch
+ * Services, so this is a warning rather than a failure.
+ */
+export function warnFallback(result: DispatchResult): void {
+  if (result.fallbackReason === null) return;
+  console.error(
+    `warning: no todo id available because ${result.fallbackReason}. The change was sent fire-and-forget via open.`,
+  );
+  if (result.fallbackDetail) console.error(result.fallbackDetail);
 }
 
 if (import.meta.main) {
@@ -280,6 +352,7 @@ if (import.meta.main) {
     if (result.output !== null) {
       console.log(result.output);
     }
+    if (argv.flags.callback) warnFallback(result);
   } else {
     const singleId = ids[0];
     if (singleId) {
@@ -289,5 +362,6 @@ if (import.meta.main) {
     if (result.output !== null) {
       console.log(result.output);
     }
+    if (argv.flags.callback) warnFallback(result);
   }
 }

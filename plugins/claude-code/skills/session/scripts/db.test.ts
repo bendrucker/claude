@@ -1049,7 +1049,7 @@ describe("outcomes query", () => {
       "sessions: ongoing": 1,
       "sessions: handed-off": 1,
       "sessions: abandoned-with-edits": 2,
-      "sessions: no-artifact": 13,
+      "sessions: no-artifact": 15,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1065,7 +1065,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 17,
+      "sessions: ongoing": 19,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1170,6 +1170,85 @@ describe("delegation query", () => {
     for (const row of pinned) {
       expect(Number(row.expensive_output_tokens)).toBe(0);
     }
+  });
+});
+
+describe("review-precision query", () => {
+  // review-session reports four findings, then re-reports the same four with outcomes
+  // after the --fix pass, so every count here also proves the dedupe: without it
+  // correctness reads 4 findings in that session instead of 2. review-mixed-session
+  // carries two correctness findings on one line (same file:line, different claim) at
+  // high effort, plus a documentation finding from a user-typed /code-review, which
+  // carries no skill attribution.
+  type PrecisionRow = {
+    category: string;
+    level: string;
+    findings: bigint;
+    sessions: bigint;
+    confirmed: bigint;
+    plausible: bigint;
+    refuted: bigint;
+    unverified: bigint;
+    confirmed_pct: number | null;
+    fixed: bigint;
+    no_change: bigint;
+    skipped: bigint;
+    acted_pct: number | null;
+  };
+
+  function precisionRows(overrides: Record<string, string | null> = {}) {
+    return runQuery<PrecisionRow>(
+      db,
+      "review-precision",
+      filterParams({ skill: null, min_findings: null, ...overrides }),
+    );
+  }
+
+  function format(rows: PrecisionRow[]) {
+    return rows
+      .map(
+        (r) =>
+          `${r.category}/${r.level} findings=${r.findings} sessions=${r.sessions} ` +
+          `verdicts=${r.confirmed}/${r.plausible}/${r.refuted}/${r.unverified} ` +
+          `confirmed_pct=${r.confirmed_pct} ` +
+          `outcomes=${r.fixed}/${r.no_change}/${r.skipped} acted_pct=${r.acted_pct}`,
+      )
+      .join("\n");
+  }
+
+  it("rolls each angle up and splits it by effort level", async () => {
+    expect(format(await precisionRows())).toMatchInlineSnapshot(`
+      "correctness/all findings=4 sessions=2 verdicts=2/1/1/0 confirmed_pct=50 outcomes=1/0/1 acted_pct=50
+      correctness/high findings=2 sessions=1 verdicts=1/0/1/0 confirmed_pct=50 outcomes=0/0/0 acted_pct=null
+      correctness/medium findings=2 sessions=1 verdicts=1/1/0/0 confirmed_pct=50 outcomes=1/0/1 acted_pct=50
+      altitude/all findings=1 sessions=1 verdicts=1/0/0/0 confirmed_pct=100 outcomes=0/1/0 acted_pct=0
+      altitude/medium findings=1 sessions=1 verdicts=1/0/0/0 confirmed_pct=100 outcomes=0/1/0 acted_pct=0
+      documentation/all findings=1 sessions=1 verdicts=1/0/0/0 confirmed_pct=100 outcomes=0/0/0 acted_pct=null
+      documentation/medium findings=1 sessions=1 verdicts=1/0/0/0 confirmed_pct=100 outcomes=0/0/0 acted_pct=null
+      reuse/all findings=1 sessions=1 verdicts=0/0/0/1 confirmed_pct=null outcomes=1/0/0 acted_pct=100
+      reuse/medium findings=1 sessions=1 verdicts=0/0/0/1 confirmed_pct=null outcomes=1/0/0 acted_pct=100"
+    `);
+  });
+
+  it("scopes to one calling skill, dropping the unattributed built-in review", async () => {
+    expect(format(await precisionRows({ skill: "review:code" }))).toMatchInlineSnapshot(`
+      "correctness/all findings=4 sessions=2 verdicts=2/1/1/0 confirmed_pct=50 outcomes=1/0/1 acted_pct=50
+      correctness/high findings=2 sessions=1 verdicts=1/0/1/0 confirmed_pct=50 outcomes=0/0/0 acted_pct=null
+      correctness/medium findings=2 sessions=1 verdicts=1/1/0/0 confirmed_pct=50 outcomes=1/0/1 acted_pct=50
+      altitude/all findings=1 sessions=1 verdicts=1/0/0/0 confirmed_pct=100 outcomes=0/1/0 acted_pct=0
+      altitude/medium findings=1 sessions=1 verdicts=1/0/0/0 confirmed_pct=100 outcomes=0/1/0 acted_pct=0
+      reuse/all findings=1 sessions=1 verdicts=0/0/0/1 confirmed_pct=null outcomes=1/0/0 acted_pct=100
+      reuse/medium findings=1 sessions=1 verdicts=0/0/0/1 confirmed_pct=null outcomes=1/0/0 acted_pct=100"
+    `);
+  });
+
+  it("floors the long tail on the angle's rollup total, not its per-level rows", async () => {
+    const rows = await precisionRows({ min_findings: "2" });
+    expect(rows.map((r) => `${r.category}/${r.level}`)).toEqual([
+      "correctness/all",
+      "correctness/high",
+      "correctness/medium",
+    ]);
   });
 });
 

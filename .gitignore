@@ -7,6 +7,10 @@ node_modules/
 # The comments plugin's eval corpus is committed labeled data. Re-include it
 # against the global `fixtures` ignore.
 !plugins/comments/evals/fixtures/
+# The session index's JSONL fixtures are committed test data. The files added
+# before the global `fixtures` ignore stayed tracked, so a new one silently did
+# not. Re-include the directory so it is tracked like the rest.
+!plugins/claude-code/skills/session/fixtures/
 
 # Generated coverage output (bun test --coverage)
 /coverage/

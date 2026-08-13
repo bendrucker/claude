@@ -18,6 +18,8 @@ allowed-tools:
 
 Load the `writing:writing` skill for the style rules, then rewrite the input to match them. Preserve all functional information. Change only voice, word choice, and sentence structure, conveying the same information in fewer, clearer words.
 
+When the input is the user's own writing rather than model output, name its core point and a few voice signals before editing: vocabulary, cadence, bluntness, humor, admitted uncertainty, digressions. Keep that note to yourself and make the smallest edit that clears the tells. Stripping the voice is the goal only when the voice is a model's.
+
 These rules apply on top of that skill:
 
 - Specific verbs over vague ones. "Generates a report" not "handles report generation."
@@ -41,6 +43,10 @@ bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input path/to/file.md
 Fix every hard tell (em dash, copula avoidance, hedging, filler, vocabulary, and the other fixed-phrase categories), then re-run until those are clean.
 
 Treat `marketing verb` findings as advisory. The script flags each one, but the live hook only objects when their weighted sum is high enough, so a lone marketing verb may be fine. Consider each in context and replace the ones that read as promotional rather than driving the count to zero.
+
+## Check
+
+Once the tells are clean, answer the questions in [`references/check.md`](references/check.md) against the rewrite beside the original. They cover the failures a detector cannot see: invented or dropped claims, cutting out of proportion to the slop, and a distinctive sentence flattened for consistency. Fix what fails and re-check.
 
 ## Output
 

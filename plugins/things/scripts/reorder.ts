@@ -3,7 +3,7 @@
 
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
-import { dispatch } from "./url";
+import { dispatch, warnFallback } from "./url";
 
 const INTERMEDIATE_LIST: Record<string, string> = {
   today: "anytime",
@@ -24,7 +24,9 @@ async function updateWhen(ids: string[], when: string): Promise<void> {
       })),
     ),
   );
-  await dispatch("json", params);
+  // Reordering moves the todos out of the list and back, so the second update
+  // must land after the first. A fire-and-forget open guarantees no such order.
+  warnFallback(await dispatch("json", params));
 }
 
 async function reorder(targetList: string, ids: string[]): Promise<void> {

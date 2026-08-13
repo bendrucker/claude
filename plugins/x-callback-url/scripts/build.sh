@@ -1,4 +1,5 @@
 #!/bin/bash
+# claude:dangerouslyDisableSandbox: swiftc writes the bundle under ~/.claude/plugins, which the command sandbox denies
 set -euo pipefail
 
 # Build xcall.app — a macOS .app bundle for x-callback-url bridging.

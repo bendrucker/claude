@@ -5,6 +5,7 @@ import {
   type DispatchActions,
   dispatch,
   isSandboxBlockedHandoff,
+  XcallError,
 } from "./url";
 
 describe("buildJsonPayload", () => {
@@ -173,7 +174,13 @@ describe("dispatch", () => {
 
     const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
 
-    expect(result).toEqual({ id: "ABC123", output: expect.any(String), viaXcall: true });
+    expect(result).toEqual({
+      id: "ABC123",
+      output: expect.any(String),
+      viaXcall: true,
+      fallbackReason: null,
+      fallbackDetail: null,
+    });
     expect(calls.open).toEqual([]);
     expect(calls.xcall[0]).toContain("things:///add?");
   });
@@ -192,21 +199,44 @@ describe("dispatch", () => {
 
     const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
 
-    expect(result).toEqual({ id: null, output: null, viaXcall: false });
+    expect(result).toEqual({
+      id: null,
+      output: null,
+      viaXcall: false,
+      fallbackReason: "the x-callback-url runner was not found",
+      fallbackDetail: null,
+    });
     expect(calls.xcall).toEqual([]);
     expect(calls.open).toEqual(["add"]);
   });
 
-  test("falls back to openUrl when xcall throws", async () => {
+  test.each<[string, Error, string, string | null]>([
+    [
+      "build failure",
+      new XcallError(3, "swiftc: error: Operation not permitted\n"),
+      "the x-callback-url bridge failed to build",
+      "swiftc: error: Operation not permitted",
+    ],
+    [
+      "callback timeout",
+      new XcallError(4, "xcall gave up after 20s\n"),
+      "the x-callback-url bridge timed out waiting for Things to call back",
+      "xcall gave up after 20s",
+    ],
+    ["app error", new XcallError(1, ""), "xcall exited 1", null],
+    ["non-xcall error", new Error("spawn blew up"), "spawn blew up", null],
+  ])("falls back to openUrl and reports a %s", async (_name, thrown, reason, detail) => {
     const { actions, calls } = trackingActions({
       xcall: async () => {
-        throw new Error("xcall failed (exit 1)");
+        throw thrown;
       },
     });
 
     const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
 
     expect(result.viaXcall).toBe(false);
+    expect(result.fallbackReason).toBe(reason);
+    expect(result.fallbackDetail).toBe(detail);
     expect(calls.open).toEqual(["add"]);
   });
 

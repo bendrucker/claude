@@ -49,9 +49,16 @@ Defer naming to implementation when the deliverable is not the code itself (an i
 The plan is a do-now spec for a session that reads nothing else:
 
 - Open with the non-negotiable conventions and a stop condition (implement, ship, end). Without a stop condition, the implementing session absorbs the next job too.
+- Stamp the plan with the commit it was written against (`**Planned at**: commit <short SHA>, <date>`) and make the executor's first instruction a drift check: `git diff --stat <SHA>..HEAD -- <the plan's in-scope paths>`. A `⏰` check-in fires days later against a repo that has moved, and the file records nothing else about what it was true of. When a listed path has changed, compare the plan's excerpts against the live code before executing, and treat a mismatch as an assumption stop.
 - Deferred design goes to a separate linked file the implementer is told not to open, with one pointer line in the plan. A handoff plan heavy with deferred design forces the implementing session to re-plan work the original session never resolved.
 - Resolved decisions and research synthesis move to a companion `<plan>-decisions.md` that the plan links.
 - Keep plans focused and under roughly 10k characters. Past that, plans get rejected: split the scope or consolidate before presenting.
+
+## Assumption Stops
+
+The stop condition above bounds the job. This section bounds the plan's accuracy. It lists the assumptions whose falsification means the plan no longer describes the repo. An implementer that hits one reports back instead of improvising a change nobody approved.
+
+Each entry names something this plan's own reading could have gotten wrong: an excerpt that no longer matches, a call-site count that has changed, a fix that turns out to need a file the plan never listed, a decision resting on a premise the code could contradict. Each ends in a stop instruction. A condition that would read identically in any other plan ("if tests fail", "if something is unclear") lists nothing. Where a repeated verification failure is the risk here, name the verification and the attempt count that ends it. When nothing in the plan rests on an assumption that could be wrong, omit the section.
 
 ## Verification
 

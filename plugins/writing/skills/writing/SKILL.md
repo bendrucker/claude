@@ -29,7 +29,7 @@ The hook enforces most of these automatically; the rest ship in the scan and rev
 
 #### PR and Review Prose
 
-- Active voice. Not "X is added" but "Adds X."
+- Active voice in PR and review prose. Not "X is added" but "Adds X." Commit subjects take the imperative: "Add X".
 - Not "Tests cover X" but "Added tests covering X."
 - No trailing hedge adverbs ("regardless.", "nonetheless.").
 - No cross-sentence negation ("It isn't X. It is Y."). Combine or drop the negation.

@@ -30,7 +30,7 @@ The session index is a DuckDB database at `${CLAUDE_PLUGIN_DATA}/session.duckdb`
 Run `refresh.ts` before querying. It scans `~/.claude/projects/**/*.jsonl` plus any imported hosts, imports files whose mtime or size changed, drops rows for deleted files, and prints the DB path. When a prior refresh finished within `--max-age` (default 300 seconds), it prints the path and exits without opening the database, so calling it before every query is cheap. Pass `--refresh` to rescan regardless when the user asks for the latest data.
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/refresh.ts
+bun ${CLAUDE_SKILL_DIR}/scripts/refresh.ts
 ```
 
 ### Querying

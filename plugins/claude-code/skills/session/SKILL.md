@@ -101,6 +101,7 @@ Every query, grouped by category with a one-line gloss:
 - `plan-iterations`: per-plan growth and carry-over
 - `outcomes`: session terminal states
 - `delegation`: subagent spawn model mix against the parent's main model, generic vs pinned-agent split
+- `review-precision`: per-angle verdict and fix-outcome mix for code-review findings
 
 #### Schema and Index
 - `schema`: list every column

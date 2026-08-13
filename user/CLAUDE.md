@@ -10,7 +10,7 @@
 - Include a trailing newline in all new files.
 - Prefer meaningful anchor text over raw URLs.
 - Use bullet points for lists, checklists if I ask for tasks.
-- Use code comments ONLY to clarify code that is not self-explanatory to OTHER readers. If you need to explain the code, do so in a separate message before editing.
+- When you want to explain code you're writing, put the explanation in a message before the edit.
 - Load the `writing:writing` skill before the first long-form prose you write for others in a context (PR comments, review feedback, documents, issue descriptions, Slack messages). Its tone and style rules must be followed, and they stay in effect for the rest of the session, so one load covers every later piece.
 
 ## Organization

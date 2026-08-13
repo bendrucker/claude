@@ -42,7 +42,7 @@ The hook enforces most of these automatically; the rest ship in the scan and rev
 
 ## Voice
 
-Direct, conversational. Every sentence should teach something new. Cut words that restate the obvious.
+Direct, conversational. Every sentence should teach something new. Cut words that restate the obvious. A sentence that could move unchanged to another person, company, or product is filler: cut it, or replace it with something true only of this subject.
 
 - Substance over filenames or implementation details
 - Shorter sentences over compound constructions

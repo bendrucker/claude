@@ -42,7 +42,13 @@ Flag wasted work the diff introduces: redundant computation or repeated I/O, ind
 
 ## Altitude
 
-Check that each change is implemented at the right depth, not as a fragile bandaid. Special cases layered on shared infrastructure are a sign the fix isn't deep enough — prefer generalizing the underlying mechanism over adding special cases.
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
 
 ## Conventions (CLAUDE.md)
 

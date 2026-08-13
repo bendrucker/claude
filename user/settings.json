@@ -431,7 +431,6 @@
     "worktrunk@worktrunk": true,
     "plan@bendrucker": true,
     "linear-cli@linear-cli": true,
-    "tmux@bendrucker": true,
     "bun@bendrucker": true,
     "mermaid@bendrucker": true,
     "typescript-lsp@claude-plugins-official": true,

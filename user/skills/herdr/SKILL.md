@@ -1,7 +1,7 @@
 ---
 name: herdr
 description: >-
-  Drive the herdr terminal workspace manager: inspect workspaces, tabs, and panes, hand work to sibling coding agents and read their results, split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Use when coordinating with another agent, opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running. Pane, tab, workspace, and split are herdr's terms, so a request naming one is a herdr request even when it never says herdr.
+  Drive the herdr terminal workspace manager: inspect workspaces, tabs, and panes, hand work to sibling coding agents in other panes, distinct from in-session `Agent` subagents, split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Load this when the decision to hand a task to another pane's agent arrives mid-task, and when opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running. Pane, tab, workspace, and split are herdr's terms, so a request naming one is a herdr request even when it never says herdr.
 argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh)
@@ -90,22 +90,26 @@ Each agent pane carries `agent_session.value`, the Claude session UUID. That mak
 
 A reference to work by branch, repo, or task usually names a pane already doing it. Match it against the `cwd` and `title` columns in the orientation block, then hand off to that pane instead of duplicating the checkout here.
 
-`agent prompt --wait` blocks through the other agent's turn. A handoff therefore costs two calls:
+A handoff is two calls. `agent prompt --wait` blocks through the other agent's turn, then `agent read` collects what it produced:
 
 ```bash
 herdr agent prompt <target> "the request" --wait --timeout 900000
 herdr agent read <target> --source recent-unwrapped --lines 80
 ```
 
+Without `--wait` the call returns as soon as the text is submitted, and the read that follows cannot distinguish a turn still running from one that finished. Drop `--wait` only to leave an agent running unattended, then collect with `agent wait` followed by `agent read`.
+
 Timeouts are milliseconds. `--wait` matches `idle`, `done`, or `blocked` unless you name states with `--until`, which repeats to accept several (`--until idle --until done`) and on `prompt` requires `--wait`. It does not track turns, so an agent that was already working can match on the turn it was in the middle of. Submitting to a resting agent returns `agent_prompt_stalled` when no state change shows up within 5s.
 
-Never poll for a state change with `sleep` and a `pane get` loop. `agent wait` blocks server-side on an agent's state, and `pane wait-output` does the same for text in a plain pane.
+`agent wait` blocks server-side on an agent's state, and `pane wait-output` does the same for text in a plain pane. A `sleep` loop around `pane get` only adds latency to either. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor` with an until-loop instead of a shell loop.
 
-An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. herdr validates the whole sequence before writing a byte. For staging literal text in a plain pane without submitting it, `pane send-text` is the counterpart, and `pane run` is the one that also presses Enter.
+An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. Modifiers join with `+`, as in `ctrl+c`, `ctrl+u`, and `shift+tab`. Only `C-c` and `c-c` are aliased to that form, so any other `-` spelling returns `invalid_key`. herdr validates the whole sequence before writing a byte. For staging literal text in a plain pane without submitting it, `pane send-text` is the counterpart, and `pane run` is the one that also presses Enter.
 
 `herdr agent focus` brings a pane to the foreground for the user. `herdr agent attach` connects to it directly.
 
 ### Starting an Agent
+
+A sibling agent that needs its own checkout gets it from `herdr worktree create`, which leaves this session where it is. `worktrunk:wt-switch-create` re-roots the calling session. It provisions this session's worktree, never another agent's.
 
 `agent start` attaches an agent to a pane that already exists and is free, and it creates no layout of its own. The pane has to be sitting at its interactive prompt with nothing running in the foreground. Split first, start second:
 
@@ -113,6 +117,10 @@ An agent parked on its own interactive UI answers to logical key names: `herdr a
 pane=$(herdr pane split --current --direction right --cwd "$PWD" --no-focus | jq -r '.result.pane.pane_id')
 herdr agent start reviewer --kind claude --pane "$pane"
 ```
+
+A session that refuses that command substitution takes the same two steps as separate calls, reading the pane ID out of the split's `.result.pane.pane_id` and passing it to `--pane`.
+
+Only `agent start` registers an agent, and only a registered agent answers `agent prompt`, `agent read`, and `agent wait`. Starting one by running its command through `pane run` or `pane send-text` fills the pane without registering anything, and `agent start` then returns `agent_pane_busy` against that same pane.
 
 The name becomes the handle every later command uses, so make it descriptive. It has to match `[a-z][a-z0-9_-]{0,31}` and be unique among live agents. It binds to the pane's current occupant and clears when that agent exits, is released, or is replaced, which frees the name for the next `agent start`. Arguments meant for the agent's own CLI go after `--`. The call blocks until herdr sees the expected agent ready for input, then gives up at 30 seconds.
 
@@ -192,7 +200,7 @@ That `select` is load-bearing. Plugins ship Windows variants of the same action 
 
 `herdr plugin log list` shows a plugin's command output, which is where to look when an action produces no visible effect. `herdr plugin config-dir <plugin_id>` locates its config.
 
-`herdr plugin pane open` takes a `--placement` of `overlay`, `split`, `tab`, or `zoomed`. The `split` and `zoomed` placements attach to an existing pane. Both need `--target-pane` and fail with `invalid_params` without it.
+`herdr plugin pane open` always needs `--entrypoint` alongside `--plugin`, and exits 2 without it. Its `--placement` decides which of the addressing flags are legal, and each wrong one comes back `invalid_params`. `split` and `zoomed` attach to an existing pane, defaulting to the active one when `--target-pane` is omitted, and reject `--workspace`. `overlay` and `popup` always take the active pane. Both reject `--workspace`, `--target-pane`, and `--direction`. `tab` is the one that takes `--workspace`, and it rejects `--target-pane` and `--direction`. `--help` lists four placements and the binary also accepts `popup` and `fullscreen`.
 
 ### reviewr
 
@@ -216,10 +224,3 @@ the reviewer's text, which may run to several lines
 reviewr never writes to the worktree, the index, or any branch, which rules it out as the explanation for an unexpected diff. Its one write is a baseline ref under `refs/reviewr/turn-base/`, deliberately outside `refs/heads`. Leave those refs alone.
 
 Its `last-turn` scope reads the same scraped `agent_status` described above, treating a resting-to-working transition as a turn boundary. A turn that finishes inside one poll interval is invisible to it, which is why a very fast edit can be missing from that view.
-
-## Sandbox Limits
-
-Every read command works under the sandbox. Three writes do not, and all three come back `Operation not permitted`:
-
-- `herdr worktree create` writes a checkout outside the allowed paths. Create worktrees with `wt` through the `worktrunk:wt-switch-create` skill instead, then `herdr worktree open` the result. Opening a checkout that already exists is fine.
-- `herdr plugin install` writes into herdr's plugin store and `herdr integration install` writes into the agent's own config tree. Both are install-time operations that dotfiles owns, so hand them to the user rather than retrying with the sandbox off.

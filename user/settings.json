@@ -518,7 +518,7 @@
         "~/.local/share/atuin",
         "~/.greptile",
         "/dev/fd",
-        "/var/folders/*/*/T"
+        "/var/folders/*/*/T/**/*"
       ]
     },
     "excludedCommands": [

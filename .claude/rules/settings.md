@@ -68,6 +68,24 @@ touch ~/.claude/plugins/data/.sandbox-probe && rm ~/.claude/plugins/data/.sandbo
 
 Do not wait for an upstream announcement. [#41156](https://github.com/anthropics/claude-code/issues/41156) raised the same conflict at the permission-prompt layer, was wrongly auto-flagged as a duplicate, and was closed `NOT_PLANNED` by a staleness bot after two and a half months. Related: [#51973](https://github.com/anthropics/claude-code/issues/51973), [#34900](https://github.com/anthropics/claude-code/issues/34900). Treat the probe as the only reliable signal.
 
+## Sandbox Path Globs
+
+A `filesystem.allowWrite` entry with no glob character becomes a Seatbelt `(subpath ...)` rule and covers everything beneath it. An entry containing `*`, `?`, `[`, or `]` becomes a `(regex ...)` rule anchored at both ends, so it matches that one path and nothing inside it. `/var/folders/*/*/T` granted the per-user temp directory itself while every `mktemp` inside it failed with a bare `Operation not permitted`.
+
+A trailing `/**` does not fix that. The harness strips `/**` off the end of every sandbox path before building the profile, which is what turns a plain `/foo/**` into the recursive `(subpath "/foo")` and what turns `/var/folders/*/*/T/**` straight back into the anchored regex. The spelling that survives the strip and still recurses is `/**/*`, which compiles to `(.*/)?[^/]*` after the glob prefix and matches any depth. `/var/folders/*/*/T/*` reaches direct children only, so `mkdir` succeeds and writing inside the new directory fails.
+
+Verified against Claude Code 2.1.232. Nested `claude --settings <file> -p` runs compared the spellings end to end: the bare glob and `/**` both failed on `touch <tmpdir>/probe`, `/*` failed one level deeper, and `/**/*` passed `touch`, nested `mkdir`, `mktemp`, and `mktemp -d`. `--settings` combines with the deployed file rather than replacing it, so the broken entry was present throughout and only the added spelling can account for the difference between runs. `sandbox-exec` on hand-written profiles confirmed the rule semantics underneath: an anchored `(regex "^/private/var/folders/[^/]*/[^/]*/T$")` denies a child, and the same pattern ending `/.*$` permits it.
+
+No deny shadows `/var/folders`. A literal non-glob entry for the resolved temp directory grants writes inside it, which rules out the `denyWithinAllow` precedence trap documented above.
+
+Seatbelt matches resolved paths, so a rule spelled `/var/...` matches nothing on macOS. The harness realpaths the literal prefix of each entry before emitting it, which is why `/var/folders/...` works in settings and why a hand-written probe profile has to say `/private/var/folders/...`.
+
+**Removal criterion.** The entry earns its place only because some tools ignore `TMPDIR`. The `xcrun` shims call `confstr(_CS_DARWIN_USER_TEMP_DIR)` and write `xcrun_db-*` under `/var/folders/<hash>/<hash>/T` whatever the environment says, which is how a sandboxed `strings` fails today. Drop the entry once a sandboxed `strings` on any Mach-O binary stops touching `/var/folders`.
+
+## `/dev/fd` and Process Substitution
+
+The `/dev/fd` entry in `allowWrite` is inert, and no path-based rule can replace it. `diff <(echo a) <(echo b)` fails with `Operation not permitted` on `/dev/fd/<n>` under a `sandbox-exec` profile that allows `(subpath "/dev/fd")`, and also under one that allows `(subpath "/dev")`, while an unfiltered `(allow file-write*)` passes. The kernel resolves `/dev/fd/<n>` to the underlying pipe, which has no filesystem path for a `subpath` or `regex` filter to match. Process substitution stays broken under the sandbox until upstream changes how the write profile is built. The entry is still listed in `user/settings.json`, and dropping it is a separate change.
+
 ## Sandbox Trust Model
 
 The sandbox is egress control, not filesystem lockdown. Credentials stay outside its reach, so a sandboxed process cannot exfiltrate them. Broad filesystem writes are fine, but a new host, socket, or network-reaching escaped command widens the egress surface and needs justification.

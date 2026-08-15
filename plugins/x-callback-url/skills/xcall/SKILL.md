@@ -13,17 +13,20 @@ Send [x-callback-url](https://x-callback-url.com/) requests from the command lin
 
 ## How It Works
 
-`xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source into `${CLAUDE_PLUGIN_DATA}/xcall.app` and registers the callback scheme (`xcall-claude://`) with Launch Services. Installing into the plugin's data directory (not the plugin source/cache tree) keeps the registered path stable across plugin updates: the marketplace cache is content-addressed, so building xcall.app inside it would orphan the Launch Services registration on the next update.
+`xcall` is a Swift CLI that builds into a macOS `.app` bundle. The `.app` is required because macOS only delivers URL scheme callbacks to registered applications. On first use, `run.sh` compiles the source into `~/.cache/claude/x-callback-url/xcall.app` and registers the callback scheme (`xcall-claude://`) with Launch Services.
 
-Claude Code exports `CLAUDE_PLUGIN_DATA` to hooks and MCP servers but not to Bash tool calls, and `run.sh` is reached both ways. A consuming skill closes that gap by setting the variable on the command it documents, where the substitution has already resolved it. `things:url` does this on every `url.ts`, `inbox.ts`, and `reorder.ts` invocation. `build.sh` never guesses a location of its own, because a second bundle would take the `xcall-claude://` scheme from the first and `lsregister -f` does not take it back.
+There is one bundle, shared by every consuming plugin, at a path outside the plugin tree. macOS registers exactly one handler for `xcall-claude://`, and `lsregister -f` on a second bundle does not take the scheme back from the first, so a per-consumer bundle makes consumers retire each other's copies in turn. The marketplace cache is content-addressed, so a bundle built beside the source loses its registration to a deleted path on the next plugin update.
 
 ## Sandbox
 
-Neither half of the bridge survives the command sandbox. `swiftc` cannot write the bundle under `~/.claude/plugins`, and a compiled `xcall` cannot complete the URL-scheme round trip. So `run.sh` and `build.sh` both carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker, which runs them outside it.
+Neither half of the bridge survives the command sandbox. `lsregister` cannot reach Launch Services to register the bundle, and a compiled `xcall` cannot complete the URL-scheme round trip. So `run.sh` and `build.sh` both carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker, which runs them outside it.
 
 The marker hook reads the script named at the head of a command, past any `VAR=value` prefixes. A wrapper token in front of it (`time`, `env`, `timeout`) hides the script from the hook, the command runs sandboxed, and the callback is lost. Invoke `run.sh` by path with at most environment assignments ahead of it.
 
-A sandboxed `xcall` hangs rather than failing, because its own deadline is scheduled inside `applicationDidFinishLaunching`, which AppKit never calls when it cannot reach the WindowServer. `run.sh` therefore holds the deadline that always runs: it kills the process after `XCALL_TIMEOUT_SECONDS` (default 20) and exits 4.
+`xcall` cannot bound its own wait. Any deadline it scheduled would live in `applicationDidFinishLaunching`, which AppKit never calls when it cannot reach the WindowServer, so the sandboxed case that most needs a deadline is the one where it is never armed. `run.sh` holds both deadlines instead, from outside the process, and neither phase can wait forever:
+
+- `XCALL_BUILD_TIMEOUT_SECONDS` (default 20) bounds the build, and exits 3
+- `XCALL_TIMEOUT_SECONDS` (default 20) bounds the callback, and exits 4
 
 ## Usage
 
@@ -85,10 +88,10 @@ Apps with their own CLI (e.g., Shortcuts via `shortcuts run`) don't need xcall â
 ## Build Details
 
 - Source: `scripts/main.swift` (~100 lines)
-- Build: `scripts/build.sh` compiles to `${CLAUDE_PLUGIN_DATA}/xcall.app/`. It exits non-zero when the variable is unset
+- Build: `scripts/build.sh` compiles to `${XDG_CACHE_HOME:-~/.cache}/claude/x-callback-url/xcall.app/`
 - Bundle ID: `com.bendrucker.xcall-claude`
 - Callback scheme: `xcall-claude://`
 - `Info.plist`: `CFBundleTypeRole=Editor`, `LSUIElement=true`. `LSBackgroundOnly` is intentionally not set: combining it with `LSUIElement` causes macOS to refuse to route URL scheme callbacks to the app, surfacing as a "no application set" dialog.
 - After building, `build.sh` calls `lsregister -f` and verifies the scheme handler is the freshly built bundle. A bundle left behind at a path an earlier version built into keeps the scheme, and `lsregister -f` does not take it back, so `build.sh` unregisters and deletes that copy before verifying. If verification still fails it exits non-zero.
-- Build is cached â€” recompiles only if `main.swift` is newer than the binary
-- Timeouts: `xcall` gives up on the callback after 10 seconds, and `run.sh` kills it after `XCALL_TIMEOUT_SECONDS` (default 20) if it never gets that far
+- Build is cached against an `installed` stamp written next to the bundle once `lsregister` verification passes. A run that compiled but failed to register leaves no stamp, so the next call retries both
+- Timeouts: see [Sandbox](#sandbox). `run.sh` owns both, and `xcall` schedules none of its own

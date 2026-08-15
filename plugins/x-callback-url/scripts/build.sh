@@ -1,5 +1,5 @@
 #!/bin/bash
-# claude:dangerouslyDisableSandbox: swiftc writes the bundle under ~/.claude/plugins, which the command sandbox denies
+# claude:dangerouslyDisableSandbox: registers the bundle with Launch Services, which the command sandbox blocks
 set -euo pipefail
 
 # Build xcall.app — a macOS .app bundle for x-callback-url bridging.
@@ -7,26 +7,20 @@ set -euo pipefail
 # The .app bundle is required because macOS only delivers URL scheme
 # callbacks to registered applications with CFBundleURLTypes in Info.plist.
 #
-# Installs into ${CLAUDE_PLUGIN_DATA}. Marketplace installs put plugin sources
-# in a content-addressed cache directory whose hash rotates per plugin version,
-# so a bundle built beside the source would leave Launch Services pointing at a
-# deleted path after any plugin update.
-#
 # Output (stdout): path to the compiled binary inside the .app bundle.
-# Cached: only recompiles if main.swift is newer than the existing binary.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE="$SCRIPT_DIR/main.swift"
 
-# Claude Code exports CLAUDE_PLUGIN_DATA to hooks and MCP servers but not to
-# Bash tool calls. A caller reached from a Bash invocation passes it explicitly,
-# taking the value from its own skill, where the variable is substituted.
-if [[ -z "${CLAUDE_PLUGIN_DATA:-}" ]]; then
-  echo "CLAUDE_PLUGIN_DATA is not set; pass it explicitly, as the things:url skill does" >&2
-  exit 1
-fi
-
-APP_DIR="$CLAUDE_PLUGIN_DATA/xcall.app"
+# macOS registers exactly one handler for xcall-claude://, so one bundle serves
+# every consumer, at a path belonging to none of them. A second bundle takes the
+# scheme, and lsregister -f does not hand it back, so each consumer with its own
+# copy would retire the others in turn. The path also sits outside the plugin
+# tree, whose marketplace cache is content-addressed and rotates its hash per
+# version, leaving Launch Services on a deleted path after an update.
+STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/claude/x-callback-url"
+APP_DIR="$STATE_DIR/xcall.app"
+STAMP="$STATE_DIR/installed"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 BINARY="$MACOS_DIR/xcall"
@@ -62,18 +56,31 @@ unregister_legacy_bundle() {
   fi
 }
 
-needs_rebuild() {
-  [[ ! -x "$BINARY" ]] || [[ "$SOURCE" -nt "$BINARY" ]]
+# The stamp records that the scheme is bound to this bundle. A run that compiles
+# and then fails to register leaves none, so the next call retries the
+# registration rather than treating the binary's presence as an install and
+# waiting out a callback Launch Services routes elsewhere. Re-reading the
+# binding costs an lsregister dump, seconds of work, so it happens on install.
+needs_install() {
+  [[ ! -x "$BINARY" ]] || [[ ! -f "$STAMP" ]] || [[ "$SOURCE" -nt "$STAMP" ]]
 }
 
+# Both files land through a private path and one rename, so nothing ever reads a
+# half-written bundle. One bundle now serves every consumer, so two sessions
+# reaching a cold cache together both install into the same paths. Each gets its
+# own $$-suffixed scratch file, and rename within a directory is atomic, so the
+# loser of that race is discarded whole instead of interleaved into the winner.
 build_bundle() {
   mkdir -p "$MACOS_DIR"
-  swiftc "$SOURCE" -o "$BINARY"
+  trap 'rm -f "$BINARY.$$" "$CONTENTS_DIR/Info.plist.$$"' EXIT
+
+  swiftc "$SOURCE" -o "$BINARY.$$"
+  mv -f "$BINARY.$$" "$BINARY"
 
   # CFBundleTypeRole=Editor ensures macOS delivers GetURL Apple Events to this app.
   # LSUIElement hides from Dock and Cmd-Tab without disabling URL scheme handling.
   # LSBackgroundOnly would disable it.
-  cat > "$CONTENTS_DIR/Info.plist" << 'PLIST'
+  cat > "$CONTENTS_DIR/Info.plist.$$" << 'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -106,6 +113,8 @@ build_bundle() {
 </dict>
 </plist>
 PLIST
+
+  mv -f "$CONTENTS_DIR/Info.plist.$$" "$CONTENTS_DIR/Info.plist"
 }
 
 # A bundle can survive at a path an earlier version of this script built into.
@@ -143,9 +152,10 @@ register_bundle() {
 
 unregister_legacy_bundle
 
-if needs_rebuild; then
+if needs_install; then
   build_bundle
   register_bundle
+  : >"$STAMP"
 fi
 
 echo "$BINARY"

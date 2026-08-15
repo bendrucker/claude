@@ -17,7 +17,7 @@ A capable orchestrator reviews better working through the angles itself than it 
 
 ## Spawn Model
 
-Every fan-out spawn passes `model: sonnet`. What a fan-out cell buys is breadth, and breadth comes from many independent readers of the same diff. Paying the orchestrator's own rate for each of those readers buys nothing extra. Most diffs fail on lines, and lines are what Sonnet reads well and cheaply.
+Every fan-out spawn passes `model: sonnet` alongside its `subagent_type`. What a fan-out cell buys is breadth, and breadth comes from many independent readers of the same diff. Paying the orchestrator's own rate for each of those readers buys nothing extra. Most diffs fail on lines, and lines are what Sonnet reads well and cheaply.
 
 ## Budgets
 
@@ -77,7 +77,7 @@ On Sonnet 5 at `high` or `xhigh`, scale the fleet to the diff size instead of us
 budget = clamp(ceil(lines / 150), 2, 8)
 ```
 
-Spawn about that many finder subagents. The committed-range count is a floor: uncommitted changes are not in it, so scale up if Phase 0 finds additional working-tree scope.
+Spawn about that many finder subagents, each with `subagent_type: review:angle, model: sonnet`. The committed-range count is a floor: uncommitted changes are not in it, so scale up if Phase 0 finds additional working-tree scope.
 
 No other model family gets this hint.
 

@@ -60,9 +60,7 @@ Otherwise run the selected angles from [angles.md](angles.md). Each surfaces up 
 
 #### Fan-out cells
 
-`medium`, `high`, and `xhigh` on the default and Sonnet families, plus `xhigh` on Fable 5. Run each angle as an independent `Agent` with `subagent_type: review:angle`. Invoking this skill is the request for that fan-out, so run it whenever `Agent` is in the tool set. Give every agent the scope block, its single angle text, its candidate cap, and the cleanup-precedence block if it carries a cleanup lens.
-
-`review:angle` and `review:verifier` pin no model, so every fan-out spawn passes `model: sonnet`, here and in Phase 2 and Phase 3. Breadth costs Sonnet rates whatever model is orchestrating.
+`medium`, `high`, and `xhigh` on the default and Sonnet families, plus `xhigh` on Fable 5. Run each angle as an independent `Agent` with `subagent_type: review:angle, model: sonnet`. Invoking this skill is the request for that fan-out, so run it whenever `Agent` is in the tool set. Give every agent the scope block, its single angle text, its candidate cap, and the cleanup-precedence block if it carries a cleanup lens. The agent pins no model, so the spawn supplies it, and breadth costs Sonnet rates whatever model is orchestrating.
 
 #### Inline cells
 
@@ -82,7 +80,7 @@ Inline cells stop here: dedup only, no verify, no re-judging. Same defect, same 
 
 Degraded cells with no `Agent` tool dedup, then re-check each remaining candidate against the diff in this context.
 
-Fan-out cells verify: for each remaining candidate, run one `Agent` with `subagent_type: review:verifier` on Sonnet. Give it the scope block, the relevant files, the candidate, and the ladder below. Group candidates that share a location into one verifier returning one verdict per candidate, each judged independently on its own claim. A candidate the verifier renders no verdict on is dropped, never reported as an unverified PLAUSIBLE.
+Fan-out cells verify: for each remaining candidate, run one `Agent` with `subagent_type: review:verifier, model: sonnet`. Give it the scope block, the relevant files, the candidate, and the ladder below. Group candidates that share a location into one verifier returning one verdict per candidate, each judged independently on its own claim. A candidate the verifier renders no verdict on is dropped, never reported as an unverified PLAUSIBLE.
 
 Each verdict is exactly one of:
 
@@ -104,7 +102,7 @@ At `xhigh`, a single non-REFUTED vote carries the finding. Do not drop on uncert
 
 Only at `xhigh` and `inline-xhigh`.
 
-Take one more pass as a fresh reviewer holding the verified list. On fan-out cells this is one more `review:angle` `Agent` on Sonnet, carrying the sweep gap focus as its angle. On inline and degraded cells it is one more pass in this context.
+Take one more pass as a fresh reviewer holding the verified list. On fan-out cells this is one more `Agent` with `subagent_type: review:angle, model: sonnet`, carrying the sweep gap focus as its angle. On inline and degraded cells it is one more pass in this context.
 
 Re-read the diff and the enclosing functions looking ONLY for defects not already listed. Do not re-derive or re-confirm anything already there. The job is gaps. Focus on what the first pass tends to miss (see the sweep gap focus in [angles.md](angles.md)).
 

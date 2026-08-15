@@ -13,20 +13,47 @@ const TMP_TARGET = /(^|\/)tmp\//;
 const UNEXPANDED_VAR_TARGET = /^\$\{?\w+\}?\//;
 const AGENT_WORKTREE_TARGET = /(^|\/)\.worktrees\//;
 
+// A heredoc body is file content: prose, prompts, and scripts where the literal
+// text `git worktree` is data rather than an invocation. Stripping runs before
+// quotes because the quoted delimiter (`<<'BRIEF'`) anchors the body.
+const HEREDOC_BODY = /<<-?[ \t]*(['"]?)(\w+)\1[\s\S]*?^[ \t]*\2[ \t]*$/gm;
+const QUOTED_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
+
+// A token is a run of non-space characters in which a quoted span counts as
+// part of the token, so a target path containing spaces stays whole.
+const TOKEN = /(?:'[^']*'|"(?:[^"\\]|\\.)*"|\S)+/g;
+
+function stripHeredocs(command: string): string {
+  return command.replace(HEREDOC_BODY, " ");
+}
+
+function stripQuoted(command: string): string {
+  return command.replace(QUOTED_SPAN, " ");
+}
+
+// Quote characters delimit the token, they are not part of the path.
+function unquote(token: string): string {
+  return token.replace(/['"]/g, "");
+}
+
+function tokensAfter(command: string, invocation: RegExp): string[] {
+  const after = stripHeredocs(command).split(invocation)[1];
+  if (after === undefined) return [];
+  return (after.match(TOKEN) ?? []).map(unquote);
+}
+
 function isExemptTarget(token: string): boolean {
   return TMP_TARGET.test(token) || UNEXPANDED_VAR_TARGET.test(token);
 }
 
 export function isThrowawayAdd(command: string): boolean {
-  const after = command.split(/\bgit\s+worktree\s+add\b/)[1];
-  if (after === undefined) return false;
-  return after.split(/\s+/).some(isExemptTarget);
+  return tokensAfter(command, /\bgit\s+worktree\s+add\b/).some(isExemptTarget);
 }
 
 export function isThrowawayRemove(command: string): boolean {
-  const after = command.split(/\bgit\s+worktree\s+remove\b/)[1];
-  if (after === undefined) return false;
-  return after.split(/\s+/).some((tok) => isExemptTarget(tok) || AGENT_WORKTREE_TARGET.test(tok));
+  return tokensAfter(command, /\bgit\s+worktree\s+remove\b/).some(
+    (tok) => isExemptTarget(tok) || AGENT_WORKTREE_TARGET.test(tok),
+  );
 }
 
 export function formatDenyOutput(subcommand: string): SyncHookJSONOutput {
@@ -63,7 +90,7 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
     return null;
   }
 
-  const match = command.match(/\bgit\s+worktree\s+(\w+)/);
+  const match = stripQuoted(stripHeredocs(command)).match(/\bgit\s+worktree\s+(\w+)/);
   const subcommand = match?.[1];
   if (!subcommand) {
     return null;

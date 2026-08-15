@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { describe, expect, it, test } from "bun:test";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import {
   formatAskOutput,
   formatDenyOutput,
@@ -134,7 +134,69 @@ describe("processInput", () => {
   });
 });
 
+describe("quoted and heredoc content", () => {
+  const brief = [
+    `cat > "$TMPDIR/briefs/task.md" <<'BRIEF'`,
+    "You are working in a git worktree of a fork of the upstream repo.",
+    "BRIEF",
+  ].join("\n");
+
+  test.each<{ name: string; command: string; expected: SyncHookJSONOutput | null }>([
+    {
+      name: "exempts a quoted tmp/ target containing spaces",
+      command: 'git worktree add -q "tmp/wt with space" keepme 2>&1',
+      expected: null,
+    },
+    {
+      name: "exempts a quoted $TMPDIR target containing spaces",
+      command: 'git worktree remove "$TMPDIR/wt with space"',
+      expected: null,
+    },
+    {
+      name: "ignores git worktree prose in a heredoc body",
+      command: brief,
+      expected: null,
+    },
+    {
+      name: "ignores git worktree prose in a single-quoted string",
+      command: "echo 'we run git worktree add ../path through worktrunk'",
+      expected: null,
+    },
+    {
+      name: "ignores git worktree prose in a double-quoted string",
+      command: 'echo "we run git worktree remove ../path through worktrunk"',
+      expected: null,
+    },
+    {
+      name: "denies a genuine add outside the exemptions",
+      command: 'git worktree add ../path -b "my branch"',
+      expected: formatDenyOutput("add"),
+    },
+    {
+      name: "denies a genuine add that follows a heredoc",
+      command: `${brief}\ngit worktree add ../path`,
+      expected: formatDenyOutput("add"),
+    },
+    {
+      name: "denies an add whose only exempt-looking target is in a heredoc body",
+      command: `git worktree add ../path <<'NOTE'\ntmp/decoy\nNOTE`,
+      expected: formatDenyOutput("add"),
+    },
+    {
+      name: "asks for an unknown subcommand with quoted arguments",
+      command: 'git worktree lock "../path with space" --reason "in use"',
+      expected: formatAskOutput(),
+    },
+  ])("$name", ({ command, expected }) => {
+    expect(processInput(bashInput(command))).toEqual(expected);
+  });
+});
+
 describe("isThrowawayAdd", () => {
+  it("matches a quoted tmp/ target containing spaces", () => {
+    expect(isThrowawayAdd('git worktree add -q "tmp/wt with space" keepme 2>&1')).toBe(true);
+  });
+
   it("matches a tmp/ target", () => {
     expect(isThrowawayAdd("git worktree add tmp/x")).toBe(true);
   });

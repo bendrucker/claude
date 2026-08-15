@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -59,5 +59,33 @@ describe("jxa cli", () => {
     );
     expect(result.code).toBe(0);
     expect(result.stdout.trim()).toBe("a,b");
+  });
+
+  describe("script file passthrough", () => {
+    const dir = join(import.meta.dirname, "fixtures");
+    const script = join(dir, "echo-argv.js");
+
+    beforeAll(async () => {
+      mkdirSync(dir, { recursive: true });
+      await Bun.write(script, "function run(argv) { return JSON.stringify(argv); }");
+    });
+
+    test.each<{ name: string; args: string[]; expected: string[] }>([
+      { name: "positional arguments", args: ["a", "b"], expected: ["a", "b"] },
+      {
+        name: "flags the script owns",
+        args: ["2026-06-01T00:00:00Z", "--notes-contains", "Discovery:"],
+        expected: ["2026-06-01T00:00:00Z", "--notes-contains", "Discovery:"],
+      },
+      {
+        name: "flags behind an explicit separator",
+        args: ["2026-06-01T00:00:00Z", "--", "--notes-contains", "Discovery:"],
+        expected: ["2026-06-01T00:00:00Z", "--notes-contains", "Discovery:"],
+      },
+    ])("forwards $name", async ({ args, expected }) => {
+      const result = await output(run("Finder", script, ...args));
+      expect(result.code).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual(expected);
+    });
   });
 });

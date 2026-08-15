@@ -11,8 +11,14 @@ import Foundation
 // Example: xcall "things:///add?title=Buy%20milk"
 //
 // stdout: x-success query string (e.g. x-things-id=ABC123)
-// stderr: x-error query string or timeout message
+// stderr: x-error query string
 // Exit codes: 0 = success, 1 = error, 2 = cancel
+//
+// run.sh holds the deadline for this process, from outside it, and passes the
+// interval through XCALL_TIMEOUT_SECONDS. In-process scheduling could only
+// happen from applicationDidFinishLaunching below, which AppKit skips entirely
+// when it cannot reach the WindowServer, the sandboxed case where the callback
+// can never arrive.
 
 let callbackScheme = "xcall-claude"
 
@@ -58,11 +64,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 fputs("Failed to open URL: \(error.localizedDescription) (domain=\(nsError.domain) code=\(nsError.code)) url=\(urlString)\n", stderr)
                 exit(1)
             }
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            fputs("Timeout waiting for callback\n", stderr)
-            NSApp.terminate(nil)
         }
     }
 

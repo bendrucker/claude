@@ -6,6 +6,7 @@ import {
   dispatch,
   isSandboxBlockedHandoff,
   XcallError,
+  xcallBackstopMs,
 } from "./url";
 
 describe("buildJsonPayload", () => {
@@ -141,6 +142,38 @@ describe("isSandboxBlockedHandoff", () => {
     ],
   ])("%s", (_name, stderr, expected) => {
     expect(isSandboxBlockedHandoff(stderr)).toBe(expected);
+  });
+});
+
+describe("xcallBackstopMs", () => {
+  test.each<{ name: string; env: Record<string, string | undefined> }>([
+    { name: "defaults when neither bound is set", env: {} },
+    { name: "a raised build bound", env: { XCALL_BUILD_TIMEOUT_SECONDS: "90" } },
+    { name: "a raised callback bound", env: { XCALL_TIMEOUT_SECONDS: "60" } },
+    {
+      name: "both bounds raised",
+      env: { XCALL_BUILD_TIMEOUT_SECONDS: "90", XCALL_TIMEOUT_SECONDS: "60" },
+    },
+    { name: "a non-numeric bound", env: { XCALL_TIMEOUT_SECONDS: "soon" } },
+    { name: "a zero bound", env: { XCALL_TIMEOUT_SECONDS: "0" } },
+  ])("outwaits run.sh with $name", ({ env }) => {
+    const bound = (name: string) => Number(env[name]) || 20;
+    const runnerCeilingMs =
+      (bound("XCALL_BUILD_TIMEOUT_SECONDS") + bound("XCALL_TIMEOUT_SECONDS") + 2) * 1000;
+
+    expect(xcallBackstopMs(env)).toBeGreaterThan(runnerCeilingMs);
+  });
+
+  test("reports the derived values", () => {
+    expect({
+      defaults: xcallBackstopMs({}),
+      raised: xcallBackstopMs({ XCALL_BUILD_TIMEOUT_SECONDS: "90", XCALL_TIMEOUT_SECONDS: "60" }),
+    }).toMatchInlineSnapshot(`
+      {
+        "defaults": 57000,
+        "raised": 167000,
+      }
+    `);
   });
 });
 

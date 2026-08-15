@@ -177,12 +177,32 @@ export function buildJsonPayload(ids: string[], attributes: Record<string, strin
 const XCALL_BUILD_FAILED = 3;
 const XCALL_TIMED_OUT = 4;
 
+/** run.sh's default for each of its two bounds, and its SIGTERM-to-SIGKILL grace. */
+const XCALL_BOUND_DEFAULT_SECONDS = 20;
+const XCALL_KILL_GRACE_SECONDS = 2;
+
+/** Slack over run.sh's own bounds, covering process startup and the Swift build. */
+const XCALL_BACKSTOP_MARGIN_MS = 15_000;
+
+function boundSeconds(env: Record<string, string | undefined>, name: string): number {
+  const seconds = Number(env[name]);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : XCALL_BOUND_DEFAULT_SECONDS;
+}
+
 /**
- * Backstop for a runner that dies without honoring its own watchdog. It must
- * exceed a cold Swift build plus run.sh's XCALL_TIMEOUT_SECONDS, or it preempts
- * the runner's own bounded failure and hides the reason.
+ * Backstop for a runner that dies without honoring its own watchdogs. Derived
+ * from run.sh's two bounds rather than fixed, because run.sh invites raising
+ * either one in its own timeout message. A backstop below their sum kills the
+ * runner before it can name why it failed, and the caller gets an anonymous
+ * signal in place of exit 3 or 4.
  */
-const XCALL_BACKSTOP_MS = 45_000;
+export function xcallBackstopMs(env: Record<string, string | undefined>): number {
+  const bounds =
+    boundSeconds(env, "XCALL_BUILD_TIMEOUT_SECONDS") +
+    boundSeconds(env, "XCALL_TIMEOUT_SECONDS") +
+    XCALL_KILL_GRACE_SECONDS;
+  return bounds * 1000 + XCALL_BACKSTOP_MARGIN_MS;
+}
 
 export class XcallError extends Error {
   constructor(
@@ -214,7 +234,7 @@ async function xcall(runner: string, url: string): Promise<string> {
   const proc = Bun.spawn([runner, url], {
     stdout: "pipe",
     stderr: "pipe",
-    timeout: XCALL_BACKSTOP_MS,
+    timeout: xcallBackstopMs(process.env),
   });
   const [text, stderr] = await Promise.all([
     new Response(proc.stdout).text(),

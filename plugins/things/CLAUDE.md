@@ -31,9 +31,9 @@ Biome linting is disabled for `scripts/jxa/` files via the root `biome.json` ove
 
 `reorder.ts` and `inbox.ts` are bun TypeScript scripts (not `osascript`). Their Launch Services handoff runs outside the command sandbox via the `claude:dangerouslyDisableSandbox` marker.
 
-The x-callback-url bridge needs `CLAUDE_PLUGIN_DATA` to locate its `.app` bundle, and Claude Code does not export it to Bash tool calls. The `things:url` skill sets it on every documented invocation, where the substitution has already resolved it, and the three scripts inherit it. Keep that prefix on any new documented command, or the callback is lost and `dispatch` falls back to `open`.
-
 A degraded dispatch is no longer silent. `dispatch` returns a `fallbackReason` naming why no id came back (runner missing, bridge build failed, callback timed out, app error) plus the runner's `fallbackDetail` stderr, and `warnFallback` prints both. Every caller of `dispatch` should pass its result through `warnFallback`, because the alternative is a write that lands with no id and no explanation.
+
+`xcallBackstopMs` in `url.ts` guards a runner that dies without honoring its own watchdogs. It reads `run.sh`'s two bounds from the environment and adds a margin, so raising either bound cannot make the backstop kill the runner before it names its own failure.
 
 ## What NOT to Do
 

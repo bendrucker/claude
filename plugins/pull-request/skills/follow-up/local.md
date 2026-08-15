@@ -4,9 +4,11 @@ Mechanics for running a hosted reviewer's CLI locally in [Local Mode](SKILL.md#l
 
 ## When the Diff Warrants a Review
 
-Reviews are metered, and a local pass plus a hosted one costs two credits for one change. A diff earns one review through one channel. Spend it when the diff carries risk (auth, permissions, sandbox config, secret handling, network egress), adds a runtime surface, or runs past roughly 200 changed lines or 8 files excluding tests, docs, and lockfiles. Prose, dependency bumps, and reverts never qualify, and a config diff qualifies only through the risk surfaces just named.
+Reviews are metered, and a local pass plus a hosted one costs two credits for one change. A diff earns one review through one channel. Spend it when the diff carries risk (auth, permissions, sandbox config, secret handling, network egress), adds a runtime surface, or runs past roughly 100 changed lines or 4 files excluding tests, docs, and lockfiles. Prose, dependency bumps, and reverts never qualify, and a config diff qualifies only through the risk surfaces just named.
 
 A `ship` skill with its own Bot Review Gate overrides these defaults, and tuning belongs there first. An explicit `--local` request overrides everything.
+
+**Recalibration trigger.** The 100 and 4 above halve an earlier 200 and 8, cut on 2026-08-14 because the allotment was going unspent: across 12 PRs none carried the `review` label, no local CLI run in the window targeted this repo, and `free_reviews_limit_reached` never appeared in the session index. Recheck those same three counts at the next review of this file. A `free_reviews_limit_reached` in the window restores 200 and 8, and rules out opting PRs in by default. Usage still far under the cap justifies adding that default opt-in ([On-Demand Review](reviewers.md#on-demand-review)) as the next lever. Usage near the cap leaves the thresholds and the opt-in as they stand.
 
 ## Provider Detection
 

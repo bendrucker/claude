@@ -10,6 +10,26 @@ CREATE OR REPLACE MACRO host_filter(host_col, host_val) AS
 
 CREATE OR REPLACE MACRO project_id(host, path) AS host || ':' || path;
 
+-- A subagent writes its own transcript under the session's `subagents/` directory, but
+-- every line in it carries the PARENT session's `sessionId`. Session id alone therefore
+-- cannot tell a parent's own tool call from a subagent's, and any per-session count over
+-- content-derived rows attributes the whole fan-out to the parent. Returns the file's
+-- agent label for a subagent line and NULL for a main-thread line, so `(host,
+-- session_id, agent_id)` is the real per-context key and `agent_id IS NOT NULL` is the
+-- subagent test.
+--
+-- The path is the discriminator rather than `isSidechain` or `attributionAgent`, which
+-- disagree with it on thousands of rows and are NULL on a large minority of subagent
+-- rows respectively. Workflow spawns nest a level deeper
+-- (`subagents/workflows/wf_<id>/agent-<label>.jsonl`) and account for roughly 40% of
+-- subagent files, so the directory is matched separately from the basename. Anchoring
+-- the whole tail instead silently reclassifies every nested file as main-thread.
+CREATE OR REPLACE MACRO subagent_id(source_file) AS
+  CASE
+    WHEN source_file LIKE '%/subagents/%'
+    THEN NULLIF(regexp_extract(source_file, '([^/]+)\.jsonl$', 1), '')
+  END;
+
 -- Cost-rate table for token spend estimates, per-MTok USD from published API rates as of
 -- 2026-07-24. Rates are keyed by family, so a family arm can drift from a specific model's
 -- current rate. Kept here so every cost query shares one source. The per-tier weighting

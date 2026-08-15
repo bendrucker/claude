@@ -60,6 +60,12 @@ GROUP BY host, session_id, message_id;
 -- passes: drop replayed source lines (same record uuid, keep the latest copy), then
 -- drop residual duplicate tool ids that arrive under fresh uuids (e.g. an Agent
 -- tool_use echoed into its subagent transcript).
+--
+-- The cross-file pass keeps the main-thread copy when one exists. The only tool ids that
+-- span two files are a parent's Agent call echoed into the transcript of the subagent it
+-- spawned, and the parent's copy is the original. Ordering on source_line alone let the
+-- echo win for about one spawn in twelve, which hands `agent_id` the spawned agent's
+-- label for a call the parent made.
 CREATE OR REPLACE TABLE content_items AS
 WITH src AS (
   SELECT
@@ -107,9 +113,13 @@ WHERE json_type(s.message_content) = 'ARRAY'
 QUALIFY COALESCE(id, tool_use_id) IS NULL
   OR ROW_NUMBER() OVER (
        PARTITION BY s.host, type, COALESCE(id, tool_use_id)
-       ORDER BY s.source_line DESC, s.source_file DESC
+       ORDER BY (s.source_file LIKE '%/subagents/%'), s.source_line DESC, s.source_file DESC
      ) = 1;
 
+-- `session_id` is the transcript's session id, which a subagent line inherits from its
+-- parent. `agent_id` names the subagent that actually made the call and is NULL on the
+-- main thread. Group by it alongside session_id wherever a per-session count would
+-- otherwise credit a whole fan-out to its parent.
 CREATE OR REPLACE VIEW tool_calls AS
 SELECT
   name AS tool_name,
@@ -122,10 +132,13 @@ SELECT
   (data->>'$.input.command')     AS command,
   attribution_skill,
   attribution_plugin,
-  attribution_agent
+  attribution_agent,
+  subagent_id(source_file) AS agent_id
 FROM content_items
 WHERE type = 'tool_use' AND name IS NOT NULL;
 
+-- `agent_id` comes from the tool_result row, so it names the context that hit the error
+-- even when the originating call did not resolve.
 CREATE OR REPLACE VIEW tool_errors AS
 SELECT
   er.tool_use_id   AS tool_id,
@@ -136,7 +149,8 @@ SELECT
   tc.project_path,
   er.timestamp,
   CASE WHEN er.tool_use_result::VARCHAR = '"User rejected tool use"'
-       THEN 'rejection' ELSE 'failure' END AS error_type
+       THEN 'rejection' ELSE 'failure' END AS error_type,
+  subagent_id(er.source_file) AS agent_id
 FROM content_items er
 LEFT JOIN tool_calls tc ON er.tool_use_id = tc.tool_id AND er.host = tc.host
 WHERE er.type = 'tool_result' AND er.is_error;
@@ -180,7 +194,8 @@ WITH bypass AS (
     host,
     session_id,
     project_path,
-    timestamp
+    timestamp,
+    subagent_id(source_file) AS agent_id
   FROM content_items
   WHERE type = 'tool_use'
     AND name = 'Bash'
@@ -194,6 +209,7 @@ SELECT
   b.session_id,
   b.project_path,
   b.timestamp,
+  b.agent_id,
   prior.tool_id AS retried_tool_id,
   prior.error   AS retried_error
 FROM bypass b
@@ -208,6 +224,9 @@ LEFT JOIN LATERAL (
     AND COALESCE((tc.data->>'$.input.dangerouslyDisableSandbox'), 'false') = 'false'
     AND tc.host = b.host
     AND tc.session_id = b.session_id
+    -- Sibling subagents share the parent's session id, so matching on session alone
+    -- pairs one agent's bypass with an unrelated agent's failure of the same command.
+    AND subagent_id(tc.source_file) IS NOT DISTINCT FROM b.agent_id
     AND tc.timestamp  < b.timestamp
     AND (tc.data->>'$.input.command') = b.command
   ORDER BY tc.timestamp DESC
@@ -226,7 +245,7 @@ WITH unified AS (
     ci.text AS raw_text,
     ci.source_file,
     ci.source_line,
-    ci.source_file LIKE '%/subagents/%' AS is_subagent,
+    subagent_id(ci.source_file) IS NOT NULL AS is_subagent,
     ci.text LIKE '<%'
       OR ci.text LIKE '[Request interrupted%'
     AS is_system
@@ -249,7 +268,7 @@ WITH unified AS (
     m.content_text AS raw_text,
     m.source_file,
     m.source_line,
-    m.source_file LIKE '%/subagents/%' AS is_subagent,
+    subagent_id(m.source_file) IS NOT NULL AS is_subagent,
     m.content_text LIKE '<%'
       OR m.content_text LIKE '[Request interrupted%'
       OR m.content_text LIKE 'Implement the following plan:%'
@@ -464,6 +483,9 @@ FROM decided;
 -- The friction surface: hook events that stopped or interrupted a tool call or the
 -- model. `decision` is deny/ask/block; `reason` is the message the hook surfaced.
 -- Use this to find hooks that overfire (high counts, repeated blocks within a session).
+-- `agent_id` marks which context was blocked, so this unions cleanly with `hook_denies`,
+-- where subagent rows are common. The harness writes hook records only to the main
+-- transcript, so it is NULL on every row today.
 CREATE OR REPLACE VIEW hook_blocks AS
 SELECT
   host,
@@ -476,7 +498,8 @@ SELECT
   tool_use_id,
   kind,
   COALESCE(decision, CASE WHEN kind = 'hook_blocking_error' THEN 'block' END) AS decision,
-  reason
+  reason,
+  subagent_id(source_file) AS agent_id
 FROM hook_events
 WHERE blocked OR decision IN ('ask', 'deny');
 
@@ -499,6 +522,12 @@ WHERE blocked OR decision IN ('ask', 'deny');
 -- an `ask` the user declined leaves both a hook record and an error, and counting both
 -- would inflate every hook that asks. `hook_name` is the map's label rather than a command
 -- string, since the deny path records no command.
+--
+-- Denies recovered this way are the one blocking channel a subagent contributes to,
+-- because a subagent's tool_results land in its own transcript while carrying the parent
+-- session's id. `agent_id` says which context was denied, so a burst count can key on
+-- the agent instead of crediting a whole fan-out's denies to the parent. Rows are kept
+-- rather than filtered, so a caller wanting every deny ignores the column.
 CREATE OR REPLACE VIEW hook_denies AS
 WITH patterns(hook_name, pattern) AS (
   VALUES
@@ -519,7 +548,8 @@ SELECT
   te.tool_id       AS tool_use_id,
   tc.tool_name     AS denied_tool,
   tc.command       AS denied_command,
-  te.error_content AS reason
+  te.error_content AS reason,
+  te.agent_id
 FROM tool_errors te
 JOIN patterns p ON te.error_content LIKE p.pattern
 JOIN tool_calls tc ON tc.host = te.host AND tc.tool_id = te.tool_id
@@ -561,7 +591,8 @@ SELECT
   file_path,
   attribution_skill,
   attribution_plugin,
-  attribution_agent
+  attribution_agent,
+  agent_id
 FROM tool_calls
 WHERE tool_name IN ('Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit')
   AND file_path IS NOT NULL;

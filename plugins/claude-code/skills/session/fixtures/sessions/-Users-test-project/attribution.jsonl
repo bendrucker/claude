@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Mine the hook data"},"sessionId":"attribution-session","cwd":"/Users/test/project","timestamp":"2024-01-20T09:00:00.000Z","uuid":"attr-u1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"attr-spawn-1","name":"Agent","input":{"subagent_type":"general-purpose","description":"mine hooks"}}]},"sessionId":"attribution-session","cwd":"/Users/test/project","timestamp":"2024-01-20T09:00:01.000Z","uuid":"attr-spawn-parent"}

@@ -867,34 +867,83 @@ describe("catalog-reinjection-thrash-sessions query", () => {
   });
 });
 
+type Blocked = {
+  hook: string;
+  blocks: bigint;
+  denies: bigint;
+  asks: bigint;
+  recovered_denies: bigint;
+  subagent_blocks: bigint;
+  sessions: bigint;
+  agent_threads: bigint;
+  storm_threads: bigint;
+  max_burst: bigint;
+};
+
+describe("subagent attribution", () => {
+  it("labels a workflow-nested subagent, which lives one directory deeper", async () => {
+    // Roughly 40% of subagent transcripts land under subagents/workflows/wf_<id>/.
+    // A pattern anchored on subagents/<file>.jsonl misses every one of them and
+    // silently reclassifies the rows as main-thread.
+    const rows = await db.query<{ agent_id: string | null }>(
+      "SELECT agent_id FROM tool_calls WHERE tool_id = 'attr-deny-1'",
+    );
+    expect(rows).toEqual([{ agent_id: "agent-nested" }]);
+  });
+
+  it("credits a spawn echoed into the subagent transcript to the parent", async () => {
+    // The Agent tool_use appears in both transcripts under different uuids. The parent
+    // made the call, so the main-thread copy has to win the cross-file dedup.
+    const rows = await db.query<{ agent_id: string | null }>(
+      "SELECT agent_id FROM tool_calls WHERE tool_id = 'attr-spawn-1'",
+    );
+    expect(rows).toEqual([{ agent_id: null }]);
+  });
+});
+
 describe("hook-blocks query", () => {
   it("groups by signature and counts repeat storms within a session", async () => {
-    const rows = await runQuery<{
-      hook: string;
-      blocks: bigint;
-      asks: bigint;
-      storm_sessions: bigint;
-      max_burst: bigint;
-    }>(db, "hook-blocks", filterParams({ hook: null }));
+    const rows = await runQuery<Blocked>(db, "hook-blocks", filterParams({ hook: null }));
     const emdash = rows.find((r) => r.hook.includes("check-tropes"));
     expect(Number(emdash?.blocks)).toBe(2);
     expect(Number(emdash?.asks)).toBe(2);
     // Both em-dash asks land in one session, so it is a storm of burst 2.
-    expect(Number(emdash?.storm_sessions)).toBe(1);
+    expect(Number(emdash?.storm_threads)).toBe(1);
     expect(Number(emdash?.max_burst)).toBe(2);
   });
 
   it("recovers a PreToolUse deny that left no hook record", async () => {
-    const rows = await runQuery<{
-      hook: string;
-      blocks: bigint;
-      denies: bigint;
-      recovered_denies: bigint;
-    }>(db, "hook-blocks", filterParams({ hook: null }));
+    const rows = await runQuery<Blocked>(db, "hook-blocks", filterParams({ hook: null }));
     const denied = rows.find((r) => r.hook === "git:block-default-branch-commit");
-    expect(Number(denied?.blocks)).toBe(1);
-    expect(Number(denied?.denies)).toBe(1);
-    expect(Number(denied?.recovered_denies)).toBe(1);
+    // One deny on a main thread plus three from the subagent fixtures.
+    expect(Number(denied?.blocks)).toBe(4);
+    expect(Number(denied?.denies)).toBe(4);
+    expect(Number(denied?.recovered_denies)).toBe(4);
+  });
+
+  it("keys a burst on the agent thread, not the session a subagent inherits", async () => {
+    // A subagent writes its own transcript but stamps every line with the parent's
+    // sessionId. Keyed on the session, hooks-session's one main-thread deny and two
+    // subagent denies read as a single burst of 3 by the parent. They are three
+    // independent contexts, so the worst burst is the one subagent that hit it twice.
+    const rows = await runQuery<Blocked>(db, "hook-blocks", filterParams({ hook: null }));
+    const denied = rows.find((r) => r.hook === "git:block-default-branch-commit");
+    expect(Number(denied?.max_burst)).toBe(2);
+    expect(Number(denied?.sessions)).toBe(2);
+    // hooks-session's main thread, its subagent, and the nested workflow subagent.
+    // A NULL agent_id groups as its own context rather than dropping out of the count.
+    expect(Number(denied?.agent_threads)).toBe(3);
+    expect(Number(denied?.subagent_blocks)).toBe(3);
+  });
+
+  it("names the subagent that was denied and leaves the parent's own deny unlabelled", async () => {
+    const rows = await db.query<{ tool_use_id: string; agent_id: string | null }>(
+      "SELECT tool_use_id, agent_id FROM hook_denies WHERE tool_use_id LIKE 'hk-%deny-1'",
+    );
+    expect(Object.fromEntries(rows.map((r) => [r.tool_use_id, r.agent_id]))).toEqual({
+      "hk-deny-1": null,
+      "hk-sub-deny-1": "agent-mine-hooks",
+    });
   });
 
   it("does not recount an ask the user declined as a recovered deny", async () => {
@@ -1049,7 +1098,7 @@ describe("outcomes query", () => {
       "sessions: ongoing": 1,
       "sessions: handed-off": 1,
       "sessions: abandoned-with-edits": 2,
-      "sessions: no-artifact": 15,
+      "sessions: no-artifact": 16,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1065,7 +1114,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 19,
+      "sessions: ongoing": 20,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1951,9 +2000,12 @@ describe("index-health query", () => {
     );
     const deny = rows.find((r) => r.check_name === "hook-deny-invisible");
     expect(deny?.status).toBe("alert");
-    expect(deny?.subject).toBe("2 denies recovered");
-    expect(deny?.detail).toContain("git:block-default-branch-commit (1)");
+    expect(deny?.subject).toBe("5 denies recovered");
+    expect(deny?.detail).toContain("git:block-default-branch-commit (4)");
     expect(deny?.detail).toContain("user:worktree (1)");
+    // Subagent denies stay in the count (hook_events misses them too) but are broken
+    // out, so a reader knows the total is not all main-thread friction.
+    expect(deny?.detail).toContain("3 of the recovered denies were a subagent");
   });
 
   it("flags a kind that went silent beyond its own historical gap", async () => {

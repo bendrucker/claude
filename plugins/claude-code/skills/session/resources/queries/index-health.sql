@@ -33,7 +33,10 @@
 --     every hook_events-only reading (hooks.sql's blocks/friction_pct, any custom SQL
 --     over hook_blocks) under-reports blocking by the recovered count. Alert when
 --     recovery exceeds the denies hook_events did record, meaning the deny channel is
---     mostly dark, info otherwise. Zero recovered is itself ambiguous: either nothing was
+--     mostly dark, info otherwise. The detail breaks out how many were a subagent being
+--     denied. hook_events misses those too, so they count here, but they carry the parent
+--     session's id and a per-session reading has to key on `agent_id`.
+--     Zero recovered is itself ambiguous: either nothing was
 --     denied, or the hand-maintained pattern map in views.sql has fallen behind a
 --     reworded hook, which is why this row is emitted even when the count is zero.
 --   null-timestamp-kinds (info): kinds whose rows carry no timestamp. date_filter
@@ -203,7 +206,10 @@ deny_window AS (
   FROM corpus c
 ),
 deny_by_hook AS (
-  SELECT hd.hook_name, COUNT(*) AS cnt
+  SELECT
+    hd.hook_name,
+    COUNT(*) AS cnt,
+    COUNT(*) FILTER (WHERE hd.agent_id IS NOT NULL) AS subagent_cnt
   FROM hook_denies hd, deny_window w
   WHERE hd.timestamp >= w.since
   GROUP BY hd.hook_name
@@ -211,6 +217,7 @@ deny_by_hook AS (
 deny_recovered AS (
   SELECT
     (SELECT COALESCE(SUM(cnt), 0) FROM deny_by_hook) AS n,
+    (SELECT COALESCE(SUM(subagent_cnt), 0) FROM deny_by_hook) AS subagent_n,
     (SELECT string_agg(hook_name || ' (' || cnt || ')', ', ' ORDER BY cnt DESC)
      FROM (SELECT hook_name, cnt FROM deny_by_hook ORDER BY cnt DESC LIMIT 5)) AS top_hooks
 ),
@@ -232,8 +239,11 @@ deny_visibility AS (
       || 'permissionDecision deny writes no hook record, so a hook_events-only reading '
       || 'under-reports blocking by the recovered count. Read the hook_denies view '
       || 'alongside hook_blocks (hook-blocks.sql does). A zero here means either no '
-      || 'denies or a stale pattern map in views.sql'
-      || COALESCE('; top: ' || r.top_hooks, '') AS detail
+      || 'denies or a stale pattern map in views.sql. '
+      || r.subagent_n || ' of the recovered denies were a subagent being denied, carried '
+      || 'on the parent session id. hook_blocks sees none of those either, so they belong '
+      || 'in this count, while a per-session reading has to key on agent_id'
+      || COALESCE('. Top: ' || r.top_hooks, '') AS detail
   FROM deny_recovered r, deny_observed o, deny_window w
 ),
 null_ts AS (

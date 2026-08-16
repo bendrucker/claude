@@ -18,23 +18,27 @@ const APPEND_ONLY_MIN_ADDED = 1;
 // only on plans over 30 unique lines, since below that the 0.9 floor is stricter.
 const APPEND_ONLY_MAX_REMOVED = 3;
 
-// Only one growth ask fires per session, so a plan that lands a hair over the
+// Only one growth denial fires per session, so a plan that lands a hair over the
 // high-water mark must not spend it. Require a margin that reads as accumulation.
 const GROWTH_MIN_EXCESS_RATIO = 0.05;
 
+// Every rule below denies. On ExitPlanMode a PreToolUse "ask" is inert: the tool
+// runs its own plan-approval prompt, and the harness drops the hook's
+// permissionDecisionReason and systemMessage alike, so neither the user nor the
+// transcript ever sees them. Deny is the only decision that carries a reason back.
 const DENY_REASON =
   "Plan text is byte-identical to the presentation that was just rejected. The plan " +
   "is the whole brief a fresh session implements from, so resubmitting it unchanged " +
   "cannot land. Rework it against the feedback since that presentation, deleting what " +
   "the feedback superseded. If the rejection carried none, ask with AskUserQuestion.";
 
-const APPEND_ONLY_ASK_REASON =
+const APPEND_ONLY_REASON =
   "This re-present carries nearly every prior line. A plan this close to the rejected " +
   "one needs reworking, not re-presenting. It will not be revised interactively. It " +
   "goes whole to a fresh session, so delete what the feedback superseded instead of " +
   "writing around it.";
 
-function growthAskReason(ordinal: number, previousMax: number, length: number): string {
+function growthReason(ordinal: number, previousMax: number, length: number): string {
   return (
     `Presentation ${ordinal} is larger than any before it (${previousMax} -> ${length} chars). ` +
     "If redirects added scope, that growth is right. Otherwise it is residue the fresh " +
@@ -43,16 +47,23 @@ function growthAskReason(ordinal: number, previousMax: number, length: number): 
   );
 }
 
-const ASK_REASON =
+const SIZE_REASON =
   "This plan exceeds 12k characters. The session that implements it reads it cold and " +
   "reads nothing else. Consolidate superseded content into <plan>-decisions.md or " +
   "split the scope.";
 
-function formatDecision(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
+export class StateUnavailableError extends Error {
+  constructor(directory: string, cause: unknown) {
+    super(`cannot create the per-session state directory ${directory}`, { cause });
+    this.name = "StateUnavailableError";
+  }
+}
+
+function formatDecision(reason: string): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      permissionDecision: decision,
+      permissionDecision: "deny",
       permissionDecisionReason: reason,
     },
   };
@@ -138,8 +149,10 @@ export async function processInput(
   const dir = join(stateRoot, sessionId);
   try {
     mkdirSync(dir, { recursive: true });
-  } catch {
-    return null;
+  } catch (error) {
+    // Without state the gate is blind to every re-present rule, and a blind gate
+    // is indistinguishable from a plan that passed. Say so rather than passing.
+    throw new StateUnavailableError(dir, error);
   }
 
   const hashPath = join(dir, "exit-plan-hash");
@@ -157,12 +170,12 @@ export async function processInput(
   await writeState(linesPath, JSON.stringify(Array.from(currentLines)));
 
   if (previous !== null && previous === hash) {
-    return formatDecision("deny", DENY_REASON);
+    return formatDecision(DENY_REASON);
   }
 
-  // Past the deny, so a byte-identical resubmission neither advances the count
-  // nor raises the high-water mark. An ask still does: the hook cannot observe
-  // whether the user approved it.
+  // Past the byte-identical check, so an unchanged resubmission neither advances
+  // the count nor raises the high-water mark. Every other presentation does,
+  // denied or not: the hook cannot observe what happened after it answered.
   const presentsRaw = await readState(presentsPath);
   const history = presentsRaw === null ? null : parsePresentHistory(presentsRaw);
   const ordinal = (history?.count ?? 0) + 1;
@@ -173,7 +186,7 @@ export async function processInput(
 
   const previousLines = previousLinesRaw === null ? null : parseLineSet(previousLinesRaw);
   if (previousLines !== null && isAppendOnlyRevision(previousLines, currentLines)) {
-    return formatDecision("ask", APPEND_ONLY_ASK_REASON);
+    return formatDecision(APPEND_ONLY_REASON);
   }
 
   // A non-null history means this is at least the second present, which is the
@@ -185,15 +198,25 @@ export async function processInput(
     (await readState(growthAskedPath)) === null
   ) {
     await writeState(growthAskedPath, "asked");
-    return formatDecision("ask", growthAskReason(ordinal, history.maxLength, plan.length));
+    return formatDecision(growthReason(ordinal, history.maxLength, plan.length));
   }
 
   if (plan.length > SIZE_THRESHOLD && (await readState(askedPath)) === null) {
     await writeState(askedPath, "asked");
-    return formatDecision("ask", ASK_REASON);
+    return formatDecision(SIZE_REASON);
   }
 
   return null;
+}
+
+// Fail open, but never silently: exit 1 lets the ExitPlanMode call through while
+// the harness shows the stderr line, so a gate that has stopped deciding says so
+// instead of reading as a plan that passed every rule.
+function failOpen(problem: string, error: unknown): void {
+  console.error(
+    `[plan/gate] ${problem}: ${error instanceof Error ? error.message : String(error)}`,
+  );
+  process.exitCode = 1;
 }
 
 async function main(): Promise<void> {
@@ -201,9 +224,7 @@ async function main(): Promise<void> {
   try {
     input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
   } catch (error) {
-    console.error(
-      `[plan/gate] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    failOpen("failed to parse hook input", error);
     return;
   }
 
@@ -214,5 +235,5 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch(console.error);
+  main().catch((error: unknown) => failOpen("failed to decide on this presentation", error));
 }

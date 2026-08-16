@@ -2,6 +2,7 @@
 // claude:dangerouslyDisableSandbox: hands off to osascript for JXA Apple Events, which the command sandbox blocks
 
 import * as acorn from "acorn";
+import { cli } from "cleye";
 
 type Node = acorn.Node & Record<string, unknown>;
 
@@ -141,38 +142,84 @@ export function emitResult({ code, stdout, stderr }: RunResult): void {
   process.exitCode = code;
 }
 
-if (import.meta.main) {
-  const { cli } = await import("cleye");
+export interface ParsedArgv {
+  app: string;
+  script?: string | undefined;
+  expression?: string | undefined;
+  args: string[];
+}
 
-  const argv = cli({
-    name: "jxa",
-    parameters: ["<app>"],
-    flags: {
-      expression: {
-        type: String,
-        alias: "e",
-        description: "Inline JXA expression",
+// The runner's own flags bind ahead of the script path. Everything past it
+// belongs to the target script, flags included, so cleye must not claim it.
+// ignoreArgv leaves ignored elements in the array cleye parses, which makes
+// those leftovers the verbatim argument list for the script.
+export function parseArgv(argv: string[]): ParsedArgv {
+  const args = [...argv];
+  let positionals = 0;
+  let expression = false;
+
+  const parsed = cli(
+    {
+      name: "jxa",
+      parameters: ["<app>", "[script]"],
+      help: {
+        description:
+          "Run a JXA expression or script file scoped to one macOS app. Arguments after the script path pass to the script verbatim.",
+      },
+      flags: {
+        expression: {
+          type: String,
+          alias: "e",
+          description: "Inline JXA expression",
+        },
+      },
+      ignoreArgv: (type: string, flagOrArgv: string) => {
+        if (positionals >= (expression ? 1 : 2)) return true;
+        // Left to cleye, a separator ahead of the script path would sweep the
+        // script and its arguments into `_["--"]` and drop everything the
+        // parameters do not name.
+        if (type === "argument" && flagOrArgv === "--") return true;
+        if (type === "known-flag") {
+          if (flagOrArgv === "expression" || flagOrArgv === "e") expression = true;
+        } else if (type === "argument") {
+          positionals += 1;
+        }
+        return false;
       },
     },
-  });
+    undefined,
+    args,
+  );
 
-  const app = argv._.app;
-  const args = argv._.slice(1);
+  // Callers that wrote an explicit `--` to force passthrough keep working: the
+  // runner absorbs one separator so osascript never receives it as an argument.
+  const separator = args.indexOf("--");
+  if (separator !== -1) args.splice(separator, 1);
+
+  return {
+    app: parsed._.app,
+    script: parsed._.script,
+    expression: parsed.flags.expression,
+    args,
+  };
+}
+
+if (import.meta.main) {
+  const { app, script, expression, args } = parseArgv(process.argv.slice(2));
 
   let source: string;
   let osascriptArgs: string[];
 
-  if (argv.flags.expression) {
-    source = argv.flags.expression;
+  if (expression) {
+    source = expression;
     osascriptArgs = ["-l", "JavaScript", "-e", source, ...args];
   } else {
-    const scriptPath = args[0];
-    if (!scriptPath) {
+    if (!script) {
       console.error("Usage: bun jxa.ts <app> <script> [args...] or bun jxa.ts <app> -e '<expr>'");
       process.exit(1);
     }
-    source = await Bun.file(scriptPath).text();
-    osascriptArgs = ["-l", "JavaScript", scriptPath, ...args.slice(1)];
+    source = await Bun.file(script).text();
+    osascriptArgs = ["-l", "JavaScript", script, ...args];
   }
 
   const result = validateAppScope(source, app);

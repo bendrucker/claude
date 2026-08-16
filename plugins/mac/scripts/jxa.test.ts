@@ -1,7 +1,7 @@
 import { describe, expect, it, test } from "bun:test";
 import { join } from "node:path";
 import type { RunResult } from "./jxa";
-import { isRetriableAppleEventsError, runWithRetry, validateAppScope } from "./jxa";
+import { isRetriableAppleEventsError, parseArgv, runWithRetry, validateAppScope } from "./jxa";
 
 type ScopeResult = { valid: boolean; violations: string[] };
 const valid: ScopeResult = { valid: true, violations: [] };
@@ -52,6 +52,112 @@ describe("validateAppScope", () => {
 
   it("throws on syntax errors", () => {
     expect(() => validateAppScope("function {{{", "Things3")).toThrow("Failed to parse JXA source");
+  });
+});
+
+describe("parseArgv", () => {
+  // Regression: cleye consumed unrecognized flags as its own, so a flag meant
+  // for the target script never reached osascript and the script saw a short
+  // argument list.
+  it("forwards every post-script argument to the script", () => {
+    const invocations: Record<string, string[]> = {
+      "documented logbook query": [
+        "Things3",
+        "query-logbook.js",
+        "2026-06-01T00:00:00Z",
+        "2026-08-15T00:00:00Z",
+        "--notes-contains",
+        "Discovery:",
+      ],
+      "explicit -- separator": [
+        "Things3",
+        "query-logbook.js",
+        "2026-06-01T00:00:00Z",
+        "--",
+        "--notes-contains",
+        "Discovery:",
+      ],
+      // No script binds here, so the runner exits with usage rather than
+      // dropping the arguments the parameters do not name.
+      "separator ahead of the script": [
+        "Things3",
+        "--",
+        "query-logbook.js",
+        "2026-06-01T00:00:00Z",
+      ],
+      "script with no arguments": ["Things3", "query-list.js"],
+      "app with no script": ["Things3"],
+      "expression with trailing flags": ["Finder", "-e", "1 + 1", "a", "--flag", "b"],
+      "expression flag before the app": ["--expression=1 + 1", "Finder", "--flag"],
+    };
+
+    const parsed = Object.fromEntries(
+      Object.entries(invocations).map(([name, argv]) => [name, parseArgv(argv)]),
+    );
+    expect(parsed).toMatchInlineSnapshot(`
+      {
+        "app with no script": {
+          "app": "Things3",
+          "args": [],
+          "expression": undefined,
+          "script": undefined,
+        },
+        "documented logbook query": {
+          "app": "Things3",
+          "args": [
+            "2026-06-01T00:00:00Z",
+            "2026-08-15T00:00:00Z",
+            "--notes-contains",
+            "Discovery:",
+          ],
+          "expression": undefined,
+          "script": "query-logbook.js",
+        },
+        "explicit -- separator": {
+          "app": "Things3",
+          "args": [
+            "2026-06-01T00:00:00Z",
+            "--notes-contains",
+            "Discovery:",
+          ],
+          "expression": undefined,
+          "script": "query-logbook.js",
+        },
+        "expression flag before the app": {
+          "app": "Finder",
+          "args": [
+            "--flag",
+          ],
+          "expression": "1 + 1",
+          "script": undefined,
+        },
+        "expression with trailing flags": {
+          "app": "Finder",
+          "args": [
+            "a",
+            "--flag",
+            "b",
+          ],
+          "expression": "1 + 1",
+          "script": undefined,
+        },
+        "script with no arguments": {
+          "app": "Things3",
+          "args": [],
+          "expression": undefined,
+          "script": "query-list.js",
+        },
+        "separator ahead of the script": {
+          "app": "Things3",
+          "args": [
+            "query-logbook.js",
+            "2026-06-01T00:00:00Z",
+          ],
+          "expression": undefined,
+          "script": undefined,
+        },
+      }
+    `);
   });
 });
 

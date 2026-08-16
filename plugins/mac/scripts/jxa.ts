@@ -144,8 +144,8 @@ export function emitResult({ code, stdout, stderr }: RunResult): void {
 
 export interface ParsedArgv {
   app: string;
-  script?: string;
-  expression?: string;
+  script?: string | undefined;
+  expression?: string | undefined;
   args: string[];
 }
 

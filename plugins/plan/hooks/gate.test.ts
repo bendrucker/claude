@@ -7,7 +7,7 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { processInput } from "./gate";
+import { processInput, StateUnavailableError } from "./gate";
 
 let stateRoot: string;
 
@@ -109,12 +109,12 @@ describe("append-only re-present", () => {
     "- Add a test for the backoff schedule",
   ].join("\n");
 
-  it("asks when the re-present keeps nearly all prior lines and only adds new ones", async () => {
+  it("denies when the re-present keeps nearly all prior lines and only adds new ones", async () => {
     await decision(basePlan);
     const grown = `${basePlan}\n## Rollout\n- Ship behind a flag\n- Monitor error rates`;
     expect(await decision(grown)).toEqual({
       hookEventName: "PreToolUse",
-      permissionDecision: "ask",
+      permissionDecision: "deny",
       permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
     });
   });
@@ -134,7 +134,7 @@ describe("append-only re-present", () => {
     expect(await decision(rewritten)).toBeNull();
   });
 
-  it("does not ask on the first presentation of a plan that would otherwise qualify", async () => {
+  it("stays silent on the first presentation of a plan that would otherwise qualify", async () => {
     expect(await decision(basePlan)).toBeNull();
   });
 });
@@ -142,31 +142,33 @@ describe("append-only re-present", () => {
 describe("size advisory", () => {
   const bigPlan = (seed: string) => seed + "x".repeat(12_001);
 
-  it("asks on a plan over 12k characters", async () => {
+  it("denies a plan over 12k characters", async () => {
     expect(await decision(bigPlan("a"))).toEqual({
       hookEventName: "PreToolUse",
-      permissionDecision: "ask",
+      permissionDecision: "deny",
       permissionDecisionReason: expect.stringContaining("exceeds 12k characters"),
     });
   });
 
-  it("does not ask at exactly 12k characters", async () => {
+  it("stays silent at exactly 12k characters", async () => {
     expect(await decision("x".repeat(12_000))).toBeNull();
   });
 
-  it("asks at most once per session", async () => {
-    expect((await decision(bigPlan("a")))?.permissionDecision).toBe("ask");
+  it("denies at most once per session", async () => {
+    expect((await decision(bigPlan("a")))?.permissionDecision).toBe("deny");
     expect(await decision(bigPlan("b"))).toBeNull();
   });
 
-  it("asks again in a different session", async () => {
+  it("denies again in a different session", async () => {
     await decision(bigPlan("a"), "session-1");
-    expect((await decision(bigPlan("a"), "session-2"))?.permissionDecision).toBe("ask");
+    expect((await decision(bigPlan("a"), "session-2"))?.permissionDecision).toBe("deny");
   });
 
-  it("prefers deny when the oversized plan is also unchanged", async () => {
-    expect((await decision(bigPlan("a")))?.permissionDecision).toBe("ask");
-    expect((await decision(bigPlan("a")))?.permissionDecision).toBe("deny");
+  it("gives the byte-identical reason when the oversized plan is also unchanged", async () => {
+    expect((await decision(bigPlan("a")))?.permissionDecisionReason).toContain(
+      "exceeds 12k characters",
+    );
+    expect((await decision(bigPlan("a")))?.permissionDecisionReason).toContain("byte-identical");
   });
 });
 
@@ -176,24 +178,24 @@ describe("append-only re-present", () => {
 
   const initial = lines(10).join("\n");
 
-  it("asks when a re-present keeps nearly all prior lines and only adds new ones", async () => {
+  it("denies when a re-present keeps nearly all prior lines and only adds new ones", async () => {
     await decision(initial);
     const appended = `${initial}\nline 10`;
     expect(await decision(appended)).toEqual({
       hookEventName: "PreToolUse",
-      permissionDecision: "ask",
+      permissionDecision: "deny",
       permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
     });
   });
 
-  it("asks on a line swap that carries the document at zero net growth", async () => {
+  it("denies a line swap that carries the document at zero net growth", async () => {
     const base = lines(50).join("\n");
     await decision(base);
     // Trade 3 lines for 3 new ones: carry-over 0.94, no net size change.
     const swapped = [...lines(47), ...lines(3, "swapped")].join("\n");
     expect(await decision(swapped)).toEqual({
       hookEventName: "PreToolUse",
-      permissionDecision: "ask",
+      permissionDecision: "deny",
       permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
     });
   });
@@ -205,14 +207,14 @@ describe("append-only re-present", () => {
     expect(await decision(revised)).toBeNull();
   });
 
-  it("does not ask when the re-present adds no new lines", async () => {
+  it("stays silent when the re-present adds no new lines", async () => {
     await decision(initial);
     // Same lines, reordered: full carry-over, nothing introduced.
     const reordered = [...lines(10)].reverse().join("\n");
     expect(await decision(reordered)).toBeNull();
   });
 
-  it("does not ask when more than the incidental-drop allowance is removed", async () => {
+  it("stays silent when more than the incidental-drop allowance is removed", async () => {
     const big = lines(100).join("\n");
     await decision(big);
     // Drop 4 prior lines and add 5 new ones: carry-over is still >= 0.9, but
@@ -224,17 +226,19 @@ describe("append-only re-present", () => {
   it("allows and skips state when the stored line set is corrupt", async () => {
     await decision(initial);
     await Bun.write(join(stateRoot, "session-1", "exit-plan-lines"), "not json");
-    // A one-line swap the append-only check would ask on, at unchanged length.
+    // A one-line swap the append-only check would deny, at unchanged length.
     expect(await decision(initial.replace("line 9", "line X"))).toBeNull();
   });
 
-  it("prefers deny when the append-only re-present is byte-identical", async () => {
+  it("gives the byte-identical reason when the append-only re-present repeats", async () => {
     await decision(initial);
     await decision(`${initial}\nline 10`);
-    expect((await decision(`${initial}\nline 10`))?.permissionDecision).toBe("deny");
+    expect((await decision(`${initial}\nline 10`))?.permissionDecisionReason).toContain(
+      "byte-identical",
+    );
   });
 
-  it("asks once for append-only, not size, when the re-present is also oversized", async () => {
+  it("denies once for append-only, not size, when the re-present is also oversized", async () => {
     const pad = "x".repeat(120);
     const padded = (count: number, prefix: string) =>
       Array.from({ length: count }, (_, i) => `${prefix} ${i} ${pad}`);
@@ -246,10 +250,10 @@ describe("append-only re-present", () => {
     expect(grown.length).toBeGreaterThan(12_000);
     expect(await decision(grown)).toEqual({
       hookEventName: "PreToolUse",
-      permissionDecision: "ask",
+      permissionDecision: "deny",
       permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
     });
-    // Append-only asks before the size check, so the size branch never runs and
+    // Append-only denies before the size check, so the size branch never runs and
     // records no marker: one prompt for append-only, no second prompt for size.
     expect(readdirSync(join(stateRoot, "session-1"))).not.toContain("exit-plan-size-asked");
   });
@@ -265,18 +269,18 @@ describe("sustained growth", () => {
   const grown = rewrite("bravo", 12);
   const grownAgain = rewrite("charlie", 30);
 
-  it("asks on a second present above the high-water mark", async () => {
+  it("denies a second present above the high-water mark", async () => {
     await decision(skeletal);
     expect(await decision(grown)).toEqual({
       hookEventName: "PreToolUse",
-      permissionDecision: "ask",
+      permissionDecision: "deny",
       permissionDecisionReason: expect.stringContaining(
         `Presentation 2 is larger than any before it (${skeletal.length} -> ${grown.length} chars)`,
       ),
     });
   });
 
-  it("does not ask on a first presentation, which has no high-water mark", async () => {
+  it("stays silent on a first presentation, which has no high-water mark", async () => {
     expect(await decision(grownAgain)).toBeNull();
   });
 
@@ -292,18 +296,18 @@ describe("sustained growth", () => {
     expect(await decision(rewrite("echo", 10))).toBeNull();
   });
 
-  it("asks at most once per session", async () => {
+  it("denies at most once per session", async () => {
     await decision(skeletal);
-    expect((await decision(grown))?.permissionDecision).toBe("ask");
+    expect((await decision(grown))?.permissionDecision).toBe("deny");
     expect(await decision(rewrite("delta", 60))).toBeNull();
   });
 
-  it("counts a present the append-only check asked on, and reports its ordinal", async () => {
+  it("counts a present the append-only check denied, and reports its ordinal", async () => {
     await decision(grownAgain);
     await decision(grown);
     // An append-only third present returns before the growth branch, so the
-    // growth ask is still available when a genuine rewrite lands fourth.
-    expect((await decision(`${grown}\nbravo tail`))?.permissionDecision).toBe("ask");
+    // growth denial is still available when a genuine rewrite lands fourth.
+    expect((await decision(`${grown}\nbravo tail`))?.permissionDecision).toBe("deny");
     expect((await decision(rewrite("delta", 60)))?.permissionDecisionReason).toContain(
       "Presentation 4",
     );
@@ -315,19 +319,55 @@ describe("sustained growth", () => {
     expect(await decision(grown)).toBeNull();
   });
 
-  it("still denies a byte-identical re-present after the growth ask has fired", async () => {
+  it("still catches a byte-identical re-present after the growth denial has fired", async () => {
     await decision(skeletal);
-    expect((await decision(grown))?.permissionDecision).toBe("ask");
-    expect((await decision(grown))?.permissionDecision).toBe("deny");
+    expect((await decision(grown))?.permissionDecisionReason).toContain("larger than any before");
+    expect((await decision(grown))?.permissionDecisionReason).toContain("byte-identical");
   });
 
-  it("does not spend the ask on a plan that barely clears the high-water mark", async () => {
+  it("does not spend the denial on a plan that barely clears the high-water mark", async () => {
     await decision(grownAgain);
     // One character over the high-water mark falls inside the noise margin.
     const barelyOver = rewrite("delta", 4).padEnd(grownAgain.length + 1, "x");
     expect(await decision(barelyOver)).toBeNull();
-    // The ask is still available for growth that reads as accumulation.
-    expect((await decision(rewrite("echo", 60)))?.permissionDecision).toBe("ask");
+    // The denial is still available for growth that reads as accumulation.
+    expect((await decision(rewrite("echo", 60)))?.permissionDecision).toBe("deny");
+  });
+});
+
+// Every test above calls processInput directly, which proves the rules and not
+// that a decision survives the trip out. A gate can decide correctly and still
+// reach nobody, so drive the path the harness drives: spawn, parse, decide, print.
+// The oversized rule needs no prior state, so one piped payload covers it.
+describe("harness invocation", () => {
+  it("emits the oversized decision when run as the harness runs it", async () => {
+    const payload = JSON.stringify(mockInput("x".repeat(12_001)));
+    const gate = Bun.spawn(["bun", join(import.meta.dir, "gate.ts")], {
+      stdin: new TextEncoder().encode(payload),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, CLAUDE_PLAN_MARKER_ROOT: stateRoot },
+    });
+
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(gate.stdout).text(),
+      new Response(gate.stderr).text(),
+      gate.exited,
+    ]);
+
+    expect({ exitCode, stderr, decision: JSON.parse(stdout) }).toMatchInlineSnapshot(`
+      {
+        "decision": {
+          "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "This plan exceeds 12k characters. The session that implements it reads it cold and reads nothing else. Consolidate superseded content into <plan>-decisions.md or split the scope.",
+          },
+        },
+        "exitCode": 0,
+        "stderr": "",
+      }
+    `);
   });
 });
 
@@ -352,10 +392,11 @@ describe("fail open", () => {
     expect(await decision("My plan")).toBeNull();
   });
 
-  it("allows when the state root is unusable", async () => {
+  it("reports rather than swallows an unusable state root", async () => {
     await Bun.write(join(stateRoot, "blocked"), "");
     const blocked = join(stateRoot, "blocked", "nested");
-    expect(await processInput(mockInput("My plan"), blocked)).toBeNull();
-    expect(await processInput(mockInput("My plan"), blocked)).toBeNull();
+    await expect(processInput(mockInput("My plan"), blocked)).rejects.toBeInstanceOf(
+      StateUnavailableError,
+    );
   });
 });

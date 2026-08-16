@@ -3,7 +3,13 @@ import { type ExecFileSyncOptions, execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 const script = join(import.meta.dirname, "../skills/shortcut/scripts/discover.swift");
-const opts: ExecFileSyncOptions = { encoding: "utf-8", timeout: 60000 };
+
+// swift compiles the script on every invocation, and the first one on a cold
+// runner builds the module cache from scratch. Bun's 5s default test timeout is
+// tighter than the budget the subprocess itself gets, so the harness kills the
+// test before swift can succeed or report its own error. Both share one budget.
+const timeoutMs = 60000;
+const opts: ExecFileSyncOptions = { encoding: "utf-8", timeout: timeoutMs };
 
 function run(command: string): string {
   return execFileSync("swift", [script, command], opts) as string;
@@ -16,7 +22,7 @@ describe.skipIf(ci)("discover.swift actions", () => {
 
   beforeAll(() => {
     actions = JSON.parse(run("actions")) as Record<string, unknown>[];
-  });
+  }, timeoutMs);
 
   it("returns a large array of built-in actions", () => {
     expect(Array.isArray(actions)).toBe(true);
@@ -55,7 +61,7 @@ describe.skipIf(ci)("discover.swift apps", () => {
 
   beforeAll(() => {
     apps = JSON.parse(run("apps")) as Record<string, unknown>[];
-  });
+  }, timeoutMs);
 
   it("returns an array of apps", () => {
     expect(Array.isArray(apps)).toBe(true);
@@ -75,21 +81,16 @@ describe.skipIf(ci)("discover.swift apps", () => {
 });
 
 describe("discover.swift error handling", () => {
-  it("exits non-zero with unknown command", () => {
-    expect(() => {
-      execFileSync("swift", [script, "invalid"], {
-        ...opts,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-    }).toThrow();
-  });
-
-  it("exits non-zero with no arguments", () => {
-    expect(() => {
-      execFileSync("swift", [script], {
-        ...opts,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-    }).toThrow();
-  });
+  it.each<{ name: string; args: string[] }>([
+    { name: "exits non-zero with unknown command", args: [script, "invalid"] },
+    { name: "exits non-zero with no arguments", args: [script] },
+  ])(
+    "$name",
+    ({ args }) => {
+      expect(() => {
+        execFileSync("swift", args, { ...opts, stdio: ["pipe", "pipe", "pipe"] });
+      }).toThrow();
+    },
+    timeoutMs,
+  );
 });

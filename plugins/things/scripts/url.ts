@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: hands off to open/xcall for Things URL schemes and osascript via ensure-running, which the command sandbox blocks
 
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
@@ -103,23 +102,29 @@ async function openUrl(
   }
 }
 
-async function findXcallRunner(): Promise<string | null> {
-  const pluginRoot = join(import.meta.dirname, "..");
-
+export async function findXcallRunner(
+  pluginRoot: string = join(import.meta.dirname, ".."),
+): Promise<string | null> {
   // Dev layout: sibling plugin directory
   const devPath = join(pluginRoot, "..", "x-callback-url", "scripts", "run.sh");
   if (await Bun.file(devPath).exists()) return devPath;
 
-  // Prod layout: up 2 levels to marketplace root, then into x-callback-url/<version>/
-  const marketplaceDir = join(pluginRoot, "..", "..", "x-callback-url");
-  if (await Bun.file(marketplaceDir).exists()) {
-    for (const entry of readdirSync(marketplaceDir)) {
-      const candidate = join(marketplaceDir, entry, "scripts", "run.sh");
-      if (await Bun.file(candidate).exists()) return candidate;
-    }
-  }
-
-  return null;
+  // Installed layout: <marketplace>/<plugin>/<version>, where the version
+  // directory is the marketplace commit. Only the sibling under this plugin's
+  // own version was installed from the same commit, and only its run.sh is
+  // known to honor the bounds xcallBackstopMs sizes its backstop against. A
+  // runner from any other version could outlive the backstop and die on a
+  // signal rather than naming its own failure, so no other version qualifies.
+  const installedPath = join(
+    pluginRoot,
+    "..",
+    "..",
+    "x-callback-url",
+    basename(pluginRoot),
+    "scripts",
+    "run.sh",
+  );
+  return (await Bun.file(installedPath).exists()) ? installedPath : null;
 }
 
 const BOOLEAN_ATTRIBUTES = ["completed", "canceled", "reveal", "duplicate"] as const;

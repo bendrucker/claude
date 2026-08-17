@@ -27,7 +27,11 @@ Biome linting is disabled for `scripts/jxa/` files via the root `biome.json` ove
 
 ## URL Dispatch
 
-`scripts/url.ts` owns the URL handoff. `dispatch(command, params)` builds the Things URL, runs it through the x-callback-url runner when available, and falls back to a Launch Services `open` on any xcall failure, returning the parsed todo id when xcall surfaces one. `inbox.ts`, `reorder.ts`, and `url.ts`'s own CLI call `dispatch` rather than re-implementing the runner-selection and fallback. `buildUrl`, `openUrl`, `xcall`, and `findXcallRunner` are internal to `url.ts`. Inject a `DispatchActions` to test runner selection and fallback without real Launch Services or keychain access, mirroring `plugins/gitlab/scripts/merge.ts`.
+`scripts/url.ts` owns the URL handoff. `dispatch(command, params)` builds the Things URL, runs it through the x-callback-url runner when available, and falls back to a Launch Services `open` on any xcall failure, returning the parsed todo id when xcall surfaces one. `inbox.ts`, `reorder.ts`, and `url.ts`'s own CLI call `dispatch` rather than re-implementing the runner-selection and fallback. `buildUrl`, `openUrl`, and `xcall` are internal to `url.ts`. Inject a `DispatchActions` to test runner selection and fallback without real Launch Services or keychain access, mirroring `plugins/gitlab/scripts/merge.ts`.
+
+`findXcallRunner` resolves the runner from two layouts: a sibling plugin directory in the dev checkout, and `<marketplace>/x-callback-url/<version>/scripts/run.sh` when installed, where `<version>` is the marketplace commit this plugin was installed from. It accepts no other version. `xcallBackstopMs` sizes its timeout from this build's own view of `run.sh`'s bounds, and only the same-commit runner is known to honor them, so a mismatched runner could outlive the backstop and die on a signal instead of naming its own failure.
+
+It takes the plugin root as an argument and is exported so tests can point it at a fixture tree. Injecting it through `DispatchActions` covers what `dispatch` does with a runner, never how one gets found, so the resolver needs its own fixtures across both layouts.
 
 `reorder.ts` and `inbox.ts` are bun TypeScript scripts (not `osascript`). Their Launch Services handoff runs outside the command sandbox via the `claude:dangerouslyDisableSandbox` marker.
 

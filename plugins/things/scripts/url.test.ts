@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildJsonPayload,
   coerceAttributes,
   type DispatchActions,
   dispatch,
+  findXcallRunner,
   isSandboxBlockedHandoff,
   XcallError,
   xcallBackstopMs,
@@ -283,6 +287,79 @@ describe("dispatch", () => {
 
     await expect(dispatch("add", new Map([["title", "Buy milk"]]), actions)).rejects.toThrow(
       "open blocked",
+    );
+  });
+});
+
+// `dispatch` injects findXcallRunner, so the real resolver ran unexercised and
+// shipped returning null for every installed plugin: it gated its version scan
+// on Bun.file(dir).exists(), which is false for a directory, so the scan never
+// ran and xcall never got invoked.
+describe("findXcallRunner", () => {
+  const version = "69eed9ed34f1";
+  const other = "282d5556b96b";
+
+  async function tree(...paths: string[]): Promise<string> {
+    const root = mkdtempSync(join(tmpdir(), "things-marketplace-"));
+    for (const path of paths) await Bun.write(join(root, path), "");
+    return root;
+  }
+
+  test.each<{
+    name: string;
+    layout: string[];
+    pluginRoot: string[];
+    runner: string[] | null;
+  }>([
+    {
+      name: "resolves the sibling installed from the same marketplace commit",
+      layout: [
+        `things/${version}/scripts/url.ts`,
+        `x-callback-url/${other}/scripts/run.sh`,
+        `x-callback-url/${version}/scripts/run.sh`,
+      ],
+      pluginRoot: ["things", version],
+      runner: ["x-callback-url", version, "scripts", "run.sh"],
+    },
+    {
+      name: "prefers a dev checkout's sibling directory over the installed layout",
+      layout: [
+        "things/scripts/url.ts",
+        "x-callback-url/scripts/run.sh",
+        `x-callback-url/${version}/scripts/run.sh`,
+      ],
+      pluginRoot: ["things"],
+      runner: ["x-callback-url", "scripts", "run.sh"],
+    },
+    {
+      name: "declines a runner from a version this plugin was not installed with",
+      layout: [`things/${version}/scripts/url.ts`, `x-callback-url/${other}/scripts/run.sh`],
+      pluginRoot: ["things", version],
+      runner: null,
+    },
+    {
+      name: "finds nothing when no sibling plugin is installed",
+      layout: [`things/${version}/scripts/url.ts`],
+      pluginRoot: ["things", version],
+      runner: null,
+    },
+    {
+      name: "finds nothing when the matching version carries no runner",
+      layout: [`things/${version}/scripts/url.ts`, `x-callback-url/${version}/scripts/main.swift`],
+      pluginRoot: ["things", version],
+      runner: null,
+    },
+    {
+      name: "finds nothing when a file sits where the sibling plugin should be",
+      layout: [`things/${version}/scripts/url.ts`, "x-callback-url"],
+      pluginRoot: ["things", version],
+      runner: null,
+    },
+  ])("$name", async ({ layout, pluginRoot, runner }) => {
+    const root = await tree(...layout);
+
+    expect(await findXcallRunner(join(root, ...pluginRoot))).toBe(
+      runner ? join(root, ...runner) : null,
     );
   });
 });

@@ -24,7 +24,7 @@ If no scope provided, scan the entire codebase.
 
 ## Type Ignores Found
 
-!`rg '@ts-ignore|@ts-expect-error|eslint-disable|biome-ignore|type:\s*ignore|noqa|pylint:\s*disable|//nolint|//lint:ignore|#\[allow\(' -g '*.{ts,tsx,js,jsx,py,go,rs,rb}' -l 2>/dev/null || echo "none found"`
+!`rg '@ts-ignore|@ts-expect-error|eslint-disable|biome-ignore|oxlint-disable|oxfmt-ignore|type:\s*ignore|noqa|pylint:\s*disable|//nolint|//lint:ignore|#\[allow\(' -g '*.{ts,tsx,js,jsx,py,go,rs,rb}' -l 2>/dev/null || echo "none found"`
 
 ## Process
 

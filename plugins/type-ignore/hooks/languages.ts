@@ -16,6 +16,8 @@ export const LANGUAGES: Record<string, LanguageConfig> = {
       { regex: /@ts-expect-error/, label: "@ts-expect-error" },
       { regex: /eslint-disable(?:-next-line)?/, label: "eslint-disable" },
       { regex: /biome-ignore/, label: "biome-ignore" },
+      { regex: /oxlint-disable(?:-next-line)?/, label: "oxlint-disable" },
+      { regex: /oxfmt-ignore/, label: "oxfmt-ignore" },
     ],
   },
   python: {

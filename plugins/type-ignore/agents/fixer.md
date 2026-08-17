@@ -13,7 +13,7 @@ You fix ignores in a single file. When spawned by the detection hook, you receiv
 
 ## Supported Patterns
 
-- TypeScript/JavaScript: `@ts-ignore`, `@ts-expect-error`, `eslint-disable[-next-line]`, `biome-ignore`
+- TypeScript/JavaScript: `@ts-ignore`, `@ts-expect-error`, `eslint-disable[-next-line]`, `biome-ignore`, `oxlint-disable[-next-line]`, `oxfmt-ignore`
 - Python: `# type: ignore`, `# noqa`, `# pylint: disable`
 - Go: `//nolint`, `//lint:ignore`
 - Rust: `#[allow(...)]`

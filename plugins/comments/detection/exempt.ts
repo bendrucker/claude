@@ -18,6 +18,8 @@ const DIRECTIVES: RegExp[] = [
   /^eslint-/i,
   /^biome-ignore\b/i,
   /^prettier-ignore\b/i,
+  /^oxlint-disable/i,
+  /^oxfmt-ignore\b/i,
   /^@ts-(expect-error|ignore|nocheck|check)\b/,
   /^(istanbul|c8|v8)\s+ignore\b/i,
   /^#(region\b|endregion\b)/i,

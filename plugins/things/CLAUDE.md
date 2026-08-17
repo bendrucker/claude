@@ -39,6 +39,12 @@ A degraded dispatch is no longer silent. `dispatch` returns a `fallbackReason` n
 
 `xcallBackstopMs` in `url.ts` guards a runner that dies without honoring its own watchdogs. It reads `run.sh`'s two bounds from the environment and adds a margin, so raising either bound cannot make the backstop kill the runner before it names its own failure.
 
+## MCP Server
+
+`src/mcp/stdio.ts` serves the same reads and writes over stdio for tailgate, reusing `url.ts`, `inbox.ts`, `reorder.ts`, and `ensure-running.ts`. stdout there is the JSON-RPC channel, so anything those modules print at runtime corrupts the protocol.
+
+Keep `console.log` under `import.meta.main`. A function both the CLI and a tool call returns its result and lets the CLI print it. Send diagnostics to stderr, which tailgate logs. Pipe or `.quiet()` every subprocess, including Bun's `$`, which inherits stdout by default. `src/mcp/stdio.test.ts` fails on any stdout line that will not parse as JSON.
+
 ## What NOT to Do
 
 - **Don't use `tag.toDos().length`** for tag metadata — includes logbook items (13K+), extremely slow

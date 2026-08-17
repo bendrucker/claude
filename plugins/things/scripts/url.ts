@@ -84,11 +84,12 @@ async function openUrl(
   const background = options?.background ?? (command !== "show" && command !== "search");
 
   try {
-    if (background) {
-      await $`open -g ${url}`;
-    } else {
-      await $`open ${url}`;
-    }
+    // Bun's `$` inherits stdout, which is the MCP server's JSON-RPC channel, so
+    // anything Launch Services prints there corrupts the protocol. Capture it
+    // and forward it to stderr, where both the CLI and tailgate's logs read it.
+    const result = background ? await $`open -g ${url}`.quiet() : await $`open ${url}`.quiet();
+    const output = result.stdout.toString() + result.stderr.toString();
+    if (output) process.stderr.write(output);
   } catch (error) {
     if (error instanceof $.ShellError) {
       const stderr = error.stderr.toString();

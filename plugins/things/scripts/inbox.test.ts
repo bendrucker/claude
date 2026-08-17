@@ -1,5 +1,23 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { printCaptured } from "./inbox";
+import { buildAttribution, printCaptured } from "./inbox";
+
+describe("buildAttribution", () => {
+  test("resumes in the caller's directory", () => {
+    expect(buildAttribution("sess-1", "/repos/thing")).toMatchInlineSnapshot(`
+      "---
+
+      🤖 Created via Claude Code (Session: sess-1)
+
+      \`\`\`sh
+      cd /repos/thing && claude --resume sess-1
+      \`\`\`"
+    `);
+  });
+
+  test("falls back to the process directory", () => {
+    expect(buildAttribution("sess-1")).toContain(`cd ${process.cwd()} &&`);
+  });
+});
 
 describe("printCaptured", () => {
   let log: ReturnType<typeof spyOn>;

@@ -21,6 +21,10 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 
 Write verification uses the `x-callback-url` plugin's `xcall` skill.
 
+### MCP Server
+
+- `src/mcp/`: stdio MCP server exposing the same reads and writes to any MCP client, spawned by [tailgate](https://github.com/bendrucker/tailgate). See [`src/mcp/README.md`](src/mcp/README.md).
+
 ## Testing
 
 ```bash

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { buildAttribution, printCaptured } from "./inbox";
+import { $ } from "bun";
+import { buildAttribution, printCaptured, shellQuote } from "./inbox";
 
 describe("buildAttribution", () => {
   test("resumes in the caller's directory", () => {
@@ -9,7 +10,7 @@ describe("buildAttribution", () => {
       🤖 Created via Claude Code (Session: sess-1)
 
       \`\`\`sh
-      cd /repos/thing && claude --resume sess-1
+      cd '/repos/thing' && claude --resume 'sess-1'
       \`\`\`"
     `);
   });
@@ -21,9 +22,43 @@ describe("buildAttribution", () => {
       🤖 Created via Claude Code (Session: sess-1)
 
       \`\`\`sh
-      claude --resume sess-1
+      claude --resume 'sess-1'
       \`\`\`"
     `);
+  });
+
+  test.each<{ name: string; directory: string; expected: string }>([
+    {
+      name: "a space",
+      directory: "/repos/my thing",
+      expected: "cd '/repos/my thing' && claude --resume 'sess-1'",
+    },
+    {
+      name: "an embedded single quote",
+      directory: "/repos/ben's thing",
+      expected: "cd '/repos/ben'\\''s thing' && claude --resume 'sess-1'",
+    },
+    {
+      name: "a command separator",
+      directory: "/repos/a; rm -rf b",
+      expected: "cd '/repos/a; rm -rf b' && claude --resume 'sess-1'",
+    },
+  ])("quotes a directory containing $name", ({ directory, expected }) => {
+    expect(buildAttribution("sess-1", directory)).toContain(expected);
+  });
+
+  // The point of the quoting is that a shell reads the value back whole, so ask
+  // one. `directory` reaches this as an MCP tool argument, hence arbitrary.
+  test.each([
+    "/repos/my thing",
+    "/repos/ben's thing",
+    "/repos/a; rm -rf b",
+    "/repos/$(whoami)",
+    "/repos/back\\slash",
+    '/repos/"quoted"',
+  ])("survives a shell round trip: %s", async (directory) => {
+    const { stdout } = await $`sh -c ${`printf %s ${shellQuote(directory)}`}`.quiet();
+    expect(stdout.toString()).toBe(directory);
   });
 });
 

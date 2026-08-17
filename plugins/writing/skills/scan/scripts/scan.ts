@@ -29,7 +29,7 @@ export function shouldSkip(path: string): boolean {
 
 export function toGlob(input: string): { cwd: string; pattern: string } {
   // readdirSync throws ENOTDIR on a file and ENOENT on a missing path, so a
-  // successful call is the directory signal. (statSync is disallowed by biome.)
+  // successful call is the directory signal. (statSync is disallowed by oxlint.)
   try {
     readdirSync(input);
     return { cwd: input, pattern: "**/*" };

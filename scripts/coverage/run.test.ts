@@ -7,7 +7,7 @@ describe("resolveScope", () => {
     ["plugins/writing/detection/scan.ts", "plugins/writing/"],
     ["plugins/writing/skills/scan/scripts/scan.ts", "plugins/writing/"],
     ["packages/validate/run.ts", "packages/validate/"],
-    [".claude/hooks/biome/index.ts", "./.claude"],
+    [".claude/hooks/ox/index.ts", "./.claude"],
     [".claude/skills/agent-ideas/sources.ts", "./.claude"],
     ["user/rules/typescript.md", "./user"],
     [join(repoRoot, "packages/validate/run.ts"), "packages/validate/"],

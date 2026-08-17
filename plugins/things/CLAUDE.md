@@ -23,7 +23,7 @@ JXA runs on JavaScriptCore (ES5). Scripts must:
 - Use shebang `#!/usr/bin/env osascript -l JavaScript`
 - Use `.whose()` for filtering — pushes work to Things, much faster than manual iteration
 
-Biome linting is disabled for `scripts/jxa/` files via the root `biome.json` override.
+Linting is disabled for `scripts/jxa/` files via the root `.oxlintrc.json` `ignorePatterns`.
 
 ## URL Dispatch
 

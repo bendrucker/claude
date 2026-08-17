@@ -49,7 +49,7 @@ Reference for creating and configuring Claude Code hooks. When uncertain about s
         "hooks": [
           {
             "type": "command",
-            "command": "bun ./hooks/biome"
+            "command": "bun ./hooks/ox"
           }
         ]
       }
@@ -137,7 +137,7 @@ Store complex hooks in `.claude/hooks/` or a project `hooks/` directory, referen
 See these repositories for hook implementations:
 - Input modification: [plugins/linear/hooks/](plugins/linear/hooks/)
 - Permission decisions: [plugins/github/scripts/](plugins/github/scripts/)
-- PostToolUse feedback: [.claude/hooks/biome/](.claude/hooks/biome/)
+- PostToolUse feedback: [.claude/hooks/ox/](.claude/hooks/ox/)
 
 ## Debugging
 

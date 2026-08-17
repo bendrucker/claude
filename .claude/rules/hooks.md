@@ -6,7 +6,7 @@ paths:
 
 # Hooks
 
-See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. A Biome PostToolUse hook (`.claude/hooks/biome/`) runs after file edits to check lint errors.
+See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An ox PostToolUse hook (`.claude/hooks/ox/`) runs after file edits to check lint errors.
 
 Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under `tmp/`, allowed for disposable scripted verification checkouts.
 

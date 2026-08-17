@@ -16,8 +16,7 @@ import {
   processPostToolUse,
   processPreToolUse,
   processStop,
-  runBiomeCheck,
-  runBiomeFix,
+  runOxlintAgent,
 } from ".";
 
 const execAsync = promisify(exec);
@@ -91,16 +90,20 @@ async function copyFixture(name: string, destDir: string): Promise<string> {
   return dest;
 }
 
-// A git repo whose Biome config excludes ignored.ts. Checking that file makes
-// Biome report "no files were processed", which must not read as a lint
-// failure. The git init matters: runBiomeCheck resolves its cwd from the
-// file's git toplevel, which is where Biome discovers this config.
+// A git repo whose ox config excludes ignored.ts. Checking that file must not
+// read as a lint or format failure. The git init matters: runOxlintAgent
+// resolves its cwd from the file's git toplevel, which is where oxlint
+// discovers this config.
 async function createIgnoredFixture(baseDir: string): Promise<string> {
   const repoDir = await mkdtemp(join(baseDir, "ignored-repo-"));
   await execAsync("git init", { cwd: repoDir });
   await Bun.write(
-    join(repoDir, "biome.json"),
-    JSON.stringify({ files: { includes: ["**", "!**/ignored.ts"] } }),
+    join(repoDir, ".oxlintrc.json"),
+    JSON.stringify({ ignorePatterns: ["ignored.ts"] }),
+  );
+  await Bun.write(
+    join(repoDir, ".oxfmtrc.json"),
+    JSON.stringify({ ignorePatterns: ["ignored.ts"] }),
   );
   const filePath = join(repoDir, "ignored.ts");
   const content = await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text();
@@ -108,31 +111,23 @@ async function createIgnoredFixture(baseDir: string): Promise<string> {
   return filePath;
 }
 
-describe("biome hook", () => {
+describe("ox hook", () => {
   beforeAll(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), "biome-test-"));
+    tempDir = await mkdtemp(join(tmpdir(), "ox-test-"));
   });
 
   afterAll(async () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  describe("runBiomeCheck", () => {
+  describe("runOxlintAgent", () => {
     test.each<{ name: string; fixture: string; expected: string | null }>([
       { name: "returns null for valid files", fixture: "valid.ts", expected: null },
-      {
-        name: "returns errors for files with fixable issues",
-        fixture: "fixable.ts",
-        expected: "format",
-      },
-      {
-        name: "returns errors for files with unfixable issues",
-        fixture: "unfixable.ts",
-        expected: "noDuplicateObjectKeys",
-      },
+      { name: "does not flag formatting-only issues", fixture: "fixable.ts", expected: null },
+      { name: "returns errors for lint issues", fixture: "unfixable.ts", expected: "no-dupe-keys" },
     ])("$name", async ({ fixture, expected }) => {
       const filePath = await copyFixture(fixture, tempDir);
-      const result = await runBiomeCheck(filePath);
+      const result = await runOxlintAgent(filePath);
       if (expected === null) {
         expect(result).toBeNull();
       } else {
@@ -141,26 +136,9 @@ describe("biome hook", () => {
       }
     });
 
-    it("returns null for files the Biome config ignores", async () => {
+    it("returns null for files the ox config ignores", async () => {
       const filePath = await createIgnoredFixture(tempDir);
-      expect(await runBiomeCheck(filePath)).toBeNull();
-    });
-  });
-
-  describe("runBiomeFix", () => {
-    test.each<{ name: string; fixture: string; fixedAfter: boolean }>([
-      { name: "fixes auto-fixable issues", fixture: "fixable.ts", fixedAfter: true },
-      { name: "does not fix unsafe issues", fixture: "unfixable.ts", fixedAfter: false },
-    ])("$name", async ({ fixture, fixedAfter }) => {
-      const filePath = await copyFixture(fixture, tempDir);
-      expect(await runBiomeCheck(filePath)).not.toBeNull();
-      await runBiomeFix(filePath);
-      const result = await runBiomeCheck(filePath);
-      if (fixedAfter) {
-        expect(result).toBeNull();
-      } else {
-        expect(result).not.toBeNull();
-      }
+      expect(await runOxlintAgent(filePath)).toBeNull();
     });
   });
 
@@ -178,7 +156,7 @@ describe("biome hook", () => {
       expect(files).toContain(filePath);
     });
 
-    it("ignores non-Biome files", async () => {
+    it("ignores non-ox files", async () => {
       const mdPath = join(tempDir, "readme.md");
       await Bun.write(mdPath, "# Test");
       const transcriptPath = join(tempDir, `transcript-md-${Date.now()}.jsonl`);
@@ -283,43 +261,39 @@ describe("biome hook", () => {
       expect(await processPostToolUse(input)).toBeNull();
     });
 
-    it("returns null for non-Biome file extensions", async () => {
+    it("returns null for non-ox file extensions", async () => {
       const input = mockPostToolUseInput("Write", { file_path: "test.md" });
       expect(await processPostToolUse(input)).toBeNull();
     });
 
-    it("returns null when biome check passes", async () => {
+    it("returns null when oxlint passes", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const input = mockPostToolUseInput("Edit", { file_path: filePath });
       expect(await processPostToolUse(input)).toBeNull();
     });
 
-    test.each<{ name: string; fixture: string; tool: string; expected: string }>([
-      {
-        name: "returns additionalContext for fixable issues",
-        fixture: "fixable.ts",
-        tool: "Write",
-        expected: "Biome found issues",
-      },
-      {
-        name: "returns additionalContext for unfixable issues",
-        fixture: "unfixable.ts",
-        tool: "Edit",
-        expected: "noDuplicateObjectKeys",
-      },
-    ])("$name", async ({ fixture, tool, expected }) => {
-      const filePath = await copyFixture(fixture, tempDir);
-      const input = mockPostToolUseInput(tool, { file_path: filePath });
+    it("returns null for a formatting-only deviation, since PostToolUse never writes", async () => {
+      const filePath = await copyFixture("fixable.ts", tempDir);
+      const before = await Bun.file(filePath).text();
+      const input = mockPostToolUseInput("Write", { file_path: filePath });
+
+      expect(await processPostToolUse(input)).toBeNull();
+      expect(await Bun.file(filePath).text()).toBe(before);
+    });
+
+    it("returns additionalContext for lint issues without touching the file", async () => {
+      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const before = await Bun.file(filePath).text();
+      const input = mockPostToolUseInput("Edit", { file_path: filePath });
       const result = await processPostToolUse(input);
 
       expect(result).not.toBeNull();
-      expect(result?.hookSpecificOutput).toMatchObject({
-        hookEventName: "PostToolUse",
-      });
+      expect(result?.hookSpecificOutput).toMatchObject({ hookEventName: "PostToolUse" });
 
       const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
         .additionalContext;
-      expect(additionalContext).toContain(expected);
+      expect(additionalContext).toContain("no-dupe-keys");
+      expect(await Bun.file(filePath).text()).toBe(before);
     });
   });
 
@@ -341,7 +315,7 @@ describe("biome hook", () => {
       expect(await processStop(input)).toBeNull();
     });
 
-    it("returns null when all files pass biome check", async () => {
+    it("returns null when all files pass", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-valid-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
@@ -350,7 +324,7 @@ describe("biome hook", () => {
       expect(await processStop(input)).toBeNull();
     });
 
-    it("auto-fixes fixable issues and allows stop", async () => {
+    it("auto-formats fixable deviations and allows stop", async () => {
       const filePath = await copyFixture("fixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-fixable-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
@@ -359,7 +333,7 @@ describe("biome hook", () => {
       const result = await processStop(input);
 
       expect(result).toBeNull();
-      expect(await runBiomeCheck(filePath)).toBeNull();
+      expect(await Bun.file(filePath).text()).toContain("return a + b;");
     });
 
     it("returns block decision when issues cannot be auto-fixed", async () => {
@@ -372,11 +346,11 @@ describe("biome hook", () => {
 
       expect(result).not.toBeNull();
       expect(result?.decision).toBe("block");
-      expect(result?.reason).toContain("Biome check failed");
-      expect(result?.reason).toContain("noDuplicateObjectKeys");
+      expect(result?.reason).toContain("Ox check failed");
+      expect(result?.reason).toContain("no-dupe-keys");
     });
 
-    it("returns null when the only modified file is ignored by Biome config", async () => {
+    it("returns null when the only modified file is ignored by ox config", async () => {
       const filePath = await createIgnoredFixture(tempDir);
       const transcriptPath = join(tempDir, `transcript-ignored-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
@@ -385,7 +359,7 @@ describe("biome hook", () => {
       expect(await processStop(input)).toBeNull();
     });
 
-    it("processes multiple files in parallel", async () => {
+    it("processes multiple files together", async () => {
       const [validPath, fixablePath, unfixablePath] = await Promise.all([
         copyFixture("valid.ts", tempDir),
         copyFixture("fixable.ts", tempDir),

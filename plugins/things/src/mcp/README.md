@@ -41,7 +41,7 @@ Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `updat
 
 - `stdio.ts`: the entry point. Constructs the server, registers the tools, connects the stdio transport.
 - `tools.ts`: the tool registrations, wrapping the plugin's read scripts and write modules.
-- `jxa.ts`: locates the `mac` plugin's JXA runner by filesystem layout and spawns it.
+- `jxa.ts`: locates the `mac` plugin's JXA runner by filesystem layout and spawns it. It resolves a dev checkout's sibling directory, or the sibling under this plugin's own version directory when installed, and accepts no other version.
 
 ## Local Development
 

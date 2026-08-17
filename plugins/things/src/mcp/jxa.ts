@@ -6,26 +6,31 @@
  * runner in scripts/url.ts.
  */
 
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const PLUGIN_ROOT = join(import.meta.dirname, "..", "..");
 
-async function findJxaRunner(): Promise<string | null> {
+export async function findJxaRunner(pluginRoot: string = PLUGIN_ROOT): Promise<string | null> {
   // Dev layout: sibling plugin directory
-  const devPath = join(PLUGIN_ROOT, "..", "mac", "scripts", "jxa.ts");
+  const devPath = join(pluginRoot, "..", "mac", "scripts", "jxa.ts");
   if (await Bun.file(devPath).exists()) return devPath;
 
-  // Prod layout: up 2 levels to marketplace root, then into mac/<version>/
-  const marketplaceDir = join(PLUGIN_ROOT, "..", "..", "mac");
-  if (await Bun.file(marketplaceDir).exists()) {
-    for (const entry of readdirSync(marketplaceDir)) {
-      const candidate = join(marketplaceDir, entry, "scripts", "jxa.ts");
-      if (await Bun.file(candidate).exists()) return candidate;
-    }
-  }
-
-  return null;
+  // Installed layout: <marketplace>/<plugin>/<version>, where the version
+  // directory is the marketplace commit. Only the sibling under this plugin's
+  // own version was installed from the same commit, and the runner's argument
+  // contract moves: it now forwards everything past the script path to the
+  // script, where an older one claimed those flags for itself and left the
+  // script with a short argument list it answers with a usage error.
+  const installedPath = join(
+    pluginRoot,
+    "..",
+    "..",
+    "mac",
+    basename(pluginRoot),
+    "scripts",
+    "jxa.ts",
+  );
+  return (await Bun.file(installedPath).exists()) ? installedPath : null;
 }
 
 export async function runQuery(script: string, args: string[]): Promise<unknown> {

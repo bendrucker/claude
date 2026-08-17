@@ -160,14 +160,12 @@ describe.skipIf(!hasSg())("checkCode (requires sg)", () => {
 });
 
 describe.skipIf(!hasSg())("checkCode uncovered languages (requires sg)", () => {
-  test.each<[string]>([
-    ["sh"],
-    ["json"],
-    ["yml"],
-    ["sql"],
-  ])("returns null for extension %p with no numbering.yml rules", async (ext) => {
-    expect(await checkCode("function step1() {}", ext)).toBeNull();
-  });
+  test.each<[string]>([["sh"], ["json"], ["yml"], ["sql"]])(
+    "returns null for extension %p with no numbering.yml rules",
+    async (ext) => {
+      expect(await checkCode("function step1() {}", ext)).toBeNull();
+    },
+  );
 });
 
 describe.skipIf(!hasSg())("processInput with code (requires sg)", () => {

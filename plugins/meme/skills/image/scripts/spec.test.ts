@@ -41,9 +41,8 @@ describe("validateSpec", () => {
 
 describe("specFromFlags", () => {
   test("classic top and bottom", () => {
-    expect(
-      specFromFlags({ top: "one does not simply", bottom: "ship on friday" }),
-    ).toMatchInlineSnapshot(`
+    expect(specFromFlags({ top: "one does not simply", bottom: "ship on friday" }))
+      .toMatchInlineSnapshot(`
         {
           "boxes": [
             {

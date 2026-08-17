@@ -13,16 +13,12 @@ describe("isBotUsername", () => {
     expect(isBotUsername(username)).toBe(true);
   });
 
-  test.each([
-    "bendrucker",
-    "jacob",
-    "coderabbitai",
-    "robotnik",
-    "group_bot_user",
-    "my_bot_friend",
-  ])("rejects %s (no bot suffix)", (username) => {
-    expect(isBotUsername(username)).toBe(false);
-  });
+  test.each(["bendrucker", "jacob", "coderabbitai", "robotnik", "group_bot_user", "my_bot_friend"])(
+    "rejects %s (no bot suffix)",
+    (username) => {
+      expect(isBotUsername(username)).toBe(false);
+    },
+  );
 });
 
 describe("parseReviewers", () => {

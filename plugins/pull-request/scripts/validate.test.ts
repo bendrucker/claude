@@ -572,13 +572,12 @@ describe("processInput", () => {
 
   // A dispatch that escapes the `if` rules must stay inert, including one that
   // names a body file the hook must not read.
-  test.each<[string]>([
-    ["ls -la"],
-    ["cat /tmp/body.md"],
-    ["{ echo one; echo two; }"],
-  ])("returns null for unrelated command %p", async (command) => {
-    expect(await processInput(createInput(command))).toBeNull();
-  });
+  test.each<[string]>([["ls -la"], ["cat /tmp/body.md"], ["{ echo one; echo two; }"]])(
+    "returns null for unrelated command %p",
+    async (command) => {
+      expect(await processInput(createInput(command))).toBeNull();
+    },
+  );
 
   it("returns null when tool_input has no command", async () => {
     const result = await processInput({

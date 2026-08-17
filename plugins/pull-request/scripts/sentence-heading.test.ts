@@ -9,17 +9,16 @@ const root = join(import.meta.dirname, "..", "..", "..");
 // one at a time, so runtime code can only import published npm packages, which
 // rules out both a cross-plugin import and a `workspace:*` package. Read as text
 // rather than imported, so the plugin-boundary checker still passes.
-test.each([
-  "heading.ts",
-  "preprocess.ts",
-  "tags.ts",
-])("linguistics/%s stays identical to the writing plugin's copy", async (file) => {
-  const [writing, pullRequest] = await Promise.all([
-    Bun.file(join(root, "plugins", "writing", "linguistics", file)).text(),
-    Bun.file(join(root, "plugins", "pull-request", "scripts", "linguistics", file)).text(),
-  ]);
-  expect(pullRequest).toBe(writing);
-});
+test.each(["heading.ts", "preprocess.ts", "tags.ts"])(
+  "linguistics/%s stays identical to the writing plugin's copy",
+  async (file) => {
+    const [writing, pullRequest] = await Promise.all([
+      Bun.file(join(root, "plugins", "writing", "linguistics", file)).text(),
+      Bun.file(join(root, "plugins", "pull-request", "scripts", "linguistics", file)).text(),
+    ]);
+    expect(pullRequest).toBe(writing);
+  },
+);
 
 test.each<[string, string, boolean]>([
   ["flags an interrogative opener", "Why This Happens", true],

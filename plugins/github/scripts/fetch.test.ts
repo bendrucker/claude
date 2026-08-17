@@ -36,12 +36,12 @@ describe("isGitHubUrl", () => {
 });
 
 describe("parseGitHubUrl", () => {
-  test.each([
-    "https://github.com/explore",
-    "https://github.com/settings",
-  ])("returns null for %p", (url) => {
-    expect(parseGitHubUrl(url)).toBeNull();
-  });
+  test.each(["https://github.com/explore", "https://github.com/settings"])(
+    "returns null for %p",
+    (url) => {
+      expect(parseGitHubUrl(url)).toBeNull();
+    },
+  );
 
   test.each<[string, string, string]>([
     ["https://github.com/bendrucker/deployments", "repo", "gh repo view"],

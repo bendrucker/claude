@@ -246,15 +246,16 @@ describe("processInput", () => {
       remotes: async () => "remote.origin.url git@gitlab.com:owner/repo.git\n",
       expected: "url.https://gitlab.com/.insteadOf=git@gitlab.com:",
     },
-  ])("resolves the remote from the repo when the command names none: $name", async ({
-    remotes,
-    expected,
-  }) => {
-    const result = await processInput(mockInput("git pull", SECRETIVE_FAILURE), remotes);
-    expect(result).not.toBeNull();
-    const context = (result?.hookSpecificOutput as { additionalContext: string }).additionalContext;
-    expect(context).toContain(expected);
-  });
+  ])(
+    "resolves the remote from the repo when the command names none: $name",
+    async ({ remotes, expected }) => {
+      const result = await processInput(mockInput("git pull", SECRETIVE_FAILURE), remotes);
+      expect(result).not.toBeNull();
+      const context = (result?.hookSpecificOutput as { additionalContext: string })
+        .additionalContext;
+      expect(context).toContain(expected);
+    },
+  );
 });
 
 describe("readRemoteUrls", () => {

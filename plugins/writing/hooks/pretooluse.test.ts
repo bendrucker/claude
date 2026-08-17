@@ -256,24 +256,15 @@ describe("heading checker gate", () => {
   // when it ran.
   const HEADING_VIOLATION = "# the cache layer\n\nStores records in memory.\n";
 
-  test.each([
-    "md",
-    "markdown",
-    "mdx",
-    "txt",
-    "rst",
-    "adoc",
-    "ts",
-    "go",
-    "yml",
-    "json",
-    "vue",
-  ])("agrees with headings.check on .%s", async (ext) => {
-    const toolInput = { file_path: `docs/note.${ext}`, content: HEADING_VIOLATION };
-    const direct = await headingCheck(mockInput("Write", toolInput));
-    const { log } = await dispatch(mockInput("Write", toolInput));
-    expect(log.category ?? null).toBe(direct?.category ?? null);
-  });
+  test.each(["md", "markdown", "mdx", "txt", "rst", "adoc", "ts", "go", "yml", "json", "vue"])(
+    "agrees with headings.check on .%s",
+    async (ext) => {
+      const toolInput = { file_path: `docs/note.${ext}`, content: HEADING_VIOLATION };
+      const direct = await headingCheck(mockInput("Write", toolInput));
+      const { log } = await dispatch(mockInput("Write", toolInput));
+      expect(log.category ?? null).toBe(direct?.category ?? null);
+    },
+  );
 });
 
 describe("shared skips", () => {

@@ -124,6 +124,24 @@ export function validateNonBlank(values: string[], field: string): void {
   });
 }
 
+/**
+ * A date `new Date` cannot parse becomes `Invalid Date`, and every comparison
+ * against one is false. `query-logbook.js` would then skip its early
+ * termination and walk all 10k+ completed todos, which is the scan the date
+ * range exists to avoid. Rejecting here keeps that out of the JXA script, whose
+ * ES5 dialect makes the check awkward to express.
+ */
+const isoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+  message: "must be an ISO 8601 date",
+});
+
+/**
+ * Things takes a blank id silently, so a write carrying one reports success
+ * having changed nothing. Rejecting in the schema keeps the request out of the
+ * handler, which is where Things gets launched.
+ */
+const todoIds = z.array(z.string().trim().min(1)).min(1);
+
 const whenDescription =
   "Schedule: today, tomorrow, evening, anytime, someday, yyyy-mm-dd, or natural language like 'next week'";
 
@@ -168,8 +186,8 @@ export function registerTools(server: McpServer): void {
       description:
         "Read completed todos from the logbook within a date range, newest first with early termination. Optionally filter by a notes substring.",
       inputSchema: {
-        start: z.string().describe("Start of range, ISO 8601 (e.g. 2026-07-01)"),
-        end: z.string().describe("End of range, ISO 8601"),
+        start: isoDate.describe("Start of range, ISO 8601 (e.g. 2026-07-01)"),
+        end: isoDate.describe("End of range, ISO 8601"),
         notes_contains: z.string().optional().describe("Only todos whose notes contain this"),
       },
       annotations: { readOnlyHint: true },
@@ -272,7 +290,7 @@ export function registerTools(server: McpServer): void {
       description:
         "Update one or more todos: retitle, edit notes, reschedule (when), set deadline, retag, complete, or cancel. Multiple IDs batch through the JSON command, rate-limited to 250 operations per 10 seconds. Repeating todos cannot have when/deadline updated.",
       inputSchema: {
-        ids: z.array(z.string()).min(1),
+        ids: todoIds,
         title: z.string().optional(),
         notes: z.string().optional().describe("Replaces existing notes"),
         prepend_notes: z.string().optional(),
@@ -291,7 +309,6 @@ export function registerTools(server: McpServer): void {
       if (Object.keys(attributes).length === 0) {
         throw new Error("At least one attribute to update is required");
       }
-      validateNonBlank(ids, "ids");
       await ensureThingsRunning();
 
       if (ids.length === 1 && ids[0]) {
@@ -335,9 +352,19 @@ export function registerTools(server: McpServer): void {
         notes: z.string().optional(),
         tags: z.array(z.string()).optional().describe("Extra tags beyond 'Claude'"),
         checklist_items: z.array(z.string()).optional(),
-        session_id: z.string().optional().describe("Claude session ID for attribution"),
+        // Blank strings are rejected rather than ignored. Both are read for
+        // truthiness below, so a blank one would drop the attribution the
+        // caller asked for without saying anything.
+        session_id: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe("Claude session ID for attribution"),
         directory: z
           .string()
+          .trim()
+          .min(1)
           .optional()
           .describe(
             "Absolute path the resume command should cd into. Omit it and the resume command carries no cd.",
@@ -377,7 +404,7 @@ export function registerTools(server: McpServer): void {
       description:
         "Move todos to the top of Today, Anytime, or Someday in the given order. Use the list matching the todos' current scheduling state. Also reorders items within a project.",
       inputSchema: {
-        ids: z.array(z.string()).min(1).describe("Todo IDs in desired top-to-bottom order"),
+        ids: todoIds.describe("Todo IDs in desired top-to-bottom order"),
         list: z.enum(["today", "anytime", "someday"]).default("today"),
       },
     },

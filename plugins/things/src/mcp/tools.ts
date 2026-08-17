@@ -39,9 +39,9 @@ function jsonResult(value: unknown) {
 }
 
 /**
- * Surfaces the dispatch outcome without ever retrying: an xcall round trip
- * that produced no output is reported as a failure (the todo may or may not
- * exist), matching the never-retry-on-silent-output rule in the url skill.
+ * Surfaces the dispatch outcome without retrying: an xcall round trip that
+ * produced no output is reported as a failure, since the todo may or may not
+ * exist.
  */
 function writeResult(result: DispatchResult, action: string) {
   warnFallback(result);
@@ -77,7 +77,6 @@ interface UpdateAttributeArgs {
   canceled?: boolean | undefined;
 }
 
-/** Converts tool arguments to the string attributes the URL scheme expects. */
 export function updateAttributes(args: UpdateAttributeArgs): Record<string, string> {
   const attributes: Record<string, string> = {};
   if (args.title !== undefined) attributes.title = args.title;
@@ -99,7 +98,7 @@ export function updateAttributes(args: UpdateAttributeArgs): Record<string, stri
 /**
  * Ensures exactly one of title/titles is provided. The Things URL scheme's
  * behavior when `add` receives both is undocumented and may create extra
- * todos, so reject the combination instead of dispatching it.
+ * todos, so reject the combination.
  */
 export function validateCaptureTitles(title?: string, titles?: string[]): void {
   if (title !== undefined && titles !== undefined) {

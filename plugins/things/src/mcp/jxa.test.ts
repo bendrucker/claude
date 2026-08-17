@@ -4,10 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findJxaRunner } from "./jxa";
 
-// Mirrors the findXcallRunner fixture table in scripts/url.test.ts. The
-// installed layout previously gated its scan on Bun.file(<dir>).exists(), which
-// is false for a directory, so no installed plugin ever resolved a runner and
-// every read tool failed.
+// The installed layout previously gated its scan on Bun.file(<dir>).exists(),
+// which is false for a directory, so no installed plugin ever resolved a
+// runner and every read tool failed.
 describe("findJxaRunner", () => {
   const version = "69eed9ed34f1";
   const other = "282d5556b96b";

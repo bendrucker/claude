@@ -10,8 +10,8 @@ const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-ite
 
 /**
  * Builds the resume footer for a captured todo. `directory` is a parameter
- * rather than always `process.cwd()` because the MCP server runs as a child of
- * tailgate, whose cwd has nothing to do with the session being attributed.
+ * because the MCP server runs as a child of tailgate, whose cwd has nothing
+ * to do with the session being attributed.
  */
 export function buildAttribution(sessionId: string, directory = process.cwd()): string {
   return `---\n\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\ncd ${directory} && claude --resume ${sessionId}\n\`\`\``;

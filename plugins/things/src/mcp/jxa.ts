@@ -1,9 +1,8 @@
 /**
  * Runs the plugin's JXA query scripts through the mac plugin's runner
  * (AST scope validation + Apple Events retry). The runner is spawned as a
- * subprocess rather than imported: cross-plugin imports are disallowed, and
- * the runner is discovered by filesystem layout like the x-callback-url
- * runner in scripts/url.ts.
+ * subprocess because cross-plugin imports are disallowed, and it is
+ * discovered by filesystem layout.
  */
 
 import { basename, join } from "node:path";
@@ -40,7 +39,7 @@ export async function runQuery(script: string, args: string[]): Promise<unknown>
   }
 
   const scriptPath = join(PLUGIN_ROOT, "scripts", "jxa", script);
-  // process.execPath, not "bun": this process is spawned by tailgate, which
+  // Uses process.execPath because this process is spawned by tailgate, which
   // inherits launchd's PATH, and that lacks /opt/homebrew/bin. Both streams are
   // piped so the runner's diagnostics cannot reach this process's stdout, where
   // JSON-RPC lives.

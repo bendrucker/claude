@@ -14,7 +14,8 @@ import {
 } from "./subagent-statusline";
 
 function strip(s: string): string {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping terminal escapes
+  // stripping terminal escapes
+  // oxlint-disable-next-line no-control-regex
   return s.replace(/\x1b\[[0-9;]*m/g, "").replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, "");
 }
 

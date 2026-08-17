@@ -71,7 +71,7 @@ export function parseBatchVerdicts(json: string, expected: number): Verdict[] {
   }
   const entries = (parsed as Record<string, unknown>).verdicts;
   if (!Array.isArray(entries)) throw new Error('Judge batch missing "verdicts" array');
-  const verdicts = new Array<Verdict | undefined>(expected);
+  const verdicts = Array.from<Verdict | undefined>({ length: expected });
   const seen = new Set<number>();
   for (const entry of entries) {
     if (typeof entry !== "object" || entry === null) {

@@ -1,7 +1,6 @@
 /**
  * Example: Get non-repeating todos from Today with notes
  */
-/// <reference path="./jxa-globals.d.ts" />
 
 import { toArray } from "./array";
 import type { Things3 } from "./Things3";

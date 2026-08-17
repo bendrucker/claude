@@ -10,7 +10,7 @@ JXA scripts run via `osascript`, which requires Apple Events mach-lookup service
 - Formatter (`scripts/format-output.ts`): reads JSON from stdin, outputs tables or passes through `--json`
 - JXA execution: invoke the `mac:jxa-run` skill, which validates `Application("Things3")` scope via AST
 
-Scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`) carry the `claude:dangerouslyDisableSandbox` marker so the `mac` plugin's sandbox hook runs them fully outside the command sandbox. `sandbox.allowAppleEvents` alone does not survive the handoff. See [`plugins/mac/README.md`](../mac/README.md).
+Scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`, `src/mcp/stdio.ts`) carry the `claude:dangerouslyDisableSandbox` marker so the `mac` plugin's sandbox hook runs them fully outside the command sandbox. `sandbox.allowAppleEvents` alone does not survive the handoff. See [`plugins/mac/README.md`](../mac/README.md).
 
 ## JXA Script Conventions
 
@@ -38,6 +38,14 @@ It takes the plugin root as an argument and is exported so tests can point it at
 A degraded dispatch is no longer silent. `dispatch` returns a `fallbackReason` naming why no id came back (runner missing, bridge build failed, callback timed out, app error) plus the runner's `fallbackDetail` stderr, and `warnFallback` prints both. Every caller of `dispatch` should pass its result through `warnFallback`, because the alternative is a write that lands with no id and no explanation.
 
 `xcallBackstopMs` in `url.ts` guards a runner that dies without honoring its own watchdogs. It reads `run.sh`'s two bounds from the environment and adds a margin, so raising either bound cannot make the backstop kill the runner before it names its own failure.
+
+## MCP Server
+
+`src/mcp/stdio.ts` serves the same reads and writes over stdio for tailgate, reusing `url.ts`, `inbox.ts`, `reorder.ts`, and `ensure-running.ts`. stdout there is the JSON-RPC channel, so anything those modules print at runtime corrupts the protocol.
+
+Keep `console.log` under `import.meta.main`. A function both the CLI and a tool call returns its result and lets the CLI print it. Send diagnostics to stderr, which tailgate logs. Pipe or `.quiet()` every subprocess, including Bun's `$`, which inherits stdout by default. `src/mcp/stdio.test.ts` fails on any stdout line that will not parse as JSON.
+
+`src/mcp/jxa.ts` resolves the `mac` plugin's JXA runner across the same two layouts as `findXcallRunner`, and accepts only the sibling under this plugin's own version directory. The runner's argument contract is versioned: this build expects the runner to forward everything past the script path to the script itself, and a runner from another commit may claim those flags and leave the script answering with a usage error. `findJxaRunner` takes the plugin root as an argument so tests can point it at a fixture tree.
 
 ## What NOT to Do
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: hands off to open/xcall for Things URL schemes and osascript via ensure-running, which the command sandbox blocks
 
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
+import { findSiblingScript } from "../src/marketplace";
 import { ensureThingsRunning } from "./ensure-running";
 
 const AUTH_REQUIRED_COMMANDS = ["update", "update-project", "json"] as const;
@@ -84,11 +85,12 @@ async function openUrl(
   const background = options?.background ?? (command !== "show" && command !== "search");
 
   try {
-    if (background) {
-      await $`open -g ${url}`;
-    } else {
-      await $`open ${url}`;
-    }
+    // Bun's `$` inherits stdout, which is the MCP server's JSON-RPC channel, so
+    // anything Launch Services prints there corrupts the protocol. Capture it
+    // and forward it to stderr, where both the CLI and tailgate's logs read it.
+    const result = background ? await $`open -g ${url}`.quiet() : await $`open ${url}`.quiet();
+    const output = result.stdout.toString() + result.stderr.toString();
+    if (output) process.stderr.write(output);
   } catch (error) {
     if (error instanceof $.ShellError) {
       const stderr = error.stderr.toString();
@@ -97,34 +99,28 @@ async function openUrl(
           `Things URL handoff was blocked by the Claude Code sandbox (LaunchServices procNotFound / -10810 / -10673). Launch Services handoff requires sandbox.allowAppleEvents in user/settings.json. Original stderr: ${stderr.trim()}`,
         );
       }
+      // ShellError's own message is only the exit code, and `.quiet()` holds
+      // what `open` printed, so the diagnostic reaches a caller only if the
+      // message carries it.
+      const detail = stderr.trim() || error.stdout.toString().trim();
+      throw new Error(
+        `Things URL handoff failed (open exited ${error.exitCode})${detail ? `: ${detail}` : ""}`,
+      );
     }
     throw error;
   }
 }
 
-export async function findXcallRunner(
+/**
+ * The version match matters here because only the same-commit `run.sh` is known
+ * to honor the bounds `xcallBackstopMs` sizes its backstop against. A runner
+ * from another version could outlive the backstop and die on a signal rather
+ * than naming its own failure.
+ */
+export function findXcallRunner(
   pluginRoot: string = join(import.meta.dirname, ".."),
 ): Promise<string | null> {
-  // Dev layout: sibling plugin directory
-  const devPath = join(pluginRoot, "..", "x-callback-url", "scripts", "run.sh");
-  if (await Bun.file(devPath).exists()) return devPath;
-
-  // Installed layout: <marketplace>/<plugin>/<version>, where the version
-  // directory is the marketplace commit. Only the sibling under this plugin's
-  // own version was installed from the same commit, and only its run.sh is
-  // known to honor the bounds xcallBackstopMs sizes its backstop against. A
-  // runner from any other version could outlive the backstop and die on a
-  // signal rather than naming its own failure, so no other version qualifies.
-  const installedPath = join(
-    pluginRoot,
-    "..",
-    "..",
-    "x-callback-url",
-    basename(pluginRoot),
-    "scripts",
-    "run.sh",
-  );
-  return (await Bun.file(installedPath).exists()) ? installedPath : null;
+  return findSiblingScript(pluginRoot, "x-callback-url", "scripts", "run.sh");
 }
 
 const BOOLEAN_ATTRIBUTES = ["completed", "canceled", "reveal", "duplicate"] as const;

@@ -9,7 +9,7 @@
     "table": "^6.9.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.104.1",
+    "@anthropic-ai/sdk": "^0.116.0",
     "fast-xml-parser": "^5.9.3"
   }
 }

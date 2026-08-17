@@ -4,21 +4,21 @@ An MCP server exposing Things 3 over stdio. It speaks JSON-RPC on stdin and stdo
 
 [tailgate](https://github.com/bendrucker/tailgate) supplies everything this server does not. It is an OAuth 2.0 resource server published through Tailscale Funnel, and it spawns this server as a child process, so reaching Things from a phone or a laptop goes through tailgate's OAuth flow, token introspection, audience validation, and per-identity policy.
 
-```
+```text
 phone / laptop / claude.ai
-        │ OAuth
-        ▼
-Tailscale Funnel ──► tailgate ──► things stdio (child process)
-                        │ introspect, audience, policy
-                        ▼
-                      tsidp
+            │ OAuth
+            ▼
+   Tailscale Funnel ──► tailgate ──► things stdio (child process)
+                            │ introspect, audience, policy
+                            ▼
+                          tsidp
 ```
 
 Identity comes from [tsidp](https://tailscale.com/docs/features/tsidp), so a caller's identity is their tailnet login.
 
 ## Stdout Discipline
 
-stdout carries JSON-RPC framing and nothing else. One stray line of output desynchronizes the client, which then reports parse errors that name neither the writer nor the write.
+stdout carries JSON-RPC framing and nothing else. One stray line of output desynchronizes the client, which then reports parse errors that don't identify what printed the line.
 
 This constrains more than `stdio.ts`. The tools reuse the plugin's CLI scripts (`scripts/url.ts`, `scripts/inbox.ts`, `scripts/reorder.ts`, `scripts/ensure-running.ts`), and those scripts print for their own human callers. Four rules keep the two uses apart:
 
@@ -35,17 +35,20 @@ Reads run the plugin's JXA query scripts through the `mac` plugin's runner: `lis
 
 Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `update_todos`, `capture_inbox`, `reorder_todos`. Cultured Code exposes no write API beyond it.
 
-`capture_inbox` takes `session_id` and `directory` and appends a resume command to the todo's notes. `directory` is a parameter because this process runs as tailgate's child, whose working directory has nothing to do with the session being attributed.
+`capture_inbox` accepts an optional `session_id` and `directory`. Given a `session_id` it appends a resume command to the todo's notes. `directory` is a parameter because this process runs as tailgate's child, whose working directory has nothing to do with the session being attributed.
 
 ## Layout
 
 - `stdio.ts`: the entry point. Constructs the server, registers the tools, connects the stdio transport.
 - `tools.ts`: the tool registrations, wrapping the plugin's read scripts and write modules.
-- `jxa.ts`: locates the `mac` plugin's JXA runner by filesystem layout and spawns it. It resolves a dev checkout's sibling directory, or the sibling under this plugin's own version directory when installed, and accepts no other version.
+- `jxa.ts`: locates the `mac` plugin's JXA runner by filesystem layout and spawns it.
 
 ## Local Development
 
+Run from the plugin root, which is where `bun` resolves the paths below.
+
 ```bash
+cd plugins/things
 printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
@@ -59,6 +62,6 @@ Each message needs its own trailing newline. The transport frames on newlines, s
 
 ## Constraints
 
-Every tool needs the Mac awake with a logged-in GUI session. Reads drive Things through Apple Events and writes hand off to Launch Services, and neither works against a Things that cannot run. Mail to Things stays the capture path when the Mac is asleep.
+Every tool needs the Mac awake with a logged-in GUI session. Reads drive Things through Apple Events and writes hand off to Launch Services, and neither works if Things cannot run. Mail to Things stays the capture path when the Mac is asleep.
 
 The first tool call that touches Things prompts for a TCC Automation grant against whatever binary spawned it. Approve it once in System Settings if the dialog is missed.

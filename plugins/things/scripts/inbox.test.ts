@@ -14,8 +14,16 @@ describe("buildAttribution", () => {
     `);
   });
 
-  test("falls back to the process directory", () => {
-    expect(buildAttribution("sess-1")).toContain(`cd ${process.cwd()} &&`);
+  test("omits the cd when the caller has no directory to name", () => {
+    expect(buildAttribution("sess-1")).toMatchInlineSnapshot(`
+      "---
+
+      🤖 Created via Claude Code (Session: sess-1)
+
+      \`\`\`sh
+      claude --resume sess-1
+      \`\`\`"
+    `);
   });
 });
 

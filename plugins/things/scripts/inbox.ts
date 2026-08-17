@@ -9,12 +9,16 @@ import { dispatch, warnFallback } from "./url";
 const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-items"]);
 
 /**
- * Builds the resume footer for a captured todo. `directory` is a parameter
- * because the MCP server runs as a child of tailgate, whose cwd has nothing
- * to do with the session being attributed.
+ * Builds the resume footer for a captured todo. The caller supplies
+ * `directory`, since the MCP server runs as a child of tailgate, whose cwd has
+ * nothing to do with the session being attributed. A caller that doesn't know
+ * the directory gets a snippet without the `cd`, which resumes from wherever
+ * it's pasted.
  */
-export function buildAttribution(sessionId: string, directory = process.cwd()): string {
-  return `---\n\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\ncd ${directory} && claude --resume ${sessionId}\n\`\`\``;
+export function buildAttribution(sessionId: string, directory?: string): string {
+  const resume = `claude --resume ${sessionId}`;
+  const command = directory ? `cd ${directory} && ${resume}` : resume;
+  return `---\n\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\n${command}\n\`\`\``;
 }
 
 export function printCaptured(params: Map<string, string>): void {
@@ -71,7 +75,7 @@ if (import.meta.main) {
   const tags = mergeTags(["Claude"], argv.flags.tag ?? [], parseTags(params.get("tags")));
   params.set("tags", tags.join(","));
 
-  const attribution = buildAttribution(argv.flags.sessionId);
+  const attribution = buildAttribution(argv.flags.sessionId, process.cwd());
   const existing = params.get("notes");
   params.set("notes", existing ? `${existing}\n\n${attribution}` : attribution);
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chunk, updateAttributes, validateCaptureTitles, validateIds } from "./tools";
+import { chunk, updateAttributes, validateCaptureTitles, validateNonBlank } from "./tools";
 
 describe("chunk", () => {
   test.each<[string, number[], number, number[][]]>([
@@ -64,20 +64,23 @@ describe("validateCaptureTitles", () => {
     ["neither", undefined, undefined, "title or titles is required"],
     ["empty title only", "", undefined, "title or titles is required"],
     ["empty titles only", undefined, [], "title or titles is required"],
+    ["whitespace title only", "  ", undefined, "title or titles is required"],
+    ["a blank entry among titles", undefined, ["one", ""], "titles[1] must be a non-empty string"],
   ])("rejects %s", (_name, title, titles, message) => {
     expect(() => validateCaptureTitles(title, titles)).toThrow(message);
   });
 });
 
-describe("validateIds", () => {
-  test("accepts non-empty ids", () => {
-    expect(() => validateIds(["abc", "def"])).not.toThrow();
+describe("validateNonBlank", () => {
+  test("accepts non-empty values", () => {
+    expect(() => validateNonBlank(["abc", "def"], "ids")).not.toThrow();
   });
 
-  test.each<[string, string[], string]>([
-    ["empty string", ["abc", ""], 'ids[1] must be a non-empty string, got ""'],
-    ["whitespace only", ["  "], 'ids[0] must be a non-empty string, got "  "'],
-  ])("rejects %s", (_name, ids, message) => {
-    expect(() => validateIds(ids)).toThrow(message);
+  test.each<[string, string[], string, string]>([
+    ["empty string", ["abc", ""], "ids", 'ids[1] must be a non-empty string, got ""'],
+    ["whitespace only", ["  "], "ids", 'ids[0] must be a non-empty string, got "  "'],
+    ["names the field", [""], "titles", 'titles[0] must be a non-empty string, got ""'],
+  ])("rejects %s", (_name, values, field, message) => {
+    expect(() => validateNonBlank(values, field)).toThrow(message);
   });
 });

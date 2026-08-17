@@ -35,7 +35,7 @@ function textResult(text: string) {
 }
 
 function jsonResult(value: unknown) {
-  return textResult(JSON.stringify(value, null, 2));
+  return textResult(JSON.stringify(value));
 }
 
 /**
@@ -104,16 +104,22 @@ export function validateCaptureTitles(title?: string, titles?: string[]): void {
   if (title !== undefined && titles !== undefined) {
     throw new Error("Provide title (single todo) or titles (multiple todos), not both");
   }
-  if (!title && !titles?.length) {
+  if (!title?.trim() && !titles?.length) {
     throw new Error("title or titles is required");
   }
+  if (titles) validateNonBlank(titles, "titles");
 }
 
-/** Rejects blank IDs before they reach Things, which fails silently on them. */
-export function validateIds(ids: string[]): void {
-  ids.forEach((id, index) => {
-    if (id.trim() === "") {
-      throw new Error(`ids[${index}] must be a non-empty string, got ${JSON.stringify(id)}`);
+/**
+ * Rejects blank entries before they reach Things, which takes a blank id
+ * silently and a blank title as a nameless todo the user then has to find.
+ */
+export function validateNonBlank(values: string[], field: string): void {
+  values.forEach((value, index) => {
+    if (value.trim() === "") {
+      throw new Error(
+        `${field}[${index}] must be a non-empty string, got ${JSON.stringify(value)}`,
+      );
     }
   });
 }
@@ -198,7 +204,7 @@ export function registerTools(server: McpServer): void {
       description:
         "Create a todo. Goes to the inbox unless when/list places it elsewhere. For quick captures that should carry Claude attribution, use capture_inbox instead.",
       inputSchema: {
-        title: z.string(),
+        title: z.string().trim().min(1),
         notes: z.string().optional().describe("Markdown supported, max 10,000 chars"),
         when: z.string().optional().describe(whenDescription),
         deadline: z.string().optional().describe("yyyy-mm-dd"),
@@ -233,7 +239,7 @@ export function registerTools(server: McpServer): void {
       title: "Create a project",
       description: "Create a project, optionally with initial todos.",
       inputSchema: {
-        title: z.string(),
+        title: z.string().trim().min(1),
         notes: z.string().optional(),
         when: z.string().optional().describe(whenDescription),
         deadline: z.string().optional().describe("yyyy-mm-dd"),
@@ -244,6 +250,7 @@ export function registerTools(server: McpServer): void {
       },
     },
     async (args) => {
+      if (args.todos) validateNonBlank(args.todos, "todos");
       await ensureThingsRunning();
       const params = new Map<string, string>();
       params.set("title", args.title);
@@ -284,7 +291,7 @@ export function registerTools(server: McpServer): void {
       if (Object.keys(attributes).length === 0) {
         throw new Error("At least one attribute to update is required");
       }
-      validateIds(ids);
+      validateNonBlank(ids, "ids");
       await ensureThingsRunning();
 
       if (ids.length === 1 && ids[0]) {
@@ -293,15 +300,26 @@ export function registerTools(server: McpServer): void {
         return writeResult(await dispatch("update", params), `Updated ${ids[0]}`);
       }
 
-      const outputs: string[] = [];
+      const applied: string[] = [];
       for (const [index, batch] of chunk(ids, BATCH_SIZE).entries()) {
         if (index > 0) await Bun.sleep(BATCH_DELAY_MS);
         const params = new Map<string, string>();
         params.set("data", buildJsonPayload(batch, attributes));
-        const result = writeResult(await dispatch("json", params), `Updated ${batch.length} todos`);
-        outputs.push(result.content[0]?.text ?? "");
+        try {
+          writeResult(await dispatch("json", params), `Updated ${batch.length} todos`);
+        } catch (error) {
+          // A batch that fails leaves the earlier ones applied. Naming them
+          // keeps a retry from updating those todos a second time.
+          const message = error instanceof Error ? error.message : String(error);
+          throw new Error(
+            applied.length
+              ? `${message}\nAlready updated: ${applied.join(", ")}. Retry only the remaining IDs.`
+              : message,
+          );
+        }
+        applied.push(...batch);
       }
-      return textResult(outputs.join("\n"));
+      return textResult(`Updated ${applied.length} todos`);
     },
   );
 
@@ -318,7 +336,12 @@ export function registerTools(server: McpServer): void {
         tags: z.array(z.string()).optional().describe("Extra tags beyond 'Claude'"),
         checklist_items: z.array(z.string()).optional(),
         session_id: z.string().optional().describe("Claude session ID for attribution"),
-        directory: z.string().optional().describe("Working directory for the resume command"),
+        directory: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path the resume command should cd into. Omit it and the resume command carries no cd.",
+          ),
       },
     },
     async (args) => {

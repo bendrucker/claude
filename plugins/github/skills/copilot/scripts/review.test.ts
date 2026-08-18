@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AGENTIC_TOOL_ARGS,
   ALL_CLASSES,
   ANGLES,
   buildPrompt,
+  copilotArgs,
   type Diff,
   daysUntilReset,
   deriveUsage,
@@ -148,5 +150,51 @@ describe("angles", () => {
     for (const sentence of ALL_CLASSES.split("\n").filter((line) => /^\d+\. /.test(line))) {
       expect(split).toContain(sentence.replace(/^\d+\. /, ""));
     }
+  });
+});
+
+describe("copilotArgs", () => {
+  const args = (agentic: boolean) =>
+    copilotArgs("review this", { model: "gpt-5.6-terra", cap: 30, cwd: ".", agentic });
+
+  // The cap is the only per-session ceiling, and the preflight guard reserves exactly this
+  // number before the spawn. A shape that omits it can bill past what was reserved.
+  test.each([
+    ["one-shot", false],
+    ["agentic", true],
+  ])("%s carries the credit cap", (_name, agentic) => {
+    const argv = args(agentic);
+    expect(argv[argv.indexOf("--max-ai-credits") + 1]).toBe("30");
+  });
+
+  test("one-shot enables no tools", () => {
+    expect(args(false)).not.toContain("--allow-all-tools");
+    expect(args(false)).not.toContain("--deny-tool");
+  });
+
+  // Deny beats --allow-all-tools, so this list is the whole containment boundary. A dropped
+  // or misspelled entry opens a path the sandbox does not close.
+  test("agentic denies every tool the containment argument depends on", () => {
+    const argv = args(true);
+    expect(argv).toContain("--allow-all-tools");
+    const denied = AGENTIC_TOOL_ARGS.filter(
+      (_arg, index) => AGENTIC_TOOL_ARGS[index - 1] === "--deny-tool",
+    );
+    expect(denied).toEqual([
+      "write",
+      "url",
+      "shell(git push)",
+      "shell(gh:*)",
+      "shell(curl:*)",
+      "shell(wget:*)",
+    ]);
+    for (const tool of denied) {
+      expect(argv[argv.indexOf(tool) - 1]).toBe("--deny-tool");
+    }
+  });
+
+  test("the prompt is the last argument", () => {
+    const argv = args(true);
+    expect(argv.slice(-2)).toEqual(["-p", "review this"]);
   });
 });

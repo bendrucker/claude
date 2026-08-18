@@ -436,7 +436,7 @@ export function buildPrompt(
  * These closing denies cover the two outbound paths the sandbox cannot: github.com is
  * allowlisted and gh credentials resolve, so push and gh would otherwise reach the network.
  */
-const AGENTIC_TOOL_ARGS = [
+export const AGENTIC_TOOL_ARGS = [
   "--allow-all-tools",
   "--deny-tool",
   "write",
@@ -469,8 +469,8 @@ interface RunOptions {
  * inlined text and Copilot never fans out. An agentic run trades that for a capped session
  * inside a throwaway checkout.
  */
-async function runCopilot(prompt: string, angle: Angle, options: RunOptions): Promise<Result> {
-  const args = [
+export function copilotArgs(prompt: string, options: RunOptions): string[] {
+  return [
     "copilot",
     "--model",
     options.model,
@@ -485,6 +485,10 @@ async function runCopilot(prompt: string, angle: Angle, options: RunOptions): Pr
     "-p",
     prompt,
   ];
+}
+
+async function runCopilot(prompt: string, angle: Angle, options: RunOptions): Promise<Result> {
+  const args = copilotArgs(prompt, options);
 
   const child = Bun.spawn(args, {
     cwd: options.cwd,

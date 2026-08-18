@@ -90,50 +90,70 @@ async function isIgnored(filePath: string): Promise<boolean> {
   }
 }
 
+// An argv array rather than a shell string, so a file path is never spliced
+// into anything `/bin/sh` would parse. `prefix` carries the script argument
+// when the binary runs through `bun`.
+type OxCommand = { bin: string; prefix: string[] };
+
 // oxlint and oxfmt ship as devDependencies, so their binaries live in the
 // module graph rather than on PATH (`bun run` adds node_modules/.bin, but
 // `bun test` and direct hook invocation do not). Neither package's `exports`
 // map declares its `bin/` entry as an importable subpath, so
 // `import.meta.resolve("oxlint/bin/oxlint")` throws even when the package is
 // installed. `package.json` is exported, so resolve that instead and rejoin
-// the package root with the `bin` path from its own manifest.
-function localBin(pkg: string, bin: string): string | null {
+// its directory with the `bin` path the manifest itself declares.
+async function localBin(pkg: string, binName: string): Promise<string | null> {
   try {
     const manifestPath = fileURLToPath(import.meta.resolve(`${pkg}/package.json`));
-    return join(dirname(manifestPath), bin);
+    const manifest = (await Bun.file(manifestPath).json()) as {
+      bin?: string | Record<string, string>;
+    };
+    const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[binName];
+    return bin ? join(dirname(manifestPath), bin) : null;
   } catch {
     return null;
   }
 }
 
-async function resolveCommand(
-  pkg: string,
-  bin: string,
-  globalName: string,
+// A single Stop asks for oxlint three times and oxfmt twice. Resolution cannot
+// change within one hook invocation, so it happens once per process.
+const commandCache = new Map<string, OxCommand | null>();
+
+async function resolveCommand(pkg: string, binName: string): Promise<OxCommand | null> {
+  const cached = commandCache.get(pkg);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const local = await localBin(pkg, binName);
+  const global = local ? null : Bun.which(binName);
+  const resolved = local
+    ? { bin: "bun", prefix: [local] }
+    : global
+      ? { bin: global, prefix: [] }
+      : null;
+  commandCache.set(pkg, resolved);
+  return resolved;
+}
+
+async function oxlintCommand(): Promise<OxCommand | null> {
+  return resolveCommand("oxlint", "oxlint");
+}
+
+async function oxfmtCommand(): Promise<OxCommand | null> {
+  return resolveCommand("oxfmt", "oxfmt");
+}
+
+async function runOx(
+  command: OxCommand,
+  args: string[],
+  cwd: string | undefined,
 ): Promise<string | null> {
-  const local = localBin(pkg, bin);
-  if (local) {
-    return `bun "${local}"`;
-  }
   try {
-    await execAsync(`command -v ${globalName}`);
-    return globalName;
-  } catch {
+    await execFileAsync(command.bin, [...command.prefix, ...args], cwd ? { cwd } : undefined);
     return null;
+  } catch (error) {
+    return commandOutput(error);
   }
-}
-
-async function oxlintCommand(): Promise<string | null> {
-  return resolveCommand("oxlint", "bin/oxlint", "oxlint");
-}
-
-async function oxfmtCommand(): Promise<string | null> {
-  return resolveCommand("oxfmt", "bin/oxfmt", "oxfmt");
-}
-
-async function hasOxTools(): Promise<boolean> {
-  const [lint, fmt] = await Promise.all([oxlintCommand(), oxfmtCommand()]);
-  return lint !== null && fmt !== null;
 }
 
 export async function parseTranscript(transcriptPath: string): Promise<string[]> {
@@ -171,20 +191,29 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   return results.filter((result) => result.keep).map((result) => result.path);
 }
 
+// Keyed by directory: a turn's files usually share one, and the answer cannot
+// change while the hook runs.
+const workingTreeCache = new Map<string, string | undefined>();
+
 // oxlint and oxfmt both discover the nearest ancestor config per file they
 // process, so resolving cwd per file lets them lint and format a nested git
 // worktree correctly even when invoked from an ancestor directory. This also
 // keeps relative paths and any future tool-relative resolution anchored to
 // the file's own working tree.
 async function oxWorkingTree(filePath: string): Promise<string | undefined> {
-  try {
-    const { stdout } = await execAsync("git rev-parse --show-toplevel", {
-      cwd: dirname(filePath),
-    });
-    return stdout.trim() || undefined;
-  } catch {
-    return undefined;
+  const dir = dirname(filePath);
+  if (workingTreeCache.has(dir)) {
+    return workingTreeCache.get(dir);
   }
+  let toplevel: string | undefined;
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd: dir });
+    toplevel = stdout.trim() || undefined;
+  } catch {
+    toplevel = undefined;
+  }
+  workingTreeCache.set(dir, toplevel);
+  return toplevel;
 }
 
 // Splits files by resolved working tree so a turn touching a single worktree
@@ -206,34 +235,26 @@ async function groupByWorkingTree(files: string[]): Promise<Map<string | undefin
   return groups;
 }
 
-function quoteAll(files: string[]): string {
-  return files.map((file) => `"${file}"`).join(" ");
-}
-
 function commandOutput(error: unknown): string | null {
-  const execError = error as { stdout?: string; stderr?: string };
-  const output = (execError.stdout || "") + (execError.stderr || "");
-  return output.trim() || null;
+  const { stdout, stderr } = error as { stdout?: string; stderr?: string };
+  const output = [stdout, stderr]
+    .map((stream) => stream?.trim())
+    .filter(Boolean)
+    .join("\n");
+  return output || null;
 }
 
 // --no-error-on-unmatched-pattern keeps oxlint/oxfmt from exiting non-zero on
 // files their config ignores (gitignored paths, fixtures). Without it, edits
 // to excluded files read as lint or format failures and block Stop.
+const LINT_ARGS = ["--no-error-on-unmatched-pattern", "-f", "agent"];
+
 export async function runOxlintAgent(filePath: string): Promise<string | null> {
   const command = await oxlintCommand();
   if (!command) {
     return null;
   }
-  const cwd = await oxWorkingTree(filePath);
-  try {
-    await execAsync(
-      `${command} --no-error-on-unmatched-pattern -f agent "${filePath}"`,
-      cwd ? { cwd } : undefined,
-    );
-    return null;
-  } catch (error) {
-    return commandOutput(error);
-  }
+  return runOx(command, [...LINT_ARGS, filePath], await oxWorkingTree(filePath));
 }
 
 async function runOxlintAgentBatch(files: string[]): Promise<string | null> {
@@ -243,22 +264,17 @@ async function runOxlintAgentBatch(files: string[]): Promise<string | null> {
   }
   const groups = await groupByWorkingTree(files);
   const outputs = await Promise.all(
-    [...groups.entries()].map(async ([cwd, groupFiles]) => {
-      try {
-        await execAsync(
-          `${command} --no-error-on-unmatched-pattern -f agent ${quoteAll(groupFiles)}`,
-          cwd ? { cwd } : undefined,
-        );
-        return null;
-      } catch (error) {
-        return commandOutput(error);
-      }
-    }),
+    [...groups.entries()].map(([cwd, groupFiles]) =>
+      runOx(command, [...LINT_ARGS, ...groupFiles], cwd),
+    ),
   );
   const combined = outputs.filter((output): output is string => Boolean(output)).join("\n");
   return combined || null;
 }
 
+// oxfmt --write exits non-zero when a file has a syntax error it cannot
+// format. The follow-up oxlint pass surfaces that separately, so its output is
+// discarded here rather than blocking on it twice.
 async function runOxfmtWrite(files: string[]): Promise<void> {
   const command = await oxfmtCommand();
   if (!command || files.length === 0) {
@@ -266,36 +282,23 @@ async function runOxfmtWrite(files: string[]): Promise<void> {
   }
   const groups = await groupByWorkingTree(files);
   await Promise.all(
-    [...groups.entries()].map(async ([cwd, groupFiles]) => {
-      try {
-        await execAsync(
-          `${command} --write --no-error-on-unmatched-pattern ${quoteAll(groupFiles)}`,
-          cwd ? { cwd } : undefined,
-        );
-      } catch {
-        // oxfmt --write exits non-zero when a file has a syntax error it
-        // cannot format. The follow-up oxlint pass surfaces that separately.
-      }
-    }),
+    [...groups.entries()].map(([cwd, groupFiles]) =>
+      runOx(command, ["--write", "--no-error-on-unmatched-pattern", ...groupFiles], cwd),
+    ),
   );
 }
 
 // Type-aware lint rules stay off in .oxlintrc.json; --type-aware is enabled
 // only because --type-check requires the same type-info plumbing. There is no
-// useful per-file mode, so this always runs repo-wide.
+// useful per-file mode, so this always runs repo-wide. --quiet drops warnings:
+// repo-wide they run to dozens of lines the turn did not cause, and the batch
+// lint pass above already reports them for the files actually edited.
 async function runTypeCheck(): Promise<string | null> {
   const command = await oxlintCommand();
   if (!command) {
     return null;
   }
-  try {
-    await execAsync(
-      `${command} --type-aware --type-check -f agent --ignore-pattern ".claude/workflows/**"`,
-    );
-    return null;
-  } catch (error) {
-    return commandOutput(error);
-  }
+  return runOx(command, ["--type-aware", "--type-check", "--quiet", "-f", "agent"], undefined);
 }
 
 function formatPostToolUseOutput(filePath: string, errors: string): SyncHookJSONOutput {
@@ -307,15 +310,57 @@ function formatPostToolUseOutput(filePath: string, errors: string): SyncHookJSON
   };
 }
 
+// The type-check run reports lint errors alongside TypeScript diagnostics and
+// there is no flag to narrow it, so drop the lines the scoped lint pass already
+// reported rather than showing each one twice.
+function withoutRepeats(typeOutput: string, lintOutput: string | null): string {
+  if (!lintOutput) {
+    return typeOutput;
+  }
+  const reported = new Set(lintOutput.split("\n"));
+  return typeOutput
+    .split("\n")
+    .filter((line) => !reported.has(line))
+    .join("\n");
+}
+
 function formatBlockReason(
   intro: string,
+  verb: string,
   lintOutput: string | null,
   typeOutput: string | null,
 ): string {
   const sections = [];
   if (lintOutput) sections.push(`Lint:\n${lintOutput}`);
-  if (typeOutput) sections.push(`Types:\n${typeOutput}`);
-  return `${intro}\n\n${sections.join("\n\n")}\n\nFix these issues before ${intro.includes("committing") ? "committing" : "stopping"}.`;
+  const types = typeOutput && withoutRepeats(typeOutput, lintOutput);
+  if (types) sections.push(`Types:\n${types}`);
+  return `${intro}\n\n${sections.join("\n\n")}\n\nFix these issues before ${verb}.`;
+}
+
+// The gate Stop and the pre-commit check share: reformat first so the lint pass
+// sees final text, then lint and type-check concurrently. Only oxlint is
+// required, so a missing oxfmt degrades to checking without reformatting rather
+// than dropping the gate entirely.
+async function runOxGate(
+  files: string[],
+  intro: string,
+  verb: string,
+): Promise<SyncHookJSONOutput | null> {
+  if (files.length === 0) {
+    return null;
+  }
+
+  await runOxfmtWrite(files);
+
+  const [lintOutput, typeOutput] = await Promise.all([runOxlintAgentBatch(files), runTypeCheck()]);
+  if (!lintOutput && !typeOutput) {
+    return null;
+  }
+
+  return {
+    decision: "block",
+    reason: formatBlockReason(intro, verb, lintOutput, typeOutput),
+  };
 }
 
 export async function processPostToolUse(
@@ -348,31 +393,15 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
     return null;
   }
 
-  if (!(await hasOxTools())) {
+  if (!(await oxlintCommand())) {
     return null;
   }
 
-  const files = await parseTranscript(input.transcript_path);
-  if (files.length === 0) {
-    return null;
-  }
-
-  await runOxfmtWrite(files);
-
-  const [lintOutput, typeOutput] = await Promise.all([runOxlintAgentBatch(files), runTypeCheck()]);
-
-  if (!lintOutput && !typeOutput) {
-    return null;
-  }
-
-  return {
-    decision: "block",
-    reason: formatBlockReason(
-      "❌ Ox check failed. Formatting was auto-applied but issues remain:",
-      lintOutput,
-      typeOutput,
-    ),
-  };
+  return runOxGate(
+    await parseTranscript(input.transcript_path),
+    "❌ Ox check failed. Formatting was auto-applied but issues remain:",
+    "stopping",
+  );
 }
 
 async function getStagedOxFiles(): Promise<string[]> {
@@ -407,31 +436,15 @@ export async function processPreToolUse(
     return null;
   }
 
-  if (!(await hasOxTools())) {
+  if (!(await oxlintCommand())) {
     return null;
   }
 
-  const files = await getStagedOxFiles();
-  if (files.length === 0) {
-    return null;
-  }
-
-  await runOxfmtWrite(files);
-
-  const [lintOutput, typeOutput] = await Promise.all([runOxlintAgentBatch(files), runTypeCheck()]);
-
-  if (!lintOutput && !typeOutput) {
-    return null;
-  }
-
-  return {
-    decision: "block",
-    reason: formatBlockReason(
-      "Ox found issues in staged files after auto-formatting:",
-      lintOutput,
-      typeOutput,
-    ),
-  };
+  return runOxGate(
+    await getStagedOxFiles(),
+    "Ox found issues in staged files after auto-formatting:",
+    "committing",
+  );
 }
 
 export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {

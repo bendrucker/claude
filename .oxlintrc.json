@@ -58,7 +58,7 @@
       }
     ]
   },
-  "ignorePatterns": ["**/fixtures/**", "**/*.d.ts", "**/jxa/**/*.js"],
+  "ignorePatterns": ["**/fixtures/**", "**/*.d.ts", "**/jxa/**/*.js", ".claude/workflows/**"],
   "env": {
     "builtin": true
   }

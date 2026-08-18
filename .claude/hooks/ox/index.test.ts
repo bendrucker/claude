@@ -406,6 +406,32 @@ describe("ox hook", () => {
     });
   });
 
+  // Stop and the commit gate share one pipeline, so these cover what differs:
+  // the closing verb, and the fact that both batch file paths into a command.
+  describe("runOxGate", () => {
+    it("names the blocked action in the reason", async () => {
+      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const transcriptPath = join(tempDir, `transcript-verb-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+
+      const result = await processStop(mockStopHookInput(transcriptPath));
+      expect(result?.reason).toContain("Fix these issues before stopping.");
+    });
+
+    it("does not shell-evaluate a batched path containing a command substitution", async () => {
+      const filePath = join(tempDir, "$(touch pwned)", "unfixable.ts");
+      await Bun.write(filePath, await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text());
+
+      const transcriptPath = join(tempDir, `transcript-hostile-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+
+      const result = await processStop(mockStopHookInput(transcriptPath));
+
+      expect(await Bun.file(join(tempDir, "pwned")).exists()).toBe(false);
+      expect(result?.reason).toContain("no-dupe-keys");
+    });
+  });
+
   describe("invokesGitCommit", () => {
     test.each<[string, boolean]>([
       ["git commit", true],

@@ -34,7 +34,7 @@
     "evals/pr-body"
   ],
   "scripts": {
-    "build": "oxlint --type-aware --type-check --ignore-pattern '.claude/workflows/**'",
+    "build": "oxlint --type-aware --type-check",
     "check": "oxlint && oxfmt --check",
     "coverage": "bun scripts/coverage/index.ts",
     "format": "oxfmt --write",

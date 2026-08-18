@@ -29,8 +29,7 @@ const OVERSHOOT = 25;
 // Below this, no shape is worth a terra call. Degrade rather than refuse.
 const DEGRADE_BELOW = 150;
 
-// The plan grants 1500/month and resets on the 1st, so this is the nominal daily allowance
-// that `pace` is judged against. It is a yardstick, never a target to spend up to.
+// The plan grants 1500/month and resets on the 1st, so this is the nominal daily allowance that `pace` is judged against.
 const NOMINAL_DAILY = 1500 / 31;
 
 // Copilot takes the prompt as an argv value, so the cap has to stay clear of ARG_MAX
@@ -178,9 +177,8 @@ interface Band {
 }
 
 /**
- * Reuses the ship skill's Bot Review Gate spend list rather than inventing a second taxonomy,
- * so one set of criteria decides both. Costs are measured at the median PR (96 changed lines
- * across 3 files) through p90 (381 lines).
+ * Reuses the ship skill's Bot Review Gate spend list, so one set of criteria decides both.
+ * Costs are measured at the median PR (96 changed lines across 3 files) through p90 (381 lines).
  */
 const BANDS: Band[] = [
   {
@@ -333,8 +331,8 @@ const ALL_CLASSES = `Prioritize, in this order:
 6. API and contract misuse. Wrong argument order, ignored return values, violated invariants stated in nearby comments or docs.`;
 
 /**
- * Distinct lenses rather than repeated passes. Three identical reviews mostly agree, which
- * costs three times as much for one review's worth of coverage.
+ * Three identical reviews mostly agree, which costs three times as much for one review's
+ * worth of coverage.
  */
 export const ANGLES: Angle[] = [
   {
@@ -494,8 +492,7 @@ async function withAgenticWorktree<T>(
   const head = git(["rev-parse", "--short", "HEAD"], cwd).trim();
   const worktree = join(cwd, "tmp", `copilot-agentic-${head}`);
 
-  // The path is derived from the commit rather than made unique, so a registration a previous
-  // run failed to clear would block every later review of the same commit.
+  // A previous run's failed cleanup would block later reviews of the same commit, since the worktree path is keyed to the commit hash.
   await $`git -C ${cwd} worktree prune`.quiet().nothrow();
   git(["worktree", "add", "--detach", worktree, "HEAD"], cwd);
   try {
@@ -534,8 +531,7 @@ async function collectContents(diff: Diff, cwd: string, maxBytes: number) {
 
     const file = Bun.file(resolved);
     if (file.size === 0) continue;
-    // Stop at the budget rather than reading every file first. A thousand small changed
-    // files can each sit under perFileCap and still blow the prompt in aggregate.
+    // A thousand small changed files can each sit under perFileCap and still blow the prompt in aggregate.
     if (file.size > perFileCap || running + file.size > maxBytes) {
       skipped.push(path);
       continue;
@@ -669,8 +665,8 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    // Degrading beats refusing. A cheap look still finds things, and luna prices every token
-    // class at a tenth of terra, so the same review costs about 0.76 instead of 7.58.
+    // A cheap look still finds things, and luna prices every token class at a tenth of terra,
+    // so the same review costs about 0.76 instead of 7.58.
     if (meter.remaining < DEGRADE_BELOW && model === DEFAULT_MODEL) {
       console.error(
         `${YELLOW}${meter.remaining} credits left, under ${DEGRADE_BELOW}. Degrading to ${CHEAP_MODEL}, one angle.${RESET}`,

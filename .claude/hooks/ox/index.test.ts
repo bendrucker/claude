@@ -61,9 +61,13 @@ function mockPreToolUseInput(command: string): PreToolUseHookInput {
   };
 }
 
-function mockStopHookInput(transcriptPath: string, stopHookActive = false): StopHookInput {
+function mockStopHookInput(
+  transcriptPath: string,
+  stopHookActive = false,
+  sessionId = "test-session",
+): StopHookInput {
   return {
-    session_id: "test-session",
+    session_id: sessionId,
     hook_event_name: "Stop",
     transcript_path: transcriptPath,
     cwd: process.cwd(),
@@ -306,13 +310,52 @@ describe("ox hook", () => {
   });
 
   describe("processStop", () => {
-    it("returns null when stop_hook_active is true", async () => {
+    // A blocked Stop wakes the model to repair, and the Stop that follows
+    // carries stop_hook_active. Skipping the gate there ends the session on a
+    // repair nothing checked.
+    it("checks the re-entrant stop rather than skipping it", async () => {
       const filePath = await copyFixture("unfixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-active-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
 
-      const input = mockStopHookInput(transcriptPath, true);
-      expect(await processStop(input)).toBeNull();
+      const input = mockStopHookInput(transcriptPath, true, `reentrant-${Date.now()}`);
+      const result = await processStop(input);
+
+      expect(result?.decision).toBe("block");
+      expect(result?.reason).toContain("no-dupe-keys");
+    });
+
+    // An error the model cannot clear would otherwise block every Stop forever,
+    // the runaway stop_hook_active used to prevent by skipping outright.
+    it("gives way once the issues survive the block limit", async () => {
+      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const transcriptPath = join(tempDir, `transcript-limit-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+      const session = `limit-${Date.now()}`;
+
+      const first = await processStop(mockStopHookInput(transcriptPath, false, session));
+      const second = await processStop(mockStopHookInput(transcriptPath, true, session));
+      const third = await processStop(mockStopHookInput(transcriptPath, true, session));
+
+      expect(first?.decision).toBe("block");
+      expect(second?.decision).toBe("block");
+      expect(third?.decision).toBeUndefined();
+      expect(third?.systemMessage).toContain("no-dupe-keys");
+    });
+
+    // The budget is per round. A Stop the model did not reach through a block
+    // ends the previous round, so the next one starts with its full count.
+    it("restarts the count on a stop that did not follow a block", async () => {
+      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const transcriptPath = join(tempDir, `transcript-restart-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+      const session = `restart-${Date.now()}`;
+
+      await processStop(mockStopHookInput(transcriptPath, false, session));
+      await processStop(mockStopHookInput(transcriptPath, true, session));
+      const fresh = await processStop(mockStopHookInput(transcriptPath, false, session));
+
+      expect(fresh?.decision).toBe("block");
     });
 
     it("returns null when no files were modified", async () => {

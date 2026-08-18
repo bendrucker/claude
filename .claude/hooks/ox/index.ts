@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 
 import { execFile } from "node:child_process";
-import { readdir } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -420,12 +421,7 @@ function withoutRepeats(typeOutput: string, lintOutput: string | null): string {
     .join("\n");
 }
 
-function formatBlockReason(
-  intro: string,
-  verb: string,
-  lintOutput: string | null,
-  typeCheck: TypeCheckResult,
-): string {
+function formatSections(lintOutput: string | null, typeCheck: TypeCheckResult): string {
   const sections = [];
   if (lintOutput) sections.push(`Lint:\n${lintOutput}`);
   const types = typeCheck.output && withoutRepeats(typeCheck.output, lintOutput);
@@ -433,14 +429,16 @@ function formatBlockReason(
   if (typeCheck.needsInstall) {
     sections.push("Types: skipped, dependencies are not installed here (`bun install`).");
   }
-  return `${intro}\n\n${sections.join("\n\n")}\n\nFix these issues before ${verb}.`;
+  return sections.join("\n\n");
 }
 
 // The gate Stop and the pre-commit check share: reformat first so the lint pass
 // sees final text, then lint and type-check concurrently. Only oxlint is
 // required, so a missing oxfmt degrades to checking without reformatting rather
-// than dropping the gate entirely.
-async function runOxGate(files: string[], intro: string, verb: string): Promise<string | null> {
+// than dropping the gate entirely. The diagnostics come back unframed: the two
+// callers say different things about them, and Stop says two different things
+// itself depending on whether it is still willing to block.
+async function runOxGate(files: string[]): Promise<string | null> {
   if (files.length === 0) {
     return null;
   }
@@ -455,7 +453,7 @@ async function runOxGate(files: string[], intro: string, verb: string): Promise<
     return null;
   }
 
-  return formatBlockReason(intro, verb, lintOutput, typeCheck);
+  return formatSections(lintOutput, typeCheck);
 }
 
 export async function processPostToolUse(
@@ -483,21 +481,71 @@ export async function processPostToolUse(
   return formatPostToolUseOutput(filePath, errors);
 }
 
-export async function processStop(input: StopHookInput): Promise<SyncHookJSONOutput | null> {
-  if (input.stop_hook_active) {
-    return null;
-  }
+// A blocked Stop wakes the model to repair, and the Stop that follows carries
+// stop_hook_active. Returning null there ends the session on text the gate never
+// saw: the repair can leave the original error standing, or introduce a
+// cross-file type error the per-edit lint pass cannot reach. So the re-entrant
+// Stop checks too, and a count of consecutive blocks bounds it, since an error
+// the model cannot clear would otherwise block every Stop forever. That runaway
+// is what the flag exists to prevent, and the count replaces it.
+const STOP_BLOCK_LIMIT = 2;
 
+const UNSAFE_SESSION = /[^A-Za-z0-9._-]+/g;
+
+function blockCountPath(sessionId: string): string {
+  return join(tmpdir(), "claude-ox-gate", `${sessionId.replace(UNSAFE_SESSION, "-")}.json`);
+}
+
+// A Stop the model did not arrive at through a block starts a fresh round, so a
+// count left over from an earlier one cannot shorten it.
+async function priorBlocks(input: StopHookInput): Promise<number> {
+  if (!input.stop_hook_active) {
+    return 0;
+  }
+  try {
+    const state = (await Bun.file(blockCountPath(input.session_id)).json()) as { blocks?: number };
+    return typeof state.blocks === "number" ? state.blocks : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function recordBlocks(sessionId: string, blocks: number): Promise<void> {
+  try {
+    await Bun.write(blockCountPath(sessionId), JSON.stringify({ blocks }));
+  } catch {}
+}
+
+async function clearBlocks(sessionId: string): Promise<void> {
+  try {
+    await rm(blockCountPath(sessionId), { force: true });
+  } catch {}
+}
+
+export async function processStop(input: StopHookInput): Promise<SyncHookJSONOutput | null> {
   if (!(await oxlintCommand())) {
     return null;
   }
 
-  const reason = await runOxGate(
-    await parseTranscript(input.transcript_path),
-    "❌ Ox check failed. Formatting was auto-applied but issues remain:",
-    "stopping",
-  );
-  return reason ? { decision: "block", reason } : null;
+  const sections = await runOxGate(await parseTranscript(input.transcript_path));
+  if (!sections) {
+    await clearBlocks(input.session_id);
+    return null;
+  }
+
+  const blocked = await priorBlocks(input);
+  if (blocked >= STOP_BLOCK_LIMIT) {
+    await clearBlocks(input.session_id);
+    return {
+      systemMessage: `⚠️ Ox issues survived ${blocked} blocked stops, so this one is allowed through with them in place:\n\n${sections}`,
+    };
+  }
+
+  await recordBlocks(input.session_id, blocked + 1);
+  return {
+    decision: "block",
+    reason: `❌ Ox check failed. Formatting was auto-applied but issues remain:\n\n${sections}\n\nFix these issues before stopping.`,
+  };
 }
 
 type StagedOxFiles = { paths: string[]; diverged: string[] };
@@ -559,13 +607,14 @@ export async function processPreToolUse(
     );
   }
 
-  const reason = await runOxGate(
-    staged.paths,
-    "Ox found issues in staged files after auto-formatting:",
-    "committing",
-  );
+  const sections = await runOxGate(staged.paths);
   await restage(staged.paths);
-  return reason ? deny(reason) : null;
+  if (!sections) {
+    return null;
+  }
+  return deny(
+    `Ox found issues in staged files after auto-formatting:\n\n${sections}\n\nFix these issues before committing.`,
+  );
 }
 
 // The gate reformats on disk, which would otherwise leave the index holding the

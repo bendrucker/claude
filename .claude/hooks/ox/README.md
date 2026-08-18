@@ -12,6 +12,8 @@ When you `Edit` or `Write` a file oxlint understands, it runs and shows any issu
 
 When the session ends, oxfmt formats all edited files, oxlint checks them, and a type check runs over each working tree those files belong to (`oxlint --type-aware --type-check`). If issues remain, the session is blocked until they're resolved.
 
+The stop that follows a block is checked too. It arrives flagged as re-entrant, and waving it through would end the session on a repair nothing looked at, where the original error can still stand or a new cross-file type error can have appeared that the per-edit lint pass cannot see. Two blocks is the budget: the third stop reports what is left as a warning and lets the session end, so an error the model cannot clear does not wedge it. A stop the model did not reach through a block starts the budget over.
+
 ## Pre-Commit Check
 
 The hook does the same on `git commit`, over staged files, and denies the commit if a lint or type error remains. Nothing is auto-fixed beyond formatting, so a lint error blocks whether or not a fixer exists for it. The formatting it applies is restaged, so the commit records the text the check passed.

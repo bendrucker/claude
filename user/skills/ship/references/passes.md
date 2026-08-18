@@ -12,10 +12,11 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | Code changes | `review:code <effort> --fix` or `simplify` | Exactly one. Skip on docs/config-only |
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
 | A supported review bot is available for the repo and the diff clears the [Bot Review Gate](#bot-review-gate) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
+| Code changes on a repo whose remote owner is `bendrucker`, clearing the [Cross-Model Gate](#cross-model-gate) | `github:copilot` | Same slot as the local bot pass. Findings fix in-branch |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
 | A runtime surface | `run` | Ship declines docs-only and tests-only |
 
-Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `writing`, `run`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
+Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `copilot`, `writing`, `run`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
 
 ## Bot Review Gate
 
@@ -44,6 +45,20 @@ My Greptile org sets `Labels / Include / review`, which skips any PR without a `
 
 These thresholds are a starting calibration to tune. Removal trigger: if the gate is right, `free_reviews_limit_reached` goes to zero in the session index and credits last the billing period. Too tight shows up as manual `--local` requests on PRs the gate skipped. Loosen the line count. Too loose and credits still run out early.
 
+## Cross-Model Gate
+
+`github:copilot` is the default cross-model channel. It reads the diff with GPT, which is worth something precisely because Claude reviewing its own work shares the blind spot that produced it.
+
+This gate is separate from the Bot Review Gate above and does not couple to it. That gate conserves, because Greptile's free tier does not reset and a spent credit is gone. Copilot's meter refills on the 1st and does not roll over, so an unspent credit is also gone. The two meters point in opposite directions, and the one-review-one-channel rule applies within the bot gate rather than across both. A change can draw a Greptile review and a Copilot review without either paying for the other.
+
+Spend when the diff clears the [Bot Review Gate](#bot-review-gate)'s own list above. The two gates share their criteria for what counts as review-worthy. They do not share a budget.
+
+`github:copilot --status` prints the current tier and picks the shape. The tier is credits remaining over days to reset, constrained under 25 a day and abundant over 60. A burst of reviews tightens the bar on what follows, and the month-end tail loosens it. Never run a review to consume an allotment. Credits left over in a month where every qualifying change got a full review are the intended result.
+
+Two things keep this inert on a work machine, and only one of them is code. An account with no personal Copilot entitlement has no `premium_interactions` quota, and the script treats an unreadable meter as a refusal rather than a default. The owner condition in the matrix row above is a routing rule this skill applies when it decides whether to invoke. The script itself never looks at the remote. A corporate account that did carry a quota would pass its guard.
+
+Removal trigger: a full billing cycle with near-zero `skill_calls` for `github:copilot` in the session index, or this pass firing under about four times, means the demand does not route this way. Drop the row and re-demote the skill.
+
 ## Plan Review
 
 Its value, an outside-view read of how the implementation drifted from what was approved, only materializes when the session could actually have drifted. Hence the two-part gate: a **substantial** approved plan in context, and a session that **ran long or redirected** enough for the diff to wander from it. A small plan executed in a short, direct session is cost without signal.
@@ -53,10 +68,10 @@ It is read-only and writes nothing, so it runs as a background dispatch rather t
 ```mermaid
 flowchart TD
     S([ship start]) --> G{plan:review gated in?}
-    G -->|no| F1[fix passes: comments-audit, local bot, review:code or simplify, writing, run]
+    G -->|no| F1[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, writing, run]
     F1 --> C([create PR])
     G -->|yes| D[dispatch plan:review in background]
-    D --> F2[fix passes: comments-audit, local bot, review:code or simplify, writing, run]
+    D --> F2[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, writing, run]
     D -. concurrent .-> R[plan:review reasons over plan + diff]
     F2 --> J{join: findings?}
     R -.-> J

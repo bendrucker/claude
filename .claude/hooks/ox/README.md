@@ -6,11 +6,11 @@ Runs [oxlint](https://oxc.rs/docs/guide/usage/linter.html) and [oxfmt](https://o
 
 #### During Work (PostToolUse)
 
-When you `Edit` or `Write` a file oxlint understands, it runs and shows any issues as context. This is informational only, and never writes to the file, so mid-turn edits keep applying cleanly. Formatting deviations are left alone until the Stop or pre-commit gate.
+When you `Edit` or `Write` a file oxlint understands, it runs and shows any issues as context. This is informational only. It never writes to the file, so your later edits in the same turn still match what is on disk. Formatting is deferred to the Stop and pre-commit gates.
 
 #### Before Stopping (Stop)
 
-When the session ends, oxfmt formats all edited files and oxlint checks them, along with a repo-wide type check (`oxlint --type-aware --type-check`). If issues remain, the session is blocked until they're resolved.
+When the session ends, oxfmt formats all edited files, oxlint checks them, and a repo-wide type check runs (`oxlint --type-aware --type-check`). If issues remain, the session is blocked until they're resolved.
 
 This lets you stay in flow during development while ensuring code quality before completing work.
 

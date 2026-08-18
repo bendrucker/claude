@@ -23,7 +23,7 @@ JXA runs on JavaScriptCore (ES5). Scripts must:
 - Use shebang `#!/usr/bin/env osascript -l JavaScript`
 - Use `.whose()` for filtering — pushes work to Things, much faster than manual iteration
 
-Linting is disabled for the `.js` files in `scripts/jxa/` via the root `.oxlintrc.json` `ignorePatterns` (`**/jxa/**/*.js`). A `.ts` file added there would still be linted.
+Linting is disabled for the `.js` files in `scripts/jxa/` via `ignorePatterns` in the root `.oxlintrc.json`. The pattern is `**/jxa/**/*.js`, so a `.ts` file added there would still be linted.
 
 ## URL Dispatch
 

@@ -12,6 +12,7 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | Code changes | `review:code <effort> --fix` or `simplify` | Exactly one. Skip on docs/config-only |
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
 | A supported review bot is available for the repo and the diff clears the [Bot Review Gate](#bot-review-gate) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
+| Code changes on a repo whose remote owner is `bendrucker`, clearing the [Cross-Model Gate](#cross-model-gate) | `github:copilot` | Same slot as the local bot pass, so findings fix in-branch |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
 | A runtime surface | `run` | Ship declines docs-only and tests-only |
 
@@ -43,6 +44,20 @@ Fall back to the hosted pass when the local CLI cannot run: the provider's CLI i
 My Greptile org sets `Labels / Include / review`, which skips any PR without a `review` label. That label exists in `bendrucker/claude`, `dotfiles`, and `bendrucker.me`. With `triggerOnUpdates` and `triggerOnDrafts` both off, a labeled PR draws one review at open and drafts draw none. `reviewers.md` covers the levers and the `@greptileai review` override.
 
 These thresholds are a starting calibration to tune. Removal trigger: if the gate is right, `free_reviews_limit_reached` goes to zero in the session index and credits last the billing period. Too tight shows up as manual `--local` requests on PRs the gate skipped. Loosen the line count. Too loose and credits still run out early.
+
+## Cross-Model Gate
+
+`github:copilot` is the default cross-model channel. It reads the diff with GPT, which is worth something precisely because Claude reviewing its own work shares the blind spot that produced it.
+
+This gate is separate from the Bot Review Gate above and does not couple to it. That gate conserves, because Greptile's free tier does not reset and a spent credit is gone. Copilot's meter refills on the 1st and does not roll over, so an unspent credit is also gone. The two meters point in opposite directions, and the one-review-one-channel rule applies within the bot gate rather than across both. A change can draw a Greptile review and a Copilot review without either paying for the other.
+
+Spend when the diff would clear the Bot Review Gate's own list: it touches auth, permissions, sandbox config, secret handling, or egress; it adds or changes a runtime surface; it runs over roughly 200 changed lines or 8 files excluding tests, docs, and lockfiles; `review:code` confirmed a real bug; or the session drifted. Prose, dependency bumps, lockfiles, and reverts never qualify.
+
+`github:copilot --status` prints the current tier and picks the shape. The tier is credits remaining over days to reset. A burst of reviews tightens the bar on what follows, and the month-end tail loosens it. Never run a review to consume an allotment. Credits left over in a month where every qualifying change got a full review are the intended result.
+
+Two things keep this inert on a work machine. A corporate remote fails the owner check, and an account with no personal Copilot entitlement has no credit meter, which the script treats as a refusal rather than a default.
+
+Removal trigger: a full billing cycle with near-zero `skill_calls` for `github:copilot` in the session index, or this pass firing under about four times, means the demand does not route this way. Drop the row and re-demote the skill.
 
 ## Plan Review
 

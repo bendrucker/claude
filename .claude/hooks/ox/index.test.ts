@@ -325,8 +325,7 @@ describe("ox hook", () => {
       expect(result?.reason).toContain("no-dupe-keys");
     });
 
-    // An error the model cannot clear would otherwise block every Stop forever,
-    // the runaway stop_hook_active used to prevent by skipping outright.
+    // An error the model cannot clear would otherwise block every Stop forever.
     it("gives way once the issues survive the block limit", async () => {
       const filePath = await copyFixture("unfixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-limit-${Date.now()}.jsonl`);

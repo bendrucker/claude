@@ -434,10 +434,10 @@ function formatSections(lintOutput: string | null, typeCheck: TypeCheckResult): 
 
 // The gate Stop and the pre-commit check share: reformat first so the lint pass
 // sees final text, then lint and type-check concurrently. Only oxlint is
-// required, so a missing oxfmt degrades to checking without reformatting rather
-// than dropping the gate entirely. The diagnostics come back unframed: the two
-// callers say different things about them, and Stop says two different things
-// itself depending on whether it is still willing to block.
+// required, so a missing oxfmt degrades to checking without reformatting. The
+// diagnostics come back unframed: the two callers say different things about
+// them, and Stop says two different things itself depending on whether it is
+// still willing to block.
 async function runOxGate(files: string[]): Promise<string | null> {
   if (files.length === 0) {
     return null;
@@ -486,8 +486,7 @@ export async function processPostToolUse(
 // saw: the repair can leave the original error standing, or introduce a
 // cross-file type error the per-edit lint pass cannot reach. So the re-entrant
 // Stop checks too, and a count of consecutive blocks bounds it, since an error
-// the model cannot clear would otherwise block every Stop forever. That runaway
-// is what the flag exists to prevent, and the count replaces it.
+// the model cannot clear would otherwise block every Stop forever.
 const STOP_BLOCK_LIMIT = 2;
 
 const UNSAFE_SESSION = /[^A-Za-z0-9._-]+/g;

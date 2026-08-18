@@ -487,32 +487,30 @@ export async function processPostToolUse(
 // cross-file type error the per-edit lint pass cannot reach. So the re-entrant
 // Stop checks too, and a count of consecutive blocks bounds it, since an error
 // the model cannot clear would otherwise block every Stop forever.
-const STOP_BLOCK_LIMIT = 2;
+export const STOP_BLOCK_LIMIT = 2;
 
 const UNSAFE_SESSION = /[^A-Za-z0-9._-]+/g;
 
-function blockCountPath(sessionId: string): string {
+export function blockCountPath(sessionId: string): string {
   return join(tmpdir(), "claude-ox-gate", `${sessionId.replace(UNSAFE_SESSION, "-")}.json`);
 }
 
-// A Stop the model did not arrive at through a block starts a fresh round, so a
-// count left over from an earlier one cannot shorten it.
-async function priorBlocks(input: StopHookInput): Promise<number> {
-  if (!input.stop_hook_active) {
-    return 0;
-  }
+async function priorBlocks(sessionId: string): Promise<number> {
   try {
-    const state = (await Bun.file(blockCountPath(input.session_id)).json()) as { blocks?: number };
+    const state = (await Bun.file(blockCountPath(sessionId)).json()) as { blocks?: number };
     return typeof state.blocks === "number" ? state.blocks : 0;
   } catch {
     return 0;
   }
 }
 
-async function recordBlocks(sessionId: string, blocks: number): Promise<void> {
+async function recordBlocks(sessionId: string, blocks: number): Promise<boolean> {
   try {
     await Bun.write(blockCountPath(sessionId), JSON.stringify({ blocks }));
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function clearBlocks(sessionId: string): Promise<void> {
@@ -522,7 +520,10 @@ async function clearBlocks(sessionId: string): Promise<void> {
 }
 
 export async function processStop(input: StopHookInput): Promise<SyncHookJSONOutput | null> {
+  // Every exit that is not a block clears the count, so a stale one can never
+  // be read back as progress through a later round's budget.
   if (!(await oxlintCommand())) {
+    await clearBlocks(input.session_id);
     return null;
   }
 
@@ -532,18 +533,22 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
     return null;
   }
 
-  const blocked = await priorBlocks(input);
-  if (blocked >= STOP_BLOCK_LIMIT) {
-    await clearBlocks(input.session_id);
+  // A Stop the model did not arrive at through a block starts a fresh round.
+  const blocked = input.stop_hook_active ? await priorBlocks(input.session_id) : 0;
+
+  // Blocking is only safe once the count that will later release it is on disk.
+  // A state file that cannot be written would otherwise leave every re-entrant
+  // Stop reading zero and blocking again, forever.
+  if (blocked < STOP_BLOCK_LIMIT && (await recordBlocks(input.session_id, blocked + 1))) {
     return {
-      systemMessage: `⚠️ Ox issues survived ${blocked} blocked stops, so this one is allowed through with them in place:\n\n${sections}`,
+      decision: "block",
+      reason: `❌ Ox check failed. Formatting was auto-applied but issues remain:\n\n${sections}\n\nFix these issues before stopping.`,
     };
   }
 
-  await recordBlocks(input.session_id, blocked + 1);
+  await clearBlocks(input.session_id);
   return {
-    decision: "block",
-    reason: `❌ Ox check failed. Formatting was auto-applied but issues remain:\n\n${sections}\n\nFix these issues before stopping.`,
+    systemMessage: `⚠️ Ox is no longer blocking on these issues, so this stop goes through with them in place:\n\n${sections}`,
   };
 }
 

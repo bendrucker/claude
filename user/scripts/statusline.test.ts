@@ -23,7 +23,6 @@ import {
 // Strip ANSI SGR and OSC 8 sequences so unit assertions read against the visible
 // glyphs rather than the escape wrappers.
 function strip(s: string): string {
-  // stripping terminal escapes
   // oxlint-disable-next-line no-control-regex
   return s.replace(/\x1b\[[0-9;]*m/g, "").replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, "");
 }

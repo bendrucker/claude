@@ -172,11 +172,10 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
 }
 
 // oxlint and oxfmt both discover the nearest ancestor config per file they
-// process, so (unlike Biome) they lint and format a nested git worktree
-// correctly even when invoked from an ancestor directory. This resolves a
-// shared cwd per invocation anyway: it keeps relative paths and any future
-// tool-relative resolution anchored to the file's own working tree rather
-// than to wherever the hook process happens to start.
+// process, so resolving cwd per file lets them lint and format a nested git
+// worktree correctly even when invoked from an ancestor directory. This also
+// keeps relative paths and any future tool-relative resolution anchored to
+// the file's own working tree.
 async function oxWorkingTree(filePath: string): Promise<string | undefined> {
   try {
     const { stdout } = await execAsync("git rev-parse --show-toplevel", {
@@ -189,9 +188,8 @@ async function oxWorkingTree(filePath: string): Promise<string | undefined> {
 }
 
 // Splits files by resolved working tree so a turn touching a single worktree
-// (the common case) becomes one batched process instead of one per file,
-// while a turn spanning a nested worktree still runs each group from the cwd
-// that governs it.
+// (the common case) becomes one batched process, while a turn spanning a
+// nested worktree still runs each group from the cwd that governs it.
 async function groupByWorkingTree(files: string[]): Promise<Map<string | undefined, string[]>> {
   const resolved = await Promise.all(
     files.map(async (file) => ({ file, cwd: await oxWorkingTree(file) })),

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
-import { exec, execFile } from "node:child_process";
+import { execFile } from "node:child_process";
+import { readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -11,7 +12,6 @@ import type {
   SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 const OX_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "json", "jsonc"]);
@@ -103,8 +103,11 @@ type OxCommand = { bin: string; prefix: string[] };
 // installed. `package.json` is exported, so resolve that instead and rejoin
 // its directory with the `bin` path the manifest itself declares.
 async function localBin(pkg: string, binName: string): Promise<string | null> {
+  const manifestPath = await binManifest(pkg);
+  if (!manifestPath) {
+    return null;
+  }
   try {
-    const manifestPath = fileURLToPath(import.meta.resolve(`${pkg}/package.json`));
     const manifest = (await Bun.file(manifestPath).json()) as {
       bin?: string | Record<string, string>;
     };
@@ -113,6 +116,46 @@ async function localBin(pkg: string, binName: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+// A worktree nobody has installed into has no `node_modules` of its own. Bun's
+// auto-install cache covers that on a warm machine, but a cold cache with no
+// network leaves the resolve throwing and every gate silently off. The binaries
+// are identical across worktrees of one repository, so fall back to the main
+// checkout's copy rather than making the gates wait on an install here.
+async function binManifest(pkg: string): Promise<string | null> {
+  try {
+    return fileURLToPath(import.meta.resolve(`${pkg}/package.json`));
+  } catch {
+    const checkout = await mainCheckout();
+    if (!checkout) {
+      return null;
+    }
+    const fallback = join(checkout, "node_modules", pkg, "package.json");
+    return (await fileExists(fallback)) ? fallback : null;
+  }
+}
+
+let mainCheckoutPromise: Promise<string | null> | undefined;
+
+// --git-common-dir points at the main checkout's .git from inside any linked
+// worktree, and at the current .git otherwise, so this resolves to the one
+// checkout that installs are shared from.
+function mainCheckout(): Promise<string | null> {
+  mainCheckoutPromise ??= (async () => {
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        { cwd: import.meta.dirname },
+      );
+      const gitDir = stdout.trim();
+      return gitDir ? dirname(gitDir) : null;
+    } catch {
+      return null;
+    }
+  })();
+  return mainCheckoutPromise;
 }
 
 // A single Stop asks for oxlint three times and oxfmt twice. Resolution cannot
@@ -288,17 +331,70 @@ async function runOxfmtWrite(files: string[]): Promise<void> {
   );
 }
 
+// A checkout nobody has installed into has neither the tsgolint binary nor the
+// dependency type declarations tsgolint resolves imports against, so it reports
+// a missing executable, or every external import as missing plus the
+// implicit-any cascade that follows. Those diagnostics describe the
+// environment, and no edit the session can make will clear them, so the type
+// section is dropped instead of blocking. The presence of `node_modules`
+// decides it rather than the diagnostics themselves, so one typo'd package name
+// in an installed tree cannot silence the whole gate.
+const MISSING_CHECKER = /Failed to find tsgolint executable/;
+
+async function installed(cwd: string | undefined): Promise<boolean> {
+  try {
+    await readdir(join(cwd ?? process.cwd(), "node_modules"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+type TypeCheckResult = { output: string | null; needsInstall: boolean };
+
 // Type-aware lint rules stay off in .oxlintrc.json; --type-aware is enabled
 // only because --type-check requires the same type-info plumbing. There is no
-// useful per-file mode, so this always runs repo-wide. --quiet drops warnings:
-// repo-wide they run to dozens of lines the turn did not cause, and the batch
-// lint pass above already reports them for the files actually edited.
-async function runTypeCheck(): Promise<string | null> {
+// useful per-file mode, so this runs whole-tree, once per working tree the
+// gated files resolve to. --quiet drops warnings: whole-tree they run to dozens
+// of lines the turn did not cause, and the batch lint pass above already
+// reports them for the files actually edited. --no-error-on-unmatched-pattern
+// covers a tree whose config ignores everything in it, which otherwise exits
+// non-zero with "No files found to lint" and reads as a type failure.
+const TYPE_CHECK_ARGS = [
+  "--type-aware",
+  "--type-check",
+  "--quiet",
+  "--no-error-on-unmatched-pattern",
+  "-f",
+  "agent",
+];
+
+async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {
   const command = await oxlintCommand();
-  if (!command) {
-    return null;
+  if (!command || files.length === 0) {
+    return { output: null, needsInstall: false };
   }
-  return runOx(command, ["--type-aware", "--type-check", "--quiet", "-f", "agent"], undefined);
+  const groups = await groupByWorkingTree(files);
+  const results = await Promise.all(
+    [...groups.keys()].map(async (cwd) => {
+      if (!(await installed(cwd))) {
+        return { output: null, needsInstall: true };
+      }
+      const output = await runOx(command, TYPE_CHECK_ARGS, cwd);
+      return output && MISSING_CHECKER.test(output)
+        ? { output: null, needsInstall: true }
+        : { output, needsInstall: false };
+    }),
+  );
+
+  const combined = results
+    .map((result) => result.output)
+    .filter((output): output is string => Boolean(output))
+    .join("\n");
+  return {
+    output: combined || null,
+    needsInstall: results.some((result) => result.needsInstall),
+  };
 }
 
 function formatPostToolUseOutput(filePath: string, errors: string): SyncHookJSONOutput {
@@ -328,12 +424,15 @@ function formatBlockReason(
   intro: string,
   verb: string,
   lintOutput: string | null,
-  typeOutput: string | null,
+  typeCheck: TypeCheckResult,
 ): string {
   const sections = [];
   if (lintOutput) sections.push(`Lint:\n${lintOutput}`);
-  const types = typeOutput && withoutRepeats(typeOutput, lintOutput);
+  const types = typeCheck.output && withoutRepeats(typeCheck.output, lintOutput);
   if (types) sections.push(`Types:\n${types}`);
+  if (typeCheck.needsInstall) {
+    sections.push("Types: skipped, dependencies are not installed here (`bun install`).");
+  }
   return `${intro}\n\n${sections.join("\n\n")}\n\nFix these issues before ${verb}.`;
 }
 
@@ -341,26 +440,22 @@ function formatBlockReason(
 // sees final text, then lint and type-check concurrently. Only oxlint is
 // required, so a missing oxfmt degrades to checking without reformatting rather
 // than dropping the gate entirely.
-async function runOxGate(
-  files: string[],
-  intro: string,
-  verb: string,
-): Promise<SyncHookJSONOutput | null> {
+async function runOxGate(files: string[], intro: string, verb: string): Promise<string | null> {
   if (files.length === 0) {
     return null;
   }
 
   await runOxfmtWrite(files);
 
-  const [lintOutput, typeOutput] = await Promise.all([runOxlintAgentBatch(files), runTypeCheck()]);
-  if (!lintOutput && !typeOutput) {
+  const [lintOutput, typeCheck] = await Promise.all([
+    runOxlintAgentBatch(files),
+    runTypeCheck(files),
+  ]);
+  if (!lintOutput && !typeCheck.output) {
     return null;
   }
 
-  return {
-    decision: "block",
-    reason: formatBlockReason(intro, verb, lintOutput, typeOutput),
-  };
+  return formatBlockReason(intro, verb, lintOutput, typeCheck);
 }
 
 export async function processPostToolUse(
@@ -397,32 +492,47 @@ export async function processStop(input: StopHookInput): Promise<SyncHookJSONOut
     return null;
   }
 
-  return runOxGate(
+  const reason = await runOxGate(
     await parseTranscript(input.transcript_path),
     "❌ Ox check failed. Formatting was auto-applied but issues remain:",
     "stopping",
   );
+  return reason ? { decision: "block", reason } : null;
 }
 
-async function getStagedOxFiles(): Promise<string[]> {
+type StagedOxFiles = { paths: string[]; diverged: string[] };
+
+// The gate checks and reformats working-tree files while the commit records the
+// index. A staged file carrying further unstaged edits makes those two
+// different texts, so a pass would clear content oxlint never saw and a block
+// would name content git is not about to commit. Those files come back as
+// `diverged` for the caller to refuse on.
+async function getStagedOxFiles(): Promise<StagedOxFiles> {
   try {
-    const { stdout } = await execAsync("git diff --cached --name-only --diff-filter=ACMR");
-    const files = stdout
-      .trim()
-      .split("\n")
-      .filter((f) => f && isOxFile(f));
+    const [staged, unstaged] = await Promise.all([
+      execFileAsync("git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR"]),
+      execFileAsync("git", ["diff", "--name-only"]),
+    ]);
+
+    const names = lines(staged.stdout).filter(isOxFile);
+    const modified = new Set(lines(unstaged.stdout));
+    const diverged = names.filter((name) => modified.has(name));
 
     const cwd = process.cwd();
-    const existChecks = files.map(async (f) => {
+    const existChecks = names.map(async (f) => {
       const fullPath = f.startsWith("/") ? f : `${cwd}/${f}`;
       return { path: fullPath, exists: await fileExists(fullPath) };
     });
 
     const results = await Promise.all(existChecks);
-    return results.filter((r) => r.exists).map((r) => r.path);
+    return { paths: results.filter((r) => r.exists).map((r) => r.path), diverged };
   } catch {
-    return [];
+    return { paths: [], diverged: [] };
   }
+}
+
+function lines(stdout: string): string[] {
+  return stdout.trim().split("\n").filter(Boolean);
 }
 
 export async function processPreToolUse(
@@ -440,11 +550,47 @@ export async function processPreToolUse(
     return null;
   }
 
-  return runOxGate(
-    await getStagedOxFiles(),
+  const staged = await getStagedOxFiles();
+  if (staged.diverged.length > 0) {
+    return deny(
+      `These files are staged with further unstaged edits, so the commit would record text this check never saw:\n\n${staged.diverged
+        .map((f) => `  ${f}`)
+        .join("\n")}\n\nStage or stash the working-tree changes, then commit.`,
+    );
+  }
+
+  const reason = await runOxGate(
+    staged.paths,
     "Ox found issues in staged files after auto-formatting:",
     "committing",
   );
+  await restage(staged.paths);
+  return reason ? deny(reason) : null;
+}
+
+// The gate reformats on disk, which would otherwise leave the index holding the
+// unformatted text the commit is about to record. The divergence check above
+// established that the two already matched, so re-adding carries the formatting
+// and nothing the user had not staged.
+async function restage(paths: string[]): Promise<void> {
+  if (paths.length === 0) {
+    return;
+  }
+  try {
+    await execFileAsync("git", ["add", "--", ...paths]);
+  } catch {
+    return;
+  }
+}
+
+function deny(reason: string): SyncHookJSONOutput {
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: reason,
+    },
+  };
 }
 
 export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {

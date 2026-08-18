@@ -10,12 +10,16 @@ When you `Edit` or `Write` a file oxlint understands, it runs and shows any issu
 
 #### Before Stopping (Stop)
 
-When the session ends, oxfmt formats all edited files, oxlint checks them, and a repo-wide type check runs (`oxlint --type-aware --type-check`). If issues remain, the session is blocked until they're resolved.
+When the session ends, oxfmt formats all edited files, oxlint checks them, and a type check runs over each working tree those files belong to (`oxlint --type-aware --type-check`). If issues remain, the session is blocked until they're resolved.
 
 ## Pre-Commit Check
 
-The hook does the same on `git commit`, over staged files, and blocks the commit if a lint or type error remains. Nothing is auto-fixed beyond formatting, so a lint error blocks whether or not a fixer exists for it.
+The hook does the same on `git commit`, over staged files, and denies the commit if a lint or type error remains. Nothing is auto-fixed beyond formatting, so a lint error blocks whether or not a fixer exists for it. The formatting it applies is restaged, so the commit records the text the check passed.
+
+A staged file carrying further unstaged edits is refused before any of that runs. The check reads working-tree files while the commit records the index, so the two have to hold the same text for its verdict to describe what git is about to write. Stage or stash the working-tree changes and commit again.
 
 ## Degraded Runs
 
 Only oxlint is required. When oxfmt cannot be resolved, the gates still lint and type-check and simply skip reformatting, rather than passing silently.
+
+A working tree with no `node_modules` skips the type check and says so in the block reason. tsgolint resolves imports through the dependency tree, so without one it reports every external import as missing, and no edit the session makes can clear that. Lint and formatting still run: the binaries come from Bun's install cache, falling back to the main checkout of the same repository, so a fresh worktree is gated before anyone runs `bun install`.

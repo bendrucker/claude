@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { HookCommand, MatcherEntryContext } from "../packages/marketplace/index";
-import { violations } from "./check-hook-matchers";
+import { entries, violations } from "./check-hook-matchers";
 
 function entry(matcher: string | undefined, ...ifs: (string | undefined)[]): MatcherEntryContext {
   const hooks: HookCommand[] = ifs.map((rule) => ({
@@ -62,4 +62,12 @@ test("the pull-request matcher that never fired", () => {
       "plugins/example/hooks/hooks.json: matcher "Bash(gh pr create:*)|Bash(gh pr edit:*)|Bash(glab mr create:*)|Bash(glab mr update:*)" uses permission-rule syntax and can never match a tool name. Move command scoping to a per-hook "if" field.",
     ]
   `);
+});
+
+// The ox commit gate sat behind a `Bash(git commit:*)` matcher in project
+// settings and never fired, because this check only ever read plugin hooks.
+test("scans both settings files alongside the plugins", async () => {
+  const files = new Set((await entries()).map((context) => context.file));
+  expect(files).toContain("user/settings.json");
+  expect(files).toContain(".claude/settings.json");
 });

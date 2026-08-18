@@ -6,13 +6,15 @@ paths:
 
 # Hooks
 
-See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a repo-wide type check.
+See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a type check.
 
 Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under `tmp/`, allowed for disposable scripted verification checkouts.
 
 Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Matcher fields are not shell commands and should not be quoted. Run `bun scripts/check-hook-quoting.ts` to validate.
 
 ## Bash Matchers
+
+A `Bash(...)` belongs in a per-hook `if`, and the entry's `matcher` stays a bare tool name. `bun scripts/check-hook-matchers.ts` validates that across every plugin and both settings files. The ox commit gate sat behind `"matcher": "Bash(git commit:*)"` in project settings and silently never fired, because the check used to read plugin hooks only.
 
 A `Bash(...)` matcher or `if` condition is a spawn-reducing pre-filter, never the authorization decision. It fails open on shell metacharacters: under CLI 2.1.223, `Bash(git commit:*)` matched `echo hi > $TMPDIR/probe.txt` while the same command with a literal path passed, and brace groups, for-loops, here-docs, and long pipelines match the same way.
 

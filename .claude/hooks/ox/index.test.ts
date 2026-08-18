@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, test } from "bun:test";
 import { exec } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,7 +7,9 @@ import { promisify } from "node:util";
 import type {
   PostToolUseHookInput,
   PreToolUseHookInput,
+  PreToolUseHookSpecificOutput,
   StopHookInput,
+  SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   invokesGitCommit,
@@ -22,6 +24,12 @@ import {
 const execAsync = promisify(exec);
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures");
+
+// hookSpecificOutput is a union across every hook event, so narrow it to the
+// PreToolUse arm before reading the permission fields.
+function deniedBy(result: SyncHookJSONOutput | null): PreToolUseHookSpecificOutput | undefined {
+  return result?.hookSpecificOutput as PreToolUseHookSpecificOutput | undefined;
+}
 
 let tempDir: string;
 
@@ -388,14 +396,80 @@ describe("ox hook", () => {
   });
 
   describe("processPreToolUse", () => {
-    it("returns null when no staged files", async () => {
-      // In test environment, there are no staged git files
-      const input = mockPreToolUseInput("git commit -m 'test'");
-      expect(await processPreToolUse(input)).toBeNull();
+    let repoDir: string;
+    let outerCwd: string;
+
+    beforeEach(async () => {
+      outerCwd = process.cwd();
+      repoDir = await mkdtemp(join(tempDir, "staged-"));
+      await execAsync("git init -q", { cwd: repoDir });
+      // Correctness rules are warnings by default, and the gate only sees a
+      // non-zero exit. This mirrors the repo's own .oxlintrc.json.
+      await Bun.write(
+        join(repoDir, ".oxlintrc.json"),
+        JSON.stringify({ categories: { correctness: "error" } }),
+      );
+      process.chdir(repoDir);
     });
 
-    // The `Bash(git commit:*)` matcher fails open on shell metacharacters, so
-    // these reach the hook and must not be able to block.
+    afterEach(() => {
+      process.chdir(outerCwd);
+    });
+
+    async function stage(name: string, content: string): Promise<string> {
+      const path = join(repoDir, name);
+      await Bun.write(path, content);
+      await execAsync(`git add ${name}`, { cwd: repoDir });
+      return path;
+    }
+
+    it("returns null when no staged files", async () => {
+      expect(await processPreToolUse(mockPreToolUseInput("git commit -m 'test'"))).toBeNull();
+    });
+
+    it("returns null when the staged files are clean", async () => {
+      await stage("clean.ts", "export const a = 1;\n");
+      expect(await processPreToolUse(mockPreToolUseInput("git commit -m x"))).toBeNull();
+    });
+
+    it("denies a commit whose staged files carry lint errors", async () => {
+      await stage("bad.ts", await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text());
+
+      const denial = deniedBy(await processPreToolUse(mockPreToolUseInput("git commit -m x")));
+      expect(denial?.permissionDecision).toBe("deny");
+      expect(denial?.permissionDecisionReason).toContain("no-dupe-keys");
+      // This repo has no node_modules, so the type pass has nothing to resolve
+      // imports against and drops out rather than blocking the commit.
+      expect(denial?.permissionDecisionReason).toContain(
+        "Types: skipped, dependencies are not installed here",
+      );
+    });
+
+    // The gate reads working-tree files, so a staged blob the working copy has
+    // moved on from would be committed unchecked.
+    it("denies a commit whose staged file has further unstaged edits", async () => {
+      const path = await stage("drift.ts", "export const a = 1;\n");
+      await Bun.write(path, "export const a = 2;\n");
+
+      const denial = deniedBy(await processPreToolUse(mockPreToolUseInput("git commit -m x")));
+      expect(denial?.permissionDecision).toBe("deny");
+      expect(denial?.permissionDecisionReason).toContain("drift.ts");
+      expect(denial?.permissionDecisionReason).toContain("Stage or stash");
+    });
+
+    // Reformatting on disk without restaging would leave the index holding the
+    // unformatted text the commit is about to record.
+    it("restages the formatting it applied", async () => {
+      await stage("messy.ts", "export const a = {  b:1 };\n");
+
+      expect(await processPreToolUse(mockPreToolUseInput("git commit -m x"))).toBeNull();
+
+      const { stdout } = await execAsync("git diff --name-only", { cwd: repoDir });
+      expect(stdout.trim()).toBe("");
+    });
+
+    // The Bash matcher fails open on shell metacharacters, so these reach the
+    // hook and must not be able to deny.
     test.each<[string]>([
       ["echo hi > $TMPDIR/probe.txt"],
       ["{ echo one; echo two; }"],

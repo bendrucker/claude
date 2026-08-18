@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, test } from "bun:test";
 import { exec } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -12,6 +12,7 @@ import type {
   SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
+  blockCountPath,
   invokesGitCommit,
   parseTranscript,
   processInput,
@@ -19,6 +20,7 @@ import {
   processPreToolUse,
   processStop,
   runOxlintAgent,
+  STOP_BLOCK_LIMIT,
 } from ".";
 
 const execAsync = promisify(exec);
@@ -61,9 +63,16 @@ function mockPreToolUseInput(command: string): PreToolUseHookInput {
   };
 }
 
-function mockStopHookInput(transcriptPath: string, stopHookActive = false): StopHookInput {
+const gateSessions = new Set<string>();
+
+function mockStopHookInput(
+  transcriptPath: string,
+  stopHookActive = false,
+  sessionId = "test-session",
+): StopHookInput {
+  gateSessions.add(sessionId);
   return {
-    session_id: "test-session",
+    session_id: sessionId,
     hook_event_name: "Stop",
     transcript_path: transcriptPath,
     cwd: process.cwd(),
@@ -124,8 +133,13 @@ describe("ox hook", () => {
     tempDir = await mkdtemp(join(tmpdir(), "ox-test-"));
   });
 
+  // A stop left blocking keeps its count file. Remove the ones these tests
+  // wrote by name: the directory holds live sessions' counts too.
   afterAll(async () => {
     await rm(tempDir, { recursive: true, force: true });
+    for (const session of gateSessions) {
+      await rm(blockCountPath(session), { recursive: true, force: true });
+    }
   });
 
   describe("runOxlintAgent", () => {
@@ -306,13 +320,71 @@ describe("ox hook", () => {
   });
 
   describe("processStop", () => {
-    it("returns null when stop_hook_active is true", async () => {
+    // A session holding one lint error oxfmt cannot fix, stopped repeatedly.
+    // Each block-budget test drives its own so the on-disk count stays its own.
+    async function unfixableSession(session: string): Promise<string> {
       const filePath = await copyFixture("unfixable.ts", tempDir);
-      const transcriptPath = join(tempDir, `transcript-active-${Date.now()}.jsonl`);
+      const transcriptPath = join(tempDir, `transcript-${session}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+      return transcriptPath;
+    }
 
-      const input = mockStopHookInput(transcriptPath, true);
-      expect(await processStop(input)).toBeNull();
+    // A blocked Stop wakes the model to repair, and the Stop that follows
+    // carries stop_hook_active. Skipping the gate there ends the session on a
+    // repair nothing checked.
+    it("checks the re-entrant stop rather than skipping it", async () => {
+      const session = `reentrant-${Date.now()}`;
+      const transcript = await unfixableSession(session);
+
+      const result = await processStop(mockStopHookInput(transcript, true, session));
+
+      expect(result?.decision).toBe("block");
+      expect(result?.reason).toContain("no-dupe-keys");
+    });
+
+    // An error the model cannot clear would otherwise block every Stop forever.
+    it("gives way once the issues survive the block limit", async () => {
+      const session = `limit-${Date.now()}`;
+      const transcript = await unfixableSession(session);
+
+      const budget = [];
+      for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
+        budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
+      }
+      const past = await processStop(mockStopHookInput(transcript, true, session));
+
+      expect(budget.map((result) => result?.decision)).toEqual(
+        Array(STOP_BLOCK_LIMIT).fill("block"),
+      );
+      expect(past?.decision).toBeUndefined();
+      expect(past?.systemMessage).toContain("no-dupe-keys");
+    });
+
+    // Blocking without a recorded count is the runaway itself: every re-entrant
+    // Stop would read zero and block again, with nothing to release it.
+    it("declines to block when the count cannot be recorded", async () => {
+      const session = `unwritable-${Date.now()}`;
+      const transcript = await unfixableSession(session);
+      // A directory where the state file goes, so every write to it fails.
+      await mkdir(blockCountPath(session), { recursive: true });
+
+      const result = await processStop(mockStopHookInput(transcript, false, session));
+
+      expect(result?.decision).toBeUndefined();
+      expect(result?.systemMessage).toContain("no-dupe-keys");
+    });
+
+    // The budget is per round. A Stop the model did not reach through a block
+    // ends the previous round, so the next one starts with its full count.
+    it("restarts the count on a stop that did not follow a block", async () => {
+      const session = `restart-${Date.now()}`;
+      const transcript = await unfixableSession(session);
+
+      await processStop(mockStopHookInput(transcript, false, session));
+      await processStop(mockStopHookInput(transcript, true, session));
+      const fresh = await processStop(mockStopHookInput(transcript, false, session));
+
+      expect(fresh?.decision).toBe("block");
     });
 
     it("returns null when no files were modified", async () => {

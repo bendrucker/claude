@@ -10,7 +10,11 @@ When you `Edit` or `Write` a file oxlint understands, it runs and shows any issu
 
 #### Before Stopping (Stop)
 
-When the session ends, oxfmt formats all edited files, oxlint checks them, and a type check runs over each working tree those files belong to (`oxlint --type-aware --type-check`). If issues remain, the session is blocked until they're resolved.
+When the session ends, oxfmt formats all edited files, oxlint checks them, and a type check runs over each working tree those files belong to (`oxlint --type-aware --type-check`). If issues remain, the session is blocked until they're resolved or the budget below runs out.
+
+The stop that follows a block is checked too. It arrives flagged as re-entrant, so the hook can tell a retry from a fresh stop. Waving it through would end the session on a repair nothing looked at. The original error can still stand, or a new cross-file type error can have appeared that the per-edit lint pass cannot see.
+
+Two blocks is the budget, counted per session. The third stop reports what is left as a warning and lets the session end, so an error the model cannot clear does not stall it. A stop that is not preceded by a block starts the budget over, and so does a new session.
 
 ## Pre-Commit Check
 
@@ -22,4 +26,4 @@ A staged file carrying further unstaged edits is refused before any of that runs
 
 Only oxlint is required. When oxfmt cannot be resolved, the gates still lint and type-check and simply skip reformatting, rather than passing silently.
 
-A working tree with no `node_modules` skips the type check and says so in the block reason. tsgolint resolves imports through the dependency tree, so without one it reports every external import as missing, and no edit the session makes can clear that. Lint and formatting still run: the binaries come from Bun's install cache, falling back to the main checkout of the same repository, so a fresh worktree is gated before anyone runs `bun install`.
+A working tree with no `node_modules` skips the type check and says so alongside whatever the gate reports. tsgolint resolves imports through the dependency tree, so without one it reports every external import as missing, and no edit the session makes can clear that. Lint and formatting still run: the binaries come from Bun's install cache, falling back to the main checkout of the same repository, so a fresh worktree is gated before anyone runs `bun install`.

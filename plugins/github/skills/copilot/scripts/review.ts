@@ -2,7 +2,7 @@
 
 import { mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import { getBorderCharacters, table } from "table";
@@ -519,10 +519,13 @@ async function withAgenticWorktree<T>(
   const worktree = join(cwd, "tmp", `copilot-agentic-${head}`);
 
   // The path is keyed to the commit, so a previous run's failed cleanup would block every
-  // later review of that commit. Prune only drops entries whose directory is already gone,
-  // which is why the directory itself has to go first.
-  await $`rm -rf ${worktree}`.quiet().nothrow();
+  // later review of that commit. `worktree remove` clears a leftover checkout and its
+  // registration together, and prune drops an entry whose directory is already gone. Neither
+  // touches a directory git does not own, so anything else sitting at that path survives and
+  // fails the add below instead of being deleted.
+  await $`git -C ${cwd} worktree remove --force ${worktree}`.quiet().nothrow();
   await $`git -C ${cwd} worktree prune`.quiet().nothrow();
+  mkdirSync(dirname(worktree), { recursive: true });
   git(["worktree", "add", "--detach", worktree, "HEAD"], cwd);
   try {
     return await run(worktree);

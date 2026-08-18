@@ -15,6 +15,7 @@ allowed-tools:
   - Skill(simplify)
   - Skill(run)
   - Skill(comments:audit)
+  - Skill(github:copilot)
   - Skill(writing:review)
   - Skill(pull-request:create)
   - Skill(pull-request:babysit)
@@ -39,6 +40,7 @@ Resolve the base to a **remote** ref so ship's view matches what the PR merges a
 - **Correctness and quality**: code changed. Exactly one of `review:code <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
 - **`comments:audit`**: diff adds code comments.
 - **`pull-request:follow-up --local`**: a supported review bot is available for the repo *and* the diff clears the [Bot Review Gate](references/passes.md). Runs the hosted reviewer locally before the PR exists.
+- **`github:copilot`**: code changed on a repo I own *and* the diff clears the [Cross-Model Gate](references/passes.md). A second model reads the diff before the PR exists.
 - **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
 - **`run`**: diff has a runtime surface. Drive the change in the real app, not just tests. Skip on docs-only and tests-only.
 
@@ -49,7 +51,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 - `--merge`: drive to merged (babysit `--merge`). Default: green and ready.
 - `--effort <low|medium|high|xhigh>`: override inferred `review:code` effort.
 - `--simplify`: force `simplify` over `review:code`.
-- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `writing`, `run` (the old `verify` is accepted as an alias).
+- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `copilot`, `writing`, `run` (the old `verify` is accepted as an alias).
 - `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
 
 ## Pre-PR Reviews
@@ -58,9 +60,10 @@ Serialized before create: `review:code --fix`, `simplify`, and comment trims all
 
 1. **`comments:audit`**: needs a clean tree (the fix passes dirty it), lands trims via fast-forward (see [Comment Trims](#comment-trims)). Pauses at preflight for an agent-count approval.
 2. **`pull-request:follow-up --local`**: reviews committed work only and commits its own fixes, so it runs while the tree is still clean, before the fix passes. Pass the resolved base.
-3. **Correctness and quality**: `review:code <effort> --fix` or `simplify`.
-4. **`writing:review`** over touched prose. Address salient findings before the body is written.
-5. **`run`** to drive the change end to end.
+3. **`github:copilot`**: the cross-model pass, in the same slot and for the same reason. Findings triage and fix in-branch. It spends a metered credit allotment. [`references/passes.md`](references/passes.md) gates it.
+4. **Correctness and quality**: `review:code <effort> --fix` or `simplify`.
+5. **`writing:review`** over touched prose. Address salient findings before the body is written.
+6. **`run`** to drive the change end to end.
 
 Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 

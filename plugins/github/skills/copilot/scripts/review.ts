@@ -5,16 +5,16 @@ import { homedir } from "node:os";
 import { join, sep } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
+import { getBorderCharacters, table } from "table";
 
 const DEFAULT_MODEL = "gpt-5.6-terra";
 const CHEAP_MODEL = "gpt-5.6-luna";
 const MAX_ANGLES = 3;
 
 /**
- * Persistent so this path becomes the ledger of record. The throwaway home it replaces is
- * why the skill's spend was invisible: the API meter read 447 while ~/.copilot's ledger held
- * 381, and the gap was exactly the runs whose home was deleted. It also enables --resume, so
- * a triage follow-up reads a warm session instead of paying the cold start again.
+ * Persistent so every run's spend lands in one ledger this path can be audited from, and so
+ * `--resume` reaches a warm session instead of paying the cold start again. A home discarded
+ * after each run takes its usage rows with it, leaving the API meter as the only record.
  */
 const COPILOT_HOME = join(homedir(), ".cache", "claude", "copilot-home");
 
@@ -25,6 +25,10 @@ const AGENTIC_CAP = 60;
 
 // Bound on that overshoot. The largest single call across the ledger is 22.65 credits.
 const OVERSHOOT = 25;
+
+// The band table's widest column, held fixed so --status reads the same in a terminal and
+// in a transcript.
+const CRITERIA_WIDTH = 62;
 
 // Below this, no shape is worth a terra call. Degrade rather than refuse.
 const DEGRADE_BELOW = 150;
@@ -119,10 +123,9 @@ export function deriveUsage(
 }
 
 /**
- * The meter is the governor that replaced this skill's old invocation barrier, so a read
- * that fails has to stop the run rather than wave it through. That also keeps a work machine
- * inert: without personal Copilot entitlement there is no premium_interactions quota, and
- * the run refuses instead of billing something unexpected.
+ * A read that fails stops the run rather than waving it through, since the meter is the only
+ * thing governing spend. That fail-closed default is also what keeps a machine without
+ * personal Copilot entitlement inert: no premium_interactions quota, no run.
  */
 export function readMeter(now: Date): Meter {
   const result = Bun.spawnSync(["gh", "api", "/copilot_internal/user"], {
@@ -162,11 +165,15 @@ export function readMeter(now: Date): Meter {
  * between a run and that bill. Reserve the whole planned session cap rather than an estimate,
  * because a session is free to spend up to its cap and the cap is soft by one response.
  *
- * Stranding is the accepted cost: a 3-angle run refuses once `used` passes 1385, leaving at
- * most ~90 credits (6%) unspent in a month that actually reaches the wall.
+ * The overshoot reserve scales with `sessions` because each spawn observes its own cap
+ * independently. Three angles are three sessions that can each overrun by one response, so
+ * reserving a single overshoot for the run would leave two of them unfunded.
+ *
+ * Stranding is the accepted cost: a 3-angle run refuses once `used` passes 1335, leaving at
+ * most ~165 credits unspent in a month that actually reaches the wall.
  */
-export function exceedsEntitlement(meter: Meter, plannedCap: number): boolean {
-  return meter.used + plannedCap + OVERSHOOT > meter.entitlement;
+export function exceedsEntitlement(meter: Meter, plannedCap: number, sessions: number): boolean {
+  return meter.used + plannedCap + OVERSHOOT * sessions > meter.entitlement;
 }
 
 interface Band {
@@ -228,12 +235,20 @@ function printStatus(meter: Meter): void {
   console.error(`${DIM}  gate       ${TIER_GATES[meter.tier]}${RESET}`);
   console.error("");
 
-  const width = Math.max(...BANDS.map((entry) => entry.shape.length));
-  for (const entry of BANDS) {
-    console.error(
-      `  ${BOLD}${entry.band.padEnd(8)}${RESET} ${entry.shape.padEnd(width)}  ${DIM}${entry.cost.padStart(9)}  ${entry.criteria}${RESET}`,
-    );
-  }
+  console.error(
+    table(
+      [
+        ["band", "shape", "cost", "criteria"],
+        ...BANDS.map((entry) => [entry.band, entry.shape, entry.cost, entry.criteria]),
+      ],
+      {
+        border: getBorderCharacters("norc"),
+        // Fixed rather than read from the terminal: this output lands in a transcript as
+        // often as it lands on a screen, so a predictable width beats a fitted one.
+        columns: { 2: { alignment: "right" }, 3: { width: CRITERIA_WIDTH, wrapWord: true } },
+      },
+    ),
+  );
 
   // The allotment does not roll over, so credits alive on the last day are credits lost.
   // A suggestion only: an automated sweep would manufacture review events to consume them.
@@ -282,8 +297,8 @@ function collectDiff(base: string, cwd: string): Diff {
   const patch = [committed, working].filter((part) => part.trim()).join("\n");
 
   const names = new Set<string>();
-  for (const range of [[`${base}...HEAD`], ["HEAD"]]) {
-    for (const path of splitPaths(git(["diff", "--name-only", "-z", ...range], cwd))) {
+  for (const range of [`${base}...HEAD`, "HEAD"]) {
+    for (const path of splitPaths(git(["diff", "--name-only", "-z", range], cwd))) {
       names.add(path);
     }
   }
@@ -321,14 +336,36 @@ function rulesFor(agentic: boolean): string {
   ].join("\n");
 }
 
-const ALL_CLASSES = `Prioritize, in this order:
+/**
+ * One definition per defect class, because both prompt shapes below are built from these. A
+ * second hand-written copy for the single-angle prompt drifts weaker over time, and the
+ * default is the single angle, so the drift lands on almost every run.
+ */
+const CLASSES = {
+  failure:
+    "Unchecked failure. A read, write, fetch, parse, or subprocess whose success is never tested, so a partial or empty result flows onward as if it were real data. Look hard at anything that streams or concatenates without checking each source succeeded.",
+  correctness:
+    "Correctness. Off-by-one, inverted conditions, null or undefined on a reachable path, falsy-zero treated as missing, wrong variable, lost error context.",
+  loss: "Data loss and destructive behavior. Overwrites, truncation, deletes, and any path that can clobber user state. Include anything that discards data on an error path.",
+  security:
+    "Security. Injection, path traversal, symlink following, secrets reaching output, arguments, logs, or a third-party service, and unsafe defaults.",
+  contract:
+    "API and contract misuse. Wrong argument order, ignored return values, a call whose documented preconditions are not met, and invariants stated in nearby comments or docs that the code violates.",
+  concurrency:
+    "Concurrency and resource handling. Races, ordering assumptions between concurrent operations, unreleased handles, unbounded growth.",
+} as const;
 
-1. Unchecked failure. A read, write, fetch, parse, or subprocess whose success is never tested, so a partial or empty result flows onward as if it were real data. Look hard at anything that streams or concatenates without checking each source succeeded.
-2. Correctness. Off-by-one, inverted conditions, null or undefined on a reachable path, falsy-zero treated as missing, wrong variable, lost error context.
-3. Data loss and destructive behavior. Overwrites, truncation, deletes, and any path that can clobber user state.
-4. Concurrency and resource handling. Races, unreleased handles, unbounded growth.
-5. Security. Injection, path traversal, secrets in output or arguments, unsafe defaults.
-6. API and contract misuse. Wrong argument order, ignored return values, violated invariants stated in nearby comments or docs.`;
+type ClassName = keyof typeof CLASSES;
+
+function listClasses(...names: ClassName[]): string {
+  return names.map((name, index) => `${index + 1}. ${CLASSES[name]}`).join("\n");
+}
+
+export const ALL_CLASSES = `Prioritize, in this order:
+
+${listClasses("failure", "correctness", "loss", "concurrency", "security", "contract")}`;
+
+const SPLIT_HEADER = "Look ONLY for these two classes and ignore everything else:";
 
 /**
  * Three identical reviews mostly agree, which costs three times as much for one review's
@@ -338,26 +375,17 @@ export const ANGLES: Angle[] = [
   {
     id: "failure",
     title: "Unchecked failure and correctness",
-    focus: `Look ONLY for these two classes and ignore everything else:
-
-1. Unchecked failure. A read, write, fetch, parse, or subprocess whose success is never tested, so a partial or empty result flows onward as if it were real data. Look hard at anything that streams or concatenates without checking each source succeeded.
-2. Correctness. Off-by-one, inverted conditions, null or undefined on a reachable path, falsy-zero treated as missing, wrong variable, lost error context.`,
+    focus: `${SPLIT_HEADER}\n\n${listClasses("failure", "correctness")}`,
   },
   {
     id: "safety",
     title: "Data loss and security",
-    focus: `Look ONLY for these two classes and ignore everything else:
-
-1. Data loss and destructive behavior. Overwrites, truncation, deletes, and any path that can clobber user state. Include anything that discards data on an error path.
-2. Security. Injection, path traversal, symlink following, secrets reaching output, arguments, logs, or a third-party service, and unsafe defaults.`,
+    focus: `${SPLIT_HEADER}\n\n${listClasses("loss", "security")}`,
   },
   {
     id: "contract",
     title: "Contracts, concurrency, and resources",
-    focus: `Look ONLY for these two classes and ignore everything else:
-
-1. API and contract misuse. Wrong argument order, ignored return values, a call whose documented preconditions are not met, and invariants stated in nearby comments or docs that the code violates.
-2. Concurrency and resource handling. Races, ordering assumptions between concurrent operations, unreleased handles, unbounded growth.`,
+    focus: `${SPLIT_HEADER}\n\n${listClasses("contract", "concurrency")}`,
   },
 ];
 
@@ -442,8 +470,6 @@ interface RunOptions {
  * inside a throwaway checkout.
  */
 async function runCopilot(prompt: string, angle: Angle, options: RunOptions): Promise<Result> {
-  mkdirSync(COPILOT_HOME, { recursive: true });
-
   const args = [
     "copilot",
     "--model",
@@ -492,7 +518,10 @@ async function withAgenticWorktree<T>(
   const head = git(["rev-parse", "--short", "HEAD"], cwd).trim();
   const worktree = join(cwd, "tmp", `copilot-agentic-${head}`);
 
-  // A previous run's failed cleanup would block later reviews of the same commit, since the worktree path is keyed to the commit hash.
+  // The path is keyed to the commit, so a previous run's failed cleanup would block every
+  // later review of that commit. Prune only drops entries whose directory is already gone,
+  // which is why the directory itself has to go first.
+  await $`rm -rf ${worktree}`.quiet().nothrow();
   await $`git -C ${cwd} worktree prune`.quiet().nothrow();
   git(["worktree", "add", "--detach", worktree, "HEAD"], cwd);
   try {
@@ -675,10 +704,11 @@ async function main(): Promise<void> {
       plannedAngles = 1;
     }
 
+    const sessions = argv.flags.agentic ? 1 : plannedAngles;
     const plannedCap = argv.flags.agentic ? AGENTIC_CAP : plannedAngles * ONE_SHOT_CAP;
-    if (exceedsEntitlement(meter, plannedCap)) {
+    if (exceedsEntitlement(meter, plannedCap, sessions)) {
       console.error(
-        `${RED}Refusing: ${meter.used} used plus a ${plannedCap} credit session cap plus ${OVERSHOOT} of soft-cap overshoot would pass the ${meter.entitlement} entitlement.${RESET}`,
+        `${RED}Refusing: ${meter.used} used plus a ${plannedCap} credit session cap plus ${OVERSHOOT * sessions} of soft-cap overshoot would pass the ${meter.entitlement} entitlement.${RESET}`,
       );
       console.error(
         `${YELLOW}Past that the plan bills overage. Run fewer angles, or wait for ${meter.resetDate}.${RESET}`,
@@ -758,14 +788,23 @@ async function main(): Promise<void> {
   }
 
   console.error("");
+  mkdirSync(COPILOT_HOME, { recursive: true });
+
+  // Angles run one at a time because every spawn shares COPILOT_HOME, and Copilot writes its
+  // session ledger there. Concurrent writers race for that state, and the ledger is the record
+  // this whole guard reads back. Serializing costs only wall-clock: separate spawns are
+  // separate sessions that share no prompt cache, so nothing is lost by not overlapping them.
   // cwd stays outside the repository for a one-shot: no tools are granted, so there is
   // nothing to read, and Copilot's default path restriction stays pointed away from the code.
-  const spawnAll = (workdir: string) =>
-    Promise.all(
-      prompts.map(({ angle, prompt }) =>
-        runCopilot(prompt, angle, { model, cap, cwd: workdir, agentic: argv.flags.agentic }),
-      ),
-    );
+  const spawnAll = async (workdir: string) => {
+    const results: Result[] = [];
+    for (const { angle, prompt } of prompts) {
+      results.push(
+        await runCopilot(prompt, angle, { model, cap, cwd: workdir, agentic: argv.flags.agentic }),
+      );
+    }
+    return results;
+  };
   const results = argv.flags.agentic
     ? await withAgenticWorktree(cwd, spawnAll)
     : await spawnAll("/");

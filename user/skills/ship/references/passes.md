@@ -12,11 +12,11 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | Code changes | `review:code <effort> --fix` or `simplify` | Exactly one. Skip on docs/config-only |
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
 | A supported review bot is available for the repo and the diff clears the [Bot Review Gate](#bot-review-gate) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
-| Code changes on a repo whose remote owner is `bendrucker`, clearing the [Cross-Model Gate](#cross-model-gate) | `github:copilot` | Same slot as the local bot pass, so findings fix in-branch |
+| Code changes on a repo whose remote owner is `bendrucker`, clearing the [Cross-Model Gate](#cross-model-gate) | `github:copilot` | Same slot as the local bot pass. Findings fix in-branch |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
 | A runtime surface | `run` | Ship declines docs-only and tests-only |
 
-Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `writing`, `run`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
+Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `copilot`, `writing`, `run`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
 
 ## Bot Review Gate
 
@@ -51,11 +51,11 @@ These thresholds are a starting calibration to tune. Removal trigger: if the gat
 
 This gate is separate from the Bot Review Gate above and does not couple to it. That gate conserves, because Greptile's free tier does not reset and a spent credit is gone. Copilot's meter refills on the 1st and does not roll over, so an unspent credit is also gone. The two meters point in opposite directions, and the one-review-one-channel rule applies within the bot gate rather than across both. A change can draw a Greptile review and a Copilot review without either paying for the other.
 
-Spend when the diff would clear the Bot Review Gate's own list: it touches auth, permissions, sandbox config, secret handling, or egress; it adds or changes a runtime surface; it runs over roughly 200 changed lines or 8 files excluding tests, docs, and lockfiles; `review:code` confirmed a real bug; or the session drifted. Prose, dependency bumps, lockfiles, and reverts never qualify.
+Spend when the diff clears the [Bot Review Gate](#bot-review-gate)'s own list above. The two gates share their criteria for what counts as review-worthy. They do not share a budget.
 
-`github:copilot --status` prints the current tier and picks the shape. The tier is credits remaining over days to reset. A burst of reviews tightens the bar on what follows, and the month-end tail loosens it. Never run a review to consume an allotment. Credits left over in a month where every qualifying change got a full review are the intended result.
+`github:copilot --status` prints the current tier and picks the shape. The tier is credits remaining over days to reset, constrained under 25 a day and abundant over 60. A burst of reviews tightens the bar on what follows, and the month-end tail loosens it. Never run a review to consume an allotment. Credits left over in a month where every qualifying change got a full review are the intended result.
 
-Two things keep this inert on a work machine. A corporate remote fails the owner check, and an account with no personal Copilot entitlement has no credit meter, which the script treats as a refusal rather than a default.
+Two things keep this inert on a work machine, and only one of them is code. An account with no personal Copilot entitlement has no `premium_interactions` quota, and the script treats an unreadable meter as a refusal rather than a default. The owner condition in the matrix row above is a routing rule this skill applies when it decides whether to invoke. The script itself never looks at the remote. A corporate account that did carry a quota would pass its guard.
 
 Removal trigger: a full billing cycle with near-zero `skill_calls` for `github:copilot` in the session index, or this pass firing under about four times, means the demand does not route this way. Drop the row and re-demote the skill.
 
@@ -68,10 +68,10 @@ It is read-only and writes nothing, so it runs as a background dispatch rather t
 ```mermaid
 flowchart TD
     S([ship start]) --> G{plan:review gated in?}
-    G -->|no| F1[fix passes: comments-audit, local bot, review:code or simplify, writing, run]
+    G -->|no| F1[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, writing, run]
     F1 --> C([create PR])
     G -->|yes| D[dispatch plan:review in background]
-    D --> F2[fix passes: comments-audit, local bot, review:code or simplify, writing, run]
+    D --> F2[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, writing, run]
     D -. concurrent .-> R[plan:review reasons over plan + diff]
     F2 --> J{join: findings?}
     R -.-> J

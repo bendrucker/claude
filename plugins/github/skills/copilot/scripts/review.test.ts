@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  ALL_CLASSES,
   ANGLES,
   buildPrompt,
   type Diff,
@@ -97,27 +98,37 @@ describe("budget", () => {
     expect(() => deriveUsage({ entitlement: 1500 }, 1500)).toThrow("neither");
   });
 
-  const meter = (used: number): Meter => ({
-    used,
-    remaining: 1500 - used,
-    entitlement: 1500,
-    resetDate: "2026-09-01",
-    days: 14,
-    pace: (1500 - used) / 14,
-    tier: "abundant",
-  });
+  // Derived from the same functions the script uses, so a fixture cannot claim a tier its own
+  // pace contradicts.
+  const meter = (used: number): Meter => {
+    const remaining = 1500 - used;
+    const days = 14;
+    const pace = remaining / days;
+    return {
+      used,
+      remaining,
+      entitlement: 1500,
+      resetDate: "2026-09-01",
+      days,
+      pace,
+      tier: resolveTier(pace),
+    };
+  };
 
-  // The reserve is the whole session cap plus the soft-cap overshoot, so the wall arrives
-  // well before the entitlement does. That gap is the stranding the guard trades for safety.
-  test.each([
-    ["a fresh month clears every shape", 0, 90, false],
-    ["3 angles fit at exactly the boundary", 1385, 90, false],
-    ["3 angles refuse one credit past it", 1386, 90, true],
-    ["agentic fits at exactly the boundary", 1415, 60, false],
-    ["agentic refuses one credit past it", 1416, 60, true],
-    ["a degraded single angle still fits", 1400, 30, false],
-  ])("%s", (_name, used, plannedCap, expected) => {
-    expect(exceedsEntitlement(meter(used), plannedCap)).toBe(expected);
+  // The reserve is the whole session cap plus one soft-cap overshoot per session, so the wall
+  // arrives well before the entitlement does. That gap is the stranding the guard trades for
+  // safety, and it widens with the angle count because each spawn can overrun on its own.
+  test.each<[string, number, number, number, boolean]>([
+    ["a fresh month clears every shape", 0, 90, 3, false],
+    ["3 angles fit at exactly the boundary", 1335, 90, 3, false],
+    ["3 angles refuse one credit past it", 1336, 90, 3, true],
+    // One overshoot reserve for three spawns would have cleared this, then billed overage.
+    ["3 angles refuse where a single reserve would have passed", 1385, 90, 3, true],
+    ["agentic fits at exactly the boundary", 1415, 60, 1, false],
+    ["agentic refuses one credit past it", 1416, 60, 1, true],
+    ["a degraded single angle still fits", 1400, 30, 1, false],
+  ])("%s", (_name, used, plannedCap, sessions, expected) => {
+    expect(exceedsEntitlement(meter(used), plannedCap, sessions)).toBe(expected);
   });
 });
 
@@ -127,6 +138,15 @@ describe("angles", () => {
     expect(new Set(ANGLES.map((angle) => angle.id)).size).toBe(3);
     for (const angle of ANGLES) {
       expect(angle.focus).toContain("Look ONLY for these two classes");
+    }
+  });
+
+  // The default is one angle, so a second hand-written copy of the class list would send the
+  // weaker text on almost every run. Both shapes read the same definitions.
+  test("cover the same defect classes as the single-angle prompt", () => {
+    const split = ANGLES.map((angle) => angle.focus).join("\n");
+    for (const sentence of ALL_CLASSES.split("\n").filter((line) => /^\d+\. /.test(line))) {
+      expect(split).toContain(sentence.replace(/^\d+\. /, ""));
     }
   });
 });

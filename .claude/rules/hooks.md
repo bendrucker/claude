@@ -6,7 +6,7 @@ paths:
 
 # Hooks
 
-See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An ox hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a repo-wide type check.
+See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a repo-wide type check.
 
 Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under `tmp/`, allowed for disposable scripted verification checkouts.
 

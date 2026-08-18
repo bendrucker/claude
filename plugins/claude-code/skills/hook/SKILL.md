@@ -135,9 +135,9 @@ Store complex hooks in `.claude/hooks/` or a project `hooks/` directory, referen
 ## Examples
 
 See these repositories for hook implementations:
-- Input modification: [plugins/linear/hooks/](plugins/linear/hooks/)
-- Permission decisions: [plugins/github/scripts/](plugins/github/scripts/)
-- PostToolUse feedback: [.claude/hooks/ox/](.claude/hooks/ox/)
+- Input modification: [plugins/linear/hooks/](../../../linear/hooks/)
+- Permission decisions: [plugins/github/scripts/](../../../github/scripts/)
+- PostToolUse feedback: [.claude/hooks/ox/](../../../../.claude/hooks/ox/)
 
 ## Debugging
 

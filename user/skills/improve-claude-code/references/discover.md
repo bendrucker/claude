@@ -63,7 +63,7 @@ These PRs have no backing Things todo, so skip the `Original Task` link. The bod
 
 A scheduled run never prompts, never implements ([Direct Implementation](#direct-implementation) is interactive-only), and ends after reporting how many todos it filed.
 
-On-demand is primary. The weekly run is committed infrastructure: `user/launchd/me.bendrucker.claude.discover.plist` runs `discover --scheduled` Mondays at 07:23 on the always-on Mac Studio (install and log instructions in `user/launchd/README.md`). It must run locally because the session DB and the `duckdb` CLI live on that machine.
+On-demand is primary. The weekly run is committed infrastructure: `user/scheduled/home/discover.yaml` declares `discover --scheduled` Mondays at 07:23, reconciled onto the always-on Mac Studio by `/scheduled sync` (see the `scheduled` skill). It must run locally because the session DB and the `duckdb` CLI live on that machine.
 
 ## Fingerprint
 

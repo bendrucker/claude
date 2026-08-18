@@ -143,9 +143,8 @@ test("run.sh bounds every wait and maps each outcome to its own exit code", asyn
       .map(({ scenario }) => scenario.name),
   ).toEqual([]);
 
-  expect(
-    pairs.map(({ scenario, outcome }) => report(scenario, outcome)).join("\n"),
-  ).toMatchInlineSnapshot(`
+  expect(pairs.map(({ scenario, outcome }) => report(scenario, outcome)).join("\n"))
+    .toMatchInlineSnapshot(`
     "callback never arrives
       exit:   4
       stdout: (none)

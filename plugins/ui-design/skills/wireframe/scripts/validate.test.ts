@@ -20,19 +20,14 @@ function findViolation(violations: Violation[], issue: string): Violation | unde
 
 describe("validate", () => {
   describe("example assets", () => {
-    it.each([
-      "login-screen",
-      "nested-groups",
-      "two-column",
-      "grid",
-      "table",
-      "form",
-      "modal",
-    ])("accepts %s", async (name) => {
-      const svg = await loadAsset(name);
-      const violations = validate(svg);
-      expect(violations).toHaveLength(0);
-    });
+    it.each(["login-screen", "nested-groups", "two-column", "grid", "table", "form", "modal"])(
+      "accepts %s",
+      async (name) => {
+        const svg = await loadAsset(name);
+        const violations = validate(svg);
+        expect(violations).toHaveLength(0);
+      },
+    );
   });
 
   describe("invalid fixtures", () => {

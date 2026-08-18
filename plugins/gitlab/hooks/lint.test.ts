@@ -224,13 +224,12 @@ describe("merge-request skill nudge", () => {
 });
 
 describe("pass-through", () => {
-  test.each<[string]>([
-    ["git status"],
-    ["bun test"],
-    ["echo glab-adjacent"],
-  ])("ignores %p", async (command) => {
-    expect(await processInput(mockInput(command), fakeEnv())).toBeNull();
-  });
+  test.each<[string]>([["git status"], ["bun test"], ["echo glab-adjacent"]])(
+    "ignores %p",
+    async (command) => {
+      expect(await processInput(mockInput(command), fakeEnv())).toBeNull();
+    },
+  );
 
   test("ignores missing command", async () => {
     const input = mockInput("");

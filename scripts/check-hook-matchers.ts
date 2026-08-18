@@ -1,11 +1,15 @@
 #!/usr/bin/env bun
 
+import { join } from "node:path";
 import {
+  type HooksFile,
   loadPlugins,
   type MatcherEntryContext,
   matcherEntries,
 } from "../packages/marketplace/index";
+import { root } from "./assets";
 import { runCheck } from "./check";
+import { SOURCES } from "./check-hook-paths";
 
 /** A `Tool(...)` permission rule: legal in an `if`, never in a matcher. */
 const PERMISSION_RULE = /^[A-Za-z_]\w*\(.*\)$/;
@@ -53,9 +57,28 @@ export function violations(entries: MatcherEntryContext[]): string[] {
   return messages;
 }
 
+function* settingsEntries(file: string, hooks: HooksFile["hooks"]): Generator<MatcherEntryContext> {
+  for (const entries of Object.values(hooks)) {
+    for (const entry of entries) yield { file, entry };
+  }
+}
+
+/**
+ * Matcher entries from every plugin plus both settings files. Roughly half this
+ * repo's hook entries live in settings rather than a plugin, and a matcher
+ * defect is equally silent in either.
+ */
 export async function entries(): Promise<MatcherEntryContext[]> {
-  const plugins = await loadPlugins();
-  return plugins.flatMap((plugin) => [...matcherEntries(plugin)]);
+  const [plugins, settings] = await Promise.all([
+    loadPlugins(),
+    Promise.all(
+      SOURCES.map(async ({ file }) => {
+        const parsed = (await Bun.file(join(root, file)).json()) as { hooks?: HooksFile["hooks"] };
+        return [...settingsEntries(file, parsed.hooks ?? {})];
+      }),
+    ),
+  ]);
+  return [...plugins.flatMap((plugin) => [...matcherEntries(plugin)]), ...settings.flat()];
 }
 
 if (import.meta.main) {

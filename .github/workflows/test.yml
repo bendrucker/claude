@@ -30,7 +30,7 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
-      - name: TypeScript build
+      - name: Type check
         run: bun run build
 
   hooks:

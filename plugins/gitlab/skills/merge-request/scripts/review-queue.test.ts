@@ -40,17 +40,16 @@ describe("filterReviewQueue", () => {
     ]);
   });
 
-  test.each<ReviewState>([
-    "APPROVED",
-    "REQUESTED_CHANGES",
-    "REVIEW_STARTED",
-  ])("drops MRs where my reviewer entry is %s", (reviewState) => {
-    const result = filterReviewQueue(
-      currentUser([mrNode("org/proj!2", [{ username: "me", reviewState }])]),
-    );
+  test.each<ReviewState>(["APPROVED", "REQUESTED_CHANGES", "REVIEW_STARTED"])(
+    "drops MRs where my reviewer entry is %s",
+    (reviewState) => {
+      const result = filterReviewQueue(
+        currentUser([mrNode("org/proj!2", [{ username: "me", reviewState }])]),
+      );
 
-    expect(result).toEqual([]);
-  });
+      expect(result).toEqual([]);
+    },
+  );
 
   test("ignores other reviewers' states", () => {
     const result = filterReviewQueue(

@@ -347,7 +347,7 @@ function heuristicTokenCounter(promptText: string): InputTokenCounter {
 }
 
 async function mapPooled<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
+  const results = Array.from<R>({ length: items.length });
   const queue = items.map((item, index) => ({ item, index }));
   const workers = Array.from({ length: Math.min(COUNT_CONCURRENCY, items.length) }, async () => {
     for (let entry = queue.shift(); entry; entry = queue.shift()) {
@@ -559,7 +559,7 @@ export function parseHeadingVerdicts(json: string, expected: number): boolean[] 
   const record = parsed as Record<string, unknown>;
   const entries = record.headings;
   if (!Array.isArray(entries)) throw new Error('Heading verdict missing "headings" array');
-  const verdicts = new Array<boolean>(expected).fill(false);
+  const verdicts = Array.from<boolean>({ length: expected }).fill(false);
   const seen = new Set<number>();
   for (const entry of entries) {
     const item = entry as Record<string, unknown>;

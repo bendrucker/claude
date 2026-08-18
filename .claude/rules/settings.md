@@ -5,7 +5,7 @@ paths:
 
 # Settings
 
-User-level settings live in `user/settings.json` (plugins, permissions, sandbox). Project-level settings live in `.claude/settings.json` (biome hook). See the [settings documentation](https://code.claude.com/docs/en/settings) for available options.
+User-level settings live in `user/settings.json` (plugins, permissions, sandbox). Project-level settings live in `.claude/settings.json` (oxlint/oxfmt hook). See the [settings documentation](https://code.claude.com/docs/en/settings) for available options.
 
 Read [`hooks.md`](hooks.md) before adding or changing a hook entry in either file. Its `paths` globs cover `hooks.json` only, so it does not auto-inject here, and roughly half this repo's hook entries live in these two files.
 

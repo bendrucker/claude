@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, test } from "bun:test";
 import { exec } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,7 +7,9 @@ import { promisify } from "node:util";
 import type {
   PostToolUseHookInput,
   PreToolUseHookInput,
+  PreToolUseHookSpecificOutput,
   StopHookInput,
+  SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   invokesGitCommit,
@@ -16,13 +18,18 @@ import {
   processPostToolUse,
   processPreToolUse,
   processStop,
-  runBiomeCheck,
-  runBiomeFix,
+  runOxlintAgent,
 } from ".";
 
 const execAsync = promisify(exec);
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures");
+
+// hookSpecificOutput is a union across every hook event, so narrow it to the
+// PreToolUse arm before reading the permission fields.
+function deniedBy(result: SyncHookJSONOutput | null): PreToolUseHookSpecificOutput | undefined {
+  return result?.hookSpecificOutput as PreToolUseHookSpecificOutput | undefined;
+}
 
 let tempDir: string;
 
@@ -91,16 +98,20 @@ async function copyFixture(name: string, destDir: string): Promise<string> {
   return dest;
 }
 
-// A git repo whose Biome config excludes ignored.ts. Checking that file makes
-// Biome report "no files were processed", which must not read as a lint
-// failure. The git init matters: runBiomeCheck resolves its cwd from the
-// file's git toplevel, which is where Biome discovers this config.
+// A git repo whose ox config excludes ignored.ts. Checking that file must not
+// read as a lint or format failure. The git init matters: runOxlintAgent
+// resolves its cwd from the file's git toplevel, which is where oxlint
+// discovers this config.
 async function createIgnoredFixture(baseDir: string): Promise<string> {
   const repoDir = await mkdtemp(join(baseDir, "ignored-repo-"));
   await execAsync("git init", { cwd: repoDir });
   await Bun.write(
-    join(repoDir, "biome.json"),
-    JSON.stringify({ files: { includes: ["**", "!**/ignored.ts"] } }),
+    join(repoDir, ".oxlintrc.json"),
+    JSON.stringify({ ignorePatterns: ["ignored.ts"] }),
+  );
+  await Bun.write(
+    join(repoDir, ".oxfmtrc.json"),
+    JSON.stringify({ ignorePatterns: ["ignored.ts"] }),
   );
   const filePath = join(repoDir, "ignored.ts");
   const content = await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text();
@@ -108,31 +119,23 @@ async function createIgnoredFixture(baseDir: string): Promise<string> {
   return filePath;
 }
 
-describe("biome hook", () => {
+describe("ox hook", () => {
   beforeAll(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), "biome-test-"));
+    tempDir = await mkdtemp(join(tmpdir(), "ox-test-"));
   });
 
   afterAll(async () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  describe("runBiomeCheck", () => {
+  describe("runOxlintAgent", () => {
     test.each<{ name: string; fixture: string; expected: string | null }>([
       { name: "returns null for valid files", fixture: "valid.ts", expected: null },
-      {
-        name: "returns errors for files with fixable issues",
-        fixture: "fixable.ts",
-        expected: "format",
-      },
-      {
-        name: "returns errors for files with unfixable issues",
-        fixture: "unfixable.ts",
-        expected: "noDuplicateObjectKeys",
-      },
+      { name: "does not flag formatting-only issues", fixture: "fixable.ts", expected: null },
+      { name: "returns errors for lint issues", fixture: "unfixable.ts", expected: "no-dupe-keys" },
     ])("$name", async ({ fixture, expected }) => {
       const filePath = await copyFixture(fixture, tempDir);
-      const result = await runBiomeCheck(filePath);
+      const result = await runOxlintAgent(filePath);
       if (expected === null) {
         expect(result).toBeNull();
       } else {
@@ -141,26 +144,9 @@ describe("biome hook", () => {
       }
     });
 
-    it("returns null for files the Biome config ignores", async () => {
+    it("returns null for files the ox config ignores", async () => {
       const filePath = await createIgnoredFixture(tempDir);
-      expect(await runBiomeCheck(filePath)).toBeNull();
-    });
-  });
-
-  describe("runBiomeFix", () => {
-    test.each<{ name: string; fixture: string; fixedAfter: boolean }>([
-      { name: "fixes auto-fixable issues", fixture: "fixable.ts", fixedAfter: true },
-      { name: "does not fix unsafe issues", fixture: "unfixable.ts", fixedAfter: false },
-    ])("$name", async ({ fixture, fixedAfter }) => {
-      const filePath = await copyFixture(fixture, tempDir);
-      expect(await runBiomeCheck(filePath)).not.toBeNull();
-      await runBiomeFix(filePath);
-      const result = await runBiomeCheck(filePath);
-      if (fixedAfter) {
-        expect(result).toBeNull();
-      } else {
-        expect(result).not.toBeNull();
-      }
+      expect(await runOxlintAgent(filePath)).toBeNull();
     });
   });
 
@@ -178,7 +164,7 @@ describe("biome hook", () => {
       expect(files).toContain(filePath);
     });
 
-    it("ignores non-Biome files", async () => {
+    it("ignores non-ox files", async () => {
       const mdPath = join(tempDir, "readme.md");
       await Bun.write(mdPath, "# Test");
       const transcriptPath = join(tempDir, `transcript-md-${Date.now()}.jsonl`);
@@ -283,43 +269,39 @@ describe("biome hook", () => {
       expect(await processPostToolUse(input)).toBeNull();
     });
 
-    it("returns null for non-Biome file extensions", async () => {
+    it("returns null for non-ox file extensions", async () => {
       const input = mockPostToolUseInput("Write", { file_path: "test.md" });
       expect(await processPostToolUse(input)).toBeNull();
     });
 
-    it("returns null when biome check passes", async () => {
+    it("returns null when oxlint passes", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const input = mockPostToolUseInput("Edit", { file_path: filePath });
       expect(await processPostToolUse(input)).toBeNull();
     });
 
-    test.each<{ name: string; fixture: string; tool: string; expected: string }>([
-      {
-        name: "returns additionalContext for fixable issues",
-        fixture: "fixable.ts",
-        tool: "Write",
-        expected: "Biome found issues",
-      },
-      {
-        name: "returns additionalContext for unfixable issues",
-        fixture: "unfixable.ts",
-        tool: "Edit",
-        expected: "noDuplicateObjectKeys",
-      },
-    ])("$name", async ({ fixture, tool, expected }) => {
-      const filePath = await copyFixture(fixture, tempDir);
-      const input = mockPostToolUseInput(tool, { file_path: filePath });
+    it("returns null for a formatting-only deviation, since PostToolUse never writes", async () => {
+      const filePath = await copyFixture("fixable.ts", tempDir);
+      const before = await Bun.file(filePath).text();
+      const input = mockPostToolUseInput("Write", { file_path: filePath });
+
+      expect(await processPostToolUse(input)).toBeNull();
+      expect(await Bun.file(filePath).text()).toBe(before);
+    });
+
+    it("returns additionalContext for lint issues without touching the file", async () => {
+      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const before = await Bun.file(filePath).text();
+      const input = mockPostToolUseInput("Edit", { file_path: filePath });
       const result = await processPostToolUse(input);
 
       expect(result).not.toBeNull();
-      expect(result?.hookSpecificOutput).toMatchObject({
-        hookEventName: "PostToolUse",
-      });
+      expect(result?.hookSpecificOutput).toMatchObject({ hookEventName: "PostToolUse" });
 
       const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
         .additionalContext;
-      expect(additionalContext).toContain(expected);
+      expect(additionalContext).toContain("no-dupe-keys");
+      expect(await Bun.file(filePath).text()).toBe(before);
     });
   });
 
@@ -341,7 +323,7 @@ describe("biome hook", () => {
       expect(await processStop(input)).toBeNull();
     });
 
-    it("returns null when all files pass biome check", async () => {
+    it("returns null when all files pass", async () => {
       const filePath = await copyFixture("valid.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-valid-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
@@ -350,7 +332,7 @@ describe("biome hook", () => {
       expect(await processStop(input)).toBeNull();
     });
 
-    it("auto-fixes fixable issues and allows stop", async () => {
+    it("auto-formats fixable deviations and allows stop", async () => {
       const filePath = await copyFixture("fixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-fixable-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
@@ -359,7 +341,7 @@ describe("biome hook", () => {
       const result = await processStop(input);
 
       expect(result).toBeNull();
-      expect(await runBiomeCheck(filePath)).toBeNull();
+      expect(await Bun.file(filePath).text()).toContain("return a + b;");
     });
 
     it("returns block decision when issues cannot be auto-fixed", async () => {
@@ -372,11 +354,11 @@ describe("biome hook", () => {
 
       expect(result).not.toBeNull();
       expect(result?.decision).toBe("block");
-      expect(result?.reason).toContain("Biome check failed");
-      expect(result?.reason).toContain("noDuplicateObjectKeys");
+      expect(result?.reason).toContain("Ox check failed");
+      expect(result?.reason).toContain("no-dupe-keys");
     });
 
-    it("returns null when the only modified file is ignored by Biome config", async () => {
+    it("returns null when the only modified file is ignored by ox config", async () => {
       const filePath = await createIgnoredFixture(tempDir);
       const transcriptPath = join(tempDir, `transcript-ignored-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
@@ -385,7 +367,7 @@ describe("biome hook", () => {
       expect(await processStop(input)).toBeNull();
     });
 
-    it("processes multiple files in parallel", async () => {
+    it("processes multiple files together", async () => {
       const [validPath, fixablePath, unfixablePath] = await Promise.all([
         copyFixture("valid.ts", tempDir),
         copyFixture("fixable.ts", tempDir),
@@ -414,14 +396,80 @@ describe("biome hook", () => {
   });
 
   describe("processPreToolUse", () => {
-    it("returns null when no staged files", async () => {
-      // In test environment, there are no staged git files
-      const input = mockPreToolUseInput("git commit -m 'test'");
-      expect(await processPreToolUse(input)).toBeNull();
+    let repoDir: string;
+    let outerCwd: string;
+
+    beforeEach(async () => {
+      outerCwd = process.cwd();
+      repoDir = await mkdtemp(join(tempDir, "staged-"));
+      await execAsync("git init -q", { cwd: repoDir });
+      // Correctness rules are warnings by default, and the gate only sees a
+      // non-zero exit. This mirrors the repo's own .oxlintrc.json.
+      await Bun.write(
+        join(repoDir, ".oxlintrc.json"),
+        JSON.stringify({ categories: { correctness: "error" } }),
+      );
+      process.chdir(repoDir);
     });
 
-    // The `Bash(git commit:*)` matcher fails open on shell metacharacters, so
-    // these reach the hook and must not be able to block.
+    afterEach(() => {
+      process.chdir(outerCwd);
+    });
+
+    async function stage(name: string, content: string): Promise<string> {
+      const path = join(repoDir, name);
+      await Bun.write(path, content);
+      await execAsync(`git add ${name}`, { cwd: repoDir });
+      return path;
+    }
+
+    it("returns null when no staged files", async () => {
+      expect(await processPreToolUse(mockPreToolUseInput("git commit -m 'test'"))).toBeNull();
+    });
+
+    it("returns null when the staged files are clean", async () => {
+      await stage("clean.ts", "export const a = 1;\n");
+      expect(await processPreToolUse(mockPreToolUseInput("git commit -m x"))).toBeNull();
+    });
+
+    it("denies a commit whose staged files carry lint errors", async () => {
+      await stage("bad.ts", await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text());
+
+      const denial = deniedBy(await processPreToolUse(mockPreToolUseInput("git commit -m x")));
+      expect(denial?.permissionDecision).toBe("deny");
+      expect(denial?.permissionDecisionReason).toContain("no-dupe-keys");
+      // This repo has no node_modules, so the type pass has nothing to resolve
+      // imports against and drops out rather than blocking the commit.
+      expect(denial?.permissionDecisionReason).toContain(
+        "Types: skipped, dependencies are not installed here",
+      );
+    });
+
+    // The gate reads working-tree files, so a staged blob the working copy has
+    // moved on from would be committed unchecked.
+    it("denies a commit whose staged file has further unstaged edits", async () => {
+      const path = await stage("drift.ts", "export const a = 1;\n");
+      await Bun.write(path, "export const a = 2;\n");
+
+      const denial = deniedBy(await processPreToolUse(mockPreToolUseInput("git commit -m x")));
+      expect(denial?.permissionDecision).toBe("deny");
+      expect(denial?.permissionDecisionReason).toContain("drift.ts");
+      expect(denial?.permissionDecisionReason).toContain("Stage or stash");
+    });
+
+    // Reformatting on disk without restaging would leave the index holding the
+    // unformatted text the commit is about to record.
+    it("restages the formatting it applied", async () => {
+      await stage("messy.ts", "export const a = {  b:1 };\n");
+
+      expect(await processPreToolUse(mockPreToolUseInput("git commit -m x"))).toBeNull();
+
+      const { stdout } = await execAsync("git diff --name-only", { cwd: repoDir });
+      expect(stdout.trim()).toBe("");
+    });
+
+    // The Bash matcher fails open on shell metacharacters, so these reach the
+    // hook and must not be able to deny.
     test.each<[string]>([
       ["echo hi > $TMPDIR/probe.txt"],
       ["{ echo one; echo two; }"],
@@ -429,6 +477,32 @@ describe("biome hook", () => {
       ["cat <<'EOF' > notes.md\nnothing here\nEOF"],
     ])("returns null for %p", async (command) => {
       expect(await processPreToolUse(mockPreToolUseInput(command))).toBeNull();
+    });
+  });
+
+  // Stop and the commit gate share one pipeline, so these cover what differs:
+  // the closing verb, and the fact that both batch file paths into a command.
+  describe("runOxGate", () => {
+    it("names the blocked action in the reason", async () => {
+      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const transcriptPath = join(tempDir, `transcript-verb-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+
+      const result = await processStop(mockStopHookInput(transcriptPath));
+      expect(result?.reason).toContain("Fix these issues before stopping.");
+    });
+
+    it("does not shell-evaluate a batched path containing a command substitution", async () => {
+      const filePath = join(tempDir, "$(touch pwned)", "unfixable.ts");
+      await Bun.write(filePath, await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text());
+
+      const transcriptPath = join(tempDir, `transcript-hostile-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
+
+      const result = await processStop(mockStopHookInput(transcriptPath));
+
+      expect(await Bun.file(join(tempDir, "pwned")).exists()).toBe(false);
+      expect(result?.reason).toContain("no-dupe-keys");
     });
   });
 

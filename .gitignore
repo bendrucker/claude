@@ -11,6 +11,8 @@ node_modules/
 # before the global `fixtures` ignore stayed tracked, so a new one silently did
 # not. Re-include the directory so it is tracked like the rest.
 !plugins/claude-code/skills/session/fixtures/
+# The ox hook's fixtures are committed test data, same as the two above.
+!.claude/hooks/ox/fixtures/
 
 # Generated coverage output (bun test --coverage)
 /coverage/

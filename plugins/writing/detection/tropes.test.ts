@@ -493,12 +493,12 @@ describe("scan", () => {
   });
 
   describe("sycophantic acknowledgment", () => {
-    it.each([
-      "You're right, that was wrong.",
-      "You're absolutely right about that.",
-    ])("flags: %j", (text) => {
-      expect(firstByTier(scan(text), "deny")?.category).toBe("sycophantic acknowledgment");
-    });
+    it.each(["You're right, that was wrong.", "You're absolutely right about that."])(
+      "flags: %j",
+      (text) => {
+        expect(firstByTier(scan(text), "deny")?.category).toBe("sycophantic acknowledgment");
+      },
+    );
 
     it("allows: turn right", () => {
       expect(
@@ -677,12 +677,12 @@ describe("scan", () => {
   });
 
   describe("filler", () => {
-    it.each([
-      "Importantly, the test was skipped.",
-      "In terms of latency, it improved.",
-    ])("flags: %j", (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("filler");
-    });
+    it.each(["Importantly, the test was skipped.", "In terms of latency, it improved."])(
+      "flags: %j",
+      (text) => {
+        expect(firstByTier(scan(text), "context")?.category).toBe("filler");
+      },
+    );
 
     it("allows prose without filler markers", () => {
       expect(scan("The cache starts cold.").find((m) => m.category === "filler")).toBeUndefined();

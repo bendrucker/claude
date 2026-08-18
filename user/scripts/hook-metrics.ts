@@ -1,4 +1,5 @@
-// biome-ignore lint/style/noRestrictedImports: concurrent sessions append to one file per hook, so writes need O_APPEND atomicity and rotation needs rename. A Bun.write read-modify-write would drop lines.
+// concurrent sessions append to one file per hook, so writes need O_APPEND atomicity and rotation needs rename. A Bun.write read-modify-write would drop lines.
+// oxlint-disable-next-line no-restricted-imports
 import { appendFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";

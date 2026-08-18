@@ -36,11 +36,12 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash(git commit:*)",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\""
+            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/ox\"",
+            "if": "Bash(git commit:*)"
           }
         ]
       }
@@ -51,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\""
+            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/ox\""
           }
         ]
       }
@@ -61,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/biome\""
+            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/ox\""
           },
           {
             "type": "command",

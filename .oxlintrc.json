@@ -1,0 +1,65 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "prefer-template": "error",
+    "no-template-curly-in-string": "warn",
+    "typescript/no-non-null-assertion": "warn",
+    "no-unused-vars": [
+      "error",
+      {
+        "args": "after-used",
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "no-unused-expressions": ["error", { "allowTernary": true }],
+    "no-unsafe-optional-chaining": "off",
+    "typescript/restrict-template-expressions": "off",
+    "typescript/await-thenable": "off",
+    "typescript/no-base-to-string": "off",
+    "typescript/no-floating-promises": "off",
+    "typescript/unbound-method": "off",
+    "typescript/no-misused-spread": "off",
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "node:fs",
+            "allowImportNames": [
+              "globSync",
+              "mkdirSync",
+              "mkdtempSync",
+              "readdirSync",
+              "realpathSync"
+            ],
+            "message": "Use Bun file APIs (Bun.file, Bun.write) instead of node:fs. Sync directory operations (glob, mkdir, mkdtemp, readdir, realpath) are allowed."
+          },
+          {
+            "name": "node:fs/promises",
+            "allowImportNames": ["mkdir", "mkdtemp", "readdir", "rm"],
+            "message": "Use Bun file APIs (Bun.file, Bun.write) instead of node:fs/promises. Directory operations (mkdir, mkdtemp, readdir, rm) are allowed."
+          },
+          {
+            "name": "fs",
+            "message": "Use \"node:fs\" with allowed directory operations, or Bun file APIs for file operations."
+          },
+          {
+            "name": "fs/promises",
+            "message": "Use \"node:fs/promises\" with allowed directory operations, or Bun file APIs for file operations."
+          }
+        ]
+      }
+    ]
+  },
+  "ignorePatterns": ["**/fixtures/**", "**/*.d.ts", "**/jxa/**/*.js", ".claude/workflows/**"],
+  "env": {
+    "builtin": true
+  }
+}

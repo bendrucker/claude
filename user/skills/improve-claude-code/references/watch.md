@@ -7,7 +7,7 @@ A follow-on mode for the PRs this skill opened. Run it under `/loop /improve-cla
 Walk every open tracked PR once and handle its state:
 
 - CI red: launch a worktree agent with the failing logs and branch to fix, test, and push.
-- A reviewer thread requests a change: launch a worktree agent to implement it, run `bun test` and `biome check`, then commit and push. Reply to the thread naming the change and its commit. Leave the thread unresolved for the reviewer, and do not merge.
+- A reviewer thread requests a change: launch a worktree agent to implement it, run `bun test` and `bun run check`, then commit and push. Reply to the thread naming the change and its commit. Leave the thread unresolved for the reviewer, and do not merge.
 - Merged: close the backing Things todo via `things:url`. Append the PR link, mark it completed, and remove the `claude-code` tag.
 - Closed without merging: leave the todo tagged `claude-code` with a note so it resurfaces next run.
 

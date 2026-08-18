@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
-// biome-ignore lint/style/noRestrictedImports: concurrent sessions append to one log, so writes need O_APPEND atomicity and rotation needs rename. Bun.write read-modify-write would drop lines.
+// concurrent sessions append to one log, so writes need O_APPEND atomicity and rotation needs rename. Bun.write read-modify-write would drop lines.
+// oxlint-disable-next-line no-restricted-imports
 import { appendFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";

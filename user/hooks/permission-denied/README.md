@@ -21,7 +21,7 @@ Reads the `PermissionDenied` payload on stdin and appends one JSON object per de
 
 `CLAUDE_AUTO_MODE_DENIAL_LOG` resolves the destination in one place, the same contract the writing plugin's [`run-log.ts`](../../../plugins/writing/hooks/run-log.ts) uses: unset defaults to on, `0`/`false`/`off` disables logging, and any other value is a path override. The default is `~/.claude/auto-mode-denials.jsonl`, rotated to `.1` past 5 MB.
 
-Appending needs `O_APPEND` atomicity, since concurrent sessions write to one file and a read-modify-write would drop records. That takes `appendFileSync`, which this repo's Biome config restricts. The import therefore carries a scoped `biome-ignore` naming that rationale, following the pattern `run-log.ts` established.
+Appending needs `O_APPEND` atomicity, since concurrent sessions write to one file and a read-modify-write would drop records. That takes `appendFileSync`, which this repo's oxlint config restricts. The import therefore carries a scoped `oxlint-disable-next-line` comment naming that rationale, following the pattern `run-log.ts` established.
 
 The hook never returns `hookSpecificOutput.retry`. Retrying is a judgment about whether a denial was wrong, which belongs to the person reading the log. A failure is caught so it cannot break the session, but it prints to stderr rather than passing silently: an empty log is the signal that retires this hook, and a silent failure would forge that signal.
 

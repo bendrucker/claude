@@ -95,13 +95,13 @@ describe("processInput", () => {
     expect(output).toBeNull();
   });
 
-  test.each<[string]>([
-    ['git commit -m "test"'],
-    ['git commit -a -m "test"'],
-  ])("blocks %p on main branch", async (command) => {
-    const output = await getOutput(mockInput(command), testRepo);
-    expect(output?.permissionDecision).toBe("deny");
-  });
+  test.each<[string]>([['git commit -m "test"'], ['git commit -a -m "test"']])(
+    "blocks %p on main branch",
+    async (command) => {
+      const output = await getOutput(mockInput(command), testRepo);
+      expect(output?.permissionDecision).toBe("deny");
+    },
+  );
 
   // The matcher fails open on shell metacharacters, so these reach the hook on
   // the default branch even though none of them commits.

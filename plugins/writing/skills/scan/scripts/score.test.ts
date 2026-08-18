@@ -86,9 +86,8 @@ describe("renderTable", () => {
   });
 
   it("no patterns for clean prose", () => {
-    expect(
-      renderTable(buildReport("The function reads input.", "doc.md", { comments: false })),
-    ).toMatchInlineSnapshot(`
+    expect(renderTable(buildReport("The function reads input.", "doc.md", { comments: false })))
+      .toMatchInlineSnapshot(`
       "prose (4 words)
       No patterns detected."
     `);

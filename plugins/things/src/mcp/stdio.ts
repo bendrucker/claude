@@ -17,6 +17,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerTools } from "./tools";
 
 if (import.meta.main) {
+  // Bounds a write so it cannot spend a client's whole request budget. Both
+  // run.sh and xcallBackstopMs read this, so one assignment moves the worst
+  // case from ~59s to ~47s, inside a typical 60s client timeout. Things answers
+  // an x-callback in well under a second when it answers at all. The 20s
+  // default only ever covered a cold first launch, which the separate build
+  // timeout still covers. An operator's own value wins.
+  process.env.XCALL_TIMEOUT_SECONDS ??= "10";
+
   const server = new McpServer({ name: "things", version: "0.1.0" });
   registerTools(server);
   await server.connect(new StdioServerTransport());

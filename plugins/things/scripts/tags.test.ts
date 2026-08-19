@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mergeTags, parseTags } from "./tags";
+import { mergeTags, parseTags, resolveTags, type TagResolution } from "./tags";
 
 describe("parseTags", () => {
   test.each<{ name: string; input: string | undefined; expected: string[] }>([
@@ -39,5 +39,49 @@ describe("mergeTags", () => {
     { name: "handles empty sources", sources: [[], ["Claude"]], expected: ["Claude"] },
   ])("$name", ({ sources, expected }) => {
     expect(mergeTags(...sources)).toEqual(expected);
+  });
+});
+
+describe("resolveTags", () => {
+  const existing = ["claude", "review", "Work"];
+
+  test.each<{ name: string; requested: string[]; expected: TagResolution }>([
+    {
+      name: "passes through a known tag",
+      requested: ["review"],
+      expected: { resolved: ["review"], unknown: [] },
+    },
+    {
+      name: "remaps to the casing Things stores",
+      requested: ["CLAUDE", "work"],
+      expected: { resolved: ["claude", "Work"], unknown: [] },
+    },
+    {
+      name: "collapses spellings that differ only in case",
+      requested: ["claude", "Claude"],
+      expected: { resolved: ["claude"], unknown: [] },
+    },
+    {
+      name: "names a tag Things does not hold",
+      requested: ["review", "bug"],
+      expected: { resolved: ["review"], unknown: ["bug"] },
+    },
+    {
+      name: "reports an unknown tag once",
+      requested: ["bug", "BUG"],
+      expected: { resolved: [], unknown: ["bug"] },
+    },
+    {
+      name: "keeps requested order",
+      requested: ["Work", "claude"],
+      expected: { resolved: ["Work", "claude"], unknown: [] },
+    },
+    { name: "handles no request", requested: [], expected: { resolved: [], unknown: [] } },
+  ])("$name", ({ requested, expected }) => {
+    expect(resolveTags(requested, existing)).toEqual(expected);
+  });
+
+  test("rejects everything when Things holds no tags", () => {
+    expect(resolveTags(["claude"], [])).toEqual({ resolved: [], unknown: ["claude"] });
   });
 });

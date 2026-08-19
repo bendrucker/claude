@@ -43,7 +43,12 @@ const HANDSHAKE = [
     method: "tools/call",
     params,
   })),
+  // A second listing, after a round of calls, for the stability tests below.
+  { jsonrpc: "2.0", id: 3 + REJECTED_CALLS.length, method: "tools/list" },
 ];
+
+const FIRST_LIST_ID = 2;
+const SECOND_LIST_ID = 3 + REJECTED_CALLS.length;
 
 /**
  * Drives the server the way tailgate does: JSON-RPC in on stdin, responses out
@@ -67,8 +72,30 @@ async function handshake(): Promise<{ stdout: string; stderr: string; exitCode: 
   return { stdout, stderr, exitCode: await proc.exited };
 }
 
+function stdoutLines(stdout: string): string[] {
+  return stdout.split("\n").filter(Boolean);
+}
+
+interface Response {
+  id: number;
+  result: { isError?: boolean; content?: Array<{ text: string }>; tools?: Array<{ name: string }> };
+}
+
+/**
+ * The result the server sent for one request. Keyed by id because responses do
+ * not come back in request order: a `tools/list` is answered synchronously
+ * while a `tools/call` goes through schema validation first.
+ */
+function responseTo(lines: string[], id: number): Response["result"] {
+  const responses = lines.map((line) => JSON.parse(line) as Response);
+  const match = responses.find((response) => response.id === id);
+  if (!match) throw new Error(`no response for request ${id}`);
+  return match.result;
+}
+
 const result = await handshake();
-const lines = result.stdout.split("\n").filter(Boolean);
+const lines = stdoutLines(result.stdout);
+const respawned = stdoutLines((await handshake()).stdout);
 
 describe("stdio server", () => {
   test("exits cleanly when stdin closes", () => {
@@ -90,10 +117,8 @@ describe("stdio server", () => {
   });
 
   test("advertises the full tool set", () => {
-    const listed = JSON.parse(lines[1] ?? "null") as {
-      result: { tools: Array<{ name: string }> };
-    };
-    expect(listed.result.tools.map((tool) => tool.name)).toMatchInlineSnapshot(`
+    const tools = responseTo(lines, FIRST_LIST_ID).tools ?? [];
+    expect(tools.map((tool) => tool.name)).toMatchInlineSnapshot(`
       [
         "list_todos",
         "find_todos",
@@ -115,11 +140,9 @@ describe("stdio server", () => {
   // covering its field fails here rather than passing on some other error.
   test("rejects arguments that would reach Things", () => {
     const rejections = REJECTED_CALLS.map((_call, index) => {
-      const response = JSON.parse(lines[2 + index] ?? "null") as {
-        result: { isError: boolean; content: Array<{ text: string }> };
-      };
-      expect(response.result.isError).toBe(true);
-      return response.result.content[0]?.text;
+      const rejection = responseTo(lines, 3 + index);
+      expect(rejection.isError).toBe(true);
+      return rejection.content?.[0]?.text;
     });
     expect(rejections).toMatchInlineSnapshot(`
       [
@@ -131,5 +154,24 @@ describe("stdio server", () => {
         "MCP error -32602: Input validation error: Invalid arguments for tool capture_inbox: Too small: expected string to have >=1 characters at session_id",
       ]
     `);
+  });
+});
+
+/**
+ * Standing refutation of a report that tool calls started failing mid-session
+ * as "has not been loaded yet". Nothing here registers a tool after `connect`,
+ * so the list a client caches on its first `tools/list` stays correct for the
+ * life of the connection and across restarts. These fail the moment that stops
+ * being true, which is cheaper than re-running the investigation.
+ */
+describe("tool list stability", () => {
+  const first = JSON.stringify(responseTo(lines, FIRST_LIST_ID));
+
+  test("answers a later tools/list with the same tools", () => {
+    expect(JSON.stringify(responseTo(lines, SECOND_LIST_ID))).toBe(first);
+  });
+
+  test("answers a fresh process with the same tools", () => {
+    expect(JSON.stringify(responseTo(respawned, FIRST_LIST_ID))).toBe(first);
   });
 });

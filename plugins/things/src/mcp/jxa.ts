@@ -1,6 +1,6 @@
 /**
- * Runs the plugin's JXA query scripts through the mac plugin's runner
- * (AST scope validation + Apple Events retry). The runner is spawned as a
+ * Runs the plugin's JXA scripts through the mac plugin's runner (AST scope
+ * validation + Apple Events retry). The runner is spawned as a
  * subprocess because cross-plugin imports are disallowed, and it is
  * discovered by filesystem layout.
  */
@@ -20,7 +20,7 @@ export function findJxaRunner(pluginRoot: string = PLUGIN_ROOT): Promise<string 
   return findSiblingScript(pluginRoot, "mac", "scripts", "jxa.ts");
 }
 
-export async function runQuery(script: string, args: string[]): Promise<unknown> {
+export async function runScript(script: string, args: string[]): Promise<unknown> {
   const runner = await findJxaRunner();
   if (!runner) {
     throw new Error("mac plugin JXA runner not found (expected plugins/mac/scripts/jxa.ts)");

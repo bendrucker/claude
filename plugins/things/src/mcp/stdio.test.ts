@@ -121,6 +121,7 @@ describe("stdio server", () => {
     expect(tools.map((tool) => tool.name)).toMatchInlineSnapshot(`
       [
         "list_todos",
+        "get_todo",
         "find_todos",
         "query_logbook",
         "list_metadata",

@@ -33,7 +33,7 @@ This constrains more than `stdio.ts`. The tools reuse the plugin's CLI scripts (
 
 Reads run the plugin's JXA scripts through the `mac` plugin's runner: `list_todos`, `get_todo`, `find_todos`, `search_todos`, `query_logbook`, `list_metadata`. Tag creation takes the same path, as the one write that the URL scheme cannot express.
 
-Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `update_todos`, `capture_inbox`, `reorder_todos`. Cultured Code exposes no write API beyond it.
+Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `update_todos`, `update_project`, `capture_inbox`, `reorder_todos`. Cultured Code exposes no write API beyond it.
 
 `capture_inbox` accepts an optional `session_id` and `directory`. Given a `session_id` it appends a resume command to the todo's notes. `directory` is a parameter because this process runs as tailgate's child, whose working directory has nothing to do with the session being attributed.
 
@@ -96,6 +96,12 @@ printf '%s\n' \
 Each message needs its own trailing newline. The transport frames on newlines, so a final line without one is never answered.
 
 `bunx @modelcontextprotocol/inspector bun src/mcp/stdio.ts` gives the same thing interactively.
+
+## What Cannot Be Read
+
+Checklist items are write-only. The URL scheme sets, prepends, and appends them, and `update_todos` exposes all three, but Things' scripting dictionary has no accessor for them, so no tool can read one back. `get_todo` says so in its description rather than returning a field that is always absent.
+
+Deleting has no URL-scheme command, so no tool exposes it and `update_todos` with `canceled` is as close as a caller gets. Things' scripting dictionary does offer `delete`, which moves an item to the Trash list rather than erasing it. A trashed todo keeps its id and still reports status `open`, so `get_todo` cannot tell one from a live todo.
 
 ## Constraints
 

@@ -304,10 +304,10 @@ export function registerTools(server: McpServer): void {
     {
       title: "Find todos by tag or project",
       description:
-        "Find open todos by tag (searched across Inbox/Today/Anytime/Upcoming/Someday) or by project name. Set include_logbook to also search completed todos. Returns a notes preview per todo, with get_todo serving one todo's full notes.",
+        "Find open todos by tag (searched across Inbox/Today/Anytime/Upcoming/Someday), by project name, or by area name. An area returns only the todos filed directly in it, since a todo inside one of its projects belongs to that project. Set include_logbook to also return completed and cancelled todos. Returns a notes preview per todo, with get_todo serving one todo's full notes.",
       inputSchema: {
-        by: z.enum(["tag", "project"]),
-        value: z.string().describe("Tag name or project name"),
+        by: z.enum(["tag", "project", "area"]),
+        value: z.string().describe("Tag, project, or area name, matched exactly"),
         include_logbook: z
           .boolean()
           .optional()

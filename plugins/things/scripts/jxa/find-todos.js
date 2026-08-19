@@ -21,7 +21,7 @@ function run(argv) {
 
   if (!mode || !value) {
     return JSON.stringify({
-      error: "Usage: find-todos.js <tag|project> <value> [--logbook] [--limit <n>]",
+      error: "Usage: find-todos.js <tag|project|area> <value> [--logbook] [--limit <n>]",
     });
   }
 
@@ -109,5 +109,42 @@ function run(argv) {
     });
   }
 
-  return JSON.stringify({ error: "Unknown mode: " + mode + ". Use 'tag' or 'project'." });
+  if (mode === "area") {
+    var areas = app.areas.whose({ name: value });
+    if (areas.length === 0) {
+      return JSON.stringify({ error: "Area not found: " + value });
+    }
+    // Only todos filed directly in the area. A todo inside one of the area's
+    // projects belongs to that project, and find-todos.js project reaches it.
+    var areaTodos = areas[0].toDos();
+    var areaItems = [];
+    var areaTruncated = false;
+    for (var ai = 0; ai < areaTodos.length; ai++) {
+      if (limit > 0 && areaItems.length >= limit) {
+        areaTruncated = true;
+        break;
+      }
+      var at = areaTodos[ai];
+      var areaStatus = at.status().toString();
+      if (!includeLogbook && areaStatus !== "open") continue;
+      var areaNotes = at.notes() || "";
+      var areaProject = at.project();
+      areaItems.push({
+        id: at.id(),
+        name: at.name(),
+        notesPreview: areaNotes.substring(0, NOTES_PREVIEW_CHARS),
+        hasMoreNotes: areaNotes.length > NOTES_PREVIEW_CHARS,
+        status: areaStatus,
+        tags: at.tagNames() || "",
+        project: areaProject ? areaProject.name() : null,
+      });
+    }
+    return JSON.stringify({
+      count: areaItems.length,
+      truncatedByLimit: areaTruncated,
+      items: areaItems,
+    });
+  }
+
+  return JSON.stringify({ error: "Unknown mode: " + mode + ". Use 'tag', 'project', or 'area'." });
 }

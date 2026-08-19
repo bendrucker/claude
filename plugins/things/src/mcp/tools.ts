@@ -141,6 +141,12 @@ interface UpdateAttributeArgs {
   tags?: string[] | undefined;
   add_tags?: string[] | undefined;
   checklist_items?: string[] | undefined;
+  prepend_checklist_items?: string[] | undefined;
+  append_checklist_items?: string[] | undefined;
+  list?: string | undefined;
+  list_id?: string | undefined;
+  area?: string | undefined;
+  area_id?: string | undefined;
   completed?: boolean | undefined;
   canceled?: boolean | undefined;
 }
@@ -158,6 +164,16 @@ export function updateAttributes(args: UpdateAttributeArgs): Record<string, stri
   if (args.checklist_items !== undefined) {
     attributes["checklist-items"] = args.checklist_items.join("\n");
   }
+  if (args.prepend_checklist_items !== undefined) {
+    attributes["prepend-checklist-items"] = args.prepend_checklist_items.join("\n");
+  }
+  if (args.append_checklist_items !== undefined) {
+    attributes["append-checklist-items"] = args.append_checklist_items.join("\n");
+  }
+  if (args.list !== undefined) attributes.list = args.list;
+  if (args.list_id !== undefined) attributes["list-id"] = args.list_id;
+  if (args.area !== undefined) attributes.area = args.area;
+  if (args.area_id !== undefined) attributes["area-id"] = args.area_id;
   if (args.completed !== undefined) attributes.completed = String(args.completed);
   if (args.canceled !== undefined) attributes.canceled = String(args.canceled);
   return attributes;
@@ -214,6 +230,19 @@ const whenDescription =
   "Schedule: today, tomorrow, evening, anytime, someday, yyyy-mm-dd, or natural language like 'next week'";
 
 const tagsDescription = "Tag names; each must already exist in Things unless create_tags is set";
+
+const listDescription =
+  "Move the todo into this project or area, named exactly as Things holds it. Prefer list_id when an id is at hand: a name Things does not match is ignored without comment.";
+
+const listIdDescription = "Move the todo into the project or area with this id";
+
+/** Checklist additions leave the existing items alone, unlike `checklist_items`. */
+function checklistAdditions(position: "top" | "bottom") {
+  return z
+    .array(z.string())
+    .optional()
+    .describe(`Adds checklist items at the ${position}, keeping the existing ones`);
+}
 
 const createTagsDescription =
   "Create any tag that does not exist yet in Things. Without it, an unknown tag fails the call.";
@@ -451,6 +480,56 @@ export function registerTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "update_project",
+    {
+      title: "Update a project",
+      description:
+        "Update one project: retitle, edit notes, reschedule, retag, move to another area, complete, or cancel. Things refuses to complete a project while any child todo is open.",
+      inputSchema: {
+        id: z.string().trim().min(1).describe("Project id, as returned by list_metadata"),
+        title: z.string().optional(),
+        notes: z.string().optional().describe("Replaces existing notes"),
+        prepend_notes: z.string().optional(),
+        append_notes: z.string().optional(),
+        when: z.string().optional().describe(whenDescription),
+        deadline: z.string().optional().describe("yyyy-mm-dd"),
+        tags: z.array(z.string()).optional().describe(`Replaces existing tags. ${tagsDescription}`),
+        add_tags: z
+          .array(z.string())
+          .optional()
+          .describe(`Adds to existing tags. ${tagsDescription}`),
+        create_tags: z.boolean().optional().describe(createTagsDescription),
+        area: z
+          .string()
+          .optional()
+          .describe(
+            "Move the project into this area, named exactly as Things holds it. Prefer area_id when an id is at hand: a name Things does not match is ignored without comment.",
+          ),
+        area_id: z.string().optional().describe("Move the project into the area with this id"),
+        completed: z.boolean().optional(),
+        canceled: z.boolean().optional(),
+      },
+    },
+    async ({ id, create_tags, ...rest }) => {
+      if (Object.keys(updateAttributes(rest)).length === 0) {
+        throw new Error("At least one attribute to update is required");
+      }
+      await ensureThingsRunning();
+
+      const createMissing = create_tags ?? false;
+      const attributes = updateAttributes({
+        ...rest,
+        tags: rest.tags && (await requireTags(rest.tags, createMissing)),
+        add_tags: rest.add_tags && (await requireTags(rest.add_tags, createMissing)),
+      });
+
+      const params = new Map<string, string>(Object.entries(attributes));
+      params.set("id", id);
+      return writeResult(await dispatch("update-project", params), `Updated project ${id}`);
+    },
+  );
+
+  server.registerTool(
     "update_todos",
     {
       title: "Update todos",
@@ -471,6 +550,10 @@ export function registerTools(server: McpServer): void {
           .describe(`Adds to existing tags. ${tagsDescription}`),
         create_tags: z.boolean().optional().describe(createTagsDescription),
         checklist_items: z.array(z.string()).optional().describe("Replaces existing checklist"),
+        prepend_checklist_items: checklistAdditions("top"),
+        append_checklist_items: checklistAdditions("bottom"),
+        list: z.string().optional().describe(listDescription),
+        list_id: z.string().optional().describe(listIdDescription),
         completed: z.boolean().optional(),
         canceled: z.boolean().optional(),
       },

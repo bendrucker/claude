@@ -128,6 +128,7 @@ describe("stdio server", () => {
         "list_metadata",
         "add_todo",
         "add_project",
+        "update_project",
         "update_todos",
         "capture_inbox",
         "reorder_todos",

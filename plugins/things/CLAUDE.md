@@ -49,6 +49,8 @@ Keep `console.log` under `import.meta.main`. A function both the CLI and a tool 
 
 A list read returns a notes preview per todo, capped at `NOTES_PREVIEW_CHARS`, and `get-todo.js` serves one todo's full notes on request. Notes are most of what a list read weighs, and a client's framing has a hard ceiling, so shipping them everywhere buys a few dozen todos instead of a few hundred. The read scripts also take `--limit`, which breaks the walk rather than slicing the result: each todo visited costs several Apple Events, so the limit is a scan bound.
 
+A `.whose()` predicate only pays off when the collection it scopes is small or the predicate is one Things can answer. Text predicates against the top-level `toDos` answer in well under a second; date predicates and text predicates scoped to the logbook list do not return inside two minutes. Things also keeps working on a predicate whose Apple Event already timed out, so one such call degrades the calls after it.
+
 `src/mcp/jxa.ts` resolves the `mac` plugin's JXA runner across the same two layouts as `findXcallRunner`, and accepts only the sibling under this plugin's own version directory. The runner's argument contract is versioned: this build expects the runner to forward everything past the script path to the script itself, and a runner from another commit may claim those flags and leave the script answering with a usage error. `findJxaRunner` takes the plugin root as an argument so tests can point it at a fixture tree.
 
 ## What NOT to Do

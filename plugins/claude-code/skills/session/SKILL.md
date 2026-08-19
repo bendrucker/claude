@@ -76,6 +76,7 @@ Every query, grouped by category with a one-line gloss:
 - `permissions`: tool calls the user rejected
 - `sandbox`: sandbox-bypassing Bash calls
 - `sandbox-bypass-effective-command`: normalized bypass verbs
+- `sandbox-bypass-justification`: bypasses backed by a prior sandboxed failure
 
 #### Hooks
 - `hooks`: hook activity and performance

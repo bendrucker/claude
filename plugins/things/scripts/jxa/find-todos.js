@@ -88,13 +88,17 @@ function run(argv) {
         break;
       }
       var pt = projectTodos[pi];
+      // A project holds its finished children alongside its open ones, so the
+      // same flag that widens the tag search to the logbook widens this.
+      var projectStatus = pt.status().toString();
+      if (!includeLogbook && projectStatus !== "open") continue;
       var projectNotes = pt.notes() || "";
       projectItems.push({
         id: pt.id(),
         name: pt.name(),
         notesPreview: projectNotes.substring(0, NOTES_PREVIEW_CHARS),
         hasMoreNotes: projectNotes.length > NOTES_PREVIEW_CHARS,
-        status: pt.status().toString(),
+        status: projectStatus,
         tags: pt.tagNames() || "",
       });
     }

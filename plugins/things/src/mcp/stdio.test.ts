@@ -123,6 +123,7 @@ describe("stdio server", () => {
         "list_todos",
         "get_todo",
         "find_todos",
+        "search_todos",
         "query_logbook",
         "list_metadata",
         "add_todo",

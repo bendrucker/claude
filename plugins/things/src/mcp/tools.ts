@@ -299,6 +299,35 @@ export function registerTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "search_todos",
+    {
+      title: "Search todos by text",
+      description:
+        "Find todos whose title or notes contain a substring. Matching is case-sensitive and literal, not a word or fuzzy search. Covers open todos only: Things cannot answer a text search over the logbook in bounded time, so use query_logbook to reach completed todos.",
+      inputSchema: {
+        text: z.string().trim().min(1).describe("Substring to look for"),
+        field: z
+          .enum(["name", "notes", "both"])
+          .optional()
+          .describe("Where to look. Defaults to both."),
+        limit: limitParameter,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ text, field, limit }) =>
+      jsonResult(
+        limitItems(
+          await runScript("search-todos.js", [
+            text,
+            ...(field === undefined ? [] : ["--field", field]),
+            ...limitArgs(limit),
+          ]),
+          "Search a longer or more distinctive substring, or set field to name only.",
+        ),
+      ),
+  );
+
+  server.registerTool(
     "query_logbook",
     {
       title: "Query completed todos",

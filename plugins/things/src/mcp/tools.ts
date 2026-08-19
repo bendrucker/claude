@@ -13,7 +13,6 @@ const LIST_IDS = {
   anytime: "TMNextListSource",
   upcoming: "TMCalendarListSource",
   someday: "TMSomedayListSource",
-  logbook: "TMLogbookListSource",
 } as const;
 
 const TODO_LINK_BASE = "https://things.bendrucker.me/show?id=";
@@ -88,7 +87,7 @@ function fittingCount(items: unknown[]): number {
  * A payload within budget is returned untouched, so the common case keeps the
  * shape callers already parse.
  */
-export function limitItems(payload: unknown): unknown {
+export function limitItems(payload: unknown, guidance: string): unknown {
   const items = readItems(payload);
   if (items === null || payloadBytes(payload) <= MAX_PAYLOAD_BYTES) return payload;
 
@@ -102,7 +101,7 @@ export function limitItems(payload: unknown): unknown {
     truncated: true,
     returned,
     total: items.length,
-    note: `Narrow the range or filter; ${omitted} of ${items.length} items omitted to fit the response budget.`,
+    note: `${omitted} of ${items.length} items omitted to fit the response budget. ${guidance}`,
     items: items.slice(0, returned),
   };
 }
@@ -219,19 +218,56 @@ const tagsDescription = "Tag names; each must already exist in Things unless cre
 const createTagsDescription =
   "Create any tag that does not exist yet in Things. Without it, an unknown tag fails the call.";
 
+/**
+ * A limit stops the JXA walk rather than trimming the response, and each todo
+ * the walk visits costs several Apple Events. Passing one is what makes a large
+ * list affordable, so it reads as a scan bound rather than a display bound.
+ */
+const limitParameter = z
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .describe("Stop after this many todos, bounding the scan and not just the response");
+
+function limitArgs(limit: number | undefined): string[] {
+  return limit === undefined ? [] : ["--limit", String(limit)];
+}
+
 export function registerTools(server: McpServer): void {
   server.registerTool(
     "list_todos",
     {
       title: "List todos in a built-in list",
       description:
-        "Read the todos in a built-in Things list (inbox, today, anytime, upcoming, someday, logbook). Full logbook scans are slow (10k+ items); prefer query_logbook for date-bounded logbook reads.",
+        "Read the todos in a built-in Things list. Returns a notes preview per todo, with get_todo serving one todo's full notes. The logbook is absent here because it can hold tens of thousands of items with nothing to narrow by. Use query_logbook, which bounds by date.",
       inputSchema: {
-        list: z.enum(["inbox", "today", "anytime", "upcoming", "someday", "logbook"]),
+        list: z.enum(["inbox", "today", "anytime", "upcoming", "someday"]),
+        limit: limitParameter,
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ list }) => jsonResult(limitItems(await runScript("query-list.js", [LIST_IDS[list]]))),
+    async ({ list, limit }) =>
+      jsonResult(
+        limitItems(
+          await runScript("query-list.js", [LIST_IDS[list], ...limitArgs(limit)]),
+          "Pass a limit, or use find_todos to narrow by tag or project.",
+        ),
+      ),
+  );
+
+  server.registerTool(
+    "get_todo",
+    {
+      title: "Read one todo in full",
+      description:
+        "Read one todo by id, with its full notes and dates. The counterpart to the previews the list reads return. Works for completed todos too. Checklist items are not included: Things' scripting interface cannot read them.",
+      inputSchema: {
+        id: z.string().trim().min(1).describe("Todo id, as returned by any list read"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ id }) => jsonResult(await runScript("get-todo.js", [id])),
   );
 
   server.registerTool(
@@ -239,18 +275,25 @@ export function registerTools(server: McpServer): void {
     {
       title: "Find todos by tag or project",
       description:
-        "Find open todos by tag (searched across Inbox/Today/Anytime/Upcoming/Someday) or by project name. Set include_logbook to also search completed todos.",
+        "Find open todos by tag (searched across Inbox/Today/Anytime/Upcoming/Someday) or by project name. Set include_logbook to also search completed todos. Returns a notes preview per todo, with get_todo serving one todo's full notes.",
       inputSchema: {
         by: z.enum(["tag", "project"]),
         value: z.string().describe("Tag name or project name"),
         include_logbook: z.boolean().optional(),
+        limit: limitParameter,
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ by, value, include_logbook }) =>
+    async ({ by, value, include_logbook, limit }) =>
       jsonResult(
         limitItems(
-          await runScript("find-todos.js", [by, value, ...(include_logbook ? ["--logbook"] : [])]),
+          await runScript("find-todos.js", [
+            by,
+            value,
+            ...(include_logbook ? ["--logbook"] : []),
+            ...limitArgs(limit),
+          ]),
+          "Search a narrower tag or project, or leave include_logbook unset to skip completed todos.",
         ),
       ),
   );
@@ -265,17 +308,20 @@ export function registerTools(server: McpServer): void {
         start: isoDate.describe("Start of range, ISO 8601 (e.g. 2026-07-01)"),
         end: isoDate.describe("End of range, ISO 8601"),
         notes_contains: z.string().optional().describe("Only todos whose notes contain this"),
+        limit: limitParameter,
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ start, end, notes_contains }) =>
+    async ({ start, end, notes_contains, limit }) =>
       jsonResult(
         limitItems(
           await runScript("query-logbook.js", [
             start,
             end,
             ...(notes_contains !== undefined ? ["--notes-contains", notes_contains] : []),
+            ...limitArgs(limit),
           ]),
+          "Results run newest first. To continue backwards, re-query with end set to the completionDate of the last item returned.",
         ),
       ),
   );

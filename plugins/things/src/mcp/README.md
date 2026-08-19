@@ -31,7 +31,7 @@ This constrains more than `stdio.ts`. The tools reuse the plugin's CLI scripts (
 
 ## Tools
 
-Reads run the plugin's JXA scripts through the `mac` plugin's runner: `list_todos`, `find_todos`, `query_logbook`, `list_metadata`. Tag creation takes the same path, as the one write that the URL scheme cannot express.
+Reads run the plugin's JXA scripts through the `mac` plugin's runner: `list_todos`, `get_todo`, `find_todos`, `query_logbook`, `list_metadata`. Tag creation takes the same path, as the one write that the URL scheme cannot express.
 
 Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `update_todos`, `capture_inbox`, `reorder_todos`. Cultured Code exposes no write API beyond it.
 
@@ -51,9 +51,15 @@ The tag list is fetched once per process (around two seconds) and held. A miss r
 
 ## Response Size
 
-Reads that return a list (`list_todos`, `find_todos`, `query_logbook`) cap their payload at 32KB. Past that they drop items from the end and return `{truncated, returned, total, note, items}` instead of the bare list. A payload within budget is returned unchanged.
+A list read returns a preview of each todo's notes rather than the whole thing. Notes are the bulk of the payload: over the logbook they measured 61% of it, median 223 characters and up to 3552, so a read that carried them in full fit a few dozen todos where the preview fits a few hundred. `get_todo` serves one todo's full notes and dates, and it reaches completed todos too, so nothing is lost by not shipping notes in every list.
 
-The cap is about framing, not about the client's context: the payload is a JSON string nested in the JSON-RPC envelope, so escaping can roughly double it, and a proxy reading the line with Go's default `bufio.Scanner` drops anything past 64KB without saying why. An uncapped logbook read runs to megabytes and surfaces as a failure carrying no detail.
+`list_todos`, `find_todos`, and `query_logbook` each take a `limit`. It stops the JXA walk rather than trimming the response, which matters because every todo the walk visits costs several Apple Events.
+
+Past that, a read that still exceeds 32KB drops items from the end and returns `{truncated, returned, total, note, items}` instead of the bare list. The `note` names an action that tool actually supports: a narrower tag or project for `find_todos`, a smaller `limit` for `list_todos`, and for `query_logbook`, re-querying with `end` set to the `completionDate` of the last item returned. A payload within budget is returned unchanged.
+
+The cap is about framing, not about the client's context: the payload is a JSON string nested in the JSON-RPC envelope, so escaping can roughly double it, and a proxy reading the line with Go's default `bufio.Scanner` drops anything past 64KB without saying why.
+
+`list_todos` does not accept the logbook. It holds tens of thousands of items with no attribute to narrow by, and a probe found no predicate that pushes a date filter down to Things: `whose({completionDate: ...})` against the logbook took 49 seconds and against all todos returned nothing. `query_logbook` walks newest-first and stops at the range boundary, which is the only bounded way in. That also rules out a cursor: resuming would re-walk from the top each time.
 
 `stdio.ts` also defaults `XCALL_TIMEOUT_SECONDS` to 10 so a write cannot spend a client's whole request budget. Both `run.sh` and `xcallBackstopMs` read it, putting the worst case around 47s. An operator's own value wins.
 

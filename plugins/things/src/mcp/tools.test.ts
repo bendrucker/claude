@@ -99,22 +99,24 @@ describe("limitItems", () => {
 
   const oversized = Array.from({ length: 400 }, (_, index) => todo(index));
 
+  const guidance = "Pass a limit.";
+
   test("returns a small array untouched", () => {
     const items = [todo(0), todo(1)];
-    expect(limitItems(items)).toBe(items);
+    expect(limitItems(items, guidance)).toBe(items);
   });
 
   test("returns a small object payload untouched", () => {
     const payload = { count: 1, items: [todo(0)] };
-    expect(limitItems(payload)).toBe(payload);
+    expect(limitItems(payload, guidance)).toBe(payload);
   });
 
   test("passes through a payload with no item list", () => {
-    expect(limitItems({ error: "nope" })).toEqual({ error: "nope" });
+    expect(limitItems({ error: "nope" }, guidance)).toEqual({ error: "nope" });
   });
 
   test("drops items from the end of an oversized array", () => {
-    const limited = limitItems(oversized) as {
+    const limited = limitItems(oversized, guidance) as {
       truncated: boolean;
       returned: number;
       total: number;
@@ -127,12 +129,12 @@ describe("limitItems", () => {
     expect(limited.returned).toBeLessThan(400);
     expect(limited.items).toEqual(oversized.slice(0, limited.returned));
     expect(limited.note).toBe(
-      `Narrow the range or filter; ${400 - limited.returned} of 400 items omitted to fit the response budget.`,
+      `${400 - limited.returned} of 400 items omitted to fit the response budget. ${guidance}`,
     );
   });
 
   test("keeps the other fields of an oversized object payload", () => {
-    const limited = limitItems({ count: 400, items: oversized }) as {
+    const limited = limitItems({ count: 400, items: oversized }, guidance) as {
       count: number;
       truncated: boolean;
       total: number;
@@ -149,6 +151,6 @@ describe("limitItems", () => {
     ["array", oversized],
     ["object payload", { count: 400, items: oversized }],
   ])("holds %s under the budget", (_name, payload) => {
-    expect(JSON.stringify(limitItems(payload)).length).toBeLessThanOrEqual(32_768);
+    expect(JSON.stringify(limitItems(payload, guidance)).length).toBeLessThanOrEqual(32_768);
   });
 });

@@ -14,7 +14,7 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 
 ### Scripts
 
-- `scripts/jxa/` — JXA scripts (`osascript`) returning JSON: `find-todos.js`, `query-list.js`, `query-logbook.js`, `query-metadata.js`, and `create-tags.js`, the one write the URL scheme cannot express
+- `scripts/jxa/` — JXA scripts (`osascript`) returning JSON: `find-todos.js`, `get-todo.js`, `query-list.js`, `query-logbook.js`, `query-metadata.js`, and `create-tags.js`, the one write the URL scheme cannot express
 - `scripts/format-output.ts` — Generic stdin JSON → table formatter with `--json`, `--columns`, `--count-prefix`
 - `scripts/url.ts` — URL scheme wrapper with auth token, encoding, and bulk update via JSON command
 - `scripts/reorder.ts` — List reordering via URL scheme (bun TypeScript, reuses `url.ts` exports)

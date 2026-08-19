@@ -4,13 +4,21 @@ function run(argv) {
   var startIso = argv[0];
   var endIso = argv[1];
   var notesContains = null;
-  if (argv[2] === "--notes-contains") {
-    notesContains = argv[3];
+  var limit = 0;
+  for (var a = 2; a < argv.length; a++) {
+    if (argv[a] === "--notes-contains") {
+      notesContains = argv[a + 1];
+      a++;
+    } else if (argv[a] === "--limit") {
+      limit = parseInt(argv[a + 1], 10);
+      a++;
+    }
   }
 
-  if (!startIso || !endIso || (argv.length > 2 && !notesContains)) {
+  if (!startIso || !endIso) {
     return JSON.stringify({
-      error: "Usage: query-logbook.js <start-iso> <end-iso> [--notes-contains <substring>]",
+      error:
+        "Usage: query-logbook.js <start-iso> <end-iso> [--notes-contains <substring>] [--limit <n>]",
     });
   }
 
@@ -21,7 +29,12 @@ function run(argv) {
   var todos = logbook.toDos();
 
   var items = [];
+  var truncated = false;
   for (var i = 0; i < todos.length; i++) {
+    if (limit > 0 && items.length >= limit) {
+      truncated = true;
+      break;
+    }
     var todo = todos[i];
     var p = todo.properties();
     if (!p.completionDate) continue;
@@ -42,5 +55,5 @@ function run(argv) {
     items.push(item);
   }
 
-  return JSON.stringify({ count: items.length, items: items });
+  return JSON.stringify({ count: items.length, truncatedByLimit: truncated, items: items });
 }

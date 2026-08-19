@@ -47,6 +47,8 @@ Keep `console.log` under `import.meta.main`. A function both the CLI and a tool 
 
 `src/mcp/tags.ts` gates every tag-carrying write on the tags Things already holds, because Things drops an unknown tag and still reports success. The matching itself is pure and lives in `scripts/tags.ts`; the module here is the IO shell, with the fetch and the create behind a `TagActions` seam the way `dispatch` puts its runner behind `DispatchActions`. `scripts/inbox.ts` routes its CLI capture through the same requirer, so the CLI and the tool agree on which tags exist.
 
+A list read returns a notes preview per todo, capped at `NOTES_PREVIEW_CHARS`, and `get-todo.js` serves one todo's full notes on request. Notes are most of what a list read weighs, and a client's framing has a hard ceiling, so shipping them everywhere buys a few dozen todos instead of a few hundred. The read scripts also take `--limit`, which breaks the walk rather than slicing the result: each todo visited costs several Apple Events, so the limit is a scan bound.
+
 `src/mcp/jxa.ts` resolves the `mac` plugin's JXA runner across the same two layouts as `findXcallRunner`, and accepts only the sibling under this plugin's own version directory. The runner's argument contract is versioned: this build expects the runner to forward everything past the script path to the script itself, and a runner from another commit may claim those flags and leave the script answering with a usage error. `findJxaRunner` takes the plugin root as an argument so tests can point it at a fixture tree.
 
 ## What NOT to Do

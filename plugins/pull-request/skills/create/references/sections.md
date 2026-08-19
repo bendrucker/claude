@@ -37,7 +37,7 @@ The most common defect in real bodies is not the wrong content, it is the right 
 
 ## Headings
 
-A heading names the section's topic. It is not a sentence about the topic. Write a Title-Cased noun phrase, usually two or three words, and let the prose below carry the explanation.
+A heading names the section's topic. It is not a sentence about the topic. Write a noun phrase in AP title case, usually two or three words, and let the prose below carry the explanation.
 
 - Cut the clause riding the head noun, whether a qualifying tail (`Structural audit sourced from the hook` → `Structural Audit`), a parenthetical (`Context Tier (Soft Reminder Only)` → `Context Tier`), or a colon-spliced status (`Not Yet Met: The Live Proof` → `Deferred Proof`). The explanation goes in the first sentence under the heading.
 - Let the parent frame the leaf: under `## Tiers`, `Deny Tier` → `Deny`; under `## Decisions`, `Why Not an N-Gram View in DuckDB` → `N-Gram View`. Nest so the child heading stays bare.
@@ -46,6 +46,14 @@ A heading names the section's topic. It is not a sentence about the topic. Write
 - Don't open with a `## Summary` heading when you aren't following a template. The first paragraph is the summary already.
 
 A heading has slipped into a sentence when it carries a comma, a colon, a trailing period or question mark, a linking verb (`is`, `are`, `exits`), a relative clause (`that`, `which`), or a subject pronoun (`this`, `it`).
+
+### AP Title Case
+
+The PR-body hook re-cases every heading through `heading-case.ts` and denies the create or edit command when its result differs from what you wrote. Capitalize each word, except these when they fall between the first and last word: `a`, `an`, `and`, `as`, `at`, `but`, `by`, `for`, `in`, `nor`, `of`, `on`, `or`, `per`, `so`, `the`, `to`, `via`, `vs`, `vs.`, `yet`. Every other word stays capitalized, `up` included, since the checker leaves it off the list (`Speed Up the Commit Hook`).
+
+- Lowercase a listed word in the middle: `Heading Case Via the Hook` → `Heading Case via the Hook`; `Reasons To Defer` → `Reasons to Defer`.
+- A hyphenated compound capitalizes each element and applies the same list past the first: `Follow-up Tasks` → `Follow-Up Tasks`, while `Ready-to-Ship Checklist` keeps its lowercase `to`.
+- Inline code spans, unbackticked CLI flags (`--body-file`), and identifiers with an internal capital (`gitLab`) pass through as written.
 
 ## Mine the Conversation
 

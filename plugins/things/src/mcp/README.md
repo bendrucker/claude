@@ -31,16 +31,37 @@ This constrains more than `stdio.ts`. The tools reuse the plugin's CLI scripts (
 
 ## Tools
 
-Reads run the plugin's JXA query scripts through the `mac` plugin's runner: `list_todos`, `find_todos`, `query_logbook`, `list_metadata`.
+Reads run the plugin's JXA scripts through the `mac` plugin's runner: `list_todos`, `find_todos`, `query_logbook`, `list_metadata`. Tag creation takes the same path, as the one write that the URL scheme cannot express.
 
 Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `update_todos`, `capture_inbox`, `reorder_todos`. Cultured Code exposes no write API beyond it.
 
 `capture_inbox` accepts an optional `session_id` and `directory`. Given a `session_id` it appends a resume command to the todo's notes. `directory` is a parameter because this process runs as tailgate's child, whose working directory has nothing to do with the session being attributed.
 
+## Tags
+
+Things refuses to apply a tag that does not already exist and reports success anyway, so a write naming an unknown tag lands with that tag missing and nothing said about it. Every tag-carrying write (`add_todo`, `add_project`, `update_todos`, `capture_inbox`) therefore resolves its tags against Things before dispatching:
+
+- A tag that exists is sent under the casing Things stores, so `CLAUDE` and `claude` are one tag rather than two spellings of it.
+- A tag that does not exist fails the call, naming it alongside the tags Things holds. Nothing is written.
+- `create_tags: true` creates the missing ones first, which is how a caller opts into growing the tag namespace.
+
+The tag list is fetched once per process (around two seconds) and held. A miss refetches once before it becomes a failure, so a tag created in the Things UI mid-session resolves rather than being rejected from a stale cache.
+
+`update_todos` resolves both `tags` and `add_tags` before its first batch, because a rejection landing partway through would leave the earlier batches written.
+
+## Response Size
+
+Reads that return a list (`list_todos`, `find_todos`, `query_logbook`) cap their payload at 32KB. Past that they drop items from the end and return `{truncated, returned, total, note, items}` instead of the bare list. A payload within budget is returned unchanged.
+
+The cap is about framing, not about the client's context: the payload is a JSON string nested in the JSON-RPC envelope, so escaping can roughly double it, and a proxy reading the line with Go's default `bufio.Scanner` drops anything past 64KB without saying why. An uncapped logbook read runs to megabytes and surfaces as a failure carrying no detail.
+
+`stdio.ts` also defaults `XCALL_TIMEOUT_SECONDS` to 10 so a write cannot spend a client's whole request budget. Both `run.sh` and `xcallBackstopMs` read it, putting the worst case around 47s. An operator's own value wins.
+
 ## Layout
 
 - `stdio.ts`: the entry point. Constructs the server, registers the tools, connects the stdio transport.
 - `tools.ts`: the tool registrations, wrapping the plugin's read scripts and write modules.
+- `tags.ts`: resolves a write's tags against Things and creates missing ones on request.
 - `jxa.ts`: locates the `mac` plugin's JXA runner by filesystem layout and spawns it.
 
 ## Local Development

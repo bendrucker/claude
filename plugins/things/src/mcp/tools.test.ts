@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { chunk, updateAttributes, validateCaptureTitles, validateNonBlank } from "./tools";
+import {
+  chunk,
+  limitItems,
+  updateAttributes,
+  validateCaptureTitles,
+  validateNonBlank,
+} from "./tools";
 
 describe("chunk", () => {
   test.each<[string, number[], number, number[][]]>([
@@ -82,5 +88,67 @@ describe("validateNonBlank", () => {
     ["names the field", [""], "titles", 'titles[0] must be a non-empty string, got ""'],
   ])("rejects %s", (_name, values, field, message) => {
     expect(() => validateNonBlank(values, field)).toThrow(message);
+  });
+});
+
+describe("limitItems", () => {
+  /** One todo-sized record, padded so a few hundred of them exceed the budget. */
+  function todo(index: number) {
+    return { id: `id-${index}`, name: `Todo ${index}`, notes: "x".repeat(200) };
+  }
+
+  const oversized = Array.from({ length: 400 }, (_, index) => todo(index));
+
+  test("returns a small array untouched", () => {
+    const items = [todo(0), todo(1)];
+    expect(limitItems(items)).toBe(items);
+  });
+
+  test("returns a small object payload untouched", () => {
+    const payload = { count: 1, items: [todo(0)] };
+    expect(limitItems(payload)).toBe(payload);
+  });
+
+  test("passes through a payload with no item list", () => {
+    expect(limitItems({ error: "nope" })).toEqual({ error: "nope" });
+  });
+
+  test("drops items from the end of an oversized array", () => {
+    const limited = limitItems(oversized) as {
+      truncated: boolean;
+      returned: number;
+      total: number;
+      note: string;
+      items: unknown[];
+    };
+
+    expect(limited.truncated).toBe(true);
+    expect(limited.total).toBe(400);
+    expect(limited.returned).toBeLessThan(400);
+    expect(limited.items).toEqual(oversized.slice(0, limited.returned));
+    expect(limited.note).toBe(
+      `Narrow the range or filter; ${400 - limited.returned} of 400 items omitted to fit the response budget.`,
+    );
+  });
+
+  test("keeps the other fields of an oversized object payload", () => {
+    const limited = limitItems({ count: 400, items: oversized }) as {
+      count: number;
+      truncated: boolean;
+      total: number;
+    };
+
+    expect(limited.count).toBe(400);
+    expect(limited.truncated).toBe(true);
+    expect(limited.total).toBe(400);
+  });
+
+  // Serialized size is what decides whether the framed JSON-RPC line fits a
+  // proxy's 64KB read buffer.
+  test.each<[string, unknown]>([
+    ["array", oversized],
+    ["object payload", { count: 400, items: oversized }],
+  ])("holds %s under the budget", (_name, payload) => {
+    expect(JSON.stringify(limitItems(payload)).length).toBeLessThanOrEqual(32_768);
   });
 });

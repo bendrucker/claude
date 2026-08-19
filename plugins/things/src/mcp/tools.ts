@@ -3,9 +3,9 @@ import { z } from "zod";
 import { ensureThingsRunning } from "../../scripts/ensure-running";
 import { buildAttribution } from "../../scripts/inbox";
 import { reorder } from "../../scripts/reorder";
-import { mergeTags } from "../../scripts/tags";
 import { buildJsonPayload, type DispatchResult, dispatch, warnFallback } from "../../scripts/url";
-import { runQuery } from "./jxa";
+import { runScript } from "./jxa";
+import { requireTags } from "./tags";
 
 const LIST_IDS = {
   inbox: "TMInboxListSource",
@@ -36,6 +36,75 @@ function textResult(text: string) {
 
 function jsonResult(value: unknown) {
   return textResult(JSON.stringify(value));
+}
+
+/**
+ * Ceiling on a read's serialized payload. The payload travels as a JSON string
+ * nested in the JSON-RPC envelope, so escaping can roughly double it, and a
+ * proxy framing the line with Go's default `bufio.Scanner` drops anything past
+ * 64KB without saying why. Half of that leaves room for the escaping and the
+ * envelope. Tunable: raise it once every hop in the path reads longer lines.
+ */
+const MAX_PAYLOAD_BYTES = 32_768;
+
+/** Headroom for the truncation wrapper's own keys, which the fit search omits. */
+const WRAPPER_RESERVE_BYTES = 512;
+
+function payloadBytes(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value));
+}
+
+/**
+ * The items a read returned: a bare array, or the `items` field of a shape that
+ * carries a count alongside them.
+ */
+function readItems(payload: unknown): unknown[] | null {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object" && "items" in payload) {
+    const items = (payload as { items: unknown }).items;
+    if (Array.isArray(items)) return items;
+  }
+  return null;
+}
+
+/** Largest prefix of `items` that serializes within the budget. */
+function fittingCount(items: unknown[]): number {
+  const budget = MAX_PAYLOAD_BYTES - WRAPPER_RESERVE_BYTES;
+  let low = 0;
+  let high = items.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (payloadBytes(items.slice(0, mid)) <= budget) low = mid;
+    else high = mid - 1;
+  }
+  return low;
+}
+
+/**
+ * Caps a read at {@link MAX_PAYLOAD_BYTES}, dropping items from the end and
+ * saying so. An uncapped read of the logbook runs to megabytes, which a client
+ * sees as a failure carrying no detail rather than as too much data.
+ *
+ * A payload within budget is returned untouched, so the common case keeps the
+ * shape callers already parse.
+ */
+export function limitItems(payload: unknown): unknown {
+  const items = readItems(payload);
+  if (items === null || payloadBytes(payload) <= MAX_PAYLOAD_BYTES) return payload;
+
+  const returned = fittingCount(items);
+  const omitted = items.length - returned;
+  // A payload that carries its items in a field keeps that field's siblings,
+  // so a caller reading `count` still finds how many matched.
+  const siblings = Array.isArray(payload) ? {} : (payload as Record<string, unknown>);
+  return {
+    ...siblings,
+    truncated: true,
+    returned,
+    total: items.length,
+    note: `Narrow the range or filter; ${omitted} of ${items.length} items omitted to fit the response budget.`,
+    items: items.slice(0, returned),
+  };
 }
 
 /**
@@ -145,6 +214,11 @@ const todoIds = z.array(z.string().trim().min(1)).min(1);
 const whenDescription =
   "Schedule: today, tomorrow, evening, anytime, someday, yyyy-mm-dd, or natural language like 'next week'";
 
+const tagsDescription = "Tag names; each must already exist in Things unless create_tags is set";
+
+const createTagsDescription =
+  "Create any tag that does not exist yet in Things. Without it, an unknown tag fails the call.";
+
 export function registerTools(server: McpServer): void {
   server.registerTool(
     "list_todos",
@@ -157,7 +231,7 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ list }) => jsonResult(await runQuery("query-list.js", [LIST_IDS[list]])),
+    async ({ list }) => jsonResult(limitItems(await runScript("query-list.js", [LIST_IDS[list]]))),
   );
 
   server.registerTool(
@@ -175,7 +249,9 @@ export function registerTools(server: McpServer): void {
     },
     async ({ by, value, include_logbook }) =>
       jsonResult(
-        await runQuery("find-todos.js", [by, value, ...(include_logbook ? ["--logbook"] : [])]),
+        limitItems(
+          await runScript("find-todos.js", [by, value, ...(include_logbook ? ["--logbook"] : [])]),
+        ),
       ),
   );
 
@@ -194,11 +270,13 @@ export function registerTools(server: McpServer): void {
     },
     async ({ start, end, notes_contains }) =>
       jsonResult(
-        await runQuery("query-logbook.js", [
-          start,
-          end,
-          ...(notes_contains !== undefined ? ["--notes-contains", notes_contains] : []),
-        ]),
+        limitItems(
+          await runScript("query-logbook.js", [
+            start,
+            end,
+            ...(notes_contains !== undefined ? ["--notes-contains", notes_contains] : []),
+          ]),
+        ),
       ),
   );
 
@@ -212,7 +290,7 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ type }) => jsonResult(await runQuery("query-metadata.js", [type])),
+    async ({ type }) => jsonResult(await runScript("query-metadata.js", [type])),
   );
 
   server.registerTool(
@@ -226,7 +304,8 @@ export function registerTools(server: McpServer): void {
         notes: z.string().optional().describe("Markdown supported, max 10,000 chars"),
         when: z.string().optional().describe(whenDescription),
         deadline: z.string().optional().describe("yyyy-mm-dd"),
-        tags: z.array(z.string()).optional(),
+        tags: z.array(z.string()).optional().describe(tagsDescription),
+        create_tags: z.boolean().optional().describe(createTagsDescription),
         checklist_items: z.array(z.string()).optional().describe("Max 100"),
         list: z.string().optional().describe("Project name to file under (projects only)"),
         list_id: z.string().optional().describe("Project or area ID (required for areas)"),
@@ -240,7 +319,9 @@ export function registerTools(server: McpServer): void {
       if (args.notes !== undefined) params.set("notes", args.notes);
       if (args.when !== undefined) params.set("when", args.when);
       if (args.deadline !== undefined) params.set("deadline", args.deadline);
-      if (args.tags !== undefined) params.set("tags", args.tags.join(","));
+      if (args.tags !== undefined) {
+        params.set("tags", (await requireTags(args.tags, args.create_tags ?? false)).join(","));
+      }
       if (args.checklist_items !== undefined) {
         params.set("checklist-items", args.checklist_items.join("\n"));
       }
@@ -263,7 +344,8 @@ export function registerTools(server: McpServer): void {
         deadline: z.string().optional().describe("yyyy-mm-dd"),
         area: z.string().optional().describe("Area name to file under"),
         area_id: z.string().optional(),
-        tags: z.array(z.string()).optional(),
+        tags: z.array(z.string()).optional().describe(tagsDescription),
+        create_tags: z.boolean().optional().describe(createTagsDescription),
         todos: z.array(z.string()).optional().describe("Initial todo titles"),
       },
     },
@@ -277,7 +359,9 @@ export function registerTools(server: McpServer): void {
       if (args.deadline !== undefined) params.set("deadline", args.deadline);
       if (args.area !== undefined) params.set("area", args.area);
       if (args.area_id !== undefined) params.set("area-id", args.area_id);
-      if (args.tags !== undefined) params.set("tags", args.tags.join(","));
+      if (args.tags !== undefined) {
+        params.set("tags", (await requireTags(args.tags, args.create_tags ?? false)).join(","));
+      }
       if (args.todos !== undefined) params.set("to-dos", args.todos.join("\n"));
       return writeResult(await dispatch("add-project", params), `Created project "${args.title}"`);
     },
@@ -297,19 +381,31 @@ export function registerTools(server: McpServer): void {
         append_notes: z.string().optional(),
         when: z.string().optional().describe(whenDescription),
         deadline: z.string().optional().describe("yyyy-mm-dd"),
-        tags: z.array(z.string()).optional().describe("Replaces existing tags"),
-        add_tags: z.array(z.string()).optional().describe("Adds to existing tags"),
+        tags: z.array(z.string()).optional().describe(`Replaces existing tags. ${tagsDescription}`),
+        add_tags: z
+          .array(z.string())
+          .optional()
+          .describe(`Adds to existing tags. ${tagsDescription}`),
+        create_tags: z.boolean().optional().describe(createTagsDescription),
         checklist_items: z.array(z.string()).optional().describe("Replaces existing checklist"),
         completed: z.boolean().optional(),
         canceled: z.boolean().optional(),
       },
     },
-    async ({ ids, ...rest }) => {
-      const attributes = updateAttributes(rest);
-      if (Object.keys(attributes).length === 0) {
+    async ({ ids, create_tags, ...rest }) => {
+      if (Object.keys(updateAttributes(rest)).length === 0) {
         throw new Error("At least one attribute to update is required");
       }
       await ensureThingsRunning();
+
+      // Both tag fields resolve up front. A rejection landing partway through
+      // the batch loop would leave the earlier chunks already written.
+      const createMissing = create_tags ?? false;
+      const attributes = updateAttributes({
+        ...rest,
+        tags: rest.tags && (await requireTags(rest.tags, createMissing)),
+        add_tags: rest.add_tags && (await requireTags(rest.add_tags, createMissing)),
+      });
 
       if (ids.length === 1 && ids[0]) {
         const params = new Map<string, string>(Object.entries(attributes));
@@ -345,12 +441,16 @@ export function registerTools(server: McpServer): void {
     {
       title: "Capture to inbox with Claude attribution",
       description:
-        "Quick-capture one or more todos to the inbox. Each todo is tagged 'Claude'; pass session_id (and directory) to append resume attribution to the notes.",
+        "Quick-capture one or more todos to the inbox. Each todo is tagged 'claude'; pass session_id (and directory) to append resume attribution to the notes.",
       inputSchema: {
         title: z.string().optional().describe("Single todo title"),
         titles: z.array(z.string()).optional().describe("Multiple todo titles"),
         notes: z.string().optional(),
-        tags: z.array(z.string()).optional().describe("Extra tags beyond 'Claude'"),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe(`Extra tags beyond 'claude'. ${tagsDescription}`),
+        create_tags: z.boolean().optional().describe(createTagsDescription),
         checklist_items: z.array(z.string()).optional(),
         // Blank strings are rejected rather than ignored. Both are read for
         // truthiness below, so a blank one would drop the attribution the
@@ -381,7 +481,10 @@ export function registerTools(server: McpServer): void {
       if (args.checklist_items !== undefined) {
         params.set("checklist-items", args.checklist_items.join("\n"));
       }
-      params.set("tags", mergeTags(["Claude"], args.tags ?? []).join(","));
+      // Lowercase to match the tag Things stores. resolveTags folds case, so a
+      // caller naming it too gets one tag rather than two spellings of it.
+      const tags = await requireTags(["claude", ...(args.tags ?? [])], args.create_tags ?? false);
+      params.set("tags", tags.join(","));
 
       let notes = args.notes;
       if (args.session_id) {

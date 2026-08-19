@@ -3,6 +3,7 @@
 
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
+import { requireTags } from "../src/mcp/tags";
 import { mergeTags, parseTags } from "./tags";
 import { dispatch, warnFallback } from "./url";
 
@@ -84,9 +85,6 @@ if (import.meta.main) {
     }
   }
 
-  const tags = mergeTags(["Claude"], argv.flags.tag ?? [], parseTags(params.get("tags")));
-  params.set("tags", tags.join(","));
-
   const attribution = buildAttribution(argv.flags.sessionId, process.cwd());
   const existing = params.get("notes");
   params.set("notes", existing ? `${existing}\n\n${attribution}` : attribution);
@@ -94,6 +92,11 @@ if (import.meta.main) {
   await ensureThingsRunning();
 
   try {
+    // Things drops a tag it does not already know and still reports success, so
+    // the CLI resolves against the stored tags for the same reason the tool does.
+    const requested = mergeTags(["claude"], argv.flags.tag ?? [], parseTags(params.get("tags")));
+    params.set("tags", (await requireTags(requested, false)).join(","));
+
     const result = await dispatch("add", params);
     if (result.id) {
       console.log(`https://things.bendrucker.me/show?id=${result.id}`);

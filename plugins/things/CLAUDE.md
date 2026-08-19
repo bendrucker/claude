@@ -45,6 +45,8 @@ A degraded dispatch is no longer silent. `dispatch` returns a `fallbackReason` n
 
 Keep `console.log` under `import.meta.main`. A function both the CLI and a tool call returns its result and lets the CLI print it. Send diagnostics to stderr, which tailgate logs. Pipe or `.quiet()` every subprocess, including Bun's `$`, which inherits stdout by default. `src/mcp/stdio.test.ts` fails on any stdout line that will not parse as JSON.
 
+`src/mcp/tags.ts` gates every tag-carrying write on the tags Things already holds, because Things drops an unknown tag and still reports success. The matching itself is pure and lives in `scripts/tags.ts`; the module here is the IO shell, with the fetch and the create behind a `TagActions` seam the way `dispatch` puts its runner behind `DispatchActions`. `scripts/inbox.ts` routes its CLI capture through the same requirer, so the CLI and the tool agree on which tags exist.
+
 `src/mcp/jxa.ts` resolves the `mac` plugin's JXA runner across the same two layouts as `findXcallRunner`, and accepts only the sibling under this plugin's own version directory. The runner's argument contract is versioned: this build expects the runner to forward everything past the script path to the script itself, and a runner from another commit may claim those flags and leave the script answering with a usage error. `findJxaRunner` takes the plugin root as an argument so tests can point it at a fixture tree.
 
 ## What NOT to Do

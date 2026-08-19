@@ -279,7 +279,10 @@ export function registerTools(server: McpServer): void {
       inputSchema: {
         by: z.enum(["tag", "project"]),
         value: z.string().describe("Tag name or project name"),
-        include_logbook: z.boolean().optional(),
+        include_logbook: z
+          .boolean()
+          .optional()
+          .describe("Also return completed and cancelled todos, which are otherwise excluded"),
         limit: limitParameter,
       },
       annotations: { readOnlyHint: true },
@@ -336,7 +339,12 @@ export function registerTools(server: McpServer): void {
       inputSchema: {
         start: isoDate.describe("Start of range, ISO 8601 (e.g. 2026-07-01)"),
         end: isoDate.describe("End of range, ISO 8601"),
-        notes_contains: z.string().optional().describe("Only todos whose notes contain this"),
+        notes_contains: z
+          .string()
+          .optional()
+          .describe(
+            "Only todos whose notes contain this substring. Matched literally and case-sensitively against the notes alone, never the title.",
+          ),
         limit: limitParameter,
       },
       annotations: { readOnlyHint: true },
@@ -580,7 +588,7 @@ export function registerTools(server: McpServer): void {
     {
       title: "Reorder todos to the top of a list",
       description:
-        "Move todos to the top of Today, Anytime, or Someday in the given order. Use the list matching the todos' current scheduling state. Also reorders items within a project.",
+        "Move todos to the top of Today, Anytime, or Someday in the given order. Use the list matching the todos' current scheduling state. This works by rescheduling each todo out of the list and back, so a todo carrying a specific date has that date replaced by the target list.",
       inputSchema: {
         ids: todoIds.describe("Todo IDs in desired top-to-bottom order"),
         list: z.enum(["today", "anytime", "someday"]).default("today"),

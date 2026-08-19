@@ -3,9 +3,10 @@
 set -euo pipefail
 
 # Exit 3 separates a build failure from xcall's own exit codes (0 success,
-# 1 x-error, 2 x-cancel). Exit 4 separates a wait that ran out of time. Callers
-# treat any non-zero status as "no result", so without them a broken bridge is
-# indistinguishable from the target app rejecting the request.
+# 1 x-error, 2 x-cancel). Exit 4 separates a wait that ran out of time. Exit 5
+# separates a wait for the bridge itself. Callers treat any non-zero status as
+# "no result", so without them a broken bridge is indistinguishable from the
+# target app rejecting the request.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -76,6 +77,29 @@ if ((build_status != 0)); then
   fi
   exit 3
 fi
+
+# One xcall runs at a time, across every process that calls this script. Two
+# waiting instances share one registered handler for xcall-claude://, and macOS
+# picks which of them a callback reaches. Each instance answers only to its own
+# token, so a stray callback is ignored rather than misread, but the instance it
+# belonged to never sees it and waits out its deadline. Holding the bridge to
+# one waiter is what keeps the callback unambiguous to deliver.
+LOCK_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/claude/x-callback-url/xcall.lock"
+mkdir -p "$(dirname "$LOCK_FILE")"
+
+# A holder cannot outlive its own watchdog, so the wait covers one full turn
+# plus the grace the watchdog allows before SIGKILL. shlock reclaims a lock
+# whose recorded pid is gone, which covers a holder killed outside that path.
+LOCK_WAIT_SECONDS=$((TIMEOUT_SECONDS + KILL_GRACE_SECONDS + 1))
+lock_deadline=$((SECONDS + LOCK_WAIT_SECONDS))
+until shlock -f "$LOCK_FILE" -p $$; do
+  if ((SECONDS >= lock_deadline)); then
+    echo "another xcall held the xcall-claude:// bridge for more than ${LOCK_WAIT_SECONDS}s" >&2
+    exit 5
+  fi
+  sleep 0.1
+done
+trap 'rm -f "$LOCK_FILE"' EXIT
 
 xcall_status=0
 run_bounded "$TIMEOUT_SECONDS" "$BINARY" "$@" || xcall_status=$?

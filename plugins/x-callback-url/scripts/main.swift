@@ -22,6 +22,15 @@ import Foundation
 
 let callbackScheme = "xcall-claude"
 
+// macOS binds one handler bundle to xcall-claude://, so every concurrently
+// waiting instance is a candidate recipient for every callback, and the three
+// callback URLs are otherwise identical between them. Without something to tell
+// them apart, an instance can accept the answer to another instance's request
+// and report that request's id as its own. The token travels out on the
+// callback URL and comes back on the event, and an instance answers only to its
+// own.
+let callbackToken = UUID().uuidString
+
 guard CommandLine.arguments.count >= 2 else {
     fputs("Usage: xcall <url>\n", stderr)
     exit(1)
@@ -40,9 +49,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             andEventID: AEEventID(kAEGetURL)
         )
 
-        let successCB = "\(callbackScheme)://x-callback-url/success"
-        let errorCB = "\(callbackScheme)://x-callback-url/error"
-        let cancelCB = "\(callbackScheme)://x-callback-url/cancel"
+        let successCB = "\(callbackScheme)://x-callback-url/success?token=\(callbackToken)"
+        let errorCB = "\(callbackScheme)://x-callback-url/error?token=\(callbackToken)"
+        let cancelCB = "\(callbackScheme)://x-callback-url/cancel?token=\(callbackToken)"
 
         var urlString = baseURL
         let sep = urlString.contains("?") ? "&" : "?"
@@ -75,7 +84,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let query = components.query ?? ""
+
+        // Percent-encoded throughout: the target app's values carry whatever a
+        // caller wrote, and decoding here only to re-encode on the way out
+        // would be a chance to change them.
+        let items = components.percentEncodedQueryItems ?? []
+        guard items.first(where: { $0.name == "token" })?.value == callbackToken else {
+            return
+        }
+
+        // The token is this bridge's own bookkeeping, so it does not reach the
+        // caller reading the query off stdout.
+        var answer = URLComponents()
+        let rest = items.filter { $0.name != "token" }
+        answer.percentEncodedQueryItems = rest.isEmpty ? nil : rest
+        let query = answer.percentEncodedQuery ?? ""
 
         switch path {
         case "success":

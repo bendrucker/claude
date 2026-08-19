@@ -192,15 +192,22 @@ function boundSeconds(env: Record<string, string | undefined>, name: string): nu
 
 /**
  * Backstop for a runner that dies without honoring its own watchdogs. Derived
- * from run.sh's two bounds rather than fixed, because run.sh invites raising
- * either one in its own timeout message. A backstop below their sum kills the
- * runner before it can name why it failed, and the caller gets an anonymous
- * signal in place of exit 3 or 4.
+ * from run.sh's bounds rather than fixed, because run.sh invites raising them
+ * in its own timeout messages. A backstop below their sum kills the runner
+ * before it can name why it failed, and the caller gets an anonymous signal in
+ * place of exit 3, 4, or 5.
+ *
+ * The callback timeout counts twice. run.sh serializes on a lock first, and a
+ * caller that finds the bridge busy waits out the holder's full turn before
+ * starting its own.
  */
 export function xcallBackstopMs(env: Record<string, string | undefined>): number {
+  const callback = boundSeconds(env, "XCALL_TIMEOUT_SECONDS");
+  const lockWait = callback + XCALL_KILL_GRACE_SECONDS + 1;
   const bounds =
     boundSeconds(env, "XCALL_BUILD_TIMEOUT_SECONDS") +
-    boundSeconds(env, "XCALL_TIMEOUT_SECONDS") +
+    lockWait +
+    callback +
     XCALL_KILL_GRACE_SECONDS;
   return bounds * 1000 + XCALL_BACKSTOP_MARGIN_MS;
 }

@@ -162,8 +162,11 @@ describe("xcallBackstopMs", () => {
     { name: "a zero bound", env: { XCALL_TIMEOUT_SECONDS: "0" } },
   ])("outwaits run.sh with $name", ({ env }) => {
     const bound = (name: string) => Number(env[name]) || 20;
+    // run.sh waits out a lock holder's whole turn before starting its own, so
+    // the callback bound counts once for the wait and once for the call.
+    const callback = bound("XCALL_TIMEOUT_SECONDS");
     const runnerCeilingMs =
-      (bound("XCALL_BUILD_TIMEOUT_SECONDS") + bound("XCALL_TIMEOUT_SECONDS") + 2) * 1000;
+      (bound("XCALL_BUILD_TIMEOUT_SECONDS") + (callback + 2 + 1) + callback + 2) * 1000;
 
     expect(xcallBackstopMs(env)).toBeGreaterThan(runnerCeilingMs);
   });
@@ -174,8 +177,8 @@ describe("xcallBackstopMs", () => {
       raised: xcallBackstopMs({ XCALL_BUILD_TIMEOUT_SECONDS: "90", XCALL_TIMEOUT_SECONDS: "60" }),
     }).toMatchInlineSnapshot(`
       {
-        "defaults": 57000,
-        "raised": 167000,
+        "defaults": 80000,
+        "raised": 230000,
       }
     `);
   });

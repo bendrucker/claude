@@ -69,6 +69,11 @@ describe("headingCaseViolations", () => {
       [{ text: "Rebase Vs. Merge", suggested: "Rebase vs. Merge" }],
     ],
     [
+      "leaves a hyphenated filename whole rather than casing each segment",
+      "## Fix the ci-config.json path",
+      [{ text: "Fix the ci-config.json path", suggested: "Fix the ci-config.json Path" }],
+    ],
+    [
       "does not capitalize into a leading numeral",
       "## 3rd-party tooling",
       [{ text: "3rd-party tooling", suggested: "3rd-Party Tooling" }],

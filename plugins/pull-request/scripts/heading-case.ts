@@ -75,22 +75,10 @@ function restore(text: string, codeSpans: string[]): string {
   return text.replaceAll(PLACEHOLDER, () => `\`${codeSpans[i++]}\``);
 }
 
-// A dot joining two segments marks a filename or config name, which is a code
-// token even unbackticked and carries no internal capital to mark it:
-// `global.css` became `Global.css` and `tmux.conf` became `Tmux.conf`.
-//
-// The dot must sit between two segments, with a lowercase alphanumeric one
-// after it, so a trailing dot never marks a word: a heading ending in a period
-// stays prose, and the AP stopword `vs.` keeps lowercasing. `e.g.` matches and
-// is left as written, which is already its AP form. `U.S.` needs no dot rule
-// because its internal capital marks it.
-const DOTTED_IDENTIFIER = /[A-Za-z0-9]\.[a-z0-9]/;
-
 // AP casing preserves all-caps acronyms on its own, but it title-cases
 // identifiers with a lowercase first letter (`gitLab` -> `GitLab`, `iOS` ->
 // `IOS`). An internal capital marks those so they aren't re-cased.
 function isIdentifier(segment: string): boolean {
-  if (DOTTED_IDENTIFIER.test(segment)) return true;
   const letters = segment.replace(/[^A-Za-z]/g, "");
   if (letters.length < 2) return false;
   return /[A-Z]/.test(letters.slice(1));
@@ -122,6 +110,17 @@ function caseHyphenated(original: string): string {
     .join("-");
 }
 
+// A dot joining two segments marks a filename or config name, which is a code
+// token even unbackticked and carries no internal capital to mark it:
+// `global.css` became `Global.css` and `tmux.conf` became `Tmux.conf`.
+//
+// The dot must sit between two segments, with a lowercase alphanumeric one
+// after it, so a trailing dot never marks a word: a heading ending in a period
+// stays prose, and the AP stopword `vs.` keeps lowercasing. `e.g.` matches and
+// is left as written, which is already its AP form. `U.S.` needs no dot rule
+// because its internal capital marks it.
+const DOTTED_IDENTIFIER = /[A-Za-z0-9]\.[a-z0-9]/;
+
 // One word's AP casing: code spans and identifiers pass through untouched,
 // hyphenated compounds get per-segment casing, everything else takes the
 // library's position-aware result.
@@ -130,6 +129,9 @@ function caseWord(original: string, cased: string): string {
   // A leading dash marks a CLI flag, which is a code token even unbackticked.
   // Casing it produces `--Format` and `-N`.
   if (original.startsWith("-")) return original;
+  // Tested ahead of the hyphen split, which cases each segment on its own and
+  // turned `ci-config.json` into `Ci-config.json`.
+  if (DOTTED_IDENTIFIER.test(original)) return original;
   if (original.includes("-")) return caseHyphenated(original);
   if (isIdentifier(original)) return original;
   return cased;

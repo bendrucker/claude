@@ -25,9 +25,16 @@ WITH stripped AS (
     sb.host,
     sb.session_id,
     sb.retried_tool_id,
+    -- Strip repeated prefixes off the front, one per repetition, leaving the command.
     regexp_replace(
       trim(sb.command),
-      '^((cd [^&;\n]*|echo [^&;\n]*)(&&|;|\n)\s*|(export )?[A-Za-z_][A-Za-z0-9_]*=(\$\([^)]*\)|"[^"]*"|''[^'']*''|[^\s;&|]*)\s*(&&|;)?\s*)+',
+      '^('
+        || '(cd [^&;\n]*|echo [^&;\n]*)(&&|;|\n)\s*'     -- a `cd ~/src &&` or `echo hi;` wrapper
+        || '|'                                           -- or
+        || '(export )?[A-Za-z_][A-Za-z0-9_]*='           -- an env assignment, optionally exported
+        || '(\$\([^)]*\)|"[^"]*"|''[^'']*''|[^\s;&|]*)'  -- whose value is `$(...)`, quoted, or bare
+        || '\s*(&&|;)?\s*'                               -- and whose trailing `&&` or `;` is optional
+      || ')+',
       ''
     ) AS eff
   FROM sandbox_bypasses sb

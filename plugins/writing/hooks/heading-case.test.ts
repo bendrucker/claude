@@ -50,6 +50,44 @@ describe("headingCaseViolations", () => {
       "## Hide the --format flag",
       [{ text: "Hide the --format flag", suggested: "Hide the --format Flag" }],
     ],
+    ["leaves an unbackticked filename alone", "## Page Column Rule in global.css", []],
+    ["leaves unbackticked config names alone", "## Notes on package.json and bun.lock", []],
+    ["leaves a dotted name in a deeper heading alone", "### Rows From views.sql", []],
+    [
+      "re-cases around an unbackticked filename",
+      "## What sourcing tmux.conf actually does",
+      [
+        {
+          text: "What sourcing tmux.conf actually does",
+          suggested: "What Sourcing tmux.conf Actually Does",
+        },
+      ],
+    ],
+    [
+      "re-cases around several unbackticked filenames",
+      "## sections.md and tsconfig.json both moved",
+      [
+        {
+          text: "sections.md and tsconfig.json both moved",
+          suggested: "sections.md and tsconfig.json Both Moved",
+        },
+      ],
+    ],
+    [
+      "still flags a sentence-case heading that ends in a period",
+      "## Two fixes found while testing.",
+      [{ text: "Two fixes found while testing.", suggested: "Two Fixes Found While Testing." }],
+    ],
+    [
+      "still lowercases the `vs.` stopword",
+      "## Rebase Vs. Merge",
+      [{ text: "Rebase Vs. Merge", suggested: "Rebase vs. Merge" }],
+    ],
+    [
+      "leaves a hyphenated filename whole rather than casing each segment",
+      "## Fix the ci-config.json path",
+      [{ text: "Fix the ci-config.json path", suggested: "Fix the ci-config.json Path" }],
+    ],
     [
       "does not capitalize into a leading numeral",
       "## 3rd-party tooling",

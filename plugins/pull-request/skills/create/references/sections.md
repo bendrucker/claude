@@ -53,7 +53,7 @@ The PR-body hook re-cases every heading through `heading-case.ts` and denies the
 
 - Lowercase a listed word in the middle: `Heading Case Via the Hook` → `Heading Case via the Hook`; `Reasons To Defer` → `Reasons to Defer`.
 - A hyphenated compound capitalizes each element and applies the same list past the first: `Follow-up Tasks` → `Follow-Up Tasks`, while `Ready-to-Ship Checklist` keeps its lowercase `to`.
-- Inline code spans, unbackticked CLI flags (`--body-file`), and identifiers with an internal capital (`gitLab`) pass through as written.
+- Inline code spans, unbackticked CLI flags (`--body-file`), identifiers with an internal capital (`gitLab`), and unbackticked filenames or config names carrying a dot (`tmux.conf`) pass through as written.
 
 ## Mine the Conversation
 

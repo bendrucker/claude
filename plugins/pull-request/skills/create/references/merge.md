@@ -1,11 +1,11 @@
 # Auto-Merge
 
-Auto-merge is passive: it arms the platform and returns. Branch protection still gates the actual merge on checks and required approvals. It does not fix red CI or wait out a review, which is what `pull-request:babysit` is for.
+Enabling auto-merge only sets a flag. Branch protection still gates the merge on checks and approvals. Auto-merge can't fix red CI or wait for a review to finish. Use `pull-request:babysit` for that.
 
-On a repo you own it is the default. You are going to merge that PR yourself once the checks clear, and arming it up front saves the round trip. On a third-party repo it stays off, because the maintainer decides when the PR merges. A draft stays off too: GitHub refuses to arm auto-merge on a draft, so `--draft` and auto-merge never combine. `--no-auto` skips it anywhere.
+Enable it by default on a repo you own. Leave it off on a third-party repo (the maintainer decides) and on a draft (GitHub refuses it there). `--no-auto` disables it everywhere.
 
 - **GitHub**: `gh pr merge --auto`. Add `--squash` or `--rebase` to match the repo's merge method when known (`gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed`).
-- **GitHub, stacked**: auto-merge has no equivalent on a stacked PR. Say so and suggest `pull-request:babysit <url> --merge`, which drives the stack merge at green.
-- **GitLab**: load `gitlab:merge-request` and run its `merge.ts --auto-merge`, which handles merge trains and falls back to `glab mr merge` as needed.
+- **GitHub, stacked**: no auto-merge equivalent exists for a stacked PR. Say so and suggest `pull-request:babysit <url> --merge`.
+- **GitLab**: load `gitlab:merge-request` and run its `merge.ts --auto-merge`, which handles merge trains and falls back to `glab mr merge`.
 
-A repo with auto-merge turned off rejects `gh pr merge --auto`. Report that the PR waits for a manual merge and move on. Leave the landing to whoever decides it. Arming the platform was the whole request.
+A repo with auto-merge disabled rejects `gh pr merge --auto`. Report that the PR needs a manual merge and continue. Don't merge it yourself.

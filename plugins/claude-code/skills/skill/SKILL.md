@@ -95,6 +95,10 @@ The description field is a trigger, not a summary. It's what Claude scans to dec
 
 The context window is a public good. Don't restate what Claude already knows. Spend tokens on what pushes Claude out of its defaults: gotchas, internal conventions, non-obvious constraints. The highest-signal content in any skill is a `## Gotchas` section documenting failure modes hit in practice; grow it as edge cases surface.
 
+#### Plain Language
+
+Write skill prose as instructions, in the imperative, with conditions before instructions and common verbs. Metaphor, epigram, and personification aim at a human reader and make weaker match targets than literal statements. See [references/plain-language.md](references/plain-language.md) for the sentence forms, the conversions, and the procedure for converting an existing skill.
+
 #### Progressive Disclosure
 
 A skill is a folder, not just a markdown file. Keep `SKILL.md` a concise hub and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. Organize references by domain and gate conditional detail behind a pointer, so a question about one domain loads only that file.
@@ -180,6 +184,7 @@ A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md fi
 Load detailed guides as needed:
 
 - **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, skill-scoped hooks, anti-patterns
+- **[references/plain-language.md](references/plain-language.md)** - Plain-language rules for skill prose and the conversion procedure
 - **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache
 
 ## Resources

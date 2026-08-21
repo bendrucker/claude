@@ -147,6 +147,40 @@ $318
     expect(parseResults(text)[0]?.arrive).toBe("7:21 AM+1");
   });
 
+  test("reads connecting airports from the qualified stop count", () => {
+    // The bare "1 stop" comes first in the tail. The airports live in a second,
+    // qualified rendering further along, which is why it gets its own search.
+    const text = `
+9:41 AM
+9:41 AM on Wednesday, April 15
+– 8:30 PM
+8:30 PM on Wednesday, April 15
+Alaska, Fiji Airways
+13 hr 49 min
+2 stops
+$744
+2 stops in LAX, NAN2 stops13 hr 49 min
+`;
+
+    expect(parseResults(text)[0]).toMatchObject({
+      stops: "2 stops",
+      via: ["LAX", "NAN"],
+    });
+  });
+
+  test("leaves via empty on a nonstop", () => {
+    expect(parseResults(itinerary({ airline: "United", price: "$274" }))[0]?.via).toEqual([]);
+  });
+
+  test("drops the operator note appended to a codeshare carrier", () => {
+    const text = itinerary({
+      airline: "AlaskaOperated by Alaska as Hawaiian Airlines",
+      price: "$684",
+    });
+
+    expect(parseResults(text)[0]?.airline).toBe("Alaska");
+  });
+
   test("sorts by departure time across noon", () => {
     const text = [
       itinerary({ airline: "United", price: "$274" }),

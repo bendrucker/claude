@@ -45,7 +45,7 @@ const FLIGHT = /^([A-Z0-9]{2} \d{1,4})(?: \((.+?)\))?Flight Number /;
 const MILES = /^([\d,.]+)k?\s*miles$/i;
 const BARE_MILES = /^([\d,.]+)k$/i;
 const TAXES = /^\+?\$([\d,.]+)$/;
-const AWARD_TYPE = /^(Saver|Everyday) Award$/;
+const AWARD_TYPE = /^((?:Saver|Everyday) Award)$/;
 const FARE_CLASS = /^(United .+ \([A-Z]{1,2}\))$/;
 
 const CABINS = new Set([
@@ -199,7 +199,7 @@ function minutesOfDay(time: string): number {
   return (hour + (time.toUpperCase().includes("PM") ? 12 : 0)) * 60 + Number(match[2]);
 }
 
-function render(flights: UnitedFlight[]): string {
+export function render(flights: UnitedFlight[]): string {
   const body: string[][] = [];
   const ordered = [...flights].sort(
     (a, b) => minutesOfDay(a.departTime) - minutesOfDay(b.departTime),

@@ -4,7 +4,7 @@ The only source for what United will actually sell, and the only source for awar
 
 ## Browser Invocation
 
-united.com returns `ERR_HTTP2_PROTOCOL_ERROR` under most agent-browser configurations. One combination works:
+united.com returns `ERR_HTTP2_PROTOCOL_ERROR` under most agent-browser configurations. One combination works often enough to use:
 
 ```bash
 agent-browser --session flights-united --profile Default --headed --idle-timeout 0 <command>
@@ -16,7 +16,9 @@ Rules that follow from this, all of them load-bearing:
 - **`--profile Default`**, the real Chrome profile. A dedicated profile directory fails intermittently. The mechanism is unexplained. It is worked around empirically, not understood.
 - **Headless never works.** Headed only.
 - **Chain `open`, a sleep, and `read` in one Bash call.** Splitting them across calls invites the daemon to reset between them.
-- Allow 12 to 14 seconds after `open`. Results render late.
+- Allow 12 to 14 seconds after `open`. Results render late, and a page that returns the site shell with no itineraries usually needs more time rather than a different approach.
+
+Even on the working combination the error recurs, including mid-session after a run of successful loads. It is a rate of use the site tolerates, not a configuration that fixes anything. Space the queries out, keep united.com to the shortlist, and when the error appears twice in a row, stop and report rather than continuing to retry. Results already collected stay valid.
 
 Password entry is the user's. Open headed, hand over the keyboard, and wait.
 

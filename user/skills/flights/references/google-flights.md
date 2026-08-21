@@ -56,7 +56,7 @@ bun user/skills/flights/scripts/google-flights.ts parse < dump.txt
 
 **Run one query per Bash tool call.** Chaining open, sleep, and read inside a single call is correct and preferred. Splitting them across calls, or looping several queries in one call, is what crashes the daemon. After a crash the session resets to `about:blank`.
 
-Do not use a retry loop around the daemon. An earlier `load.sh` wrapper did exactly that and its retries were the thing killing the daemon.
+Retrying around the daemon compounds the failure: repeated calls kill it faster than letting one call fail.
 
 ## Parsing
 

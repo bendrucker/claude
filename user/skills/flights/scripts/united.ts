@@ -1,3 +1,8 @@
+#!/usr/bin/env bun
+
+import { cli, command } from "cleye";
+import { table } from "table";
+
 // united.com's award results page is the only source for mileage pricing and
 // fare classes. Its rendered text repeats every value twice, once as the visible
 // label and once inside the screen-reader description ("3:00 PMDeparting at
@@ -149,16 +154,21 @@ export function parseAwardResults(text: string): UnitedFlight[] {
 }
 
 /**
- * Award search on united.com. `at=1` is what switches the results from cash to
- * miles. Without it the same URL returns dollar fares.
+ * Search on united.com. `at` is what switches the results between dollars and
+ * miles, and is the whole of the award search.
  */
-export function awardSearchUrl(origin: string, destination: string, date: string): string {
+export function searchUrl(
+  origin: string,
+  destination: string,
+  date: string,
+  award = false,
+): string {
   const params = new URLSearchParams({
     f: origin,
     t: destination,
     d: date,
     tt: "1",
-    at: "1",
+    at: award ? "1" : "0",
     sc: "7",
     px: "1",
     taxng: "1",
@@ -168,4 +178,141 @@ export function awardSearchUrl(origin: string, destination: string, date: string
     tqp: "A",
   });
   return `https://www.united.com/en/us/fsr/choose-flights?${params}`;
+}
+
+export function awardSearchUrl(origin: string, destination: string, date: string): string {
+  return searchUrl(origin, destination, date, true);
+}
+
+const DIM = "\x1b[90m";
+const GREEN = "\x1b[32m";
+const YELLOW = "\x1b[33m";
+const RESET = "\x1b[0m";
+
+const IATA = /^[A-Z]{3}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function minutesOfDay(time: string): number {
+  const match = /(\d+):(\d+)/.exec(time);
+  if (!match) return 0;
+  const hour = Number(match[1]) % 12;
+  return (hour + (time.toUpperCase().includes("PM") ? 12 : 0)) * 60 + Number(match[2]);
+}
+
+function render(flights: UnitedFlight[]): string {
+  const body: string[][] = [];
+  const ordered = [...flights].sort(
+    (a, b) => minutesOfDay(a.departTime) - minutesOfDay(b.departTime),
+  );
+
+  for (const flight of ordered) {
+    const available = flight.fares.filter((fare) => fare.available && fare.miles !== null);
+    const cells = [
+      flight.departTime,
+      flight.arriveTime,
+      flight.duration,
+      flight.stops,
+      flight.flight,
+      flight.aircraft ?? "",
+    ];
+
+    if (available.length === 0) {
+      body.push([...cells, `${DIM}none${RESET}`, "", ""]);
+      continue;
+    }
+
+    for (const [index, fare] of available.entries()) {
+      // Repeating the itinerary on every fare row would bury the flight it
+      // belongs to, so only the first row of a flight carries it.
+      const lead = index === 0 ? cells : ["", "", "", "", "", ""];
+      const saver = fare.awardType?.startsWith("Saver");
+      const miles = fare.miles?.toLocaleString() ?? "";
+      const bucket = fare.fareClass ?? `${DIM}dynamic${RESET}`;
+      body.push([
+        ...lead,
+        fare.cabin,
+        saver ? `${GREEN}${miles}${RESET}` : miles,
+        saver ? `${GREEN}${fare.fareClass ?? "saver"}${RESET}` : bucket,
+      ]);
+    }
+  }
+
+  return table(
+    [
+      ["Depart", "Arrive", "Duration", "Stops", "Flight", "Aircraft", "Cabin", "Miles", ""],
+      ...body,
+    ],
+    { columns: { 7: { alignment: "right" } } },
+  );
+}
+
+const urlCmd = command(
+  {
+    name: "url",
+    parameters: ["<origin>", "<destination>", "<date>"],
+    help: {
+      description: "Build a united.com one-way search URL. Date is YYYY-MM-DD.",
+    },
+    flags: {
+      award: { type: Boolean, description: "Price in miles instead of dollars" },
+    },
+  },
+  (parsed) => {
+    const { origin, destination, date } = parsed._;
+    for (const code of [origin, destination]) {
+      if (!IATA.test(code)) {
+        throw new Error(`airport must be a 3-letter IATA code, got ${JSON.stringify(code)}`);
+      }
+    }
+    if (!DATE.test(date)) {
+      throw new Error(`date must be YYYY-MM-DD, got ${JSON.stringify(date)}`);
+    }
+    console.log(searchUrl(origin, destination, date, parsed.flags.award));
+  },
+);
+
+const parseCmd = command(
+  {
+    name: "parse",
+    help: {
+      description: "Parse `agent-browser read` output of an award results page, from stdin.",
+    },
+    flags: {
+      json: { type: Boolean, description: "Emit flights as JSON" },
+    },
+  },
+  async (parsed) => {
+    const flights = parseAwardResults(await Bun.stdin.text());
+    if (parsed.flags.json) {
+      console.log(JSON.stringify(flights, null, 2));
+      return;
+    }
+    if (flights.length === 0) {
+      console.error("no flights parsed — page may not have rendered yet");
+      process.exit(1);
+    }
+    console.log(render(flights));
+
+    const saver = flights.filter((flight) =>
+      flight.fares.some((fare) => fare.available && fare.awardType?.startsWith("Saver")),
+    );
+    console.log(
+      saver.length > 0
+        ? `${GREEN}saver space on ${saver.map((flight) => flight.flight).join(", ")}${RESET}`
+        : `${YELLOW}no saver space; everything here is dynamically priced${RESET}`,
+    );
+  },
+);
+
+if (import.meta.main) {
+  cli(
+    {
+      name: "united",
+      commands: [urlCmd, parseCmd],
+      help: {
+        description: "Build united.com search URLs and parse rendered award results.",
+      },
+    },
+    (parsed) => parsed.showHelp(),
+  );
 }

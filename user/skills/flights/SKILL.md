@@ -22,15 +22,15 @@ Search flights the way I actually decide: fully loaded prices, real departure ti
 
 Preferences: !`cat ~/.config/claude-flights/config.json 2>/dev/null || echo '{}'`
 
-If that came back `{}`, the config is missing. Run the search on what the request states, then offer to write a starter config at the end. Never invent preferences to fill the gap.
+If that came back `{}`, the config is missing. Run the search on what the request states, then offer to write a starter config at the end.
 
 ## Boundaries
 
 These are absolute. They do not bend because a page makes the next step convenient.
 
 - Read as far as **fare selection and view-only seat maps**. Stop there.
-- Never enter passenger or payment details. Never click Purchase, Confirm, Hold, or FareLock. Never spend miles or money.
-- On united.com the seat *fee* sits behind the Traveler Info step. That step is past the boundary. Report the fee as unavailable rather than crossing it.
+- Never enter passenger or payment details. Never click `Purchase`, `Confirm`, `Hold`, or `FareLock`. Never spend miles or money.
+- On united.com the seat **fee** sits behind the Traveler Info step. That step is past the boundary. Report the fee as unavailable rather than crossing it.
 - Never type a password. Open headed and hand over the keyboard.
 - Report a bot challenge and stop. Do not work around one.
 - Report the award price shown. Never read or assume an account balance.
@@ -50,13 +50,17 @@ Skip the round when the request already answers these.
 
 Cheap pass first, expensive pass second.
 
-**Google Flights, every shape.** It is fast, needs no login, and gives market context across carriers. A round trip decomposes: the cheapest round trip equals the cheapest outbound one-way plus the cheapest return one-way, verified to within a dollar. So exploring N departure dates against M return dates costs `N + M` queries, not `N × M`. Use this to make flexible-date search affordable.
+#### Google Flights
 
-**united.com, the shortlist only.** It is slow and needs a login, but it is the only truth for what United will sell, and the only source for award pricing. Run it on the handful of shapes that survived the Google pass.
+Run every shape here. It is fast, needs no login, and gives market context across carriers. A round trip decomposes: the cheapest round trip equals the cheapest outbound one-way plus the cheapest return one-way, verified to within a dollar. So exploring N departure dates against M return dates costs `N + M` queries, not `N × M`. Use this to make flexible-date search affordable.
+
+#### united.com
+
+Run the shortlist only. It is slow and needs a login, but it is the only truth for what United will sell, and the only source for award pricing. Use it on the handful of shapes that survived the Google pass.
 
 See [`references/google-flights.md`](references/google-flights.md) and [`references/united.md`](references/united.md) for the mechanics. Both encode gotchas that cost real debugging time. Read the relevant one before driving that site.
 
-Bound the work. Say up front how many queries the plan needs. If a shape gets dropped for budget, say which and why. Never let a silent cap read as full coverage.
+Bound the work. Say up front how many queries the plan needs, and if a shape gets dropped for budget, say which and why, so the coverage stated matches the coverage run.
 
 ## Filters
 
@@ -94,6 +98,6 @@ Rank on the config's prose preferences, judged per search. Do not reduce them to
 
 Where Google and united.com disagree on a United flight, united.com wins and the gap gets flagged.
 
-## When Stuck
+## Recovery
 
 Retry once. Then degrade to a narrower search. Then report which step failed and what was collected before it did. A partial answer with its gap named beats a confident guess.

@@ -20,7 +20,7 @@ Rules that follow from this, all of them load-bearing:
 
 Password entry is the user's. Open headed, hand over the keyboard, and wait.
 
-Avoid triggering 1Password autofill during a run. It has been observed to kill the daemon.
+1Password autofill kills the daemon. Avoid triggering it during a run.
 
 ## URLs
 
@@ -40,7 +40,7 @@ https://www.united.com/en/us/fsr/choose-flights
 
 `awardSearchUrl()` in `scripts/united.ts` builds the award form.
 
-## The Grid Price Lies
+## The Basic-versus-Standard Trap
 
 **The "From" price on the results grid is frequently Basic Economy, and the grid never labels it.**
 
@@ -70,9 +70,9 @@ $274
 
 Basic is identifiable by the label `Basic (Most restrictive)` and by its restriction list, which includes `No carry-on bags` and `No upgrades`. It is sometimes rendered `[disabled]` in the accessibility snapshot.
 
-## Economy Plus Has No Basic Tier
+## Economy Plus Pricing
 
-This is the useful consequence: **the Economy Plus fare price is already the fully loaded economy-with-legroom number.** No ladder click needed, no Basic ambiguity.
+Economy Plus has no Basic tier, so **its fare price is already the fully loaded economy-with-legroom number.** No ladder click needed, no Basic ambiguity.
 
 Its ladder holds only Standard and Flexible:
 
@@ -86,7 +86,7 @@ $470
 
 On one transcontinental route the Economy Plus Standard fare ran a flat premium over Economy Standard, holding across several flights, two dates, and three aircraft types. A stable per-leg premium is worth sanity-checking against, but it is a route-level pattern rather than a constant.
 
-## The Seat Fee Is Out of Reach
+## The Seat Fee
 
 Two distinct things get called "Economy Plus":
 
@@ -135,7 +135,7 @@ grep -n 'button "Seats for the flight' snap.txt \
 
 **Refs change on every page load and after some clicks.** Re-snapshot rather than reusing them.
 
-## Dismiss the Cookie Banner First
+## Cookie Banner
 
 The consent banner overlays the bottom of the viewport and silently intercepts clicks aimed at fare buttons:
 

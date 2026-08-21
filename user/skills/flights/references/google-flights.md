@@ -41,7 +41,11 @@ Two fields claim to do this and they do not agree.
 
 `noBasic` sets the field Google's own UI labels "exclude Basic Economy". On at least one market it did not reprice anything. **`carryOn: 1` is what reliably drops Basic fares**, which is why the CLI defaults to it. Pass `--carry-on 0` to see Basic deliberately.
 
+It reprices rather than filters. The same itineraries come back either way, quoted at the fare that includes a carry-on. On one market a nonstop quoted `$235` at `--carry-on 0` came back `$285` at the default, with the Basic marker gone. Row counts matching across the two is the expected result, not a sign the flag did nothing.
+
 Detect Basic in results by the phrase **`overhead bin access`**, not by a `N carry-on bag` string. Google states the restriction rather than the fare name, and that phrasing has survived layout changes better.
+
+`parse --no-basic` drops any row still carrying the marker, and `--no-red-eye` drops a departure at or after 9pm that lands the next day. Marking is the default so a filtered search can say what it removed.
 
 ## Reading Results
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { styleText } from "node:util";
 import { genericGlyph, purposeGlyphs } from "./glyphs";
+import { styleText } from "./style";
 import {
   extractActivity,
   extractModel,

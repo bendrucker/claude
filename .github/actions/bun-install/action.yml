@@ -6,6 +6,11 @@ runs:
   steps:
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
+      with:
+        # Pinned so a Bun release lands as a reviewable diff. Unpinned, CI
+        # floats to the current release and a runtime behavior change arrives
+        # as an unexplained red build on an untouched branch.
+        bun-version: 1.4.0
 
     - name: Cache dependencies
       uses: actions/cache@v5

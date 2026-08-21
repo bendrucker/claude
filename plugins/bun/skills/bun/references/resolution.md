@@ -12,7 +12,7 @@ bun --cwd ./packages/app run dev
 
 Never use `.js` extensions in TypeScript imports. Bun resolves `.ts`, `.tsx`, `.jsx`, and `.js` files natively.
 
-```ts
+```ts fragment
 import { handler } from "./routes/auth";  // correct
 import { handler } from "./routes/auth.js";  // wrong
 ```

@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
-import { styleText } from "node:util";
 import { type ContextToken, type DialReport, reportContextDial } from "./context-dial";
 import { effortMarker } from "./effort";
 import { dialGlyph } from "./glyphs";
 import { modelMarker } from "./model";
 import { expandTilde, type RateLimits } from "./rate-limits";
+import { styleText } from "./style";
 
 interface CurrentUsage {
   input_tokens?: number;

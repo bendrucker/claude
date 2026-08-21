@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { styleText } from "node:util";
 import { effortGlyph } from "./effort";
 import { genericGlyph, purposeGlyphs, remoteGlyph } from "./glyphs";
 import { modelMarker } from "./model";
+import { styleText } from "./style";
 
 export interface Task {
   id: string;

@@ -165,6 +165,28 @@ $301
     expect(parseResults(text).map((row) => row.depart)).toEqual(["7:15 AM", "9:41 AM"]);
   });
 
+  test.each<[string, string, string, boolean]>([
+    ["a late departure landing next day", "10:41 PM", "4:00 AM+1", true],
+    ["a late departure landing same day", "10:41 PM", "11:50 PM", false],
+    ["an early departure landing next day", "9:41 AM", "3:12 PM", false],
+    ["an evening departure landing next day", "6:30 PM", "1:02 AM+1", false],
+  ])("treats %s as redEye=%p", (_label, depart, arrive, expected) => {
+    const plus = arrive.endsWith("+1");
+    const bare = plus ? arrive.slice(0, -2) : arrive;
+    const text = `
+${depart}
+${depart} on Wednesday, April 15
+– ${bare}${plus ? "+1" : ""}
+${bare} on Thursday, April 16
+United
+5 hr 26 min
+Nonstop
+$318
+`;
+
+    expect(parseResults(text)[0]?.redEye).toBe(expected);
+  });
+
   test("returns nothing for a page that has not rendered", () => {
     expect(parseResults("Loading…")).toEqual([]);
   });

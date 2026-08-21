@@ -64,11 +64,11 @@ Bound the work. Say up front how many queries the plan needs, and if a shape get
 
 ## Filters
 
-Hard, applied silently:
+Hard: Basic Economy, red-eyes, and two or more stops. The Google Flights parser marks the first two and drops them on request, so let the tool apply them rather than filtering by eye:
 
-- Basic Economy, always
-- Red-eyes
-- Two or more stops
+```bash
+bun user/skills/flights/scripts/google-flights.ts parse --no-basic --no-red-eye < dump.txt
+```
 
 Soft, shown but marked down: tight connections, arrivals near midnight, departures needing a pre-dawn wake-up.
 

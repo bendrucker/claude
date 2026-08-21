@@ -30,7 +30,8 @@ export interface UnitedFlight {
   origin: string;
   destination: string;
   duration: string;
-  flight: string;
+  /** Null on connecting itineraries, which carry no flight number in the page text. */
+  flight: string | null;
   aircraft: string | null;
   fares: AwardFare[];
 }
@@ -79,8 +80,6 @@ function parseFares(lines: string[]): AwardFare[] {
 
   for (const [index, line] of lines.entries()) {
     if (!CABINS.has(line)) continue;
-    // "Not available" sits immediately before the cabin name it applies to.
-    const unavailable = lines[index - 1] === "Not available";
 
     const window = lines.slice(index + 1, index + 22);
     const stop = window.findIndex((entry) => CABINS.has(entry) || entry === "Not available");
@@ -94,16 +93,21 @@ function parseFares(lines: string[]): AwardFare[] {
 
     const discounted = scope.includes("Was") && scope.includes("Now");
     const taxes = firstMatch(scope, TAXES);
+    // An unavailable cabin prices itself at zero. Reading availability from the
+    // price avoids the neighbouring "Not available" marker, which belongs to the
+    // previous cabin's collapsed second render and sits directly above this
+    // cabin's label.
+    const available = amounts.some((value) => value > 0);
 
     fares.push({
       cabin: line,
       // With a discount the page lists the old price first, then the new one.
-      miles: unavailable ? null : discounted ? (amounts[1] ?? null) : (amounts[0] ?? null),
-      standardMiles: discounted ? (amounts[0] ?? null) : null,
-      taxes: taxes ? Number(taxes.replaceAll(",", "")) : null,
+      miles: available ? (discounted ? (amounts[1] ?? null) : (amounts[0] ?? null)) : null,
+      standardMiles: available && discounted ? (amounts[0] ?? null) : null,
+      taxes: available && taxes ? Number(taxes.replaceAll(",", "")) : null,
       awardType: firstMatch(scope, AWARD_TYPE),
       fareClass: firstMatch(scope, FARE_CLASS),
-      available: !unavailable,
+      available,
     });
   }
 
@@ -129,7 +133,6 @@ export function parseAwardResults(text: string): UnitedFlight[] {
     const block = lines.slice(start, starts[position + 1] ?? lines.length);
     const flightLine = block.find((line) => FLIGHT.test(line));
     const flightMatch = flightLine ? FLIGHT.exec(flightLine) : null;
-    if (!flightMatch?.[1]) continue;
 
     const departTime = firstMatch(block, DEPARTING);
     const arriveTime = firstMatch(block, ARRIVING);
@@ -144,8 +147,8 @@ export function parseAwardResults(text: string): UnitedFlight[] {
       origin,
       destination,
       duration: firstMatch(block, DURATION) ?? "?",
-      flight: flightMatch[1],
-      aircraft: flightMatch[2] ?? null,
+      flight: flightMatch?.[1] ?? null,
+      aircraft: flightMatch?.[2] ?? null,
       fares: parseFares(block),
     });
   }
@@ -212,7 +215,7 @@ export function render(flights: UnitedFlight[]): string {
       flight.arriveTime,
       flight.duration,
       flight.stops,
-      flight.flight,
+      flight.flight ?? `${DIM}connection${RESET}`,
       flight.aircraft ?? "",
     ];
 
@@ -298,7 +301,7 @@ const parseCmd = command(
     );
     console.log(
       saver.length > 0
-        ? `${GREEN}saver space on ${saver.map((flight) => flight.flight).join(", ")}${RESET}`
+        ? `${GREEN}saver space on ${saver.map((flight) => flight.flight ?? `${flight.departTime} connection`).join(", ")}${RESET}`
         : `${YELLOW}no saver space; everything here is dynamically priced${RESET}`,
     );
   },

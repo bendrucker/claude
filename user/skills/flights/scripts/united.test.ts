@@ -60,6 +60,55 @@ Not available
 Premium Economy
 `;
 
+// An unavailable cabin renders its label once rather than twice, so its second
+// "Not available" is left stranded above the *next* cabin's label. The stranded
+// marker used to make the cabin below it read as sold out.
+const UNAVAILABLE_THEN_AVAILABLE = `
+Not available
+
+Premium Economy
+
+0
+
+miles
+
+Select fare for Premium Economy
+
+Not available
+
+Business/First (lowest)
+
+108k miles
+
++$5.60
+
+Everyday Award
+
+United Business (JN)
+
+Select fare for Business/First (lowest)
+`;
+
+// A connecting itinerary carries no flight number anywhere in the page text.
+// The three-letter codes still name the true endpoints, though the city text
+// beside them names the connection point.
+const CONNECTION = `
+1 STOP
+
+9:30 PMDeparting at 9:30 PM
+
+8:13 AMArriving at 8:13 AM
+
+LAXOrigin Los Angeles, CA, US (LAX)
+
+7H, 43MDuration 7 hours and 43 minutes
+
+ORDDestination Denver, CO, US (DEN)
+
+DetailsSeats
+${DYNAMIC}
+`;
+
 // Built from a char code because a literal escape byte in a regex trips the
 // control-character lint.
 const STRIP_ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
@@ -120,7 +169,29 @@ describe("parseAwardResults", () => {
     ]);
   });
 
-  test("skips a block with no flight number", () => {
+  test("prices the cabin below an unavailable one", () => {
+    const fares = parseAwardResults(flight(UNAVAILABLE_THEN_AVAILABLE))[0]?.fares;
+
+    expect(fares).toMatchObject([
+      { cabin: "Premium Economy", available: false, miles: null },
+      { cabin: "Business/First (lowest)", available: true, miles: 108000 },
+    ]);
+  });
+
+  test("keeps a connecting itinerary that has no flight number", () => {
+    const [parsed] = parseAwardResults(CONNECTION);
+
+    expect(parsed).toMatchObject({
+      stops: "1 STOP",
+      origin: "LAX",
+      destination: "ORD",
+      flight: null,
+      aircraft: null,
+    });
+    expect(parsed?.fares).toHaveLength(1);
+  });
+
+  test("skips a block with no itinerary", () => {
     expect(parseAwardResults("NONSTOP\nsome unrelated text\n")).toEqual([]);
   });
 });
@@ -128,6 +199,10 @@ describe("parseAwardResults", () => {
 describe("render", () => {
   test("formats a saver award", () => {
     expect(plain(render(parseAwardResults(flight(DISCOUNTED_SAVER))))).toMatchSnapshot();
+  });
+
+  test("formats a connection alongside a numbered flight", () => {
+    expect(plain(render(parseAwardResults(flight(DYNAMIC) + CONNECTION)))).toMatchSnapshot();
   });
 
   test("formats a cabin with no award space", () => {

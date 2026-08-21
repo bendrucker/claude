@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseResults, searchUrl, tfs, type SearchParams } from "./google-flights";
+import { parseGrid, parseResults, searchUrl, tfs, type SearchParams } from "./google-flights";
 
 // `tfs` is a protobuf message Google parses positionally, so a wrong byte does
 // not fail. It silently searches for something else. These snapshots are the
@@ -76,6 +76,53 @@ describe("tfs", () => {
 
   test("requires a leg", () => {
     expect(() => tfs({ legs: [] })).toThrow(/at least one leg/);
+  });
+});
+
+describe("parseGrid", () => {
+  // Google marks a cell "cheapest price", "low price", "selected", or nothing,
+  // and a round-trip cell names both of its dates.
+  const ROUND_TRIP = `
+    - grid "Date grid" [ref=e7]
+      - button "$467, cheapest price, Nov 8 to Nov 13" [ref=e10]
+      - button "$507, low price, Nov 8 to Nov 15" [ref=e11]
+      - button "$587, Nov 8 to Nov 16" [ref=e12]
+      - button "$467, Nov 9 to Nov 13, selected" [ref=e13]
+`;
+
+  test("pairs both dates off the cell's own label", () => {
+    expect(parseGrid(ROUND_TRIP)).toEqual([
+      { out: "Nov 8", back: "Nov 13", price: 467, tier: "cheapest" },
+      { out: "Nov 8", back: "Nov 15", price: 507, tier: "low" },
+      { out: "Nov 8", back: "Nov 16", price: 587, tier: null },
+      { out: "Nov 9", back: "Nov 13", price: 467, tier: null },
+    ]);
+  });
+
+  test("matches one-way cells against the header row by position", () => {
+    // A one-way cell names no date at all, so order is the only link to the header.
+    const text = `
+    - grid "Date grid" [ref=e27]
+      - StaticText "Sun"
+      - StaticText "Nov 8"
+      - StaticText "Mon"
+      - StaticText "Nov 9"
+      - StaticText "Tue"
+      - StaticText "Nov 10"
+      - button "$234, cheapest price" [ref=e39]
+      - button "$329" [ref=e40]
+      - button "$234, cheapest price, selected" [ref=e41]
+`;
+
+    expect(parseGrid(text)).toEqual([
+      { out: "Nov 8", back: null, price: 234, tier: "cheapest" },
+      { out: "Nov 9", back: null, price: 329, tier: null },
+      { out: "Nov 10", back: null, price: 234, tier: "cheapest" },
+    ]);
+  });
+
+  test("ignores prices outside the grid", () => {
+    expect(parseGrid('button "$999, Nov 1 to Nov 2"')).toEqual([]);
   });
 });
 

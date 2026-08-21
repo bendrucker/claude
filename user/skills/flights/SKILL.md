@@ -22,7 +22,26 @@ Search flights the way I actually decide: fully loaded prices, real departure ti
 
 Preferences: !`cat ~/.config/claude-flights/config.json 2>/dev/null || echo '{}'`
 
-If that came back `{}`, the config is missing. Run the search on what the request states, then offer to write a starter config at the end.
+If that came back `{}`, the config is missing. Run the search on what the request states, then offer to write a starter config at the end. Its shape:
+
+```json
+{
+  "home": { "primary": "SFO", "metro": ["SFO", "OAK", "SJC"] },
+  "loyalty": { "carrier": "UA", "program": "MileagePlus", "status": "none" },
+  "miles": { "centsPerPointThreshold": 1.5 },
+  "filters": {
+    "hard": ["no Basic Economy", "no red-eyes", "no 2+ stop itineraries"],
+    "soft": ["prefer nonstop", "avoid arrivals after midnight"]
+  },
+  "cabin": { "default": "economy plus" },
+  "preferences": [
+    "Aircraft type matters. Say which one every row is.",
+    "Show a few real options, not one pick."
+  ]
+}
+```
+
+`preferences` is prose, read and applied per search rather than scored. Every key is optional, and any object may carry a `note` string for context that does not fit the field.
 
 ## Boundaries
 
@@ -52,7 +71,11 @@ Cheap pass first, expensive pass second.
 
 #### Google Flights
 
-Run every shape here. It is fast, needs no login, and gives market context across carriers. A round trip decomposes: the cheapest round trip equals the cheapest outbound one-way plus the cheapest return one-way, verified to within a dollar. So exploring N departure dates against M return dates costs `N + M` queries, not `N × M`. Use this to make flexible-date search affordable.
+Run every shape here. It is fast, needs no login, and gives market context across carriers.
+
+For flexible dates, open the **Date grid** first. It prices a whole window of date pairs in one page load, which answers "is there a better fare a day either side" without a query per date. Use it to pick the shortlist, then price those dates properly.
+
+Where the grid does not reach, a round trip still decomposes: the cheapest round trip equals the cheapest outbound one-way plus the cheapest return one-way, verified to within a dollar. So N departure dates against M return dates costs `N + M` queries, not `N × M`.
 
 #### united.com
 
@@ -64,11 +87,7 @@ Bound the work. Say up front how many queries the plan needs, and if a shape get
 
 ## Filters
 
-Hard: Basic Economy, red-eyes, and two or more stops. The Google Flights parser marks the first two and drops them on request, so let the tool apply them rather than filtering by eye:
-
-```bash
-bun user/skills/flights/scripts/google-flights.ts parse --no-basic --no-red-eye < dump.txt
-```
+Hard filters come from `filters.hard`, defaulting to Basic Economy, red-eyes, and two or more stops. The parser marks the first two and drops them on request, so let the tool apply them rather than filtering by eye. The reference gives the flags.
 
 Soft, shown but marked down: tight connections, arrivals near midnight, departures needing a pre-dawn wake-up.
 
@@ -86,11 +105,11 @@ For cash against miles, compute cents per point:
 cpp = (cash_fare - award_taxes) / miles * 100
 ```
 
-Compare that against the threshold in config. Report cash, miles, and cpp for every option regardless of which one wins, and say which the arithmetic favors. A saver award is worth calling out by name, because saver space is scarce and dynamic pricing usually lands well below the threshold.
+Compare that against `miles.centsPerPointThreshold`, defaulting to 1.5 if unset. Report cash, miles, and cpp for every option regardless of which one wins, and say which the arithmetic favors. A saver award is worth calling out by name, because saver space is scarce and dynamic pricing usually lands well below the threshold.
 
 ## Output
 
-A terminal table, then one line of recommendation. Deep links so any row can be opened directly.
+A terminal table, then one line of recommendation. Include the search URL each table came from, so a row can be re-found. There is no per-itinerary link to hand over, so do not describe one as if there were.
 
 Columns that earn their place: departure and arrival with the day, duration, stops, flight number, aircraft, and the fully loaded price. Aircraft matters for cabin and wifi, so keep it.
 

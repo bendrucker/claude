@@ -40,7 +40,10 @@ https://www.united.com/en/us/fsr/choose-flights
 - `tt=1` is one-way. One-way queries are the right unit here, matching the decomposition described in the skill.
 - `px` is passenger count.
 
-`awardSearchUrl()` in `scripts/united.ts` builds the award form.
+```bash
+bun user/skills/flights/scripts/united.ts url SFO EWR 2026-11-11
+bun user/skills/flights/scripts/united.ts url SFO EWR 2026-11-11 --award
+```
 
 ## The Basic-versus-Standard Trap
 
@@ -149,9 +152,22 @@ Click `Accept cookies` once per profile before anything else. The error message 
 
 ## Award Results
 
-`at=1`. Parse with `parseAwardResults()` in `scripts/united.ts`.
+`at=1`, then parse the page text:
+
+```bash
+bun user/skills/flights/scripts/united.ts parse < award-dump.txt
+bun user/skills/flights/scripts/united.ts parse --json < award-dump.txt
+```
 
 - Prices show a cardmember discount as `Was` / `Now`. The `Now` figure is what gets charged.
 - `Saver Award` with fare class `XN` or `IN` is the scarce, good-value bucket. `YN` is everyday dynamic pricing.
-- Taxes are typically `$5.60` domestic.
+- Domestic taxes on an award are small and fixed, `$5.60` on every award checked so far. Read it off the page rather than assuming it, since it is per-segment and a connection carries more than one.
 - Saver space is rare. Across five dates on one route, exactly one flight had it. Dynamic awards clustered near 1.1 cents per point, below a typical redemption threshold, so the cash-versus-miles answer is usually cash.
+
+### Two Parsing Traps
+
+Both of these were silent. The parser looked like it was working.
+
+**A connecting itinerary carries no flight number.** Nothing in the page text names the operating flights for a connection, so a parser that requires one drops every connection while still returning a plausible-looking list of nonstops. On one route that was 23 of 35 itineraries. The parser gates on departure time and airports instead, and reports a connection with a null flight number. The three-letter codes on a connecting block still name the true endpoints, even though the city text beside them names the connection point.
+
+**An unavailable cabin poisons the cabin below it.** `Not available` renders twice for a sold-out cabin but the cabin label renders only once, so the second marker is left stranded directly above the *next* cabin's label. Reading availability from that adjacency reported Business/First as sold out on every flight where Premium Economy was. Availability comes from the cabin's own price instead, since an unavailable cabin prices itself at zero.

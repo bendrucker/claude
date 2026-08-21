@@ -45,7 +45,37 @@ It reprices rather than filters. The same itineraries come back either way, quot
 
 Detect Basic in results by the phrase **`overhead bin access`**, not by a `N carry-on bag` string. Google states the restriction rather than the fare name, and that phrasing has survived layout changes better.
 
-`parse --no-basic` drops any row still carrying the marker, and `--no-red-eye` drops a departure at or after 9pm that lands the next day. Marking is the default so a filtered search can say what it removed.
+`parse --no-basic` drops any row still carrying the marker. `--no-red-eye` drops a departure at or after 9pm that also lands the next day, so a 10pm arrival the same evening is not a red-eye and a 6am departure is not one either. Both default to marking rather than dropping, so a filtered search can say what it removed.
+
+## The Date Grid
+
+The highest-leverage thing on the page. It prices a whole window of date pairs in **one page load**, which is what makes "is there a better fare a day either side" affordable to ask.
+
+It is an overlay on the results URL, not a page of its own:
+
+```bash
+agent-browser --session flights open "<url>" && sleep 9 \
+  && agent-browser --session flights find text "Date grid" click && sleep 7 \
+  && agent-browser --session flights snapshot > grid.txt
+bun user/skills/flights/scripts/google-flights.ts grid < grid.txt
+```
+
+**Snapshot, not read.** This is the one exception to the read-everywhere rule above. `read` returns the results list underneath and never shows the grid, so the click looks like it silently failed. Take a snapshot instead.
+
+A round trip gives a 7×7 departure-by-return matrix. A one-way gives 8 consecutive days.
+
+The two encode dates differently, which `parseGrid()` handles:
+
+| Search | Cell label | Dates come from |
+|---|---|---|
+| Round trip | `"$467, cheapest price, Nov 8 to Nov 13"` | the label itself |
+| One-way | `"$234, cheapest price"` | position against the header row |
+
+Google marks two tiers, `cheapest price` and `low price`, and a fourth label `selected` marks the dates currently searched. All four shapes appear in one grid, so a regex that only allows `cheapest price` silently drops a third of the cells.
+
+`Scroll left` and `Scroll right` buttons move the window if the useful dates fall outside it.
+
+Grid prices track the filters already applied to the search, including the carry-on repricing described above, so they are comparable with the list's numbers rather than with a bare headline fare.
 
 ## Reading Results
 
@@ -77,6 +107,10 @@ United
 
 Price, stop count, and the Basic marker are found by scanning a fixed tail past the block rather than by position, since Google varies what sits between.
 
+The stop count renders twice in that tail, first bare (`1 stop`) and then qualified with the connecting airports (`1 stop in CLT`, `2 stops in LAX, NAN`). The bare one comes first, so the airports need their own search rather than an optional group on the first match.
+
+Carrier names are the weak spot. On a codeshare Google appends an operator note straight onto the name with no separator, giving `AlaskaOperated by Alaska as Hawaiian Airlines`. That suffix is stripped. A second form, `QantasAlaska, American`, has no separator to key on and is left as-is, so treat the carrier field as approximate on codeshares and confirm on the booking page when it matters.
+
 ## The Booking Page
 
 Worth two clicks for a shortlisted itinerary. It carries what the results list omits: flight numbers, aircraft, Google's on-time warning, legroom, and the full fare ladder.
@@ -91,6 +125,4 @@ Fares are distinguished from other `###` sections, such as Price insights, by wh
 
 ## Trusting the Numbers
 
-Google's fare for a United flight has matched united.com's **Standard** fare exactly in every case checked. It does not match united.com's grid headline, which is often Basic.
-
-That makes Google a good cross-check against the Basic-versus-Standard trap described in [`united.md`](united.md). When the two disagree on a United flight, united.com is the truth and the gap is worth reporting.
+Google's fare for a United flight has matched united.com's **Standard** fare exactly in every case checked. It does not match united.com's grid headline, which is often Basic. That makes Google a useful cross-check against the Basic-versus-Standard trap described in [`united.md`](united.md).

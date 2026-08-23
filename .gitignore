@@ -19,3 +19,7 @@ node_modules/
 # The coverage tooling lives in a directory named `coverage`. Re-include it
 # against a global `coverage` ignore so the source stays tracked.
 !scripts/coverage/
+
+# terminal-browser's installer drops a skill symlink into ~/.claude/skills,
+# which is this repo's user/skills. The skill belongs to that install, not here.
+/user/skills/terminal-browser

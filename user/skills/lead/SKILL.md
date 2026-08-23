@@ -23,7 +23,7 @@ Read the tracker project and the code it touches. Then decide, in coordination w
 - Blockers/parallelization
 - Any blocking decisions
 
-Grill me on any ambiguous requirements before dispatching.
+Grill me on any ambiguous requirements before dispatching. Load `grilling` for the rounds.
 
 ## Dispatch
 

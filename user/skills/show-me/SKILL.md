@@ -1,6 +1,6 @@
 ---
 name: show-me
-description: Explain the current topic visually with pseudocode, a call tree, a component tree, a file tree, a diff, a whole code block, a Mermaid diagram, or a published Artifact. Invoke with /show-me.
+description: Explain the current topic visually with pseudocode, a call tree, a component tree, a file tree, a diff, a whole block, a Mermaid diagram, or a published Artifact.
 argument-hint: "[<what to show>]"
 disable-model-invocation: true
 ---
@@ -11,7 +11,7 @@ Explain $ARGUMENTS visually. Pick the smallest view that makes the point, and ke
 
 ## Arguments
 
-`$ARGUMENTS` names what to show. With no argument, show the current topic of conversation.
+With no argument, show the current topic of conversation.
 
 ## Formats
 
@@ -142,7 +142,7 @@ sequenceDiagram
 
 ### Artifact
 
-A rendered UI, a layout, a state comparison, or a concept too dense for Mermaid. Load `artifact-design`, write the page to a file, then call `Artifact` with that path.
+A rendered UI, a layout, a state comparison, or a concept too dense for Mermaid. Publish it as an Artifact.
 
 ## Scope
 

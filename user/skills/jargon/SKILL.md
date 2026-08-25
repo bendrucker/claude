@@ -1,6 +1,6 @@
 ---
 name: jargon
-description: Restate your previous message in plain language for one turn, with no jargon, every acronym expanded, and mechanisms in place of metaphors. Invoke with /jargon.
+description: Restate your previous message in plain language for one turn, with no jargon, every acronym expanded, and mechanisms in place of metaphors.
 disable-model-invocation: true
 ---
 

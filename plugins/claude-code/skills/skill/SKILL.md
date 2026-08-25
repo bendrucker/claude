@@ -103,7 +103,7 @@ Write skill prose as instructions, in the imperative, with conditions before ins
 
 A skill is a folder, not just a markdown file. Keep `SKILL.md` a concise hub and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. Organize references by domain and gate conditional detail behind a pointer, so a question about one domain loads only that file.
 
-See [references/information-hierarchy.md](references/information-hierarchy.md) for the two budgets a document spends, the ladder each piece sits on, and when a document earns a split.
+See [references/information-hierarchy.md](references/information-hierarchy.md) for what body, reference, and pointer each cost, how to word a pointer, and when a document earns a split.
 
 #### Don't Railroad Claude
 
@@ -187,8 +187,8 @@ A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md fi
 
 Load detailed guides as needed:
 
-- **[references/information-hierarchy.md](references/information-hierarchy.md)** - Context and cognitive load, context pointers, the step/reference ladder, progressive disclosure, co-location, splitting
-- **[references/levers.md](references/levers.md)** - Completion criteria, leading words, the positive form, pruning
+- **[references/information-hierarchy.md](references/information-hierarchy.md)** - What body, reference, and pointer cost, pointer wording, splitting
+- **[references/levers.md](references/levers.md)** - Completion criteria, leading words, positive form, pruning
 - **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, skill-scoped hooks, anti-patterns
 - **[references/plain-language.md](references/plain-language.md)** - Plain-language rules for skill prose and the conversion procedure
 - **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache

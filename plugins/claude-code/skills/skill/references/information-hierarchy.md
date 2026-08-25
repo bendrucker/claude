@@ -1,83 +1,81 @@
 # Information Hierarchy
 
-Where each piece of a document sits, and what it costs to put it there. Applies to any document an agent reads: a skill, a `CLAUDE.md`, a rule under `.claude/rules/`, a file reached by a pointer.
+Where each piece of an agent-facing document sits, and what that placement costs. Applies to a skill, a `CLAUDE.md`, a rule under `.claude/rules/`, and any file reached by a pointer.
 
 ## Two Budgets
 
-Every document spends one of two budgets, and which one it spends is decided by how the agent reaches it.
+Every document spends one of two budgets. How the agent reaches the document decides which.
 
 #### Context Load
 
-Material sitting in the window every turn, spending tokens and attention whether or not it fires. A skill description is context load. So is every line of `CLAUDE.md` and every always-on rule.
+Tokens and attention spent every turn, whether or not the material fires. A skill description, a `CLAUDE.md` line, and an always-on rule are all context load. Three prices set the cost:
 
-Three local facts set the price:
-
-- A model-invocable skill spends its description on every session in the catalog. `disable-model-invocation: true` drops it from the catalog entirely, so a user-invoked skill costs zero until it runs.
-- An invoked skill's body is re-injected in full at every compaction, so `SKILL.md` size is a recurring per-compaction cost. Keep bodies under roughly 4k tokens.
+- A model-invocable skill spends its description on every session.
+- An invoked skill's body is re-injected at every compaction. Keep bodies under roughly 4k tokens.
 - A `references/` file costs nothing until its pointer fires.
 
 #### Cognitive Load
 
-The cost on the human: knowing which documents exist and when to reach for each. The human is the index.
+What the human must hold: which documents exist, and when each one applies.
 
-This one is worth spending. Cognitive load is the price of human agency, so put it where human judgment belongs and take it away where the judgment is mechanical. A user-invoked skill trades context load for cognitive load deliberately: it costs nothing until the user decides it applies.
+Spend cognitive load where human judgment decides the outcome, and remove it where the judgment is mechanical. Making a skill user-invoked trades context load for cognitive load, since it then costs nothing until the user decides it applies.
 
-Material behind a pointer escapes context load for the price of the pointer's own line. Material with no pointer at all rides entirely on cognitive load.
+Material behind a pointer costs only the pointer's own line. Material with no pointer costs no tokens and is reached only when the human remembers it.
 
 ## Context Pointers
 
-A context pointer is a reference held in context that names out-of-context material and encodes the condition for reaching it. A skill's `description` is one. A line in `CLAUDE.md` naming a rule file is the same object. A `See [references/patterns.md]` link inside a `SKILL.md` is one too.
+A context pointer is a reference held in context that names out-of-context material and states the condition for reaching it. A skill's `description` is a pointer. So is a `CLAUDE.md` line naming a rule file, and a `See [references/patterns.md]` link inside a `SKILL.md`.
 
-The pointer's wording decides when the agent reaches the material and how reliably. The target has no say. When must-have material sits behind a weakly worded pointer, the result is a variance bug: some runs find it and some do not. Sharpen the wording first. Inline the material only after sharpening has failed.
+The pointer's wording decides when the agent reaches the material and how reliably. The target has no effect on this. When required material sits behind a weak pointer, some runs find it and some do not. Sharpen the wording first, and inline the material only after sharpening fails.
 
-A pointer does two jobs. It states what the material is, and it lists the branches that should trigger reaching it. A branch is a distinct case the document handles, so different runs take different paths through it.
+Write a pointer to do two things: state what the material is, and list the branches that should trigger reaching it. A branch is a distinct case the document handles.
 
-Every word of an always-loaded pointer costs on every turn, so prune it harder than the body:
+Prune a pointer harder than the body, because every word of it costs on every turn:
 
-- Front-load the trigger word. The pointer is where it does its work.
-- One trigger per branch. Synonyms that rename a single branch are one branch written twice.
+- Put the trigger word first.
+- Write one trigger per branch. Synonyms renaming a single branch are one branch written twice.
 - Cut identity the body already carries.
 
 ## The Ladder
 
-A document is built from two content types. Steps are the ordered actions the agent performs. Reference is definitions, rules, and facts consulted on demand. The two mix freely: all steps (a runbook), all reference (a review's angle list), or both.
+A document holds two content types. Steps are the ordered actions the agent performs. Reference is definitions, rules, and facts consulted on demand. A document can be all steps, all reference, or both.
 
-The decision for each piece is where it sits on a ladder ranked by how immediately the agent needs it:
+Place each piece on a ladder ranked by how immediately the agent needs it:
 
-1. **In-file step**: what the agent does, in order. The primary tier.
-2. **In-file reference**: consulted on demand while the document runs. Often a flat peer set, such as every rule of a review on one rung. That flatness is a legitimate arrangement.
-3. **Disclosed reference**: pushed into a separate file behind a pointer, loaded only when the pointer fires. Spans a sibling in `references/` through a fully external doc any skill can point at.
+1. **In-file step**: what the agent does, in order.
+2. **In-file reference**: consulted on demand while the document runs. A flat set of peer rules on one rung is a correct arrangement, so keep it flat.
+3. **Disclosed reference**: a separate file behind a pointer, loaded when the pointer fires. Ranges from a sibling in `references/` to an external doc any skill can point at.
 
-Push too little down and the top bloats. Push too much down and the agent misses material it needed. That tension is the whole decision.
+Pushing too little down bloats the top. Pushing too much down hides material the agent needs.
 
 ## Progressive Disclosure
 
-Progressive disclosure is the move down the ladder: out of the main file, behind a pointer, so the top stays legible. Token savings are a side effect. The point is protecting the hierarchy.
+Move material down the ladder, out of the main file and behind a pointer, so the top stays legible.
 
-Branching is the cleanest test. Inline what every branch needs. Push behind a pointer what only some branches reach.
+Use branching as the test. Inline what every branch needs, and disclose what only some branches reach.
 
-When a document has steps, in-file reference that belongs one rung lower buries them, and attending to a step becomes a coin flip. Disclosure is a variance lever before it is a legibility one.
+In a document with steps, in-file reference that belongs one rung lower buries them, and the agent then attends to a buried step inconsistently across runs. Disclose to reduce that variance, not only to save tokens.
 
-## Co-location
+## Co-Location
 
-The ladder decides how far down a piece sits. Co-location decides what sits beside it once there. Keep a concept's definition, its rules, and its caveats under one heading so reading one part brings its neighbors along.
+Once the ladder decides how far down a piece sits, co-location decides what sits beside it. Keep a concept's definition, rules, and caveats under one heading.
 
-The test: the document should read like documentation written for the agent. Grouped material reads that way. Scattered material reads like a changelog.
+Test a section by reading it alone: it should answer the question it names without sending the reader elsewhere in the file.
 
-Co-location is a different failure from duplication. Duplication repeats one meaning in two places. Scattering fragments one meaning across many.
+Co-location and duplication are separate failures. Duplication repeats one meaning in two places. Scattering splits one meaning across many.
 
 ## Sprawl
 
-A document can be too long while every line in it is live and unique. Attention thins across the excess, and every extra line is one more to keep relevant.
+A document can be too long while every line in it is live and unique. Attention thins across the excess, and every added line is another to keep current.
 
-The cure is the ladder. Disclose reference behind pointers, then split by branch or by sequence so each path carries only what it needs.
+Cure sprawl with the ladder. Disclose reference behind pointers, then split by branch or by sequence so each path carries only what it needs.
 
 ## Splitting
 
-Splitting one document into two always spends one of the two budgets, so the cut has to earn it.
+Splitting one document into two spends one of the two budgets, so split only when the cut pays for itself.
 
-Split by sequence when the later steps tempt the agent to rush the one in front of it. Keeping them out of view drives more digging on the current task. The reverse holds as a warning: merging two sequences exposes each step to everything that follows and invites the rush.
+Split by sequence when later steps tempt the agent to finish the current one early. Hiding them drives more work on the step in front of it. Merging two sequences has the reverse effect, exposing each step to everything that follows.
 
-Hiding later steps only works across a real context break, meaning a hand-off or a subagent dispatch. An inline call leaves them in context and clears nothing.
+Hiding later steps requires a real context break, meaning a hand-off or a subagent dispatch. An inline call leaves them in context.
 
-Split by invocation when two branches of one skill want different frontmatter: a different model, a different `allowed-tools`, or one branch the model should route to while the other stays user-invoked.
+Split by invocation when two branches of one skill need different frontmatter: a different model, different `allowed-tools`, or one branch routed by the model while the other stays user-invoked.

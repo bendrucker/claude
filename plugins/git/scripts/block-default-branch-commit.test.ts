@@ -9,23 +9,20 @@ import type {
 import { $ } from "bun";
 import { formatDenyOutput, invokesGitCommit, processInput } from "./block-default-branch-commit";
 
-function mockInput(command: string): PreToolUseHookInput {
+function mockInput(command: string, cwd: string): PreToolUseHookInput {
   return {
     hook_event_name: "PreToolUse",
     session_id: "test",
     transcript_path: "/tmp/test",
-    cwd: "/tmp",
+    cwd,
     tool_name: "Bash",
     tool_input: { command },
     tool_use_id: "test",
   };
 }
 
-async function getOutput(
-  input: PreToolUseHookInput,
-  cwd: string,
-): Promise<PreToolUseHookSpecificOutput | null> {
-  const result = await processInput(input, cwd);
+async function getOutput(input: PreToolUseHookInput): Promise<PreToolUseHookSpecificOutput | null> {
+  const result = await processInput(input);
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
 }
@@ -68,21 +65,25 @@ describe("formatDenyOutput", () => {
   });
 });
 
+async function createTestRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "git-hook-test-"));
+
+  await $`git init -q -b main`.cwd(repo).quiet();
+  await $`git config user.email test@example.com`.cwd(repo).quiet();
+  await $`git config user.name "Test User"`.cwd(repo).quiet();
+  await Bun.write(join(repo, "README.md"), "");
+  await $`git add README.md`.cwd(repo).quiet();
+  await $`git commit -q -m initial`.cwd(repo).quiet();
+  await $`git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main`.cwd(repo).quiet();
+
+  return repo;
+}
+
 describe("processInput", () => {
   let testRepo: string;
 
   beforeEach(async () => {
-    testRepo = await mkdtemp(join(tmpdir(), "git-hook-test-"));
-
-    await $`git init -q -b main`.cwd(testRepo).quiet();
-    await $`git config user.email test@example.com`.cwd(testRepo).quiet();
-    await $`git config user.name "Test User"`.cwd(testRepo).quiet();
-    await Bun.write(join(testRepo, "README.md"), "");
-    await $`git add README.md`.cwd(testRepo).quiet();
-    await $`git commit -q -m initial`.cwd(testRepo).quiet();
-    await $`git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main`
-      .cwd(testRepo)
-      .quiet();
+    testRepo = await createTestRepo();
   });
 
   afterEach(async () => {
@@ -91,14 +92,14 @@ describe("processInput", () => {
 
   it("allows commit on feature branch", async () => {
     await $`git checkout -q -b feature-branch`.cwd(testRepo).quiet();
-    const output = await processInput(mockInput('git commit -m "test"'), testRepo);
+    const output = await processInput(mockInput('git commit -m "test"', testRepo));
     expect(output).toBeNull();
   });
 
   test.each<[string]>([['git commit -m "test"'], ['git commit -a -m "test"']])(
     "blocks %p on main branch",
     async (command) => {
-      const output = await getOutput(mockInput(command), testRepo);
+      const output = await getOutput(mockInput(command, testRepo));
       expect(output?.permissionDecision).toBe("deny");
     },
   );
@@ -112,13 +113,13 @@ describe("processInput", () => {
     ["cat <<'EOF' > notes.md\nnothing here\nEOF"],
     ["git log --oneline | head -20 | awk '{print $1}' | sort | uniq"],
   ])("allows %p on main branch", async (command) => {
-    const output = await processInput(mockInput(command), testRepo);
+    const output = await processInput(mockInput(command, testRepo));
     expect(output).toBeNull();
   });
 
   it("allows commit in detached HEAD state", async () => {
     await $`git checkout -q --detach HEAD`.cwd(testRepo).quiet();
-    const output = await processInput(mockInput('git commit -m "test"'), testRepo);
+    const output = await processInput(mockInput('git commit -m "test"', testRepo));
     expect(output).toBeNull();
   });
 
@@ -126,10 +127,37 @@ describe("processInput", () => {
     const outsideDir = await mkdtemp(join(tmpdir(), "outside-git-"));
 
     try {
-      const output = await processInput(mockInput('git commit -m "test"'), outsideDir);
+      const output = await processInput(mockInput('git commit -m "test"', outsideDir));
       expect(output).toBeNull();
     } finally {
       await rm(outsideDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("hook process", () => {
+  // Handing processInput a directory cannot catch main() resolving the branch
+  // against its own working directory, because the test supplies the directory
+  // either way. Drive the script the way Claude Code does instead: hook JSON on
+  // stdin, spawned somewhere other than the repo the command targets.
+  it("resolves the branch from the hook input, not the process directory", async () => {
+    const testRepo = await createTestRepo();
+    const spawnDir = await mkdtemp(join(tmpdir(), "outside-git-"));
+
+    try {
+      const input = mockInput('git commit -m "test"', testRepo);
+      const proc = Bun.spawn(["bun", join(import.meta.dir, "block-default-branch-commit.ts")], {
+        cwd: spawnDir,
+        stdin: new TextEncoder().encode(JSON.stringify(input)),
+        stdout: "pipe",
+        stderr: "inherit",
+      });
+
+      const stdout = await new Response(proc.stdout).text();
+      expect(stdout.trim()).toBe(JSON.stringify(formatDenyOutput("main")));
+    } finally {
+      await rm(testRepo, { recursive: true, force: true });
+      await rm(spawnDir, { recursive: true, force: true });
     }
   });
 });

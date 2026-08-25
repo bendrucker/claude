@@ -79,7 +79,8 @@ const VERIFY_SCHEMA = {
 phase("Ground");
 const ground = await agent(
   [
-    "Return, verbatim, the '## Technique Selection' section of .claude/rules/testing.md in the current repo.",
+    "Return, verbatim, the '## Technique Selection' and '## Refactor Bar' sections of user/rules/testing.md in the current repo,",
+    "followed by the whole body of user/rules/testing-typescript.md.",
     "No commentary.",
   ].join("\n"),
   { label: "ground:rule-text", phase: "Ground", effort: "low" },

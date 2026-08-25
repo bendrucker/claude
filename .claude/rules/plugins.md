@@ -7,6 +7,8 @@ paths:
 
 Each plugin has `.claude-plugin/plugin.json` plus optional `skills/`, `hooks/`, `commands/`, `agents/`.
 
+Creating or renaming a plugin directory requires adding or updating its entry in `.claude-plugin/marketplace.json`. `bun scripts/check-marketplace.ts` verifies this.
+
 When creating or modifying skills, load the `claude-code:skill` skill.
 
 ## Naming
@@ -33,7 +35,7 @@ Each plugin's `README.md` needs a title with one-line description, a contents li
 
 ## Plugin Metadata
 
-Plugin `settings.json` only supports `agent` and `subagentStatusLine` keys. Don't create schema-only placeholder files. `plugin.json` supports an optional `"$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json"` for editor autocomplete, and `displayName` for human-readable names in the UI.
+Plugin `settings.json` only supports `agent` and `subagentStatusLine` keys. Don't create schema-only placeholder files. `plugin.json` supports an optional `"$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json"` for editor autocomplete, and `displayName` for human-readable names in the UI. Deleting a plugin's `commands/`, `agents/`, or `hooks/` directory requires removing the matching path key from `plugin.json` in the same change, or `claude plugin validate` fails CI on the dangling path.
 
 ## Dependencies
 

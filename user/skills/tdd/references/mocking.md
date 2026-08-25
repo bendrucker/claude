@@ -34,6 +34,19 @@ function processPayment(order) {
 }
 ```
 
+```go
+// The caller declares the interface it needs
+type Charger interface {
+	Charge(cents int64) error
+}
+
+func ProcessPayment(order Order, c Charger) error {
+	return c.Charge(order.Total)
+}
+```
+
+Go declares the interface on the consumer side, so `Charger` lives where it is used rather than being exported by the payment package. The seam stays as wide as this one caller needs, and the provider never depends on it.
+
 #### One Function per Operation
 
 Give each external operation its own function rather than one generic caller that branches on its arguments.

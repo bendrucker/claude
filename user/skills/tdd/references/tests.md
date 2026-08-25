@@ -28,6 +28,16 @@ test("checkout calls paymentService.process", async () => {
 });
 ```
 
+```python
+# BAD: the patch target is an import path, so the test encodes the module layout
+def test_checkout_calls_payment(mocker):
+    mock = mocker.patch("app.services.payment.process")
+    checkout(cart, payment)
+    mock.assert_called_once_with(cart.total)
+```
+
+The target names where `process` is looked up rather than where it is defined. Switching `checkout` between `from app.services.payment import process` and a module-attribute call breaks the test while behavior is unchanged.
+
 Also a red flag: asserting on call counts or call order, and a test name describing how rather than what.
 
 #### Side-Channel Verification

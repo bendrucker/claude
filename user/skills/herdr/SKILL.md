@@ -14,6 +14,8 @@ allowed-tools:
   - Bash(herdr tab --help:*)
   - Bash(herdr plugin --help:*)
   - Bash(herdr worktree --help:*)
+  - Bash(herdr agent prompt --help:*)
+  - Bash(herdr agent start --help:*)
   - Bash(herdr agent list:*)
   - Bash(herdr agent get:*)
   - Bash(herdr agent read:*)
@@ -36,29 +38,23 @@ allowed-tools:
 
 # Herdr
 
-herdr manages the terminal workspace this session runs in. It knows every workspace, pane, and sibling coding agent, including which Claude session occupies which pane.
+herdr manages the terminal workspace this session runs in, and knows every workspace, pane, and sibling coding agent, including which Claude session occupies which pane.
 
 Under `HERDR_ENV=1`, a request naming a pane, tab, workspace, or split is about this session's herdr layout. Use tmux only when the user says tmux.
 
-## Arguments
-
-`$0` (optional verb) routes to a section: `orient` to [Current Workspace](#current-workspace), `agents` to [Sibling Agents](#sibling-agents), `view <file>` to [Collaborative File Viewing](#collaborative-file-viewing), `read <pane>` to [Reading Another Pane](#reading-another-pane). With no verb, answer from the orientation block below.
-
 ## Command Surface
-
-herdr ships roughly weekly. This file therefore states no command table of its own. The block below is generated from `--help` at load time and cannot go stale. It lists every group with its subcommands, then the full signature of the handful used most.
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh`
 
 For a command whose flags are not shown above, `herdr <group> <command> --help` is complete: it prints defaults, enumerates valid values for every enum flag, and states preconditions. Where the CLI and this file disagree, the CLI is right and this file is stale.
 
-Discovery goes through `--help` in every case. Bare `herdr` launches or attaches the TUI in this pane. A mutating command dropped to its bare form runs on its defaults instead of printing usage, so `herdr workspace create` with no arguments creates a workspace.
+Bare `herdr` launches or attaches the TUI in this pane. A mutating command dropped to its bare form runs on its defaults instead of printing usage, so `herdr workspace create` with no arguments creates a workspace.
 
 ## Current Workspace
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh`
 
-Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view is a projection over `herdr api snapshot`, which returns workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls. When the projection looks wrong or omits something, read the source: `herdr api snapshot | jq .`
+Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view projects `herdr api snapshot`, which returns workspaces, tabs, panes, layouts, and agents in one call. Prefer the snapshot to a sequence of `list` calls, and read it directly when the projection looks wrong: `herdr api snapshot | jq .`
 
 If the block reports that herdr is not running, stop here and use ordinary tools. Nothing below will reach a server.
 
@@ -70,69 +66,83 @@ Most commands answer with a single-line JSON envelope. Pipe them through `jq -r 
 {"id":"cli:pane:list","result":{"panes":[...],"type":"pane_list"}}
 ```
 
-Others print plain text, and `jq` on those dies with `Invalid numeric literal`. Two kinds do it. Terminal content and human explanations are one: `pane read`, `agent read`, `agent explain`. Anything reporting local installation instead of live session state is the other: `plugin list`, `plugin config-dir`, `config check`, `integration status`, `server agent-manifests`. The split runs between siblings, so `plugin action list` returns an envelope while `plugin list` does not.
+Others print plain text, and `jq` on those dies with `Invalid numeric literal`. Terminal content and human explanations are one kind: `pane read`, `agent read`, `agent explain`. Anything reporting local installation instead of live session state is the other: `plugin list`, `plugin config-dir`, `config check`, `integration status`, `server agent-manifests`.
 
-Failures separate by exit status. A server error exits 1 with a JSON error on stderr, which is worth parsing. A syntax error exits 2, which means the command was wrong before it ever reached the server.
+Exit 1 is a server error with JSON on stderr: parse it. Exit 2 is a syntax error, wrong before it reached the server.
 
 ## Addressing
 
-A pane exists whether or not an agent runs in it. `pane` commands drive the raw terminal, and `agent` commands drive the recognized process inside one, addressed by agent name or pane ID.
+A pane exists whether or not an agent runs in it. `pane` commands drive the raw terminal, and `agent` commands drive the recognized process inside one.
 
-Your own identity comes from the environment, never from inference: `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`. `HERDR_ENV=1` marks a pane herdr launched. Whether the server still answers is a separate question, which the orientation block above already settled.
+An agent target is a live agent name or the pane ID hosting it, and nothing else. `agent list` prints a `terminal_id` and an `agent` kind beside those, and either one passed as a target yields `agent_not_found`, indistinguishable from a genuinely absent agent.
+
+Your own identity comes from the environment, never from inference: `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`. `HERDR_ENV=1` marks a pane herdr launched.
 
 Name a target on every command that takes one. Use `--current` for the calling pane, an explicit ID otherwise. A pane command with no target may resolve to the UI-focused pane, and that pane can belong to the user or to another client.
 
-IDs are opaque handles shaped `w1` for a workspace, `w1:t1` for a tab, and `w1:p1` for a pane. Read them out of responses rather than composing them: `pane split` returns `.result.pane`, `tab create` returns `.result.tab` and `.result.root_pane`, `workspace create` returns all three. Closed IDs are never reused. `pane move` mints a new workspace-qualified pane ID, so take the pane forward as `.result.move_result.pane.pane_id` and drop the old value the response echoes at `.result.move_result.previous_pane_id`. The moved process still carries that stale ID in its own inherited `HERDR_PANE_ID`, which makes it useless as a target for anyone else.
+IDs are opaque handles shaped `w1` for a workspace, `w1:t1` for a tab, and `w1:p1` for a pane. Read them out of responses rather than composing them: `pane split` returns `.result.pane`, `tab create` returns `.result.tab` and `.result.root_pane`, `workspace create` returns all three. Closed IDs are never reused. `pane move` mints a new workspace-qualified pane ID, so take the pane forward as `.result.move_result.pane.pane_id` and drop `.result.move_result.previous_pane_id`. The moved process keeps the stale ID in its own inherited `HERDR_PANE_ID`, so never take a target from there.
+
+## Safety
+
+Leave the server alone. `herdr server stop` takes down every pane process the session owns, this one included, so run it only when the user asks for exactly that. Signalling the main herdr process does the same. An experiment needing its own server gets `herdr --session <name>`.
+
+Close only what you opened. A pane you split for the user to read counts as theirs. Close your own scratch panes with `herdr pane close` once the work in them is done.
+
+Read another agent's approval dialog and hand it to the user. Answering it is theirs. `agent prompt` refuses a `blocked` agent on its own, and `send-keys` carries no such check.
+
+Leave lifecycle reporting to the scraper. `pane report-agent` overrides the detection manifest for a Claude pane and leaves herdr's view wrong.
 
 ## Sibling Agents
 
-Each agent pane carries `agent_session.value`, the Claude session UUID. That makes pane-to-session correlation exact, where a title match would only be a guess.
+Each agent pane carries `agent_session.value`, the Claude session UUID.
 
 A reference to work by branch, repo, or task usually names a pane already doing it. Match it against the `cwd` and `title` columns in the orientation block, then hand off to that pane instead of duplicating the checkout here.
 
-A handoff is two calls. `agent prompt --wait` blocks through the other agent's turn, then `agent read` collects what it produced:
+Hand off with `agent prompt --wait`, which blocks through the other agent's turn, then collect with `agent read`:
 
 ```bash
 herdr agent prompt <target> "the request" --wait --timeout 900000
 herdr agent read <target> --source recent-unwrapped --lines 80
 ```
 
-Without `--wait` the call returns as soon as the text is submitted, and the read that follows cannot distinguish a turn still running from one that finished. Drop `--wait` only to leave an agent running unattended, then collect with `agent wait` followed by `agent read`.
+Drop `--wait` only to leave an agent running unattended, then collect with `agent wait` followed by `agent read`.
 
-Timeouts are milliseconds. `--wait` matches `idle`, `done`, or `blocked` unless you name states with `--until`, which repeats to accept several (`--until idle --until done`) and on `prompt` requires `--wait`. It does not track turns, so an agent that was already working can match on the turn it was in the middle of. Submitting to a resting agent returns `agent_prompt_stalled` when no state change shows up within 5s.
+`agent prompt` writes through the pane's live bracketed-paste mode and presses Enter after a short delay, so a multi-line prompt arrives as one paste instead of submitting at the first newline.
 
-`agent wait` blocks server-side on an agent's state, and `pane wait-output` does the same for text in a plain pane. A `sleep` loop around `pane get` only adds latency to either. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor` with an until-loop instead of a shell loop.
+`agent wait` and `pane wait-output` block server-side, so use them instead of polling `pane get`. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor`.
 
-An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. Modifiers join with `+`, as in `ctrl+c`, `ctrl+u`, and `shift+tab`. Only `C-c` and `c-c` are aliased to that form, so any other `-` spelling returns `invalid_key`. herdr validates the whole sequence before writing a byte. For staging literal text in a plain pane without submitting it, `pane send-text` is the counterpart, and `pane run` is the one that also presses Enter.
+An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. Modifiers join with `+`, as in `ctrl+c`, `ctrl+u`, and `shift+tab`. Only `C-c` and `c-c` are aliased to that form, so any other `-` spelling returns `invalid_key`. For staging literal text in a plain pane without submitting it, `pane send-text` is the counterpart, and `pane run` is the one that also presses Enter.
 
 `herdr agent focus` brings a pane to the foreground for the user. `herdr agent attach` connects to it directly.
 
 ### Starting an Agent
 
-A sibling agent that needs its own checkout gets it from `herdr worktree create`, which leaves this session where it is. `worktrunk:wt-switch-create` re-roots the calling session. It provisions this session's worktree, never another agent's.
+A sibling agent that needs its own checkout gets it from `herdr worktree create`, which leaves this session where it is. `worktrunk:wt-switch-create` re-roots the calling session instead.
 
-`agent start` attaches an agent to a pane that already exists and is free, and it creates no layout of its own. The pane has to be sitting at its interactive prompt with nothing running in the foreground. Split first, start second:
+`agent start` attaches an agent to a pane that already exists and is free, sitting at its interactive prompt with nothing running in the foreground. Split first, start second:
 
 ```bash
 pane=$(herdr pane split --current --direction right --cwd "$PWD" --no-focus | jq -r '.result.pane.pane_id')
 herdr agent start reviewer --kind claude --pane "$pane"
 ```
 
-A session that refuses that command substitution takes the same two steps as separate calls, reading the pane ID out of the split's `.result.pane.pane_id` and passing it to `--pane`.
+A session that refuses that command substitution takes the same two steps as separate calls, reading `.result.pane.pane_id` out of the split and passing it to `--pane`.
 
-Only `agent start` registers an agent, and only a registered agent answers `agent prompt`, `agent read`, and `agent wait`. Starting one by running its command through `pane run` or `pane send-text` fills the pane without registering anything, and `agent start` then returns `agent_pane_busy` against that same pane.
+Only `agent start` registers an agent, and only a registered agent answers `agent prompt`, `agent read`, and `agent wait`. Starting one through `pane run` or `pane send-text` fills the pane without registering anything, and `agent start` then returns `agent_pane_busy` against that same pane.
 
-The name becomes the handle every later command uses, so make it descriptive. It has to match `[a-z][a-z0-9_-]{0,31}` and be unique among live agents. It binds to the pane's current occupant and clears when that agent exits, is released, or is replaced, which frees the name for the next `agent start`. Arguments meant for the agent's own CLI go after `--`. The call blocks until herdr sees the expected agent ready for input, then gives up at 30 seconds.
+The name becomes the handle every later command uses, so make it descriptive. It has to match `[a-z][a-z0-9_-]{0,31}` and be unique among live agents. It binds to the pane's current occupant and clears when that agent exits, is released, or is replaced. Arguments meant for the agent's own CLI go after `--`.
+
+An agent that comes up into a permission or trust dialog returns `agent_not_ready` without waiting out the startup timeout. The name is bound, so `agent read` and `agent send-keys` reach the pane. `agent prompt` stays refused until it settles at `idle`.
 
 ### Agent Status
 
-For Claude, herdr's integration hook reports only session identity. The `idle`, `working`, `blocked`, and `done` states come from matching the pane's screen against a detection manifest. An unusual or suppressed terminal title therefore reads as `unknown`.
+For Claude, herdr's integration hook reports only session identity. The `idle`, `working`, `blocked`, and `done` states come from matching the pane's screen against a detection manifest, so an unusual or suppressed terminal title reads as `unknown`.
 
 `idle` and `done` are one resting state, split by whether the pane's tab has been seen. Seen rests at `idle`. Work that finished in a tab nobody looked at rests at `done`. The user focusing that tab marks it seen, and so does a `focus` command you issue yourself. Plain reads never do, so an agent you follow entirely through `agent read` stays `done`.
 
 `blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present and the scraper could not classify it, which is no evidence that it finished.
 
-Debug that with `herdr agent explain <pane>`. Do not paper over a detection gap by calling `herdr pane report-agent`, which claims lifecycle authority that belongs to the scraper for Claude panes.
+Debug that with `herdr agent explain <pane>`, which prints the manifest rule that fired, the region it read, and the text it matched.
 
 ## Collaborative File Viewing
 
@@ -147,17 +157,15 @@ Use `markless --watch` for markdown and `$EDITOR` for everything else. Keep `--n
 
 `right` suits a wide pane and `down` suits a tall one. Read the shape from `herdr pane layout --pane "$HERDR_PANE_ID"` when it is not obvious, and alternate directions across successive splits rather than slicing one axis down to an unusable strip.
 
-`pane run` hands the command string to the pane's own interactive shell, which parses it a second time. One command with ordinary quoting survives that. A multi-statement script does not: the pane's zsh re-parses it and dies on a bare `parse error`, and that failure lands in the pane rather than in your tool result. Write anything past a single command to a file and run `bash <path>`.
+`pane run` hands the command string to the pane's own interactive shell, which parses it a second time. Send one command with ordinary quoting. Write anything longer to a file and run `bash <path>`, since a multi-statement string dies on a bare `parse error` inside the pane where your tool result never shows it.
 
-That shell also inherits the new pane's directory, and mise activates tools per directory. A mise-managed tool available elsewhere can still come back `command not found` here. Confirm the pane actually started the viewer before telling the user to look at it:
+That shell also inherits the new pane's directory, and mise activates tools per directory. A mise-managed tool available elsewhere can come back `command not found` here. Confirm the pane started the viewer before telling the user to look at it:
 
 ```bash
 herdr pane read "$pane" --source visible --lines 8
 ```
 
-Fall back to `glow -w 0` or `bat --paging always` when the preferred viewer is missing, both of which are installed outside mise.
-
-A pane opened for the user is theirs, so leave it. Close one you split for your own use (`herdr pane close`) once the work in it is done, rather than leaving the layout littered.
+Fall back to `glow -w 0` or `bat --paging always`, both installed outside mise.
 
 ## Long-Running Processes
 
@@ -176,51 +184,26 @@ To block until the process reaches a known point, match on its output rather tha
 herdr pane wait-output "$pane" --match "Listening on" --timeout 120000
 ```
 
-`--match` takes a literal substring and `--regex` takes a Rust regular expression. The search runs against the current snapshot before it waits, so text already on screen matches immediately. Omitting `--timeout` waits forever.
-
 ## Reading Another Pane
 
 `herdr pane read <pane_id>` replaces a terminal scrape. The default `--source recent` reads accumulated output history and returns nothing for a pane created moments ago, so use `--source visible` when reading a pane you just made. On an established pane the sources agree. `recent-unwrapped` is that same history with soft wraps joined back into whole lines. Use it for logs and transcripts. `--source detection` returns the slice the status scraper matches against, which is what to compare when a pane's status looks wrong.
 
 Add `--format ansi` when color is the evidence, as in a diff or a test summary. Otherwise take the text.
 
-`pane read --lines` draws on the pane's screen and the host's scrollback. An agent painting the terminal's alternate screen feeds neither, so its scrolled-away rows sit beyond `pane read` at any `--lines`. `agent read` recovers them for a recognized agent at rest: past the visible screen, herdr pages the history out through the agent's own mouse-scroll interface. That path needs the agent resting, so a deep read during `working`, `blocked`, or `unknown` comes back truncated or as an `agent_not_idle` error. When the history is unreachable either way, ask the agent to write its full response as markdown under a temp directory and reply with nothing but the path, then read the file yourself. Hold that fallback until a read has actually come up short.
+`pane read --lines` draws on the pane's screen and the host's scrollback. An agent painting the terminal's alternate screen feeds neither, so its scrolled-away rows sit beyond `pane read` at any `--lines`. `agent read` recovers them for a recognized agent at rest, paging the history out through the agent's own mouse-scroll interface. That path needs the agent resting, so a deep read during `working`, `blocked`, or `unknown` comes back truncated or as an `agent_not_idle` error. When the history is unreachable either way, ask the agent to write its full response as markdown under a temp directory and reply with nothing but the path, then read the file yourself. Hold that fallback until a read has actually come up short.
 
 ## Plugins
-
-herdr's own capabilities are extended by plugins, and they are discoverable the same way everything else is:
 
 ```bash
 herdr plugin list
 herdr plugin action list | jq -r --arg os macos '.result.actions[] | select(.platforms | index($os)) | "\(.plugin_id)  \(.action_id)  \(.title)"'
-herdr plugin action invoke <action_id> --plugin <plugin_id>
+herdr plugin action invoke "$action_id" --plugin "$plugin_id"
 ```
 
-That `select` is load-bearing. Plugins ship Windows variants of the same action and no platform flag exists, so an unfiltered list shows each one twice.
+No platform flag exists, so an unfiltered list shows each action twice.
 
 `herdr plugin log list` shows a plugin's command output, which is where to look when an action produces no visible effect. `herdr plugin config-dir <plugin_id>` locates its config.
 
-`herdr plugin pane open` always needs `--entrypoint` alongside `--plugin`, and exits 2 without it. Its `--placement` decides which of the addressing flags are legal, and each wrong one comes back `invalid_params`. `split` and `zoomed` attach to an existing pane, defaulting to the active one when `--target-pane` is omitted, and reject `--workspace`. `overlay` and `popup` always take the active pane. Both reject `--workspace`, `--target-pane`, and `--direction`. `tab` is the one that takes `--workspace`, and it rejects `--target-pane` and `--direction`. `--help` lists four placements and the binary also accepts `popup` and `fullscreen`.
+`herdr plugin pane open` always needs `--entrypoint` alongside `--plugin`, and exits 2 without it. Its `--placement` then decides which of the addressing flags are legal, and each wrong one comes back `invalid_params`. `--help` lists four placements, and the binary also accepts `popup` and `fullscreen`.
 
-### reviewr
-
-A review sidebar that shows the diff you just wrote and takes line comments on it. Its contract with you runs one direction, and misreading that direction is the main way to get this wrong.
-
-You never query reviewr and never poll it. When the user hits Send, reviewr injects the comment batch into your input and stops. It does not submit. The comments therefore reach you as part of an ordinary user turn, usually with their own remarks attached.
-
-Each block takes this shape, ordered by file then line:
-
-```fragment
-user/skills/herdr/SKILL.md:41-43
--old line
-+new line
-the reviewer's text, which may run to several lines
-```
-
-- Locate the code by matching the verbatim snippet lines. Your own edits shift line numbers, which makes the snippet the reliable anchor and the header a hint.
-- A ` (removed)` suffix on the header means the comment sits on a deleted line. Its snippet comes from the old side and will not be found in the current file.
-- Sending clears reviewr's list, and the store is in-memory only. The batch you receive is the only copy. Work through the whole set rather than acting on the first few.
-
-reviewr never writes to the worktree, the index, or any branch, which rules it out as the explanation for an unexpected diff. Its one write is a baseline ref under `refs/reviewr/turn-base/`, deliberately outside `refs/heads`. Leave those refs alone.
-
-Its `last-turn` scope reads the same scraped `agent_status` described above, treating a resting-to-working transition as a turn boundary. A turn that finishes inside one poll interval is invisible to it, which is why a very fast edit can be missing from that view.
+A turn carrying `path:line-range` blocks, each with diff lines and reviewer text under it, came from the reviewr sidebar. [`references/reviewr.md`](references/reviewr.md) covers anchoring those comments and the plugin's one-way contract.

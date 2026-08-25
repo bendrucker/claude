@@ -1,6 +1,6 @@
 ---
 name: show-me
-description: Explain the current topic visually with pseudocode, a call tree, a component tree, a file tree, a diff, a Mermaid diagram, or a published Artifact. Invoke with /show-me.
+description: Explain the current topic visually with pseudocode, a call tree, a component tree, a file tree, a diff, a whole code block, a Mermaid diagram, or a published Artifact. Invoke with /show-me.
 argument-hint: "[<what to show>]"
 disable-model-invocation: true
 ---
@@ -19,7 +19,7 @@ Pick one format or several. Using all of them is rare.
 
 ### Pseudocode
 
-For logic or an algorithm:
+For logic or an algorithm. Keep it to the decisions and the order they run in:
 
 ```text
 on(save)
@@ -31,7 +31,7 @@ on(save)
 
 ### Call Tree
 
-For runtime control flow:
+For runtime control flow inside one process. Show which function calls which:
 
 ```text
 submitForm
@@ -48,8 +48,8 @@ For UI structure. Annotate the state and the seams that matter:
 ```tsx
 <SessionPage> (apps/example/src/routes/session.tsx)
   useSessionEvents()
-  <SessionToolbar>
-    <RunSkillButton> (packages/ui)
+  <SessionToolbar> (packages/ui)
+  <SessionTimeline>
 ```
 
 ### File Tree
@@ -60,7 +60,7 @@ For file responsibility or the shape of a refactor. Keep it shallow and give eac
 src/
 ├── commands/       # parses user actions
 ├── sessions/       # owns session state
-└── transport/      # sends API requests
+└── transport.ts    # sends API requests
 ```
 
 ### Diff
@@ -108,10 +108,11 @@ A change in what runs when diffs the state or control flow:
 ```diff
  on(save)
 -  write content
+-  return result
 +  if content is unchanged
 +    return cached result
 +  write new content
-+  invalidate cache
++  return fresh result
 ```
 
 ### Whole Block
@@ -127,7 +128,7 @@ function expandSkill(command: string): string {
 
 ### Mermaid
 
-For component interaction, control flow, or data flow:
+For interaction that crosses modules or processes, and for data flow through them:
 
 ```mermaid
 sequenceDiagram

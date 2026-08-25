@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Restate your previous message in plain language. Keep every claim it made and land on the same conclusion.
 
-- Replace each specialized term with what the thing does. When the term is the subject of the message, keep it and define it at first use.
+- Replace each specialized term with what the thing does. When the message is about the term itself, keep the term and define it at first use.
 - Expand every acronym at first use.
 - Replace metaphor and analogy with the mechanism they stand for.
 - Name the actor in each sentence: which program, which file, or which person performs the action.

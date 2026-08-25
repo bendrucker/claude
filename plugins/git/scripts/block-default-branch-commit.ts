@@ -36,10 +36,7 @@ export function formatDenyOutput(branch: string): SyncHookJSONOutput {
   };
 }
 
-export async function processInput(
-  input: PreToolUseHookInput,
-  cwd?: string,
-): Promise<SyncHookJSONOutput | null> {
+export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   // The `Bash(git commit:*)` condition only narrows which calls spawn this hook.
   // It fails open on shell metacharacters, so the deny decision rests on the
   // command this hook reads for itself.
@@ -48,7 +45,11 @@ export async function processInput(
     return null;
   }
 
-  const dir = cwd ?? process.cwd();
+  // The hook process is spawned in the session's directory, which is not where
+  // the Bash command runs: a subagent working in a worktree reports that
+  // worktree as `input.cwd`, and resolving the branch anywhere else reads the
+  // wrong repo.
+  const dir = input.cwd ?? process.cwd();
 
   // One rev-parse yields both the repo root (cache key) and current branch.
   // A non-zero exit means we're outside a repo; "HEAD" means detached.

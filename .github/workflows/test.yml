@@ -227,7 +227,7 @@ jobs:
             bun "$plugin/node_modules/.bin/playwright" install chromium --with-deps
           fi
           if echo "$deps" | grep -q '^@duckdb/node-api$'; then
-            curl -fsSL https://install.duckdb.org | sh
+            curl -fsSL https://install.duckdb.org | bash
             echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
           fi
 

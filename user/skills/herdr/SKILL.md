@@ -14,6 +14,8 @@ allowed-tools:
   - Bash(herdr tab --help:*)
   - Bash(herdr plugin --help:*)
   - Bash(herdr worktree --help:*)
+  - Bash(herdr agent prompt --help:*)
+  - Bash(herdr agent start --help:*)
   - Bash(herdr agent list:*)
   - Bash(herdr agent get:*)
   - Bash(herdr agent read:*)
@@ -58,7 +60,7 @@ Bare `herdr` launches or attaches the TUI in this pane. A mutating command dropp
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh`
 
-Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view projects `herdr api snapshot`, which returns workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls, and read the source when it looks wrong: `herdr api snapshot | jq .`
+Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view projects `herdr api snapshot`, which returns workspaces, tabs, panes, layouts, and agents in one call. Prefer the snapshot to a sequence of `list` calls, and read it directly when the projection looks wrong: `herdr api snapshot | jq .`
 
 If the block reports that herdr is not running, stop here and use ordinary tools. Nothing below will reach a server.
 
@@ -113,7 +115,6 @@ Without `--wait` the call returns as soon as the text is submitted, and the read
 
 `agent prompt` writes through the pane's live bracketed-paste mode and presses Enter after a short delay. A multi-line prompt therefore arrives as one paste rather than submitting at the first newline.
 
-An agent already parked at an approval or question dialog gets `agent_blocked` back before any of the text is sent.
 
 `agent wait` and `pane wait-output` block server-side, so use them instead of polling `pane get`. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor`.
 
@@ -203,7 +204,7 @@ Add `--format ansi` when color is the evidence, as in a diff or a test summary. 
 ```bash
 herdr plugin list
 herdr plugin action list | jq -r --arg os macos '.result.actions[] | select(.platforms | index($os)) | "\(.plugin_id)  \(.action_id)  \(.title)"'
-herdr plugin action invoke <action_id> --plugin <plugin_id>
+herdr plugin action invoke "$action_id" --plugin "$plugin_id"
 ```
 
 Plugins ship Windows variants of the same action and no platform flag exists, so an unfiltered list shows each one twice.
@@ -212,4 +213,4 @@ Plugins ship Windows variants of the same action and no platform flag exists, so
 
 `herdr plugin pane open` always needs `--entrypoint` alongside `--plugin`, and exits 2 without it. Its `--placement` then decides which of the addressing flags are legal, and each wrong one comes back `invalid_params`. `--help` lists four placements, and the binary also accepts `popup` and `fullscreen`.
 
-A turn carrying `path:line-range` blocks, each with diff lines and reviewer text under it, came from the reviewr sidebar. [references/reviewr.md](references/reviewr.md) covers anchoring those comments and the plugin's one-way contract.
+A turn carrying `path:line-range` blocks, each with diff lines and reviewer text under it, came from the reviewr sidebar. [`references/reviewr.md`](references/reviewr.md) covers anchoring those comments and the plugin's one-way contract.

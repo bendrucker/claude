@@ -1,6 +1,6 @@
 ---
 name: show-me
-description: Explain the current topic visually with pseudocode, a call tree, a component tree, a file tree, a diff, a whole block, a Mermaid diagram, or a published Artifact.
+description: Explain the current topic or a proposed design visually with types and signatures, pseudocode, a call tree, a component tree, a file tree, a diff, a whole block, a Mermaid diagram, or a published Artifact.
 argument-hint: "[<what to show>]"
 disable-model-invocation: true
 ---
@@ -16,6 +16,23 @@ With no argument, show the current topic of conversation.
 ## Formats
 
 Pick one format or several, rarely all.
+
+### Types and Signatures
+
+The shape of code before an implementation exists, showing the interface and the seam:
+
+```ts fragment
+interface Skill {
+  name: string
+  body: string
+}
+
+interface SkillSource {
+  read(name: string): Promise<Skill>
+}
+
+function expand(command: string, source: SkillSource): Promise<string>
+```
 
 ### Pseudocode
 
@@ -65,7 +82,7 @@ src/
 
 ### Diff
 
-What changes, when the surrounding shape already exists.
+A change against a shape that already exists:
 
 Component tree:
 
@@ -143,6 +160,10 @@ sequenceDiagram
 ### Artifact
 
 A rendered UI, a layout, a state comparison, or a concept too dense for Mermaid. Publish it as an Artifact.
+
+## Planning
+
+When the topic is work not yet done, show the proposed shape rather than describing it. Types and signatures carry a design first, then the call tree, then the file layout. Where the work changes something that exists, show the proposal as a diff.
 
 ## Scope
 

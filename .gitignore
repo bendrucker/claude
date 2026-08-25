@@ -13,6 +13,8 @@ node_modules/
 !plugins/claude-code/skills/session/fixtures/
 # The ox hook's fixtures are committed test data, same as the two above.
 !.claude/hooks/ox/fixtures/
+# The plan gate's recorded ExitPlanMode presentations, same again.
+!plugins/plan/hooks/fixtures/
 
 # Generated coverage output (bun test --coverage)
 /coverage/

@@ -7,6 +7,7 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
+import recorded from "./fixtures/re-presents.json";
 import { processInput, StateUnavailableError } from "./gate";
 
 let stateRoot: string;
@@ -38,6 +39,24 @@ async function decision(
   const result = await processInput(mockInput(plan, sessionId), stateRoot);
   if (!result) return null;
   return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+}
+
+type GateRun = { stdout: string; stderr: string; exitCode: number };
+
+async function runGate(input: PreToolUseHookInput): Promise<GateRun> {
+  const gate = Bun.spawn(["bun", join(import.meta.dir, "gate.ts")], {
+    stdin: new TextEncoder().encode(JSON.stringify(input)),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, CLAUDE_PLAN_MARKER_ROOT: stateRoot },
+  });
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(gate.stdout).text(),
+    new Response(gate.stderr).text(),
+    gate.exited,
+  ]);
+  return { stdout, stderr, exitCode };
 }
 
 describe("first presentation", () => {
@@ -341,19 +360,7 @@ describe("sustained growth", () => {
 // The oversized rule needs no prior state, so one piped payload covers it.
 describe("harness invocation", () => {
   it("emits the oversized decision when run as the harness runs it", async () => {
-    const payload = JSON.stringify(mockInput("x".repeat(12_001)));
-    const gate = Bun.spawn(["bun", join(import.meta.dir, "gate.ts")], {
-      stdin: new TextEncoder().encode(payload),
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...process.env, CLAUDE_PLAN_MARKER_ROOT: stateRoot },
-    });
-
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(gate.stdout).text(),
-      new Response(gate.stderr).text(),
-      gate.exited,
-    ]);
+    const { stdout, stderr, exitCode } = await runGate(mockInput("x".repeat(12_001)));
 
     expect({ exitCode, stderr, decision: JSON.parse(stdout) }).toMatchInlineSnapshot(`
       {
@@ -366,6 +373,68 @@ describe("harness invocation", () => {
         },
         "exitCode": 0,
         "stderr": "",
+      }
+    `);
+  });
+});
+
+// The rules above decide inside one process. In production the gate is a fresh
+// process per presentation and learns everything about the plan before it off
+// disk, so a rule can hold in-process and still never decide anything. These are
+// ExitPlanMode presentations recorded from real sessions, replayed one spawn per
+// presentation against a shared marker root.
+//
+// The label carries the permissionDecision alongside the rule because the
+// append-only rule shipped returning "ask", which ExitPlanMode discards, and so
+// decided nothing for its first month. A label naming only the rule would have
+// read as healthy throughout.
+describe("recorded re-presents", () => {
+  const RULES: [needle: string, label: string][] = [
+    ["byte-identical", "byte-identical"],
+    ["carries nearly every prior line", "append-only"],
+    ["larger than any before it", "growth"],
+    ["exceeds 12k characters", "size"],
+  ];
+
+  function label(run: GateRun): string {
+    if (run.exitCode !== 0 || run.stderr) return `gate failed (${run.exitCode}): ${run.stderr}`;
+    if (!run.stdout.trim()) return "allowed";
+    const { hookSpecificOutput } = JSON.parse(run.stdout) as {
+      hookSpecificOutput: PreToolUseHookSpecificOutput;
+    };
+    const reason = hookSpecificOutput.permissionDecisionReason ?? "";
+    const rule = RULES.find(([needle]) => reason.includes(needle))?.[1] ?? "unrecognized";
+    return `${hookSpecificOutput.permissionDecision}:${rule}`;
+  }
+
+  it("decides every recorded presentation the same way across process boundaries", async () => {
+    const replays = await Promise.all(
+      recorded.sessions.map(async ({ session, date, presents }) => {
+        const labels: string[] = [];
+        for (const plan of presents) {
+          labels.push(label(await runGate(mockInput(plan, session))));
+        }
+        return [`${date} ${session}`, labels] as const;
+      }),
+    );
+
+    expect(Object.fromEntries(replays)).toMatchInlineSnapshot(`
+      {
+        "2026-07-10 a4b38156": [
+          "allowed",
+          "allowed",
+          "deny:append-only",
+        ],
+        "2026-07-19 dfdb8641": [
+          "allowed",
+          "deny:append-only",
+          "deny:byte-identical",
+          "deny:append-only",
+        ],
+        "2026-08-12 aeebf85d": [
+          "allowed",
+          "deny:append-only",
+        ],
       }
     `);
   });

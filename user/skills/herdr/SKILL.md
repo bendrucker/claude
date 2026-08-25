@@ -42,10 +42,6 @@ herdr manages the terminal workspace this session runs in, and knows every works
 
 Under `HERDR_ENV=1`, a request naming a pane, tab, workspace, or split is about this session's herdr layout. Use tmux only when the user says tmux.
 
-## Arguments
-
-`$0` (optional verb) routes to a section: `orient` to [Current Workspace](#current-workspace), `agents` to [Sibling Agents](#sibling-agents), `view <file>` to [Collaborative File Viewing](#collaborative-file-viewing), `read <pane>` to [Reading Another Pane](#reading-another-pane). With no verb, answer from the orientation block below.
-
 ## Command Surface
 
 !`bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh`

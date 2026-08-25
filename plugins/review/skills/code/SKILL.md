@@ -22,15 +22,13 @@ allowed-tools:
 
 Review the diff for correctness bugs and cleanups: $ARGUMENTS
 
-This is a port of Claude Code's built-in `/code-review`, which is user-invocable only and cannot be reached through the Skill tool. This one is model-invocable, so `ship`, `review:peer`, and any other skill can delegate to it. The upstream text it was ported from is in [references/upstream-2.1.215.md](references/upstream-2.1.215.md).
-
 ## Arguments
 
 - **Effort level**: the first token, if it matches `^(low|med|hig|xhi|max)[a-z]*$` case-insensitively. Prefixes count: `med`, `hi`, `xh` all resolve. `xhigh` is the top of the ladder, and `max` resolves to it. `--effort <level>` is an alias, valid anywhere in the arguments, and its value goes through the same match. Ignore an unrecognized level-shaped token with a brief note naming the valid levels. Do not treat it as a target.
 - **`--fix`**: apply findings to the working tree after reporting. May appear anywhere.
 - **`--base <ref>`**: review against this base instead of the resolved default.
 - **`<target>`**: everything else, free-form. A PR number, branch, ref range, path, or a plain-English scope restriction ("only `src/parser.ts`", "focus on error handling", "skip the test churn").
-- **`ultra`**: not supported here. Stop and tell the user to type `/code-review ultra` themselves. It launches a billed cloud review and only a user-typed invocation can start it.
+- **`ultra`**: not supported here. Stop and tell the user to type `/code-review ultra` themselves.
 
 With no effort level, use the session's effort. Default to `medium`.
 
@@ -56,7 +54,7 @@ Pick the effort cell from [efforts.md](efforts.md). It fixes the fan-out shape, 
 
 At `low`, follow the low-cell instructions in `efforts.md` and skip the remaining phases.
 
-Otherwise run the selected angles from [angles.md](angles.md). Each surfaces up to its cap of candidates with `file`, `line`, a one-line `summary`, and a concrete `failure_scenario`.
+Otherwise run the selected angles from [angles.md](angles.md) and [local-angles.md](local-angles.md). Each surfaces up to its cap of candidates with `file`, `line`, a one-line `summary`, and a concrete `failure_scenario`.
 
 #### Fan-out cells
 

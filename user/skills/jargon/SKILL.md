@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Jargon
 
-Restate your previous message in plain language. Keep every claim it made and land on the same conclusion.
+Restate your previous message in plain language. Keep every claim it made.
 
 - Replace each specialized term with what the thing does. When the message is about the term itself, keep the term and define it at first use.
 - Expand every acronym at first use.
@@ -14,4 +14,4 @@ Restate your previous message in plain language. Keep every claim it made and la
 - Name the actor in each sentence: which program, which file, or which person performs the action.
 - Keep filenames, commands, numbers, and error text exactly as written.
 
-Restate the current turn only. Write later messages in your normal register.
+Restate the current turn only, and write later messages in your normal register.

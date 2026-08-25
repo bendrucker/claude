@@ -15,11 +15,11 @@ Explain $ARGUMENTS visually. Pick the smallest view that makes the point, and ke
 
 ## Formats
 
-Pick one format or several. Using all of them is rare.
+Pick one format or several, rarely all.
 
 ### Pseudocode
 
-For logic or an algorithm. Keep it to the decisions and the order they run in:
+Logic or an algorithm, as decisions in the order they run:
 
 ```text
 on(save)
@@ -31,7 +31,7 @@ on(save)
 
 ### Call Tree
 
-For runtime control flow inside one process. Show which function calls which:
+Runtime control flow inside one process:
 
 ```text
 submitForm
@@ -43,7 +43,7 @@ submitForm
 
 ### Component Tree
 
-For UI structure. Annotate the state and the seams that matter:
+UI structure, annotated with the state and seams that matter:
 
 ```tsx
 <SessionPage> (apps/example/src/routes/session.tsx)
@@ -54,7 +54,7 @@ For UI structure. Annotate the state and the seams that matter:
 
 ### File Tree
 
-For file responsibility or the shape of a refactor. Keep it shallow and give each entry one line of responsibility:
+File responsibility or the shape of a refactor, one line of responsibility per entry:
 
 ```text
 src/
@@ -65,9 +65,9 @@ src/
 
 ### Diff
 
-Use a diff when the point is what changes and the surrounding shape already exists. Match the diff to the shape of the topic.
+What changes, when the surrounding shape already exists. Match the diff to the shape of the topic.
 
-A component change diffs the component tree:
+Component tree:
 
 ```diff
  <SessionPage>
@@ -78,7 +78,7 @@ A component change diffs the component tree:
 +    <SkillResultCard />
 ```
 
-A move or split diffs the file tree:
+File tree:
 
 ```diff
  src/
@@ -91,7 +91,7 @@ A move or split diffs the file tree:
 +    └── stream.ts
 ```
 
-A new step in an existing path diffs the call tree:
+Call tree:
 
 ```diff
  submitForm
@@ -103,7 +103,7 @@ A new step in an existing path diffs the call tree:
 +    subscribeToEvents
 ```
 
-A change in what runs when diffs the state or control flow:
+State and control flow:
 
 ```diff
  on(save)
@@ -117,7 +117,7 @@ A change in what runs when diffs the state or control flow:
 
 ### Whole Block
 
-Show the whole block when most of it is new, when omitted context would hide ownership or order, or when the user needs a copyable target shape:
+Most of the block is new, omitted context would hide ownership or order, or the user needs a copyable target shape:
 
 ```ts
 function expandSkill(command: string): string {
@@ -128,7 +128,7 @@ function expandSkill(command: string): string {
 
 ### Mermaid
 
-For interaction that crosses modules or processes, and for data flow through them:
+Interaction that crosses modules or processes, and data flow through them:
 
 ```mermaid
 sequenceDiagram
@@ -142,12 +142,10 @@ sequenceDiagram
 
 ### Artifact
 
-For a rendered UI, a layout, a state comparison, or a concept too dense for Mermaid, publish an Artifact: a diagram, an infographic, or a short slide deck, whichever fits the point. Load the `artifact-design` skill first, write the page to a file, then call `Artifact` with that path. Artifacts render Mermaid natively. A fenced mermaid block inside the page needs no library.
-
-Match the product's colors, type, spacing, and components. Use real labels and real data, and support desktop and mobile widths.
+A rendered UI, a layout, a state comparison, or a concept too dense for Mermaid. Load `artifact-design`, write the page to a file, then call `Artifact` with that path.
 
 ## Scope
 
 Place each visual next to the short text it supports.
 
-Keep only the calls, files, props, states, and seams needed to answer the question on the table. Cut every branch that doesn't bear on it.
+Keep only the calls, files, props, states, and seams that answer the question on the table.

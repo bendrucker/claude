@@ -58,6 +58,8 @@ So the fix belongs upstream, and nothing in this repo's settings can express it 
 
 A second confirmed instance is `~/.claude/jobs/*/tmp`. The harness tells background-job sessions to write temp files under `$CLAUDE_JOB_DIR/tmp` (`~/.claude/jobs/<id>/tmp`), but `~/.claude/jobs` is a harness-injected `denyWithinAllow` entry, so an `allowWrite` for any subpath is inert for the same reason. The harness generates the deny, so `user/settings.json` cannot narrow it either. Background jobs fall back to `$TMPDIR` (`/tmp`), which is writable, at the cost of the cross-job clobbering the per-job directory was meant to prevent. Do not add a `~/.claude/jobs` subpath to `allowWrite`.
 
+A third is `~/.claude/projects`, which holds the per-project memory directories. Only Bash runs under Seatbelt, so a `Write` from the tool layer lands while `rm` or `cp` on the same memory file returns `Operation not permitted`. Session transcripts carry those `rm` and `cp` failures from ordinary work, and auto mode routing file edits through Bash is what makes the gap reachable so often. Verified inert against Claude Code 2.1.232: a nested `claude --settings` run granting `~/.claude/projects` denied a `touch` inside it, while every other entry in that same probe file succeeded. Do not add `~/.claude/projects` to `allowWrite`. Editing a memory file works through the tool layer, and deleting or renaming one needs a sandbox bypass.
+
 Meanwhile, the four session-index writers carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker. That is a bridge around a bug, not the intended design, and it trades real sandbox coverage for a working toolchain.
 
 **Removal criterion.** Drop the markers when this probe succeeds under the sandbox:
@@ -67,6 +69,12 @@ touch ~/.claude/plugins/data/.sandbox-probe && rm ~/.claude/plugins/data/.sandbo
 ```
 
 Do not wait for an upstream announcement. [#41156](https://github.com/anthropics/claude-code/issues/41156) raised the same conflict at the permission-prompt layer, was wrongly auto-flagged as a duplicate, and was closed `NOT_PLANNED` by a staleness bot after two and a half months. Related: [#51973](https://github.com/anthropics/claude-code/issues/51973), [#34900](https://github.com/anthropics/claude-code/issues/34900). Treat the probe as the only reliable signal.
+
+## Bare `/tmp`
+
+The `/tmp` entry in `allowWrite` does not grant `/tmp` itself. A `mkdir` directly in `/tmp` returns `Operation not permitted`, while `/tmp/claude` and the session scratchpad under `/tmp/claude-<uid>` both accept writes. So a redirect to a bare `/tmp/<file>` fails, and temp files belong in a repo's `tmp/` or the session scratchpad.
+
+This contradicts the global CLAUDE.md line saying the sandbox can write `/tmp` and `$TMPDIR`. The `$TMPDIR` half holds, though not for the reason the `env` block suggests: `env` sets `TMPDIR=/tmp`, and the harness overrides it per session to the scratchpad, so the variable resolves somewhere writable while the literal value in settings would not. Fix the CLAUDE.md line rather than trusting it. The mechanism behind the denial is unconfirmed, and it is not the `denyWithinAllow` precedence trap above, since a deny covering `/tmp` would take `/tmp/claude` with it.
 
 ## Sandbox Path Globs
 
@@ -136,9 +144,18 @@ Treat this section as a trust model, not an exhaustive mirror of `settings.json`
 
 - `allowUnixSockets` should be local IPC endpoints where secret material never leaves a dedicated agent (for example, signing daemons or the tmux and herdr sockets). The multiplexer sockets (tmux, herdr) can inject keys into other panes, so they are command execution by another name. Accepted so layout, agent, and notification commands run sandboxed rather than escaped.
 - `allowLocalBinding` should stay loopback-only.
-- `filesystem.allowWrite` should allow only scratch/cache/worktree paths that tools must mutate, and never credential stores or broad home-directory globs. Two paths are deliberate exceptions to the credential-store clause, `~/.greptile` and `~/.local/share/atuin`.
+- `filesystem.allowWrite` should allow only scratch/cache/worktree paths that tools must mutate, and never credential stores or broad home-directory globs. Three paths are deliberate exceptions to the credential-store clause: `~/.greptile`, `~/.coderabbit`, and `~/.local/share/atuin`.
 - `~/.greptile` holds the CLI's `auth.json` beside its `reviews.json` log, and `greptile review` writes both on every run. The grant covers the directory because the CLI chmods it, which a file-level grant leaves failing at `EPERM`. Accepted so `greptile review` runs sandboxed rather than escaped, the same trade as the `*.greptile.com` egress entry above. The added risk is tampering with a token that is already exfiltrable. **Removal criterion:** narrow it back to `~/.greptile/reviews.json` once a sandboxed `greptile review` stops dying on the directory `chmod`.
+- `~/.coderabbit` is the same trade as `~/.greptile`. It holds `auth.json` beside the CLI's local state, and `coderabbit review` writes on every run. Without the grant, `coderabbit doctor` reports `[fail] Storage — Unable to read and write ~/.coderabbit`, and a review hangs for many minutes before dying rather than failing fast. Accepted so `coderabbit review` runs sandboxed rather than escaped, matching the `*.coderabbit.ai` egress entry above. **Removal criterion:** drop it when `pull-request:follow-up --local` no longer runs the `coderabbit` CLI.
 - `~/.local/share/atuin`: the dir holds atuin's sync encryption key and the session tokens in `meta.db`. Atuin opens `meta.db` read-write on every command, including the history reads behind the `atuin:history` skill, and SQLite creates journal and WAL files beside its dbs, so a file-level grant would fail intermittently. The sandbox grants no egress to atuin's sync hosts, so the risk is local tampering: a swapped key or token would first reach the network through a later unsandboxed `atuin sync`.
+
+The rest of the list is tool caches and state directories holding no credential material. Each was denied in practice before being granted, and each denial surfaced as a bare `Operation not permitted` from the tool, naming neither the sandbox nor the path rule.
+
+- `~/.duckdb` holds the extensions DuckDB installs on first `INSTALL ... FROM community`. Without it the `claude-code:session` skill dies on `IO Error: Failed to create directory "~/.duckdb/extensions/<version>"`, having already been granted the `community-extensions.duckdb.org` egress it needs to fetch them. The version in the path changes with each DuckDB release, so a fresh install re-denies. **Removal criterion:** drop it when no skill queries DuckDB with a community extension.
+- `~/.agent-browser` holds the CLI's control socket. `agent-browser` sits in `excludedCommands`, but only a top-level match escapes, so a skill script that shells out to it runs sandboxed and fails with `Socket directory '~/.agent-browser' is not writable`. The nested-command trap explains it, so adding another `excludedCommands` entry would not help. **Removal criterion:** drop it when the `agent-browser` skill stops invoking the CLI from a wrapper.
+- `~/Library/Caches/ms-playwright` holds Playwright's unpacked browser builds. Without it an install fails at `mkdir` before reaching the download, which reads as a network problem. **Removal criterion:** drop it when no skill or work repo drives Playwright.
+- `~/.gradle` and `~/.config/jgit` hold the Gradle wrapper's distribution lock and jgit's config lock, both written by Java builds in work repos. Gradle also needs egress the sandbox does not grant, so this fixes the filesystem half only. A build that reaches the network still needs a full skip. **Removal criterion:** drop both when no Java repo is in rotation, and revisit if the egress half is ever granted, since the pair only pays off together.
+- `~/.claude/plans` holds saved plan files, and copying one in fails without the grant. No injected deny shadows it, unlike the `~/.claude` paths in [Plugin Data Dir](#plugin-data-dir) above, so the entry works. Expected to be permanent: it lapses only if plan files move out of `~/.claude`.
 
 ### Escaped Commands (`excludedCommands`)
 

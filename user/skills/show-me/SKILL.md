@@ -19,7 +19,7 @@ Pick one format or several, rarely all.
 
 ### Pseudocode
 
-Logic or an algorithm, as decisions in the order they run:
+Logic or an algorithm:
 
 ```text
 on(save)
@@ -43,7 +43,7 @@ submitForm
 
 ### Component Tree
 
-UI structure, annotated with the state and seams that matter:
+UI structure:
 
 ```tsx fragment
 <SessionPage> (apps/example/src/routes/session.tsx)
@@ -54,7 +54,7 @@ UI structure, annotated with the state and seams that matter:
 
 ### File Tree
 
-File responsibility or the shape of a refactor, one line of responsibility per entry:
+File responsibility or the shape of a refactor:
 
 ```text
 src/
@@ -65,7 +65,7 @@ src/
 
 ### Diff
 
-What changes, when the surrounding shape already exists. Match the diff to the shape of the topic.
+What changes, when the surrounding shape already exists.
 
 Component tree:
 

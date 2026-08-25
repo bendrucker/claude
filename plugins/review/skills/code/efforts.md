@@ -26,16 +26,18 @@ Every fan-out spawn passes `model: sonnet` alongside its `subagent_type`. What a
 | `low` | 1 diff pass | — | none | no | <=4 | terse, hunk-only, skips test/fixture hunks |
 | `low-sonnet5` | 1 diff pass | — | none | no | floor `min(files, 4)` | same, plus a second pass if under the floor |
 | `inline-low` | 1 diff pass | — | none | no | <=8, floor `min(files, 4)` | no test-hunk skip |
-| `medium` | 3 correctness + 3 cleanup + altitude + conventions = 8 | 6 | 1-vote, 3-state | no | <=8 | precision |
-| `high` | 8 | 6 | 1-vote, recall-biased | no | <=10 | recall |
-| `xhigh` | 5 correctness + 5 cleanup/altitude/conventions = 10 | 8 | 1-vote, single non-REFUTED carries | yes | <=15 | recall |
-| `inline-med` | 8, inline | 6 | dedup only | no | <=8, floor 4 | recall |
-| `inline-high` | 8, inline | 6 | dedup only | no | <=10, floor 5 | recall |
-| `inline-xhigh` | 10, inline | 8 | dedup only | yes | <=15, floor 7 | recall |
-
-"8 angles" means Angles A, B, C plus Reuse, Simplification, Efficiency, Altitude, Conventions. "10 angles" adds Angles D and E.
+| `medium` | `core` | 6 | 1-vote, 3-state | no | <=8 | precision |
+| `high` | `core` | 6 | 1-vote, recall-biased | no | <=10 | recall |
+| `xhigh` | `full` | 8 | 1-vote, single non-REFUTED carries | yes | <=15 | recall |
+| `inline-med` | `core`, inline | 6 | dedup only | no | <=8, floor 4 | recall |
+| `inline-high` | `core`, inline | 6 | dedup only | no | <=10, floor 5 | recall |
+| `inline-xhigh` | `full`, inline | 8 | dedup only | yes | <=15, floor 7 | recall |
 
 When the `Agent` tool is unavailable, every fan-out cell degrades to a single inline pass. See [SKILL.md](SKILL.md) for that path.
+
+## Angle Sets
+
+Angles D and E in [angles.md](angles.md) are xhigh-only. `core` is that file's other angles. `full` is all of them plus every angle in [local-angles.md](local-angles.md).
 
 ## Framing Paragraphs
 
@@ -77,7 +79,7 @@ On Sonnet 5 at `high` or `xhigh`, scale the fleet to the diff size instead of us
 budget = clamp(ceil(lines / 150), 2, 8)
 ```
 
-Spawn about that many finder subagents, each with `subagent_type: review:angle, model: sonnet`. The committed-range count is a floor: uncommitted changes are not in it, so scale up if Phase 0 finds additional working-tree scope.
+Spawn about that many finder subagents, each with `subagent_type: review:angle, model: sonnet`. Deal the cell's angle set across them in whole angles. A fleet smaller than the set gives some agents more than one angle. The committed-range count is a floor: uncommitted changes are not in it, so scale up if Phase 0 finds additional working-tree scope.
 
 No other model family gets this hint.
 

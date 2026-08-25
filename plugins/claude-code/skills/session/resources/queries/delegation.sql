@@ -1,10 +1,16 @@
 -- Delegation observability: how well expensive orchestrator sessions push work down to
 -- cheaper models on Agent/Task spawns. One row per (parent main-model family, path,
--- actual spawn-model family), where `path` splits `pinned` (frontmatter-pinned
--- purpose-built agents: `claude-code-guide`, `github:logs`, `gitlab:logs`,
--- `github:rulesets-manager`, the known agents that pin a `model:` in their definition)
--- from `generic` (`general-purpose`, `Plan`, bare `claude`, no `subagent_type`, and any
--- subagent type not on the known-pinned list). `Explore` is generic, not pinned: since
+-- actual spawn-model family), where `path` splits `pinned` (purpose-built agents that
+-- set a `model:` in their own definition, so the parent's choice never applies) from
+-- `generic` (`general-purpose`, `Plan`, bare `claude`, no `subagent_type`, and any
+-- subagent type not on the known-pinned list). Re-derive the pinned list from the
+-- `model` column of `bun run inventory agents` in the config repo, plus the built-in
+-- `claude-code-guide`. An agent that gains or loses a frontmatter `model:` moves
+-- between the two paths, and a purpose-built agent without one (`review:angle`,
+-- `review:verifier`) belongs in `generic` because its spawn site still has to supply
+-- the model.
+--
+-- `Explore` is generic, not pinned: since
 -- CLI v2.1.198 it inherits the main conversation model (capped at Opus) instead of
 -- pinning Haiku, so an Explore spawn under an expensive parent is a real delegation miss,
 -- not a free downgrade. Unrecognized types default to generic, so the split undercounts
@@ -113,7 +119,9 @@ per_call AS (
     COALESCE(model_family(j.main_model), 'unknown') AS parent_family,
     CASE
       WHEN j.subagent_type IN (
-        'claude-code-guide', 'github:logs', 'gitlab:logs', 'github:rulesets-manager'
+        'analyst', 'claude-code-guide', 'github:logs', 'gitlab:logs',
+        'github:rulesets-manager', 'type-ignore:fixer',
+        'writing:artifacts', 'writing:content', 'writing:style'
       ) THEN 'pinned'
       ELSE 'generic'
     END AS path,

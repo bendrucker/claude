@@ -469,14 +469,14 @@
       "source": {
         "source": "github",
         "repo": "max-sixty/worktrunk",
-        "ref": "v0.72.0"
+        "ref": "v0.74.0"
       }
     },
     "linear-cli": {
       "source": {
         "source": "github",
         "repo": "schpet/linear-cli",
-        "ref": "v2.4.0"
+        "ref": "v2.5.0"
       }
     },
     "agent-browser": {
@@ -508,15 +508,22 @@
         "~/.terraform.d/plugin-cache",
         "~/.cache",
         "~/Library/Caches/go-build",
+        "~/Library/Caches/ms-playwright",
         "~/src/go/pkg/mod",
         "~/src/go/pkg/sumdb",
         "~/.bun/install",
+        "~/.duckdb",
+        "~/.gradle",
         "~/.config/glab-cli/recover",
+        "~/.config/jgit",
         "~/.npm",
         "~/.local/share/uv",
         "~/.local/share/graphite",
         "~/.local/share/atuin",
         "~/.greptile",
+        "~/.coderabbit",
+        "~/.agent-browser",
+        "~/.claude/plans",
         "/dev/fd",
         "/var/folders/*/*/T/**/*"
       ]

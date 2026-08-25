@@ -48,8 +48,6 @@ Under `HERDR_ENV=1`, a request naming a pane, tab, workspace, or split is about 
 
 ## Command Surface
 
-The block below comes from `--help` at load time.
-
 !`bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh`
 
 For a command whose flags are not shown above, `herdr <group> <command> --help` is complete: it prints defaults, enumerates valid values for every enum flag, and states preconditions. Where the CLI and this file disagree, the CLI is right and this file is stale.
@@ -72,7 +70,7 @@ Most commands answer with a single-line JSON envelope. Pipe them through `jq -r 
 {"id":"cli:pane:list","result":{"panes":[...],"type":"pane_list"}}
 ```
 
-Others print plain text, and `jq` on those dies with `Invalid numeric literal`. Terminal content and human explanations are one kind: `pane read`, `agent read`, `agent explain`. Anything reporting local installation instead of live session state is the other: `plugin list`, `plugin config-dir`, `config check`, `integration status`, `server agent-manifests`. Siblings fall on opposite sides, so `plugin action list` returns an envelope while `plugin list` does not.
+Others print plain text, and `jq` on those dies with `Invalid numeric literal`. Terminal content and human explanations are one kind: `pane read`, `agent read`, `agent explain`. Anything reporting local installation instead of live session state is the other: `plugin list`, `plugin config-dir`, `config check`, `integration status`, `server agent-manifests`.
 
 Exit 1 is a server error with JSON on stderr: parse it. Exit 2 is a syntax error, wrong before it reached the server.
 
@@ -80,13 +78,13 @@ Exit 1 is a server error with JSON on stderr: parse it. Exit 2 is a syntax error
 
 A pane exists whether or not an agent runs in it. `pane` commands drive the raw terminal, and `agent` commands drive the recognized process inside one.
 
-An agent target is a live agent name or the pane ID hosting it, and nothing else. `agent list` prints a `terminal_id` and an `agent` kind beside those, and either one passed as a target yields `agent_not_found`, which reads as an absent agent rather than a wrong kind of handle.
+An agent target is a live agent name or the pane ID hosting it, and nothing else. `agent list` prints a `terminal_id` and an `agent` kind beside those, and either one passed as a target yields `agent_not_found`, indistinguishable from a genuinely absent agent.
 
 Your own identity comes from the environment, never from inference: `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_SOCKET_PATH`. `HERDR_ENV=1` marks a pane herdr launched.
 
 Name a target on every command that takes one. Use `--current` for the calling pane, an explicit ID otherwise. A pane command with no target may resolve to the UI-focused pane, and that pane can belong to the user or to another client.
 
-IDs are opaque handles shaped `w1` for a workspace, `w1:t1` for a tab, and `w1:p1` for a pane. Read them out of responses rather than composing them: `pane split` returns `.result.pane`, `tab create` returns `.result.tab` and `.result.root_pane`, `workspace create` returns all three. Closed IDs are never reused. `pane move` mints a new workspace-qualified pane ID, so take the pane forward as `.result.move_result.pane.pane_id` and drop `.result.move_result.previous_pane_id`. The moved process still carries that stale ID in its own inherited `HERDR_PANE_ID`, which makes it useless as a target for anyone else.
+IDs are opaque handles shaped `w1` for a workspace, `w1:t1` for a tab, and `w1:p1` for a pane. Read them out of responses rather than composing them: `pane split` returns `.result.pane`, `tab create` returns `.result.tab` and `.result.root_pane`, `workspace create` returns all three. Closed IDs are never reused. `pane move` mints a new workspace-qualified pane ID, so take the pane forward as `.result.move_result.pane.pane_id` and drop `.result.move_result.previous_pane_id`. The moved process keeps the stale ID in its own inherited `HERDR_PANE_ID`, so never take a target from there.
 
 ## Safety
 
@@ -111,10 +109,9 @@ herdr agent prompt <target> "the request" --wait --timeout 900000
 herdr agent read <target> --source recent-unwrapped --lines 80
 ```
 
-Without `--wait` the call returns as soon as the text is submitted, and the read that follows cannot distinguish a turn still running from one that finished. Drop `--wait` only to leave an agent running unattended, then collect with `agent wait` followed by `agent read`.
+Drop `--wait` only to leave an agent running unattended, then collect with `agent wait` followed by `agent read`.
 
-`agent prompt` writes through the pane's live bracketed-paste mode and presses Enter after a short delay. A multi-line prompt therefore arrives as one paste rather than submitting at the first newline.
-
+`agent prompt` writes through the pane's live bracketed-paste mode and presses Enter after a short delay, so a multi-line prompt arrives as one paste instead of submitting at the first newline.
 
 `agent wait` and `pane wait-output` block server-side, so use them instead of polling `pane get`. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor`.
 
@@ -164,7 +161,7 @@ Use `markless --watch` for markdown and `$EDITOR` for everything else. Keep `--n
 
 `right` suits a wide pane and `down` suits a tall one. Read the shape from `herdr pane layout --pane "$HERDR_PANE_ID"` when it is not obvious, and alternate directions across successive splits rather than slicing one axis down to an unusable strip.
 
-`pane run` hands the command string to the pane's own interactive shell, which parses it a second time. One command with ordinary quoting survives that. A multi-statement script does not: the pane's zsh dies on a bare `parse error`, and that failure lands in the pane rather than in your tool result. Write anything past a single command to a file and run `bash <path>`.
+`pane run` hands the command string to the pane's own interactive shell, which parses it a second time. Send one command with ordinary quoting. Write anything longer to a file and run `bash <path>`, since a multi-statement string dies on a bare `parse error` inside the pane where your tool result never shows it.
 
 That shell also inherits the new pane's directory, and mise activates tools per directory. A mise-managed tool available elsewhere can come back `command not found` here. Confirm the pane started the viewer before telling the user to look at it:
 
@@ -207,7 +204,7 @@ herdr plugin action list | jq -r --arg os macos '.result.actions[] | select(.pla
 herdr plugin action invoke "$action_id" --plugin "$plugin_id"
 ```
 
-Plugins ship Windows variants of the same action and no platform flag exists, so an unfiltered list shows each one twice.
+No platform flag exists, so an unfiltered list shows each action twice.
 
 `herdr plugin log list` shows a plugin's command output, which is where to look when an action produces no visible effect. `herdr plugin config-dir <plugin_id>` locates its config.
 

@@ -45,7 +45,7 @@ submitForm
 
 UI structure, annotated with the state and seams that matter:
 
-```tsx
+```tsx fragment
 <SessionPage> (apps/example/src/routes/session.tsx)
   useSessionEvents()
   <SessionToolbar> (packages/ui)

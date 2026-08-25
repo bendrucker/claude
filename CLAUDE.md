@@ -8,6 +8,7 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `.claude-plugin/marketplace.json`: Marketplace definition listing all available plugins
 - `schemas/`: JSON Schemas for Claude Code config formats. Upstream-backed ones (`plugin`, `marketplace`, `settings`) keep only our edits as an RFC 6902 overlay in [`schemas/overlays/`](schemas/overlays/), merged with the live upstream base in memory at validation time; the rest are hand-authored
 - `user/`: User-level configuration, symlinked to `~/.claude`
+- `docs/`: Reference material too long to auto-inject, linked from the rule that needs it
 - `.claude/`: Project-level configuration for this repository
 
 ## Inventory
@@ -33,7 +34,7 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 - [`plugins.md`](.claude/rules/plugins.md) (`plugins/**`): plugin architecture, naming, MCP tool naming, READMEs, metadata, dependencies
 - [`scripts.md`](.claude/rules/scripts.md) (`**/*.ts`): Bun runtime, script conventions, terminal colors, sandbox/nested-command pattern
 - [`hooks.md`](.claude/rules/hooks.md) (`**/hooks.json`, `**/hooks/**`): hook guidance, quoting, MCP matcher validation
-- [`settings.md`](.claude/rules/settings.md) (`**/settings*.json`): permission paths, sandbox and `excludedCommands`
+- [`settings.md`](.claude/rules/settings.md) (`**/settings*.json`): permission paths, `autoMode` scoping, sandbox and `excludedCommands`. Per-entry rationale and removal criteria live in [`docs/settings.md`](docs/settings.md), which does not auto-inject
 - [`testing.md`](.claude/rules/testing.md) (test and workflow files): testing conventions, CI structure
 - [`lockfile.md`](.claude/rules/lockfile.md) (`bun.lock`, `**/package.json`): lockfile conflict resolution
 - [`schemas.md`](.claude/rules/schemas.md) (`schemas/**`): schema overlays, generated vs hand-authored artifacts

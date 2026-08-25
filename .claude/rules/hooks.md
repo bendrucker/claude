@@ -8,29 +8,25 @@ paths:
 
 See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a type check.
 
-Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under `tmp/`, allowed for disposable scripted verification checkouts.
+Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under `tmp/`.
 
-Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Matcher fields are not shell commands and should not be quoted. Run `bun scripts/check-hook-quoting.ts` to validate.
+Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Leave matcher fields unquoted. Run `bun scripts/check-hook-quoting.ts` to validate.
 
 ## Bash Matchers
 
-A `Bash(...)` belongs in a per-hook `if`, and the entry's `matcher` stays a bare tool name. `bun scripts/check-hook-matchers.ts` validates that across every plugin and both settings files. The ox commit gate sat behind `"matcher": "Bash(git commit:*)"` in project settings and silently never fired, because the check used to read plugin hooks only.
+A `Bash(...)` belongs in a per-hook `if`, and the entry's `matcher` stays a bare tool name. Run `bun scripts/check-hook-matchers.ts` to validate.
 
-A `Bash(...)` matcher or `if` condition is a spawn-reducing pre-filter, never the authorization decision. It fails open on shell metacharacters: under CLI 2.1.223, `Bash(git commit:*)` matched `echo hi > $TMPDIR/probe.txt` while the same command with a literal path passed, and brace groups, for-loops, here-docs, and long pipelines match the same way.
+Treat a `Bash(...)` matcher or `if` condition as a spawn-reducing pre-filter, never as the authorization decision. It fails open on shell metacharacters, matching brace groups, for-loops, here-docs, redirects, and long pipelines that invoke something else entirely.
 
-So every Bash-matched hook script must re-read `input.tool_input.command` and confirm the command really invokes what the hook governs before it denies, blocks, or rewrites. `plugins/git/scripts/block-default-branch-commit.ts` (`invokesGitCommit`), `user/hooks/worktree/index.ts` (`/\bgit\s+worktree\s+(\w+)/`), and `plugins/shortcuts/hooks/open.ts` (a quote-aware `tokenize` that yields no target for a compound) are the working examples. A script that decides purely on ambient state, without reading the command, denies unrelated Bash calls the moment the matcher overfires.
+So every Bash-matched hook script must re-read `input.tool_input.command` and confirm the command really invokes what the hook governs before it denies, blocks, or rewrites. Working examples: `plugins/git/scripts/block-default-branch-commit.ts` (`invokesGitCommit`), `user/hooks/worktree/index.ts`, `plugins/shortcuts/hooks/open.ts`.
 
 ## Async
 
-The `claude-code:hook` skill covers `async` and `asyncRewake`: what they drop, which events kill or outlive a backgrounded process, and when to use them. Read it before marking a hook async here.
+The `claude-code:hook` skill covers `async` and `asyncRewake`. Read it before marking a hook async here.
 
-In this repo only the vibe-island bridge and the herdr state export in `user/settings.json` qualify. Everything else gates a call or emits `hookSpecificOutput`, including every hook in `plugins/*/hooks/hooks.json`. Three of the bridge's 14 entries stay synchronous:
+Only the vibe-island bridge and the herdr state export in `user/settings.json` qualify. Everything else gates a call or emits `hookSpecificOutput`, including every hook in `plugins/*/hooks/hooks.json`. Three bridge entries stay synchronous: `Stop` and `StopFailure`, whose backgrounded processes are killed before they finish, and `PermissionRequest`, which blocks to return a remote `permissionDecision`.
 
-- `Stop`, because backgrounded `Stop` hooks are killed before they finish. Measured, and the reason the skill calls the event out.
-- `StopFailure`, which shares the same stop path. Left synchronous for that reason rather than a measurement of its own.
-- `PermissionRequest`, because the bridge blocks there to return a remote `permissionDecision`. That is what its 86400s timeout is for, and it follows from the general rule against backgrounding a hook that emits output.
-
-`plugins/tmux/hooks/notification.ts` is not a notifier, despite the name. Its three hooks do a read-modify-write on shared tmux options and depend on completing in event order, so backgrounding any of them races the others.
+Never background `plugins/tmux/hooks/notification.ts`. Its three hooks do a read-modify-write on shared tmux options and must complete in event order.
 
 ## MCP Matchers
 

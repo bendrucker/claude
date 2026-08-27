@@ -20,7 +20,7 @@ import type { DiffOptions } from "../../../detection/diff";
 import { extractComments, languageForPath } from "../../../detection/extract";
 import { rankComments, type SortKey } from "../../../detection/rank";
 import type { Comment } from "../../../detection/types";
-import { buildJob, type JobShard, writeJob } from "../../../judge/job";
+import { buildJob, type BuildJobOptions, type JobShard, writeJob } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
 
 const WORKFLOW_PATH = join(import.meta.dirname, "..", "..", "..", "workflow", "judge.workflow.js");
@@ -129,7 +129,9 @@ const preflightCmd = command(
       return;
     }
 
-    const descriptor = await buildJob(limited, { fix, ...(shardSize ? { shardSize } : {}) });
+    const options: BuildJobOptions = { fix };
+    if (shardSize) options.shardSize = shardSize;
+    const descriptor = await buildJob(limited, options);
     const written = await writeJob(descriptor);
     // An --mr job records comment text from the remote MR ref, but apply trims
     // the local tree from HEAD. Persist the scope so apply can refuse to branch

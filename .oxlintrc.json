@@ -58,6 +58,7 @@
       }
     ],
     "local/no-chained-type-assertions": "error",
+    "local/no-conditional-empty-object-spread": "error",
     "local/no-module-mocking": "error",
     "local/no-terminal-width": "error"
   },

@@ -84,6 +84,28 @@ describe("no-terminal-width", () => {
   });
 });
 
+describe("no-conditional-empty-object-spread", () => {
+  const rule = "no-conditional-empty-object-spread";
+
+  test.each([
+    ["a declared-then-assigned optional", "const o: T = { a }; if (b) o.b = b;"],
+    ["a spread of a non-empty branch", "export const o = { ...(b ? { b } : { c }) };"],
+    ["a conditional spread outside an object", "export const a = [...(b ? [] : [b])];"],
+    ["a logical-and spread", "export const o = { ...(b && { b }) };"],
+  ])("allows %s", async (_name, code) => {
+    expect(await lint(rule, code)).toEqual([]);
+  });
+
+  test.each([
+    ["empty in the alternate", "export const o = { a, ...(b ? { b } : {}) };"],
+    ["empty in the consequent", "export const o = { a, ...(b ? {} : { b }) };"],
+    ["parenthesized", "export const o = { a, ...((b ? { b } : {})) };"],
+    ["an undefined comparison", "export const o = { a, ...(b === undefined ? {} : { b }) };"],
+  ])("rejects %s", async (_name, code) => {
+    expect(await lint(rule, code)).toEqual([`local(${rule})`]);
+  });
+});
+
 describe("no-module-mocking", () => {
   const rule = "no-module-mocking";
 

@@ -3,15 +3,14 @@ import type { HookCommand, MatcherEntryContext } from "../packages/marketplace/i
 import { entries, violations } from "./check-hook-matchers";
 
 function entry(matcher: string | undefined, ...ifs: (string | undefined)[]): MatcherEntryContext {
-  const hooks: HookCommand[] = ifs.map((rule) => ({
-    type: "command",
-    command: "bun hook.ts",
-    ...(rule === undefined ? {} : { if: rule }),
-  }));
-  return {
-    file: "plugins/example/hooks/hooks.json",
-    entry: { ...(matcher === undefined ? {} : { matcher }), hooks },
-  };
+  const hooks: HookCommand[] = ifs.map((rule) => {
+    const hook: HookCommand = { type: "command", command: "bun hook.ts" };
+    if (rule !== undefined) hook.if = rule;
+    return hook;
+  });
+  const entry: MatcherEntryContext["entry"] = { hooks };
+  if (matcher !== undefined) entry.matcher = matcher;
+  return { file: "plugins/example/hooks/hooks.json", entry };
 }
 
 test.each<{ name: string; entries: MatcherEntryContext[]; expected: number }>([

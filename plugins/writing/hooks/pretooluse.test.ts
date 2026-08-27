@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { check as headingCheck } from "./headings";
+import type { SyncHookJSONOutput } from "./io";
 import { dispatch } from "./pretooluse";
 
 // Session-state files land in $TMPDIR. Redirect it so test runs do not litter
@@ -47,9 +48,8 @@ function mockInput(
 // (numbering + headings) and a spaced em dash (tropes).
 const MULTI_VIOLATION = "# step 1: introduction\n\nThis — is bad\n";
 
-function contextOf(output: unknown): string {
-  return (output as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput
-    .additionalContext;
+function contextOf(output: SyncHookJSONOutput | null): string {
+  return (output?.hookSpecificOutput as { additionalContext: string }).additionalContext;
 }
 
 describe("single output per tool call", () => {

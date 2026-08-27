@@ -1,15 +1,22 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
+import { z } from "zod";
+import { decodeFile } from "../packages/decode/index";
 import {
   type HooksFile,
   loadPlugins,
+  MatcherEntry,
   type MatcherEntryContext,
   matcherEntries,
 } from "../packages/marketplace/index";
 import { root } from "./assets";
 import { runCheck } from "./check";
 import { SOURCES } from "./check-hook-paths";
+
+const SettingsHooks = z.looseObject({
+  hooks: z.record(z.string(), z.array(MatcherEntry)).optional(),
+});
 
 /** A `Tool(...)` permission rule: legal in an `if`, never in a matcher. */
 const PERMISSION_RULE = /^[A-Za-z_]\w*\(.*\)$/;
@@ -73,7 +80,7 @@ export async function allMatcherEntries(): Promise<MatcherEntryContext[]> {
     loadPlugins(),
     Promise.all(
       SOURCES.map(async ({ file }) => {
-        const parsed = (await Bun.file(join(root, file)).json()) as { hooks?: HooksFile["hooks"] };
+        const parsed = await decodeFile(SettingsHooks, join(root, file));
         return [...settingsEntries(file, parsed.hooks ?? {})];
       }),
     ),

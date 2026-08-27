@@ -128,7 +128,7 @@ test.each<{ name: string; body: string; expected: Metrics }>([
   const { tells, ...scalars } = expected;
   expect(row).toMatchObject(scalars);
   for (const [tell, count] of Object.entries(tells ?? {})) {
-    expect(row.narrationTellCounts[tell as NarrationTell]).toBe(count);
+    expect(row.narrationTellCounts[tell]).toBe(count);
   }
 });
 

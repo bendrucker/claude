@@ -49,11 +49,15 @@
     },
     "packages/marketplace": {
       "name": "@bendrucker/claude-marketplace",
+      "dependencies": {
+        "zod": "^4.4.3",
+      },
     },
     "packages/oxlint-rules": {
       "name": "@bendrucker/claude-oxlint-rules",
       "dependencies": {
         "@oxlint/plugins": "1.78.0",
+        "zod": "^4.4.3",
       },
     },
     "packages/skill-lint": {
@@ -69,6 +73,7 @@
         "ajv": "^8.17.1",
         "ajv-formats": "^3.0.1",
         "rfc6902": "^5.2.0",
+        "zod": "^4.4.3",
       },
     },
     "plugins/claude-code": {

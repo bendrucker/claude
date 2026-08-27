@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { HookInput } from "../../scripts/hook-input";
 import {
   formatAskOutput,
   formatDenyOutput,
@@ -8,11 +9,13 @@ import {
   processInput,
 } from "./index";
 
-function bashInput(command: string): PreToolUseHookInput {
+function bashInput(command: string): HookInput {
   return {
+    session_id: "test",
+    hook_event_name: "PreToolUse",
     tool_name: "Bash",
     tool_input: { command },
-  } as PreToolUseHookInput;
+  };
 }
 
 describe("processInput", () => {
@@ -129,8 +132,7 @@ describe("processInput", () => {
   });
 
   it("returns null when command is missing", () => {
-    const input = { tool_name: "Bash", tool_input: {} } as PreToolUseHookInput;
-    expect(processInput(input)).toBeNull();
+    expect(processInput({ ...bashInput(""), tool_input: {} })).toBeNull();
   });
 });
 

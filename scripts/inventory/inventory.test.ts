@@ -91,9 +91,9 @@ test.each<Kind>([...KINDS])("renders the %s table", (kind) => {
   expect(render(section(fixture, kind, 40))).toMatchSnapshot();
 });
 
-test.each<{ name: string; kind: Kind; expected: boolean }>([
+test.each<{ name: string; kind: string; expected: boolean }>([
   { name: "known kind", kind: "skills", expected: true },
-  { name: "unknown kind", kind: "wordlists" as Kind, expected: false },
+  { name: "unknown kind", kind: "wordlists", expected: false },
 ])("isKind: $name", ({ kind, expected }) => {
   expect(isKind(kind)).toBe(expected);
 });

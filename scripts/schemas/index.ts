@@ -29,7 +29,9 @@ const check = command({ name: "check" }, async () => {
       applyOverlay(base, patch);
       console.log(`${green("✓")} ${source.name}: overlay applies to current upstream`);
     } catch (error) {
-      console.log(`${red("✗")} ${source.name}: ${(error as Error).message}`);
+      console.log(
+        `${red("✗")} ${source.name}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       failed = true;
     }
 

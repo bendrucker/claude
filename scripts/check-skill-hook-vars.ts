@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import matter from "gray-matter";
-import { assetPaths, root, SKILL_GLOBS } from "./assets";
+import { z } from "zod";
+import { decode } from "../packages/decode/index";
+import { assetPaths, frontmatter, root, SKILL_GLOBS } from "./assets";
 import { runCheck } from "./check";
 
 // The hooks engine substitutes only ${CLAUDE_PROJECT_DIR}, ${CLAUDE_PLUGIN_ROOT},
@@ -13,17 +14,20 @@ import { runCheck } from "./check";
 // Reference bundled scripts by ${CLAUDE_PLUGIN_ROOT}/skills/<skill>/... instead.
 const FORBIDDEN = /\$\{CLAUDE_SKILL_(?:DIR|ROOT)\}/;
 
-interface MatcherEntry {
-  hooks?: Array<{ command?: string; args?: string[] }>;
-}
+const MatcherEntry = z.looseObject({
+  hooks: z
+    .array(z.looseObject({ command: z.string().optional(), args: z.array(z.string()).optional() }))
+    .optional(),
+});
+
+const SkillHooks = z.record(z.string(), z.array(MatcherEntry)).optional();
 
 async function checkSkillHookVars(): Promise<string[]> {
   const violations: string[] = [];
 
   for await (const file of assetPaths(SKILL_GLOBS)) {
-    const raw = await Bun.file(join(root, file)).text();
-    const { data } = matter(raw);
-    const hooks = data.hooks as Record<string, MatcherEntry[]> | undefined;
+    const data = frontmatter(await Bun.file(join(root, file)).text(), file);
+    const hooks = decode(SkillHooks, data.hooks, `${file} hooks`);
     if (!hooks) continue;
 
     for (const entries of Object.values(hooks)) {

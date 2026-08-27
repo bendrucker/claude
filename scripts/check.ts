@@ -25,7 +25,7 @@ export async function readTracked(file: string, cwd: string): Promise<string | n
   try {
     return await Bun.file(join(cwd, file)).text();
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
     throw error;
   }
 }

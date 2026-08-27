@@ -2,6 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
+import { decodeJson } from "../decode/index";
+
+const Report = z.looseObject({
+  diagnostics: z.array(z.looseObject({ code: z.string().nullable() })),
+});
 
 const PLUGIN = join(import.meta.dirname, "index.ts");
 const OXLINT = join(import.meta.dirname, "..", "..", "node_modules", ".bin", "oxlint");
@@ -27,9 +33,7 @@ async function lint(rule: string, code: string): Promise<string[]> {
       "--format=json",
       file,
     ]);
-    const parsed = JSON.parse(result.stdout.toString()) as {
-      diagnostics: { code: string | null }[];
-    };
+    const parsed = decodeJson(Report, result.stdout.toString(), "oxlint --format=json");
     return parsed.diagnostics
       .map((d) => d.code)
       .filter((c): c is string => c !== null && c.startsWith("local("));

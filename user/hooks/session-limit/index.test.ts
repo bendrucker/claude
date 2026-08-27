@@ -5,17 +5,14 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type {
-  SyncHookJSONOutput,
-  UserPromptSubmitHookInput,
-  UserPromptSubmitHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput, UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import {
   crossedBand,
   evaluate,
   FIVE_HOUR_BANDS,
   formatResetTime,
-  type Marker,
+  Marker,
   processInput,
   SEVEN_DAY_BANDS,
 } from "./index";
@@ -199,9 +196,10 @@ describe("processInput", () => {
     await Bun.write(rlPath, JSON.stringify(limits(fivePct, sevenPct)));
   }
 
+  const Injected = z.looseObject({ additionalContext: z.string().optional().catch(undefined) });
+
   function context(output: SyncHookJSONOutput | null): string {
-    const specific = output?.hookSpecificOutput as UserPromptSubmitHookSpecificOutput | undefined;
-    return specific?.additionalContext ?? "";
+    return Injected.safeParse(output?.hookSpecificOutput).data?.additionalContext ?? "";
   }
 
   it("injects context when a band is crossed", async () => {
@@ -233,9 +231,9 @@ describe("processInput", () => {
     );
     expect(await processInput(input("s3"), 0)).toBeNull();
 
-    const stored = (await Bun.file(
-      join(dir, "markers", "s3", "session-limit.json"),
-    ).json()) as Marker;
+    const stored = Marker.parse(
+      await Bun.file(join(dir, "markers", "s3", "session-limit.json")).json(),
+    );
     expect(stored.fiveHourBand).toBe(0);
     expect(stored.fiveHourResetsAt).toBe(FIVE_RESETS + 18000);
   });

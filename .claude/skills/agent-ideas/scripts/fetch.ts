@@ -2,6 +2,8 @@
 
 import { cli } from "cleye";
 import { XMLParser } from "fast-xml-parser";
+import { z } from "zod";
+import { decode } from "../../../../packages/decode/index";
 import { type Source, sources } from "../sources";
 
 export interface Post {
@@ -30,16 +32,30 @@ const parser = new XMLParser({
   processEntities: false,
 });
 
+/** A parsed XML element: attributes keyed `@_name`, children keyed by tag name. */
+const Element = z.record(z.string(), z.unknown());
+type Element = z.infer<typeof Element>;
+
+// A repeated tag arrives as an array, a single one as a bare value.
+function list<S extends z.ZodType>(item: S) {
+  return z
+    .union([z.array(item), item])
+    .optional()
+    .catch(undefined)
+    .transform((value) => (value === undefined ? [] : Array.isArray(value) ? value : [value]));
+}
+
+const Elements = list(Element);
+const Links = list(z.union([z.string(), Element]));
+
 /** Normalize a parser value that may be a string, object, or array into a string. */
 function text(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
   if (Array.isArray(value)) return text(value[0]);
-  if (typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    if ("#text" in record) return text(record["#text"]);
-  }
+  const element = Element.safeParse(value).data;
+  if (element && "#text" in element) return text(element["#text"]);
   return "";
 }
 
@@ -50,8 +66,12 @@ function decodeEntities(input: string): string {
     .replace(/&gt;/g, ">")
     .replace(/&#0*39;|&apos;/g, "'")
     .replace(/&quot;/g, '"')
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number.parseInt(dec, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_: string, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_: string, dec: string) =>
+      String.fromCodePoint(Number.parseInt(dec, 10)),
+    )
     .replace(/&amp;/g, "&");
 }
 
@@ -69,40 +89,34 @@ function excerpt(html: string, limit = 320): string {
   return clean.length > limit ? `${clean.slice(0, limit).trimEnd()}…` : clean;
 }
 
-function asArray<T>(value: T | T[] | undefined): T[] {
-  if (value == null) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
 /** Resolve the alternate link from an Atom entry's `link` field. */
 function atomLink(link: unknown): string {
-  const links = asArray(link as Record<string, unknown> | Record<string, unknown>[]);
+  const links = Links.parse(link);
   if (links.length === 0) return "";
-  const alternate = links.find((l) => l?.["@_rel"] === "alternate" || l?.["@_rel"] == null);
+  const alternate = links.find((l) => {
+    const rel = typeof l === "string" ? undefined : l["@_rel"];
+    return rel === "alternate" || rel == null;
+  });
   const chosen = alternate ?? links[0];
   return typeof chosen === "string" ? chosen : text(chosen?.["@_href"]);
 }
 
-function parseAtom(feed: Record<string, unknown>): Post[] {
-  return asArray(feed.entry as Record<string, unknown> | Record<string, unknown>[]).map(
-    (entry) => ({
-      title: stripHtml(text(entry.title)),
-      url: atomLink(entry.link),
-      date: normalizeDate(text(entry.published) || text(entry.updated)),
-      excerpt: excerpt(text(entry.summary) || text(entry.content)),
-    }),
-  );
+function parseAtom(feed: Element): Post[] {
+  return Elements.parse(feed.entry).map((entry) => ({
+    title: stripHtml(text(entry.title)),
+    url: atomLink(entry.link),
+    date: normalizeDate(text(entry.published) || text(entry.updated)),
+    excerpt: excerpt(text(entry.summary) || text(entry.content)),
+  }));
 }
 
-function parseRss(channel: Record<string, unknown>): Post[] {
-  return asArray(channel.item as Record<string, unknown> | Record<string, unknown>[]).map(
-    (item) => ({
-      title: stripHtml(text(item.title)),
-      url: text(item.link),
-      date: normalizeDate(text(item.pubDate) || text(item["dc:date"])),
-      excerpt: excerpt(text(item.description) || text(item["content:encoded"])),
-    }),
-  );
+function parseRss(channel: Element): Post[] {
+  return Elements.parse(channel.item).map((item) => ({
+    title: stripHtml(text(item.title)),
+    url: text(item.link),
+    date: normalizeDate(text(item.pubDate) || text(item["dc:date"])),
+    excerpt: excerpt(text(item.description) || text(item["content:encoded"])),
+  }));
 }
 
 function normalizeDate(raw: string): string | null {
@@ -111,16 +125,20 @@ function normalizeDate(raw: string): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+const element = Element.optional().catch(undefined);
+
+const Document = z.looseObject({
+  feed: element,
+  rss: z.looseObject({ channel: element }).optional().catch(undefined),
+  "rdf:RDF": element,
+});
+
 export function parseFeed(xml: string): Post[] {
-  const doc = parser.parse(xml) as Record<string, unknown>;
-  if (doc.feed) return parseAtom(doc.feed as Record<string, unknown>);
-  const rss = doc.rss as Record<string, unknown> | undefined;
-  if (rss?.channel) return parseRss(rss.channel as Record<string, unknown>);
+  const doc = decode(Document, parser.parse(xml), "feed XML");
+  if (doc.feed) return parseAtom(doc.feed);
+  if (doc.rss?.channel) return parseRss(doc.rss.channel);
   // Some RSS 1.0 (RDF) feeds put items at the top level.
-  if (doc["rdf:RDF"]) {
-    const rdf = doc["rdf:RDF"] as Record<string, unknown>;
-    return parseRss(rdf);
-  }
+  if (doc["rdf:RDF"]) return parseRss(doc["rdf:RDF"]);
   return [];
 }
 

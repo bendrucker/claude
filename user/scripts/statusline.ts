@@ -1,28 +1,43 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
+import { z } from "zod";
+import { decodeJson } from "../../packages/decode/index";
 import { effortMarker } from "./effort";
 import { dialGlyph } from "./glyphs";
 import { modelMarker } from "./model";
 import { type ContextToken, type DialReport, reportPaneMetadata } from "./pane-metadata";
-import { expandTilde, type RateLimits } from "./rate-limits";
+import { expandTilde, RateLimits } from "./rate-limits";
 import { styleText } from "./style";
 
-interface CurrentUsage {
-  input_tokens?: number;
-  output_tokens?: number;
-  cache_creation_input_tokens?: number;
-  cache_read_input_tokens?: number;
-}
+const num = z.number().optional().catch(undefined);
+const str = z.string().optional().catch(undefined);
 
-interface StatusInput {
-  session_id?: string;
-  model?: { id?: string; display_name?: string } | null;
-  effort?: { level?: string } | null;
-  context_window?: { used_percentage?: number | null; current_usage?: CurrentUsage | null };
-  cost?: { total_lines_added?: number; total_lines_removed?: number };
-  rate_limits?: RateLimits | null;
-}
+const CurrentUsage = z.looseObject({
+  input_tokens: num,
+  output_tokens: num,
+  cache_creation_input_tokens: num,
+  cache_read_input_tokens: num,
+});
+
+const StatusInput = z.looseObject({
+  session_id: str,
+  model: z.looseObject({ id: str, display_name: str }).nullish().catch(undefined),
+  effort: z.looseObject({ level: str }).nullish().catch(undefined),
+  context_window: z
+    .looseObject({
+      used_percentage: z.number().nullish().catch(undefined),
+      current_usage: CurrentUsage.nullish().catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
+  cost: z
+    .looseObject({ total_lines_added: num, total_lines_removed: num })
+    .optional()
+    .catch(undefined),
+  rate_limits: RateLimits.nullish().catch(undefined),
+});
+type StatusInput = z.infer<typeof StatusInput>;
 
 // A styled, ordered piece of the worktree label. `text` is the visible content
 // that elision shortens; `pre`/`suf` are escape wrappers (color, OSC 8 link)
@@ -293,20 +308,24 @@ export function buildStatusLine(
   return segments.join(SEP);
 }
 
+const WorktreeList = z.array(
+  z.looseObject({
+    is_current: z.boolean().optional().catch(undefined),
+    is_main: z.boolean().optional().catch(undefined),
+    branch: str,
+    path: str,
+    ci: z.looseObject({ url: str }).optional().catch(undefined),
+    remote: z.looseObject({ name: str }).optional().catch(undefined),
+    main: z.looseObject({ ahead: num }).optional().catch(undefined),
+  }),
+);
+
 function resolveWorktree(): WorktreeData | null {
   try {
     const wt = Bun.spawnSync(["wt", "list", "statusline", "--format=json"]);
     if (!wt.success) return null;
 
-    const list = JSON.parse(wt.stdout.toString()) as Array<{
-      is_current?: boolean;
-      is_main?: boolean;
-      branch?: string;
-      path?: string;
-      ci?: { url?: string };
-      remote?: { name?: string };
-      main?: { ahead?: number };
-    }>;
+    const list = decodeJson(WorktreeList, wt.stdout.toString(), "wt list statusline");
     const cur = list.find((w) => w.is_current);
     if (!cur) return null;
 
@@ -335,11 +354,11 @@ if (import.meta.main) {
   // Empty or malformed stdin renders nothing rather than crashing to a blank
   // line, matching the bash original's tolerance of bad input.
   const raw = await Bun.stdin.text();
-  let input: StatusInput | null = null;
+  let input: StatusInput | undefined;
   try {
-    if (raw.trim()) input = JSON.parse(raw) as StatusInput;
+    if (raw.trim()) input = StatusInput.parse(JSON.parse(raw));
   } catch {
-    input = null;
+    input = undefined;
   }
   if (input) {
     const rateLimitsPath = process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH;

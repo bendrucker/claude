@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 import { brandGlyph } from "./glyphs";
 
 // herdr strips control bytes out of reported token values, so a pre-colored
@@ -17,10 +18,11 @@ export interface DialReport {
   value: string;
 }
 
-interface CachedReport {
-  sig: string;
-  at: number;
-}
+const CachedReport = z.object({
+  sig: z.string(),
+  at: z.number(),
+});
+type CachedReport = z.infer<typeof CachedReport>;
 
 const SOURCE = "claude-statusline";
 const TTL_MS = 86_400_000;
@@ -76,12 +78,30 @@ export function reportArgs(paneId: string, report: DialReport | null): string[] 
 
 // `agent_session.value` is the Claude session UUID herdr's integration hook
 // reports, which makes the pane match exact where cwd or title would guess.
+const PaneList = z.looseObject({
+  result: z
+    .looseObject({
+      panes: z
+        .array(
+          z.looseObject({
+            pane_id: z.string().optional().catch(undefined),
+            agent_session: z
+              .looseObject({ value: z.string().optional().catch(undefined) })
+              .optional()
+              .catch(undefined),
+          }),
+        )
+        .optional()
+        .catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
+});
+
 export function findPane(paneList: string, sessionId: string): string | null {
-  let parsed: {
-    result?: { panes?: Array<{ pane_id?: string; agent_session?: { value?: string } }> };
-  };
+  let parsed: z.infer<typeof PaneList>;
   try {
-    parsed = JSON.parse(paneList);
+    parsed = PaneList.parse(JSON.parse(paneList));
   } catch {
     return null;
   }
@@ -91,8 +111,7 @@ export function findPane(paneList: string, sessionId: string): string | null {
 
 async function readCache(path: string): Promise<CachedReport | null> {
   try {
-    const cached = JSON.parse(await Bun.file(path).text()) as CachedReport;
-    return typeof cached.sig === "string" && typeof cached.at === "number" ? cached : null;
+    return CachedReport.parse(await Bun.file(path).json());
   } catch {
     return null;
   }

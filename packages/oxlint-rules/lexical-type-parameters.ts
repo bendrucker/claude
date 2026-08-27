@@ -2,10 +2,12 @@
 // https://github.com/dmmulroy/anti-slop
 //
 // Upstream reaches the visitor-key children through `node as unknown as
-// Record<string, unknown>`. That chain is what `no-chained-type-assertions`
-// bans, so the walk widens to an intersection in one assertion instead.
+// Record<string, unknown>`. The walk decodes the node once per visit instead.
 
 import type { ESTree } from "@oxlint/plugins";
+import { z } from "zod";
+
+const Children = z.record(z.string(), z.unknown());
 
 type VisitorKeys = Readonly<Record<string, readonly string[]>>;
 
@@ -15,21 +17,15 @@ function isNode(value: unknown): value is ESTree.Node {
   );
 }
 
-// A visitor key reaches a node, an array of nodes, or a primitive, and the
-// caller discriminates.
-// oxlint-disable-next-line local/no-unknown-returns
-function childAt(node: ESTree.Node, key: string): unknown {
-  return (node as ESTree.Node & Record<string, unknown>)[key];
-}
-
 function collectInferTypeParameterNames(
   node: ESTree.Node,
   visitorKeys: VisitorKeys,
   names: Set<string>,
 ): void {
   if (node.type === "TSInferType") names.add(node.typeParameter.name.name);
+  const children = Children.safeParse(node).data ?? {};
   for (const key of visitorKeys[node.type] ?? []) {
-    const value = childAt(node, key);
+    const value = children[key];
     if (isNode(value)) {
       collectInferTypeParameterNames(value, visitorKeys, names);
       continue;

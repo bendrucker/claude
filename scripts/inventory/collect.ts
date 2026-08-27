@@ -1,9 +1,12 @@
 import { basename, join } from "node:path";
-import matter from "gray-matter";
+import { z } from "zod";
+import { decodeFile } from "../../packages/decode/index";
 import { loadPlugins } from "../../packages/marketplace/index";
 import {
   AGENT_GLOBS,
   COMMAND_GLOBS,
+  frontmatter,
+  type Frontmatter,
   namespaced,
   type Origin,
   origin,
@@ -77,10 +80,8 @@ export interface Inventory {
   mcpServers: McpServer[];
 }
 
-type Frontmatter = Record<string, unknown>;
-
-async function frontmatter(path: string): Promise<Frontmatter> {
-  return matter(await Bun.file(join(root, path)).text()).data;
+async function frontmatterOf(path: string): Promise<Frontmatter> {
+  return frontmatter(await Bun.file(join(root, path)).text(), path);
 }
 
 function text(value: unknown): string {
@@ -92,25 +93,38 @@ function toolList(value: unknown): string {
   return Array.isArray(value) ? value.map(text).join(", ") : text(value);
 }
 
-/**
- * Only `hooks.json` is schema-validated. Skill frontmatter and the settings
- * files reach here as raw YAML and JSON, so nothing below the event key is
- * guaranteed to exist or to have the right shape.
- */
-type HookEvents = Record<
-  string,
-  Array<{ matcher?: string; hooks?: Array<{ type: string; command?: string; if?: string }> }>
->;
+// Skill frontmatter and the settings files reach here as raw YAML and JSON, so
+// every field falls back rather than rejecting the manifest it came from.
+const HookEvents = z
+  .record(
+    z.string(),
+    z
+      .array(
+        z.looseObject({
+          matcher: z.string().optional().catch(undefined),
+          hooks: z
+            .array(
+              z.looseObject({
+                type: z.string().catch(""),
+                command: z.string().optional().catch(undefined),
+                if: z.string().optional().catch(undefined),
+              }),
+            )
+            .optional()
+            .catch(undefined),
+        }),
+      )
+      .catch([]),
+  )
+  .catch({});
 
 /** Every hook a settings, plugin, or skill manifest registers, one row per command. */
-export function* hookEntries(source: string, events: HookEvents): Generator<Hook> {
+export function* hookEntries(source: string, events: unknown): Generator<Hook> {
   const from = origin(source);
 
-  for (const [event, entries] of Object.entries(events)) {
-    if (!Array.isArray(entries)) continue;
-
+  for (const [event, entries] of Object.entries(HookEvents.parse(events))) {
     for (const entry of entries) {
-      for (const hook of entry?.hooks ?? []) {
+      for (const hook of entry.hooks ?? []) {
         yield {
           ...from,
           event,
@@ -125,23 +139,22 @@ export function* hookEntries(source: string, events: HookEvents): Generator<Hook
 
 /** A skill's own record plus any hooks its frontmatter registers, from one parse. */
 async function readSkill(path: string): Promise<{ skill: Skill; hooks: Hook[] }> {
-  const data = await frontmatter(path);
-  const events = data.hooks as HookEvents | undefined;
+  const data = await frontmatterOf(path);
 
   return {
     skill: {
       ...origin(path),
-      name: skillName(path, data.name as string | undefined),
+      name: skillName(path, typeof data.name === "string" ? data.name : undefined),
       description: text(data.description),
       modelInvocable: data["disable-model-invocation"] !== true,
       userInvocable: data["user-invocable"] !== false,
     },
-    hooks: events ? [...hookEntries(path, events)] : [],
+    hooks: [...hookEntries(path, data.hooks)],
   };
 }
 
 async function readAgent(path: string): Promise<Agent> {
-  const data = await frontmatter(path);
+  const data = await frontmatterOf(path);
   const allowed = toolList(data.tools);
   const denied = toolList(data.disallowedTools);
 
@@ -164,7 +177,7 @@ function commandName(path: string): string {
 }
 
 async function readCommand(path: string): Promise<Command> {
-  const data = await frontmatter(path);
+  const data = await frontmatterOf(path);
   return {
     ...origin(path),
     name: namespaced(path, text(data.name) || commandName(path)),
@@ -173,7 +186,7 @@ async function readCommand(path: string): Promise<Command> {
 }
 
 async function readRule(path: string): Promise<Rule> {
-  const data = await frontmatter(path);
+  const data = await frontmatterOf(path);
   return {
     ...origin(path),
     name: basename(path, ".md"),
@@ -189,12 +202,14 @@ const SETTINGS_FILES = [
   ".claude/settings.local.json",
 ];
 
+const SettingsHooks = z.looseObject({ hooks: z.unknown().optional() });
+
 async function settingsHooks(path: string): Promise<Hook[]> {
   const file = Bun.file(join(root, path));
   if (!(await file.exists())) return [];
 
-  const settings = (await file.json()) as { hooks?: HookEvents };
-  return [...hookEntries(path, settings.hooks ?? {})];
+  const settings = await decodeFile(SettingsHooks, join(root, path));
+  return [...hookEntries(path, settings.hooks)];
 }
 
 export interface Filters {

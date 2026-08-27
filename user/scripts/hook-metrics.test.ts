@@ -4,10 +4,11 @@ import { rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { decodeFileLines } from "../../packages/decode/index";
 import {
   appendHookMetric,
   classifyOutcome,
-  type HookMetric,
+  HookMetric,
   type HookOutcome,
   resolveMetricsPath,
   timeHook,
@@ -28,11 +29,7 @@ function metricsPath(hook = "worktree"): string {
 }
 
 async function readLines(path: string): Promise<HookMetric[]> {
-  const text = await Bun.file(path).text();
-  return text
-    .trim()
-    .split("\n")
-    .map((line) => JSON.parse(line) as HookMetric);
+  return decodeFileLines(HookMetric, path);
 }
 
 async function readOne(path: string): Promise<HookMetric> {

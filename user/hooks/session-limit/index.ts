@@ -2,18 +2,22 @@
 
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { SyncHookJSONOutput, UserPromptSubmitHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+import { decodeFile } from "../../../packages/decode/index";
+import { type HookInput, readHookInput } from "../../scripts/hook-input";
 import { timeHook } from "../../scripts/hook-metrics";
-import { expandTilde, type RateLimits } from "../../scripts/rate-limits";
+import { expandTilde, RateLimits } from "../../scripts/rate-limits";
 
 // Highest announced band per window, keyed to the block it applies to. A changed
 // resets_at means the block rolled over, so the band no longer applies.
-export interface Marker {
-  fiveHourBand: number;
-  fiveHourResetsAt: number;
-  sevenDayBand: number;
-  sevenDayResetsAt: number;
-}
+export const Marker = z.object({
+  fiveHourBand: z.number(),
+  fiveHourResetsAt: z.number(),
+  sevenDayBand: z.number(),
+  sevenDayResetsAt: z.number(),
+});
+export type Marker = z.infer<typeof Marker>;
 
 // A band pairs its threshold with the message emitted on crossing, so a threshold
 // can never exist without a message (no silent empty injection). Adding one is a
@@ -139,9 +143,9 @@ function markerPath(sessionId: string): string {
   return join(root, sessionId, "session-limit.json");
 }
 
-async function readJson<T>(path: string): Promise<T | null> {
+async function readJson<S extends z.ZodType>(schema: S, path: string): Promise<z.output<S> | null> {
   try {
-    return JSON.parse(await Bun.file(path).text()) as T;
+    return await decodeFile(schema, path);
   } catch {
     return null;
   }
@@ -158,7 +162,7 @@ function markerChanged(prev: Marker | null, next: Marker): boolean {
 }
 
 export async function processInput(
-  input: UserPromptSubmitHookInput,
+  input: HookInput,
   nowMs: number,
 ): Promise<SyncHookJSONOutput | null> {
   const sessionId = input.session_id;
@@ -167,11 +171,11 @@ export async function processInput(
   const source = rateLimitsPath();
   if (!source) return null;
 
-  const rl = await readJson<RateLimits>(source);
+  const rl = await readJson(RateLimits, source);
   if (!rl) return null;
 
   const path = markerPath(sessionId);
-  const prev = await readJson<Marker>(path);
+  const prev = await readJson(Marker, path);
   const result = evaluate(rl, prev, nowMs);
   if (!result) return null;
 
@@ -197,9 +201,9 @@ export async function processInput(
 }
 
 async function main(): Promise<void> {
-  let input: UserPromptSubmitHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as UserPromptSubmitHookInput;
+    input = await readHookInput("session-limit");
   } catch (error) {
     console.error(
       `[session-limit] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

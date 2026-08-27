@@ -3,7 +3,9 @@ import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
 export type { ErrorObject } from "ajv";
 
 import addFormats from "ajv-formats";
-import { loadOverlaySchema, type Schema } from "./overlay";
+import { z } from "zod";
+import { decode, decodeFile } from "../decode/index";
+import { loadOverlaySchema, Schema } from "./overlay";
 
 /** A schema to validate against: a file path, an http(s) URL, or an in-memory overlay merge. */
 export type SchemaRef = string | { overlay: string };
@@ -30,13 +32,18 @@ interface CacheEntry {
 
 const validatorCache = new Map<string, CacheEntry>();
 
+const Properties = z.record(z.string(), z.unknown()).catch({});
+
 export function createValidator(): Ajv {
   const ajv = new Ajv({ allErrors: true, strict: false });
   addFormats(ajv);
   return ajv;
 }
 
-export function formatError(file: string, error: ErrorObject): string {
+export function formatError(
+  file: string,
+  error: Pick<ErrorObject, "instancePath" | "message">,
+): string {
   const path = error.instancePath || "/";
   const message = `${path}: ${error.message}`;
 
@@ -61,9 +68,9 @@ export async function loadSchema(ref: SchemaRef): Promise<Schema> {
   }
   if (ref.startsWith("http")) {
     const response = await fetch(ref);
-    return response.json();
+    return decode(Schema, await response.json(), ref);
   }
-  return Bun.file(ref).json();
+  return decodeFile(Schema, ref);
 }
 
 export async function validateFile(
@@ -82,7 +89,7 @@ export async function validateFile(
     validatorCache.set(key, entry);
   }
 
-  const data = await Bun.file(file).json();
+  const data = await decodeFile(Schema, file);
   const valid = entry.validate(data);
 
   const errors = valid
@@ -91,8 +98,8 @@ export async function validateFile(
 
   const warnings: string[] = [];
   if (options?.warnAdditional && entry.schema.properties) {
-    const known = new Set(Object.keys(entry.schema.properties));
-    for (const property of Object.keys(data as Record<string, unknown>)) {
+    const known = new Set(Object.keys(Properties.parse(entry.schema.properties)));
+    for (const property of Object.keys(data)) {
       if (property !== "$schema" && !known.has(property)) {
         warnings.push(formatWarning(file, property));
       }

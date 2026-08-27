@@ -1,6 +1,17 @@
 import { join } from "node:path";
+import matter from "gray-matter";
+import { z } from "zod";
+import { decode } from "../packages/decode/index";
 
 export const root = join(import.meta.dirname, "..");
+
+const Frontmatter = z.record(z.string(), z.unknown());
+export type Frontmatter = z.infer<typeof Frontmatter>;
+
+/** The YAML front block of a markdown asset, keyed but otherwise unvalidated. */
+export function frontmatter(text: string, source: string): Frontmatter {
+  return decode(Frontmatter, matter(text).data, source);
+}
 
 /** Where an asset is registered from, which decides when Claude Code loads it. */
 export const SCOPES = ["plugin", "user", "project"] as const;

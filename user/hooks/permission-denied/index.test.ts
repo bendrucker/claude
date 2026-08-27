@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PermissionDeniedHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { append, record, resolveLogPath, target } from "./index";
+import { decodeFileLines } from "../../../packages/decode/index";
+import { type DeniedInput, DenialRecord, append, record, resolveLogPath, target } from "./index";
 
 const STAMP = "2026-08-01T12:00:00.000Z";
 
@@ -29,7 +29,7 @@ test.each<{ name: string; input: unknown; expected: string }>([
 });
 
 test("record captures the denial", () => {
-  const input: Partial<PermissionDeniedHookInput> = {
+  const input: Partial<DeniedInput> = {
     session_id: "abc123",
     cwd: "/repo",
     tool_name: "Bash",
@@ -87,8 +87,8 @@ test("append writes one JSON line per denial and creates the directory", async (
   append(record({ tool_name: "Bash", tool_input: { command: "a" } }, STAMP), path);
   append(record({ tool_name: "Edit", tool_input: { file_path: "/b" } }, STAMP), path);
 
-  const lines = (await Bun.file(path).text()).trimEnd().split("\n");
-  expect(lines.map((line) => JSON.parse(line).target)).toEqual(["a", "/b"]);
+  const logged = await decodeFileLines(DenialRecord, path);
+  expect(logged.map((entry) => entry.target)).toEqual(["a", "/b"]);
 });
 
 test("append writes nothing when logging is disabled", () => {
@@ -104,6 +104,6 @@ test("append rotates once the log passes the size cap", async () => {
   append(record({ tool_name: "Bash", tool_input: { command: "after" } }, STAMP), path);
 
   expect(await Bun.file(`${path}.1`).exists()).toBe(true);
-  const lines = (await Bun.file(path).text()).trimEnd().split("\n");
-  expect(lines.map((line) => JSON.parse(line).target)).toEqual(["after"]);
+  const logged = await decodeFileLines(DenialRecord, path);
+  expect(logged.map((entry) => entry.target)).toEqual(["after"]);
 });

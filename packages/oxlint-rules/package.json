@@ -4,6 +4,7 @@
   "type": "module",
   "main": "./index.ts",
   "dependencies": {
-    "@oxlint/plugins": "1.78.0"
+    "@oxlint/plugins": "1.78.0",
+    "zod": "^4.4.3"
   }
 }

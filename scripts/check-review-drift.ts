@@ -91,7 +91,7 @@ async function snapshotFragments(version: string): Promise<Map<string, string>> 
   if (!heading) {
     throw new Error(`upstream-${version}.md has no "finder angles, verbatim" section to compare.`);
   }
-  const section = body.slice((heading.index as number) + heading[0].length);
+  const section = body.slice((heading.index ?? 0) + heading[0].length);
   const fragments = new Map<string, string>();
 
   let label = "";
@@ -129,7 +129,7 @@ function fragmentPattern(fragment: string): RegExp {
   // oxlint-disable-next-line typescript/no-misused-spread -- code points are the unit here: each is escaped or rewritten as its own \uXXXX form.
   const escaped = [...fragment]
     .map((char) => {
-      const code = char.codePointAt(0) as number;
+      const code = char.codePointAt(0) ?? 0;
       if (code > 0x7f) {
         const utf8 = Buffer.from(char, "utf8")
           .toString("latin1")
@@ -174,7 +174,7 @@ await runCheck(
 
     const snapshot = snapshots.includes(version)
       ? version
-      : (snapshots.toSorted(bySemverDesc)[0] as string);
+      : (snapshots.toSorted(bySemverDesc)[0] ?? version);
     if (snapshot !== version) {
       violations.push(
         `Installed Claude Code is ${version}; the newest snapshot is ${snapshot}. Re-extract and land references/upstream-${version}.md, then port any changes into SKILL.md, angles.md, and efforts.md.`,

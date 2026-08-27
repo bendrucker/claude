@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import matter from "gray-matter";
-import { readAll, root, SKILL_GLOBS, skillName } from "./assets";
+import { z } from "zod";
+import { frontmatter, readAll, root, SKILL_GLOBS, skillName } from "./assets";
 import { runCheck } from "./check";
 
 // Bundled built-ins registered with `disableModelInvocation: true`, per section
@@ -50,15 +50,16 @@ export function violations(files: SkillFile[]): string[] {
   );
 }
 
+const ToolList = z.array(z.string()).catch([]);
+
 async function read(path: string): Promise<SkillFile> {
-  const { data } = matter(await Bun.file(join(root, path)).text());
-  const allowedTools = data["allowed-tools"] as unknown;
+  const data = frontmatter(await Bun.file(join(root, path)).text(), path);
 
   return {
     path,
-    name: skillName(path, data.name as string | undefined),
+    name: skillName(path, typeof data.name === "string" ? data.name : undefined),
     disabled: data["disable-model-invocation"] === true,
-    grants: skillGrants(Array.isArray(allowedTools) ? allowedTools : []),
+    grants: skillGrants(ToolList.parse(data["allowed-tools"])),
   };
 }
 

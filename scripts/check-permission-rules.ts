@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import matter from "gray-matter";
+import { z } from "zod";
+import { decodeJson } from "../packages/decode/index";
+import { frontmatter, type Frontmatter } from "./assets";
 import { readTracked, runCheck, tracked } from "./check";
 
 // Claude Code warns on startup about Write(path), NotebookEdit(path), and
@@ -28,11 +30,13 @@ function describe(file: string, context: string, rule: string): string {
   return `${file} (${context}): ${rule} (use ${REPLACEMENT[tool]}(...) instead)`;
 }
 
-interface Permissions {
-  allow?: string[];
-  deny?: string[];
-  ask?: string[];
-}
+const Permissions = z.looseObject({
+  allow: z.array(z.string()).optional(),
+  deny: z.array(z.string()).optional(),
+  ask: z.array(z.string()).optional(),
+});
+
+const SettingsPermissions = z.looseObject({ permissions: Permissions.optional() });
 
 async function checkSettings(): Promise<string[]> {
   const violations: string[] = [];
@@ -41,10 +45,7 @@ async function checkSettings(): Promise<string[]> {
     const raw = await readTracked(file, root);
     if (raw === null) continue;
 
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) continue;
-
-    const permissions = (parsed as Record<string, unknown>).permissions as Permissions | undefined;
+    const { permissions } = decodeJson(SettingsPermissions, raw, file);
     if (!permissions) continue;
 
     for (const list of ["allow", "deny", "ask"] as const) {
@@ -70,9 +71,9 @@ async function checkFrontmatter(): Promise<string[]> {
     const raw = await readTracked(file, root);
     if (raw === null || !raw.startsWith("---")) continue;
 
-    let data: Record<string, unknown>;
+    let data: Frontmatter;
     try {
-      ({ data } = matter(raw));
+      data = frontmatter(raw, file);
     } catch (error) {
       const message = error instanceof Error ? error.message.split("\n")[0] : String(error);
       violations.push(`${file}: frontmatter failed to parse (${message})`);

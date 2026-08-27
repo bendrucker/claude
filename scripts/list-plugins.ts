@@ -1,9 +1,10 @@
 import { parseArgs } from "node:util";
+import { z } from "zod";
+import { decodeFile } from "../packages/decode/index";
 import { loadPlugins } from "../packages/marketplace/index";
 
-interface CiConfig {
-  runner?: string;
-}
+const CiConfig = z.looseObject({ runner: z.string().optional() });
+type CiConfig = z.infer<typeof CiConfig>;
 
 interface PluginMatrix {
   name: string;
@@ -16,9 +17,9 @@ async function getLocalPlugins(): Promise<string[]> {
 }
 
 async function readCiConfig(plugin: string): Promise<CiConfig> {
-  const file = Bun.file(`plugins/${plugin}/.ci.json`);
-  if (!(await file.exists())) return {};
-  return file.json();
+  const path = `plugins/${plugin}/.ci.json`;
+  if (!(await Bun.file(path).exists())) return {};
+  return decodeFile(CiConfig, path);
 }
 
 async function toMatrixEntry(name: string): Promise<PluginMatrix> {

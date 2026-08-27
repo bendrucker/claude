@@ -4,6 +4,8 @@ import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
+import { z } from "zod";
+import { decode, decodeFile } from "../../../../packages/decode/index";
 
 export const LABEL_ROOT = "me.bendrucker.claude";
 const LAUNCH_AGENTS_DIR = join(homedir(), "Library/LaunchAgents");
@@ -19,32 +21,47 @@ const WEEKDAYS: Record<string, number> = {
   sat: 6,
 };
 
-export type Mode = "headless" | "agent-view" | "cloud";
+export const Mode = z.enum(["headless", "agent-view", "cloud"], {
+  error: (issue) => `unknown "mode" ${JSON.stringify(issue.input)}`,
+});
+export type Mode = z.infer<typeof Mode>;
 
-export interface Schedule {
-  weekday?: string | undefined;
-  day?: number | undefined;
-  at: string;
+// An absent key and an empty value are the same authoring mistake.
+function required(field: string) {
+  const error = `missing "${field}"`;
+  return z.string({ error }).min(1, { error });
 }
 
-export interface Descriptor {
-  label: string;
-  schedule: Schedule;
-  mode: Mode;
-  command: string;
-  workdir?: string | undefined;
-  permission_mode?: string | undefined;
-}
+export const Schedule = z.object(
+  {
+    weekday: z.string({ error: '"schedule.weekday" must be a string' }).optional(),
+    day: z.number({ error: '"schedule.day" must be a number' }).optional(),
+    at: required("schedule.at"),
+  },
+  { error: 'missing "schedule.at"' },
+);
+export type Schedule = z.infer<typeof Schedule>;
+
+export const Descriptor = z.object({
+  label: required("label"),
+  schedule: Schedule,
+  mode: Mode,
+  command: required("command"),
+  workdir: z.string({ error: '"workdir" must be a string' }).optional(),
+  permission_mode: z.string({ error: '"permission_mode" must be a string' }).optional(),
+});
+export type Descriptor = z.infer<typeof Descriptor>;
 
 export interface DescriptorFile {
   descriptor: Descriptor;
   file: string;
 }
 
-interface Config {
-  version: number;
-  groups: { name: string; dir: string }[];
-}
+const Config = z.object({
+  version: z.number(),
+  groups: z.array(z.object({ name: z.string(), dir: z.string() })),
+});
+type Config = z.infer<typeof Config>;
 
 export interface ReconcilePlan {
   install: string[];
@@ -175,52 +192,7 @@ ${intervalKeys.join("\n")}
 }
 
 export function parseDescriptor(text: string, source: string): Descriptor {
-  const data = Bun.YAML.parse(text) as Record<string, unknown>;
-
-  const label = data.label;
-  if (typeof label !== "string" || !label) throw new Error(`${source}: missing "label"`);
-
-  const schedule = data.schedule as Record<string, unknown> | undefined;
-  if (!schedule || typeof schedule.at !== "string") {
-    throw new Error(`${source}: missing "schedule.at"`);
-  }
-  const weekday = schedule.weekday;
-  if (weekday !== undefined && typeof weekday !== "string") {
-    throw new Error(`${source}: "schedule.weekday" must be a string`);
-  }
-  const day = schedule.day;
-  if (day !== undefined && typeof day !== "number") {
-    throw new Error(`${source}: "schedule.day" must be a number`);
-  }
-
-  const mode = data.mode;
-  if (mode !== "headless" && mode !== "agent-view" && mode !== "cloud") {
-    throw new Error(`${source}: unknown "mode" ${JSON.stringify(mode)}`);
-  }
-
-  const commandText = data.command;
-  if (typeof commandText !== "string" || !commandText) {
-    throw new Error(`${source}: missing "command"`);
-  }
-
-  const workdir = data.workdir;
-  if (workdir !== undefined && typeof workdir !== "string") {
-    throw new Error(`${source}: "workdir" must be a string`);
-  }
-
-  const permissionMode = data.permission_mode;
-  if (permissionMode !== undefined && typeof permissionMode !== "string") {
-    throw new Error(`${source}: "permission_mode" must be a string`);
-  }
-
-  return {
-    label,
-    schedule: { at: schedule.at, weekday, day },
-    mode,
-    command: commandText,
-    workdir,
-    permission_mode: permissionMode,
-  };
+  return decode(Descriptor, Bun.YAML.parse(text), source);
 }
 
 export async function listDescriptors(dir: string): Promise<DescriptorFile[]> {
@@ -251,7 +223,7 @@ async function loadConfig(): Promise<Config> {
       `no group directories given and no config at ${CONFIG_PATH}; run /scheduled setup or pass directories explicitly`,
     );
   }
-  return (await file.json()) as Config;
+  return decodeFile(Config, CONFIG_PATH);
 }
 
 async function resolveGroups(dirs: string[]): Promise<{ group: string; dir: string }[]> {

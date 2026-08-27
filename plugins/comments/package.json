@@ -6,7 +6,8 @@
     "cleye": "^2.2.1",
     "parse-diff": "^0.12.0",
     "shiki": "^4.3.0",
-    "table": "^6.9.0"
+    "table": "^6.9.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

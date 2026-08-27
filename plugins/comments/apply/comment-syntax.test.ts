@@ -9,8 +9,8 @@ import type { EditItem } from "./edits";
  */
 function span(source: string, kind: CommentKind = "line"): { lines: string[]; item: EditItem } {
   const lines = source.split("\n");
-  const first = lines[0] as string;
-  const last = lines[lines.length - 1] as string;
+  const first = lines[0] ?? "";
+  const last = lines.at(-1) ?? "";
   return {
     lines,
     item: {

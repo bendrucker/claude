@@ -1,7 +1,18 @@
+import { z } from "zod";
 import { commentId } from "../detection/identity";
 import type { Comment } from "../detection/types";
 import { parseVerdict } from "../judge/judge";
 import type { Verdict } from "../judge/schema";
+
+const ShardEntry = z.looseObject(
+  { id: z.string({ error: "entry id must be a string" }), verdict: z.unknown().optional() },
+  { error: "entry must be an object" },
+);
+
+const Shard = z.looseObject(
+  { verdicts: z.array(ShardEntry, { error: `missing "verdicts" array` }) },
+  { error: "must be a JSON object" },
+);
 
 /**
  * Fold the verdict shards the agents wrote into one id→verdict map, validating
@@ -11,20 +22,13 @@ import type { Verdict } from "../judge/schema";
 export function collectVerdicts(shards: unknown[]): Map<string, Verdict> {
   const map = new Map<string, Verdict>();
   for (const shard of shards) {
-    if (typeof shard !== "object" || shard === null) {
-      throw new Error("Verdict shard must be a JSON object");
+    const parsed = Shard.safeParse(shard);
+    if (!parsed.success) {
+      throw new Error(`Verdict shard ${parsed.error.issues[0]?.message}`);
     }
-    const entries = (shard as Record<string, unknown>).verdicts;
-    if (!Array.isArray(entries)) throw new Error('Verdict shard missing "verdicts" array');
-    for (const entry of entries) {
-      if (typeof entry !== "object" || entry === null) {
-        throw new Error("Verdict entry must be an object");
-      }
-      const record = entry as Record<string, unknown>;
-      const id = record.id;
-      if (typeof id !== "string") throw new Error("Verdict entry id must be a string");
-      if (map.has(id)) throw new Error(`Verdict id ${id} appears more than once`);
-      map.set(id, parseVerdict(record.verdict, id));
+    for (const entry of parsed.data.verdicts) {
+      if (map.has(entry.id)) throw new Error(`Verdict id ${entry.id} appears more than once`);
+      map.set(entry.id, parseVerdict(entry.verdict, entry.id));
     }
   }
   return map;

@@ -21,7 +21,7 @@ export interface ReportItem {
 
 /** The first line of a possibly multi-line comment, for a one-line preview. */
 function firstLine(text: string): string {
-  return text.split("\n")[0] as string;
+  return text.split("\n")[0] ?? "";
 }
 
 /**

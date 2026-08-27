@@ -341,15 +341,15 @@ export function computeFileEdits(
   for (let n = 1; n <= lines.length; n++) {
     const insert = spanInserts.get(n);
     if (insert) {
-      if (insert.length > 0) {
-        for (const line of insert) out.push(line);
-        lastPushed = insert[insert.length - 1] as string;
-        lastPushedBlank = isBlank(lastPushed);
+      for (const line of insert) {
+        out.push(line);
+        lastPushed = line;
+        lastPushedBlank = isBlank(line);
       }
       continue;
     }
     if (deletions.has(n)) continue;
-    const line = replacements.has(n) ? (replacements.get(n) as string) : (lines[n - 1] as string);
+    const line = replacements.get(n) ?? lines[n - 1] ?? "";
     // A trim can leave a surviving blank line next to a blank we already kept,
     // collapsing `blank / deleted comment / blank` into a double blank. Drop it,
     // but only when a neighbor was deleted, so unrelated blank runs are untouched.

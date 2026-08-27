@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { z } from "zod";
 import type { CommentKind } from "../detection/types";
 import type { Verdict } from "../judge/schema";
 import { computeFileEdits, type EditItem } from "./edits";
@@ -596,14 +597,29 @@ describe("computeFileEdits", () => {
   });
 });
 
+const FixtureFile = z.looseObject({
+  comment: z.string(),
+  kind: z.enum(["line", "block", "docstring"]) satisfies z.ZodType<CommentKind>,
+  trimTo: z.string(),
+  trimToLines: z.array(z.number()),
+});
+
 describe("migration-data-migration-mixed convention", () => {
   test("trimToLines:[2] keeps the genuine why line and drops the restatement", async () => {
-    const fixture = JSON.parse(
-      await Bun.file(
-        join(import.meta.dirname, "..", "evals", "fixtures", "migration-data-migration-mixed.json"),
-      ).text(),
+    const fixture = FixtureFile.parse(
+      JSON.parse(
+        await Bun.file(
+          join(
+            import.meta.dirname,
+            "..",
+            "evals",
+            "fixtures",
+            "migration-data-migration-mixed.json",
+          ),
+        ).text(),
+      ),
     );
-    const [first, second] = fixture.comment.split("\n") as [string, string];
+    const [first = "", second = ""] = fixture.comment.split("\n");
     expect(fixture.comment.split("\n")).toHaveLength(2);
     expect(fixture.trimToLines).toEqual([2]);
 
@@ -614,7 +630,7 @@ describe("migration-data-migration-mixed convention", () => {
         endLine: 2,
         startColumn: first.length - first.trimStart().length,
         endColumn: second.length,
-        kind: fixture.kind as CommentKind,
+        kind: fixture.kind,
         verdict: verdict(over),
       });
 

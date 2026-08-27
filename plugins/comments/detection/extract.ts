@@ -24,8 +24,12 @@ function getHighlighter(): Promise<Highlighter> {
   return highlighterPromise;
 }
 
+function isBundledLanguage(language: Language): language is BundledLanguage {
+  return language in bundledLanguages;
+}
+
 function bundledLanguage(language: Language): BundledLanguage | null {
-  return language in bundledLanguages ? (language as BundledLanguage) : null;
+  return isBundledLanguage(language) ? language : null;
 }
 
 async function loadLanguage(highlighter: Highlighter, language: BundledLanguage): Promise<void> {

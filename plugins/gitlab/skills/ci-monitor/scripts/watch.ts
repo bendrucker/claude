@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { type ExecSyncOptions, execSync } from "node:child_process";
+import { streamText } from "../../../scripts/merge";
 import { cli } from "cleye";
 import UrlPattern from "url-pattern";
 
@@ -378,12 +379,6 @@ export type ExecResult =
   | { ok: false; stderr: string; rateLimited: boolean; retryAfter: string };
 
 export type ExecFn = (command: string) => ExecResult;
-
-function streamText(stream: unknown): string {
-  if (typeof stream === "string") return stream;
-  if (stream instanceof Uint8Array) return new TextDecoder().decode(stream);
-  return "";
-}
 
 function exec(command: string): ExecResult {
   try {

@@ -16,9 +16,9 @@ const TRANSIENT = ["approvals_syncing"];
 const MAX_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 2000;
 
-function streamText(stream: unknown): string {
-  if (typeof stream === "string") return stream.trim();
-  if (stream instanceof Uint8Array) return new TextDecoder().decode(stream).trim();
+export function streamText(stream: unknown): string {
+  if (typeof stream === "string") return stream;
+  if (stream instanceof Uint8Array) return new TextDecoder().decode(stream);
   return "";
 }
 
@@ -28,7 +28,7 @@ export function errorText(err: unknown): string {
   // Read both so the already-armed guard matches and callers see the full error text.
   const record = err as Record<string, unknown>;
   const streams = [record?.stdout, record?.stderr]
-    .map(streamText)
+    .map((stream) => streamText(stream).trim())
     .filter((text) => text.length > 0);
   if (streams.length > 0) {
     return streams.join("\n");

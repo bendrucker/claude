@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { MergeActions, MergeRequestDetail } from "./merge";
-import { arm, errorText, merge, mergeArgs, status } from "./merge";
+import { arm, errorText, merge, mergeArgs, status, streamText } from "./merge";
 
 function shellError(streams: { stdout?: string; stderr?: string }): Error {
   return Object.assign(new Error("glab exited non-zero"), {
@@ -38,6 +38,16 @@ function createActions(overrides: Partial<MergeActions> = {}): MergeActions {
     ...overrides,
   };
 }
+
+describe("streamText", () => {
+  test.each<[string, unknown, string]>([
+    ["passes a string through untrimmed", "  body\n", "  body\n"],
+    ["decodes a Uint8Array", new TextEncoder().encode("body"), "body"],
+    ["drops a value that is not text", { code: 1 }, ""],
+  ])("%s", (_name, stream, expected) => {
+    expect(streamText(stream)).toBe(expected);
+  });
+});
 
 describe("errorText", () => {
   const encode = (text: string) => new TextEncoder().encode(text);

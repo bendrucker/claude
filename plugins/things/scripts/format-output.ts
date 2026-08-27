@@ -41,9 +41,14 @@ if (argv.flags.countPrefix) {
   console.log(`${count} ${argv.flags.countPrefix}\n`);
 }
 
+if (items.length === 0) {
+  process.exit(0);
+}
+
 const [first] = items;
 if (!first) {
-  process.exit(0);
+  console.error("format-output: first item is not an object");
+  process.exit(1);
 }
 
 const keys = Object.keys(first);

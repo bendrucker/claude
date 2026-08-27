@@ -7,7 +7,8 @@ describe("stringify", () => {
     [3, "3"],
     [true, "true"],
     [{ name: "Inbox" }, '{"name":"Inbox"}'],
-    [["a", "b"], '["a","b"]'],
+    [["a", "b"], "a, b"],
+    [[], ""],
   ])("%o -> %s", (value, expected) => {
     expect(stringify(value)).toBe(expected);
   });

@@ -6,6 +6,7 @@ export function formatDate(value: string | null): string {
 }
 
 export function stringify(value: unknown): string {
+  if (Array.isArray(value)) return value.map(stringify).join(", ");
   if (typeof value === "object" && value !== null) return JSON.stringify(value);
   return String(value);
 }

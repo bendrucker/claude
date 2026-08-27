@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { type FetchedPr, type Item, type MinedPr, selectSample, toItem, weave } from "./mine";
 
 function makeItem(overrides: Partial<Item>): Item {

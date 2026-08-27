@@ -22,7 +22,7 @@ export function getDefaultState(assignee: string | undefined): string {
 
 // Wrapper keys the connector tolerates inconsistently. A single one whose value
 // is the real field object is unwrapped to flat top-level keys.
-const WRAPPER_KEYS = ["issue", "input", "parameters"];
+const WRAPPER_KEYS = new Set(["issue", "input", "parameters"]);
 
 function isFieldObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -46,7 +46,7 @@ export function normalizeInput(toolInput: Record<string, unknown>): NormalizeRes
   if (
     wrapperKey != null &&
     wrapperKey !== "" &&
-    WRAPPER_KEYS.includes(wrapperKey) &&
+    WRAPPER_KEYS.has(wrapperKey) &&
     isFieldObject(input[wrapperKey])
   ) {
     input = input[wrapperKey];

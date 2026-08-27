@@ -47,7 +47,7 @@ Past roughly 20 lines, use `toMatchSnapshot()`, which writes to `__snapshots__/*
 Write one `fast-check` property plus a small example table. `fast-check` needs no runner adapter.
 
 ```ts
-import fc from "fast-check";
+import * as fc from "fast-check";
 
 test("encode/decode roundtrip", () => {
   fc.assert(

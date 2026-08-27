@@ -142,9 +142,7 @@ export function parseDiff(diffText: string): ParsedDiff {
           currentKey !== "" &&
           newPath !== currentKey
         ) {
-          if (current.oldPath === undefined) {
-            current.oldPath = currentKey;
-          }
+          current.oldPath ??= currentKey;
           rename(newPath);
         }
       }

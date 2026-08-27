@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { overlaps, scopeIntroduced } from "./scope";
 import type { Comment, LineRange } from "./types";
 

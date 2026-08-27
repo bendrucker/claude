@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "promise", "node"],
+  "plugins": ["typescript", "unicorn", "oxc", "promise", "node", "import"],
   "categories": {
     "correctness": "error",
     "suspicious": "error"
@@ -22,6 +22,12 @@
     ],
     "no-unused-expressions": ["error", { "allowTernary": true }],
     "no-underscore-dangle": ["error", { "allow": ["__typename", "__dirname"] }],
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "max-depth": "error",
+    "import/no-named-as-default-member": "error",
+    "oxc/no-map-spread": "error",
+    "unicorn/prefer-array-find": "error",
+    "unicorn/prefer-set-has": "error",
     "no-unsafe-optional-chaining": "off",
     "typescript/no-unsafe-type-assertion": "off",
     "typescript/ban-ts-comment": "error",

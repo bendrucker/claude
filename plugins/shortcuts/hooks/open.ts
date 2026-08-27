@@ -17,6 +17,25 @@ export type HookInput = z.infer<typeof HookInput>;
 // receives.
 const OPERATORS = new Set([";", "&", "|", "<", ">", "(", ")", "{", "}", "`", "$", "#", "\n"]);
 
+function readDoubleQuoted(command: string, start: number): { value: string; end: number } | null {
+  let value = "";
+  let j = start + 1;
+  for (; j < command.length && command[j] !== '"'; j++) {
+    const inner = command.charAt(j);
+    if (inner === "$" || inner === "`") return null;
+    if (inner === "\\") {
+      const escaped = command[j + 1];
+      if (escaped === undefined) return null;
+      value += escaped;
+      j++;
+      continue;
+    }
+    value += inner;
+  }
+  if (j >= command.length) return null;
+  return { value, end: j };
+}
+
 // Split a command into shell words, or return null when it is not a single
 // simple command: an unbalanced quote, an operator, or any substitution
 // (`$(...)`, `${x}`, backticks) whose value is unknowable here.
@@ -45,23 +64,10 @@ function tokenize(command: string): string[] | null {
     }
 
     if (char === '"') {
-      let value = "";
-      let j = i + 1;
-      for (; j < command.length && command[j] !== '"'; j++) {
-        const inner = command.charAt(j);
-        if (inner === "$" || inner === "`") return null;
-        if (inner === "\\") {
-          const escaped = command[j + 1];
-          if (escaped === undefined) return null;
-          value += escaped;
-          j++;
-          continue;
-        }
-        value += inner;
-      }
-      if (j >= command.length) return null;
-      current = (current ?? "") + value;
-      i = j;
+      const quoted = readDoubleQuoted(command, i);
+      if (!quoted) return null;
+      current = (current ?? "") + quoted.value;
+      i = quoted.end;
       continue;
     }
 

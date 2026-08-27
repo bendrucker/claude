@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "bun:test";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import {
   firstByTier,
   type PatternMatch,

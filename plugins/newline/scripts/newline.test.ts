@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PostToolUseHookInput, PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { processInput as checkInput, hasTrailingNewline } from "./check";
 import { processInput as ensureInput, ensureTrailingNewline } from "./ensure";
 import { processInput as preserveInput, preserveNewlineState } from "./preserve";

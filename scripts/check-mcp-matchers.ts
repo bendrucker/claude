@@ -14,6 +14,41 @@ const CLAUDE_AI_MAPPINGS: Record<string, { displayName: string; tools: Record<st
   },
 };
 
+export function missingVariants(
+  file: string,
+  pattern: string,
+  patterns: string[],
+  resolvePluginName: (server: string) => string | null,
+): string[] {
+  const match = MCP_PATTERN.exec(pattern);
+  if (!match) return [];
+
+  const server = match[1];
+  const tool = match[2];
+  if (server == null || server === "" || tool == null || tool === "") return [];
+
+  const pluginName = resolvePluginName(server);
+  if (pluginName == null || pluginName === "") return [];
+
+  const errors: string[] = [];
+  const pluginVariant = `mcp__plugin_${pluginName}_${server}__${tool}`;
+  if (!patterns.includes(pluginVariant)) {
+    errors.push(`${file}: matcher "${pattern}" is missing plugin variant "${pluginVariant}"`);
+  }
+
+  const claudeAi = CLAUDE_AI_MAPPINGS[server];
+  if (claudeAi) {
+    const mappedTool = claudeAi.tools[tool] ?? tool;
+    const claudeAiVariant = `mcp__claude_ai_${claudeAi.displayName}__${mappedTool}`;
+    if (!patterns.includes(claudeAiVariant)) {
+      errors.push(
+        `${file}: matcher "${pattern}" is missing Claude AI variant "${claudeAiVariant}"`,
+      );
+    }
+  }
+  return errors;
+}
+
 async function checkMatchers(): Promise<string[]> {
   const [plugins, enabledNames] = await Promise.all([loadPlugins(), enabledPluginNames()]);
 
@@ -25,6 +60,9 @@ async function checkMatchers(): Promise<string[]> {
     }
   }
 
+  const resolvePluginName = (server: string): string | null =>
+    knownServers.get(server) ?? (enabledNames.has(server) ? server : null);
+
   const errors: string[] = [];
 
   for (const plugin of plugins) {
@@ -33,31 +71,7 @@ async function checkMatchers(): Promise<string[]> {
       const patterns = entry.matcher.split("|");
 
       for (const pattern of patterns) {
-        const match = MCP_PATTERN.exec(pattern);
-        if (!match) continue;
-
-        const server = match[1];
-        const tool = match[2];
-        if (server == null || server === "" || tool == null || tool === "") continue;
-
-        const pluginName = knownServers.get(server) ?? (enabledNames.has(server) ? server : null);
-        if (pluginName == null || pluginName === "") continue;
-
-        const pluginVariant = `mcp__plugin_${pluginName}_${server}__${tool}`;
-        if (!patterns.includes(pluginVariant)) {
-          errors.push(`${file}: matcher "${pattern}" is missing plugin variant "${pluginVariant}"`);
-        }
-
-        const claudeAi = CLAUDE_AI_MAPPINGS[server];
-        if (claudeAi) {
-          const mappedTool = claudeAi.tools[tool] ?? tool;
-          const claudeAiVariant = `mcp__claude_ai_${claudeAi.displayName}__${mappedTool}`;
-          if (!patterns.includes(claudeAiVariant)) {
-            errors.push(
-              `${file}: matcher "${pattern}" is missing Claude AI variant "${claudeAiVariant}"`,
-            );
-          }
-        }
+        errors.push(...missingVariants(file, pattern, patterns, resolvePluginName));
       }
     }
   }
@@ -65,10 +79,12 @@ async function checkMatchers(): Promise<string[]> {
   return errors;
 }
 
-await runCheck(
-  async () => ({
-    header: "MCP hook matchers missing plugin variants:",
-    violations: await checkMatchers(),
-  }),
-  { success: "All MCP hook matchers include plugin and Claude AI variants" },
-);
+if (import.meta.main) {
+  await runCheck(
+    async () => ({
+      header: "MCP hook matchers missing plugin variants:",
+      violations: await checkMatchers(),
+    }),
+    { success: "All MCP hook matchers include plugin and Claude AI variants" },
+  );
+}

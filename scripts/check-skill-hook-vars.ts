@@ -30,14 +30,12 @@ async function checkSkillHookVars(): Promise<string[]> {
     const hooks = decode(SkillHooks, data.hooks, `${file} hooks`);
     if (!hooks) continue;
 
-    for (const entries of Object.values(hooks)) {
-      for (const entry of entries) {
-        for (const hook of entry.hooks ?? []) {
-          const command = hook.command ?? "";
-          const args = (hook.args ?? []).join(" ");
-          if (FORBIDDEN.test(command) || FORBIDDEN.test(args)) {
-            violations.push(`${file}: ${command !== "" ? command : args}`);
-          }
+    for (const entry of Object.values(hooks).flat()) {
+      for (const hook of entry.hooks ?? []) {
+        const command = hook.command ?? "";
+        const args = (hook.args ?? []).join(" ");
+        if (FORBIDDEN.test(command) || FORBIDDEN.test(args)) {
+          violations.push(`${file}: ${command !== "" ? command : args}`);
         }
       }
     }

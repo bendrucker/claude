@@ -80,7 +80,7 @@ export function blameOwners(files: string[], self: Set<string>, cwd?: string): O
       }
     }
   }
-  return [...byEmail.values()].sort((a, b) => b.lines - a.lines);
+  return [...byEmail.values()].toSorted((a, b) => b.lines - a.lines);
 }
 
 /** PR/MR refs parsed from recent commits touching the changed files on the base branch. */

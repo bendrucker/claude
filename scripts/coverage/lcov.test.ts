@@ -129,7 +129,7 @@ DA:3,1
 end_of_record
 `),
     );
-    expect(merged.map((r) => r.file).sort()).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(merged.map((r) => r.file).toSorted()).toEqual(["src/a.ts", "src/b.ts"]);
     const a = defined(merged.find((r) => r.file === "src/a.ts"));
     expect(a.functionsHit).toBe(2);
     expect(uncoveredLines(a)).toEqual([]);

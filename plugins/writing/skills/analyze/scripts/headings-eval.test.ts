@@ -137,7 +137,7 @@ describe("sampleForLabeling", () => {
     const byHeading = new Map(sample.map((row) => [row.heading, row.source]));
 
     const disagreementRows = sample.filter((row) => row.source === "disagreement");
-    expect(disagreementRows.map((row) => row.heading).sort()).toEqual(["H0", "H1"]);
+    expect(disagreementRows.map((row) => row.heading).toSorted()).toEqual(["H0", "H1"]);
 
     const randomRows = sample.filter((row) => row.source === "random");
     for (const row of randomRows) {

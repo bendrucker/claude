@@ -76,7 +76,7 @@ function stem(word: string): string {
 /** Lowercased, stemmed content words of the comment, delimiters and stopwords dropped. */
 function contentWords(text: string): string[] {
   const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
-  return words.filter((word) => word.length >= 3 && STOPWORDS.has(word) === false).map(stem);
+  return words.filter((word) => word.length >= 3 && !STOPWORDS.has(word)).map(stem);
 }
 
 /** Stemmed word set of the code's identifiers, camelCase and snake_case split apart. */

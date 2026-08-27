@@ -77,7 +77,7 @@ export function toItem(mined: MinedPr, fetched: FetchedPr): Item {
 // Interleave longest and shortest so a truncated labeling session still spans
 // both the sectioned long-form bodies and the tight one-paragraph ones.
 export function weave<T>(items: T[], length: (item: T) => number): T[] {
-  const sorted = [...items].sort((a, b) => length(b) - length(a));
+  const sorted = items.toSorted((a, b) => length(b) - length(a));
   const woven: T[] = [];
   let lo = 0;
   let hi = sorted.length - 1;
@@ -107,7 +107,7 @@ export function selectSample(candidates: Item[], limit: number): Item[] {
       weave(arr, (i) => i.body.length),
     );
   }
-  const order = [...buckets.keys()].sort();
+  const order = [...buckets.keys()].toSorted();
   const selected: Item[] = [];
   let added = true;
   while (added && selected.length < limit) {
@@ -210,7 +210,7 @@ async function main() {
   const mined = await queryMined(dbPath);
   console.log(`Session index: ${mined.length} distinct local bendrucker/* PRs`);
 
-  const repos = [...new Set(mined.map((m) => m.repository))].sort();
+  const repos = [...new Set(mined.map((m) => m.repository))].toSorted();
   const fetched = new Map<string, Map<number, FetchedPr>>();
   for (const repo of repos) {
     fetched.set(repo, await fetchRepoPrs(repo));

@@ -30,7 +30,7 @@ describe("VOICE_DELTA_FEATURES", () => {
     const byProvenance = (p: string) =>
       VOICE_DELTA_FEATURES.filter((f) => f.provenance === p)
         .map((f) => f.id)
-        .sort();
+        .toSorted();
     expect(byProvenance("skill-encouraged")).toEqual([
       "body_length",
       "causal_language_rate",

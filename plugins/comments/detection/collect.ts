@@ -106,7 +106,7 @@ async function collectDiffFile(
   const lines = source.split("\n");
   const comments = await extractComments(source, language);
   return scopeIntroduced(comments, file.added)
-    .filter((comment) => isExemptComment(comment) === false)
+    .filter((comment) => !isExemptComment(comment))
     .map((comment) => toCollected(file.path, language, comment, lines));
 }
 
@@ -127,7 +127,7 @@ export async function collectDiff(
   const matches = matchesPathGlobs(collect.pathGlobs);
   const [resolved, vendoredRoots] = await Promise.all([resolveDiff(options), listVendoredRoots()]);
   const diffs = resolved.filter(
-    (file) => matches(file.path) && isVendoredPath(file.path, vendoredRoots) === false,
+    (file) => matches(file.path) && !isVendoredPath(file.path, vendoredRoots),
   );
   const perFile = await Promise.all(diffs.map((file) => collectDiffFile(file, options, mrSource)));
   return perFile.flat();
@@ -143,7 +143,7 @@ async function collectRepoFile(path: string): Promise<CollectedComment[]> {
   const lines = source.split("\n");
   const comments = await extractComments(source, language);
   return comments
-    .filter((comment) => isExemptComment(comment) === false)
+    .filter((comment) => !isExemptComment(comment))
     .map((comment) => toCollected(path, language, comment, lines));
 }
 

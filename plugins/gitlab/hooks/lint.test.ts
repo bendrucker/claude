@@ -172,7 +172,7 @@ describe("gh on a GitLab remote", () => {
   test("resolves the shared config through a worktree .git file", async () => {
     const env = fakeEnv({
       "/repo/wt/.git": "gitdir: /repo/.git/worktrees/wt\n",
-      "/repo/.git/config": GITLAB_REPO["/repo/.git/config"] as string,
+      "/repo/.git/config": GITLAB_REPO["/repo/.git/config"],
     });
     const output = decision(await processInput(mockInput("gh pr view", "/repo/wt"), env));
     expect(output?.permissionDecision).toBe("deny");
@@ -217,9 +217,9 @@ describe("merge-request skill nudge", () => {
 
   test("defaultEnv.touch writes the marker before the marker directory exists", async () => {
     const base = mkdtempSync(join(tmpdir(), "gitlab-lint-"));
-    const marker = join(base, "gitlab-skill", "session.nudged");
-    await defaultEnv.touch(marker);
-    expect(await defaultEnv.fileExists(marker)).toBe(true);
+    const markerPath = join(base, "gitlab-skill", "session.nudged");
+    await defaultEnv.touch(markerPath);
+    expect(await defaultEnv.fileExists(markerPath)).toBe(true);
   });
 });
 

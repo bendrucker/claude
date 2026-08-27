@@ -20,15 +20,15 @@ const mapCmd = command(
 
     if (platform !== "github" && platform !== "gitlab") {
       console.error("--platform must be github or gitlab");
-      return process.exit(1);
+      process.exit(1);
     }
     if (comments === undefined || diff === undefined || commit === undefined) {
       console.error("--comments, --diff, and --commit are required");
-      return process.exit(1);
+      process.exit(1);
     }
     if (platform === "gitlab" && (base === undefined || start === undefined)) {
       console.error("gitlab requires --base and --start");
-      return process.exit(1);
+      process.exit(1);
     }
 
     let commentList: TuicrComment[];
@@ -38,7 +38,7 @@ const mapCmd = command(
       diffText = await Bun.file(diff).text();
     } catch (error) {
       console.error((error as Error).message);
-      return process.exit(1);
+      process.exit(1);
     }
 
     const parsedDiff = parseDiff(diffText);

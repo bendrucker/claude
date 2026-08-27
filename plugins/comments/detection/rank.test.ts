@@ -33,8 +33,8 @@ const commentArb: fc.Arbitrary<Comment> = fc
 /** Independent stable sort: descending metric, original index breaks ties. */
 function rankOracle<T extends Comment>(comments: T[], sort: SortKey): T[] {
   return comments
-    .map((comment, index) => ({ comment, index }))
-    .sort((a, b) => {
+    .map((entry, index) => ({ comment: entry, index }))
+    .toSorted((a, b) => {
       const diff = scoreComment(b.comment)[sort] - scoreComment(a.comment)[sort];
       return diff !== 0 ? diff : a.index - b.index;
     })

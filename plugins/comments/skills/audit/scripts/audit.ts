@@ -41,7 +41,7 @@ function parseSort(value: string): SortKey {
   console.error(
     `Invalid --sort ${JSON.stringify(value)}; expected one of ${SORT_KEYS.join(", ")}.`,
   );
-  process.exit(1);
+  return process.exit(1);
 }
 
 /**

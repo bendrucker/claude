@@ -197,11 +197,11 @@ export function parsePrUrl(url: string): {
   return { owner: match.owner, repo: match.repo, number };
 }
 
+const stripGit = (s: string): string => (s.endsWith(".git") ? s.slice(0, -4) : s);
+
 export function parseRepo(remoteUrl: string): { owner: string; repo: string } | null {
   const trimmed = remoteUrl.trim();
   if (!trimmed) return null;
-
-  const stripGit = (s: string): string => (s.endsWith(".git") ? s.slice(0, -4) : s);
 
   const tryPattern = (pattern: string): { owner: string; repo: string } | null => {
     const match = new UrlPattern(pattern, {
@@ -252,9 +252,7 @@ function exec(command: string): ExecResult {
     return { ok: true, stdout };
   } catch (err) {
     const stderr =
-      err && typeof err === "object" && "stderr" in err
-        ? String((err as { stderr: unknown }).stderr ?? "")
-        : "";
+      err && typeof err === "object" && "stderr" in err ? String(err.stderr ?? "") : "";
     const { rateLimited, retryAfter } = detectRateLimit(stderr);
     return { ok: false, stderr, rateLimited, retryAfter };
   }
@@ -328,6 +326,9 @@ export async function resolveMergeable(
   return current;
 }
 
+const isQueuedState = (s: string): boolean =>
+  s === "QUEUED" || s === "PENDING" || s === "WAITING" || s === "REQUESTED" || s === "EXPECTED";
+
 // `gh pr checks --json` exposes a unified `state` (status when in-flight,
 // conclusion when complete) and a normalized `bucket` ("pass" | "fail" |
 // "cancel" | "pending" | "skipping"). It does NOT expose `conclusion`. Use
@@ -345,8 +346,6 @@ export function deriveChecksState(
   }
   const states = checks.map((c) => (c.state ?? "").toUpperCase());
   if (states.some((s) => s === "IN_PROGRESS")) return "running";
-  const isQueuedState = (s: string): boolean =>
-    s === "QUEUED" || s === "PENDING" || s === "WAITING" || s === "REQUESTED" || s === "EXPECTED";
   const anyQueued = states.some(isQueuedState);
   const allQueued = states.every(isQueuedState);
   if (allQueued && anyQueued) return "queued";
@@ -605,7 +604,7 @@ type RunOptions = {
   | { mode: "run-id"; repo: string; runId: string }
 );
 
-async function run(options: RunOptions): Promise<void> {
+async function watch(options: RunOptions): Promise<void> {
   let prNumber: number | null = null;
   let branch: string | null = null;
   let repo: string | null = null;
@@ -766,7 +765,7 @@ async function main(): Promise<void> {
       console.error("--repo only applies in branch or run-id mode");
       process.exit(1);
     }
-    await run({ mode: "pr", prUrl, ...common });
+    await watch({ mode: "pr", prUrl, ...common });
     return;
   }
 
@@ -781,11 +780,11 @@ async function main(): Promise<void> {
   };
 
   if (runId) {
-    await run({ mode: "run-id", repo: resolveRepo(), runId, ...common });
+    await watch({ mode: "run-id", repo: resolveRepo(), runId, ...common });
     return;
   }
 
-  await run({ mode: "branch", repo: resolveRepo(), branch: branch as string, ...common });
+  await watch({ mode: "branch", repo: resolveRepo(), branch: branch as string, ...common });
 }
 
 if (import.meta.main) {

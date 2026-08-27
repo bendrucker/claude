@@ -162,7 +162,7 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
       const stripped = stripCode(text);
       const sentences = sentenceSplit(stripped);
       if (sentences.length === 0) return 0;
-      const lengths = sentences.map((s) => wordCount(s)).sort((a, b) => a - b);
+      const lengths = sentences.map((s) => wordCount(s)).toSorted((a, b) => a - b);
       const mid = Math.floor(lengths.length / 2);
       return lengths.length % 2 === 0
         ? ((lengths[mid - 1] ?? 0) + (lengths[mid] ?? 0)) / 2
@@ -179,7 +179,7 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
       const stripped = stripCode(text);
       const sentences = sentenceSplit(stripped);
       if (sentences.length === 0) return 0;
-      const lengths = sentences.map((s) => wordCount(s)).sort((a, b) => a - b);
+      const lengths = sentences.map((s) => wordCount(s)).toSorted((a, b) => a - b);
       const idx = Math.floor(lengths.length * 0.9);
       return lengths[Math.min(idx, lengths.length - 1)] ?? 0;
     },

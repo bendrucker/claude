@@ -58,7 +58,7 @@ async function findBinary(): Promise<string> {
 
   const versions = join(homedir(), ".local", "share", "claude", "versions");
   const entries = await readdir(versions).catch(() => []);
-  for (const entry of entries.sort(bySemverDesc)) {
+  for (const entry of entries.toSorted(bySemverDesc)) {
     const candidate = join(versions, entry, "claude");
     if (Bun.file(candidate).size > BUNDLE_MIN_BYTES) return candidate;
   }
@@ -173,7 +173,7 @@ await runCheck(
 
     const snapshot = snapshots.includes(version)
       ? version
-      : (snapshots.sort(bySemverDesc)[0] as string);
+      : (snapshots.toSorted(bySemverDesc)[0] as string);
     if (snapshot !== version) {
       violations.push(
         `Installed Claude Code is ${version}; the newest snapshot is ${snapshot}. Re-extract and land references/upstream-${version}.md, then port any changes into SKILL.md, angles.md, and efforts.md.`,

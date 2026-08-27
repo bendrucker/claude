@@ -48,7 +48,7 @@ export async function collectFiles(input: string): Promise<string[]> {
     if (!isProseFile(path)) continue;
     files.push(path);
   }
-  return files.sort();
+  return files.toSorted();
 }
 
 function scanInput(text: string, filePath: string | undefined): number {
@@ -103,12 +103,12 @@ function printSummary(results: FileViolations[]): void {
   }
 
   const categoryRows = [...byCategory.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .toSorted((a, b) => b[1] - a[1])
     .map(([category, count]) => [category, String(count)]);
   console.error(table([["Category", "Count"], ...categoryRows]));
 
   const noisiest = [...byFile.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .toSorted((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([path, count]) => [relativeLabel(path), String(count)]);
   console.error(table([["File", "Violations"], ...noisiest]));
@@ -121,7 +121,7 @@ async function collectAcross(paths: string[]): Promise<string[]> {
   for (const path of paths) {
     for (const file of await collectFiles(path)) files.add(file);
   }
-  return [...files].sort();
+  return [...files].toSorted();
 }
 
 const auditCmd = command(

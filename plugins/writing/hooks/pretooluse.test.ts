@@ -41,7 +41,7 @@ function mockInput(
     tool_input: toolInput,
     tool_use_id: "test",
     ...overrides,
-  } as PreToolUseHookInput;
+  };
 }
 
 // Trips all three checkers at context tier: a lowercase step heading

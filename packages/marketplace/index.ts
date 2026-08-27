@@ -165,7 +165,7 @@ export async function loadPlugins(opts?: LoadOptions): Promise<Plugin[]> {
     plugin.listing = listing;
   }
 
-  return [...plugins.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...plugins.values()].toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 /** The settings file read for enabled state, or an empty object when absent. */

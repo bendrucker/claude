@@ -24,7 +24,7 @@ function walkNode(node: Node, visitor: (n: Node) => void): void {
   visitor(node);
   for (const key of Object.keys(node)) {
     const value = node[key];
-    if (value && typeof value === "object" && "type" in (value as object)) {
+    if (value && typeof value === "object" && "type" in value) {
       walkNode(value as Node, visitor);
     } else if (Array.isArray(value)) {
       for (const item of value) {
@@ -44,6 +44,7 @@ export function validateAppScope(source: string, app: string): ValidationResult 
   } catch (error) {
     throw new Error(
       `Failed to parse JXA source: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 

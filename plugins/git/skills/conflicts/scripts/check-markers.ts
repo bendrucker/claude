@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
 
 function formatOutput(reason: string): SyncHookJSONOutput {
@@ -14,9 +14,8 @@ function formatOutput(reason: string): SyncHookJSONOutput {
 }
 
 async function main(): Promise<void> {
-  let _input: PreToolUseHookInput;
   try {
-    _input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    JSON.parse(await Bun.stdin.text());
   } catch (error) {
     console.error(
       `[git/conflicts/check-markers] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

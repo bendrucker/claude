@@ -19,14 +19,14 @@ export function coveredLines(fc: FileCoverage): number[] {
   return [...fc.lineHits.entries()]
     .filter(([, hits]) => hits > 0)
     .map(([line]) => line)
-    .sort((a, b) => a - b);
+    .toSorted((a, b) => a - b);
 }
 
 export function uncoveredLines(fc: FileCoverage): number[] {
   return [...fc.lineHits.entries()]
     .filter(([, hits]) => hits === 0)
     .map(([line]) => line)
-    .sort((a, b) => a - b);
+    .toSorted((a, b) => a - b);
 }
 
 export interface LineCoverage {
@@ -116,7 +116,7 @@ export function formatLcov(reports: FileCoverage[]): string {
   const blocks: string[] = [];
   for (const fc of reports) {
     const lines = ["TN:", `SF:${fc.file}`, `FNF:${fc.functionsFound}`, `FNH:${fc.functionsHit}`];
-    for (const line of [...fc.lineHits.keys()].sort((a, b) => a - b)) {
+    for (const line of [...fc.lineHits.keys()].toSorted((a, b) => a - b)) {
       lines.push(`DA:${line},${fc.lineHits.get(line)}`);
     }
     const covered = coveredLines(fc).length;
@@ -128,7 +128,7 @@ export function formatLcov(reports: FileCoverage[]): string {
 
 // Collapse sorted line numbers into human-readable ranges: [1,2,3,5,8,9] -> "1-3, 5, 8-9".
 export function formatRanges(lines: number[]): string {
-  const [first, ...rest] = [...lines].sort((a, b) => a - b);
+  const [first, ...rest] = lines.toSorted((a, b) => a - b);
   if (first === undefined) return "";
 
   const ranges: string[] = [];

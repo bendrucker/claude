@@ -78,7 +78,7 @@ function validateFixture(value: unknown, file: string): Fixture {
     throw new Error(`Fixture ${file} is "rewrite" but carries no gold rewrite text`);
   }
   for (const key of ["id", "path", "language", "kind", "comment", "context"]) {
-    if (typeof record[key] !== "string" || (record[key] as string).length === 0) {
+    if (typeof record[key] !== "string" || record[key].length === 0) {
       throw new Error(`Fixture ${file} missing required string "${key}"`);
     }
   }

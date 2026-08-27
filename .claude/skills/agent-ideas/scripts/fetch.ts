@@ -43,8 +43,8 @@ function text(value: unknown): string {
   return "";
 }
 
-function decodeEntities(text: string): string {
-  return text
+function decodeEntities(input: string): string {
+  return input
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

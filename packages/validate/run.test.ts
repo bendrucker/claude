@@ -84,9 +84,9 @@ describe("runValidation", () => {
 
   it("exits non-zero on validation errors", async () => {
     const file = await writeFixture("invalid", { name: 123 });
-    const exitSpy = spyOn(process, "exit").mockImplementation((() => {
+    const exitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("exit");
-    }) as never);
+    });
 
     try {
       await expect(runValidation({ files: [file], schema: schemaPath })).rejects.toThrow("exit");

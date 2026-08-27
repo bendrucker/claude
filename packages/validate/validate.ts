@@ -91,10 +91,10 @@ export async function validateFile(
 
   const warnings: string[] = [];
   if (options?.warnAdditional && entry.schema.properties) {
-    const known = new Set(Object.keys(entry.schema.properties as Record<string, unknown>));
-    for (const key of Object.keys(data as Record<string, unknown>)) {
-      if (key !== "$schema" && !known.has(key)) {
-        warnings.push(formatWarning(file, key));
+    const known = new Set(Object.keys(entry.schema.properties));
+    for (const property of Object.keys(data as Record<string, unknown>)) {
+      if (property !== "$schema" && !known.has(property)) {
+        warnings.push(formatWarning(file, property));
       }
     }
   }

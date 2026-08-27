@@ -130,9 +130,9 @@ export async function shipped(): Promise<Set<string>> {
   return found;
 }
 
-export function violations(references: Reference[], shipped: Set<string>): string[] {
-  return references
-    .filter((reference) => !shipped.has(reference.path))
+export function violations(refs: Reference[], shippedPaths: Set<string>): string[] {
+  return refs
+    .filter((reference) => !shippedPaths.has(reference.path))
     .map((reference) => `${reference.file} ${reference.event}: ${reference.path}`);
 }
 

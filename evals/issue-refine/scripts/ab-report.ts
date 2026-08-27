@@ -36,7 +36,7 @@ const briefs = [
   ...new Set(
     files.filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.(before|after)\.md$/, "")),
   ),
-].sort();
+].toSorted();
 
 const FINDING_NAME: Record<number, string> = {
   1: "headings",
@@ -68,7 +68,7 @@ for (const brief of briefs) {
   );
   const findings = [...new Set([...Object.keys(b.byFinding), ...Object.keys(a.byFinding)])]
     .map(Number)
-    .sort((x, y) => x - y);
+    .toSorted((x, y) => x - y);
   for (const f of findings) {
     const bn = b.byFinding[f] ?? 0;
     const an = a.byFinding[f] ?? 0;

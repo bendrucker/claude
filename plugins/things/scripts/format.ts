@@ -5,6 +5,8 @@ export function formatDate(value: string | null): string {
   return value.slice(0, 10);
 }
 
+const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, "-");
+
 export function selectColumns(
   headers: string[],
   rows: string[][],
@@ -12,7 +14,6 @@ export function selectColumns(
 ): [string[], string[][]] {
   if (!columns || columns.length === 0) return [headers, rows];
 
-  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, "-");
   const headerMap = new Map(headers.map((h, i) => [normalize(h), i]));
 
   const indices: number[] = [];

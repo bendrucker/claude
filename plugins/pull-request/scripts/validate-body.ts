@@ -11,7 +11,7 @@ function hasBashCommand(input: unknown): input is { command: string } {
     typeof input === "object" &&
     input !== null &&
     "command" in input &&
-    typeof (input as { command: unknown }).command === "string"
+    typeof input.command === "string"
   );
 }
 

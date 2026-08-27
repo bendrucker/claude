@@ -42,7 +42,7 @@ describe("buildJob partitioning", () => {
     [41, [20, 20, 1]],
   ])("partitions %i comments into shards of default size", async (n, sizes) => {
     const job = await buildJob(many(n), { fix: false });
-    expect(job.shards.map((s) => s.comments.length)).toEqual(sizes as number[]);
+    expect(job.shards.map((s) => s.comments.length)).toEqual(sizes);
     expect(job.shards.map((s) => s.id)).toEqual(sizes.map((_, i) => i));
   });
 

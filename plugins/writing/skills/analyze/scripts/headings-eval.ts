@@ -82,7 +82,7 @@ export function dedupeHeadings(
     heading,
     occurrences,
     sessions: sessions.size,
-  })).sort((a, b) => b.occurrences - a.occurrences);
+  })).toSorted((a, b) => b.occurrences - a.occurrences);
 }
 
 export interface ClassifierStats {
@@ -294,7 +294,7 @@ export function formatPowerReport(
 async function corpusFromDocs(dir: string): Promise<Array<{ session_id: string; text: string }>> {
   const files = readdirSync(dir)
     .filter((name) => name.endsWith(".md"))
-    .sort();
+    .toSorted();
   return Promise.all(
     files.map(async (name) => ({
       session_id: name,

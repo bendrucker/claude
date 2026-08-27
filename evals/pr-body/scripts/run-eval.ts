@@ -122,7 +122,7 @@ export function manifestPath(runDir: string): string {
 }
 
 export async function loadScenarios(dir: string): Promise<Scenario[]> {
-  const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).sort();
+  const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).toSorted();
   const scenarios: Scenario[] = [];
   for (const name of names) {
     const parsed: unknown = await Bun.file(join(dir, name)).json();

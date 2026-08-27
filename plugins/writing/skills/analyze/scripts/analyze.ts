@@ -396,7 +396,7 @@ export async function runAnalysis(
   );
   const rateDocumentRows = deliverableRows
     .filter((r) => r.text)
-    .map((r) => analyzeDocument(r.session_id, r.text as string));
+    .map((r) => analyzeDocument(r.session_id, r.text));
   const rateTrends = aggregateTrends(rateDocumentRows);
 
   let meaningAudit: ReportInput["meaningAudit"] = null;

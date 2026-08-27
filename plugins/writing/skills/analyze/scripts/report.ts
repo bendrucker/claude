@@ -172,7 +172,7 @@ function renderProposedRemovals(input: ReportInput): string {
   ];
   const removable = input.ruleHealth
     .filter((r) => r.status === "remove")
-    .sort(
+    .toSorted(
       (a, b) =>
         reasonRank(a.removeReason) - reasonRank(b.removeReason) ||
         (a.modelPerM ?? 0) - (b.modelPerM ?? 0),
@@ -298,7 +298,7 @@ function renderStructuralAudit(input: ReportInput): string {
     lines.push("");
     lines.push("| pattern | scope | assistant hits | user hits | rows | sessions | retire when |");
     lines.push("| --- | --- | --- | --- | --- | --- | --- |");
-    const sorted = [...rows].sort((a, b) => b.assistantHits - a.assistantHits);
+    const sorted = rows.toSorted((a, b) => b.assistantHits - a.assistantHits);
     for (const r of sorted) {
       const scope = r.sideEffectOnly ? "side-effect" : r.fileOnly ? "file-only" : "all";
       lines.push(
@@ -472,7 +472,7 @@ function fmtPct(value: number): string {
 
 function fmtNum(value: number | null): string {
   if (value === null) return "-";
-  return Number(value).toLocaleString();
+  return value.toLocaleString();
 }
 
 function fmtPerM(value: number | null): string {
@@ -512,7 +512,7 @@ function voiceBaselineSummary(profile: VoiceProfile | null): string {
 function formatQuote(quote: QuoteContext | null): string {
   if (!quote) return "(no deliverable occurrence found)";
   const pointer = quote.filePath
-    ? `${quote.filePath}`
+    ? quote.filePath
     : quote.sourceFile
       ? `${quote.sourceFile}:${quote.sourceLine ?? "?"}`
       : "(no source pointer)";

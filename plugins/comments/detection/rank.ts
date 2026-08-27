@@ -32,6 +32,6 @@ export function scoreComment(comment: Comment): CommentScore {
 export function rankComments<T extends Comment>(comments: T[], sort: SortKey = "score"): T[] {
   return comments
     .map((comment) => ({ comment, score: scoreComment(comment) }))
-    .sort((a, b) => b.score[sort] - a.score[sort])
+    .toSorted((a, b) => b.score[sort] - a.score[sort])
     .map((entry) => entry.comment);
 }

@@ -64,7 +64,7 @@ export function parseBatchVerdicts(json: string, expected: number): Verdict[] {
   try {
     parsed = JSON.parse(json);
   } catch (error) {
-    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`);
+    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`, { cause: error });
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error("Judge batch must be a JSON object");

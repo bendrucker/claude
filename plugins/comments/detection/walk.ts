@@ -35,7 +35,7 @@ export function isVendoredPath(path: string, vendoredRoots: string[]): boolean {
 /** Drop files under a vendored root. Pure over its inputs. */
 export function excludeVendored(files: string[], vendoredRoots: string[]): string[] {
   if (vendoredRoots.length === 0) return files;
-  return files.filter((path) => isVendoredPath(path, vendoredRoots) === false);
+  return files.filter((path) => !isVendoredPath(path, vendoredRoots));
 }
 
 /**

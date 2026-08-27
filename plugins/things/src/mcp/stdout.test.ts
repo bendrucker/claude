@@ -39,7 +39,7 @@ async function importClosure(entry: string): Promise<string[]> {
     }
   }
 
-  return [...seen].sort();
+  return [...seen].toSorted();
 }
 
 /**

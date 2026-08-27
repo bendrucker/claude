@@ -170,7 +170,7 @@ export function parseVerdict(json: string): JudgeVerdict {
   try {
     parsed = JSON.parse(json);
   } catch (error) {
-    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`);
+    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`, { cause: error });
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error("Judge verdict must be a JSON object");
@@ -189,7 +189,7 @@ export function parseVerdict(json: string): JudgeVerdict {
     if (entry.span !== null && typeof entry.span !== "string") {
       throw new Error(`Judge verdict "${criterion.key}.span" must be a string or null`);
     }
-    verdict[criterion.key] = { flagged: entry.flagged, span: entry.span as string | null };
+    verdict[criterion.key] = { flagged: entry.flagged, span: entry.span };
   }
   return verdict;
 }
@@ -554,7 +554,9 @@ export function parseHeadingVerdicts(json: string, expected: number): boolean[] 
   try {
     parsed = JSON.parse(json);
   } catch (error) {
-    throw new Error(`Heading judge returned invalid JSON: ${(error as Error).message}`);
+    throw new Error(`Heading judge returned invalid JSON: ${(error as Error).message}`, {
+      cause: error,
+    });
   }
   const record = parsed as Record<string, unknown>;
   const entries = record.headings;

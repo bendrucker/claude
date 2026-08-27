@@ -41,7 +41,7 @@ describe("selectColumns", () => {
       throw new Error("process.exit");
     });
     const originalExit = process.exit;
-    process.exit = mockExit as never;
+    process.exit = mockExit;
 
     const mockError = mock();
     const originalError = console.error;

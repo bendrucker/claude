@@ -114,7 +114,7 @@ describe("runAnalysis", () => {
       model: result.modelSummary[0]?.model,
       voiceProfile: result.voiceProfile,
       ruleHealthLength: result.ruleHealth.length,
-      surfaces: [...new Set(result.ruleHealth.map((r) => r.surface))].sort(),
+      surfaces: [...new Set(result.ruleHealth.map((r) => r.surface))].toSorted(),
     }).toMatchInlineSnapshot(`
       {
         "generatedAt": "2026-05-24",

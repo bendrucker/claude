@@ -14,6 +14,7 @@ export async function ensureThingsRunning(): Promise<void> {
     } catch (error) {
       throw new Error(
         `Things 3 is not available. Ensure it is installed and can be launched. (${error instanceof Error ? error.message : String(error)})`,
+        { cause: error },
       );
     }
   }

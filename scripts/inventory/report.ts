@@ -45,6 +45,12 @@ function invocation(skill: { modelInvocable: boolean; userInvocable: boolean }):
   return modes.join("+") || "none";
 }
 
+// Plugins and MCP servers exist only in the plugin scope, so their row skips
+// the per-scope split the others break down by.
+function pluginOnly(kind: string, total: number, note: string): string[] {
+  return [kind, String(total), "-", "-", String(total), note];
+}
+
 function counts(inventory: Inventory): Columns {
   const scoped = [
     { kind: "skills", items: inventory.skills },
@@ -52,17 +58,6 @@ function counts(inventory: Inventory): Columns {
     { kind: "commands", items: inventory.commands },
     { kind: "rules", items: inventory.rules },
     { kind: "hooks", items: inventory.hooks },
-  ];
-
-  // Plugins and MCP servers exist only in the plugin scope, so their row skips
-  // the per-scope split the others break down by.
-  const pluginOnly = (kind: string, total: number, note: string): string[] => [
-    kind,
-    String(total),
-    "-",
-    "-",
-    String(total),
-    note,
   ];
 
   return {
@@ -160,6 +155,8 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
         head: ["server", "plugin", "path"],
         rows: inventory.mcpServers.map((m) => [m.name, m.plugin, m.path]),
       };
+    default:
+      throw new Error(`Unknown inventory kind: ${kind}`);
   }
 }
 

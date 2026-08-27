@@ -51,6 +51,8 @@ const { dataDir, queue: queues, interval } = argv.flags;
 // Monitor sees a single long-lived process (no shell while/sleep loop, which
 // breaks on macOS due to PATH-stripped eval and nice(5) restrictions).
 while (true) {
+  // oxlint-disable-next-line no-await-in-loop -- poll loop: the next iteration only runs after this one finishes.
   await iteration(queues, dataDir);
+  // oxlint-disable-next-line no-await-in-loop -- poll interval between iterations.
   await sleep(interval * 1000);
 }

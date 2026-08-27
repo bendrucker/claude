@@ -301,6 +301,7 @@ export async function judgeDocument(judge: ChunkJudge, text: string): Promise<Ju
   const chunks = chunkDocument(text);
   const verdicts: JudgeVerdict[] = [];
   for (const chunk of chunks) {
+    // oxlint-disable-next-line no-await-in-loop -- one judge API call per chunk; serializing keeps a document inside the rate limit.
     verdicts.push(await judge(chunk));
   }
   return aggregateVerdicts(verdicts);
@@ -374,6 +375,7 @@ async function mapPooled<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise
   const queue = items.map((item, index) => ({ item, index }));
   const workers = Array.from({ length: Math.min(COUNT_CONCURRENCY, items.length) }, async () => {
     for (let entry = queue.shift(); entry; entry = queue.shift()) {
+      // oxlint-disable-next-line no-await-in-loop -- this is the worker body of the bounded pool above; the pool is the parallelism.
       results[entry.index] = await fn(entry.item);
     }
   });
@@ -484,6 +486,7 @@ export async function judgeCorpus(
     spans: [],
   }));
   for (const text of texts) {
+    // oxlint-disable-next-line no-await-in-loop -- one judge API call per document; serializing keeps the corpus run inside the rate limit.
     const verdict = await judgeDocument(judge, text);
     for (const [index, criterion] of JUDGE_CRITERIA.entries()) {
       const stat = stats[index];
@@ -656,6 +659,7 @@ export function anthropicHeadingJudge(options: AnthropicJudgeOptions): HeadingJu
 export async function judgeHeadings(judge: HeadingJudge, headings: string[]): Promise<boolean[]> {
   const verdicts: boolean[] = [];
   for (let i = 0; i < headings.length; i += HEADING_BATCH_SIZE) {
+    // oxlint-disable-next-line no-await-in-loop -- one judge API call per heading batch; serializing keeps the run inside the rate limit.
     verdicts.push(...(await judge(headings.slice(i, i + HEADING_BATCH_SIZE))));
   }
   return verdicts;

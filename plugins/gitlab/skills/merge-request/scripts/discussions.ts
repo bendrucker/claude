@@ -293,6 +293,7 @@ const resolveCmd = command(
     const iid = parsed._.iid;
 
     for (const id of parsed._.ids) {
+      // oxlint-disable-next-line no-await-in-loop -- one API mutation per discussion, each confirmed on stderr as it resolves.
       await $`glab api projects/:id/merge_requests/${iid}/discussions/${id} -X PUT -f resolved=true`.text();
       console.error(`Resolved: ${id}`);
     }

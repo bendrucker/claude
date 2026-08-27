@@ -91,6 +91,7 @@ if (import.meta.main) {
 
   for (const file of files) {
     try {
+      // oxlint-disable-next-line no-await-in-loop -- each render drives a headless browser and prints its result before the next starts.
       const result = await renderFile(file, outputPath, { scale });
       console.log(`Rendered ${result.input} to ${result.output}`);
     } catch (error) {

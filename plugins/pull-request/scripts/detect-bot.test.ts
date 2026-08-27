@@ -13,9 +13,7 @@ const noOrigin = () => Promise.resolve(null);
 
 async function repo(files: string[]): Promise<string> {
   const root = mkdtempSync(join(tmpdir(), "detect-bot-"));
-  for (const file of files) {
-    await Bun.write(join(root, file), "{}");
-  }
+  await Promise.all(files.map((file) => Bun.write(join(root, file), "{}")));
   return root;
 }
 

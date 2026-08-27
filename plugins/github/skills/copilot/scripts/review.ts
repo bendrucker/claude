@@ -582,6 +582,7 @@ async function collectContents(diff: Diff, cwd: string, maxBytes: number) {
       continue;
     }
     running += file.size;
+    // oxlint-disable-next-line no-await-in-loop -- the running byte budget checked above accumulates across iterations.
     contents.set(path, await file.text());
   }
 
@@ -816,6 +817,7 @@ async function main(): Promise<void> {
     const results: Result[] = [];
     for (const { angle, prompt } of prompts) {
       results.push(
+        // oxlint-disable-next-line no-await-in-loop -- every spawn shares COPILOT_HOME and the session ledger written there.
         await runCopilot(prompt, angle, { model, cap, cwd: workdir, agentic: argv.flags.agentic }),
       );
     }

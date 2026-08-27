@@ -12,7 +12,9 @@ export async function findContributing(
   for (const candidate of CANDIDATES) {
     const full = join(repoRoot, candidate);
     const file = Bun.file(full);
+    // oxlint-disable-next-line no-await-in-loop -- first match wins: a later candidate must not be read once an earlier one exists.
     if (await file.exists()) {
+      // oxlint-disable-next-line no-await-in-loop -- first match wins: a later candidate must not be read once an earlier one exists.
       return { path: candidate, content: await file.text() };
     }
   }

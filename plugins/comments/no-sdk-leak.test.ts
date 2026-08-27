@@ -12,15 +12,18 @@ describe("no SDK leak into the product path", () => {
   const productDirs = ["detection", "judge", "apply", "skills", "workflow"];
 
   test("no @anthropic-ai/sdk import outside evals/", async () => {
-    const offenders: string[] = [];
-    for (const dir of productDirs) {
-      const glob = new Glob("**/*.{ts,js}");
-      for await (const path of glob.scan(join(root, dir))) {
-        if (path.includes("node_modules")) continue;
-        const text = await Bun.file(join(root, dir, path)).text();
-        if (text.includes("@anthropic-ai/sdk")) offenders.push(join(dir, path));
-      }
-    }
-    expect(offenders).toEqual([]);
+    const perDir = await Promise.all(
+      productDirs.map(async (dir) => {
+        const glob = new Glob("**/*.{ts,js}");
+        const found: string[] = [];
+        for await (const path of glob.scan(join(root, dir))) {
+          if (path.includes("node_modules")) continue;
+          const text = await Bun.file(join(root, dir, path)).text();
+          if (text.includes("@anthropic-ai/sdk")) found.push(join(dir, path));
+        }
+        return found;
+      }),
+    );
+    expect(perDir.flat()).toEqual([]);
   });
 });

@@ -365,6 +365,7 @@ export async function resolveMergeable(
       }
     }
     if (attempt < MERGEABLE_UNKNOWN_RETRIES - 1) {
+      // oxlint-disable-next-line no-await-in-loop -- backoff between mergeability rechecks.
       await sleepFn(MERGEABLE_RECHECK_SECONDS * 1000);
     }
   }
@@ -680,6 +681,7 @@ async function watch(options: RunOptions): Promise<void> {
       // same cycle as a stale `success`, ahead of the terminal return below.
       let probe = result.probe;
       if (options.mode === "pr" && prNumber !== null && probeIsUndetermined(probe)) {
+        // oxlint-disable-next-line no-await-in-loop -- poll loop: each cycle reads state the previous cycle left behind.
         const resolved = await resolveMergeable(prNumber, repo, exec, sleep);
         probe = {
           ...probe,
@@ -705,6 +707,7 @@ async function watch(options: RunOptions): Promise<void> {
       if (terminal) return;
     }
 
+    // oxlint-disable-next-line no-await-in-loop -- poll interval between API cycles.
     await sleep((intervalSeconds ?? DEFAULT_INTERVAL_SECONDS) * 1000);
   }
 }

@@ -275,9 +275,12 @@ const applyCmd = command(
     for (const path of await judgedPaths(job)) {
       const language = languageForPath(path);
       const file = Bun.file(path);
+      // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.
       if (language == null || language === "" || !(await file.exists())) continue;
+      // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.
       const source = await file.text();
       const editItems: EditItem[] = [];
+      // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.
       for (const match of matchVerdicts(path, await extractComments(source, language), verdicts)) {
         matched.add(match.id);
         reportItems.push({
@@ -301,6 +304,7 @@ const applyCmd = command(
 
     if (format != null && format !== "" && !report) {
       for (const [path, content] of editsByPath) {
+        // oxlint-disable-next-line no-await-in-loop -- bounds formatter subprocess fan-out to one `sh -c` per edited file at a time.
         const formatted = await formatContent(format, path, content);
         if (formatted.formatted) {
           editsByPath.set(path, formatted.content);

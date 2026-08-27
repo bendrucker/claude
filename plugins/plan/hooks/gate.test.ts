@@ -397,6 +397,7 @@ describe("recorded re-presents", () => {
       recorded.sessions.map(async ({ session, date, presents }) => {
         const labels: string[] = [];
         for (const plan of presents) {
+          // oxlint-disable-next-line no-await-in-loop -- the gate decides each presentation against the state the prior presentations left.
           labels.push(label(await runGate(mockInput(plan, session))));
         }
         return [`${date} ${session}`, labels] as const;

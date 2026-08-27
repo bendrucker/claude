@@ -189,9 +189,11 @@ describe("ox hook", () => {
   // wrote by name: the directory holds live sessions' counts too.
   afterAll(async () => {
     await rm(tempDir, { recursive: true, force: true });
-    for (const session of gateSessions) {
-      await rm(blockCountPath(session), { recursive: true, force: true });
-    }
+    await Promise.all(
+      [...gateSessions].map((session) =>
+        rm(blockCountPath(session), { recursive: true, force: true }),
+      ),
+    );
   });
 
   describe("runOxlintAgent", () => {
@@ -430,6 +432,7 @@ describe("ox hook", () => {
 
       const budget: (SyncHookJSONOutput | null)[] = [];
       for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
+        // oxlint-disable-next-line no-await-in-loop -- each stop increments the persisted block count that the next stop reads.
         budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
       }
       const past = await processStop(mockStopHookInput(transcript, true, session));

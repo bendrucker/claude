@@ -129,10 +129,9 @@ export function manifestPath(runDir: string): string {
 
 export async function loadScenarios(dir: string): Promise<Scenario[]> {
   const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).toSorted();
-  const scenarios: Scenario[] = [];
-  for (const name of names) {
-    scenarios.push(await decodeFile(Scenario, join(dir, name)));
-  }
+  const scenarios = await Promise.all(
+    names.map(async (name) => decodeFile(Scenario, join(dir, name))),
+  );
   if (scenarios.length === 0) throw new Error(`No scenario JSON files in ${dir}`);
   return scenarios;
 }
@@ -239,6 +238,7 @@ export async function mapPool<T, R>(
         const index = cursor++;
         const item = items[index];
         if (index >= items.length || item === undefined) return;
+        // oxlint-disable-next-line no-await-in-loop -- this is the worker body of the bounded pool above; the pool is the parallelism.
         results[index] = await fn(item);
       }
     }),
@@ -359,6 +359,7 @@ async function main(): Promise<void> {
 
   for (const row of recorded) {
     addUsage(total, row.usage);
+    // oxlint-disable-next-line no-await-in-loop -- emit appends to a single FileSink; resumed rows must be written back in order.
     await emit(row);
   }
   if (recorded.length > 0) {
@@ -368,6 +369,7 @@ async function main(): Promise<void> {
   if (!argv.flags.skipBaseline) {
     for (const scenario of scenarios) {
       if (done.has(rowKey(scenario.id, "original", 0))) continue;
+      // oxlint-disable-next-line no-await-in-loop -- emit appends to a single FileSink; baseline rows must land in scenario order.
       await emit({
         scenarioId: scenario.id,
         arm: "original",

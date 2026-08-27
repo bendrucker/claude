@@ -261,6 +261,7 @@ async function installDescriptor(descriptor: Descriptor, group: string): Promise
   for (let attempt = 0; attempt < 5; attempt++) {
     const result = Bun.spawnSync(["launchctl", "bootstrap", `gui/${uid}`, dest]);
     if (result.exitCode === 0) break;
+    // oxlint-disable-next-line no-await-in-loop -- backoff between launchctl bootstrap retries.
     await Bun.sleep(500);
   }
 
@@ -288,6 +289,7 @@ async function syncGroups(dirs: string[], dryRun: boolean): Promise<void> {
   const failures: string[] = [];
 
   for (const { group, dir } of groups) {
+    // oxlint-disable-next-line no-await-in-loop -- each group runs launchctl against the shared user domain and appends its rows in order.
     const entries = await listDescriptors(dir);
     const headless = entries.filter((e) => e.descriptor.mode === "headless");
     for (const skipped of entries.filter((e) => e.descriptor.mode !== "headless")) {
@@ -307,6 +309,7 @@ async function syncGroups(dirs: string[], dryRun: boolean): Promise<void> {
     for (const label of desired) {
       if (install.includes(label)) continue;
       const entry = byShortLabel.get(label);
+      // oxlint-disable-next-line no-await-in-loop -- each group runs launchctl against the shared user domain and appends its rows in order.
       if (entry && (await changedContent(entry, group))) update.push(label);
     }
 
@@ -318,11 +321,13 @@ async function syncGroups(dirs: string[], dryRun: boolean): Promise<void> {
     if (!dryRun) {
       for (const label of [...install, ...update]) {
         const entry = byShortLabel.get(label);
+        // oxlint-disable-next-line no-await-in-loop -- installDescriptor boots a launchd agent into the shared user domain.
         if (entry && !(await installDescriptor(entry.descriptor, group))) {
           failures.push(fullLabel(group, entry.descriptor.label));
         }
       }
       for (const label of plan.prune) {
+        // oxlint-disable-next-line no-await-in-loop -- pruneAgent removes a launchd agent from the shared user domain.
         await pruneAgent(group, label.slice(group.length + 1));
       }
     }
@@ -356,6 +361,7 @@ async function listCommand(dirs: string[], withLoadState: boolean): Promise<void
   const rows: string[][] = [header];
 
   for (const { group, dir } of groups) {
+    // oxlint-disable-next-line no-await-in-loop -- each group appends its rows to one table in group order.
     const entries = await listDescriptors(dir);
     const declared = new Map(
       entries.map((e) => [shortLabel(group, e.descriptor.label), e] as const),

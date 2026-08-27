@@ -510,6 +510,7 @@ export async function resolveBody(command: string, cwd: string): Promise<BodyRes
       chunks.push(part.text);
       continue;
     }
+    // oxlint-disable-next-line no-await-in-loop -- returns on the first unreadable part, and a command carries at most a few.
     const text = await readBodyFile(part.path, cwd);
     if (text === null) {
       return {

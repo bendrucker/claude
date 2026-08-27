@@ -21,8 +21,14 @@ export async function runValidation(target: ValidationTarget): Promise<void> {
   let ajv: Ajv | undefined;
   if (target.extraSchemas != null && target.extraSchemas.length !== 0) {
     ajv = createValidator();
-    for (const extra of target.extraSchemas) {
-      ajv.addSchema(await loadSchema(extra.schema), extra.key);
+    const extras = await Promise.all(
+      target.extraSchemas.map(async (extra) => ({
+        key: extra.key,
+        schema: await loadSchema(extra.schema),
+      })),
+    );
+    for (const extra of extras) {
+      ajv.addSchema(extra.schema, extra.key);
     }
   }
 
@@ -32,11 +38,13 @@ export async function runValidation(target: ValidationTarget): Promise<void> {
 
   const result: ValidationResult = { errors: [], warnings: [] };
   for (const file of target.files) {
+    // oxlint-disable-next-line no-await-in-loop -- each file prints its bullet as it is validated, so the checks follow the printed order.
     if (!(await Bun.file(resolve(file)).exists())) {
       console.log(`• ${file} (not found, skipped)`);
       continue;
     }
     console.log(`• ${file}`);
+    // oxlint-disable-next-line no-await-in-loop -- each file prints its bullet as it is validated, so the checks follow the printed order.
     const r = await validateFile(file, target.schema, options);
     result.errors.push(...r.errors);
     result.warnings.push(...r.warnings);

@@ -12,6 +12,7 @@ async function detectOperation(): Promise<{ op: Operation; ref: string | null }>
   ];
 
   for (const { op, ref } of checks) {
+    // oxlint-disable-next-line no-await-in-loop -- first match wins: a later ref must not be probed once an earlier one verified.
     const result = await $`git rev-parse --verify ${ref}`.quiet().nothrow();
     if (result.exitCode === 0) {
       return { op, ref };

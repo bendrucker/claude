@@ -352,18 +352,20 @@ if (import.meta.main) {
       ? extractModel(await readEntries(input.transcript_path))
       : null;
 
-  const lines: string[] = [];
-  for (const task of input.tasks ?? []) {
-    const base = subagentBase(task.id, projectDir);
-    const meta = base != null && base !== "" ? await readMeta(base) : null;
-    const entries = base != null && base !== "" ? await readEntries(`${base}.jsonl`) : [];
-    const activity = extractActivity(entries);
-    // The payload's model is resolved at spawn and covers a subagent that has
-    // yet to write a turn. Task types that carry none fall back to the
-    // transcript this loop already read for the activity.
-    const model = subagentModelLetter(task.model ?? extractModel(entries), sessionModel);
-    lines.push(
-      JSON.stringify(
+  const lines = await Promise.all(
+    (input.tasks ?? []).map(async (task) => {
+      const base = subagentBase(task.id, projectDir);
+      const hasBase = base != null && base !== "";
+      const [meta, entries] = await Promise.all([
+        hasBase ? readMeta(base) : null,
+        hasBase ? readEntries(`${base}.jsonl`) : [],
+      ]);
+      const activity = extractActivity(entries);
+      // The payload's model is resolved at spawn and covers a subagent that has
+      // yet to write a turn. Task types that carry none fall back to the
+      // transcript read alongside the activity.
+      const model = subagentModelLetter(task.model ?? extractModel(entries), sessionModel);
+      return JSON.stringify(
         renderTask(
           task,
           input.columns ?? null,
@@ -373,8 +375,8 @@ if (import.meta.main) {
           meta?.description ?? null,
           model,
         ),
-      ),
-    );
-  }
+      );
+    }),
+  );
   if (lines.length !== 0) process.stdout.write(`${lines.join("\n")}\n`);
 }

@@ -38,14 +38,16 @@ if (
   process.exit(1);
 }
 
+const versionDir = argv.flags.version;
 const brief = await decodeFile(Brief, argv.flags.brief);
-const files = (await readdir(argv.flags.version)).filter((f) => f.endsWith(".md")).toSorted();
+const files = (await readdir(versionDir)).filter((f) => f.endsWith(".md")).toSorted();
 
-const skillBlocks: string[] = [];
-for (const f of files) {
-  const body = await Bun.file(join(argv.flags.version, f)).text();
-  skillBlocks.push(`================ ${f} ================\n${body.trim()}`);
-}
+const skillBlocks = await Promise.all(
+  files.map(async (f) => {
+    const body = await Bun.file(join(versionDir, f)).text();
+    return `================ ${f} ================\n${body.trim()}`;
+  }),
+);
 
 const files_ctx = brief.context.files.map((x) => `- ${x}`).join("\n");
 const issues_ctx = brief.context.related_issues.map((x) => `- ${x}`).join("\n");

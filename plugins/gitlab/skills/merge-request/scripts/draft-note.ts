@@ -245,6 +245,7 @@ const reviewCmd = command(
           });
         }
 
+        // oxlint-disable-next-line no-await-in-loop -- one API POST per note; the created/failed tally and its error lines follow entry order.
         await glabApiPost(apiPath(mr), payload);
         created++;
       } catch (err) {

@@ -595,10 +595,12 @@ export function registerTools(server: McpServer): void {
 
       const applied: string[] = [];
       for (const [index, batch] of chunk(ids, BATCH_SIZE).entries()) {
+        // oxlint-disable-next-line no-await-in-loop -- deliberate pacing: the Things URL scheme drops batches sent back to back.
         if (index > 0) await Bun.sleep(BATCH_DELAY_MS);
         const params = new Map<string, string>();
         params.set("data", buildJsonPayload(batch, attributes));
         try {
+          // oxlint-disable-next-line no-await-in-loop -- a failed batch names the batches already applied, which requires knowing their order.
           writeResult(await dispatch("json", params), `Updated ${batch.length} todos`);
         } catch (error) {
           // A batch that fails leaves the earlier ones applied. Naming them

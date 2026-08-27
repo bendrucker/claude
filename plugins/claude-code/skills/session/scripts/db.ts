@@ -156,23 +156,26 @@ function readDirEntries(dir: string) {
 
 export async function listImportedHosts(importsDir?: string): Promise<ImportedHost[]> {
   const root = getImportsDir(importsDir);
-  const hosts: ImportedHost[] = [];
-  for (const entry of readDirEntries(root)) {
-    if (!entry.isDirectory()) continue;
-    const hostRoot = path.join(root, entry.name);
-    const manifestPath = path.join(hostRoot, "manifest.json");
-    try {
-      hosts.push({
-        label: entry.name,
-        root: hostRoot,
-        manifestPath,
-        manifest: Manifest.parse(await Bun.file(manifestPath).json()),
-      });
-    } catch {
-      // A missing or undecodable manifest means this directory is not a registered host.
-    }
-  }
-  return hosts;
+  const read = await Promise.all(
+    readDirEntries(root)
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const hostRoot = path.join(root, entry.name);
+        const manifestPath = path.join(hostRoot, "manifest.json");
+        try {
+          return {
+            label: entry.name,
+            root: hostRoot,
+            manifestPath,
+            manifest: Manifest.parse(await Bun.file(manifestPath).json()),
+          };
+        } catch {
+          // A missing or undecodable manifest means this directory is not a registered host.
+          return null;
+        }
+      }),
+  );
+  return read.filter((host) => host !== null);
 }
 
 export async function enumerateHosts(
@@ -221,7 +224,9 @@ async function applySchema(db: Database): Promise<void> {
     .filter((f) => f.endsWith(".sql"))
     .toSorted();
   for (const file of files) {
+    // oxlint-disable-next-line no-await-in-loop -- schema files apply in sorted order; later DDL depends on tables earlier DDL created.
     const sql = await Bun.file(path.join(SCHEMA_DIR, file)).text();
+    // oxlint-disable-next-line no-await-in-loop -- schema files apply in sorted order; later DDL depends on tables earlier DDL created.
     await db.run(sql);
   }
 }
@@ -328,6 +333,7 @@ export async function ensureIndex(
     const scanned = scanJsonlFiles(entry.root);
     corpusBytes += scanned.reduce((sum, f) => sum + f.size, 0);
 
+    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
     const indexed = await db.query(
       "SELECT path, mtime, size FROM indexed_files WHERE host = $host",
       z.object({ path: z.string(), mtime: z.bigint(), size: z.bigint() }),
@@ -342,19 +348,27 @@ export async function ensureIndex(
     });
     const removed = indexed.filter((r) => !scannedPaths.has(r.path));
 
+    // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the per-file import below reads back.
     await db.run("SET VARIABLE host = $host", { host: entry.host });
     for (const file of changed) {
+      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the import statement below reads back.
       await db.run("SET VARIABLE source_path = $path", { path: file.path });
+      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the import statement below reads back.
       await db.run("SET VARIABLE source_mtime = $mtime", { mtime: String(file.mtime) });
+      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the import statement below reads back.
       await db.run("SET VARIABLE source_size = $size", { size: String(file.size) });
+      // oxlint-disable-next-line no-await-in-loop -- reads the SET VARIABLE state set just above; overlapping imports would cross files.
       await db.run(importSql);
     }
     for (const file of removed) {
+      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
       await removeFile(db, entry.host, file.path);
     }
 
     if (changed.length > 0 || removed.length > 0) {
+      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
       await db.run("DELETE FROM meta WHERE host = $host", { host: entry.host });
+      // oxlint-disable-next-line no-await-in-loop -- the insert must follow the delete above on the same connection.
       await db.run("INSERT INTO meta VALUES ($host, CURRENT_TIMESTAMP)", { host: entry.host });
     }
     changedFiles += changed.length;
@@ -420,8 +434,10 @@ export async function runQuery<T>(
 ): Promise<T[]> {
   for (const [key, value] of Object.entries(params)) {
     if (value === null) {
+      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
       await db.run(`SET VARIABLE "${key}" = NULL`);
     } else {
+      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
       await db.run(`SET VARIABLE "${key}" = $value`, { value });
     }
   }

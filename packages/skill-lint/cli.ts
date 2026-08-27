@@ -47,26 +47,27 @@ function tryReaddir(dir: string) {
 }
 
 async function resolveSkillDirs(patterns: string[]): Promise<string[]> {
-  const dirs: string[] = [];
-  for (const pattern of patterns) {
-    if (pattern.includes("*")) {
+  const perPattern = await Promise.all(
+    patterns.map(async (pattern) => {
+      if (!pattern.includes("*")) {
+        return (await Bun.file(path.join(pattern, "SKILL.md")).exists()) ? [pattern] : [];
+      }
+
       const base = pattern.split("*")[0] ?? "";
       const suffix = pattern.split("*").slice(1).join("*");
 
       const entries = tryReaddir(base);
-      if (!entries) continue;
-      for (const d of entries) {
-        if (!d.isDirectory()) continue;
-        const p = path.join(base, d.name, suffix.replace(/^\*?\/?/, ""));
-        if (await Bun.file(path.join(p, "SKILL.md")).exists()) {
-          dirs.push(p);
-        }
-      }
-    } else if (await Bun.file(path.join(pattern, "SKILL.md")).exists()) {
-      dirs.push(pattern);
-    }
-  }
-  return dirs;
+      if (!entries) return [];
+      const candidates = entries
+        .filter((d) => d.isDirectory())
+        .map((d) => path.join(base, d.name, suffix.replace(/^\*?\/?/, "")));
+      const present = await Promise.all(
+        candidates.map((p) => Bun.file(path.join(p, "SKILL.md")).exists()),
+      );
+      return candidates.filter((_, index) => present[index]);
+    }),
+  );
+  return perPattern.flat();
 }
 
 const skillDirs = await resolveSkillDirs(positionals);

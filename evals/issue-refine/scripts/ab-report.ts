@@ -59,11 +59,14 @@ let totalAfter = 0;
 for (const brief of briefs) {
   const beforeFile = join(argv.flags.out, `${brief}.before.md`);
   const afterFile = join(argv.flags.out, `${brief}.after.md`);
+  // oxlint-disable-next-line no-await-in-loop -- each brief prints its own report block, so scoring follows the printed order.
   if (!(await Bun.file(beforeFile).exists()) || !(await Bun.file(afterFile).exists())) {
     console.log(`${brief}: missing before/after output, skipping`);
     continue;
   }
+  // oxlint-disable-next-line no-await-in-loop -- each brief prints its own report block, so scoring follows the printed order.
   const b = await score(beforeFile);
+  // oxlint-disable-next-line no-await-in-loop -- each brief prints its own report block, so scoring follows the printed order.
   const a = await score(afterFile);
   totalBefore += b.score;
   totalAfter += a.score;

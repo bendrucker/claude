@@ -27,7 +27,9 @@ export async function findTemplate(provider: Provider, repoRoot: string): Promis
   for (const p of paths) {
     const full = join(repoRoot, p);
     const file = Bun.file(full);
+    // oxlint-disable-next-line no-await-in-loop -- first match wins: a later candidate must not be read once an earlier one exists.
     if (await file.exists()) {
+      // oxlint-disable-next-line no-await-in-loop -- first match wins: a later candidate must not be read once an earlier one exists.
       return await file.text();
     }
   }

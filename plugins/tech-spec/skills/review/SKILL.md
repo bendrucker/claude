@@ -1,8 +1,6 @@
 ---
 name: tech-spec:review
-disable-model-invocation: true
-description: |
-  Review a technical specification through expert lenses. Use to identify gaps, risks, and missing considerations in an existing spec. Works on any tech spec, not just those created with tech-spec:create.
+description: Review an existing technical specification for gaps, risks, and missing considerations.
 ---
 
 # Review Technical Specification

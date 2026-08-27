@@ -294,10 +294,20 @@ function commandOutput(error: unknown): string | null {
 const LINT_ARGS = ["--no-error-on-unmatched-pattern", "-f", "agent"];
 
 // --type-aware in a tree tsgolint cannot resolve reports the missing executable
-// as a lint finding no edit can clear, so it is gated on the same signal as the
-// type check below.
-async function lintArgs(cwd: string | undefined): Promise<string[]> {
-  return (await installed(cwd)) ? ["--type-aware", ...LINT_ARGS] : LINT_ARGS;
+// instead of linting, and no edit clears that. `installed` skips the doomed run
+// where node_modules is absent. A tree carrying node_modules without the checker
+// shows up only in the diagnostics, so the plain pass runs as a fallback to
+// recover the findings that need no type information.
+async function runOxlintPass(
+  command: OxCommand,
+  args: string[],
+  cwd: string | undefined,
+): Promise<string | null> {
+  if (!(await installed(cwd))) {
+    return runOx(command, args, cwd);
+  }
+  const output = await runOx(command, ["--type-aware", ...args], cwd);
+  return output && MISSING_CHECKER.test(output) ? runOx(command, args, cwd) : output;
 }
 
 export async function runOxlintAgent(filePath: string): Promise<string | null> {
@@ -306,7 +316,7 @@ export async function runOxlintAgent(filePath: string): Promise<string | null> {
     return null;
   }
   const cwd = await oxWorkingTree(filePath);
-  return runOx(command, [...(await lintArgs(cwd)), filePath], cwd);
+  return runOxlintPass(command, [...LINT_ARGS, filePath], cwd);
 }
 
 async function runOxlintAgentBatch(files: string[]): Promise<string | null> {
@@ -316,8 +326,8 @@ async function runOxlintAgentBatch(files: string[]): Promise<string | null> {
   }
   const groups = await groupByWorkingTree(files);
   const outputs = await Promise.all(
-    [...groups.entries()].map(async ([cwd, groupFiles]) =>
-      runOx(command, [...(await lintArgs(cwd)), ...groupFiles], cwd),
+    [...groups.entries()].map(([cwd, groupFiles]) =>
+      runOxlintPass(command, [...LINT_ARGS, ...groupFiles], cwd),
     ),
   );
   const combined = outputs.filter((output): output is string => Boolean(output)).join("\n");

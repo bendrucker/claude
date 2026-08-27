@@ -128,11 +128,15 @@ async function createIgnoredFixture(baseDir: string): Promise<string> {
   return filePath;
 }
 
-// --type-aware is gated on node_modules, so linkNodeModules picks which pass runs
-// over a file whose only violation needs type information.
+// The type-aware pass is skipped where node_modules is absent and falls back to
+// the plain pass where it is present without tsgolint, so `nodeModules` picks
+// which of the three shapes a fixture exercises. The empty tree stands in for a
+// partial install: node_modules exists, the checker is not in it.
+type NodeModules = "linked" | "empty" | "absent";
+
 async function createTypeAwareFixture(
   baseDir: string,
-  { linkNodeModules }: { linkNodeModules: boolean },
+  { nodeModules }: { nodeModules: NodeModules },
 ): Promise<string> {
   const repoDir = await mkdtemp(join(baseDir, "type-aware-repo-"));
   await execAsync("git init", { cwd: repoDir });
@@ -140,12 +144,14 @@ async function createTypeAwareFixture(
     join(repoDir, ".oxlintrc.json"),
     JSON.stringify({
       plugins: ["typescript"],
-      rules: { "typescript/no-misused-promises": "error" },
+      rules: { "typescript/no-misused-promises": "error", "no-dupe-keys": "error" },
     }),
   );
-  if (linkNodeModules) {
+  if (nodeModules === "linked") {
     const repoRoot = join(import.meta.dirname, "..", "..", "..");
     await execAsync(`ln -s "${join(repoRoot, "node_modules")}" node_modules`, { cwd: repoDir });
+  } else if (nodeModules === "empty") {
+    await mkdir(join(repoDir, "node_modules"));
   }
   const filePath = join(repoDir, "schedule.ts");
   await Bun.write(filePath, await Bun.file(join(FIXTURES_DIR, "type-aware.ts")).text());
@@ -342,24 +348,31 @@ describe("ox hook", () => {
       expect(await Bun.file(filePath).text()).toBe(before);
     });
 
-    it("reports a violation only the type-aware pass sees", async () => {
-      const filePath = await createTypeAwareFixture(tempDir, { linkNodeModules: true });
+    async function typeAwareContext(nodeModules: NodeModules): Promise<string | undefined> {
+      const filePath = await createTypeAwareFixture(tempDir, { nodeModules });
       const result = await processPostToolUse(
         mockPostToolUseInput("Edit", { file_path: filePath }),
       );
-
-      const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
+      return (result?.hookSpecificOutput as { additionalContext: string } | undefined)
         ?.additionalContext;
-      expect(additionalContext).toContain("no-misused-promises");
+    }
+
+    it("reports a violation only the type-aware pass sees", async () => {
+      expect(await typeAwareContext("linked")).toContain("no-misused-promises");
     });
 
-    it("stays quiet where tsgolint cannot resolve rather than reporting it as a lint issue", async () => {
-      const filePath = await createTypeAwareFixture(tempDir, { linkNodeModules: false });
-      const result = await processPostToolUse(
-        mockPostToolUseInput("Edit", { file_path: filePath }),
-      );
+    it("skips the type-aware pass where node_modules is absent", async () => {
+      const context = await typeAwareContext("absent");
 
-      expect(result).toBeNull();
+      expect(context).toContain("no-dupe-keys");
+      expect(context).not.toContain("tsgolint");
+    });
+
+    it("falls back to the plain pass where node_modules omits tsgolint", async () => {
+      const context = await typeAwareContext("empty");
+
+      expect(context).toContain("no-dupe-keys");
+      expect(context).not.toContain("tsgolint");
     });
   });
 

@@ -36,7 +36,11 @@ const Permissions = z.looseObject({
   ask: z.array(z.string()).optional(),
 });
 
-const SettingsPermissions = z.looseObject({ permissions: Permissions.optional() });
+// The settings glob also matches the JSON Patch overlays, which are arrays.
+const SettingsPermissions = z.union([
+  z.looseObject({ permissions: Permissions.optional() }),
+  z.array(z.unknown()).transform(() => ({ permissions: undefined })),
+]);
 
 async function checkSettings(): Promise<string[]> {
   const violations: string[] = [];

@@ -382,6 +382,10 @@ describe("ox hook", () => {
   });
 
   describe("processStop", () => {
+    // Each Stop runs a whole-tree type-aware check, so a test driving the gate
+    // three times needs a budget the 5s default does not give it on CI.
+    const MULTI_STOP_TIMEOUT_MS = 30_000;
+
     // A session holding one lint error oxfmt cannot fix, stopped repeatedly.
     // Each block-budget test drives its own so the on-disk count stays its own.
     async function unfixableSession(session: string): Promise<string> {
@@ -420,7 +424,7 @@ describe("ox hook", () => {
       );
       expect(past?.decision).toBeUndefined();
       expect(past?.systemMessage).toContain("no-dupe-keys");
-    });
+    }, MULTI_STOP_TIMEOUT_MS);
 
     // Blocking without a recorded count is the runaway itself: every re-entrant
     // Stop would read zero and block again, with nothing to release it.
@@ -447,7 +451,7 @@ describe("ox hook", () => {
       const fresh = await processStop(mockStopHookInput(transcript, false, session));
 
       expect(fresh?.decision).toBe("block");
-    });
+    }, MULTI_STOP_TIMEOUT_MS);
 
     it("returns null when no files were modified", async () => {
       const transcriptPath = join(tempDir, `transcript-empty-${Date.now()}.jsonl`);

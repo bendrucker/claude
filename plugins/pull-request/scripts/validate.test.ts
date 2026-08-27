@@ -7,9 +7,10 @@ import * as path from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import {
   type BodyContext,
+  type BodyPart,
+  type BodySpec,
   extractBacktickedHexCandidates,
-  extractBodyFilePath,
-  extractInlineBody,
+  extractBodySpec,
   extractTitle,
   findBacktickedCommits,
   findNarrationTells,
@@ -24,6 +25,7 @@ import {
   parseGhLogin,
   parseRemote,
   processInput,
+  resolveBody,
   sentenceShapedHeadings,
   validateBody,
 } from "./validate-body";
@@ -63,18 +65,6 @@ const LONG_PROSE = Array(6).fill(PROSE_PARAGRAPH).join("\n\n");
 // Clears PERSONAL_BODY_WORD_LIMIT.
 const OVERLONG_PROSE = Array(16).fill(PROSE_PARAGRAPH).join("\n\n");
 
-describe("extractBodyFilePath", () => {
-  test.each<[string, string | null]>([
-    ["gh pr create --title 'Test'", null],
-    ["gh pr create --body-file /tmp/body.md", "/tmp/body.md"],
-    ["gh pr create --body-file=/tmp/body.md", "/tmp/body.md"],
-    ['gh pr create --body-file "/tmp/my file.md"', "/tmp/my file.md"],
-    ["gh pr create --body-file /tmp/body.md --draft", "/tmp/body.md"],
-  ])("extractBodyFilePath(%p) -> %p", (command, expected) => {
-    expect(extractBodyFilePath(command)).toBe(expected);
-  });
-});
-
 describe("isPrBodyCommand", () => {
   test.each<[string, boolean]>([
     ["gh pr create --body-file body.md", true],
@@ -82,7 +72,7 @@ describe("isPrBodyCommand", () => {
     ["GH_PAGER=cat gh pr create --body-file body.md", true],
     ["GIT_SSH_COMMAND=false gh pr create --title x", true],
     ["gh pr edit 12 --body-file body.md", true],
-    ["glab mr create --body-file body.md", true],
+    ["glab mr create --description-file body.md", true],
     ["glab mr update 3 --description x", true],
     ["git status", false],
     ["gh pr list", false],
@@ -96,17 +86,114 @@ describe("isPrBodyCommand", () => {
   });
 });
 
-describe("extractInlineBody", () => {
-  test.each<[string, string | null]>([
-    ['gh pr create --body "## Known Follow-Up\n\nprose"', "## Known Follow-Up\n\nprose"],
-    ["gh pr create --body '## Open Item'", "## Open Item"],
-    ["gh pr create -b '## Open Item'", "## Open Item"],
-    ['gh pr create --body="## Open Item"', "## Open Item"],
-    ['gh pr create --body "a \\"quoted\\" word"', 'a "quoted" word'],
-    ["gh pr create --body-file body.md", null],
-    ["gh pr create --title 'x'", null],
-  ])("extractInlineBody(%p) -> %p", (command, expected) => {
-    expect(extractInlineBody(command)).toBe(expected);
+const literal = (text: string): BodyPart => ({ kind: "literal", text });
+const file = (path: string): BodyPart => ({ kind: "file", path });
+const parts = (...items: BodyPart[]): BodySpec => ({ kind: "parts", parts: items });
+
+describe("extractBodySpec", () => {
+  test.each<[string, BodySpec]>([
+    [
+      'gh pr create --body "## Known Follow-Up\n\nprose"',
+      parts(literal("## Known Follow-Up\n\nprose")),
+    ],
+    ["gh pr create --body '## Open Item'", parts(literal("## Open Item"))],
+    ["gh pr create -b '## Open Item'", parts(literal("## Open Item"))],
+    ['gh pr create --body="## Open Item"', parts(literal("## Open Item"))],
+    ['gh pr create --body "a \\"quoted\\" word"', parts(literal('a "quoted" word'))],
+    ["gh pr create --body-file body.md", parts(file("body.md"))],
+    ['gh pr create --body "Use \\`code\\` here"', parts(literal("Use `code` here"))],
+    ["gh pr create --title 'x'", { kind: "none" }],
+    ["glab mr create --fill", { kind: "none" }],
+    ["glab mr create --description-file body.md", parts(file("body.md"))],
+    ['glab mr create --description "$(cat body.md)"', parts(file("body.md"))],
+    ["glab mr update 3 --description \"$(cat 'my body.md')\"", parts(file("my body.md"))],
+    ['glab mr update 3 -d "$(< body.md)"', parts(file("body.md"))],
+    ['glab mr create --description "`cat body.md`"', parts(file("body.md"))],
+    [
+      'glab mr create --description "Intro line.\n\n$(cat body.md)"',
+      parts(literal("Intro line.\n\n"), file("body.md")),
+    ],
+    // `-b` is the body on gh and the target branch on glab; `-d` is the
+    // description on glab and the draft switch on gh.
+    ["glab mr create -b main --description-file body.md", parts(file("body.md"))],
+    ["gh pr create -d --body-file body.md", parts(file("body.md"))],
+  ])("extractBodySpec(%p) -> %p", (command, expected) => {
+    expect(extractBodySpec(command)).toEqual(expected);
+  });
+
+  test.each<[string, string]>([
+    ['glab mr create --description "$(git log --oneline)"', "$(git log --oneline)"],
+    ['glab mr create --description "$BODY"', "$BODY"],
+    ['gh pr create --body-file "$BODY"', "$BODY"],
+    ['glab mr create --description "$(cat $BODY_FILE)"', "$BODY_FILE"],
+    ["glab mr create --description-file -", "standard input"],
+    ["gh pr create --body-file -", "standard input"],
+    ["glab mr create --description -", "editor"],
+  ])("extractBodySpec(%p) reports it cannot read %p", (command, fragment) => {
+    const spec = extractBodySpec(command);
+    expect(spec.kind).toBe("unreadable");
+    expect(spec.kind === "unreadable" ? spec.detail : "").toContain(fragment);
+  });
+});
+
+const REPO_ROOT = path.join(import.meta.dir, "..", "..", "..");
+
+const SKILL_DOCS = [
+  "plugins/pull-request/skills/create/SKILL.md",
+  "plugins/pull-request/skills/update/SKILL.md",
+  "plugins/gitlab/skills/merge-request/SKILL.md",
+];
+
+// A body flag carrying a value. Written out independently of the extractor's
+// own flag table, so a doc that starts naming a fifth flag fails the contract
+// below instead of quietly resolving to nothing.
+const DOCUMENTED_BODY_ARG =
+  /(?:--body-file|--description-file|--body|--description|(?<![\w-])-[bd])[=\s]\S/;
+
+function codeSnippets(markdown: string): string[] {
+  const snippets: string[] = [];
+  let fenced = false;
+  for (const line of markdown.split("\n")) {
+    if (/^\s*```/.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) {
+      snippets.push(line.trim());
+      continue;
+    }
+    for (const match of line.matchAll(/`([^`]+)`/g)) snippets.push(match[1] ?? "");
+  }
+  return snippets;
+}
+
+const DOCUMENTED_FORMS: Array<[string, string]> = (
+  await Promise.all(
+    SKILL_DOCS.map(async (doc) => {
+      const markdown = await Bun.file(path.join(REPO_ROOT, doc)).text();
+      return codeSnippets(markdown)
+        .filter((snippet) => DOCUMENTED_BODY_ARG.test(snippet))
+        .map((snippet): [string, string] => [doc, snippet]);
+    }),
+  )
+).flat();
+
+// The skills are the only place a command form is written down, so a form that
+// lands there without the extractor learning it is invisible until an unchecked
+// body ships. These docs are read back and every body-carrying command in them
+// has to resolve to the body it names.
+describe("command forms the skills document", () => {
+  it("finds the documented forms", () => {
+    expect(DOCUMENTED_FORMS.length).toBeGreaterThanOrEqual(6);
+  });
+
+  test.each(DOCUMENTED_FORMS)("%s: %s reaches the body", async (_doc, snippet) => {
+    const bodyPath = path.join(mkdtempSync(path.join(os.tmpdir(), "doc-form-")), "body.md");
+    const body = "## Summary\n\nResolved through the form the skill documents.\n";
+    await Bun.write(bodyPath, body);
+    // Doc paths are placeholders (`tmp/pr-body-<branch>.md`, `file.md`).
+    const command = snippet.replace(/\S*\.md/g, bodyPath);
+    expect(await resolveBody(command, REPO_ROOT)).toEqual({ kind: "text", text: body });
   });
 });
 
@@ -587,9 +674,18 @@ describe("processInput", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null when body file does not exist", async () => {
-    const result = await processInput(createInput("gh pr create --body-file /nonexistent.md"));
-    expect(result).toBeNull();
+  // A skipped check must not read as a clean body, so the one case the hook
+  // cannot inspect is the one case it refuses outright.
+  test.each<[string, string]>([
+    ["gh pr create --body-file /nonexistent.md", "/nonexistent.md"],
+    ['glab mr create --description "$(cat /nonexistent.md)"', "/nonexistent.md"],
+    ['glab mr create --description "$(git log --oneline)"', "$(git log --oneline)"],
+    ["glab mr update 3 --description-file -", "standard input"],
+  ])("denies %p, which it cannot read", async (command, fragment) => {
+    const result = await processInput(createInput(command));
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain(fragment);
+    expect(getDenyReason(result)).toContain("none of the body checks ran");
   });
 
   it("returns null for valid body", async () => {
@@ -597,6 +693,33 @@ describe("processInput", () => {
     await Bun.write(bodyFile, "## Summary\nFixes a bug");
     const result = await processInput(createInput(`gh pr create --body-file ${bodyFile}`));
     expect(result).toBeNull();
+  });
+
+  // Every shape a PR/MR body arrives in, bound to the same deny. The GitLab
+  // rows are the ones the hook used to wave through: a `--description` value is
+  // the only way `glab` took a body before `--description-file`, and neither
+  // reached the checks.
+  test.each<[string, (body: string) => string]>([
+    ["gh pr create --body-file", (body) => `gh pr create --title T --body-file ${body}`],
+    ["gh pr edit --body-file", (body) => `gh pr edit 12 --body-file ${body}`],
+    ["gh pr create --body", (body) => `gh pr create --title T --body "$(cat ${body})"`],
+    [
+      "glab mr create --description-file",
+      (body) => `glab mr create --title T --description-file ${body}`,
+    ],
+    ["glab mr update --description-file", (body) => `glab mr update 3 --description-file ${body}`],
+    [
+      "glab mr create --description",
+      (body) => `glab mr create --title T --description "$(cat ${body})"`,
+    ],
+    ["glab mr update --description", (body) => `glab mr update 3 --description "$(cat ${body})"`],
+    ["glab mr update -d", (body) => `glab mr update 3 -d "$(cat ${body})"`],
+  ])("checks the body behind %s", async (_form, build) => {
+    const bodyFile = path.join(tempDir, "body.md");
+    await Bun.write(bodyFile, "## Two fixes found while testing\n\nReshapes the resolver.");
+    const result = await processInput(createInput(build(bodyFile), repoRoot));
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
   });
 
   it("denies body with test count", async () => {
@@ -670,15 +793,16 @@ describe("processInput", () => {
     expect(getAdditionalContext(result)).toContain("characters");
   });
 
-  it("warns on the title when the body file does not exist yet", async () => {
+  it("carries the title warning into the deny when the body file is missing", async () => {
     const result = await processInput(
       createInput(
         `gh pr create --title "Add an LRU Cache to the Resolver and Wire It Through" --body-file ${path.join(tempDir, "missing.md")}`,
         repoRoot,
       ),
     );
-    expect(getPermissionDecision(result)).toBeUndefined();
-    expect(getAdditionalContext(result)).toContain("characters");
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("none of the body checks ran");
+    expect(getDenyReason(result)).toContain("characters");
   });
 
   it("stays silent on a title-only command with a clean title", async () => {

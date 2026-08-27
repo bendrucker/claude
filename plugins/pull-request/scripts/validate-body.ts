@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { headingCaseViolations } from "./heading-case";
 import { LINKING_VERBS } from "./linguistics/heading";
@@ -332,37 +332,209 @@ function unquote(value: string): string {
   return match?.[2] ?? value;
 }
 
-export function extractBodyFilePath(command: string): string | null {
-  const match = command.match(/--body-file[=\s]("[^"]+"|'[^']+'|[^\s]+)/);
-  if (!match?.[1]) return null;
-  const path = unquote(match[1]);
+function unescapeDoubleQuoted(text: string): string {
+  return text.replace(/\\(["`$\\])/g, "$1");
+}
+
+function expandTmpdir(path: string): string {
   const tmpdir = process.env.TMPDIR?.replace(/\/$/, "");
   if (!tmpdir) return path;
   return path.replace(/\$\{TMPDIR\}|\$TMPDIR/g, tmpdir);
 }
 
-// Inline bodies are a small share of invocations but bypass the file path
-// entirely. Only quoted forms are read: an unquoted `--body` value is a single
-// shell word, so it cannot hold the headings this validates.
-export function extractInlineBody(command: string): string | null {
-  const match = command.match(/(?:--body|(?<!\w)-b)[=\s]("(?:[^"\\]|\\.)*"|'[^']*')/);
-  if (!match?.[1]) return null;
-  const raw = unquote(match[1]);
-  return raw.replace(/\\(["`$\\])/g, "$1");
+// One flag value as the shell would word-split it: a quoted string, a command
+// substitution, or a bare word.
+const VALUE_PATTERN = String.raw`("(?:[^"\\]|\\.)*"|'[^']*'|\$\((?:[^()]|\([^()]*\))*\)|[^\s]+)`;
+
+type PrCli = "gh" | "glab";
+
+const CLI_PATTERNS: ReadonlyArray<readonly [PrCli, RegExp]> = [
+  ["gh", /\bgh pr (?:create|edit)\b/],
+  ["glab", /\bglab mr (?:create|update)\b/],
+];
+
+// `-b` is `--body` on gh and `--target-branch` on glab; `-d` is `--description`
+// on glab and `--draft` on gh. A shorthand means a body only on the CLI that
+// owns it, so the flag sets are keyed by CLI. A fragment naming neither verb
+// falls back to the union, so a bare flag form lifted out of a skill doc still
+// resolves.
+const BODY_FLAGS: Record<PrCli, { file: string[]; inline: string[] }> = {
+  gh: { file: ["--body-file"], inline: ["--body", "-b"] },
+  glab: { file: ["--description-file"], inline: ["--description", "-d"] },
+};
+
+function commandCli(command: string): PrCli | null {
+  let earliest: PrCli | null = null;
+  let earliestIndex = Number.POSITIVE_INFINITY;
+  for (const [cli, pattern] of CLI_PATTERNS) {
+    const index = command.search(pattern);
+    if (index !== -1 && index < earliestIndex) {
+      earliestIndex = index;
+      earliest = cli;
+    }
+  }
+  return earliest;
+}
+
+function bodyFlags(command: string): { file: string[]; inline: string[] } {
+  const cli = commandCli(command);
+  if (cli !== null) return BODY_FLAGS[cli];
+  return {
+    file: [...BODY_FLAGS.gh.file, ...BODY_FLAGS.glab.file],
+    inline: [...BODY_FLAGS.gh.inline, ...BODY_FLAGS.glab.inline],
+  };
+}
+
+function flagValuePattern(flags: string[], global = false): RegExp {
+  const alternation = flags
+    .map((flag) => (flag.startsWith("--") ? flag : `(?<!\\w)${flag}`))
+    .join("|");
+  return new RegExp(`(?:${alternation})[=\\s]${VALUE_PATTERN}`, global ? "g" : "");
+}
+
+// An unescaped `$(...)` or backtick run. The shell replaces it before the CLI
+// sees it, so its source text is not the body.
+const SUBSTITUTION_PATTERN = /(?<!\\)\$\((?:[^()]|\([^()]*\))*\)|(?<!\\)`[^`]*`/g;
+
+// A substitution whose whole job is to read a file: `$(cat f)`, `$(< f)`,
+// `` `cat f` ``. GitLab has no way to pass a body inline from a file, so this
+// is the form every historical `glab mr` invocation uses.
+const FILE_READ_PATTERN = /^(?:cat\s+|<\s*)("[^"]+"|'[^']+'|[^\s]+)$/;
+
+// A `$VAR`, `${VAR}`, `$(...)`, or backtick left over after the file reads are
+// taken out. The shell resolves it and the hook cannot, so the text the hook
+// holds is not the text the CLI will receive.
+const SHELL_EXPANSION_PATTERN = /(?<!\\)(?:\$\{[^}]*\}?|\$[A-Za-z_]\w*|\$\([^)]*\)?|`)/;
+
+export type BodyPart = { kind: "literal"; text: string } | { kind: "file"; path: string };
+
+/** Where a command's body comes from, before any file is read. */
+export type BodySpec =
+  | { kind: "none" }
+  | { kind: "parts"; parts: BodyPart[] }
+  | { kind: "unreadable"; detail: string };
+
+function unreadableExpansion(source: string): BodySpec {
+  return {
+    kind: "unreadable",
+    detail: `an inline body holding a shell expansion the hook cannot evaluate (\`${source.trim()}\`)`,
+  };
+}
+
+// Null when the path itself is a variable the shell resolves and the hook
+// cannot, so the caller reports it unreadable rather than reading the wrong
+// file.
+function filePart(rawPath: string): BodyPart | null {
+  const path = expandTmpdir(unquote(rawPath));
+  if (SHELL_EXPANSION_PATTERN.test(path)) return null;
+  return { kind: "file", path };
+}
+
+// A double-quoted value is a mix of literal runs and substitutions, so it is
+// walked rather than matched: each `$(cat f)` becomes a file part, each run
+// between them a literal. Escapes are stripped from the literal runs only, so a
+// `\"` inside the file's own text survives. Single quotes suppress every
+// expansion, so that value is literal whatever it holds.
+function parseInlineValue(raw: string): BodySpec {
+  const single = raw.match(/^'(.*)'$/s);
+  if (single) return { kind: "parts", parts: [{ kind: "literal", text: single[1] ?? "" }] };
+  if (unquote(raw) === "-") {
+    return { kind: "unreadable", detail: "a body typed into an editor (`-`)" };
+  }
+  const inner = raw.match(/^"(.*)"$/s)?.[1] ?? raw;
+
+  const parts: BodyPart[] = [];
+  let cursor = 0;
+  const pushLiteral = (segment: string): BodySpec | null => {
+    const stray = segment.match(SHELL_EXPANSION_PATTERN);
+    if (stray) return unreadableExpansion(stray[0]);
+    if (segment.length > 0) parts.push({ kind: "literal", text: unescapeDoubleQuoted(segment) });
+    return null;
+  };
+
+  for (const match of inner.matchAll(SUBSTITUTION_PATTERN)) {
+    const source = match[0];
+    const index = match.index ?? 0;
+    const literal = pushLiteral(inner.slice(cursor, index));
+    if (literal) return literal;
+    const substituted = source.startsWith("`") ? source.slice(1, -1) : source.slice(2, -1);
+    const read = substituted.trim().match(FILE_READ_PATTERN)?.[1];
+    if (read === undefined) return unreadableExpansion(source);
+    const part = filePart(read);
+    if (part === null) return unreadableExpansion(read);
+    parts.push(part);
+    cursor = index + source.length;
+  }
+  const tail = pushLiteral(inner.slice(cursor));
+  if (tail) return tail;
+  return { kind: "parts", parts };
+}
+
+export function extractBodySpec(command: string): BodySpec {
+  const flags = bodyFlags(command);
+  const fileMatch = command.match(flagValuePattern(flags.file));
+  if (fileMatch?.[1]) {
+    const path = unquote(fileMatch[1]);
+    if (path === "-") {
+      return { kind: "unreadable", detail: "a body piped in on standard input (`-`)" };
+    }
+    const part = filePart(fileMatch[1]);
+    if (part === null) return unreadableExpansion(path);
+    return { kind: "parts", parts: [part] };
+  }
+  const inlineMatch = command.match(flagValuePattern(flags.inline));
+  if (inlineMatch?.[1]) return parseInlineValue(inlineMatch[1]);
+  return { kind: "none" };
+}
+
+/** The body text a command will send, or why the hook cannot see it. */
+export type BodyResolution =
+  | { kind: "none" }
+  | { kind: "text"; text: string }
+  | { kind: "unreadable"; detail: string };
+
+async function readBodyFile(path: string, cwd: string): Promise<string | null> {
+  try {
+    return await Bun.file(isAbsolute(path) ? path : join(cwd, path)).text();
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveBody(command: string, cwd: string): Promise<BodyResolution> {
+  const spec = extractBodySpec(command);
+  if (spec.kind !== "parts") return spec;
+  const chunks: string[] = [];
+  for (const part of spec.parts) {
+    if (part.kind === "literal") {
+      chunks.push(part.text);
+      continue;
+    }
+    const text = await readBodyFile(part.path, cwd);
+    if (text === null) {
+      return {
+        kind: "unreadable",
+        detail: `body file \`${part.path}\`, which does not exist yet or could not be read`,
+      };
+    }
+    chunks.push(text);
+  }
+  return { kind: "text", text: chunks.join("") };
 }
 
 // Anchored to the `gh pr`/`glab mr` verb with the body values blanked first:
 // an unanchored scan reads a ` -t ` from an earlier command in a compound
-// (`mktemp -t`), and a `--title` mentioned inside an inline `--body` string,
-// as the PR title.
+// (`mktemp -t`), and a `--title` mentioned inside an inline body string, as the
+// PR title.
 export function extractTitle(command: string): string | null {
   const start = command.search(PR_BODY_COMMAND_PATTERN);
+  const flags = bodyFlags(command);
   const scope = (start === -1 ? command : command.slice(start))
-    .replace(/(?:--body|(?<!\w)-b)[=\s]("(?:[^"\\]|\\.)*"|'[^']*')/g, " ")
-    .replace(/--body-file[=\s]("[^"]+"|'[^']+'|[^\s]+)/g, " ");
+    .replace(flagValuePattern(flags.file, true), " ")
+    .replace(flagValuePattern(flags.inline, true), " ");
   const match = scope.match(/(?:--title|(?<![\w-])-t)[=\s]("(?:[^"\\]|\\.)*"|'[^']*'|[^\s]+)/);
   if (!match?.[1]) return null;
-  return unquote(match[1]).replace(/\\(["`$\\])/g, "$1");
+  return unescapeDoubleQuoted(unquote(match[1]));
 }
 
 function bullets(reasons: string[]): string {
@@ -501,16 +673,12 @@ export function validateBody(
   return decide(denyReasons(body), warnReasons(body, context));
 }
 
-async function resolveBody(command: string): Promise<string | null> {
-  const bodyFilePath = extractBodyFilePath(command);
-  if (bodyFilePath) {
-    try {
-      return await Bun.file(bodyFilePath).text();
-    } catch {
-      return null;
-    }
-  }
-  return extractInlineBody(command);
+// A body the hook cannot read is not a body without problems. Every check below
+// runs on the body text, so an unresolvable one silently skips all of them, and
+// the command sails through looking validated. The deny names the readable form
+// instead, which is a path either CLI accepts.
+export function unreadableBodyReason(detail: string): string {
+  return `The hook cannot read ${detail}, so none of the body checks ran. Write the body to a file in its own Bash call, then pass that path: \`--body-file <path>\` on \`gh\`, \`--description-file <path>\` on \`glab\`.`;
 }
 
 export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
@@ -523,17 +691,25 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
     return null;
   }
 
+  const cwd = input.cwd ?? process.cwd();
   const title = extractTitle(command);
-  const body = await resolveBody(command);
+  const resolved = await resolveBody(command, cwd);
 
-  // A title-only command (`gh pr edit --title ...`, or a --body-file not yet
-  // written at PreToolUse time) still gets its title checked.
-  if (body === null) {
+  if (resolved.kind === "unreadable") {
+    return decide(
+      [unreadableBodyReason(resolved.detail)],
+      warnReasons("", { title, personalRepo: false }),
+    );
+  }
+
+  // A title-only command (`gh pr edit --title ...`) still gets its title
+  // checked.
+  if (resolved.kind === "none") {
     if (title === null) return null;
     return decide([], warnReasons("", { title, personalRepo: false }));
   }
 
-  const cwd = input.cwd ?? process.cwd();
+  const body = resolved.text;
   const denies = denyReasons(body);
 
   if (!denies.includes(AUTOLINK_REASON)) {

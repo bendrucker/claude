@@ -15,7 +15,9 @@ const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 // The full set of Bash prose surfaces this hook scans. The hooks.json Bash
 // guard is derived from these. hooks.test.ts enforces the sync.
 export const PROSE_FLAGS = ["--body", "--message", "--description", "--title"] as const;
-export const BODY_FILE_FLAG = "--body-file";
+// gh reads a body from `--body-file`, glab from `--description-file`. Both name
+// a path the hook can read, so both are scanned.
+export const BODY_FILE_FLAGS = ["--body-file", "--description-file"] as const;
 
 // gh api / glab api carry prose in `-F key=@file` / `--field key=@file` forms
 // that the prose-flag alternation misses. The guard fragment ships to
@@ -27,7 +29,7 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 
-const BODY_FILE_PATTERN = new RegExp(`${BODY_FILE_FLAG}[=\\s](\\S+)`);
+const BODY_FILE_PATTERN = new RegExp(`(?:${BODY_FILE_FLAGS.join("|")})[=\\s](\\S+)`);
 const FIELD_FILE_PATTERN = /(?:^|\s)['"]?(?:-F|--field)[= ]([^\s=]+)=@(\S+)/g;
 const GIT_MESSAGE_FILE_PATTERN = /\bgit\s+(?:commit|tag)\b[^|;&]*?\s(?:-F|--file)[= ](\S+)/g;
 

@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  BODY_FILE_FLAG,
+  BODY_FILE_FLAGS,
   FIELD_FILE_GUARD,
   GIT_MESSAGE_FILE_GUARD,
   PROSE_FLAGS,
@@ -51,7 +51,7 @@ describe("PreToolUse gating", () => {
     expect(command).toContain(alternation);
     expect(command).toContain(FIELD_FILE_GUARD);
     expect(command).toContain(GIT_MESSAGE_FILE_GUARD);
-    expect(`${BODY_FILE_FLAG} `).toMatch(new RegExp(alternation));
+    for (const flag of BODY_FILE_FLAGS) expect(`${flag} `).toMatch(new RegExp(alternation));
   });
 });
 

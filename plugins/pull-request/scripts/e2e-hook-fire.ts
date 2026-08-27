@@ -11,13 +11,52 @@ const DENY_REASON_FRAGMENT = "test counts";
 
 interface Case {
   name: string;
+  /** External CLI the case drives, stubbed onto PATH. */
+  cli: "gh" | "glab";
+  /** How the body reaches the CLI, as the create/update skills write it. */
+  command: (fixturePath: string) => string;
+  /** Substring of a stub log line that means the CLI was reached. */
+  marker: string;
   fixture: string;
   expectCreate: boolean;
 }
 
+// GitLab is covered through both forms it accepts: the `--description-file`
+// path the skills now document, and the `--description "$(cat ...)"` command
+// substitution they used to.
 const CASES: Case[] = [
-  { name: "deny", fixture: "deny.md", expectCreate: false },
-  { name: "clean", fixture: "clean.md", expectCreate: true },
+  {
+    name: "gh deny",
+    cli: "gh",
+    command: (fixture) => `gh pr create --title "e2e" --body-file ${fixture}`,
+    marker: "pr create",
+    fixture: "deny.md",
+    expectCreate: false,
+  },
+  {
+    name: "gh clean",
+    cli: "gh",
+    command: (fixture) => `gh pr create --title "e2e" --body-file ${fixture}`,
+    marker: "pr create",
+    fixture: "clean.md",
+    expectCreate: true,
+  },
+  {
+    name: "glab deny",
+    cli: "glab",
+    command: (fixture) => `glab mr create --title "e2e" --description "$(cat ${fixture})"`,
+    marker: "mr create",
+    fixture: "deny.md",
+    expectCreate: false,
+  },
+  {
+    name: "glab clean",
+    cli: "glab",
+    command: (fixture) => `glab mr create --title "e2e" --description-file ${fixture}`,
+    marker: "mr create",
+    fixture: "clean.md",
+    expectCreate: true,
+  },
 ];
 
 interface RunResult {
@@ -53,21 +92,26 @@ async function setupRepo(root: string): Promise<void> {
   await git(["commit", "-m", "init"]);
 }
 
-async function setupGhStub(root: string): Promise<{ binDir: string; logPath: string }> {
+async function setupCliStubs(root: string): Promise<{ binDir: string; logPath: string }> {
   const binDir = join(root, "bin");
-  const logPath = join(root, "gh-invocations.log");
+  const logPath = join(root, "cli-invocations.log");
   await mkdir(binDir, { recursive: true });
-  const stub = join(binDir, "gh");
-  await Bun.write(stub, `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(logPath)}\nexit 0\n`);
-  await run(["chmod", "+x", stub], root);
+  for (const cli of ["gh", "glab"]) {
+    const stub = join(binDir, cli);
+    await Bun.write(
+      stub,
+      `#!/bin/sh\nprintf '%s %s\\n' ${cli} "$*" >> ${JSON.stringify(logPath)}\nexit 0\n`,
+    );
+    await run(["chmod", "+x", stub], root);
+  }
   await Bun.write(logPath, "");
   return { binDir, logPath };
 }
 
-function instruction(fixturePath: string): string {
+function instruction(command: string): string {
   return [
     "Run exactly one command with the Bash tool:",
-    `gh pr create --title "e2e" --body-file ${fixturePath}`,
+    command,
     "Run nothing else. Do not read, write, or edit any file.",
     "If the command is blocked, do not retry it and do not change anything.",
     "Then stop and reply with the single word done.",
@@ -116,16 +160,17 @@ async function runClaude(cwd: string, binDir: string, prompt: string): Promise<R
   return { output: `${stdout}${stderr}`, timedOut, exitCode };
 }
 
-async function prCreateCount(logPath: string): Promise<number> {
+async function createCount(logPath: string, marker: string): Promise<number> {
   const log = await Bun.file(logPath).text();
-  return log.split("\n").filter((line) => line.includes("pr create")).length;
+  return log.split("\n").filter((line) => line.includes(marker)).length;
 }
 
 async function runCase(testCase: Case, root: string, binDir: string, logPath: string) {
   const fixturePath = join(FIXTURE_DIR, testCase.fixture);
   await Bun.write(logPath, "");
 
-  const { output, timedOut, exitCode } = await runClaude(root, binDir, instruction(fixturePath));
+  const command = testCase.command(fixturePath);
+  const { output, timedOut, exitCode } = await runClaude(root, binDir, instruction(command));
   const failures: string[] = [];
 
   if (timedOut) {
@@ -134,13 +179,17 @@ async function runCase(testCase: Case, root: string, binDir: string, logPath: st
     failures.push(`claude exited ${exitCode}`);
   }
 
-  const created = await prCreateCount(logPath);
+  const created = await createCount(logPath, testCase.marker);
   if (testCase.expectCreate && created === 0) {
-    failures.push("expected the gh stub to record a `pr create`, it recorded none");
+    failures.push(
+      `expected the ${testCase.cli} stub to record a \`${testCase.marker}\`, it recorded none`,
+    );
   }
   if (!testCase.expectCreate) {
     if (created > 0) {
-      failures.push(`hook did not block: gh stub recorded ${created} \`pr create\` invocation(s)`);
+      failures.push(
+        `hook did not block: ${testCase.cli} stub recorded ${created} \`${testCase.marker}\` invocation(s)`,
+      );
     }
     if (!output.includes(DENY_REASON_FRAGMENT)) {
       failures.push(`stream output never mentioned "${DENY_REASON_FRAGMENT}"`);
@@ -155,7 +204,7 @@ async function main(): Promise<void> {
   let failed = false;
   try {
     await setupRepo(root);
-    const { binDir, logPath } = await setupGhStub(root);
+    const { binDir, logPath } = await setupCliStubs(root);
 
     for (const testCase of CASES) {
       const { failures, output } = await runCase(testCase, root, binDir, logPath);

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { HookInput } from "./hook-input";
 import {
   checkSkillNamespace,
   checkStuttering,
@@ -14,7 +14,7 @@ import {
 } from "./check-namespace";
 import { makePostToolUseInput } from "./test-support";
 
-function mockWriteInput(filePath: string): PostToolUseHookInput {
+function mockWriteInput(filePath: string): HookInput {
   return makePostToolUseInput({ tool_input: { file_path: filePath, content: "" } });
 }
 

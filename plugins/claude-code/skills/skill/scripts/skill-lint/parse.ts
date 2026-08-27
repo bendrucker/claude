@@ -1,5 +1,6 @@
 import { parse as parseYaml } from "yaml";
-import type { SkillContent } from "./types";
+import type { z } from "zod";
+import { Frontmatter, type SkillContent } from "./types";
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
 
@@ -15,19 +16,20 @@ export function parseSkill(raw: string): SkillContent {
   }
 
   const [, yamlContent, body] = match;
-  let frontmatter: Record<string, unknown> = {};
-
-  try {
-    frontmatter = parseYaml(yamlContent ?? "") ?? {};
-  } catch {
-    frontmatter = {};
-  }
 
   return {
-    frontmatter,
+    frontmatter: parseFrontmatter(yamlContent ?? ""),
     body: body ?? "",
     raw,
   };
+}
+
+function parseFrontmatter(yamlContent: string): z.infer<typeof Frontmatter> {
+  try {
+    return Frontmatter.parse(parseYaml(yamlContent) ?? {});
+  } catch {
+    return {};
+  }
 }
 
 export function countLines(text: string): number {

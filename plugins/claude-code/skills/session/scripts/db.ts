@@ -3,6 +3,7 @@ import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
+import { z } from "zod";
 
 const RESOURCES_DIR = path.join(import.meta.dirname, "..", "resources");
 const SCHEMA_DIR = path.join(RESOURCES_DIR, "schema");
@@ -18,20 +19,20 @@ export const INDEX_VERSION = 3;
 
 export interface Database {
   run(sql: string, params?: Record<string, string | null>): Promise<void>;
-  query<T>(sql: string, params?: Record<string, string | null>): Promise<T[]>;
+  query<T>(sql: string, schema: z.ZodType<T>, params?: Record<string, string | null>): Promise<T[]>;
   close(): void;
 }
 
-export interface HostPolicy {
-  block_egress?: boolean;
-}
+export const HostPolicy = z.looseObject({ block_egress: z.boolean().optional() });
+export type HostPolicy = z.infer<typeof HostPolicy>;
 
-export interface Manifest {
-  host: string;
-  source: string;
-  imported_at: string;
-  policy: HostPolicy;
-}
+export const Manifest = z.looseObject({
+  host: z.string(),
+  source: z.string(),
+  imported_at: z.string(),
+  policy: HostPolicy,
+});
+export type Manifest = z.infer<typeof Manifest>;
 
 export interface HostEntry {
   host: string;
@@ -48,9 +49,13 @@ async function createDatabase(dbPath: string): Promise<Database> {
       await connection.run(sql, params);
     },
 
-    async query<T>(sql: string, params: Record<string, string | null> = {}): Promise<T[]> {
+    async query<T>(
+      sql: string,
+      schema: z.ZodType<T>,
+      params: Record<string, string | null> = {},
+    ): Promise<T[]> {
       const reader = await connection.runAndReadAll(sql, params);
-      return reader.getRowObjectsJS() as T[];
+      return z.array(schema).parse(reader.getRowObjectsJS());
     },
 
     // Closing the instance (not just the connection) lets DuckDB run its shutdown
@@ -156,15 +161,14 @@ export async function listImportedHosts(importsDir?: string): Promise<ImportedHo
     const hostRoot = path.join(root, entry.name);
     const manifestPath = path.join(hostRoot, "manifest.json");
     try {
-      const manifest: unknown = await Bun.file(manifestPath).json();
       hosts.push({
         label: entry.name,
         root: hostRoot,
         manifestPath,
-        manifest: manifest as Manifest,
+        manifest: Manifest.parse(await Bun.file(manifestPath).json()),
       });
     } catch {
-      // No manifest (or invalid JSON) means this directory is not a registered host.
+      // A missing or undecodable manifest means this directory is not a registered host.
     }
   }
   return hosts;
@@ -230,7 +234,8 @@ async function dropCache(db: Database): Promise<void> {
 }
 
 async function migrateIfNeeded(db: Database): Promise<void> {
-  const [row] = await db.query<{ has_data: boolean; has_host: boolean; has_version: boolean }>(`
+  const [row] = await db.query(
+    `
     SELECT
       EXISTS (
         SELECT 1 FROM information_schema.columns
@@ -244,12 +249,15 @@ async function migrateIfNeeded(db: Database): Promise<void> {
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'main' AND table_name = 'index_meta'
       ) AS has_version
-  `);
+  `,
+    z.object({ has_data: z.boolean(), has_host: z.boolean(), has_version: z.boolean() }),
+  );
   // Querying index_meta is only safe once the table exists.
   const version = row?.has_version
     ? ((
-        await db.query<{ version: number }>(
+        await db.query(
           "SELECT COALESCE(MAX(version), 0) AS version FROM index_meta",
+          z.object({ version: z.number() }),
         )
       )[0]?.version ?? 0)
     : 0;
@@ -266,7 +274,7 @@ export async function getDb(dataDir: string): Promise<Database> {
 export async function ensureSchema(db: Database): Promise<void> {
   await migrateIfNeeded(db);
   await applySchema(db);
-  const [row] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM index_meta");
+  const [row] = await db.query("SELECT COUNT(*) AS n FROM index_meta", z.object({ n: z.bigint() }));
   if (!row || row.n === 0n) {
     await db.run(`INSERT INTO index_meta VALUES (${INDEX_VERSION}, NULL)`);
   }
@@ -319,8 +327,9 @@ export async function ensureIndex(
     const scanned = scanJsonlFiles(entry.root);
     corpusBytes += scanned.reduce((sum, f) => sum + f.size, 0);
 
-    const indexed = await db.query<{ path: string; mtime: bigint; size: bigint }>(
+    const indexed = await db.query(
       "SELECT path, mtime, size FROM indexed_files WHERE host = $host",
+      z.object({ path: z.string(), mtime: z.bigint(), size: z.bigint() }),
       { host: entry.host },
     );
     const indexedByPath = new Map(indexed.map((r) => [r.path, r]));
@@ -356,8 +365,9 @@ export async function ensureIndex(
   // edited, so a definition change applies even on a no-change refresh.
   const wrote = changedFiles > 0 || removedFiles > 0;
   const fingerprint = await viewsFingerprint();
-  const [metaRow] = await db.query<{ views_hash: string | null }>(
+  const [metaRow] = await db.query(
     "SELECT views_hash FROM index_meta",
+    z.object({ views_hash: z.string().nullable() }),
   );
   const viewsChanged = metaRow?.views_hash !== fingerprint;
   if (wrote || viewsChanged) {
@@ -404,6 +414,7 @@ export async function compactDatabase(dataDir: string): Promise<void> {
 export async function runQuery<T>(
   db: Database,
   queryName: string,
+  schema: z.ZodType<T>,
   params: Record<string, string | null> = {},
 ): Promise<T[]> {
   for (const [key, value] of Object.entries(params)) {
@@ -414,5 +425,5 @@ export async function runQuery<T>(
     }
   }
   const sql = await readSql(QUERIES_DIR, queryName);
-  return db.query<T>(sql);
+  return db.query(sql, schema);
 }

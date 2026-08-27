@@ -83,6 +83,7 @@
       "dependencies": {
         "cleye": "^2.2.1",
         "table": "^6.9.0",
+        "zod": "^4.4.3",
       },
       "devDependencies": {
         "@duckdb/node-api": "1.5.0-r.1",
@@ -93,6 +94,7 @@
       "version": "1.0.0",
       "dependencies": {
         "yaml": "^2.7.1",
+        "zod": "^4.4.3",
       },
     },
     "plugins/comments": {

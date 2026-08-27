@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { formatDate, selectColumns, table } from "./format";
+import { formatDate, selectColumns, stringify, table } from "./format";
 
 const argv = cli({
   name: "format-output",
@@ -41,18 +41,18 @@ if (argv.flags.countPrefix) {
   console.log(`${count} ${argv.flags.countPrefix}\n`);
 }
 
-if (items.length === 0) {
+const [first] = items;
+if (!first) {
   process.exit(0);
 }
 
-const first = items[0];
-const keys = Object.keys(first as Record<string, unknown>);
+const keys = Object.keys(first);
 let headers = keys.map(camelToTitle);
 let rows = items.map((item) =>
   keys.map((k) => {
     const v = item[k];
     if (v == null) return "";
-    const s = String(v);
+    const s = stringify(v);
     if (isIsoDate(s)) return formatDate(s);
     return s;
   }),

@@ -379,13 +379,18 @@ export type ExecResult =
 
 export type ExecFn = (command: string) => ExecResult;
 
+function streamText(stream: unknown): string {
+  if (typeof stream === "string") return stream;
+  if (stream instanceof Uint8Array) return new TextDecoder().decode(stream);
+  return "";
+}
+
 function exec(command: string): ExecResult {
   try {
     const stdout = execSync(command, execOptions).toString().trim();
     return { ok: true, stdout };
   } catch (err) {
-    const stderr =
-      err && typeof err === "object" && "stderr" in err ? String(err.stderr ?? "") : "";
+    const stderr = err && typeof err === "object" && "stderr" in err ? streamText(err.stderr) : "";
     // glab does not surface structured rate-limit metadata. Rather than
     // regexing human text we rely on the api-error counter instead.
     return { ok: false, stderr, rateLimited: false, retryAfter: "" };

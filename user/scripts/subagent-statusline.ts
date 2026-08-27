@@ -171,14 +171,9 @@ interface TranscriptEntry {
   message?: { role?: string; content?: ContentBlock[]; model?: string };
 }
 
-const basename = (p: unknown): string =>
-  String(p ?? "")
-    .split("/")
-    .pop() ?? "";
-const firstWord = (cmd: unknown): string =>
-  String(cmd ?? "")
-    .trim()
-    .split(/\s+/)[0] ?? "";
+const text = (value: unknown): string => (typeof value === "string" ? value : "");
+const basename = (p: unknown): string => text(p).split("/").pop() ?? "";
+const firstWord = (cmd: unknown): string => text(cmd).trim().split(/\s+/)[0] ?? "";
 const oneLine = (s: string): string => s.replace(/\s+/g, " ").trim();
 
 // A tool call renders as a verb plus its most telling argument: the file for
@@ -199,22 +194,22 @@ export function humanizeTool(name: string, input: Record<string, unknown> = {}):
       return `Running ${firstWord(input.command)}`;
     case "Grep":
     case "WebSearch":
-      return oneLine(`Searching ${String(input.pattern ?? input.query ?? "")}`);
+      return oneLine(`Searching ${text(input.pattern) || text(input.query)}`);
     case "Glob":
-      return oneLine(`Globbing ${String(input.pattern ?? "")}`);
+      return oneLine(`Globbing ${text(input.pattern)}`);
     case "ToolSearch":
       return "Searching tools";
     case "WebFetch":
       return `Fetching ${basename(input.url)}`;
     case "SendMessage":
-      return `→ ${String(input.summary ?? "message")}`;
+      return `→ ${text(input.summary) || "message"}`;
     case "Task":
     case "Agent":
-      return `Spawning ${String(input.description ?? "agent")}`;
+      return `Spawning ${text(input.description) || "agent"}`;
     case "TodoWrite":
       return "Updating todos";
     case "Skill":
-      return oneLine(`Running /${String(input.skill ?? input.command ?? "")}`);
+      return oneLine(`Running /${text(input.skill) || text(input.command)}`);
     default:
       return name || "working";
   }

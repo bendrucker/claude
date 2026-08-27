@@ -5,6 +5,11 @@ export function formatDate(value: string | null): string {
   return value.slice(0, 10);
 }
 
+export function stringify(value: unknown): string {
+  if (typeof value === "object" && value !== null) return JSON.stringify(value);
+  return String(value);
+}
+
 const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, "-");
 
 export function selectColumns(
@@ -14,17 +19,20 @@ export function selectColumns(
 ): [string[], string[][]] {
   if (!columns || columns.length === 0) return [headers, rows];
 
-  const headerMap = new Map(headers.map((h, i) => [normalize(h), i]));
+  const headerMap = new Map(headers.map((header, index) => [normalize(header), { header, index }]));
 
-  const indices: number[] = [];
+  const selected: { header: string; index: number }[] = [];
   for (const col of columns) {
-    const idx = headerMap.get(normalize(col));
-    if (idx === undefined) {
+    const match = headerMap.get(normalize(col));
+    if (match === undefined) {
       console.error(`Unknown column: ${col}. Available: ${headers.join(", ")}`);
       process.exit(1);
     }
-    indices.push(idx);
+    selected.push(match);
   }
 
-  return [indices.map((i) => headers[i]!), rows.map((row) => indices.map((i) => row[i]!))];
+  return [
+    selected.map((c) => c.header),
+    rows.map((row) => selected.map((c) => row[c.index] ?? "")),
+  ];
 }

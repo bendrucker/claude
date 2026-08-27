@@ -16,13 +16,19 @@ const TRANSIENT = ["approvals_syncing"];
 const MAX_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 2000;
 
+function streamText(stream: unknown): string {
+  if (typeof stream === "string") return stream.trim();
+  if (stream instanceof Uint8Array) return new TextDecoder().decode(stream).trim();
+  return "";
+}
+
 export function errorText(err: unknown): string {
   // glab spreads a failure across both streams: `glab api` prints the HTTP error body
   // (the JSON message) to stdout and a `glab: <message> (HTTP <code>)` line to stderr.
   // Read both so the already-armed guard matches and callers see the full error text.
   const record = err as Record<string, unknown>;
   const streams = [record?.stdout, record?.stderr]
-    .map((stream) => (stream == null ? "" : String(stream).trim()))
+    .map(streamText)
     .filter((text) => text.length > 0);
   if (streams.length > 0) {
     return streams.join("\n");
@@ -72,11 +78,12 @@ export async function getMrIid(branch: string): Promise<number> {
   const mrs: MergeRequest[] =
     await $`glab api projects/:id/merge_requests -X GET --field source_branch=${branch} --field state=opened`.json();
 
-  if (mrs.length === 0) {
+  const [mr] = mrs;
+  if (!mr) {
     throw new Error(`No open MR found for branch: ${branch}`);
   }
 
-  return mrs[0]!.iid;
+  return mr.iid;
 }
 
 export interface MergeRequestDetail {

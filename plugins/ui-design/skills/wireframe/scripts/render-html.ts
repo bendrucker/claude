@@ -94,7 +94,7 @@ if (import.meta.main) {
       const result = await renderFile(file, outputPath, { scale });
       console.log(`Rendered ${result.input} to ${result.output}`);
     } catch (error) {
-      console.error(`Failed ${file}: ${error instanceof Error ? error.message : error}`);
+      console.error(`Failed ${file}: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
   }

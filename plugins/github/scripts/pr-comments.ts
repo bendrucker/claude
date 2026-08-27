@@ -234,7 +234,7 @@ interface GraphQLResponse {
 
 async function fetchGraphQL(
   query: string,
-  variables: Record<string, unknown>,
+  variables: Record<string, string | number | undefined>,
 ): Promise<GraphQLResponse> {
   const args = ["gh", "api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(variables)) {
@@ -298,7 +298,7 @@ async function main(): Promise<void> {
   let reviews: Review[] = [];
 
   do {
-    const variables: Record<string, unknown> = { owner, repo, number };
+    const variables: Record<string, string | number | undefined> = { owner, repo, number };
     if (cursor) variables.cursor = cursor;
 
     const result = await fetchGraphQL(QUERY, variables);

@@ -55,7 +55,9 @@ async function cleanupStrayDatabases(): Promise<void> {
       await rm(dir, { recursive: true, force: true });
       console.error(`refresh: removed stale index at ${dir}`);
     } catch (err) {
-      console.error(`refresh: could not remove stale index at ${dir}: ${err}`);
+      console.error(
+        `refresh: could not remove stale index at ${dir}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

@@ -47,8 +47,10 @@ describe("VOICE_DELTA_FEATURES", () => {
       "backtick_manifest_bullet_rate",
       "consequence_chain_rate",
       "median_sentence_length",
+      "negative_contrast_rate",
       "p90_sentence_length",
       "question_mark_rate",
+      "subordinate_coordinate_ratio",
       "url_rate",
     ]);
   });
@@ -222,6 +224,42 @@ describe("consequence_chain_rate", () => {
 
   test("ignores 'so' without a following determiner", () => {
     expect(compute("It ran slowly, so slowly we noticed.")).toBe(0);
+  });
+});
+
+describe("subordinate_coordinate_ratio", () => {
+  const compute = feature("subordinate_coordinate_ratio").compute;
+
+  test("divides subordinators by coordinators", () => {
+    // 2 subordinators (because, which), 1 coordinator (and).
+    const text =
+      "The loader retried because the cache was cold and returned the row, which was stale.";
+    expect(compute(text)).toBeCloseTo(2, 5);
+  });
+
+  test("returns 0 when no coordinator is present", () => {
+    expect(compute("The loader retried because the cache was cold.")).toBe(0);
+  });
+
+  test("ignores clause words inside code spans", () => {
+    expect(
+      compute("Call `if (a and b)` twice. The row loads because it is warm and cached."),
+    ).toBeCloseTo(1, 5);
+  });
+});
+
+describe("negative_contrast_rate", () => {
+  const compute = feature("negative_contrast_rate").compute;
+
+  test("counts rather than, instead of, and never per 1k words", () => {
+    // 12 words, 2 constructions.
+    const text = "It retries rather than failing, and it never drops instead of queueing.";
+    const words = text.split(/\s+/).length;
+    expect(compute(text)).toBeGreaterThan((2 / words) * 1000 * 0.9);
+  });
+
+  test("returns 0 on prose without contrast constructions", () => {
+    expect(compute("The loader refetches the row and writes it to the cache.")).toBe(0);
   });
 });
 

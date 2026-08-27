@@ -146,7 +146,7 @@ Where each existing detector sits, and what moving it would take:
 
 - **Vocabulary** (`wordlists/*.txt`): stay as wordlists. The analyze skill audits them each run.
 - **Grammar** (regexes in `detection/tropes.ts`): candidates for a tagger rule, each only after the layer check confirms a tagger beats a regex. Passive voice, "not X but Y", and test-result reporting are the current candidates.
-- **Cross-sentence** (negation flips, burstiness, question cadence, discourse markers, tricolon): five batch-surface detectors in `detection/tropes.ts`, plus the tagger-backed tricolon in `linguistics/tricolon.ts` behind the hook wall. Thresholds are literature heuristics until the #769 labeling pass calibrates them.
+- **Cross-sentence** (negation flips, question cadence, consequence chains, tricolon): batch-surface detectors in `detection/tropes.ts`, plus the tagger-backed tricolon in `linguistics/tricolon.ts` behind the hook wall. Thresholds are literature heuristics until the #769 labeling pass calibrates them. A corpus comparison retired burstiness and discourse-marker density: neither separates agent-era prose from the pre-AI baseline, and discourse markers run lower in agent prose than in the baseline. The subordinate:coordinate ratio and negative-contrast rate replace them as rate features in `voice-delta.ts`.
 - **Meaning** (vacuous specificity, motivation absence, marketing tone, hedging): the batch judge (`judge.ts`) covers this layer in analyze, pending calibration (#791). Hooks never run it.
 
 Until the bars and the power calculation are in place, the `tropes.ts` regexes stay as they are and ship as hook nudges.

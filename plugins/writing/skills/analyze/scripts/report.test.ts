@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CorrectionRow, CorrectiveRow, ModelSummaryRow } from "./dump";
 import { type CandidatePhrase, renderReport } from "./report";
-import type { FeatureRate } from "./voice-delta";
+import { type FeatureRate, VOICE_DELTA_FEATURES } from "./voice-delta";
 import type { VoiceProfile } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 
@@ -305,7 +305,7 @@ describe("renderReport", () => {
     const rows = section
       .split("\n")
       .filter((l) => l.startsWith("| ") && !l.includes("--- ") && !l.startsWith("| feature"));
-    expect(rows.length).toBe(14);
+    expect(rows.length).toBe(VOICE_DELTA_FEATURES.length);
     for (const row of rows) {
       expect(row).toMatch(/\| (skill-prescribed|skill-encouraged|ungoverned) \|/);
     }

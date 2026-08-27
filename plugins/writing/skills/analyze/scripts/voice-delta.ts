@@ -90,6 +90,20 @@ function per1k(count: number, words: number): number {
   return (count / words) * 1000;
 }
 
+// Clause-linking vocabulary for the subordinate:coordinate ratio. Agent-era
+// deliverables coordinate where the pre-AI baseline subordinates: the ratio
+// runs 0.44x the baseline on length-matched PR bodies and 0.66x on review
+// comments. Word-level counting stands in for a parse. "that" and "if" carry
+// non-clausal senses, so read the ratio as a rate and not as a clause census.
+const COORDINATORS = /\b(?:and|or|but)\b/gi;
+const SUBORDINATORS =
+  /\b(?:because|since|although|though|while|whereas|unless|until|when|where|which|who|whose|that|if)\b/gi;
+
+// Negative-contrast constructions run ~2.8x the pre-AI baseline across both
+// PR bodies and review comments. The writing skill already bans "X, not Y"
+// contrast. This measures the wider family the wordlists do not reach.
+const NEGATIVE_CONTRAST = /\b(?:rather than|instead of|not\s+\w+,?\s+but|never)\b/gi;
+
 export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
   {
     id: "first_person_rate",
@@ -278,6 +292,32 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
       // Pattern: ", so" followed by a determiner.
       const matches =
         stripped.match(/,\s+so\s+(?:the|a|an|this|that|these|those|its|their|our)\b/gi) ?? [];
+      return per1k(matches.length, words);
+    },
+  },
+  {
+    id: "subordinate_coordinate_ratio",
+    label: "Subordinate:coordinate clause ratio",
+    provenance: "ungoverned",
+    source: "no skill text. Fightin' Words corpus comparison, 2026-08",
+    compute: (text) => {
+      const stripped = stripCode(text);
+      const coordinators = stripped.match(COORDINATORS) ?? [];
+      if (coordinators.length === 0) return 0;
+      const subordinators = stripped.match(SUBORDINATORS) ?? [];
+      return subordinators.length / coordinators.length;
+    },
+    format: (rate) => rate.toFixed(2),
+  },
+  {
+    id: "negative_contrast_rate",
+    label: "Negative contrast (rather than/instead of/never per 1k)",
+    provenance: "ungoverned",
+    source: "no skill text. Fightin' Words corpus comparison, 2026-08",
+    compute: (text) => {
+      const stripped = stripCode(text);
+      const words = strippedWordCount(stripped);
+      const matches = stripped.match(NEGATIVE_CONTRAST) ?? [];
       return per1k(matches.length, words);
     },
   },

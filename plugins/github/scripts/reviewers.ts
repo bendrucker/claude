@@ -1,9 +1,11 @@
 import { join } from "node:path";
+import { z } from "zod";
 
-export interface Author {
-  login: string;
-  __typename?: string;
-}
+export const Author = z.looseObject({
+  login: z.string(),
+  __typename: z.string().optional(),
+});
+export type Author = z.infer<typeof Author>;
 
 // GitHub classifies bot accounts natively: GraphQL reports `__typename: "Bot"`
 // for GitHub Apps and bot users (Copilot, CodeRabbit, Greptile, and the rest).

@@ -1,7 +1,16 @@
 #!/usr/bin/env bun
 
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+
+export const HookInput = z.looseObject({
+  hook_event_name: z.literal("PreToolUse"),
+  session_id: z.string(),
+  cwd: z.string(),
+  tool_input: z.looseObject({ command: z.string().optional().catch(undefined) }).catch({}),
+});
+export type HookInput = z.infer<typeof HookInput>;
 
 // The <session_id> "loaded" marker is written by the bang-execution line in
 // skills/merge-request/SKILL.md. Keep the path in sync with that command.
@@ -187,10 +196,10 @@ export async function nudgeSkill(
 }
 
 export async function processInput(
-  input: PreToolUseHookInput,
+  input: HookInput,
   env: LintEnv = defaultEnv,
 ): Promise<SyncHookJSONOutput | null> {
-  const command = (input.tool_input as { command?: string }).command;
+  const command = input.tool_input.command;
   if (!command) return null;
 
   if (command.includes("glab")) {
@@ -211,16 +220,16 @@ export async function processInput(
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let raw: unknown;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    raw = JSON.parse(await Bun.stdin.text());
   } catch {
     return;
   }
+  const input = HookInput.safeParse(raw);
+  if (!input.success) return;
 
-  if (input.hook_event_name !== "PreToolUse") return;
-
-  const output = await processInput(input);
+  const output = await processInput(input.data);
   if (output) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }

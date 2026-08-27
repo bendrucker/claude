@@ -7,6 +7,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.3.0",
     "cleye": "^2.2.1",
     "table": "^6.9.0",
-    "url-pattern": "^1.0.3"
+    "url-pattern": "^1.0.3",
+    "zod": "^4.4.3"
   }
 }

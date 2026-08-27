@@ -2,13 +2,22 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
+import { z } from "zod";
 import { errorText } from "../../../scripts/merge";
 
-export type DiffRefs = { base_sha: string; head_sha: string; start_sha: string };
+const Entries = z.array(z.unknown());
+
+export const DiffRefs = z.looseObject({
+  base_sha: z.string(),
+  head_sha: z.string(),
+  start_sha: z.string(),
+});
+export type DiffRefs = z.infer<typeof DiffRefs>;
 
 export async function getDiffRefs(iid: number | string): Promise<DiffRefs> {
-  const result = await $`glab api projects/:id/merge_requests/${iid} | jq '.diff_refs'`.json();
-  return result as DiffRefs;
+  return DiffRefs.parse(
+    await $`glab api projects/:id/merge_requests/${iid} | jq '.diff_refs'`.json(),
+  );
 }
 
 export type Hunk = {
@@ -41,20 +50,19 @@ export function isLineInDiff(hunks: Hunk[], line: number, side: "new" | "old"): 
   return false;
 }
 
-type MrDiff = {
-  old_path: string;
-  new_path: string;
-  diff: string;
-};
+const MrDiffs = z.array(
+  z.looseObject({ old_path: z.string(), new_path: z.string(), diff: z.string() }),
+);
+type MrDiff = z.infer<typeof MrDiffs>[number];
 
 export function parseGlabPaginated(raw: string): unknown[] {
   const fixed = raw.replace(/\]\s*\[/g, ",");
-  return JSON.parse(fixed);
+  return Entries.parse(JSON.parse(fixed));
 }
 
 export async function fetchMrDiffs(iid: number | string): Promise<MrDiff[]> {
   const raw = await $`glab api projects/:id/merge_requests/${iid}/diffs --paginate`.text();
-  return parseGlabPaginated(raw) as MrDiff[];
+  return MrDiffs.parse(parseGlabPaginated(raw));
 }
 
 export function validateLineInDiff(

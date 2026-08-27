@@ -2,6 +2,7 @@
 
 import { $ } from "bun";
 import { cli, command } from "cleye";
+import { z } from "zod";
 import {
   buildPosition,
   exitOnRejection,
@@ -11,6 +12,16 @@ import {
   readBody,
   validateLineInDiff,
 } from "./diff";
+
+const RequestChangesResponse = z.looseObject({
+  data: z
+    .looseObject({
+      mergeRequestRequestChanges: z
+        .looseObject({ errors: z.array(z.string()).nullish() })
+        .nullish(),
+    })
+    .nullish(),
+});
 
 exitOnRejection();
 
@@ -144,11 +155,12 @@ const submitCmd = command(
           errors
         }
       }`;
-      const gqlResult =
-        await $`glab api graphql -f query=${query} -f projectPath=${projectPath} -f iid=${String(mr)}`.json();
-      const payload = gqlResult?.data?.mergeRequestRequestChanges;
-      if (payload?.errors?.length) {
-        console.error(`Request changes failed: ${payload.errors.join(", ")}`);
+      const gqlResult = RequestChangesResponse.parse(
+        await $`glab api graphql -f query=${query} -f projectPath=${projectPath} -f iid=${String(mr)}`.json(),
+      );
+      const errors = gqlResult.data?.mergeRequestRequestChanges?.errors ?? [];
+      if (errors.length > 0) {
+        console.error(`Request changes failed: ${errors.join(", ")}`);
         process.exit(1);
       }
       console.error("Requested changes");
@@ -168,12 +180,14 @@ const listCmd = command(
   },
 );
 
-type ReviewEntry = {
-  file?: string;
-  line?: number;
-  oldLine?: number;
-  body: string;
-};
+const ReviewEntries = z.array(
+  z.looseObject({
+    file: z.string().optional(),
+    line: z.number().optional(),
+    oldLine: z.number().optional(),
+    body: z.string(),
+  }),
+);
 
 const reviewCmd = command(
   {
@@ -204,7 +218,7 @@ const reviewCmd = command(
       process.exit(1);
     }
 
-    const entries: ReviewEntry[] = JSON.parse(await Bun.file(parsed.flags.input).text());
+    const entries = ReviewEntries.parse(JSON.parse(await Bun.file(parsed.flags.input).text()));
     const hasPositioned = entries.some((e) => e.file);
 
     const [refs, diffs] = hasPositioned

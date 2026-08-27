@@ -2,25 +2,38 @@
 
 import { $ } from "bun";
 import { cli } from "cleye";
+import { z } from "zod";
 
-export type ReviewState = "UNREVIEWED" | "REVIEW_STARTED" | "REQUESTED_CHANGES" | "APPROVED";
+export const ReviewState = z.enum([
+  "UNREVIEWED",
+  "REVIEW_STARTED",
+  "REQUESTED_CHANGES",
+  "APPROVED",
+]);
+export type ReviewState = z.infer<typeof ReviewState>;
 
-type Reviewer = {
-  username: string;
-  mergeRequestInteraction: { reviewState: ReviewState | null } | null;
-};
+const Reviewer = z.looseObject({
+  username: z.string(),
+  mergeRequestInteraction: z.looseObject({ reviewState: ReviewState.nullable() }).nullish(),
+});
 
-type MergeRequestNode = {
-  reference: string;
-  webUrl: string;
-  title: string;
-  reviewers: { nodes: Reviewer[] } | null;
-};
+const MergeRequestNode = z.looseObject({
+  reference: z.string(),
+  webUrl: z.string(),
+  title: z.string(),
+  reviewers: z.looseObject({ nodes: z.array(Reviewer) }).nullish(),
+});
 
-export type CurrentUser = {
-  username: string;
-  reviewRequestedMergeRequests: { nodes: MergeRequestNode[] };
-};
+export const CurrentUser = z.looseObject({
+  username: z.string(),
+  reviewRequestedMergeRequests: z.looseObject({ nodes: z.array(MergeRequestNode) }),
+});
+export type CurrentUser = z.infer<typeof CurrentUser>;
+
+const ReviewQueueResponse = z.looseObject({
+  data: z.looseObject({ currentUser: CurrentUser.nullish() }).nullish(),
+  errors: z.array(z.looseObject({ message: z.string() })).nullish(),
+});
 
 export type ReviewQueueEntry = { url: string; reference: string; title: string };
 
@@ -68,10 +81,7 @@ if (import.meta.main) {
       flags: {},
     },
     async () => {
-      const result = (await $`glab api graphql -f query=${QUERY}`.json()) as {
-        data?: { currentUser?: CurrentUser | null };
-        errors?: Array<{ message: string }>;
-      };
+      const result = ReviewQueueResponse.parse(await $`glab api graphql -f query=${QUERY}`.json());
       if (result.errors?.length) {
         console.error(`GraphQL errors: ${result.errors.map((e) => e.message).join("; ")}`);
         process.exit(1);

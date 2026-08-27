@@ -2,6 +2,7 @@
 
 import { $ } from "bun";
 import { cli } from "cleye";
+import { z } from "zod";
 
 // glab has no merge-train command: `glab mr merge --auto-merge` hits the accept
 // endpoint (PUT .../merge). GitLab 19.1+ resolves that to the train server-side,
@@ -22,12 +23,17 @@ export function streamText(stream: unknown): string {
   return "";
 }
 
+const ShellFailure = z.looseObject({
+  stdout: z.unknown().optional(),
+  stderr: z.unknown().optional(),
+});
+
 export function errorText(err: unknown): string {
   // glab spreads a failure across both streams: `glab api` prints the HTTP error body
   // (the JSON message) to stdout and a `glab: <message> (HTTP <code>)` line to stderr.
   // Read both so the already-armed guard matches and callers see the full error text.
-  const record = err as Record<string, unknown>;
-  const streams = [record?.stdout, record?.stderr]
+  const failure = ShellFailure.safeParse(err);
+  const streams = (failure.success ? [failure.data.stdout, failure.data.stderr] : [])
     .map((stream) => streamText(stream).trim())
     .filter((text) => text.length > 0);
   if (streams.length > 0) {
@@ -61,24 +67,20 @@ export async function arm(
   }
 }
 
-interface ProjectConfig {
-  id: number;
-  merge_trains_enabled: boolean;
-}
+const ProjectConfig = z.looseObject({ id: z.number(), merge_trains_enabled: z.boolean() });
+type ProjectConfig = z.infer<typeof ProjectConfig>;
 
 export async function getProjectConfig(): Promise<ProjectConfig> {
-  return $`glab api projects/:id`.json();
+  return ProjectConfig.parse(await $`glab api projects/:id`.json());
 }
 
-interface MergeRequest {
-  iid: number;
-}
+const MergeRequests = z.array(z.looseObject({ iid: z.number() }));
 
 export async function getMrIid(branch: string): Promise<number> {
-  const mrs: MergeRequest[] =
-    await $`glab api projects/:id/merge_requests -X GET --field source_branch=${branch} --field state=opened`.json();
+  const [mr] = MergeRequests.parse(
+    await $`glab api projects/:id/merge_requests -X GET --field source_branch=${branch} --field state=opened`.json(),
+  );
 
-  const [mr] = mrs;
   if (!mr) {
     throw new Error(`No open MR found for branch: ${branch}`);
   }
@@ -86,23 +88,24 @@ export async function getMrIid(branch: string): Promise<number> {
   return mr.iid;
 }
 
-export interface MergeRequestDetail {
-  iid: number;
-  title: string;
-  state: string;
-  draft: boolean;
-  web_url: string;
-  source_branch: string;
-  target_branch: string;
-  detailed_merge_status: string;
-  has_conflicts: boolean;
-  blocking_discussions_resolved: boolean;
-  auto_merge_enabled?: boolean;
-  head_pipeline?: { id: number; status: string } | null;
-}
+export const MergeRequestDetail = z.looseObject({
+  iid: z.number(),
+  title: z.string(),
+  state: z.string(),
+  draft: z.boolean(),
+  web_url: z.string(),
+  source_branch: z.string(),
+  target_branch: z.string(),
+  detailed_merge_status: z.string(),
+  has_conflicts: z.boolean(),
+  blocking_discussions_resolved: z.boolean(),
+  auto_merge_enabled: z.boolean().optional(),
+  head_pipeline: z.looseObject({ id: z.number(), status: z.string() }).nullish(),
+});
+export type MergeRequestDetail = z.infer<typeof MergeRequestDetail>;
 
 export async function getMergeRequest(iid: number): Promise<MergeRequestDetail> {
-  return $`glab api projects/:id/merge_requests/${iid}`.json();
+  return MergeRequestDetail.parse(await $`glab api projects/:id/merge_requests/${iid}`.json());
 }
 
 // The API's has_conflicts/detailed_merge_status stay stale for minutes after a
@@ -172,10 +175,10 @@ const defaultActions: MergeActions = {
   mergeViaGlab,
 };
 
-export interface MergeRequestStatus extends MergeRequestDetail {
+export type MergeRequestStatus = MergeRequestDetail & {
   merge_trains_enabled: boolean;
   rebased_on_target: boolean | null;
-}
+};
 
 export async function status(
   branch: string,

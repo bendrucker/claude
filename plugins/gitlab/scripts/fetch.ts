@@ -1,9 +1,16 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import UrlPattern from "url-pattern";
+import { z } from "zod";
 
-export type WebFetchInput = { url: string; prompt: string };
+const WebFetchInput = z.looseObject({ url: z.string() });
+
+export const HookInput = z.looseObject({ tool_input: z.unknown() });
+export type HookInput = z.infer<typeof HookInput>;
+
+// url-pattern's match() returns `any`.
+const Params = z.record(z.string(), z.string());
 
 type RouteMatch = {
   type: string;
@@ -61,9 +68,9 @@ export function isGitLabUrl(url: string): boolean {
 
 export function matchRoute(path: string): RouteMatch | null {
   for (const route of routes) {
-    const params = route.pattern.match(path);
-    if (params) {
-      return { type: route.type, params };
+    const params = Params.safeParse(route.pattern.match(path));
+    if (params.success) {
+      return { type: route.type, params: params.data };
     }
   }
   return null;
@@ -115,8 +122,8 @@ export function formatOutput(
   };
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { url } = input.tool_input as WebFetchInput;
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const { url } = WebFetchInput.parse(input.tool_input);
 
   if (!isGitLabUrl(url)) {
     return null;
@@ -131,9 +138,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[gitlab/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

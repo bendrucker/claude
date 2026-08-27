@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli, command } from "cleye";
+import { z } from "zod";
 
 export const REPLY_MUTATION = `
 mutation($threadId: ID!, $body: String!) {
@@ -36,10 +37,11 @@ mutation($subjectId: ID!, $content: ReactionContent!) {
 }
 `;
 
-async function ghGraphQL<T = unknown>(
+async function ghGraphQL<S extends z.ZodType>(
+  schema: S,
   query: string,
   variables: Record<string, string>,
-): Promise<T> {
+): Promise<z.output<S>> {
   const args = ["gh", "api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(variables)) {
     args.push("-f", `${key}=${value}`);
@@ -55,7 +57,7 @@ async function ghGraphQL<T = unknown>(
   }
 
   try {
-    return JSON.parse(stdout);
+    return schema.parse(JSON.parse(stdout));
   } catch {
     throw new Error(`Failed to parse GraphQL response: ${stdout.slice(0, 200)}`);
   }
@@ -89,9 +91,9 @@ const replyCmd = command(
       process.exit(1);
     }
 
-    await ghGraphQL(REPLY_MUTATION, { threadId, body });
+    await ghGraphQL(z.unknown(), REPLY_MUTATION, { threadId, body });
     if (parsed.flags.resolve) {
-      await ghGraphQL(RESOLVE_MUTATION, { threadId });
+      await ghGraphQL(z.unknown(), RESOLVE_MUTATION, { threadId });
     }
     console.error(`Replied to ${threadId}${parsed.flags.resolve ? " and resolved" : ""}`);
   },
@@ -103,17 +105,23 @@ const resolveCmd = command(
     parameters: ["<thread-id>"],
   },
   async (parsed) => {
-    await ghGraphQL(RESOLVE_MUTATION, { threadId: parsed._.threadId });
+    await ghGraphQL(z.unknown(), RESOLVE_MUTATION, { threadId: parsed._.threadId });
     console.error(`Resolved ${parsed._.threadId}`);
   },
 );
 
-interface ThreadCommentResponse {
-  data: { node: { comments: { nodes: { id: string }[] } } | null };
-}
+const ThreadCommentResponse = z.looseObject({
+  data: z.looseObject({
+    node: z
+      .looseObject({
+        comments: z.looseObject({ nodes: z.array(z.looseObject({ id: z.string() })) }),
+      })
+      .nullable(),
+  }),
+});
 
 async function firstCommentId(threadId: string): Promise<string> {
-  const result = await ghGraphQL<ThreadCommentResponse>(THREAD_COMMENT_QUERY, { threadId });
+  const result = await ghGraphQL(ThreadCommentResponse, THREAD_COMMENT_QUERY, { threadId });
   const id = result.data.node?.comments.nodes[0]?.id;
   if (!id) {
     throw new Error(`No comment found for thread ${threadId}`);
@@ -143,9 +151,9 @@ const reactCmd = command(
     const content = parsed.flags.down ? "THUMBS_DOWN" : "THUMBS_UP";
     const subjectId = await firstCommentId(threadId);
 
-    await ghGraphQL(REACT_MUTATION, { subjectId, content });
+    await ghGraphQL(z.unknown(), REACT_MUTATION, { subjectId, content });
     if (parsed.flags.resolve) {
-      await ghGraphQL(RESOLVE_MUTATION, { threadId });
+      await ghGraphQL(z.unknown(), RESOLVE_MUTATION, { threadId });
     }
     console.error(
       `Reacted ${parsed.flags.down ? "👎" : "👍"} to ${threadId}${parsed.flags.resolve ? " and resolved" : ""}`,

@@ -11,6 +11,7 @@ import {
   exceedsEntitlement,
   type Meter,
   resolveTier,
+  type Snapshot,
   splitPaths,
   type Tier,
 } from "./review";
@@ -88,7 +89,7 @@ describe("budget", () => {
 
   // Each of these derives the other. Defaulting an absent credits_used to 0 would read an
   // account with 10 credits left as untouched, and the guard would clear every shape.
-  test.each<[string, Record<string, unknown>, number, number]>([
+  test.each<[string, Snapshot, number, number]>([
     ["both reported", { entitlement: 1500, credits_used: 447, remaining: 1052 }, 447, 1052],
     ["only credits_used", { entitlement: 1500, credits_used: 1490 }, 1490, 10],
     ["only remaining", { entitlement: 1500, remaining: 10 }, 1490, 10],

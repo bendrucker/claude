@@ -1,11 +1,31 @@
 import { describe, expect, mock, test } from "bun:test";
-import type { MergeActions } from "./merge";
-import { arm, merge } from "./merge";
+import type { MergeActions, MergeRequestDetail } from "./merge";
+import { arm, merge, mergeArgs, status } from "./merge";
+
+function createMergeRequest(overrides: Partial<MergeRequestDetail> = {}): MergeRequestDetail {
+  return {
+    iid: 10,
+    title: "Add tenants config",
+    state: "opened",
+    draft: false,
+    web_url: "https://gitlab.com/acme/tenants-config/-/merge_requests/10",
+    source_branch: "feature",
+    target_branch: "main",
+    detailed_merge_status: "mergeable",
+    has_conflicts: false,
+    blocking_discussions_resolved: true,
+    auto_merge_enabled: false,
+    head_pipeline: { id: 7, status: "success" },
+    ...overrides,
+  };
+}
 
 function createActions(overrides: Partial<MergeActions> = {}): MergeActions {
   return {
     getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: false })),
     getMrIid: mock(() => Promise.resolve(10)),
+    getMergeRequest: mock(() => Promise.resolve(createMergeRequest())),
+    isRebasedOnTarget: mock(() => Promise.resolve(true)),
     addToMergeTrain: mock(() => Promise.resolve()),
     mergeViaGlab: mock(() => Promise.resolve()),
     ...overrides,
@@ -168,5 +188,66 @@ describe("arm", () => {
 
     await expect(arm(run, sleep)).rejects.toThrow("glab exited with code 1");
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("mergeArgs", () => {
+  // glab enables auto-merge by default when a pipeline is running, so omitting the
+  // flag silently queues the MR. Both branches must send it explicitly.
+  test.each([
+    [true, "--auto-merge=true"],
+    [false, "--auto-merge=false"],
+  ])("passes the auto-merge choice explicitly when autoMerge is %p", (autoMerge, flag) => {
+    expect(mergeArgs("feature", autoMerge)).toEqual(["feature", flag, "-y"]);
+  });
+});
+
+describe("status", () => {
+  test("reports merge readiness without merging", async () => {
+    const actions = createActions({
+      getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: true })),
+    });
+
+    const result = await status("feature", actions);
+
+    expect(result).toMatchObject({
+      iid: 10,
+      detailed_merge_status: "mergeable",
+      merge_trains_enabled: true,
+      rebased_on_target: true,
+    });
+    expect(actions.isRebasedOnTarget).toHaveBeenCalledWith("main", "feature");
+    expect(actions.mergeViaGlab).not.toHaveBeenCalled();
+    expect(actions.addToMergeTrain).not.toHaveBeenCalled();
+  });
+
+  test("surfaces a child MR still targeting a merged parent branch", async () => {
+    const actions = createActions({
+      getMergeRequest: mock(() =>
+        Promise.resolve(createMergeRequest({ target_branch: "parent-layer" })),
+      ),
+      isRebasedOnTarget: mock(() => Promise.resolve(false)),
+    });
+
+    const result = await status("feature", actions);
+
+    expect(result.target_branch).toBe("parent-layer");
+    expect(result.rebased_on_target).toBe(false);
+  });
+
+  test("reports null when the ancestry check cannot run", async () => {
+    const actions = createActions({
+      isRebasedOnTarget: mock(() => Promise.resolve(null)),
+    });
+
+    expect((await status("feature", actions)).rebased_on_target).toBeNull();
+  });
+
+  test("throws when no open MR found for branch", async () => {
+    const actions = createActions({
+      getMrIid: mock(() => Promise.reject(new Error("No open MR found for branch: no-mr"))),
+    });
+
+    await expect(status("no-mr", actions)).rejects.toThrow("No open MR found for branch: no-mr");
   });
 });

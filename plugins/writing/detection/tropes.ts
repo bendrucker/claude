@@ -257,41 +257,6 @@ function adversativeNegationFlipHits(text: string): Hits {
   return { count: 0, sample: "" };
 }
 
-// Burstiness: coefficient of variation (CV) of sentence word counts.
-// Literature: LLM output clusters near CV ~0.5, human prose near CV ~0.78.
-// Gate: 8+ sentences required. Gated DEFAULT-OFF (batch-only, uncalibrated).
-const BURSTINESS_MIN_SENTENCES = 8;
-// CV threshold: flag when CV < 0.55 (suspiciously uniform).
-// Literature heuristic. Session-corpus calibration pending.
-const BURSTINESS_CV_THRESHOLD = 0.55;
-
-function sentenceWordCount(sentence: string): number {
-  return sentence
-    .trim()
-    .split(/\s+/)
-    .filter((w) => w.length > 0).length;
-}
-
-function coefficientOfVariation(values: number[]): number {
-  if (values.length === 0) return 0;
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  if (mean === 0) return 0;
-  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
-  return Math.sqrt(variance) / mean;
-}
-
-function burstinessHits(text: string): Hits {
-  const sentences = splitSentences(text).filter((s) => s.split(/\s+/).length >= 2);
-  if (sentences.length < BURSTINESS_MIN_SENTENCES) return { count: 0, sample: "" };
-  const wordCounts = sentences.map(sentenceWordCount);
-  const cv = coefficientOfVariation(wordCounts);
-  if (cv >= BURSTINESS_CV_THRESHOLD) return { count: 0, sample: "" };
-  return {
-    count: 1,
-    sample: `CV=${cv.toFixed(2)} over ${sentences.length} sentences`,
-  };
-}
-
 // Question-then-answer cadence: 2 of 4+ paragraphs open with a question.
 // Pure regex. Lower precision, near-zero cost.
 const MIN_PARAGRAPHS_FOR_QA = 4;
@@ -312,59 +277,6 @@ function questionAnswerCadenceHits(text: string): Hits {
   }
   if (questionOpeners.length < QA_QUESTION_THRESHOLD) return { count: 0, sample: "" };
   return { count: questionOpeners.length, sample: questionOpeners[0] as string };
-}
-
-// Discourse-marker density: two-tier PDTB-derived connective lookup.
-// Tier 1 (unambiguous adversatives): flat substring match, always count.
-// Tier 2 (ambiguous): only count when appearing at sentence start, where
-// they unambiguously signal a discourse move rather than a local modifier.
-//
-// Threshold: > 20% of sentences carry a tier-1 or tier-2 cue.
-// Literature heuristic. Session-corpus calibration pending.
-const DISCOURSE_MIN_SENTENCES = 5;
-const DISCOURSE_DENSITY_THRESHOLD = 0.2;
-
-// Tier 1: unambiguously discourse-adversative / concessive when they appear
-// anywhere in a sentence.
-const DISCOURSE_TIER1 = [
-  /\bhowever\b/i,
-  /\bnevertheless\b/i,
-  /\bnonetheless\b/i,
-  /\bnotwithstanding\b/i,
-  /\bconversely\b/i,
-  /\bin contrast\b/i,
-  /\bon the other hand\b/i,
-  /\bthat said\b/i,
-  /\bby contrast\b/i,
-];
-
-// Tier 2: ambiguous connectives counted only at sentence start.
-const DISCOURSE_TIER2_START = [
-  /^(?:also|moreover|furthermore|in addition|additionally),?\s/i,
-  /^(?:therefore|thus|hence|consequently|as a result),?\s/i,
-  /^(?:similarly|likewise),?\s/i,
-  /^(?:specifically|for example|for instance|in particular),?\s/i,
-  /^(?:finally|first|second|third|lastly),?\s/i,
-];
-
-function hasDiscourseMarker(sentence: string): boolean {
-  for (const pattern of DISCOURSE_TIER1) {
-    if (pattern.test(sentence)) return true;
-  }
-  for (const pattern of DISCOURSE_TIER2_START) {
-    if (pattern.test(sentence)) return true;
-  }
-  return false;
-}
-
-function discourseMarkerDensityHits(text: string): Hits {
-  const sentences = splitSentences(text).filter((s) => s.split(/\s+/).length >= 3);
-  if (sentences.length < DISCOURSE_MIN_SENTENCES) return { count: 0, sample: "" };
-  const marked = sentences.filter(hasDiscourseMarker);
-  if (marked.length / sentences.length < DISCOURSE_DENSITY_THRESHOLD) {
-    return { count: 0, sample: "" };
-  }
-  return { count: marked.length, sample: (marked[0] as string).slice(0, 60) };
 }
 
 // A salutation addresses a person before the substance starts: a greeting word,
@@ -1227,30 +1139,6 @@ export const PATTERNS: PatternDef[] = [
   {
     tier: "context",
     layer: "cross-sentence",
-    category: "sentence burstiness",
-    fileOnly: true,
-    test: burstinessHits,
-    message: (matched) =>
-      `Low sentence-length variation (${matched}). Uniform sentence length is an AI prose tell. Vary sentence rhythm.`,
-    positives: [
-      // 8 sentences, all near the same word count (~7-8 words each)
-      "The server starts up and runs tasks. The queue fills as jobs arrive. The workers drain the queue items. The logs show each completed entry. The metrics update with each pass. The cron job fires at midnight. The results post to the dashboard view. The cycle repeats the next morning.",
-      "A function receives the data input. It validates each field carefully. Then it calls the database layer. The result gets returned to caller. Errors propagate up the stack. The caller logs any failures found. The client retries failed requests now. The system recovers from each error.",
-    ],
-    negatives: [
-      // Fewer than 8 sentences
-      "The server starts. The queue fills. The workers drain it.",
-      // High CV (varied lengths)
-      "Go. The server starts up and begins processing the incoming queue of jobs that arrive throughout the day. Ok. The extremely long sentence that goes on and on with many clauses and sub-clauses describing the entire system architecture in exhaustive detail. Fine.",
-    ],
-    evidence:
-      "Literature heuristic. Session-corpus calibration pending. CV threshold 0.55 is a starting point derived from commercial detector documentation placing LLM output near CV 0.5 and human prose near CV 0.78. Gate: 8+ sentences. Batch-only. Must not fire in the hook.",
-    retire:
-      "Remove or recalibrate the threshold after session-corpus calibration. If the false-positive rate on technical prose is high, raise the threshold or narrow to prose-file context.",
-  },
-  {
-    tier: "context",
-    layer: "cross-sentence",
     category: "question-answer cadence",
     fileOnly: true,
     test: questionAnswerCadenceHits,
@@ -1270,29 +1158,6 @@ export const PATTERNS: PatternDef[] = [
       "Literature heuristic. Session-corpus calibration pending. Question-opener cadence is a known AI structuring pattern in explanatory prose. Threshold: 2 of 4+ paragraphs. Batch-only.",
     retire:
       "Remove when session-corpus calibration shows the pattern does not distinguish assistant from user text, or when precision on a labeled sample is below the hook bar.",
-  },
-  {
-    tier: "context",
-    layer: "cross-sentence",
-    category: "discourse-marker density",
-    fileOnly: true,
-    test: discourseMarkerDensityHits,
-    message: (matched) =>
-      `High discourse-marker density (e.g., "${matched}"). Dense connective scaffolding is an AI prose pattern. Cut markers that do not carry meaning.`,
-    positives: [
-      "The cache warms on first access. However, under load it can evict entries. Nevertheless, the retry logic compensates. Furthermore, the metrics track hit rate. In addition, the dashboard surfaces evictions. Therefore, operators can tune the size.",
-      "First, the worker picks up the job. Then it validates the payload fields. Furthermore, it calls the downstream service. However, on failure it retries twice. Nevertheless, transient errors still surface. Consequently, the caller must handle them.",
-    ],
-    negatives: [
-      // Below the 20% threshold: only 1 of 6 sentences has a marker
-      "The server starts. The queue fills. The workers drain it. The logs update. The metrics post. However, errors propagate.",
-      // Fewer than 5 sentences
-      "However, the cache is cold. Nevertheless, the retry works.",
-    ],
-    evidence:
-      "Literature heuristic. Session-corpus calibration pending. PDTB-derived two-tier connective table. Tier 1 (unambiguous adversatives) is counted anywhere. Tier 2 (ambiguous) is counted only at sentence start. 20% density threshold is a starting heuristic. Batch-only.",
-    retire:
-      "Remove or recalibrate after session-corpus calibration. If the false-positive rate on technical documentation is high, raise the threshold or restrict tier-2 markers.",
   },
 ];
 

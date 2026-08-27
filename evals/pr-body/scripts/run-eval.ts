@@ -3,6 +3,8 @@ import { mkdir, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeFile, decodeJson, decodeJsonLines } from "../../../packages/decode/index";
 import { scoreBody } from "./score";
 
 // A/B runner for `pull-request:create` guidance. Each arm is a markdown file
@@ -21,39 +23,43 @@ const GEN_RATES: TokenRates = { input: 5 / 1_000_000, output: 25 / 1_000_000 };
 const MAX_RETRIES = 3;
 
 export const ARMS = ["a", "b"] as const;
-export type Arm = (typeof ARMS)[number];
+export const Arm = z.enum(ARMS);
+export type Arm = z.infer<typeof Arm>;
 
-export interface Scenario {
-  id: string;
-  url: string;
-  title: string;
-  repo: string;
-  tier: "personal";
-  diffSummary: string;
-  substance: string[];
-  originalBody: string;
-}
+export const Scenario = z.looseObject({
+  id: z.string(),
+  url: z.string(),
+  title: z.string(),
+  repo: z.string(),
+  tier: z.literal("personal"),
+  diffSummary: z.string(),
+  substance: z.array(z.string()),
+  originalBody: z.string(),
+});
+export type Scenario = z.infer<typeof Scenario>;
 
 export type ScoreRow = ReturnType<typeof scoreBody>;
 
-export interface GenerationRow {
-  scenarioId: string;
-  /** "original" rows carry the shipped body as a baseline; no model produced them. */
-  arm: Arm | "original";
-  seed: number;
-  model: string | null;
-  title: string;
-  body: string;
-  score: ScoreRow;
-  usage: Usage;
-}
+export const Usage = z.object({
+  input: z.number(),
+  cacheWrite: z.number(),
+  cacheRead: z.number(),
+  output: z.number(),
+});
+export type Usage = z.infer<typeof Usage>;
 
-export interface Usage {
-  input: number;
-  cacheWrite: number;
-  cacheRead: number;
-  output: number;
-}
+/** `score` is written but never read back, so it rides along unmodeled. */
+export const GenerationRow = z.looseObject({
+  scenarioId: z.string(),
+  /** "original" rows carry the shipped body as a baseline; no model produced them. */
+  arm: z.enum([...ARMS, "original"]),
+  seed: z.number(),
+  model: z.string().nullable(),
+  title: z.string(),
+  body: z.string(),
+  usage: Usage,
+});
+export type GenerationRow = z.infer<typeof GenerationRow>;
 
 /** USD per token. Cache writes and reads bill as multiples of the input rate. */
 export interface TokenRates {
@@ -125,36 +131,18 @@ export async function loadScenarios(dir: string): Promise<Scenario[]> {
   const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).toSorted();
   const scenarios: Scenario[] = [];
   for (const name of names) {
-    const parsed: unknown = await Bun.file(join(dir, name)).json();
-    scenarios.push(asScenario(parsed, join(dir, name)));
+    scenarios.push(await decodeFile(Scenario, join(dir, name)));
   }
   if (scenarios.length === 0) throw new Error(`No scenario JSON files in ${dir}`);
   return scenarios;
 }
 
-function asScenario(value: unknown, path: string): Scenario {
-  if (typeof value !== "object" || value === null) {
-    throw new Error(`${path}: scenario must be a JSON object`);
-  }
-  const record = value as Record<string, unknown>;
-  for (const key of ["id", "url", "title", "repo", "tier", "diffSummary", "originalBody"]) {
-    if (typeof record[key] !== "string") {
-      throw new Error(`${path}: missing string field "${key}"`);
-    }
-  }
-  if (!Array.isArray(record.substance) || record.substance.some((s) => typeof s !== "string")) {
-    throw new Error(`${path}: "substance" must be an array of strings`);
-  }
-  return value as Scenario;
+export async function readGenerations(runDir: string): Promise<GenerationRow[]> {
+  const path = generationsPath(runDir);
+  return decodeJsonLines(GenerationRow, await Bun.file(path).text(), path);
 }
 
-export async function readGenerations(runDir: string): Promise<GenerationRow[]> {
-  const text = await Bun.file(generationsPath(runDir)).text();
-  return text
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as GenerationRow);
-}
+const Draft = z.looseObject({ title: z.string(), body: z.string() });
 
 /** JSON schema the generation call is constrained to. */
 export function draftSchema(): Record<string, unknown> {
@@ -229,14 +217,7 @@ async function generate(
   if (block?.type !== "text") {
     throw new Error(`${scenario.id} seed ${seed}: no text block (stop: ${response.stop_reason})`);
   }
-  const parsed: unknown = JSON.parse(block.text);
-  if (typeof parsed !== "object" || parsed === null) {
-    throw new Error(`${scenario.id} seed ${seed}: draft was not a JSON object`);
-  }
-  const draft = parsed as Record<string, unknown>;
-  if (typeof draft.title !== "string" || typeof draft.body !== "string") {
-    throw new Error(`${scenario.id} seed ${seed}: draft is missing title or body`);
-  }
+  const draft = decodeJson(Draft, block.text, `${scenario.id} seed ${seed} draft`);
   return {
     title: draft.title,
     body: draft.body,

@@ -2,6 +2,20 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeFile } from "../../../packages/decode/index";
+
+const Slots = z.object({ "1": z.string(), "2": z.string() });
+const Mapping = z.record(z.string(), Slots);
+
+const Verdict = z.object({
+  brief: z.string(),
+  scores: z.record(z.string(), z.union([z.number(), z.string()])).optional(),
+  better: z.union([z.literal("1"), z.literal("2"), z.literal(1), z.literal(2)]),
+  reason: z.string().optional(),
+});
+
+const Verdicts = z.union([z.object({ verdicts: z.array(Verdict) }), z.array(Verdict)]);
 
 // Prepares a blinded LLM-judge run over an A/B output set. For each brief it
 // assigns before/after to slots "1" and "2" in random order, copies the outputs
@@ -37,13 +51,14 @@ const argv = cli({
 const mappingPath = join(argv.flags.judgeDir, "mapping.json");
 
 if (argv.flags.unblind) {
-  const mapping = await Bun.file(mappingPath).json();
-  const verdict = await Bun.file(argv.flags.unblind).json();
-  for (const v of verdict.verdicts ?? verdict) {
+  const mapping = await decodeFile(Mapping, mappingPath);
+  const decoded = await decodeFile(Verdicts, argv.flags.unblind);
+  for (const v of Array.isArray(decoded) ? decoded : decoded.verdicts) {
     const map = mapping[v.brief];
-    const better = v.better === "1" || v.better === 1 ? map["1"] : map["2"];
-    const s1 = `${map["1"]}=${v.scores?.["1"] ?? v.scores?.[1] ?? "?"}`;
-    const s2 = `${map["2"]}=${v.scores?.["2"] ?? v.scores?.[2] ?? "?"}`;
+    if (!map) throw new Error(`${mappingPath} has no entry for brief ${v.brief}`);
+    const better = String(v.better) === "1" ? map["1"] : map["2"];
+    const s1 = `${map["1"]}=${v.scores?.["1"] ?? "?"}`;
+    const s2 = `${map["2"]}=${v.scores?.["2"] ?? "?"}`;
     console.log(`\n${v.brief}: judge prefers ${better.toUpperCase()}  (${s1}, ${s2})`);
     if (v.reason) console.log(`  ${v.reason}`);
   }

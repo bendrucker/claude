@@ -1,17 +1,14 @@
 import { join } from "node:path";
+import { z } from "zod";
+import { decodeFile } from "../../packages/decode/index";
 import { classifyPrHeading } from "./classifier";
 
-interface Label {
-  text: string;
-  words: number;
-  kind: string;
-  url: string;
-  verdict: "good" | "bad" | "skip" | null;
-  notes: string;
-  rewrite: string;
-}
+const Label = z.looseObject({
+  text: z.string(),
+  verdict: z.enum(["good", "bad", "skip"]).nullable(),
+});
 
-const labels: Label[] = await Bun.file(join(import.meta.dirname, "labels.json")).json();
+const labels = await decodeFile(z.array(Label), join(import.meta.dirname, "labels.json"));
 
 const labeled = labels.filter((l) => l.verdict === "good" || l.verdict === "bad");
 

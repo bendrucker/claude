@@ -2,8 +2,11 @@
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeJson, decodeJsonLines } from "../../../packages/decode/index";
 import {
-  type Arm,
+  Arm,
+  ARMS,
   addUsage,
   costUsd,
   emptyUsage,
@@ -16,7 +19,7 @@ import {
   type Scenario,
   type TokenRates,
   toUsage,
-  type Usage,
+  Usage,
 } from "./run-eval";
 
 // Blinded pairwise judge over a run written by run-eval.ts. Each pair is one
@@ -39,30 +42,37 @@ export type Axis = (typeof AXES)[number];
 export const SLOTS = ["1", "2"] as const;
 export type Slot = (typeof SLOTS)[number];
 
-export interface AxisVerdict {
-  score: number;
-  justification: string;
-}
+const AxisVerdict = z.looseObject({ score: z.number(), justification: z.string().catch("") });
+export type AxisVerdict = z.infer<typeof AxisVerdict>;
 
-export type CandidateVerdict = Record<Axis, AxisVerdict>;
+// Listed per axis so adding an axis is a type error here.
+const CandidateVerdict = z.looseObject({
+  narrationLeak: AxisVerdict,
+  verbosity: AxisVerdict,
+  selfContained: AxisVerdict,
+  substanceRetention: AxisVerdict,
+});
+export type CandidateVerdict = z.infer<typeof CandidateVerdict>;
 
-export interface Verdict {
-  candidates: Record<Slot, CandidateVerdict>;
-  preference: Slot | "tie";
-  preferenceReason: string;
-}
+const Verdict = z.looseObject({
+  candidates: z.looseObject({ "1": CandidateVerdict, "2": CandidateVerdict }),
+  preference: z.enum([...SLOTS, "tie"]),
+  preferenceReason: z.string().catch(""),
+});
+export type Verdict = z.infer<typeof Verdict>;
 
-export interface JudgmentRow {
-  scenarioId: string;
-  seed: number;
-  model: string;
+const JudgmentRow = z.looseObject({
+  scenarioId: z.string(),
+  seed: z.number(),
+  model: z.string(),
   /** Which arm sat in each blinded slot. */
-  mapping: Record<Slot, Arm>;
-  arms: Record<Arm, CandidateVerdict>;
-  preference: Arm | "tie";
-  preferenceReason: string;
-  usage: Usage;
-}
+  mapping: z.looseObject({ "1": Arm, "2": Arm }),
+  arms: z.looseObject({ a: CandidateVerdict, b: CandidateVerdict }),
+  preference: z.enum([...ARMS, "tie"]),
+  preferenceReason: z.string(),
+  usage: Usage,
+});
+export type JudgmentRow = z.infer<typeof JudgmentRow>;
 
 export interface Pair {
   scenario: Scenario;
@@ -175,56 +185,7 @@ export function verdictSchema(): Record<string, unknown> {
 }
 
 export function parseVerdict(jsonText: string): Verdict {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch (error) {
-    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`, { cause: error });
-  }
-  if (typeof parsed !== "object" || parsed === null) {
-    throw new Error("Judge verdict must be a JSON object");
-  }
-  const record = parsed as Record<string, unknown>;
-  const preference = record.preference;
-  if (preference !== "1" && preference !== "2" && preference !== "tie") {
-    throw new Error(`Judge verdict has an unusable preference: ${String(preference)}`);
-  }
-  const rawCandidates = record.candidates;
-  if (typeof rawCandidates !== "object" || rawCandidates === null) {
-    throw new Error('Judge verdict is missing "candidates"');
-  }
-  const candidates = {} as Record<Slot, CandidateVerdict>;
-  for (const slot of SLOTS) {
-    candidates[slot] = asCandidate((rawCandidates as Record<string, unknown>)[slot], slot);
-  }
-  return {
-    candidates,
-    preference,
-    preferenceReason: typeof record.preferenceReason === "string" ? record.preferenceReason : "",
-  };
-}
-
-function asCandidate(value: unknown, slot: Slot): CandidateVerdict {
-  if (typeof value !== "object" || value === null) {
-    throw new Error(`Judge verdict is missing candidate ${slot}`);
-  }
-  const record = value as Record<string, unknown>;
-  const candidate = {} as CandidateVerdict;
-  for (const axis of AXES) {
-    const raw = record[axis];
-    if (typeof raw !== "object" || raw === null) {
-      throw new Error(`Candidate ${slot} is missing axis ${axis}`);
-    }
-    const entry = raw as Record<string, unknown>;
-    if (typeof entry.score !== "number") {
-      throw new Error(`Candidate ${slot} axis ${axis} has a non-numeric score`);
-    }
-    candidate[axis] = {
-      score: entry.score,
-      justification: typeof entry.justification === "string" ? entry.justification : "",
-    };
-  }
-  return candidate;
+  return decodeJson(Verdict, jsonText, "judge verdict");
 }
 
 export function deblind(
@@ -234,11 +195,9 @@ export function deblind(
   arms: Record<Arm, CandidateVerdict>;
   preference: Arm | "tie";
 } {
+  const [first, second] = [verdict.candidates["1"], verdict.candidates["2"]];
   return {
-    arms: {
-      [mapping["1"]]: verdict.candidates["1"],
-      [mapping["2"]]: verdict.candidates["2"],
-    } as Record<Arm, CandidateVerdict>,
+    arms: mapping["1"] === "a" ? { a: first, b: second } : { a: second, b: first },
     preference: verdict.preference === "tie" ? "tie" : mapping[verdict.preference],
   };
 }
@@ -281,20 +240,20 @@ async function judgePair(
 async function readJudgments(runDir: string): Promise<JudgmentRow[]> {
   const file = Bun.file(judgmentsPath(runDir));
   if (!(await file.exists())) return [];
-  const text = await file.text();
-  return text
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as JudgmentRow);
+  return decodeJsonLines(JudgmentRow, await file.text(), judgmentsPath(runDir));
 }
 
 export function meanScores(rows: JudgmentRow[], arm: Arm): Record<Axis, number> {
-  const means = {} as Record<Axis, number>;
-  for (const axis of AXES) {
+  const mean = (axis: Axis): number => {
     const scores = rows.map((row) => row.arms[arm][axis].score);
-    means[axis] = scores.length === 0 ? 0 : scores.reduce((a, b) => a + b, 0) / scores.length;
-  }
-  return means;
+    return scores.length === 0 ? 0 : scores.reduce((a, b) => a + b, 0) / scores.length;
+  };
+  return {
+    narrationLeak: mean("narrationLeak"),
+    verbosity: mean("verbosity"),
+    selfContained: mean("selfContained"),
+    substanceRetention: mean("substanceRetention"),
+  };
 }
 
 export function formatSummary(rows: JudgmentRow[]): string {

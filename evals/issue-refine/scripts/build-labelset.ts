@@ -2,7 +2,17 @@
 import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeFile } from "../../../packages/decode/index";
 import { parseIssue } from "./frontmatter";
+
+const Brief = z.looseObject({
+  id: z.string().optional(),
+  type: z.string().optional(),
+  size: z.string().optional(),
+  project: z.string().optional(),
+  brief: z.string(),
+});
 
 // Assembles a labeling dataset from generated issues. Pairs each brief in
 // briefs/label/ with the refined artifact an agent wrote to data/label-out/<id>.md,
@@ -36,7 +46,7 @@ const samples: unknown[] = [];
 const missing: string[] = [];
 
 for (const f of files) {
-  const brief = await Bun.file(join(argv.flags.briefs, f)).json();
+  const brief = await decodeFile(Brief, join(argv.flags.briefs, f));
   const id = brief.id ?? basename(f, ".json");
   const outPath = join(argv.flags.out, `${id}.md`);
   const file = Bun.file(outPath);

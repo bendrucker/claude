@@ -2,6 +2,18 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeFile } from "../../../packages/decode/index";
+
+const Brief = z.looseObject({
+  brief: z.string(),
+  context: z
+    .looseObject({
+      files: z.array(z.string()).default([]),
+      related_issues: z.array(z.string()).default([]),
+    })
+    .default({ files: [], related_issues: [] }),
+});
 
 // Assembles the agent prompt for one A/B cell: a skill version (a directory of
 // SKILL.md + guide files) run against one synthetic brief. The agent identifies
@@ -21,7 +33,7 @@ if (!argv.flags.version || !argv.flags.brief) {
   process.exit(1);
 }
 
-const brief = await Bun.file(argv.flags.brief).json();
+const brief = await decodeFile(Brief, argv.flags.brief);
 const files = (await readdir(argv.flags.version)).filter((f) => f.endsWith(".md")).toSorted();
 
 const skillBlocks: string[] = [];
@@ -30,9 +42,8 @@ for (const f of files) {
   skillBlocks.push(`================ ${f} ================\n${body.trim()}`);
 }
 
-const ctx = brief.context ?? {};
-const files_ctx = (ctx.files ?? []).map((x: string) => `- ${x}`).join("\n");
-const issues_ctx = (ctx.related_issues ?? []).map((x: string) => `- ${x}`).join("\n");
+const files_ctx = brief.context.files.map((x) => `- ${x}`).join("\n");
+const issues_ctx = brief.context.related_issues.map((x) => `- ${x}`).join("\n");
 
 const prompt = `You are the issue:refine skill. Refine the brief below into a structured issue by following the skill instructions verbatim.
 

@@ -2,6 +2,13 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeJson } from "../../../packages/decode/index";
+
+const Score = z.looseObject({
+  score: z.number(),
+  byFinding: z.record(z.string(), z.number()),
+});
 
 // Scores the before/after refined issues produced by an A/B run and prints the
 // per-brief delta. Expects ab/out/<brief>.<before|after>.md to exist. The
@@ -24,11 +31,11 @@ const argv = cli({
   },
 });
 
-async function score(file: string): Promise<{ score: number; byFinding: Record<number, number> }> {
+async function score(file: string) {
   const proc = Bun.spawn(["bun", argv.flags.score, "--input", file, "--json"], { stdout: "pipe" });
   const out = await new Response(proc.stdout).text();
   await proc.exited;
-  return JSON.parse(out);
+  return decodeJson(Score, out, `score.ts --input ${file}`);
 }
 
 const files = await readdir(argv.flags.out);

@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeFile } from "../../../packages/decode/index";
 
 // Builds a curated, type-balanced sample of real issue:refine runs from
 // session history. Inputs are the three JSON exports in raw/ (see README).
@@ -23,19 +25,21 @@ const argv = cli({
   },
 });
 
-type SaveIssue = {
-  session_id: string;
-  project_path: string;
-  title: string | null;
-  issue_id: string | null;
-  description: string;
-};
-type Brief = { session_id: string; project_path: string; brief: string };
-type TypeRow = { session_id: string; type: string };
+const SaveIssue = z.looseObject({
+  session_id: z.string(),
+  project_path: z.string(),
+  title: z.string().nullish(),
+  description: z.string(),
+});
+const Brief = z.looseObject({ session_id: z.string(), brief: z.string() });
+const TypeRow = z.looseObject({ session_id: z.string(), type: z.string() });
 
-const saves: SaveIssue[] = await Bun.file(`${argv.flags.rawDir}/save_issues.json`).json();
-const briefs: Brief[] = await Bun.file(`${argv.flags.rawDir}/briefs.json`).json();
-const types: TypeRow[] = await Bun.file(`${argv.flags.rawDir}/types.json`).json();
+type SaveIssue = z.infer<typeof SaveIssue>;
+type Brief = z.infer<typeof Brief>;
+
+const saves = await decodeFile(z.array(SaveIssue), `${argv.flags.rawDir}/save_issues.json`);
+const briefs = await decodeFile(z.array(Brief), `${argv.flags.rawDir}/briefs.json`);
+const types = await decodeFile(z.array(TypeRow), `${argv.flags.rawDir}/types.json`);
 
 const typeBySession = new Map(types.map((t) => [t.session_id, t.type]));
 
@@ -43,8 +47,7 @@ const typeBySession = new Map(types.map((t) => [t.session_id, t.type]));
 const briefBySession = new Map<string, Brief>();
 for (const b of briefs) {
   const cur = briefBySession.get(b.session_id);
-  if (!cur || (b.brief?.length ?? 0) > (cur.brief?.length ?? 0))
-    briefBySession.set(b.session_id, b);
+  if (!cur || b.brief.length > cur.brief.length) briefBySession.set(b.session_id, b);
 }
 
 // Richest refined body per session (longest description is the fullest draft).

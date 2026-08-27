@@ -72,7 +72,7 @@ git push -u origin feature-branch && glab mr create --fill
 
 **Auto-fill vs custom:** `--fill` auto-populates from commits but cannot combine with `--title`/`--description`. Choose one approach.
 
-**Body from file:** No `--body-file` flag; use `--description "$(cat file.md)"`.
+**Body from file:** The flag is `--description-file file.md`, not gh's `--body-file`. Prefer it over `--description "$(cat file.md)"`, which passes the body through the shell and keeps it out of some hooks.
 
 **Username resolution:** Flags like `--reviewer` and `--assignee` require exact usernames; invalid names are silently ignored. Look up users first:
 

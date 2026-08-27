@@ -79,7 +79,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 1. Draft the body. Past a single paragraph, read [`references/sections.md`](references/sections.md) first: audience tiers, session content, density and heading rules, evidence, optional sections, slop to cut.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
-   - **GitLab**: `glab mr create --title "..." --description "$(cat tmp/pr-body-<branch>.md)"`
+   - **GitLab**: `glab mr create --title "..." --description-file tmp/pr-body-<branch>.md`
    - Write the body file in its own Bash call, with the branch name in the filename so concurrent agents don't collide. Start the create command with `gh`/`glab`: the body-validation hook matches that leading word, and a `cd`, chained heredoc, or env assignment in front of it silently skips validation.
 1. Chain a GitHub stack layer into its stack once the PR exists. Load `github:stack` for the `gh stack link` forms, the detection query that picks between them, and what an exit code 9 means.
 1. Enable auto-merge after the PR/MR exists, unless `--no-auto` or `--draft` is set. On a repo you own (the Remote URL above names the owner), run `gh pr merge --auto`. On a third-party repo, leave the merge to the maintainer. GitLab, stacked PRs, and a repo that rejects `--auto` take the paths in [`references/merge.md`](references/merge.md).

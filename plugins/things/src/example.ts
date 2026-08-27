@@ -22,7 +22,7 @@ const nonRepeating = todos.filter((t) => {
   return cd.getHours() !== 0 || cd.getMinutes() !== 0 || cd.getSeconds() !== 0;
 });
 
-const withNotes = nonRepeating.filter((t) => t.notes() && t.notes().length > 0);
+const withNotes = nonRepeating.filter((t) => t.notes().length > 0);
 
 const result = withNotes.map((t) => ({
   id: t.id(),

@@ -20,7 +20,7 @@ const Decision = z.looseObject({
 });
 
 function isAllow(output: string): boolean {
-  if (!output) return false;
+  if (output === "") return false;
   return Decision.parse(JSON.parse(output)).hookSpecificOutput?.permissionDecision === "allow";
 }
 

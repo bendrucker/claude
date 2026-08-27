@@ -29,8 +29,10 @@ async function query<T>(dbPath: string, sql: string, schema: z.ZodType<T>): Prom
     new Response(proc.stderr).text(),
     proc.exited,
   ]);
-  if (code !== 0) throw new Error(err.trim() || `duckdb exited ${code}`);
-  return z.array(schema).parse(JSON.parse(out.trim() || "[]"));
+  const detail = err.trim();
+  if (code !== 0) throw new Error(detail !== "" ? detail : `duckdb exited ${code}`);
+  const rows = out.trim();
+  return z.array(schema).parse(JSON.parse(rows !== "" ? rows : "[]"));
 }
 
 function setVariables(vars: Record<string, string | number | undefined>): string {
@@ -40,7 +42,7 @@ function setVariables(vars: Record<string, string | number | undefined>): string
     const literal = typeof value === "number" ? String(value) : sqlString(value);
     lines.push(`SET VARIABLE "${key}" = ${literal};`);
   }
-  return lines.length ? `${lines.join("\n")}\n` : "";
+  return lines.length !== 0 ? `${lines.join("\n")}\n` : "";
 }
 
 const localTime = (ts: string): string =>
@@ -173,7 +175,7 @@ if (!(await Bun.file(dbPath).exists())) {
   process.exit(1);
 }
 
-if (argv.flags.session) {
+if (argv.flags.session != null && argv.flags.session !== "") {
   await renderTimeline(dbPath, argv.flags.session, argv.flags.host, argv.flags.bucket);
 } else {
   await renderTopSessions(dbPath, argv.flags.host, argv.flags.days);

@@ -52,8 +52,8 @@ export async function checkMarkdown(content: string): Promise<string | null> {
     if (STEP_HEADING.test(text)) {
       matches.push({
         text: text.trim(),
-        line: node.position?.start?.line || 0,
-        column: node.position?.start?.column || 0,
+        line: node.position?.start.line ?? 0,
+        column: node.position?.start.column ?? 0,
       });
     }
   });
@@ -92,7 +92,7 @@ export async function checkCode(content: string, ext: string): Promise<string | 
       result = (ExecFailure.safeParse(error).data?.stdout ?? "").trim();
     }
 
-    if (result) {
+    if (result !== "") {
       const matches = AstGrepMatches.parse(JSON.parse(result));
       return matches[0]?.message ?? null;
     }
@@ -137,7 +137,7 @@ export async function check(input: PreToolUseHookInput, mode: Mode): Promise<Hoo
     match = await checkCode(content, ext);
   }
 
-  if (!match) {
+  if (match == null || match === "") {
     return null;
   }
 

@@ -30,7 +30,7 @@ export function extractCommands(command: string): Invocation[] {
 
   for (const segment of segments) {
     const trimmed = segment.trim().replace(/^[()]+|[()]+$/g, "");
-    if (!trimmed) continue;
+    if (trimmed === "") continue;
 
     const tokens = trimmed.split(/\s+/);
     let i = 0;
@@ -41,13 +41,13 @@ export function extractCommands(command: string): Invocation[] {
     }
 
     const cmd = tokens[i];
-    if (!cmd) continue;
+    if (cmd == null || cmd === "") continue;
 
     const name = basename(cmd);
     const invocation: Invocation = { cmd };
     if (SCRIPT_INTERPRETERS.has(name)) {
       const next = tokens[i + 1];
-      if (next && !next.startsWith("-")) {
+      if (next != null && next !== "" && !next.startsWith("-")) {
         invocation.scriptArg = next;
       }
     } else if (SCRIPT_EXTENSIONS.has(extname(name))) {
@@ -90,10 +90,10 @@ export async function processInput(
   if (platform !== "darwin") return null;
 
   const toolInput = ToolInput.safeParse(input.tool_input).data;
-  if (!toolInput?.command) return null;
+  if (toolInput?.command == null || toolInput.command === "") return null;
 
   for (const { scriptArg } of extractCommands(toolInput.command)) {
-    if (scriptArg && (await hasBypassMarker(scriptArg))) {
+    if (scriptArg != null && scriptArg !== "" && (await hasBypassMarker(scriptArg))) {
       return disableSandbox(toolInput);
     }
   }

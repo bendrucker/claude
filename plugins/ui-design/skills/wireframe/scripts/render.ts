@@ -20,12 +20,9 @@ export async function render(
   let pipeline = sharp(svgContent);
 
   if (scale !== 1) {
-    const metadata = await sharp(svgContent).metadata();
-    if (metadata.width && metadata.height) {
-      pipeline = pipeline.resize(
-        Math.round(metadata.width * scale),
-        Math.round(metadata.height * scale),
-      );
+    const { width, height } = await sharp(svgContent).metadata();
+    if (width > 0 && height > 0) {
+      pipeline = pipeline.resize(Math.round(width * scale), Math.round(height * scale));
     }
   }
 
@@ -40,7 +37,10 @@ export async function renderFile(
 ): Promise<RenderResult> {
   const scale = options.scale ?? 1;
   const suffix = scale !== 1 ? `@${scale}x` : "";
-  const output = outputPath || inputPath.replace(/\.svg$/, `${suffix}.png`);
+  const output =
+    outputPath != null && outputPath !== ""
+      ? outputPath
+      : inputPath.replace(/\.svg$/, `${suffix}.png`);
   const content = Buffer.from(await Bun.file(inputPath).arrayBuffer());
   await render(content, output, options);
   return { input: inputPath, output, scale };
@@ -59,7 +59,8 @@ async function main() {
   let scale = 1;
   const scaleIndex = args.findIndex((a) => a === "--scale" || a === "-s");
   if (scaleIndex !== -1) {
-    scale = Number.parseFloat(args[scaleIndex + 1] ?? "1") || 1;
+    const parsed = Number.parseFloat(args[scaleIndex + 1] ?? "1");
+    scale = Number.isNaN(parsed) || parsed === 0 ? 1 : parsed;
     args.splice(scaleIndex, 2);
   }
 
@@ -79,12 +80,18 @@ async function main() {
   const [svg] = svgFiles;
   const [firstArg, secondArg] = args;
 
-  if (svg && nonSvgArgs.length === 1) {
-    files.push({ input: svg, ...(nonSvgArgs[0] && { output: nonSvgArgs[0] }) });
+  if (svg != null && svg !== "" && nonSvgArgs.length === 1) {
+    files.push({
+      input: svg,
+      ...(nonSvgArgs[0] != null && nonSvgArgs[0] !== "" && { output: nonSvgArgs[0] }),
+    });
   } else if (svgFiles.length > 0) {
     files.push(...svgFiles.map((input) => ({ input })));
-  } else if (firstArg) {
-    files.push({ input: firstArg, ...(secondArg && { output: secondArg }) });
+  } else if (firstArg != null && firstArg !== "") {
+    files.push({
+      input: firstArg,
+      ...(secondArg != null && secondArg !== "" && { output: secondArg }),
+    });
   }
 
   try {

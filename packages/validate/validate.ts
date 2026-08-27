@@ -44,7 +44,7 @@ export function formatError(
   file: string,
   error: Pick<ErrorObject, "instancePath" | "message">,
 ): string {
-  const path = error.instancePath || "/";
+  const path = error.instancePath !== "" ? error.instancePath : "/";
   const message = `${path}: ${error.message}`;
 
   if (isCI()) {
@@ -97,7 +97,7 @@ export async function validateFile(
     : (entry.validate.errors?.map((err: ErrorObject) => formatError(file, err)) ?? []);
 
   const warnings: string[] = [];
-  if (options?.warnAdditional && entry.schema.properties) {
+  if (options?.warnAdditional && entry.schema.properties !== "") {
     const known = new Set(Object.keys(Properties.parse(entry.schema.properties)));
     for (const property of Object.keys(data)) {
       if (property !== "$schema" && !known.has(property)) {

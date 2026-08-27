@@ -25,7 +25,7 @@ export async function processPostToolUse(
   lintSkill: LintSkillFn = defaultLintSkill,
 ): Promise<SyncHookJSONOutput | null> {
   const filePath = filePathOf(input.tool_input);
-  if (!filePath || basename(filePath) !== "SKILL.md") return null;
+  if (filePath == null || filePath === "" || basename(filePath) !== "SKILL.md") return null;
 
   const messages = await lintMessages(dirname(filePath), lintSkill);
   if (messages.length === 0) return null;

@@ -70,7 +70,9 @@ function statusColor(status: string): "gray" | "green" | "red" {
 // gray dims to recede behind the title; finished green/red stay vivid so a
 // terminal state reads at a glance.
 function typeIcon(agentType: string | null, status: string): string {
-  const glyph = (agentType ? purposeGlyphs.get(agentType) : undefined) ?? genericGlyph;
+  const glyph =
+    (agentType != null && agentType !== "" ? purposeGlyphs.get(agentType) : undefined) ??
+    genericGlyph;
   const color = statusColor(status);
   return styleText(color === "gray" ? [color, "dim"] : color, glyph);
 }
@@ -86,7 +88,7 @@ function remoteMarker(type: string | undefined): string {
 // prefix and sentence-case what remains so the title reads cleanly.
 export function formatDescription(description: string, agentType: string | null): string {
   let text = description;
-  if (agentType) {
+  if (agentType != null && agentType !== "") {
     const prefix = `${agentType}: `;
     if (text.toLowerCase().startsWith(prefix.toLowerCase())) text = text.slice(prefix.length);
   }
@@ -110,22 +112,22 @@ export function renderTask(
   const metaParts: string[] = [];
   if (task.startTime != null) metaParts.push(formatElapsed(task.startTime, now));
   if ((task.tokenCount ?? 0) > 0) metaParts.push(formatTokens(task.tokenCount ?? 0));
-  if (model) metaParts.push(model);
+  if (model != null && model !== "") metaParts.push(model);
   // Every declared level renders. The payload carries no session effort to
   // compare a task's against, and a task's effort is its agent config's
   // declaration rather than a resolved level, so there is no baseline to hide.
   const effort = effortGlyph(task.effort);
-  if (effort) metaParts.push(effort);
+  if (effort != null && effort !== "") metaParts.push(effort);
 
   // The type name trails as dim text after the meta. The icon already conveys
   // the kind, so a narrow terminal can drop the name without losing it.
   const build = (text: string, withType: boolean): string => {
     let body = icon;
-    if (marker) body += ` ${marker}`;
+    if (marker !== "") body += ` ${marker}`;
     body += ` ${text}`;
     const trailing = [...metaParts];
-    if (withType && agentType) trailing.push(agentType);
-    if (trailing.length) {
+    if (withType && agentType != null && agentType !== "") trailing.push(agentType);
+    if (trailing.length !== 0) {
       body += ` ${styleText(["dim"], trailing.map((part) => `· ${part}`).join(" "))}`;
     }
     return body;
@@ -136,16 +138,19 @@ export function renderTask(
   // every teammate. The clean meta description (or stdin description) covers the
   // gap before the teammate's first action; the name is the last resort.
   const fallback = description ?? task.description ?? null;
-  let text = activity
-    ? activity
-    : fallback
-      ? formatDescription(fallback, agentType)
-      : task.name || "agent";
+  let text =
+    activity != null && activity !== ""
+      ? activity
+      : fallback != null && fallback !== ""
+        ? formatDescription(fallback, agentType)
+        : task.name != null && task.name !== ""
+          ? task.name
+          : "agent";
   let content = build(text, true);
 
   if (columns != null && Bun.stringWidth(content) > columns) {
     // Shed the optional type name first; the icon keeps the kind visible.
-    if (agentType) content = build(text, false);
+    if (agentType != null && agentType !== "") content = build(text, false);
     const visible = Bun.stringWidth(content);
     if (visible > columns) {
       const overflow = visible - columns;
@@ -187,6 +192,7 @@ const text = (value: unknown): string => (typeof value === "string" ? value : ""
 const basename = (p: unknown): string => text(p).split("/").pop() ?? "";
 const firstWord = (cmd: unknown): string => text(cmd).trim().split(/\s+/)[0] ?? "";
 const oneLine = (s: string): string => s.replace(/\s+/g, " ").trim();
+const firstText = (...values: unknown[]): string => values.map(text).find((s) => s !== "") ?? "";
 
 // A tool call renders as a verb plus its most telling argument: the file for
 // file tools, the leading command word for Bash (ssh, grep, sed), the message
@@ -206,7 +212,7 @@ export function humanizeTool(name: string, input: Record<string, unknown> = {}):
       return `Running ${firstWord(input.command)}`;
     case "Grep":
     case "WebSearch":
-      return oneLine(`Searching ${text(input.pattern) || text(input.query)}`);
+      return oneLine(`Searching ${firstText(input.pattern, input.query)}`);
     case "Glob":
       return oneLine(`Globbing ${text(input.pattern)}`);
     case "ToolSearch":
@@ -214,16 +220,16 @@ export function humanizeTool(name: string, input: Record<string, unknown> = {}):
     case "WebFetch":
       return `Fetching ${basename(input.url)}`;
     case "SendMessage":
-      return `→ ${text(input.summary) || "message"}`;
+      return `→ ${firstText(input.summary, "message")}`;
     case "Task":
     case "Agent":
-      return `Spawning ${text(input.description) || "agent"}`;
+      return `Spawning ${firstText(input.description, "agent")}`;
     case "TodoWrite":
       return "Updating todos";
     case "Skill":
-      return oneLine(`Running /${text(input.skill) || text(input.command)}`);
+      return oneLine(`Running /${firstText(input.skill, input.command)}`);
     default:
-      return name || "working";
+      return name !== "" ? name : "working";
   }
 }
 
@@ -241,7 +247,7 @@ export function extractActivity(entries: TranscriptEntry[]): string | null {
       if (block?.type === "tool_use" && typeof block.name === "string") {
         return humanizeTool(block.name, block.input ?? {});
       }
-      if (block?.type === "text" && typeof block.text === "string" && block.text.trim()) {
+      if (block?.type === "text" && typeof block.text === "string" && block.text.trim() !== "") {
         return oneLine(block.text);
       }
     }
@@ -253,7 +259,7 @@ export function extractActivity(entries: TranscriptEntry[]): string | null {
 export function extractModel(entries: TranscriptEntry[]): string | null {
   for (let i = entries.length - 1; i >= 0; i--) {
     const model = entries[i]?.message?.model;
-    if (typeof model === "string" && model) return model;
+    if (typeof model === "string" && model !== "") return model;
   }
   return null;
 }
@@ -265,9 +271,10 @@ export function subagentModelLetter(
   subModel: string | null,
   sessionModel: string | null,
 ): string | null {
-  if (!subModel || !sessionModel) return null;
+  if (subModel == null || subModel === "" || sessionModel == null || sessionModel === "")
+    return null;
   const sub = modelMarker(subModel)?.letter ?? null;
-  if (!sub || sub === (modelMarker(sessionModel)?.letter ?? null)) return null;
+  if (sub == null || sub === "" || sub === (modelMarker(sessionModel)?.letter ?? null)) return null;
   return sub;
 }
 
@@ -303,13 +310,13 @@ async function readEntries(path: string): Promise<TranscriptEntry[]> {
   try {
     const file = Bun.file(path);
     const size = file.size;
-    if (!size) return [];
+    if (size === 0) return [];
     const start = Math.max(0, size - TAIL_BYTES);
     const lines = (await file.slice(start).text()).split("\n");
     if (start > 0) lines.shift();
     const entries: TranscriptEntry[] = [];
     for (const line of lines) {
-      if (!line.trim()) continue;
+      if (line.trim() === "") continue;
       try {
         entries.push(TranscriptEntry.parse(JSON.parse(line)));
       } catch {
@@ -328,7 +335,7 @@ if (import.meta.main) {
   const raw = await Bun.stdin.text();
   let input: z.infer<typeof SubagentInput> | null = null;
   try {
-    if (raw.trim()) input = SubagentInput.parse(JSON.parse(raw));
+    if (raw.trim() !== "") input = SubagentInput.parse(JSON.parse(raw));
   } catch {
     input = null;
   }
@@ -340,15 +347,16 @@ if (import.meta.main) {
 
   // All tasks share the parent session named by stdin, so the model every
   // subagent letter is compared against is read once.
-  const sessionModel = input.transcript_path
-    ? extractModel(await readEntries(input.transcript_path))
-    : null;
+  const sessionModel =
+    input.transcript_path != null && input.transcript_path !== ""
+      ? extractModel(await readEntries(input.transcript_path))
+      : null;
 
   const lines: string[] = [];
   for (const task of input.tasks ?? []) {
     const base = subagentBase(task.id, projectDir);
-    const meta = base ? await readMeta(base) : null;
-    const entries = base ? await readEntries(`${base}.jsonl`) : [];
+    const meta = base != null && base !== "" ? await readMeta(base) : null;
+    const entries = base != null && base !== "" ? await readEntries(`${base}.jsonl`) : [];
     const activity = extractActivity(entries);
     // The payload's model is resolved at spawn and covers a subagent that has
     // yet to write a turn. Task types that carry none fall back to the
@@ -368,5 +376,5 @@ if (import.meta.main) {
       ),
     );
   }
-  if (lines.length) process.stdout.write(`${lines.join("\n")}\n`);
+  if (lines.length !== 0) process.stdout.write(`${lines.join("\n")}\n`);
 }

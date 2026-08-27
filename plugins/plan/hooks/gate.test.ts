@@ -383,8 +383,9 @@ describe("recorded re-presents", () => {
   ];
 
   function label(run: GateRun): string {
-    if (run.exitCode !== 0 || run.stderr) return `gate failed (${run.exitCode}): ${run.stderr}`;
-    if (!run.stdout.trim()) return "allowed";
+    if (run.exitCode !== 0 || run.stderr !== "")
+      return `gate failed (${run.exitCode}): ${run.stderr}`;
+    if (run.stdout.trim() === "") return "allowed";
     const { hookSpecificOutput } = GateOutput.parse(JSON.parse(run.stdout));
     const reason = hookSpecificOutput.permissionDecisionReason ?? "";
     const rule = RULES.find(([needle]) => reason.includes(needle))?.[1] ?? "unrecognized";

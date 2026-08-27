@@ -86,13 +86,13 @@ export function formatAskOutput(): SyncHookJSONOutput {
 
 export function processInput(input: HookInput): SyncHookJSONOutput | null {
   const command = BashInput.safeParse(input.tool_input).data?.command;
-  if (!command) {
+  if (command == null || command === "") {
     return null;
   }
 
   const match = stripQuoted(stripHeredocs(command)).match(/\bgit\s+worktree\s+(\w+)/);
   const subcommand = match?.[1];
-  if (!subcommand) {
+  if (subcommand == null || subcommand === "") {
     return null;
   }
   if (ALLOWED_SUBCOMMANDS.has(subcommand)) {

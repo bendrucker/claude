@@ -66,7 +66,7 @@ export function toItem(mined: MinedPr, fetched: FetchedPr): Item {
     id: "",
     repo: mined.repository,
     pr_number: mined.pr_number,
-    url: fetched.url || mined.url,
+    url: fetched.url !== "" ? fetched.url : mined.url,
     title: fetched.title,
     state: fetched.state,
     created_at: fetched.createdAt,
@@ -129,9 +129,13 @@ export function selectSample(candidates: Item[], limit: number): Item[] {
 }
 
 function resolveDbPath(db: string | undefined): string {
-  if (db) return db;
+  if (db != null && db !== "") return db;
+  const pluginData = process.env.CLAUDE_PLUGIN_DATA;
+  const tmp = process.env.TMPDIR;
   const dataDir =
-    process.env.CLAUDE_PLUGIN_DATA || join(process.env.TMPDIR || "/tmp", "claude-session");
+    pluginData != null && pluginData !== ""
+      ? pluginData
+      : join(tmp != null && tmp !== "" ? tmp : "/tmp", "claude-session");
   return join(dataDir, "session.duckdb");
 }
 
@@ -148,7 +152,7 @@ async function queryMined(dbPath: string): Promise<MinedPr[]> {
   ]);
   if (code !== 0) throw new Error(`duckdb failed (${code}): ${err.trim()}`);
   const trimmed = out.trim();
-  if (!trimmed) return [];
+  if (trimmed === "") return [];
   return decodeJson(z.array(MinedPr), trimmed, `duckdb ${dbPath}`);
 }
 

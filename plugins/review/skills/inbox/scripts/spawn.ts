@@ -42,7 +42,7 @@ if (repoPath == null || repoPath === "") {
 function resolvePermissionMode(value: string | undefined): PermissionMode | undefined {
   if (value === undefined) return undefined;
   const mode = PERMISSION_MODES.find((m) => m === value);
-  if (!mode) {
+  if (mode === undefined) {
     console.error(`--permission-mode must be one of: ${PERMISSION_MODES.join(", ")}`);
     process.exit(1);
   }

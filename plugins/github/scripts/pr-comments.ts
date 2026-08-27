@@ -88,7 +88,14 @@ export function parseUrl(url: string): {
   const repo = parts[1];
   const number = Number.parseInt(parts[3] ?? "", 10);
 
-  if (!owner || !repo || parts[2] !== "pull" || Number.isNaN(number)) {
+  if (
+    owner == null ||
+    owner === "" ||
+    repo == null ||
+    repo === "" ||
+    parts[2] !== "pull" ||
+    Number.isNaN(number)
+  ) {
     throw new Error(`Invalid PR URL: ${url}`);
   }
 
@@ -192,9 +199,9 @@ export function formatThreads(
 
     for (const thread of fileThreads) {
       let lineInfo: string;
-      if (thread.startLine) {
+      if (thread.startLine != null) {
         lineInfo = `Lines ${thread.startLine}–${thread.line}`;
-      } else if (thread.line) {
+      } else if (thread.line != null) {
         lineInfo = `Line ${thread.line}`;
       } else {
         lineInfo = "File-level";
@@ -314,12 +321,12 @@ async function main(): Promise<void> {
 
   do {
     const variables: Record<string, string | number | undefined> = { owner, repo, number };
-    if (cursor) variables.cursor = cursor;
+    if (cursor != null && cursor !== "") variables.cursor = cursor;
 
     const result = await fetchGraphQL(QUERY, variables);
     const pr = result.data.repository.pullRequest;
 
-    if (!prTitle) {
+    if (prTitle === "") {
       viewer = result.data.viewer.login;
       prTitle = pr.title;
       prAuthor = pr.author?.login ?? "ghost";
@@ -331,7 +338,7 @@ async function main(): Promise<void> {
 
     const pageInfo = pr.reviewThreads.pageInfo;
     cursor = pageInfo.hasNextPage ? (pageInfo.endCursor ?? undefined) : undefined;
-  } while (cursor);
+  } while (cursor != null && cursor !== "");
 
   const role = resolveRole(argv.flags.role, viewer, prAuthor);
   if (role == null) {
@@ -340,7 +347,7 @@ async function main(): Promise<void> {
   }
 
   let since: Date | undefined;
-  if (argv.flags.since) {
+  if (argv.flags.since != null && argv.flags.since !== "") {
     if (argv.flags.since === "last-review") {
       const date = findLastReviewDate(reviews, viewer, role);
       if (!date) {

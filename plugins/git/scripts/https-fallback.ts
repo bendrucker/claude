@@ -112,7 +112,8 @@ function findNetworkInvocation(command: string): { subcommand: string; insertAt:
     const insertAt = match.index + match[0].length;
     const [segment = ""] = command.slice(insertAt).split(SEGMENT_SEPARATOR);
     const subcommand = subcommandOf(segment.trim().split(/\s+/).filter(Boolean));
-    if (subcommand && NETWORK_SUBCOMMANDS.has(subcommand)) return { subcommand, insertAt };
+    if (subcommand != null && subcommand !== "" && NETWORK_SUBCOMMANDS.has(subcommand))
+      return { subcommand, insertAt };
   }
   return null;
 }
@@ -159,17 +160,17 @@ export async function processInput(
   readRemotes: (cwd: string) => Promise<string> = readRemoteUrls,
 ): Promise<SyncHookJSONOutput | null> {
   const command = BashInput.safeParse(input.tool_input).data?.command;
-  if (!command) return null;
+  if (command == null || command === "") return null;
 
-  if (!gitNetworkSubcommand(command)) return null;
-  if (!hasSshAuthFailure(input.error ?? "")) return null;
+  if (gitNetworkSubcommand(command) == null || gitNetworkSubcommand(command) === "") return null;
+  if (!hasSshAuthFailure(input.error)) return null;
 
-  const cwd = input.cwd ?? process.cwd();
+  const cwd = input.cwd;
   const target = sshProviderOf(command) ?? sshProviderOf(await readRemotes(cwd));
   if (!target) return null;
 
   const retryCommand = rewriteCommand(command, target);
-  if (!retryCommand) return null;
+  if (retryCommand == null || retryCommand === "") return null;
 
   return {
     hookSpecificOutput: {
@@ -186,8 +187,6 @@ async function main(): Promise<void> {
   } catch {
     return;
   }
-
-  if (input.hook_event_name !== "PostToolUseFailure") return;
 
   const output = await processInput(input);
   if (output) {

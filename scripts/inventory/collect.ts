@@ -125,12 +125,13 @@ export function* hookEntries(source: string, events: unknown): Generator<Hook> {
   for (const [event, entries] of Object.entries(HookEvents.parse(events))) {
     for (const entry of entries) {
       for (const hook of entry.hooks ?? []) {
+        const command = text(hook.command);
         yield {
           ...from,
           event,
           matcher: entry.matcher ?? "*",
           condition: text(hook.if),
-          command: text(hook.command) || hook.type,
+          command: command !== "" ? command : hook.type,
         };
       }
     }
@@ -157,13 +158,14 @@ async function readAgent(path: string): Promise<Agent> {
   const data = await frontmatterOf(path);
   const allowed = toolList(data.tools);
   const denied = toolList(data.disallowedTools);
+  const name = text(data.name);
 
   return {
     ...origin(path),
-    name: namespaced(path, text(data.name) || basename(path, ".md")),
+    name: namespaced(path, name !== "" ? name : basename(path, ".md")),
     description: text(data.description),
     model: text(data.model),
-    tools: allowed || (denied ? `all except ${denied}` : ""),
+    tools: allowed !== "" ? allowed : denied !== "" ? `all except ${denied}` : "",
   };
 }
 
@@ -178,9 +180,10 @@ function commandName(path: string): string {
 
 async function readCommand(path: string): Promise<Command> {
   const data = await frontmatterOf(path);
+  const name = text(data.name);
   return {
     ...origin(path),
-    name: namespaced(path, text(data.name) || commandName(path)),
+    name: namespaced(path, name !== "" ? name : commandName(path)),
     description: text(data.description),
   };
 }
@@ -219,11 +222,11 @@ export interface Filters {
 
 export function filter(inventory: Inventory, { plugin, scope }: Filters): Inventory {
   const keep = (item: Origin): boolean =>
-    (!plugin || item.plugin === plugin) && (!scope || item.scope === scope);
+    (plugin == null || item.plugin === plugin) && (scope == null || item.scope === scope);
 
   // Plugins and their MCP servers have no scope of their own. They are the plugin scope.
   const named = (name: string): boolean =>
-    (!plugin || name === plugin) && (!scope || scope === "plugin");
+    (plugin == null || name === plugin) && (scope == null || scope === "plugin");
 
   return {
     plugins: inventory.plugins.filter((item) => named(item.name)),

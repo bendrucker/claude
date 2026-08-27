@@ -29,9 +29,13 @@ const argv = cli({
 });
 
 function resolveDbPath(): string {
-  if (argv.flags.db) return argv.flags.db;
+  if (argv.flags.db != null && argv.flags.db !== "") return argv.flags.db;
+  const pluginData = process.env.CLAUDE_PLUGIN_DATA;
+  const tmp = process.env.TMPDIR;
   const dataDir =
-    process.env.CLAUDE_PLUGIN_DATA || join(process.env.TMPDIR || "/tmp", "claude-session");
+    pluginData != null && pluginData !== ""
+      ? pluginData
+      : join(tmp != null && tmp !== "" ? tmp : "/tmp", "claude-session");
   return join(dataDir, "session.duckdb");
 }
 
@@ -103,7 +107,7 @@ async function queryRows(dbPath: string): Promise<WriteRow[]> {
   ]);
   if (code !== 0) throw new Error(`duckdb failed (${code}): ${err.trim()}`);
   const trimmed = out.trim();
-  if (!trimmed) return [];
+  if (trimmed === "") return [];
   return decodeJson(z.array(WriteRow), trimmed, `duckdb ${dbPath}`);
 }
 
@@ -117,7 +121,8 @@ function isText(fp: string): "json" | "md" | null {
 function workdirOf(fp: string): string {
   const idx = fp.indexOf("/tmp");
   const dir = idx > 0 ? fp.slice(0, idx) : dirname(fp);
-  return basename(dir) || dir;
+  const base = basename(dir);
+  return base !== "" ? base : dir;
 }
 
 function bodiesFromJson(
@@ -178,9 +183,9 @@ async function main() {
   const seen = new Set<string>();
 
   for (const row of rows) {
-    if (hostFilter && row.host !== hostFilter) continue;
+    if (hostFilter != null && hostFilter !== "" && row.host !== hostFilter) continue;
     const kind = isText(row.file_path);
-    if (!kind) continue;
+    if (kind == null) continue;
 
     const extracted =
       kind === "json"

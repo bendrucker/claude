@@ -247,7 +247,7 @@ const stripGit = (s: string): string => (s.endsWith(".git") ? s.slice(0, -4) : s
 
 export function parseRepo(remoteUrl: string): { owner: string; repo: string } | null {
   const trimmed = remoteUrl.trim();
-  if (!trimmed) return null;
+  if (trimmed === "") return null;
 
   const tryPattern = (pattern: string): { owner: string; repo: string } | null => {
     const match = RepoParams.safeParse(
@@ -263,8 +263,10 @@ export function parseRepo(remoteUrl: string): { owner: string; repo: string } | 
 
   // scp-like: git@github.com:owner/repo(.git)
   const scpMatch = trimmed.match(/^git@github\.com:([^/]+)\/(.+)$/);
-  if (scpMatch?.[1] && scpMatch[2]) {
-    return { owner: scpMatch[1], repo: stripGit(scpMatch[2]) };
+  const scpOwner = scpMatch?.at(1);
+  const scpRepo = scpMatch?.at(2);
+  if (scpOwner != null && scpOwner !== "" && scpRepo != null && scpRepo !== "") {
+    return { owner: scpOwner, repo: stripGit(scpRepo) };
   }
 
   return null;
@@ -303,7 +305,8 @@ function exec(command: string): ExecResult {
     const stdout = execSync(command, execOptions).toString().trim();
     return { ok: true, stdout };
   } catch (err) {
-    const stderr = err && typeof err === "object" && "stderr" in err ? streamText(err.stderr) : "";
+    const stderr =
+      typeof err === "object" && err !== null && "stderr" in err ? streamText(err.stderr) : "";
     const { rateLimited, retryAfter } = detectRateLimit(stderr);
     return { ok: false, stderr, rateLimited, retryAfter };
   }
@@ -442,7 +445,7 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
   const prState = view.state;
   const mergeable = view.mergeable;
   const mergeStateStatus = view.mergeStateStatus;
-  if (!branch) {
+  if (branch === "") {
     const message = `gh pr view did not include headRefName for PR #${prNumber}`;
     console.error(`${message}; treating as probe failure`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
@@ -461,7 +464,9 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
   }
   let state: InternalState;
   try {
-    state = deriveChecksState(Checks.parse(JSON.parse(checksResult.stdout || "[]")));
+    state = deriveChecksState(
+      Checks.parse(JSON.parse(checksResult.stdout !== "" ? checksResult.stdout : "[]")),
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`gh pr checks returned unusable JSON for PR #${prNumber}: ${message}`);
@@ -479,7 +484,7 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
       stderr: runIdResult.stderr,
     };
   }
-  const runId = runIdResult.stdout ? runIdResult.stdout : null;
+  const runId = runIdResult.stdout !== "" ? runIdResult.stdout : null;
 
   return {
     kind: "ok",
@@ -523,7 +528,7 @@ export function probeBranch(repo: string, branch: string, run: ExecFn = exec): P
   }
   let runs: RunView[];
   try {
-    runs = RunList.parse(JSON.parse(result.stdout || "[]"));
+    runs = RunList.parse(JSON.parse(result.stdout !== "" ? result.stdout : "[]"));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`gh run list returned unusable JSON for ${repo}@${branch}: ${message}`);
@@ -544,7 +549,7 @@ export function computeInterval(durationsSeconds: number[]): number {
 }
 
 function fetchInterval(branch: string, repo: string | null): number {
-  const repoFlag = repo ? `--repo ${repo} ` : "";
+  const repoFlag = repo != null && repo !== "" ? `--repo ${repo} ` : "";
   const result = exec(
     `gh run list ${repoFlag}--branch ${branch} --limit 5 --json createdAt,updatedAt,conclusion --jq '[.[] | select(.conclusion == "success") | ((.updatedAt | fromdateiso8601) - (.createdAt | fromdateiso8601))]'`,
   );
@@ -555,7 +560,7 @@ function fetchInterval(branch: string, repo: string | null): number {
     return DEFAULT_INTERVAL_SECONDS;
   }
   try {
-    const parsed = Durations.parse(JSON.parse(result.stdout || "[]"));
+    const parsed = Durations.parse(JSON.parse(result.stdout !== "" ? result.stdout : "[]"));
     return computeInterval(parsed.filter((n): n is number => typeof n === "number"));
   } catch (err) {
     console.error(
@@ -585,7 +590,7 @@ export function probeRunId(runId: string, repo: string, run: ExecFn = exec): Pro
   }
   let view: RunView;
   try {
-    view = RunView.parse(JSON.parse(result.stdout || "{}"));
+    view = RunView.parse(JSON.parse(result.stdout !== "" ? result.stdout : "{}"));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`gh run view returned unusable JSON for run ${runId}: ${message}`);
@@ -640,11 +645,11 @@ async function watch(options: RunOptions): Promise<void> {
     }
 
     let result: Probed;
-    if (options.mode === "pr" && prNumber !== null && repo !== null) {
+    if (options.mode === "pr" && prNumber !== null) {
       result = probePr(prNumber, repo);
-    } else if (options.mode === "branch" && repo !== null && branch !== null) {
+    } else if (options.mode === "branch" && branch !== null) {
       result = probeBranch(repo, branch);
-    } else if (options.mode === "run-id" && repo !== null) {
+    } else if (options.mode === "run-id") {
       result = probeRunId(options.runId, repo);
     } else {
       throw new Error("Invalid run configuration");
@@ -658,7 +663,7 @@ async function watch(options: RunOptions): Promise<void> {
     } else if (result.kind === "error") {
       if (result.rateLimited) {
         emit({ type: "rate-limited", retry_after: result.retryAfter });
-      } else if (result.stderr) {
+      } else if (result.stderr !== "") {
         // Surface the probe failure so callers see *something* before the
         // api-error threshold is reached. Without this, a misshapen gh
         // command (e.g., schema drift in --json fields) silently retries
@@ -670,16 +675,11 @@ async function watch(options: RunOptions): Promise<void> {
       for (const event of outcome.events) emit(event);
     } else {
       state = clearApiErrors(state);
-      if (result.branch) branch = result.branch;
+      if (result.branch != null && result.branch !== "") branch = result.branch;
       // Settle mergeability before deriving events so `conflicts` lands in the
       // same cycle as a stale `success`, ahead of the terminal return below.
       let probe = result.probe;
-      if (
-        options.mode === "pr" &&
-        prNumber !== null &&
-        repo !== null &&
-        probeIsUndetermined(probe)
-      ) {
+      if (options.mode === "pr" && prNumber !== null && probeIsUndetermined(probe)) {
         const resolved = await resolveMergeable(prNumber, repo, exec, sleep);
         probe = {
           ...probe,
@@ -761,8 +761,8 @@ async function main(): Promise<void> {
     apiErrorThreshold: argv.flags.apiErrorThreshold,
   };
 
-  if (prUrl) {
-    if (argv.flags.repo) {
+  if (prUrl != null && prUrl !== "") {
+    if (argv.flags.repo != null && argv.flags.repo !== "") {
       console.error("--repo only applies in branch or run-id mode");
       process.exit(1);
     }
@@ -771,7 +771,7 @@ async function main(): Promise<void> {
   }
 
   const resolveRepo = (): string => {
-    if (argv.flags.repo) return argv.flags.repo;
+    if (argv.flags.repo != null && argv.flags.repo !== "") return argv.flags.repo;
     const detected = detectRepoFromGit();
     if (!detected) {
       console.error("Could not infer repo from git remote. Pass --repo <owner/repo>.");
@@ -780,12 +780,12 @@ async function main(): Promise<void> {
     return `${detected.owner}/${detected.repo}`;
   };
 
-  if (runId) {
+  if (runId != null && runId !== "") {
     await watch({ mode: "run-id", repo: resolveRepo(), runId, ...common });
     return;
   }
 
-  if (!branch) return;
+  if (branch == null || branch === "") return;
   await watch({ mode: "branch", repo: resolveRepo(), branch, ...common });
 }
 

@@ -33,7 +33,7 @@ export function isSingleInvocation(command: string): boolean {
 
 export function processInput(input: HookInput): SyncHookJSONOutput | null {
   const command = BashInput.safeParse(input.tool_input).data?.command;
-  if (!command || !CREATE.test(command)) return null;
+  if (command == null || command === "" || !CREATE.test(command)) return null;
   if (HAS_STATE.test(command) || HAS_START.test(command)) return null;
 
   const state = getDefaultState(command.match(ASSIGNEE)?.[1]);

@@ -48,7 +48,7 @@ export function parseCooldowns(text: string): Cooldown[] {
     const record = CooldownEntry.safeParse(entry).data;
     if (!record) return [];
     const { remote, ...rest } = record;
-    return [remote ? { ...rest, remote } : rest];
+    return [remote != null && remote !== "" ? { ...rest, remote } : rest];
   });
 }
 

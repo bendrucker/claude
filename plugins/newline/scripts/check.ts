@@ -21,7 +21,7 @@ export async function hasTrailingNewline(filePath: string): Promise<boolean | nu
 
 export async function processInput(input: PreToolUseHookInput): Promise<void> {
   const filePath = filePathOf(input.tool_input);
-  if (!filePath) return;
+  if (filePath == null || filePath === "") return;
   if (isMemoryPath(filePath)) return;
 
   const hasNewline = await hasTrailingNewline(filePath);

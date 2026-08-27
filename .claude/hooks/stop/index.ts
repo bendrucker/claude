@@ -53,7 +53,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   const existChecks: Array<Promise<{ path: string; exists: boolean }>> = [];
 
   for (const line of content.split("\n")) {
-    if (!line.trim()) continue;
+    if (line.trim() === "") continue;
 
     try {
       const entry = decodeJson(TranscriptEntry, line, transcriptPath);
@@ -65,7 +65,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
         if (block.name !== "Edit" && block.name !== "Write") continue;
 
         const filePath = block.input?.file_path;
-        if (filePath) {
+        if (filePath != null && filePath !== "") {
           existChecks.push(fileExists(filePath).then((exists) => ({ path: filePath, exists })));
         }
       }
@@ -99,7 +99,7 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
     return null;
   }
 
-  if (process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE) {
+  if ((process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE ?? "") !== "") {
     return null;
   }
 
@@ -123,7 +123,7 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
   } catch (error) {
     const failure = PrekFailure.safeParse(error);
     const execError = failure.success ? failure.data : {};
-    const output = ((execError.stdout || "") + (execError.stderr || "")).trim();
+    const output = `${execError.stdout ?? ""}${execError.stderr ?? ""}`.trim();
 
     let context: string;
     if (execError.code === "ENOENT") {
@@ -131,7 +131,8 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
     } else if (execError.killed) {
       context = `Checks timed out after ${PREK_TIMEOUT / 1000}s. Partial output:\n\n${output}`;
     } else {
-      context = `Check failures:\n\n${output || execError.message || String(error)}`;
+      const detail = output !== "" ? output : (execError.message ?? "");
+      context = `Check failures:\n\n${detail !== "" ? detail : String(error)}`;
     }
 
     return {

@@ -61,12 +61,12 @@ const createCmd = command(
 
     const payload: Record<string, unknown> = { note: body };
 
-    if (parsed.flags.replyTo) {
+    if (parsed.flags.replyTo != null && parsed.flags.replyTo !== "") {
       payload.in_reply_to_discussion_id = parsed.flags.replyTo;
       if (parsed.flags.resolve) {
         payload.resolve_discussion = true;
       }
-    } else if (parsed.flags.file) {
+    } else if (parsed.flags.file != null && parsed.flags.file !== "") {
       const [refs, diffs] = await Promise.all([getDiffRefs(mr), fetchMrDiffs(mr)]);
       validateLineInDiff(diffs, parsed.flags.file, {
         line: parsed.flags.line,
@@ -127,15 +127,16 @@ const submitCmd = command(
       process.exit(1);
     }
 
-    const summaryText = parsed.flags.summaryFile
-      ? await Bun.file(parsed.flags.summaryFile).text()
-      : parsed.flags.summary;
+    const summaryText =
+      parsed.flags.summaryFile != null && parsed.flags.summaryFile !== ""
+        ? await Bun.file(parsed.flags.summaryFile).text()
+        : parsed.flags.summary;
 
     const result = await $`glab api ${apiPath(mr)}/bulk_publish -X POST`.text();
     console.log(result);
     console.error("Published draft notes");
 
-    if (summaryText) {
+    if (summaryText != null && summaryText !== "") {
       const notePath = `projects/:id/merge_requests/${mr}/notes`;
       await glabApiPost(notePath, { body: summaryText });
       console.error("Posted summary comment");
@@ -213,17 +214,17 @@ const reviewCmd = command(
   async (parsed) => {
     const mr = Number(parsed._.mr);
 
-    if (!parsed.flags.input) {
+    if (parsed.flags.input == null || parsed.flags.input === "") {
       console.error("--input is required");
       process.exit(1);
     }
 
     const entries = ReviewEntries.parse(JSON.parse(await Bun.file(parsed.flags.input).text()));
-    const hasPositioned = entries.some((e) => e.file);
+    const hasPositioned = entries.some((e) => e.file != null && e.file !== "");
 
-    const [refs, diffs] = hasPositioned
+    const positioned = hasPositioned
       ? await Promise.all([getDiffRefs(mr), fetchMrDiffs(mr)])
-      : [null, null];
+      : null;
 
     let created = 0;
     let failed = 0;
@@ -232,7 +233,8 @@ const reviewCmd = command(
       try {
         const payload: Record<string, unknown> = { note: entry.body };
 
-        if (entry.file && refs && diffs) {
+        if (entry.file != null && entry.file !== "" && positioned != null) {
+          const [refs, diffs] = positioned;
           validateLineInDiff(diffs, entry.file, {
             line: entry.line,
             oldLine: entry.oldLine,
@@ -260,7 +262,7 @@ const reviewCmd = command(
       console.error("Published draft notes");
 
       if (parsed.flags.approve) {
-        const approveRefs = refs ?? (await getDiffRefs(mr));
+        const approveRefs = positioned?.[0] ?? (await getDiffRefs(mr));
         await $`glab api projects/:id/merge_requests/${mr}/approve -X POST -f sha=${approveRefs.head_sha}`.text();
         console.error("Approved MR");
       }

@@ -192,7 +192,7 @@ export function elideSpans(spans: Span[], budget: number): string {
   let pos = 0;
   let out = "";
   let ellipsisDone = false;
-  spans.forEach((span, i) => {
+  for (const [i, span] of spans.entries()) {
     const c = chars[i] ?? [];
     const spanStart = pos;
     const spanEnd = pos + c.length;
@@ -212,9 +212,9 @@ export function elideSpans(spans: Span[], budget: number): string {
       piece += c.slice(tBegin - spanStart, spanEnd - spanStart).join("");
     }
 
-    if (piece) out += `${span.pre}${piece}${span.suf}`;
+    if (piece !== "") out += `${span.pre}${piece}${span.suf}`;
     pos = spanEnd;
-  });
+  }
 
   if (!ellipsisDone) out += "…";
   return out;
@@ -224,7 +224,7 @@ export function elideSpans(spans: Span[], budget: number): string {
 // of the sanitized branch, the branch already carries the repo. Worktrunk names
 // branches worktree-<id> against a <id> worktree, so the repo is a suffix.
 function showRepo(repo: string, sanitizedBranch: string): boolean {
-  if (!repo) return true;
+  if (repo === "") return true;
   return !(sanitizedBranch.startsWith(repo) || sanitizedBranch.endsWith(repo));
 }
 
@@ -234,8 +234,8 @@ export function formatWorktree(data: WorktreeData, budget: number): string[] {
   const repoSuffix = `.${sanitizedBranch}`;
   if (repo.endsWith(repoSuffix)) repo = repo.slice(0, -repoSuffix.length);
 
-  const repoPre = data.repoUrl ? osc8Open(data.repoUrl) : "";
-  const repoSuf = data.repoUrl ? OSC8_CLOSE : "";
+  const repoPre = data.repoUrl != null && data.repoUrl !== "" ? osc8Open(data.repoUrl) : "";
+  const repoSuf = data.repoUrl != null && data.repoUrl !== "" ? OSC8_CLOSE : "";
 
   const spans: Span[] = [];
   if (data.isMain) {
@@ -245,24 +245,26 @@ export function formatWorktree(data: WorktreeData, budget: number): string[] {
       spans.push({ text: repo, pre: repoPre, suf: repoSuf });
       spans.push({ text: "/", pre: DIM.open, suf: DIM.close });
     }
-    const branchPre = data.ciUrl ? CYAN.open + osc8Open(data.ciUrl) : CYAN.open;
-    const branchSuf = data.ciUrl ? OSC8_CLOSE + CYAN.close : CYAN.close;
+    const branchPre =
+      data.ciUrl != null && data.ciUrl !== "" ? CYAN.open + osc8Open(data.ciUrl) : CYAN.open;
+    const branchSuf =
+      data.ciUrl != null && data.ciUrl !== "" ? OSC8_CLOSE + CYAN.close : CYAN.close;
     spans.push({ text: data.branch, pre: branchPre, suf: branchSuf });
   }
 
   const aheadSeg = data.ahead > 0 ? styleText(["dim"], `↑${data.ahead}`) : "";
 
   // Reserve room for the ahead segment (and its separator) before eliding.
-  const labelBudget = aheadSeg ? budget - Bun.stringWidth(aheadSeg) - SEP.length : budget;
+  const labelBudget = aheadSeg !== "" ? budget - Bun.stringWidth(aheadSeg) - SEP.length : budget;
 
   const segments: string[] = [];
   if (labelBudget < 3) {
-    if (aheadSeg) segments.push(aheadSeg);
+    if (aheadSeg !== "") segments.push(aheadSeg);
     return segments;
   }
 
   segments.push(elideSpans(spans, labelBudget));
-  if (aheadSeg) segments.push(aheadSeg);
+  if (aheadSeg !== "") segments.push(aheadSeg);
   return segments;
 }
 
@@ -286,13 +288,13 @@ export function buildStatusLine(
   const segments: string[] = [];
 
   const model = modelSegment(input);
-  if (model) segments.push(model);
+  if (model != null && model !== "") segments.push(model);
   const effort = effortSegment(input);
-  if (effort) segments.push(effort);
+  if (effort != null && effort !== "") segments.push(effort);
   const dial = dialSegment(input);
-  if (dial) segments.push(dial);
+  if (dial != null && dial !== "") segments.push(dial);
   const lines = linesSegment(input);
-  if (lines) segments.push(lines);
+  if (lines != null && lines !== "") segments.push(lines);
 
   // Fixed segments (dials) are measured first and never elided; the worktree
   // label takes whatever width remains so the dial stays visible at any width.
@@ -331,10 +333,10 @@ function resolveWorktree(): WorktreeData | null {
 
     const ciUrl = cur.ci?.url ?? null;
     let repoUrl: string | null = null;
-    if (ciUrl) {
+    if (ciUrl != null && ciUrl !== "") {
       const git = Bun.spawnSync(["git", "remote", "get-url", cur.remote?.name ?? "origin"]);
       const raw = git.success ? git.stdout.toString().trim() : "";
-      if (raw) repoUrl = raw.replace(/^git@([^:]*):/, "https://$1/").replace(/\.git$/, "");
+      if (raw !== "") repoUrl = raw.replace(/^git@([^:]*):/, "https://$1/").replace(/\.git$/, "");
     }
 
     return {
@@ -356,13 +358,13 @@ if (import.meta.main) {
   const raw = await Bun.stdin.text();
   let input: StatusInput | undefined;
   try {
-    if (raw.trim()) input = StatusInput.parse(JSON.parse(raw));
+    if (raw.trim() !== "") input = StatusInput.parse(JSON.parse(raw));
   } catch {
     input = undefined;
   }
   if (input) {
     const rateLimitsPath = process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH;
-    if (rateLimitsPath) {
+    if (rateLimitsPath != null && rateLimitsPath !== "") {
       try {
         await emitRateLimits(input, rateLimitsPath);
       } catch {
@@ -376,7 +378,7 @@ if (import.meta.main) {
 
     // Not gated on the dial: the same report carries the brand mark, which has
     // to keep being sent even on the renders before `context_window` shows up.
-    if (input.session_id) {
+    if (input.session_id != null && input.session_id !== "") {
       try {
         await reportPaneMetadata(input.session_id, contextDial(input));
       } catch {

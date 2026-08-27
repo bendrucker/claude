@@ -152,8 +152,7 @@ if (import.meta.main) {
     const list = Bun.spawnSync(["herdr", "pane", "list"], { timeout: HERDR_TIMEOUT_MS });
     const paneId = list.success ? findPane(list.stdout.toString(), sessionId) : null;
     if (paneId != null && paneId !== "") {
-      const report =
-        name != null && name !== "" && value != null && value !== "" ? { token: name, value } : null;
+      const report = name != null && value != null && value !== "" ? { token: name, value } : null;
       Bun.spawnSync(["herdr", ...reportArgs(paneId, report)], { timeout: HERDR_TIMEOUT_MS });
     }
   }

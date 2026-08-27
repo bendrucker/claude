@@ -96,6 +96,6 @@ try {
   db.close();
 }
 
-const blockEgress = existing ? (existing.policy?.block_egress ?? true) : !argv.flags.egress;
+const blockEgress = existing ? (existing.policy.block_egress ?? true) : !argv.flags.egress;
 console.log(`${existing ? "Re-indexed" : "Imported"} host "${label}" from ${projectsDir}`);
 console.log(`  egress: ${blockEgress ? "blocked" : "allowed"}`);

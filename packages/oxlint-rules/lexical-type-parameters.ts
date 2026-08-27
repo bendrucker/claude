@@ -44,8 +44,8 @@ export function lexicalTypeParameterNames(
 ): ReadonlySet<string> {
   const names = new Set<string>();
   let descendant: ESTree.Node = node;
-  let current: ESTree.Node | null = node;
-  while (current !== null && current.type !== "Program") {
+  let current: ESTree.Node = node;
+  while (current.type !== "Program") {
     if ("typeParameters" in current) {
       for (const parameter of current.typeParameters?.params ?? []) {
         names.add(parameter.name.name);

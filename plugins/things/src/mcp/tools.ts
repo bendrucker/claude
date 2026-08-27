@@ -127,16 +127,16 @@ export function limitItems(payload: unknown, guidance: string): unknown {
  */
 function writeResult(result: DispatchResult, action: string) {
   warnFallback(result);
-  if (result.viaXcall && !result.output) {
+  if (result.viaXcall && (result.output == null || result.output === "")) {
     throw new Error(
       `${action}: xcall returned no output. The operation may not have applied. ` +
         "Do not retry until the cause is understood (retries create duplicates).",
     );
   }
-  if (result.id) {
+  if (result.id != null && result.id !== "") {
     return textResult(`${action}: ${TODO_LINK_BASE}${result.id}`);
   }
-  if (result.output) {
+  if (result.output != null && result.output !== "") {
     return textResult(`${action}: ${result.output}`);
   }
   return textResult(`${action}: dispatched via Launch Services (no callback confirmation)`);
@@ -202,7 +202,7 @@ export function validateCaptureTitles(title?: string, titles?: string[]): void {
   if (title !== undefined && titles !== undefined) {
     throw new Error("Provide title (single todo) or titles (multiple todos), not both");
   }
-  if (!title?.trim() && !titles?.length) {
+  if ((title?.trim() ?? "") === "" && (titles?.length ?? 0) === 0) {
     throw new Error("title or titles is required");
   }
   if (titles) validateNonBlank(titles, "titles");
@@ -587,7 +587,7 @@ export function registerTools(server: McpServer): void {
         add_tags: rest.add_tags && (await requireTags(rest.add_tags, createMissing)),
       });
 
-      if (ids.length === 1 && ids[0]) {
+      if (ids.length === 1 && ids[0] != null && ids[0] !== "") {
         const params = new Map<string, string>(Object.entries(attributes));
         params.set("id", ids[0]);
         return writeResult(await dispatch("update", params), `Updated ${ids[0]}`);
@@ -605,7 +605,7 @@ export function registerTools(server: McpServer): void {
           // keeps a retry from updating those todos a second time.
           const message = error instanceof Error ? error.message : String(error);
           throw new Error(
-            applied.length
+            applied.length !== 0
               ? `${message}\nAlready updated: ${applied.join(", ")}. Retry only the remaining IDs.`
               : message,
             { cause: error },
@@ -668,9 +668,9 @@ export function registerTools(server: McpServer): void {
       params.set("tags", tags.join(","));
 
       let notes = args.notes;
-      if (args.session_id) {
+      if (args.session_id != null && args.session_id !== "") {
         const attribution = buildAttribution(args.session_id, args.directory);
-        notes = notes ? `${notes}\n\n${attribution}` : attribution;
+        notes = notes != null && notes !== "" ? `${notes}\n\n${attribution}` : attribution;
       }
       if (notes !== undefined) params.set("notes", notes);
 

@@ -28,7 +28,12 @@ const argv = cli({
   },
 });
 
-if (!argv.flags.version || !argv.flags.brief) {
+if (
+  argv.flags.version == null ||
+  argv.flags.version === "" ||
+  argv.flags.brief == null ||
+  argv.flags.brief === ""
+) {
   console.error("usage: ab-prompt --version <dir> --brief <file.json>");
   process.exit(1);
 }
@@ -60,10 +65,10 @@ ${brief.brief}
 
 ================ SYNTHETIC CONTEXT ================
 Files:
-${files_ctx || "(none)"}
+${files_ctx !== "" ? files_ctx : "(none)"}
 
 Related issues:
-${issues_ctx || "(none)"}
+${issues_ctx !== "" ? issues_ctx : "(none)"}
 `;
 
 console.log(prompt);

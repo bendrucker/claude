@@ -470,7 +470,7 @@ function salutationHits(text: string): Hits {
   if (line === "") return { count: 0, sample: "" };
   if (GREETING_OPENER.test(line)) return { count: 1, sample: line.slice(0, 40) };
   const address = ADDRESS_OPENER.exec(line)?.[1];
-  if (!address) return { count: 0, sample: "" };
+  if (address == null || address === "") return { count: 0, sample: "" };
   const head = address.split(/\s+/)[0] ?? "";
   if (!isNameShaped(head)) return { count: 0, sample: "" };
   return { count: 1, sample: `${address},` };

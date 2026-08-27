@@ -120,9 +120,13 @@ export function selectSample(candidates: Item[], limit: number): Item[] {
 }
 
 function resolveDbPath(db: string | undefined): string {
-  if (db) return db;
+  if (db != null && db !== "") return db;
+  const pluginData = process.env.CLAUDE_PLUGIN_DATA;
+  const tmp = process.env.TMPDIR;
   const dataDir =
-    process.env.CLAUDE_PLUGIN_DATA || join(process.env.TMPDIR || "/tmp", "claude-session");
+    pluginData != null && pluginData !== ""
+      ? pluginData
+      : join(tmp != null && tmp !== "" ? tmp : "/tmp", "claude-session");
   return join(dataDir, "session.duckdb");
 }
 
@@ -139,7 +143,8 @@ async function probeInvocations(dbPath: string): Promise<number | null> {
     proc.exited,
   ]);
   if (code !== 0) throw new Error(`duckdb failed (${code}): ${err.trim()}`);
-  const rows = decodeJson(Probe, out.trim() || "[]", `duckdb ${dbPath}`);
+  const json = out.trim();
+  const rows = decodeJson(Probe, json !== "" ? json : "[]", `duckdb ${dbPath}`);
   return rows[0]?.invocations ?? 0;
 }
 

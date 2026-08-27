@@ -98,7 +98,7 @@ const FixtureInput = z
     if (fixture.action !== "keep" && fixture.category == null) {
       ctx.addIssue({ code: "custom", message: "has an invalid slop category null" });
     }
-    if (fixture.action === "rewrite" && !fixture.rewrite) {
+    if (fixture.action === "rewrite" && (fixture.rewrite == null || fixture.rewrite === "")) {
       ctx.addIssue({ code: "custom", message: `is "rewrite" but carries no gold rewrite text` });
     }
     if (fixture.trimTo != null && (fixture.trimTo.length === 0 || fixture.action !== "trim")) {

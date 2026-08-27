@@ -37,7 +37,7 @@ for (const { label, manifest } of imported) {
   rows.push([
     label,
     manifest.imported_at,
-    (manifest.policy?.block_egress ?? true) ? "blocked" : "allowed",
+    (manifest.policy.block_egress ?? true) ? "blocked" : "allowed",
     watermarks[label] ?? "-",
     manifest.source !== "" ? manifest.source : "-",
   ]);

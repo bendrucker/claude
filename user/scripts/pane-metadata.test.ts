@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { CONTEXT_TOKENS, cachePath, findPane, reportArgs, shouldReport } from "./context-dial";
+import { brandGlyph } from "./glyphs";
+import {
+  CONTEXT_TOKENS,
+  cachePath,
+  findPane,
+  reportArgs,
+  reportSignature,
+  shouldReport,
+} from "./pane-metadata";
 
 const HOUR_MS = 3_600_000;
 
@@ -54,7 +62,11 @@ describe("shouldReport", () => {
 
 describe("reportArgs", () => {
   test("sets the live token and clears the other levels", () => {
-    expect(reportArgs("w2:p2", { token: "ctx_high", value: "\u{f0aa2}" })).toMatchInlineSnapshot(`
+    const args = reportArgs("w2:p2", { token: "ctx_high", value: "\u{f0aa2}" });
+    // The mark stands in as `<brand>`: a private-use glyph inlined here is one
+    // bad paste away from silently snapshotting some other icon. Its codepoint
+    // is asserted below instead.
+    expect(args.map((arg) => (arg === brandGlyph ? "<brand>" : arg))).toMatchInlineSnapshot(`
       [
         "pane",
         "report-metadata",
@@ -63,6 +75,8 @@ describe("reportArgs", () => {
         "claude-statusline",
         "--ttl-ms",
         "86400000",
+        "--display-agent",
+        "<brand>",
         "--token",
         "ctx_high=󰪢",
         "--clear-token",
@@ -75,6 +89,28 @@ describe("reportArgs", () => {
     `);
   });
 
+  test("carries the brand mark with no dial to report", () => {
+    const args = reportArgs("w2:p2", null);
+    expect(args).toEqual([
+      "pane",
+      "report-metadata",
+      "w2:p2",
+      "--source",
+      "claude-statusline",
+      "--ttl-ms",
+      "86400000",
+      "--display-agent",
+      brandGlyph,
+    ]);
+  });
+
+  test("brands the pane whether or not a dial rides along", () => {
+    for (const report of [null, { token: "ctx_low", value: "x" } as const]) {
+      const args = reportArgs("w2:p2", report);
+      expect(args[args.indexOf("--display-agent") + 1]).toBe(brandGlyph);
+    }
+  });
+
   const levels = CONTEXT_TOKENS.map((token) => [token] as const);
 
   test.each(levels)("%s clears every other level", (token) => {
@@ -84,13 +120,23 @@ describe("reportArgs", () => {
   });
 });
 
+describe("reportSignature", () => {
+  test("separates a dial from no dial, so the first one re-reports", () => {
+    expect(reportSignature({ token: "ctx_low", value: "x" })).not.toBe(reportSignature(null));
+  });
+
+  test("moves when the mark moves, so a changed glyph is not cached away", () => {
+    expect(reportSignature(null)).toStartWith(brandGlyph);
+  });
+});
+
 describe("cachePath", () => {
   test("keeps a session-scoped file out of the session's own tree", () => {
     const path = cachePath("4cba0d0a-8875-48eb-b6cd-90874f2a875b");
-    expect(path).toEndWith("claude-context-dial/4cba0d0a-8875-48eb-b6cd-90874f2a875b.json");
+    expect(path).toEndWith("claude-pane-metadata/4cba0d0a-8875-48eb-b6cd-90874f2a875b.json");
   });
 
   test("sanitizes a session id that would escape the directory", () => {
-    expect(cachePath("../../etc/passwd")).toEndWith("claude-context-dial/..-..-etc-passwd.json");
+    expect(cachePath("../../etc/passwd")).toEndWith("claude-pane-metadata/..-..-etc-passwd.json");
   });
 });

@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
-import { type ContextToken, type DialReport, reportContextDial } from "./context-dial";
 import { effortMarker } from "./effort";
 import { dialGlyph } from "./glyphs";
 import { modelMarker } from "./model";
+import { type ContextToken, type DialReport, reportPaneMetadata } from "./pane-metadata";
 import { expandTilde, type RateLimits } from "./rate-limits";
 import { styleText } from "./style";
 
@@ -140,7 +140,7 @@ const DIAL_TOKENS: Record<DialColor, ContextToken> = {
 };
 
 // The same dial herdr's sidebar shows, named by color rather than styled: see
-// `context-dial.ts` for why the color rides on the token name.
+// `pane-metadata.ts` for why the color rides on the token name.
 export function contextDial(input: StatusInput): DialReport | null {
   const dial = dialState(input);
   return dial ? { token: DIAL_TOKENS[dial.color], value: dial.glyph } : null;
@@ -354,10 +354,11 @@ if (import.meta.main) {
     const columns = Number.isInteger(parsed) && parsed > 0 ? parsed : 80;
     process.stdout.write(buildStatusLine(input, columns, resolveWorktree()));
 
-    const dial = contextDial(input);
-    if (dial && input.session_id) {
+    // Not gated on the dial: the same report carries the brand mark, which has
+    // to keep being sent even on the renders before `context_window` shows up.
+    if (input.session_id) {
       try {
-        await reportContextDial(input.session_id, dial);
+        await reportPaneMetadata(input.session_id, contextDial(input));
       } catch {
         // The sidebar mirror is best-effort, and the line is already written.
       }

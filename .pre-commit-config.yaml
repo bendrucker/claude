@@ -46,21 +46,12 @@ repos:
         pass_filenames: false
         entry: bun packages/validate/settings.ts
 
-      - id: no-double-assertion
-        name: No double type assertions
+      - id: lint
+        name: Lint
         language: system
         files: \.ts$
-        exclude: \.test\.ts$
         pass_filenames: false
-        entry: ast-grep scan --rule rules/no-double-assertion.yaml
-
-      - id: no-terminal-width
-        name: No terminal-width output sizing
-        language: system
-        files: \.ts$
-        exclude: \.test\.ts$
-        pass_filenames: false
-        entry: ast-grep scan --rule rules/no-terminal-width.yaml
+        entry: bun run lint
 
       - id: marketplace-check
         name: Marketplace completeness

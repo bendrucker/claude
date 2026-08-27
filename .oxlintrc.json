@@ -56,9 +56,21 @@
           }
         ]
       }
-    ]
+    ],
+    "local/no-chained-type-assertions": "error",
+    "local/no-terminal-width": "error"
   },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "local/no-chained-type-assertions": "off",
+        "local/no-terminal-width": "off"
+      }
+    }
+  ],
   "ignorePatterns": ["**/fixtures/**", "**/*.d.ts", "**/jxa/**/*.js", ".claude/workflows/**"],
+  "jsPlugins": [{ "name": "local", "specifier": "./packages/oxlint-rules/index.ts" }],
   "env": {
     "builtin": true
   }

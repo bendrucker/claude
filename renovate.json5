@@ -33,6 +33,12 @@
       automerge: true,
     },
     {
+      // The JS plugin API is alpha and unversioned, so @oxlint/plugins only works
+      // against its matching oxlint. Bump them in one PR so CI proves the pair.
+      matchPackageNames: ["oxlint", "@oxlint/plugins"],
+      groupName: "oxlint",
+    },
+    {
       matchManagers: ["custom.regex"],
       matchFileNames: ["user/settings.json"],
       commitMessagePrefix: "chore(plugins):",

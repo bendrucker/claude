@@ -1,0 +1,9 @@
+{
+  "name": "@bendrucker/claude-oxlint-rules",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "dependencies": {
+    "@oxlint/plugins": "1.78.0"
+  }
+}

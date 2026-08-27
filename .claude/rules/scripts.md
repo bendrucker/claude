@@ -17,7 +17,7 @@ Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` cod
 
 - **Argument parsing**: use [cleye](https://github.com/privatenumber/cleye). Load the `cleye` skill for parameters, flags, and subcommands instead of reading existing scripts.
 - **Table output**: use the `table` package, not `markdown-table` or another GFM-oriented package. Script output lands in a terminal.
-- **Output width**: use a fixed default with a flag override (`--truncate <n>`). Do not read `process.stdout.columns` or gate on `process.stdout.isTTY`, both undefined when piped. The `no-terminal-width` prek hook enforces this.
+- **Output width**: use a fixed default with a flag override (`--truncate <n>`). Do not read `process.stdout.columns` or gate on `process.stdout.isTTY`, both undefined when piped. The `local/no-terminal-width` lint rule enforces this.
 - **Ancestor paths**: use `join(import.meta.dirname, "..")` rather than chained `dirname()` calls.
 - **Terminal colors**: use ANSI colors 0-15, which the terminal theme remaps for light and dark mode. Avoid 256-color and truecolor escapes for foreground text.
 

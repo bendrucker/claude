@@ -10,9 +10,14 @@ const list = app.lists.byId("TMTodayListSource");
 
 const todos = toArray<Things3.ToDo>(list.toDos());
 
+// The generated Things3 types give every date accessor `any`.
+function asDate(value: unknown): Date | null {
+  return value instanceof Date ? value : null;
+}
+
 // Filter for non-repeating todos (creation date not at midnight)
 const nonRepeating = todos.filter((t) => {
-  const cd = t.creationDate();
+  const cd = asDate(t.creationDate());
   if (!cd) return true;
   return cd.getHours() !== 0 || cd.getMinutes() !== 0 || cd.getSeconds() !== 0;
 });

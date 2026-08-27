@@ -7,6 +7,7 @@
  * runner behind `DispatchActions`.
  */
 
+import { z } from "zod";
 import { resolveTags } from "../../scripts/tags";
 import { runScript } from "./jxa";
 
@@ -15,8 +16,10 @@ export interface TagActions {
   createTags(names: string[]): Promise<void>;
 }
 
+const TagList = z.array(z.object({ name: z.string() }));
+
 async function fetchTags(): Promise<string[]> {
-  const tags = await runScript<Array<{ name: string }>>("query-metadata.js", ["tags"]);
+  const tags = TagList.parse(await runScript("query-metadata.js", ["tags"]));
   return tags.map((tag) => tag.name);
 }
 

@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 
-type StateStore = Record<string, string>;
+const StateStore = z.record(z.string(), z.string());
+type StateStore = z.infer<typeof StateStore>;
 
 function getStateFilePath(): string {
   return process.env.CLAUDE_NEWLINE_STATE_FILE ?? join(tmpdir(), "claude-newline-state.json");
@@ -14,7 +16,7 @@ async function readStore(): Promise<StateStore> {
     return {};
   }
   try {
-    return (await file.json()) as StateStore;
+    return StateStore.parse(await file.json());
   } catch {
     return {};
   }

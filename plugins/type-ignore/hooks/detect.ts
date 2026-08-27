@@ -3,10 +3,28 @@
 import { mkdirSync } from "node:fs";
 import * as path from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import { EXTENSION_MAP, LANGUAGES, TARGET_EXTENSIONS } from "./languages";
 
-export type WriteInput = { file_path: string; content: string };
-export type EditInput = { file_path: string; old_string: string; new_string: string };
+const HookInput = z.looseObject({
+  hook_event_name: z.literal("PostToolUse"),
+  session_id: z.string().catch(""),
+  transcript_path: z.string().catch(""),
+  cwd: z.string().catch(""),
+  tool_name: z.string().catch(""),
+  tool_input: z.unknown().catch(undefined),
+  tool_response: z.unknown().catch(undefined),
+  tool_use_id: z.string().catch(""),
+}) satisfies z.ZodType<PostToolUseHookInput>;
+
+export const WriteInput = z.looseObject({ file_path: z.string(), content: z.string() });
+export type WriteInput = z.infer<typeof WriteInput>;
+export const EditInput = z.looseObject({
+  file_path: z.string(),
+  old_string: z.string(),
+  new_string: z.string(),
+});
+export type EditInput = z.infer<typeof EditInput>;
 
 export interface PatternMatch {
   label: string;
@@ -113,11 +131,13 @@ export async function processInput(
   let oldContent = "";
 
   if (toolName === "Write") {
-    const writeInput = input.tool_input as WriteInput;
+    const writeInput = WriteInput.safeParse(input.tool_input).data;
+    if (!writeInput) return null;
     filePath = writeInput.file_path;
     newContent = writeInput.content;
   } else if (toolName === "Edit") {
-    const editInput = input.tool_input as EditInput;
+    const editInput = EditInput.safeParse(input.tool_input).data;
+    if (!editInput) return null;
     filePath = editInput.file_path;
     oldContent = editInput.old_string;
     newContent = editInput.new_string;
@@ -153,7 +173,7 @@ export async function processInput(
 async function main(): Promise<void> {
   let input: PostToolUseHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[type-ignore] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

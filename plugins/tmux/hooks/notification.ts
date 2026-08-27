@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { z } from "zod";
 import { tmux, tmuxQuery } from "./tmux";
 
 const argv = cli({
@@ -85,16 +86,17 @@ function updateSummary(): void {
   tmux("set-option", "-g", "@claude_notification", styled);
 }
 
-interface HookInput {
-  notification_type?: string;
-  message?: string;
-}
+const HookInput = z.looseObject({
+  notification_type: z.string().optional().catch(undefined),
+  message: z.string().optional().catch(undefined),
+});
+type HookInput = z.infer<typeof HookInput>;
 
 async function readHookInput(): Promise<HookInput | null> {
   const text = await Bun.stdin.text();
   if (!text) return null;
   try {
-    return JSON.parse(text);
+    return HookInput.parse(JSON.parse(text));
   } catch (error) {
     console.error(
       `[tmux/notification] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

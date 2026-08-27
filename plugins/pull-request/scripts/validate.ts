@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { processInput } from "./validate-body";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { HookInput, processInput } from "./validate-body";
 
 function denyWithError(reason: string): void {
   const output = {
@@ -15,9 +15,9 @@ function denyWithError(reason: string): void {
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[pull-request/validate] Failed to parse hook input: ${message}`);

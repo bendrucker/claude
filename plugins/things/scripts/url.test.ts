@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { z } from "zod";
 import { join } from "node:path";
 import {
   buildJsonPayload,
@@ -14,9 +15,11 @@ import {
   xcallBackstopMs,
 } from "./url";
 
+const Payload = z.array(z.looseObject({ attributes: z.record(z.string(), z.unknown()) }));
+
 describe("buildJsonPayload", () => {
   test("single ID produces correct structure", () => {
-    const result = JSON.parse(buildJsonPayload(["ABC"], { when: "tomorrow" }));
+    const result: unknown = JSON.parse(buildJsonPayload(["ABC"], { when: "tomorrow" }));
     expect(result).toEqual([
       {
         type: "to-do",
@@ -28,7 +31,7 @@ describe("buildJsonPayload", () => {
   });
 
   test("multiple IDs produce one object per ID with same attributes", () => {
-    const result = JSON.parse(
+    const result: unknown = JSON.parse(
       buildJsonPayload(["A", "B", "C"], { when: "today", "add-tags": "Urgent" }),
     );
     const expected = {
@@ -74,8 +77,8 @@ describe("buildJsonPayload", () => {
       },
     ],
   ])("%s", (_name, attrs, expected) => {
-    const result = JSON.parse(buildJsonPayload(["ABC"], attrs));
-    expect(result[0].attributes).toEqual(expected);
+    const result = Payload.parse(JSON.parse(buildJsonPayload(["ABC"], attrs)));
+    expect(result[0]?.attributes).toEqual(expected);
   });
 });
 
@@ -213,11 +216,11 @@ describe("dispatch", () => {
       },
     });
 
-    const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
+    const { output, ...result } = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
 
+    expect(typeof output).toBe("string");
     expect(result).toEqual({
       id: "ABC123",
-      output: expect.any(String),
       viaXcall: true,
       fallbackReason: null,
       fallbackDetail: null,

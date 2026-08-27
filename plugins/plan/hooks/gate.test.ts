@@ -7,8 +7,16 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import recorded from "./fixtures/re-presents.json";
 import { processInput, StateUnavailableError } from "./gate";
+
+const GateOutput = z.object({
+  hookSpecificOutput: z.looseObject({
+    permissionDecision: z.string(),
+    permissionDecisionReason: z.string().optional(),
+  }),
+});
 
 let stateRoot: string;
 
@@ -37,10 +45,15 @@ async function decision(
   sessionId = "session-1",
 ): Promise<PreToolUseHookSpecificOutput | null> {
   const result = await processInput(mockInput(plan, sessionId), stateRoot);
-  if (!result) return null;
-  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+  const specific = result?.hookSpecificOutput;
+  return specific?.hookEventName === "PreToolUse" ? specific : null;
 }
 
+/** Asserts the gate denied, and hands back the reason for the caller to match on. */
+function denialReason(result: PreToolUseHookSpecificOutput | null): string {
+  expect(result?.permissionDecision).toBe("deny");
+  return result?.permissionDecisionReason ?? "";
+}
 type GateRun = { stdout: string; stderr: string; exitCode: number };
 
 async function runGate(input: PreToolUseHookInput): Promise<GateRun> {
@@ -80,11 +93,7 @@ describe("unchanged re-present", () => {
 
   it("denies a byte-identical resubmission", async () => {
     await decision(plan);
-    expect(await decision(plan)).toEqual({
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining("byte-identical"),
-    });
+    expect(denialReason(await decision(plan))).toContain("byte-identical");
   });
 
   it("denies repeatedly until the text changes", async () => {
@@ -131,11 +140,7 @@ describe("append-only re-present", () => {
   it("denies when the re-present keeps nearly all prior lines and only adds new ones", async () => {
     await decision(basePlan);
     const grown = `${basePlan}\n## Rollout\n- Ship behind a flag\n- Monitor error rates`;
-    expect(await decision(grown)).toEqual({
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
-    });
+    expect(denialReason(await decision(grown))).toContain("carries nearly every prior line");
   });
 
   it("allows a genuine revision that rewrites most of the plan", async () => {
@@ -162,11 +167,7 @@ describe("size advisory", () => {
   const bigPlan = (seed: string) => seed + "x".repeat(12_001);
 
   it("denies a plan over 12k characters", async () => {
-    expect(await decision(bigPlan("a"))).toEqual({
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining("exceeds 12k characters"),
-    });
+    expect(denialReason(await decision(bigPlan("a")))).toContain("exceeds 12k characters");
   });
 
   it("stays silent at exactly 12k characters", async () => {
@@ -200,11 +201,7 @@ describe("append-only re-present", () => {
   it("denies when a re-present keeps nearly all prior lines and only adds new ones", async () => {
     await decision(initial);
     const appended = `${initial}\nline 10`;
-    expect(await decision(appended)).toEqual({
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
-    });
+    expect(denialReason(await decision(appended))).toContain("carries nearly every prior line");
   });
 
   it("denies a line swap that carries the document at zero net growth", async () => {
@@ -212,11 +209,7 @@ describe("append-only re-present", () => {
     await decision(base);
     // Trade 3 lines for 3 new ones: carry-over 0.94, no net size change.
     const swapped = [...lines(47), ...lines(3, "swapped")].join("\n");
-    expect(await decision(swapped)).toEqual({
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
-    });
+    expect(denialReason(await decision(swapped))).toContain("carries nearly every prior line");
   });
 
   it("returns null for a genuine revision with low carry-over", async () => {
@@ -267,11 +260,7 @@ describe("append-only re-present", () => {
 
     const grown = [...padded(90, "line"), ...padded(5, "new")].join("\n");
     expect(grown.length).toBeGreaterThan(12_000);
-    expect(await decision(grown)).toEqual({
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining("carries nearly every prior line"),
-    });
+    expect(denialReason(await decision(grown))).toContain("carries nearly every prior line");
     // Append-only denies before the size check, so the size branch never runs and
     // records no marker: one prompt for append-only, no second prompt for size.
     expect(readdirSync(join(stateRoot, "session-1"))).not.toContain("exit-plan-size-asked");
@@ -290,13 +279,9 @@ describe("sustained growth", () => {
 
   it("denies a second present above the high-water mark", async () => {
     await decision(skeletal);
-    expect(await decision(grown)).toEqual({
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining(
-        `Presentation 2 is larger than any before it (${skeletal.length} -> ${grown.length} chars)`,
-      ),
-    });
+    expect(denialReason(await decision(grown))).toContain(
+      `Presentation 2 is larger than any before it (${skeletal.length} -> ${grown.length} chars)`,
+    );
   });
 
   it("stays silent on a first presentation, which has no high-water mark", async () => {
@@ -361,8 +346,9 @@ describe("sustained growth", () => {
 describe("harness invocation", () => {
   it("emits the oversized decision when run as the harness runs it", async () => {
     const { stdout, stderr, exitCode } = await runGate(mockInput("x".repeat(12_001)));
+    const emitted: unknown = JSON.parse(stdout);
 
-    expect({ exitCode, stderr, decision: JSON.parse(stdout) }).toMatchInlineSnapshot(`
+    expect({ exitCode, stderr, decision: emitted }).toMatchInlineSnapshot(`
       {
         "decision": {
           "hookSpecificOutput": {
@@ -399,9 +385,7 @@ describe("recorded re-presents", () => {
   function label(run: GateRun): string {
     if (run.exitCode !== 0 || run.stderr) return `gate failed (${run.exitCode}): ${run.stderr}`;
     if (!run.stdout.trim()) return "allowed";
-    const { hookSpecificOutput } = JSON.parse(run.stdout) as {
-      hookSpecificOutput: PreToolUseHookSpecificOutput;
-    };
+    const { hookSpecificOutput } = GateOutput.parse(JSON.parse(run.stdout));
     const reason = hookSpecificOutput.permissionDecisionReason ?? "";
     const rule = RULES.find(([needle]) => reason.includes(needle))?.[1] ?? "unrecognized";
     return `${hookSpecificOutput.permissionDecision}:${rule}`;

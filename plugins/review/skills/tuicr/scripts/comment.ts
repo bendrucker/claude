@@ -1,19 +1,30 @@
-export type CommentType = "issue" | "suggestion" | "note" | "praise";
-export type CommentSide = "new" | "old";
-export type LifecycleState = "local_draft" | "pushed_draft" | "submitted";
+import { z } from "zod";
 
-export interface TuicrComment {
-  id: string;
-  location: string;
-  path: string | null;
-  start_line: number | null;
-  end_line: number | null;
-  side: CommentSide | null;
-  comment_type: CommentType;
-  lifecycle_state: LifecycleState;
-  created_at?: string;
-  content: string;
-}
+export const CommentType = z.enum(["issue", "suggestion", "note", "praise"]);
+export type CommentType = z.infer<typeof CommentType>;
+export const CommentSide = z.enum(["new", "old"]);
+export type CommentSide = z.infer<typeof CommentSide>;
+export const LifecycleState = z.enum(["local_draft", "pushed_draft", "submitted"]);
+export type LifecycleState = z.infer<typeof LifecycleState>;
+
+export const TuicrComment = z.looseObject({
+  id: z.string(),
+  location: z.string(),
+  path: z.string().nullable(),
+  start_line: z.number().nullable(),
+  end_line: z.number().nullable(),
+  side: CommentSide.nullable(),
+  comment_type: CommentType,
+  lifecycle_state: LifecycleState,
+  created_at: z.string().optional(),
+  content: z.string(),
+});
+export type TuicrComment = z.infer<typeof TuicrComment>;
+
+const CommentPayload = z.union([
+  z.looseObject({ comments: z.array(TuicrComment) }),
+  z.array(TuicrComment),
+]);
 
 export interface Anchor {
   side: CommentSide;
@@ -39,6 +50,6 @@ export function deriveAnchor(comment: TuicrComment): Anchor {
 
 /** Decode a comments JSON payload, accepting either `{ comments: [...] }` or a bare array. */
 export function decodeComments(raw: string): TuicrComment[] {
-  const data = JSON.parse(raw) as { comments: TuicrComment[] } | TuicrComment[];
+  const data = CommentPayload.parse(JSON.parse(raw));
   return Array.isArray(data) ? data : data.comments;
 }

@@ -27,12 +27,19 @@ afterAll(async () => {
   await rm(fixtureDir, { recursive: true, force: true });
 });
 
-function makeInput(command: string, toolName = "Bash"): PreToolUseHookInput {
+function makeInput(toolInput: unknown, toolName = "Bash"): PreToolUseHookInput {
   return {
+    hook_event_name: "PreToolUse",
+    session_id: "s",
+    transcript_path: "/dev/null",
+    cwd: "/",
     tool_name: toolName,
-    tool_input: { command },
-  } as PreToolUseHookInput;
+    tool_input: toolInput,
+    tool_use_id: "t",
+  };
 }
+
+const bashInput = (command: string) => makeInput({ command });
 
 describe("extractCommands", () => {
   test("captures bun script arg", () => {
@@ -78,7 +85,7 @@ describe("extractCommands", () => {
   });
 
   test.each<[string]>([["git status"], ["/usr/bin/touch x"]])("no script arg for %p", (command) => {
-    expect(extractCommands(command)).toEqual([{ cmd: command.split(" ")[0] as string }]);
+    expect(extractCommands(command)).toEqual([{ cmd: command.split(" ")[0] ?? "" }]);
   });
 });
 
@@ -98,37 +105,35 @@ describe("hasBypassMarker", () => {
 
 describe("processInput", () => {
   test("returns null on non-darwin", async () => {
-    const result = await processInput(makeInput(`bun ${markedScriptPath}`), "linux");
+    const result = await processInput(bashInput(`bun ${markedScriptPath}`), "linux");
     expect(result).toBeNull();
   });
 
   test("returns null when command is undefined", async () => {
-    const input = { tool_name: "Bash", tool_input: {} } as PreToolUseHookInput;
+    const input = makeInput({});
     const result = await processInput(input, "darwin");
     expect(result).toBeNull();
   });
 
   test("disables sandbox for marked bun script", async () => {
-    const input = makeInput(`bun ${markedScriptPath} --pr 42`);
+    const command = `bun ${markedScriptPath} --pr 42`;
+    const input = bashInput(command);
     const result = await processInput(input, "darwin");
     expect(result).toEqual({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        updatedInput: {
-          ...(input.tool_input as Record<string, unknown>),
-          dangerouslyDisableSandbox: true,
-        },
+        updatedInput: { command, dangerouslyDisableSandbox: true },
       },
     });
   });
 
   test("does not disable sandbox for unmarked bun script", async () => {
-    const result = await processInput(makeInput(`bun ${unmarkedScriptPath}`), "darwin");
+    const result = await processInput(bashInput(`bun ${unmarkedScriptPath}`), "darwin");
     expect(result).toBeNull();
   });
 
   test("honors marker on second bun invocation in a chain", async () => {
-    const input = makeInput(`bun ${unmarkedScriptPath} && bun ${markedScriptPath}`);
+    const input = bashInput(`bun ${unmarkedScriptPath} && bun ${markedScriptPath}`);
     const result = await processInput(input, "darwin");
     expect(result?.hookSpecificOutput).toMatchObject({
       hookEventName: "PreToolUse",
@@ -137,7 +142,7 @@ describe("processInput", () => {
   });
 
   test("disables sandbox for a marked script run directly", async () => {
-    const result = await processInput(makeInput(`${markedScriptPath} --refresh`), "darwin");
+    const result = await processInput(bashInput(`${markedScriptPath} --refresh`), "darwin");
     expect(result?.hookSpecificOutput).toMatchObject({
       hookEventName: "PreToolUse",
       updatedInput: { dangerouslyDisableSandbox: true },
@@ -145,12 +150,12 @@ describe("processInput", () => {
   });
 
   test("does not disable sandbox for an unmarked script run directly", async () => {
-    const result = await processInput(makeInput(unmarkedScriptPath), "darwin");
+    const result = await processInput(bashInput(unmarkedScriptPath), "darwin");
     expect(result).toBeNull();
   });
 
   test("honors marker on second directly-run script in a chain", async () => {
-    const input = makeInput(`${unmarkedScriptPath} && ${markedScriptPath}`);
+    const input = bashInput(`${unmarkedScriptPath} && ${markedScriptPath}`);
     const result = await processInput(input, "darwin");
     expect(result?.hookSpecificOutput).toMatchObject({
       hookEventName: "PreToolUse",
@@ -159,7 +164,7 @@ describe("processInput", () => {
   });
 
   test("processes Monitor tool input the same as Bash", async () => {
-    const input = makeInput(`bun ${markedScriptPath}`, "Monitor");
+    const input = makeInput({ command: `bun ${markedScriptPath}` }, "Monitor");
     const result = await processInput(input, "darwin");
     expect(result?.hookSpecificOutput).toMatchObject({
       hookEventName: "PreToolUse",

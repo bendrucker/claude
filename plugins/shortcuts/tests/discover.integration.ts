@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { type ExecFileSyncOptions, execFileSync } from "node:child_process";
 import { join } from "node:path";
+import { z } from "zod";
 
 const script = join(import.meta.dirname, "../skills/shortcut/scripts/discover.swift");
 
@@ -11,8 +12,10 @@ const script = join(import.meta.dirname, "../skills/shortcut/scripts/discover.sw
 const timeoutMs = 60000;
 const opts: ExecFileSyncOptions = { encoding: "utf-8", timeout: timeoutMs };
 
-function run(command: string): string {
-  return execFileSync("swift", [script, command], opts) as string;
+const Entries = z.array(z.record(z.string(), z.unknown()));
+
+function run(command: string): Record<string, unknown>[] {
+  return Entries.parse(JSON.parse(execFileSync("swift", [script, command], opts).toString()));
 }
 
 const ci = !!process.env.CI;
@@ -21,7 +24,7 @@ describe.skipIf(ci)("discover.swift actions", () => {
   let actions: Record<string, unknown>[];
 
   beforeAll(() => {
-    actions = JSON.parse(run("actions")) as Record<string, unknown>[];
+    actions = run("actions");
   }, timeoutMs);
 
   it("returns a large array of built-in actions", () => {
@@ -60,7 +63,7 @@ describe.skipIf(ci)("discover.swift apps", () => {
   let apps: Record<string, unknown>[];
 
   beforeAll(() => {
-    apps = JSON.parse(run("apps")) as Record<string, unknown>[];
+    apps = run("apps");
   }, timeoutMs);
 
   it("returns an array of apps", () => {

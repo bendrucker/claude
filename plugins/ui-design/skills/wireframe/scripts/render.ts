@@ -76,12 +76,15 @@ async function main() {
 
   const files: Array<{ input: string; output?: string }> = [];
 
-  if (svgFiles.length === 1 && nonSvgArgs.length === 1) {
-    files.push({ input: svgFiles[0] as string, ...(nonSvgArgs[0] && { output: nonSvgArgs[0] }) });
+  const [svg] = svgFiles;
+  const [firstArg, secondArg] = args;
+
+  if (svg && nonSvgArgs.length === 1) {
+    files.push({ input: svg, ...(nonSvgArgs[0] && { output: nonSvgArgs[0] }) });
   } else if (svgFiles.length > 0) {
     files.push(...svgFiles.map((input) => ({ input })));
-  } else if (args.length >= 1) {
-    files.push({ input: args[0] as string, ...(args[1] && { output: args[1] }) });
+  } else if (firstArg) {
+    files.push({ input: firstArg, ...(secondArg && { output: secondArg }) });
   }
 
   try {
@@ -97,8 +100,8 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("/bun")) {
-  main().catch((error) => {
-    console.error("Error:", error.message);
+  main().catch((error: unknown) => {
+    console.error("Error:", error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
 }

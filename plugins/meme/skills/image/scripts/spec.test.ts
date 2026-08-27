@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { specFromFlags, validateSpec } from "./spec";
+import { type Spec, specFromFlags, validateSpec } from "./spec";
 
 describe("validateSpec", () => {
   test.each([
@@ -21,7 +21,7 @@ describe("validateSpec", () => {
   });
 
   test("accepts a full spec unchanged", () => {
-    const spec = {
+    const spec: Spec = {
       boxes: [
         { text: "top text", preset: "classic", anchor: "top" },
         {
@@ -35,7 +35,7 @@ describe("validateSpec", () => {
       ],
       captions: [{ text: "a caption", position: "bottom" }],
     };
-    expect(validateSpec(spec)).toEqual(spec as ReturnType<typeof validateSpec>);
+    expect(validateSpec(spec)).toEqual(spec);
   });
 });
 

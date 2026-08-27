@@ -2,6 +2,7 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 
 export interface Provider {
   name: string;
@@ -14,12 +15,20 @@ export const PROVIDERS: Provider[] = [
   { name: "coderabbit", configs: [".coderabbit.yaml", ".coderabbit.yml"], cli: "coderabbit" },
 ];
 
-export interface Cooldown {
-  provider: string;
-  remote?: string;
-  pausedUntil: string;
-  reason: string;
-}
+export const Cooldown = z.object({
+  provider: z.string(),
+  remote: z.string().optional(),
+  pausedUntil: z.string(),
+  reason: z.string(),
+});
+export type Cooldown = z.infer<typeof Cooldown>;
+
+// A file written by an older build can carry `remote: null` where the current
+// shape omits the key, and the timestamp is only required to be parseable.
+const CooldownEntry = Cooldown.extend({
+  remote: z.string().nullish(),
+  pausedUntil: z.string().refine((value) => !Number.isNaN(Date.parse(value))),
+});
 
 export type Which = (cli: string) => string | null;
 export type ReadCooldowns = () => Promise<Cooldown[]>;
@@ -34,19 +43,13 @@ export function parseCooldowns(text: string): Cooldown[] {
   } catch {
     return [];
   }
-  if (!Array.isArray(parsed)) return [];
-  const records: Cooldown[] = [];
-  for (const entry of parsed) {
-    if (typeof entry !== "object" || entry === null) continue;
-    const { provider, pausedUntil, reason, remote } = entry as Record<string, unknown>;
-    if (typeof provider !== "string") continue;
-    if (typeof reason !== "string") continue;
-    if (typeof pausedUntil !== "string" || Number.isNaN(Date.parse(pausedUntil))) continue;
-    if (typeof remote === "string") records.push({ provider, pausedUntil, reason, remote });
-    else if (remote === undefined || remote === null)
-      records.push({ provider, pausedUntil, reason });
-  }
-  return records;
+  const entries = z.array(z.unknown()).safeParse(parsed).data ?? [];
+  return entries.flatMap((entry) => {
+    const record = CooldownEntry.safeParse(entry).data;
+    if (!record) return [];
+    const { remote, ...rest } = record;
+    return [remote ? { ...rest, remote } : rest];
+  });
 }
 
 export const readCooldowns: ReadCooldowns = async () =>

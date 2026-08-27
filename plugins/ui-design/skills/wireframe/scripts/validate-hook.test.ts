@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import path from "node:path";
-import type {
-  PostToolUseHookInput,
-  PostToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 
 import { isSvgFile, processInput } from "./validate-hook";
 
@@ -12,9 +9,15 @@ const assetsDir = path.join(import.meta.dirname, "..", "assets");
 
 function makeInput(toolName: string, filePath: string): PostToolUseHookInput {
   return {
+    hook_event_name: "PostToolUse",
+    session_id: "test",
+    transcript_path: "/tmp/test",
+    cwd: "/tmp",
     tool_name: toolName,
     tool_input: { file_path: filePath },
-  } as PostToolUseHookInput;
+    tool_response: {},
+    tool_use_id: "test",
+  };
 }
 
 describe("isSvgFile", () => {
@@ -61,8 +64,10 @@ describe("processInput", () => {
       expect(result).toBeNull();
     } else {
       expect(result).not.toBeNull();
-      const output = result?.hookSpecificOutput as PostToolUseHookSpecificOutput | undefined;
-      expect(output?.additionalContext).toContain(expected);
+      const specific = result?.hookSpecificOutput;
+      expect(specific?.hookEventName === "PostToolUse" && specific.additionalContext).toContain(
+        expected,
+      );
     }
   });
 });

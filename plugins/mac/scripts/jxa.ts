@@ -3,8 +3,20 @@
 
 import * as acorn from "acorn";
 import { cli } from "cleye";
+import { z } from "zod";
 
-type Node = acorn.Node & Record<string, unknown>;
+const AstNode = z.looseObject({ type: z.string() });
+type AstNode = z.infer<typeof AstNode>;
+const AnyList = z.array(z.unknown());
+
+const Identifier = z.looseObject({ type: z.literal("Identifier"), name: z.string() });
+const MemberExpression = z.looseObject({
+  type: z.literal("MemberExpression"),
+  object: AstNode,
+  property: AstNode,
+});
+const CallExpression = z.looseObject({ type: z.literal("CallExpression"), callee: AstNode });
+const StringLiteral = z.looseObject({ type: z.literal("Literal"), value: z.string() });
 
 interface ValidationResult {
   valid: boolean;
@@ -20,19 +32,16 @@ function stripShebang(source: string): string {
   return source;
 }
 
-function walkNode(node: Node, visitor: (n: Node) => void): void {
+/** The nodes reachable from one property of a node: itself, or the ones in its list. */
+function childNodes(value: unknown): AstNode[] {
+  const items = AnyList.safeParse(value).data ?? [value];
+  return items.flatMap((item) => AstNode.safeParse(item).data ?? []);
+}
+
+function walkNode(node: AstNode, visitor: (n: AstNode) => void): void {
   visitor(node);
-  for (const key of Object.keys(node)) {
-    const value = node[key];
-    if (value && typeof value === "object" && "type" in value) {
-      walkNode(value as Node, visitor);
-    } else if (Array.isArray(value)) {
-      for (const item of value) {
-        if (item && typeof item === "object" && "type" in item) {
-          walkNode(item as Node, visitor);
-        }
-      }
-    }
+  for (const value of Object.values(node)) {
+    for (const child of childNodes(value)) walkNode(child, visitor);
   }
 }
 
@@ -50,32 +59,24 @@ export function validateAppScope(source: string, app: string): ValidationResult 
 
   const violations: string[] = [];
 
-  walkNode(ast as Node, (node) => {
-    if (node.type !== "CallExpression") return;
-
-    const callee = node.callee as Node;
+  walkNode(AstNode.parse(ast), (node) => {
+    const call = CallExpression.safeParse(node);
+    if (!call.success) return;
+    const callee = call.data.callee;
 
     // Application.currentApplication() — always allowed
+    const member = MemberExpression.safeParse(callee).data;
     if (
-      callee.type === "MemberExpression" &&
-      (callee.object as Node).type === "Identifier" &&
-      (callee.object as Node).name === "Application" &&
-      (callee.property as Node).type === "Identifier" &&
-      (callee.property as Node).name === "currentApplication"
+      Identifier.safeParse(member?.object).data?.name === "Application" &&
+      Identifier.safeParse(member?.property).data?.name === "currentApplication"
     ) {
       return;
     }
 
     // Application("SomeApp")
-    if (callee.type === "Identifier" && callee.name === "Application") {
-      const args = node.arguments as Node[];
-      const firstArg = args[0];
-      if (firstArg?.type === "Literal" && typeof firstArg.value === "string") {
-        if (firstArg.value !== app) {
-          violations.push(firstArg.value);
-        }
-      }
-    }
+    if (Identifier.safeParse(callee).data?.name !== "Application") return;
+    const first = StringLiteral.safeParse(AnyList.parse(node.arguments)[0]).data;
+    if (first && first.value !== app) violations.push(first.value);
   });
 
   return { valid: violations.length === 0, violations };

@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { selectColumns, stringify } from "./format";
 
 describe("stringify", () => {
@@ -55,15 +55,10 @@ describe("selectColumns", () => {
   });
 
   test("exits with error for unknown column", () => {
-    const mockExit = mock(() => {
+    const mockExit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
     });
-    const originalExit = process.exit;
-    process.exit = mockExit;
-
-    const mockError = mock();
-    const originalError = console.error;
-    console.error = mockError;
+    const mockError = spyOn(console, "error").mockImplementation(() => {});
 
     try {
       selectColumns(headers, rows, ["unknown"]);
@@ -76,7 +71,7 @@ describe("selectColumns", () => {
       "Unknown column: unknown. Available: Name, Status, Due Date, Project",
     );
 
-    process.exit = originalExit;
-    console.error = originalError;
+    mockExit.mockRestore();
+    mockError.mockRestore();
   });
 });

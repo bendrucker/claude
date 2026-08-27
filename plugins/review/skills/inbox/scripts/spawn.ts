@@ -39,15 +39,17 @@ if (!repoPath) {
   process.exit(1);
 }
 
-if (
-  permissionModeFlag !== undefined &&
-  !(PERMISSION_MODES as readonly string[]).includes(permissionModeFlag)
-) {
-  console.error(`--permission-mode must be one of: ${PERMISSION_MODES.join(", ")}`);
-  process.exit(1);
+function resolvePermissionMode(value: string | undefined): PermissionMode | undefined {
+  if (value === undefined) return undefined;
+  const mode = PERMISSION_MODES.find((m) => m === value);
+  if (!mode) {
+    console.error(`--permission-mode must be one of: ${PERMISSION_MODES.join(", ")}`);
+    process.exit(1);
+  }
+  return mode;
 }
 
-const permissionMode = permissionModeFlag as PermissionMode | undefined;
+const permissionMode = resolvePermissionMode(permissionModeFlag);
 
 const state = await readState(dataDir);
 if (isDispatched(state, url)) {

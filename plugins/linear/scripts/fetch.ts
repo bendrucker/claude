@@ -1,8 +1,13 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 
-export type WebFetchInput = { url: string };
+const WebFetchInput = z.looseObject({ url: z.string() });
+export type WebFetchInput = z.infer<typeof WebFetchInput>;
+
+export const HookInput = z.looseObject({ tool_input: z.unknown() });
+export type HookInput = z.infer<typeof HookInput>;
 
 const PUBLIC_PATH_PREFIXES = ["/docs", "/developers", "/changelog"];
 
@@ -21,10 +26,9 @@ export function formatOutput(reason: string): SyncHookJSONOutput {
   };
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { url } = input.tool_input as WebFetchInput;
-
-  if (isPublicUrl(url)) {
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const url = WebFetchInput.safeParse(input.tool_input).data?.url;
+  if (url === undefined || isPublicUrl(url)) {
     return null;
   }
 
@@ -34,9 +38,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[linear/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

@@ -70,7 +70,12 @@
     "local/no-conditional-empty-object-spread": "error",
     "local/no-module-mocking": "error",
     "local/no-terminal-width": "error",
-    "local/no-unknown-returns": "error"
+    "local/no-unknown-returns": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error"
   },
   "overrides": [
     {
@@ -79,6 +84,16 @@
         "local/no-chained-type-assertions": "off",
         "unicorn/consistent-function-scoping": "off",
         "typescript/no-non-null-assertion": "off"
+      }
+    },
+    {
+      "files": ["**/*.workflow.js"],
+      "rules": {
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off"
       }
     }
   ],

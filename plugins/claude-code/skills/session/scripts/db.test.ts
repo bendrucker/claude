@@ -1535,7 +1535,7 @@ describe("change catalog", () => {
       const subdir = path.join(importsDir, "guarded", "projects", "-Users-test-project");
       await $`chmod 000 ${subdir}`.quiet();
       try {
-        await expect(reindex()).rejects.toThrow();
+        expect(reindex()).rejects.toThrow();
       } finally {
         await $`chmod 755 ${subdir}`.quiet();
       }
@@ -1566,7 +1566,7 @@ describe("view versioning", () => {
     await db.run("DROP VIEW tool_calls");
     await reindex();
 
-    await expect(db.query("SELECT * FROM tool_calls LIMIT 1", z.unknown())).rejects.toThrow();
+    expect(db.query("SELECT * FROM tool_calls LIMIT 1", z.unknown())).rejects.toThrow();
   });
 });
 

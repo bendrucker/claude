@@ -114,13 +114,13 @@ describe("merge", () => {
     expect(actions.addToMergeTrain).not.toHaveBeenCalled();
   });
 
-  test("throws when no open MR found for branch", async () => {
+  test("throws when no open MR found for branch", () => {
     const actions = createActions({
       getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: true })),
       getMrIid: mock(() => Promise.reject(new Error("No open MR found for branch: no-mr"))),
     });
 
-    await expect(merge("no-mr", { autoMerge: true }, actions)).rejects.toThrow(
+    expect(merge("no-mr", { autoMerge: true }, actions)).rejects.toThrow(
       "No open MR found for branch: no-mr",
     );
   });
@@ -179,20 +179,20 @@ describe("arm", () => {
     expect(sleep).toHaveBeenCalledTimes(2);
   });
 
-  test("throws after exhausting retries on a persistent transient", async () => {
+  test("throws after exhausting retries on a persistent transient", () => {
     const run = mock(() => Promise.reject(new Error("approvals_syncing")));
     const sleep = mock(() => Promise.resolve());
 
-    await expect(arm(run, sleep)).rejects.toThrow("approvals_syncing");
+    expect(arm(run, sleep)).rejects.toThrow("approvals_syncing");
     expect(run).toHaveBeenCalledTimes(5);
     expect(sleep).toHaveBeenCalledTimes(4);
   });
 
-  test("rethrows a non-transient error immediately", async () => {
+  test("rethrows a non-transient error immediately", () => {
     const run = mock(() => Promise.reject(new Error("404 Not Found")));
     const sleep = mock(() => Promise.resolve());
 
-    await expect(arm(run, sleep)).rejects.toThrow("404 Not Found");
+    expect(arm(run, sleep)).rejects.toThrow("404 Not Found");
     expect(run).toHaveBeenCalledTimes(1);
     expect(sleep).not.toHaveBeenCalled();
   });
@@ -222,7 +222,7 @@ describe("arm", () => {
     expect(sleep).not.toHaveBeenCalled();
   });
 
-  test("falls back to the Error message when both streams are empty", async () => {
+  test("falls back to the Error message when both streams are empty", () => {
     const run = mock(() =>
       Promise.reject(
         Object.assign(new Error("glab exited with code 1"), { stderr: Buffer.from("") }),
@@ -230,7 +230,7 @@ describe("arm", () => {
     );
     const sleep = mock(() => Promise.resolve());
 
-    await expect(arm(run, sleep)).rejects.toThrow("glab exited with code 1");
+    expect(arm(run, sleep)).rejects.toThrow("glab exited with code 1");
     expect(run).toHaveBeenCalledTimes(1);
   });
 });
@@ -287,11 +287,11 @@ describe("status", () => {
     expect((await status("feature", actions)).rebased_on_target).toBeNull();
   });
 
-  test("throws when no open MR found for branch", async () => {
+  test("throws when no open MR found for branch", () => {
     const actions = createActions({
       getMrIid: mock(() => Promise.reject(new Error("No open MR found for branch: no-mr"))),
     });
 
-    await expect(status("no-mr", actions)).rejects.toThrow("No open MR found for branch: no-mr");
+    expect(status("no-mr", actions)).rejects.toThrow("No open MR found for branch: no-mr");
   });
 });

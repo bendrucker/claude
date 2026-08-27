@@ -195,9 +195,9 @@ describe("aggregateVerdicts", () => {
 describe("judgeDocument", () => {
   test("judges each chunk and aggregates", async () => {
     const seen: string[] = [];
-    const judge = async (chunk: string) => {
+    const judge = (chunk: string) => {
       seen.push(chunk);
-      return verdict({ information_density: seen.length === 2 });
+      return Promise.resolve(verdict({ information_density: seen.length === 2 }));
     };
     const long = `${Array.from({ length: 1400 }, () => "alpha").join(" ")}\n\n${Array.from({ length: 1400 }, () => "beta").join(" ")}`;
     const result = await judgeDocument(judge, long);
@@ -222,9 +222,9 @@ describe("estimateCost", () => {
     const counted: string[] = [];
     const estimate = await estimateCost(["doc one", "doc two"], {
       promptText: "prompt words here",
-      countTokens: async (userContent) => {
+      countTokens: (userContent) => {
         counted.push(userContent);
-        return 1000;
+        return Promise.resolve(1000);
       },
     });
     expect(counted).toEqual(["doc one", "doc two"]);
@@ -239,9 +239,9 @@ describe("estimateCost", () => {
     const batches: string[] = [];
     const estimate = await estimateHeadingCost(headings, {
       promptText: "prompt words here",
-      countTokens: async (userContent) => {
+      countTokens: (userContent) => {
         batches.push(userContent);
-        return 500;
+        return Promise.resolve(500);
       },
     });
     expect(estimate.calls).toBe(3);
@@ -273,7 +273,7 @@ describe("modelPricing", () => {
     const estimate = await estimateCost(["doc"], {
       promptText: "prompt",
       model,
-      countTokens: async () => 1000,
+      countTokens: () => Promise.resolve(1000),
     });
     expect(estimate.usd).toBeCloseTo(usd, 6);
   });
@@ -284,7 +284,7 @@ describe("modelPricing", () => {
       const estimate = await estimateCost(["doc"], {
         promptText: "prompt",
         model: "some-other-vendor-model",
-        countTokens: async () => 1000,
+        countTokens: () => Promise.resolve(1000),
       });
       expect(estimate.usd).toBeCloseTo(0.0025, 6);
       expect(warn).toHaveBeenCalledTimes(1);
@@ -300,7 +300,7 @@ describe("modelPricing", () => {
       await estimateCost(["doc"], {
         promptText: "prompt",
         model: JUDGE_MODEL,
-        countTokens: async () => 1000,
+        countTokens: () => Promise.resolve(1000),
       });
       expect(warn).not.toHaveBeenCalled();
     } finally {
@@ -317,7 +317,7 @@ describe("judgeCorpus", () => {
       verdict(),
     ];
     let i = 0;
-    const judge = async () => verdicts[i++] ?? verdict();
+    const judge = () => Promise.resolve(verdicts[i++] ?? verdict());
     const audit = await judgeCorpus(judge, ["a", "b", "c"], {
       promptSha256: "abc123",
       model: "claude-haiku-4-5",
@@ -352,7 +352,7 @@ describe("judgeCorpus", () => {
   });
 
   test("caps sampled spans", async () => {
-    const judge = async () => verdict({ marketing_phrasing: "seamless" });
+    const judge = () => Promise.resolve(verdict({ marketing_phrasing: "seamless" }));
     const audit = await judgeCorpus(
       judge,
       Array.from({ length: 8 }, () => "doc"),
@@ -393,9 +393,9 @@ describe("parseHeadingVerdicts", () => {
 describe("judgeHeadings", () => {
   test("batches headings per call", async () => {
     const batches: number[] = [];
-    const judge = async (headings: string[]) => {
+    const judge = (headings: string[]) => {
       batches.push(headings.length);
-      return headings.map(() => false);
+      return Promise.resolve(headings.map(() => false));
     };
     const verdicts = await judgeHeadings(
       judge,

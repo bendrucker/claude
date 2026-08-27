@@ -20,10 +20,11 @@ function fakeEnv(files: Record<string, string> = {}): LintEnv & { touched: strin
   const touched: string[] = [];
   return {
     touched,
-    fileExists: async (path) => path in files || touched.includes(path),
-    readFile: async (path) => files[path] ?? null,
-    touch: async (path) => {
+    fileExists: (path) => Promise.resolve(path in files || touched.includes(path)),
+    readFile: (path) => Promise.resolve(files[path] ?? null),
+    touch: (path) => {
       touched.push(path);
+      return Promise.resolve();
     },
   };
 }

@@ -353,7 +353,7 @@ const applyCmd = command(
   },
 );
 
-cli(
+await cli(
   {
     name: "audit",
     commands: [preflightCmd, applyCmd],

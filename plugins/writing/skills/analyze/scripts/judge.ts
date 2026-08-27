@@ -365,8 +365,8 @@ export function anthropicTokenCounter(options: AnthropicJudgeOptions): InputToke
 /** Word-count heuristic for contexts without API credentials (tests, dry runs). */
 function heuristicTokenCounter(promptText: string): InputTokenCounter {
   const promptTokens = Math.ceil(countWords(promptText) * TOKENS_PER_WORD);
-  return async (userContent: string) =>
-    promptTokens + Math.ceil(countWords(userContent) * TOKENS_PER_WORD);
+  return (userContent: string) =>
+    Promise.resolve(promptTokens + Math.ceil(countWords(userContent) * TOKENS_PER_WORD));
 }
 
 async function mapPooled<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {

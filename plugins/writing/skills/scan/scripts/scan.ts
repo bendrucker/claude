@@ -225,7 +225,7 @@ const scoreCmd = command(
 );
 
 if (import.meta.main) {
-  cli(
+  await cli(
     {
       name: "scan",
       commands: [auditCmd, scoreCmd],

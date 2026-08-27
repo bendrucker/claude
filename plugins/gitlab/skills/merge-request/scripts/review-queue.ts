@@ -75,7 +75,7 @@ export function filterReviewQueue(currentUser: CurrentUser): ReviewQueueEntry[] 
 }
 
 if (import.meta.main) {
-  cli(
+  await cli(
     {
       name: "review-queue",
       flags: {},

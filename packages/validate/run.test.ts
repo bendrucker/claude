@@ -91,7 +91,7 @@ describe("runValidation", () => {
     });
 
     try {
-      await expect(runValidation({ files: [file], schema: schemaPath })).rejects.toThrow("exit");
+      expect(runValidation({ files: [file], schema: schemaPath })).rejects.toThrow("exit");
       expect(exitSpy).toHaveBeenCalledWith(1);
     } finally {
       exitSpy.mockRestore();

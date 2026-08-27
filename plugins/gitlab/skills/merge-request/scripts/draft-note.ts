@@ -268,7 +268,7 @@ const reviewCmd = command(
   },
 );
 
-cli(
+await cli(
   {
     name: "draft-note",
     commands: [createCmd, publishCmd, submitCmd, listCmd, reviewCmd],

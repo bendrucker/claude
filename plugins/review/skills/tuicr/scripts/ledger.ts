@@ -290,7 +290,7 @@ const reconcileCmd = command(
 );
 
 if (import.meta.main) {
-  cli({
+  await cli({
     name: "ledger",
     commands: [resolveCmd, upsertCmd, listCmd, reconcileCmd],
   });

@@ -7,9 +7,9 @@ import { type Cooldown, detect, parseCooldowns } from "./detect-bot";
 const NOW = new Date("2026-08-02T00:00:00Z");
 const REMOTE = "git@github.com:bendrucker/claude.git";
 
-const none = async () => [];
-const origin = async () => REMOTE;
-const noOrigin = async () => null;
+const none = () => Promise.resolve([]);
+const origin = () => Promise.resolve(REMOTE);
+const noOrigin = () => Promise.resolve(null);
 
 async function repo(files: string[]): Promise<string> {
   const root = mkdtempSync(join(tmpdir(), "detect-bot-"));
@@ -134,7 +134,7 @@ test.each<{ name: string; records: unknown; expected: string }>([
     expected: "greptile: repo config (.greptile/config.json), CLI installed",
   },
 ])("cooldown: $name", async ({ records, expected }) => {
-  const cooldowns = async () => parseCooldowns(JSON.stringify(records));
+  const cooldowns = () => Promise.resolve(parseCooldowns(JSON.stringify(records)));
   const root = await repo([".greptile/config.json"]);
   expect(await detect(root, { which: onlyGreptile, cooldowns, remote: origin, now: NOW })).toBe(
     expected,
@@ -154,7 +154,7 @@ test.each<{ name: string; records: Cooldown[]; expected: string }>([
     expected: "greptile: repo config (.greptile/config.json), CLI installed",
   },
 ])("unresolvable remote: $name", async ({ records, expected }) => {
-  const cooldowns = async () => records;
+  const cooldowns = () => Promise.resolve(records);
   const root = await repo([".greptile/config.json"]);
   expect(await detect(root, { which: onlyGreptile, cooldowns, remote: noOrigin, now: NOW })).toBe(
     expected,
@@ -162,7 +162,7 @@ test.each<{ name: string; records: Cooldown[]; expected: string }>([
 });
 
 test("cooldown: unparseable JSON", async () => {
-  const cooldowns = async () => parseCooldowns("not json");
+  const cooldowns = () => Promise.resolve(parseCooldowns("not json"));
   const root = await repo([".greptile/config.json"]);
   expect(await detect(root, { which: onlyGreptile, cooldowns, remote: origin, now: NOW })).toBe(
     "greptile: repo config (.greptile/config.json), CLI installed",

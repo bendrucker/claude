@@ -71,7 +71,7 @@ const mapCmd = command(
 );
 
 if (import.meta.main) {
-  cli({
+  await cli({
     name: "mapping",
     commands: [mapCmd],
   });

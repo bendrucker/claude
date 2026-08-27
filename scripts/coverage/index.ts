@@ -25,10 +25,10 @@ function changedFiles(base: string): string[] {
     .filter((f) => f && isSourceFile(f));
 }
 
-function persistLcov(reports: Parameters<typeof formatLcov>[0]): void {
+async function persistLcov(reports: Parameters<typeof formatLcov>[0]): Promise<void> {
   const dir = join(repoRoot, "coverage");
   mkdirSync(dir, { recursive: true });
-  Bun.write(join(dir, "lcov.info"), formatLcov(reports));
+  await Bun.write(join(dir, "lcov.info"), formatLcov(reports));
 }
 
 const argv = cli({
@@ -67,7 +67,7 @@ if (files.length === 0 && argv.flags.changed) {
 const reports = await runCoverage(files);
 
 // Persist a merged report so the PostToolUse hook has fresh data to surface.
-persistLcov(reports);
+await persistLcov(reports);
 
 // When specific files were requested, focus the report on them.
 const targets = files.length

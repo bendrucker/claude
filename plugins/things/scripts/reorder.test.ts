@@ -8,7 +8,7 @@ describe("reorder input guards", () => {
   test.each<[string, string, string[], string]>([
     ["empty ids", "today", [], "No IDs provided"],
     ["unknown list", "logbook", ["abc"], "Invalid list: logbook"],
-  ])("rejects %s by throwing", async (_name, list, ids, message) => {
-    await expect(reorder(list, ids)).rejects.toThrow(message);
+  ])("rejects %s by throwing", (_name, list, ids, message) => {
+    expect(reorder(list, ids)).rejects.toThrow(message);
   });
 });

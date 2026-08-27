@@ -70,7 +70,7 @@ describe("applyToBranch", () => {
     const edits = new Map([["note.ts", "// keep\nconst x = 1;\n"]]);
     await applyToBranch(edits, { branch: "audit" });
 
-    await expect(applyToBranch(edits, { branch: "audit" })).rejects.toThrow(/audit/);
+    expect(applyToBranch(edits, { branch: "audit" })).rejects.toThrow(/audit/);
 
     const status = (await $`git status --porcelain`.quiet()).text().trim();
     expect(status).toBe("");

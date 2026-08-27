@@ -24,9 +24,6 @@
     "no-underscore-dangle": ["error", { "allow": ["__typename", "__dirname"] }],
     "no-unsafe-optional-chaining": "off",
     "typescript/no-unsafe-type-assertion": "off",
-    "typescript/await-thenable": "off",
-    "typescript/no-floating-promises": "off",
-    "typescript/unbound-method": "off",
     "typescript/ban-ts-comment": "error",
     "typescript/explicit-module-boundary-types": "error",
     "typescript/no-deprecated": "error",
@@ -35,6 +32,7 @@
     "typescript/no-misused-spread": "error",
     "typescript/only-throw-error": "error",
     "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-await": "error",
     "no-restricted-imports": [
       "error",
       {

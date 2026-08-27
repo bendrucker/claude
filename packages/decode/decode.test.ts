@@ -177,7 +177,7 @@ describe("sources", () => {
     await Bun.write(bad, '{"name":1}');
 
     expect(await decodeFile(Tag, good)).toEqual({ name: "a" });
-    await expect(decodeFile(Tag, bad)).rejects.toThrow(`${bad} did not match its schema`);
+    expect(decodeFile(Tag, bad)).rejects.toThrow(`${bad} did not match its schema`);
   });
 
   test("decodeFileLines reads a JSONL file", async () => {
@@ -186,11 +186,11 @@ describe("sources", () => {
     expect(await decodeFileLines(Tag, path)).toEqual([{ name: "a" }, { name: "b" }]);
   });
 
-  test("decodeStdin defaults its source label and accepts an override", async () => {
+  test("decodeStdin defaults its source label and accepts an override", () => {
     const stdin = spyOn(Bun.stdin, "text").mockResolvedValue('{"name":1}');
     try {
-      await expect(decodeStdin(Tag)).rejects.toThrow("stdin did not match its schema");
-      await expect(decodeStdin(Tag, "newline/check hook input")).rejects.toThrow(
+      expect(decodeStdin(Tag)).rejects.toThrow("stdin did not match its schema");
+      expect(decodeStdin(Tag, "newline/check hook input")).rejects.toThrow(
         "newline/check hook input did not match its schema",
       );
     } finally {

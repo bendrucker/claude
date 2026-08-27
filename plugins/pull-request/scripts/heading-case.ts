@@ -172,9 +172,15 @@ export function headingCaseViolations(body: string): { text: string; suggested: 
     const cased = apStyleTitleCase(trimmed, { stopwords: AP_STOPWORDS }).trim().split(/\s+/);
     if (original.length !== cased.length) continue;
 
-    const suggested = original.map((word, i) => caseWord(word, cased[i] ?? word));
+    const suggested: string[] = [];
+    let differs = false;
+    for (const [i, word] of original.entries()) {
+      const next = caseWord(word, cased[i] ?? word);
+      suggested.push(next);
+      if (next !== word) differs = true;
+    }
 
-    if (suggested.some((word, i) => word !== original[i])) {
+    if (differs) {
       violations.push({
         text: restore(original.join(" "), codeSpans),
         suggested: restore(suggested.join(" "), codeSpans),

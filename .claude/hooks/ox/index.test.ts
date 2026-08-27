@@ -128,6 +128,30 @@ async function createIgnoredFixture(baseDir: string): Promise<string> {
   return filePath;
 }
 
+// --type-aware is gated on node_modules, so linkNodeModules picks which pass runs
+// over a file whose only violation needs type information.
+async function createTypeAwareFixture(
+  baseDir: string,
+  { linkNodeModules }: { linkNodeModules: boolean },
+): Promise<string> {
+  const repoDir = await mkdtemp(join(baseDir, "type-aware-repo-"));
+  await execAsync("git init", { cwd: repoDir });
+  await Bun.write(
+    join(repoDir, ".oxlintrc.json"),
+    JSON.stringify({
+      plugins: ["typescript"],
+      rules: { "typescript/no-misused-promises": "error" },
+    }),
+  );
+  if (linkNodeModules) {
+    const repoRoot = join(import.meta.dirname, "..", "..", "..");
+    await execAsync(`ln -s "${join(repoRoot, "node_modules")}" node_modules`, { cwd: repoDir });
+  }
+  const filePath = join(repoDir, "schedule.ts");
+  await Bun.write(filePath, await Bun.file(join(FIXTURES_DIR, "type-aware.ts")).text());
+  return filePath;
+}
+
 describe("ox hook", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ox-test-"));
@@ -316,6 +340,26 @@ describe("ox hook", () => {
         .additionalContext;
       expect(additionalContext).toContain("no-dupe-keys");
       expect(await Bun.file(filePath).text()).toBe(before);
+    });
+
+    it("reports a violation only the type-aware pass sees", async () => {
+      const filePath = await createTypeAwareFixture(tempDir, { linkNodeModules: true });
+      const result = await processPostToolUse(
+        mockPostToolUseInput("Edit", { file_path: filePath }),
+      );
+
+      const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
+        ?.additionalContext;
+      expect(additionalContext).toContain("no-misused-promises");
+    });
+
+    it("stays quiet where tsgolint cannot resolve rather than reporting it as a lint issue", async () => {
+      const filePath = await createTypeAwareFixture(tempDir, { linkNodeModules: false });
+      const result = await processPostToolUse(
+        mockPostToolUseInput("Edit", { file_path: filePath }),
+      );
+
+      expect(result).toBeNull();
     });
   });
 

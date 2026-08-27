@@ -51,6 +51,14 @@ export function resolveScopes(files: string[]): string[] {
   return [...new Set(files.map(resolveScope))];
 }
 
+async function readLcov(coverageDir: string): Promise<FileCoverage[]> {
+  const lcov = Bun.file(join(coverageDir, "lcov.info"));
+  if (!(await lcov.exists())) {
+    return [];
+  }
+  return parseLcov(await lcov.text());
+}
+
 function runScope(scope: string): Promise<FileCoverage[]> {
   const coverageDir = mkdtempSync(join(tmpdir(), "cov-"));
   return new Promise((resolve) => {
@@ -58,13 +66,8 @@ function runScope(scope: string): Promise<FileCoverage[]> {
       cwd: repoRoot,
       stdio: "ignore",
     });
-    child.on("close", async () => {
-      const lcov = Bun.file(join(coverageDir, "lcov.info"));
-      if (!(await lcov.exists())) {
-        resolve([]);
-        return;
-      }
-      resolve(parseLcov(await lcov.text()));
+    child.on("close", () => {
+      readLcov(coverageDir).then(resolve, () => resolve([]));
     });
     child.on("error", () => resolve([]));
   });

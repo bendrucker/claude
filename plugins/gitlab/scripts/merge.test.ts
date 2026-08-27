@@ -2,6 +2,13 @@ import { describe, expect, mock, test } from "bun:test";
 import type { MergeActions, MergeRequestDetail } from "./merge";
 import { arm, merge, mergeArgs, status } from "./merge";
 
+function shellError(streams: { stdout?: string; stderr?: string }): Error {
+  return Object.assign(new Error("glab exited non-zero"), {
+    stdout: Buffer.from(streams.stdout ?? ""),
+    stderr: Buffer.from(streams.stderr ?? ""),
+  });
+}
+
 function createMergeRequest(overrides: Partial<MergeRequestDetail> = {}): MergeRequestDetail {
   return {
     iid: 10,
@@ -154,7 +161,7 @@ describe("arm", () => {
 
   test("reads the message from a shell error's stderr", async () => {
     const run = mock(() =>
-      Promise.reject({ stderr: Buffer.from("... already set to Auto-Merge ...") }),
+      Promise.reject(shellError({ stderr: "... already set to Auto-Merge ..." })),
     );
     const sleep = mock(() => Promise.resolve());
 
@@ -165,10 +172,9 @@ describe("arm", () => {
 
   test("reads the error body from stdout when stderr is empty", async () => {
     const run = mock(() =>
-      Promise.reject({
-        stdout: Buffer.from('{"message":"Merge request is already set to Auto-Merge"}'),
-        stderr: Buffer.from(""),
-      }),
+      Promise.reject(
+        shellError({ stdout: '{"message":"Merge request is already set to Auto-Merge"}' }),
+      ),
     );
     const sleep = mock(() => Promise.resolve());
 

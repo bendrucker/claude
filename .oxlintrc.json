@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc"],
+  "plugins": ["typescript", "unicorn", "oxc", "promise", "node"],
   "categories": {
     "correctness": "error"
   },
@@ -25,7 +25,14 @@
     "typescript/no-base-to-string": "off",
     "typescript/no-floating-promises": "off",
     "typescript/unbound-method": "off",
-    "typescript/no-misused-spread": "off",
+    "typescript/ban-ts-comment": "error",
+    "typescript/explicit-module-boundary-types": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-misused-spread": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
     "no-restricted-imports": [
       "error",
       {

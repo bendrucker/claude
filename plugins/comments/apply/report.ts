@@ -2,10 +2,10 @@ import type { Verdict } from "../judge/schema";
 
 /** ANSI colors (0-15) remap under the terminal theme, so they adapt to light/dark. */
 export const color = {
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
+  dim: (s: string): string => `\x1b[2m${s}\x1b[0m`,
+  bold: (s: string): string => `\x1b[1m${s}\x1b[0m`,
+  red: (s: string): string => `\x1b[31m${s}\x1b[0m`,
+  yellow: (s: string): string => `\x1b[33m${s}\x1b[0m`,
 };
 
 /** One flagged comment to render: location, the judge's verdict, and its text. */

@@ -82,9 +82,7 @@ const SMALL_WORDS = new Set([
   "under",
 ]);
 
-const raw = argv.flags.input
-  ? await Bun.file(argv.flags.input).text()
-  : await Bun.readableStreamToText(Bun.stdin.stream());
+const raw = argv.flags.input ? await Bun.file(argv.flags.input).text() : await Bun.stdin.text();
 const { title: fmTitle, type, body } = parseIssue(raw);
 const title = argv.flags.title ?? fmTitle;
 

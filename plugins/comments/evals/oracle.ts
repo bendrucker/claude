@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { XMLBuilder } from "fast-xml-parser";
+import Builder from "fast-xml-builder";
 import type { CommentKind, Language } from "../detection/types";
 import { BATCH_SIZE, parseVerdict } from "../judge/judge";
 import { batchVerdictSchema, type Verdict } from "../judge/schema";
@@ -26,7 +26,7 @@ export interface CommentJudgeInput {
 /** Judges a batch of comments. The eval tests mock this. The SDK call implements it. */
 export type CommentJudge = (inputs: CommentJudgeInput[]) => Promise<Verdict[]>;
 
-const xml = new XMLBuilder({
+const xml = new Builder({
   format: true,
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
@@ -126,6 +126,7 @@ export function anthropicCommentJudge(options: AnthropicJudgeOptions): CommentJu
     const response = await client.messages.create({
       model,
       max_tokens: 4096,
+      // oxlint-disable-next-line typescript/no-deprecated -- the pinned model still honors temperature, and dropping it costs the judge its determinism.
       temperature: 0,
       system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
       output_config: { format: { type: "json_schema", schema: batchVerdictSchema() } },

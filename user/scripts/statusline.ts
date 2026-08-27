@@ -161,6 +161,7 @@ export function linesSegment(input: StatusInput): string | null {
 // the first span and the end of the last with a single `…` between. Operates on
 // codepoint arrays so multi-byte branch names elide on character boundaries.
 export function elideSpans(spans: Span[], budget: number): string {
+  // oxlint-disable-next-line typescript/no-misused-spread -- eliding on code points is the documented intent; grapheme clusters would change the width budget.
   const chars = spans.map((s) => [...s.text]);
   const total = chars.reduce((sum, c) => sum + c.length, 0);
 

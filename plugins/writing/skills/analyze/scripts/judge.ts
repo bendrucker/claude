@@ -261,6 +261,7 @@ export function anthropicChunkJudge(options: AnthropicJudgeOptions): ChunkJudge 
     const response = await client.messages.create({
       model,
       max_tokens: 2048,
+      // oxlint-disable-next-line typescript/no-deprecated -- the pinned model still honors temperature, and dropping it costs the judge its determinism.
       temperature: 0,
       system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
       output_config: { format: { type: "json_schema", schema: verdictSchema() } },
@@ -597,6 +598,7 @@ export function anthropicHeadingJudge(options: AnthropicJudgeOptions): HeadingJu
     const response = await client.messages.create({
       model,
       max_tokens: 2048,
+      // oxlint-disable-next-line typescript/no-deprecated -- the pinned model still honors temperature, and dropping it costs the judge its determinism.
       temperature: 0,
       system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
       output_config: {

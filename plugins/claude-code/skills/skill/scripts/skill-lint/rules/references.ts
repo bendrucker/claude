@@ -12,7 +12,7 @@ export function findReferences(body: string): string[] {
 
   for (const match of matches) {
     const ref = match[1];
-    if (ref) refs.add(ref);
+    if (ref != null && ref !== "") refs.add(ref);
   }
 
   return Array.from(refs);

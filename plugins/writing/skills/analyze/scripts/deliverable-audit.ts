@@ -61,7 +61,7 @@ export function auditDeliverableCorpus(
 
   let totalTokens = 0;
   for (const row of rows) {
-    if (!row.text) continue;
+    if (row.text == null || row.text === "") continue;
     const tokens = stemTokens(row.text);
     totalTokens += tokens.length;
     for (const n of needles) {

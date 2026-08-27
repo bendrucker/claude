@@ -57,18 +57,21 @@ export function resolveMetricsPath(
 ): string | null {
   if (env !== undefined && OFF_VALUES.has(env.toLowerCase())) return null;
   const dir =
-    env && !ON_VALUES.has(env.toLowerCase()) ? env : join(homedir(), ".claude", "hook-metrics");
+    env != null && env !== "" && !ON_VALUES.has(env.toLowerCase())
+      ? env
+      : join(homedir(), ".claude", "hook-metrics");
   return join(dir, `${hook.replace(UNSAFE_NAME, "-")}.jsonl`);
 }
 
 export function classifyOutcome(output: SyncHookJSONOutput | null | undefined): HookOutcome {
   if (!output) return "silent";
   const specific = output.hookSpecificOutput;
-  if (specific && "permissionDecision" in specific && specific.permissionDecision) {
+  if (specific && "permissionDecision" in specific) {
     return specific.permissionDecision;
   }
   if (output.decision === "block") return "block";
-  if (specific && "additionalContext" in specific && specific.additionalContext) return "context";
+  if (specific && "additionalContext" in specific && specific.additionalContext !== "")
+    return "context";
   return "output";
 }
 
@@ -77,7 +80,7 @@ export function appendHookMetric(
   metric: HookMetric,
   path: string | null = resolveMetricsPath(hook),
 ): void {
-  if (!path) return;
+  if (path == null || path === "") return;
   try {
     mkdirSync(dirname(path), { recursive: true });
     if (Bun.file(path).size > MAX_LOG_BYTES) {

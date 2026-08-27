@@ -42,7 +42,8 @@ function skillDir(path: string): string {
 
 function invocation(skill: { modelInvocable: boolean; userInvocable: boolean }): string {
   const modes = [skill.modelInvocable && "model", skill.userInvocable && "user"].filter(Boolean);
-  return modes.join("+") || "none";
+  const joined = modes.join("+");
+  return joined !== "" ? joined : "none";
 }
 
 // Plugins and MCP servers exist only in the plugin scope, so their row skips
@@ -121,13 +122,16 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
     case "agents":
       return {
         head: ["agent", "model", "tools", "path", "description"],
-        rows: inventory.agents.map((a) => [
-          a.name,
-          a.model || "-",
-          cut(a.tools) || "all",
-          a.path,
-          cut(a.description),
-        ]),
+        rows: inventory.agents.map((a) => {
+          const tools = cut(a.tools);
+          return [
+            a.name,
+            a.model !== "" ? a.model : "-",
+            tools !== "" ? tools : "all",
+            a.path,
+            cut(a.description),
+          ];
+        }),
       };
     case "commands":
       return {
@@ -137,18 +141,24 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
     case "hooks":
       return {
         head: ["event", "matcher", "when", "source", "command"],
-        rows: inventory.hooks.map((h) => [
-          h.event,
-          cut(h.matcher),
-          cut(h.condition) || "-",
-          h.path,
-          cut(h.command),
-        ]),
+        rows: inventory.hooks.map((h) => {
+          const condition = cut(h.condition);
+          return [
+            h.event,
+            cut(h.matcher),
+            condition !== "" ? condition : "-",
+            h.path,
+            cut(h.command),
+          ];
+        }),
       };
     case "rules":
       return {
         head: ["rule", "path", "applies to"],
-        rows: inventory.rules.map((r) => [r.name, r.path, cut(r.paths.join(", ") || "always")]),
+        rows: inventory.rules.map((r) => {
+          const paths = r.paths.join(", ");
+          return [r.name, r.path, cut(paths !== "" ? paths : "always")];
+        }),
       };
     case "mcp":
       return {

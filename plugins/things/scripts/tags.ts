@@ -1,5 +1,5 @@
 export function parseTags(value: string | undefined): string[] {
-  if (!value) return [];
+  if (value == null || value === "") return [];
   return value
     .split(",")
     .map((t) => t.trim())

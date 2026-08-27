@@ -42,7 +42,7 @@ const argv = cli({
 
 const label = argv.flags.host;
 
-if (!label) {
+if (label == null || label === "") {
   console.error("--host is required.");
   process.exit(1);
 }
@@ -62,7 +62,9 @@ const projectsDir = path.join(root, "projects");
 if (!dirExists(projectsDir)) {
   console.error(`No corpus at ${projectsDir}.`);
   console.error("Sync the source machine's ~/.claude/projects/ there first, then re-run:");
-  console.error(`  rsync -av --update ${argv.flags.source || "<source>"} ${projectsDir}/`);
+  const source = argv.flags.source;
+  const shown = source !== "" ? source : "<source>";
+  console.error(`  rsync -av --update ${shown} ${projectsDir}/`);
   process.exit(1);
 }
 

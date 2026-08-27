@@ -28,7 +28,7 @@ const argv = cli({
 
 const label = argv.flags.host;
 
-if (!label) {
+if (label == null || label === "") {
   console.error("--host is required.");
   process.exit(1);
 }

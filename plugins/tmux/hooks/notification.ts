@@ -31,7 +31,7 @@ interface NotificationEntry {
 
 function parseEntry(raw: string): NotificationEntry | null {
   const [window, tool] = raw.split(":");
-  if (!window || !tool) return null;
+  if (window == null || window === "" || tool == null || tool === "") return null;
   return { window, tool };
 }
 
@@ -46,7 +46,7 @@ function truncate(str: string, max: number): string {
 
 function updateSummary(): void {
   const output = tmuxQuery("show-options", "-g");
-  if (!output) return;
+  if (output == null || output === "") return;
 
   const entries: NotificationEntry[] = [];
   for (const line of output.split("\n")) {
@@ -94,7 +94,7 @@ type HookInput = z.infer<typeof HookInput>;
 
 async function readHookInput(): Promise<HookInput | null> {
   const text = await Bun.stdin.text();
-  if (!text) return null;
+  if (text === "") return null;
   try {
     return HookInput.parse(JSON.parse(text));
   } catch (error) {
@@ -106,9 +106,9 @@ async function readHookInput(): Promise<HookInput | null> {
 }
 
 async function main(): Promise<void> {
-  if (!process.env.TMUX) return;
+  if (process.env.TMUX == null || process.env.TMUX === "") return;
   const pane = process.env.TMUX_PANE ?? tmuxQuery("display-message", "-p", "#{pane_id}");
-  if (!pane) return;
+  if (pane == null || pane === "") return;
 
   // hooks.json wraps the --clear invocation in an inline shell guard that
   // skips the bun startup entirely when this pane has no notification marker,
@@ -126,10 +126,18 @@ async function main(): Promise<void> {
     pane,
     "#{pane_tty}\n#{window_index}\n#{window_active}",
   );
-  if (!paneInfo) return;
+  if (paneInfo == null || paneInfo === "") return;
 
   const [tty, window, active] = paneInfo.split("\n");
-  if (!tty || !window || !active) return;
+  if (
+    tty == null ||
+    tty === "" ||
+    window == null ||
+    window === "" ||
+    active == null ||
+    active === ""
+  )
+    return;
 
   if (argv.flags.backgroundOnly && active === "1") return;
 

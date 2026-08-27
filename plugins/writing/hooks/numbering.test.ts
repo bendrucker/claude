@@ -309,7 +309,7 @@ describe("processInput with markdown", () => {
       return;
     }
     expect(output).not.toHaveProperty("permissionDecision");
-    if (reasonContains) {
+    if (reasonContains != null && reasonContains !== "") {
       expect(output?.additionalContext).toContain(reasonContains);
     }
   });

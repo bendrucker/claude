@@ -165,7 +165,10 @@ describe("xcallBackstopMs", () => {
     { name: "a non-numeric bound", env: { XCALL_TIMEOUT_SECONDS: "soon" } },
     { name: "a zero bound", env: { XCALL_TIMEOUT_SECONDS: "0" } },
   ])("outwaits run.sh with $name", ({ env }) => {
-    const bound = (name: string) => Number(env[name]) || 20;
+    const bound = (name: string) => {
+      const parsed = Number(env[name]);
+      return Number.isNaN(parsed) || parsed === 0 ? 20 : parsed;
+    };
     // run.sh waits out a lock holder's whole turn before starting its own, so
     // the callback bound counts once for the wait and once for the call.
     const callback = bound("XCALL_TIMEOUT_SECONDS");

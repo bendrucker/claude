@@ -4,6 +4,7 @@
 // when the probe in docs/settings.md succeeds.
 import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { cli } from "cleye";
 import {
@@ -43,11 +44,8 @@ const stampPath = path.join(dataDir, "last-refresh");
 // against the real (derived) data dir: a CLAUDE_PLUGIN_DATA override means a
 // test or dev run, which must not delete machine-wide state.
 async function cleanupStrayDatabases(): Promise<void> {
-  if (process.env.CLAUDE_PLUGIN_DATA) return;
-  const strayDirs = new Set([
-    path.join(process.env.TMPDIR || "/tmp", "claude-session"),
-    "/tmp/claude-session",
-  ]);
+  if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "") return;
+  const strayDirs = new Set([path.join(tmpdir(), "claude-session"), "/tmp/claude-session"]);
   for (const dir of strayDirs) {
     if (path.resolve(dir) === path.resolve(dataDir)) continue;
     if (!(await Bun.file(sessionDbPath(dir)).exists())) continue;

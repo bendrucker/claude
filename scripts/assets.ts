@@ -78,7 +78,7 @@ export interface Origin {
 export function origin(path: string): Origin {
   const plugin = path.startsWith("plugins/") ? path.split("/")[1] : undefined;
   const result: Origin = { scope: scopeOf(path), path };
-  if (plugin) result.plugin = plugin;
+  if (plugin != null && plugin !== "") result.plugin = plugin;
   return result;
 }
 
@@ -89,7 +89,7 @@ export function origin(path: string): Origin {
  */
 export function namespaced(path: string, name: string): string {
   const plugin = path.startsWith("plugins/") ? path.split("/")[1] : undefined;
-  return plugin && !name.includes(":") ? `${plugin}:${name}` : name;
+  return plugin != null && plugin !== "" && !name.includes(":") ? `${plugin}:${name}` : name;
 }
 
 /**
@@ -100,7 +100,7 @@ export function namespaced(path: string, name: string): string {
  * where the two match. User and project skills carry no namespace.
  */
 export function skillName(path: string, frontmatterName?: string): string {
-  if (frontmatterName) return frontmatterName;
+  if (frontmatterName != null && frontmatterName !== "") return frontmatterName;
 
   const segments = path.split("/");
   const skill = segments.at(-2) ?? "";

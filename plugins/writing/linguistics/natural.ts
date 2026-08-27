@@ -11,7 +11,7 @@ const tokenizer = new natural.WordTokenizer();
 export const naturalTagger: Tagger = {
   name: "natural",
   tag(text: string): TaggedSentence[] {
-    const words = tokenizer.tokenize(text) ?? [];
+    const words = tokenizer.tokenize(text);
     const tokens = brill.tag(words).taggedWords.map((tagged) => {
       const normal = tagged.token.toLowerCase();
       const mapped =

@@ -17,7 +17,7 @@ export type CreateIssueInput = {
 };
 
 export function getDefaultState(assignee: string | undefined): string {
-  return assignee ? "Todo" : "Backlog";
+  return assignee != null && assignee !== "" ? "Todo" : "Backlog";
 }
 
 // Wrapper keys the connector tolerates inconsistently. A single one whose value
@@ -43,7 +43,12 @@ export function normalizeInput(toolInput: Record<string, unknown>): NormalizeRes
 
   const keys = Object.keys(input);
   const wrapperKey = keys.length === 1 ? keys[0] : undefined;
-  if (wrapperKey && WRAPPER_KEYS.includes(wrapperKey) && isFieldObject(input[wrapperKey])) {
+  if (
+    wrapperKey != null &&
+    wrapperKey !== "" &&
+    WRAPPER_KEYS.includes(wrapperKey) &&
+    isFieldObject(input[wrapperKey])
+  ) {
     input = input[wrapperKey];
     mutated = true;
   }
@@ -65,12 +70,12 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
 
   // An absent id means create (the connector's save_issue and the local
   // create_issue tool); present id means update.
-  const isCreate = !id;
+  const isCreate = id == null || id === "";
 
   // Unrecoverable: a create with no title cannot proceed. Deny with a message
   // that names neither tool, since this hook fires for both save_issue and
   // create_issue, so the model can recover by supplying title or id.
-  if (isCreate && !title) {
+  if (isCreate && (title == null || title === "")) {
     return {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
@@ -83,7 +88,7 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
 
   // Preserve the original default-state behavior: inject a default only when
   // creating and state is absent. Never override an explicitly set state.
-  const needsDefaultState = isCreate && !state;
+  const needsDefaultState = isCreate && (state == null || state === "");
 
   if (!mutated && !needsDefaultState) {
     return null;

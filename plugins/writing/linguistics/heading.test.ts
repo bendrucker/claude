@@ -130,7 +130,7 @@ describe("classifyHeadingBaseline", () => {
     it(description, () => {
       const verdict = classifyHeadingBaseline(heading);
       expect(verdict.flagged).toBe(flagged);
-      if (kind) {
+      if (kind != null) {
         expect(verdict.kind).toBe(kind);
       }
     });

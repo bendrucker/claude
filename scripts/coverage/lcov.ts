@@ -49,7 +49,7 @@ export function parseLcov(text: string): FileCoverage[] {
 
   for (const raw of text.split("\n")) {
     const line = raw.trim();
-    if (!line) continue;
+    if (line === "") continue;
 
     if (line.startsWith("SF:")) {
       current = {
@@ -70,9 +70,11 @@ export function parseLcov(text: string): FileCoverage[] {
         current.lineHits.set(n, c);
       }
     } else if (line.startsWith("FNF:")) {
-      current.functionsFound = Number(line.slice(4)) || 0;
+      const found = Number(line.slice(4));
+      current.functionsFound = Number.isNaN(found) ? 0 : found;
     } else if (line.startsWith("FNH:")) {
-      current.functionsHit = Number(line.slice(4)) || 0;
+      const hit = Number(line.slice(4));
+      current.functionsHit = Number.isNaN(hit) ? 0 : hit;
     } else if (line === "end_of_record") {
       records.push(current);
       current = null;
@@ -123,7 +125,7 @@ export function formatLcov(reports: FileCoverage[]): string {
     lines.push(`LF:${fc.lineHits.size}`, `LH:${covered}`, "end_of_record");
     blocks.push(lines.join("\n"));
   }
-  return blocks.length ? `${blocks.join("\n")}\n` : "";
+  return blocks.length !== 0 ? `${blocks.join("\n")}\n` : "";
 }
 
 // Collapse sorted line numbers into human-readable ranges: [1,2,3,5,8,9] -> "1-3, 5, 8-9".

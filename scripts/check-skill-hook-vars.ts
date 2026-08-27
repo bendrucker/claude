@@ -36,7 +36,7 @@ async function checkSkillHookVars(): Promise<string[]> {
           const command = hook.command ?? "";
           const args = (hook.args ?? []).join(" ");
           if (FORBIDDEN.test(command) || FORBIDDEN.test(args)) {
-            violations.push(`${file}: ${command || args}`);
+            violations.push(`${file}: ${command !== "" ? command : args}`);
           }
         }
       }

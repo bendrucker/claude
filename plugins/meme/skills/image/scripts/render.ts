@@ -38,7 +38,7 @@ const IMPACT_PATH = "/System/Library/Fonts/Supplemental/Impact.ttf";
 let cachedFamily: string | undefined;
 
 async function classicFontFamily(): Promise<string> {
-  if (cachedFamily) return cachedFamily;
+  if (cachedFamily != null && cachedFamily !== "") return cachedFamily;
   if (await Bun.file(IMPACT_PATH).exists()) {
     GlobalFonts.registerFromPath(IMPACT_PATH, "Impact");
     cachedFamily = "Impact";
@@ -293,19 +293,28 @@ if (import.meta.main) {
   });
 
   const { top, bottom, subtitle, caption, captionPosition, spec: specPath, out } = argv.flags;
-  if (!out) {
+  if (out == null || out === "") {
     console.error("error: --out is required");
     process.exit(1);
   }
-  if (specPath && (top || bottom || subtitle || caption || captionPosition)) {
+  if (
+    specPath != null &&
+    specPath !== "" &&
+    ((top != null && top !== "") ||
+      (bottom != null && bottom !== "") ||
+      (subtitle != null && subtitle !== "") ||
+      (caption != null && caption !== "") ||
+      (captionPosition != null && captionPosition !== ""))
+  ) {
     console.error("error: --spec is mutually exclusive with --top/--bottom/--subtitle/--caption");
     process.exit(1);
   }
 
   try {
-    const spec = specPath
-      ? validateSpec(await Bun.file(specPath).json())
-      : specFromFlags({ top, bottom, subtitle, caption, captionPosition });
+    const spec =
+      specPath != null && specPath !== ""
+        ? validateSpec(await Bun.file(specPath).json())
+        : specFromFlags({ top, bottom, subtitle, caption, captionPosition });
     const result = await render(spec, argv._.image, out);
     for (const warning of result.warnings) {
       console.error(`warning: ${warning}`);

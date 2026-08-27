@@ -74,7 +74,7 @@ const SearchResults = z.array(
 
 async function fetchGithub(): Promise<VoiceDocument[]> {
   const author = argv.flags.author;
-  if (!author) {
+  if (author == null || author === "") {
     throw new Error("--author is required for the github source");
   }
   // gh search prs does not expose diff sizes, so the meta line carries the
@@ -89,7 +89,8 @@ async function fetchGithub(): Promise<VoiceDocument[]> {
     "--json",
     "url,body,createdAt",
   ];
-  if (argv.flags.created) args.push(`--created=${argv.flags.created}`);
+  if (argv.flags.created != null && argv.flags.created !== "")
+    args.push(`--created=${argv.flags.created}`);
 
   console.error(`Running: gh ${args.join(" ")}`);
   const proc = Bun.spawn(["gh", ...args], { stdout: "pipe", stderr: "pipe" });
@@ -105,7 +106,7 @@ async function fetchGithub(): Promise<VoiceDocument[]> {
   const results = SearchResults.parse(JSON.parse(stdout));
 
   return results
-    .filter((pr) => pr.body && pr.body.trim().length >= 30)
+    .filter((pr) => pr.body.trim().length >= 30)
     .map((pr) => ({
       source: pr.url,
       meta: pr.createdAt,
@@ -115,7 +116,7 @@ async function fetchGithub(): Promise<VoiceDocument[]> {
 
 async function readFileSource(): Promise<VoiceDocument[]> {
   const file = argv.flags.file;
-  if (!file) {
+  if (file == null || file === "") {
     throw new Error("--file is required for the file source");
   }
   const text = await Bun.file(file).text();

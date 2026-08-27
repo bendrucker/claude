@@ -7,7 +7,7 @@ function bangCommands(body: string): string[] {
   const commands: string[] = [];
   for (const match of body.matchAll(BANG_COMMAND)) {
     const command = match[1]?.trim();
-    if (command) commands.push(command);
+    if (command != null && command !== "") commands.push(command);
   }
   return commands;
 }
@@ -18,7 +18,7 @@ function bashMatchers(allowedTools: unknown): string[] {
   for (const tool of allowedTools) {
     if (typeof tool !== "string") continue;
     const match = tool.match(BASH_ENTRY);
-    if (match?.[1]) matchers.push(match[1]);
+    if (match?.[1] != null && match[1] !== "") matchers.push(match[1]);
   }
   return matchers;
 }

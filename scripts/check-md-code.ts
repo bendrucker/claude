@@ -40,7 +40,7 @@ function firstLine(error: unknown): string {
 
 function checkBlock(node: Code): string | null {
   const lang = node.lang?.toLowerCase();
-  if (!lang) return null;
+  if (lang == null || lang === "") return null;
 
   // A `fragment` token in the info string opts a deliberately-partial or
   // multi-example block out of single-module parsing.
@@ -56,7 +56,7 @@ function checkBlock(node: Code): string | null {
   }
 
   const loader = LOADERS[lang];
-  if (!loader) return null;
+  if (loader == null) return null;
 
   try {
     transpilerFor(loader).transformSync(node.value);

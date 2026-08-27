@@ -9,8 +9,7 @@ export async function getDefaultBranch(cwd?: string, repoRoot?: string): Promise
     const root =
       repoRoot ?? (await $`git rev-parse --show-toplevel`.cwd(dir).quiet()).text().trim();
     const safePath = root.replace(/\//g, "_");
-    const tmpDir = process.env.TMPDIR || tmpdir();
-    const cacheFile = join(tmpDir, `claude-default-branch${safePath}`);
+    const cacheFile = join(tmpdir(), `claude-default-branch${safePath}`);
 
     if (await Bun.file(cacheFile).exists()) {
       return (await Bun.file(cacheFile).text()).trim();
@@ -34,11 +33,10 @@ export async function getDefaultBranch(cwd?: string, repoRoot?: string): Promise
       }
     }
 
-    if (defaultBranch) {
-      await Bun.write(cacheFile, defaultBranch);
-    }
+    if (defaultBranch == null || defaultBranch === "") return null;
 
-    return defaultBranch || null;
+    await Bun.write(cacheFile, defaultBranch);
+    return defaultBranch;
   } catch {
     return null;
   }

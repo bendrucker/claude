@@ -27,7 +27,7 @@ const JOBS_PATH_PATTERN = /\/\.claude\/jobs\//;
 export function isScratchPath(filePath: string, cwd: string = process.cwd()): boolean {
   const resolved = resolve(cwd, filePath);
   const tmpDir = process.env.TMPDIR;
-  if (tmpDir && resolved.startsWith(`${resolve(tmpDir)}/`)) return true;
+  if (tmpDir != null && tmpDir !== "" && resolved.startsWith(`${resolve(tmpDir)}/`)) return true;
   if (JOBS_PATH_PATTERN.test(resolved)) return true;
   if (resolved.startsWith("/tmp/") || resolved.startsWith("/private/tmp/")) return true;
   const root = resolve(cwd);

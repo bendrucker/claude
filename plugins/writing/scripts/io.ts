@@ -7,10 +7,10 @@
 export async function readInput(
   arg: string | undefined,
 ): Promise<{ text: string; filePath?: string }> {
-  if (arg && (await Bun.file(arg).exists())) {
+  if (arg != null && arg !== "" && (await Bun.file(arg).exists())) {
     return { text: await Bun.file(arg).text(), filePath: arg };
   }
-  if (arg) {
+  if (arg != null && arg !== "") {
     return { text: arg };
   }
   return { text: await new Response(Bun.stdin.stream()).text() };

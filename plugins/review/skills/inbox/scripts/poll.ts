@@ -20,8 +20,8 @@ export async function fetchUrls(command: string): Promise<FetchResult> {
     new Response(proc.stderr).text(),
   ]);
   if (exit !== 0) {
-    const detail = stderrText.trim() || `exited with code ${exit}`;
-    return { ok: false, reason: detail };
+    const detail = stderrText.trim();
+    return { ok: false, reason: detail !== "" ? detail : `exited with code ${exit}` };
   }
   try {
     const entries = Queue.parse(JSON.parse(stdoutText));

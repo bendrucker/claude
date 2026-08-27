@@ -15,7 +15,7 @@ export async function isCleanTree(): Promise<boolean> {
 async function headMode(path: string): Promise<string> {
   const entry = (await $`git ls-files -s -- ${path}`.quiet()).text().trim();
   const mode = entry.split(/\s+/)[0];
-  if (!mode) throw new Error(`Path is not tracked at HEAD: ${path}`);
+  if (mode == null || mode === "") throw new Error(`Path is not tracked at HEAD: ${path}`);
   return mode;
 }
 

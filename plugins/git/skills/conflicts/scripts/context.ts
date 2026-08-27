@@ -23,7 +23,7 @@ async function detectOperation(): Promise<{ op: Operation; ref: string | null }>
 
 const { op, ref } = await detectOperation();
 
-if (!op || !ref) {
+if (op == null || ref == null || ref === "") {
   console.log("No conflict operation in progress");
   process.exit(0);
 }
@@ -32,7 +32,7 @@ console.log(`Operation: ${op}`);
 console.log("");
 
 const conflictedFiles = await $`git diff --name-only --diff-filter=U`.text();
-if (!conflictedFiles.trim()) {
+if (conflictedFiles.trim() === "") {
   console.log("No conflicted files");
   process.exit(0);
 }
@@ -40,4 +40,5 @@ if (!conflictedFiles.trim()) {
 console.log("Incoming commits:");
 const files = conflictedFiles.trim().split("\n");
 const logs = await $`git log --oneline ${ref} -10 -- ${files}`.text();
-console.log(logs.trim() || "(none found)");
+const trimmedLogs = logs.trim();
+console.log(trimmedLogs !== "" ? trimmedLogs : "(none found)");

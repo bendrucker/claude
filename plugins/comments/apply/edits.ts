@@ -109,7 +109,7 @@ function strandsFragment(item: EditItem, kept: Set<number>, lines: string[]): bo
     const firstWord = stripCommentMarkers(lines[n - 1] ?? "")
       .match(/^[A-Za-z']+/)?.[0]
       ?.toLowerCase();
-    if (firstWord && SENTENCE_CONNECTIVES.has(firstWord)) return true;
+    if (firstWord != null && firstWord !== "" && SENTENCE_CONNECTIVES.has(firstWord)) return true;
   }
   return false;
 }
@@ -189,7 +189,7 @@ function conformRefusal(style: CommentStyle): string {
 function widthRefusal(produced: string[], maxWidth: number | undefined): string | null {
   if (maxWidth === undefined) return null;
   const over = produced.find((line) => line.length > maxWidth);
-  if (!over) return null;
+  if (over == null || over === "") return null;
   return `replacement would produce a ${over.length}-character line (over ${maxWidth}); re-wrap by hand`;
 }
 
@@ -234,7 +234,7 @@ function replaceSpan(
     const indent = before;
     const produced = textLines.map((line) => `${indent}${line}`.replace(/\s+$/, ""));
     const tooWide = widthRefusal(produced, maxWidth);
-    if (tooWide) {
+    if (tooWide != null && tooWide !== "") {
       skips.push({ startLine: item.startLine, reason: "manual", detail: tooWide });
       return;
     }
@@ -247,7 +247,7 @@ function replaceSpan(
     const code = before.replace(/\s+$/, "");
     const produced = [`${code} ${textLines.join(" ")}`.replace(/\s+$/, "")];
     const tooWide = widthRefusal(produced, maxWidth);
-    if (tooWide) {
+    if (tooWide != null && tooWide !== "") {
       skips.push({ startLine: item.startLine, reason: "manual", detail: tooWide });
       return;
     }
@@ -272,7 +272,7 @@ function applyRewrite(
   maxWidth: number | undefined,
 ): void {
   const rewrite = item.verdict.rewrite;
-  if (!rewrite) {
+  if (rewrite == null || rewrite === "") {
     skips.push({
       startLine: item.startLine,
       reason: "manual",
@@ -317,7 +317,7 @@ export function computeFileEdits(
       case "keep":
         break;
       case "trim": {
-        if (item.verdict.trimTo) {
+        if (item.verdict.trimTo != null && item.verdict.trimTo !== "") {
           replaceSpan(item, item.verdict.trimTo, lines, deletions, spanInserts, skips, maxWidth);
           break;
         }

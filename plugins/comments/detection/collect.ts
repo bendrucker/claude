@@ -68,7 +68,7 @@ async function newFileContent(
   options: DiffOptions,
   mrSource: MrSource | null,
 ): Promise<string | null> {
-  if (options.mr && mrSource) {
+  if (options.mr != null && options.mr !== "" && mrSource) {
     const encoded = encodeURIComponent(path);
     const raw =
       await $`glab api projects/${mrSource.projectId}/repository/files/${encoded}/raw?ref=${mrSource.ref}`
@@ -103,7 +103,7 @@ async function collectDiffFile(
   mrSource: MrSource | null,
 ): Promise<CollectedComment[]> {
   const language = languageForPath(file.path);
-  if (!language || file.added.length === 0) return [];
+  if (language == null || language === "" || file.added.length === 0) return [];
   const source = await newFileContent(file.path, options, mrSource);
   if (source == null) {
     console.error(`skipped ${file.path}: could not read new file content`);
@@ -142,7 +142,7 @@ export async function collectDiff(
 
 async function collectRepoFile(path: string): Promise<CollectedComment[]> {
   const language = languageForPath(path);
-  if (!language) return [];
+  if (language == null || language === "") return [];
   const file = Bun.file(path);
   if (!(await file.exists())) return [];
   const source = await file.text();

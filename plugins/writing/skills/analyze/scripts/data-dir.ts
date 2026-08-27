@@ -5,8 +5,9 @@ import { join } from "node:path";
 // repository at the plugin data dir so it can later grow to include private
 // writing. Resolve CLAUDE_PLUGIN_DATA if set, else the conventional default.
 export function resolveDataDir(override?: string): string {
-  if (override) return override;
-  if (process.env.CLAUDE_PLUGIN_DATA) return process.env.CLAUDE_PLUGIN_DATA;
+  if (override != null && override !== "") return override;
+  if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "")
+    return process.env.CLAUDE_PLUGIN_DATA;
   return join(homedir(), ".claude", "plugins", "data", "writing-bendrucker");
 }
 

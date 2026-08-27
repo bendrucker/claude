@@ -79,7 +79,7 @@ export function classifyHeadingBaseline(heading: string): HeadingVerdict {
 
   // Interrogative-led headings ("Why X is Y", "What was wrong") are a
   // conventional rationale-section label, not the sentence-heading trope.
-  if (lower[0] && INTERROGATIVE_OPENERS.has(lower[0])) {
+  if (lower[0] != null && lower[0] !== "" && INTERROGATIVE_OPENERS.has(lower[0])) {
     return { kind: "interrogative", flagged: false, evidence: ["interrogative opener"] };
   }
 
@@ -97,14 +97,15 @@ export function classifyHeadingBaseline(heading: string): HeadingVerdict {
       .map((word) => word.toLowerCase().replace(/[^a-z']/g, ""))
       .filter((word) => word.length > 0);
     const afterPredicate = after.some((word) => LINKING_VERBS.has(word) || word === "not");
-    const preEnumerator = before[0] ? ENUMERATOR_STOPLIST.test(before[0]) : false;
+    const preEnumerator =
+      before[0] != null && before[0] !== "" ? ENUMERATOR_STOPLIST.test(before[0]) : false;
     if (before.length <= 4 && after.length >= 3 && afterPredicate && !preEnumerator) {
       return { kind: "clause", flagged: true, evidence: ["colon-gated predicate"] };
     }
   }
 
   const linkingVerb = lower.find((word) => LINKING_VERBS.has(word));
-  if (linkingVerb) {
+  if (linkingVerb != null && linkingVerb !== "") {
     return { kind: "clause", flagged: true, evidence: [`linking verb "${linkingVerb}"`] };
   }
 
@@ -115,7 +116,12 @@ export function classifyHeadingBaseline(heading: string): HeadingVerdict {
     return { kind: "clause", flagged: true, evidence: ["relative clause"] };
   }
 
-  if (words.length >= 3 && lower[0] && IMPERATIVE_OPENERS.has(lower[0])) {
+  if (
+    words.length >= 3 &&
+    lower[0] != null &&
+    lower[0] !== "" &&
+    IMPERATIVE_OPENERS.has(lower[0])
+  ) {
     return { kind: "imperative", flagged: true, evidence: [`imperative opener "${lower[0]}"`] };
   }
 

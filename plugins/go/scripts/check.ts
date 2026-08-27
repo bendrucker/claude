@@ -41,7 +41,7 @@ export function isGeneratedFile(content: string): boolean {
 export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
   const filePath = FileInput.safeParse(input.tool_input).data?.file_path;
 
-  if (!filePath || !filePath.endsWith(".go")) {
+  if (filePath == null || filePath === "" || !filePath.endsWith(".go")) {
     return null;
   }
 

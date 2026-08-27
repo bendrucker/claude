@@ -104,7 +104,7 @@ describe("parseVerdict", () => {
       return;
     }
     const v = parseVerdict(raw(over), "x");
-    if (trimTo) {
+    if (trimTo != null && trimTo !== "") {
       expect(v.trimTo).toBe(trimTo);
     } else {
       expect(v.trimTo).toBeUndefined();

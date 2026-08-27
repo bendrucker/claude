@@ -128,7 +128,9 @@ function report(row: ScoreRow): string {
     const flags = [row.title.over50 ? "over 50" : null, row.title.clauseStacking ? "stacked" : null]
       .filter(Boolean)
       .join(", ");
-    lines.push(`title: ${row.title.length} chars${flags ? ` (${flags})` : ""} · ${row.title.text}`);
+    lines.push(
+      `title: ${row.title.length} chars${flags !== "" ? ` (${flags})` : ""} · ${row.title.text}`,
+    );
   }
 
   lines.push(`heading case violations: ${row.headingCaseViolations}`);

@@ -22,7 +22,7 @@ function changedFiles(base: string): string[] {
   return git(["diff", "--name-only", `${base}...HEAD`])
     .split("\n")
     .map((f) => f.trim())
-    .filter((f) => f && isSourceFile(f));
+    .filter((f) => f !== "" && isSourceFile(f));
 }
 
 async function persistLcov(reports: Parameters<typeof formatLcov>[0]): Promise<void> {
@@ -70,15 +70,14 @@ const reports = await runCoverage(files);
 await persistLcov(reports);
 
 // When specific files were requested, focus the report on them.
-const targets = files.length
-  ? new Set(files.map((f) => relative(repoRoot, join(process.cwd(), f))))
-  : null;
+const targets =
+  files.length !== 0 ? new Set(files.map((f) => relative(repoRoot, join(process.cwd(), f)))) : null;
 const scoped = targets ? reports.filter((fc) => targets.has(fc.file)) : reports;
 
 if (argv.flags.report === "github") {
   const summary = githubReport(scoped);
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-  if (summaryPath) {
+  if (summaryPath != null && summaryPath !== "") {
     await Bun.write(
       summaryPath,
       `${await Bun.file(summaryPath)

@@ -122,12 +122,15 @@ export async function detect(root: string, options: DetectOptions = {}): Promise
     }
     const cli = which(provider.cli) !== null;
     let presence: string;
-    if (config && cli) presence = `repo config (${config}), CLI installed`;
-    else if (config) presence = `repo config (${config}), CLI not installed`;
+    if (config != null && config !== "" && cli) presence = `repo config (${config}), CLI installed`;
+    else if (config != null && config !== "")
+      presence = `repo config (${config}), CLI not installed`;
     else if (cli) presence = "CLI installed, no repo config";
     else continue;
     const paused = pause(records, provider.name, origin, now);
-    lines.push(`${provider.name}: ${presence}${paused ? `, ${paused}` : ""}`);
+    lines.push(
+      `${provider.name}: ${presence}${paused != null && paused !== "" ? `, ${paused}` : ""}`,
+    );
   }
   return lines.length > 0 ? lines.join("\n") : "none: no bot config or CLI found locally";
 }

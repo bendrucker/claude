@@ -23,7 +23,8 @@ export function terminalReport(reports: FileCoverage[]): string {
   const rows = sorted.map((fc) => {
     const { pct } = lineCoverage(fc);
     const paint = pctColor(pct);
-    return [fc.file, paint(`${pct.toFixed(1)}%`), formatRanges(uncoveredLines(fc)) || "—"];
+    const ranges = formatRanges(uncoveredLines(fc));
+    return [fc.file, paint(`${pct.toFixed(1)}%`), ranges !== "" ? ranges : "—"];
   });
 
   const summary = table([["File", "% Lines", "Uncovered"], ...rows]);
@@ -35,14 +36,17 @@ export function terminalReport(reports: FileCoverage[]): string {
     details.push(`${color(31, fc.file)}: ${uncovered.join(", ")}`);
   }
 
-  return details.length ? `${summary}\nUncovered lines:\n${details.join("\n")}` : summary.trimEnd();
+  return details.length !== 0
+    ? `${summary}\nUncovered lines:\n${details.join("\n")}`
+    : summary.trimEnd();
 }
 
 function markdownTable(reports: FileCoverage[]): string {
   const header = "| File | % Lines | Uncovered |\n| --- | --- | --- |";
   const rows = sortByCoverage(reports).map((fc) => {
     const { pct } = lineCoverage(fc);
-    return `| \`${fc.file}\` | ${pct.toFixed(1)}% | ${formatRanges(uncoveredLines(fc)) || "—"} |`;
+    const ranges = formatRanges(uncoveredLines(fc));
+    return `| \`${fc.file}\` | ${pct.toFixed(1)}% | ${ranges !== "" ? ranges : "—"} |`;
   });
   return [header, ...rows].join("\n");
 }
@@ -51,7 +55,7 @@ function markdownTable(reports: FileCoverage[]): string {
 // per-line annotations, which read as defect-grade warnings and hit GitHub's
 // ~10-per-level render cap. Per-line detail lives in the local hook and skill.
 export function githubReport(reports: FileCoverage[]): string {
-  return reports.length
+  return reports.length !== 0
     ? `## Coverage\n\n${markdownTable(reports)}`
     : "## Coverage\n\nNo coverage data.";
 }

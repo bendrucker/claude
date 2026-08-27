@@ -271,7 +271,7 @@ function questionAnswerCadenceHits(text: string): Hits {
   const questionOpeners: string[] = [];
   for (const sentences of paragraphs) {
     const first = sentences[0];
-    if (first && QUESTION_OPENER.test(first)) {
+    if (first != null && first !== "" && QUESTION_OPENER.test(first)) {
       questionOpeners.push(first.slice(0, 60));
     }
   }
@@ -1285,7 +1285,7 @@ export function scanIntroduced(
 
   for (const def of PATTERNS) {
     if (def.skillOnly) continue;
-    if (def.fileOnly && filePath && !isProseFile(filePath)) continue;
+    if (def.fileOnly && filePath != null && filePath !== "" && !isProseFile(filePath)) continue;
     if (def.sideEffectOnly && context === "file") continue;
 
     const newHits = patternHits(newStripped, def);
@@ -1303,7 +1303,7 @@ export function scanIntroduced(
   }
 
   for (const group of WEIGHTED_PATTERNS) {
-    if (group.fileOnly && filePath && !isProseFile(filePath)) continue;
+    if (group.fileOnly && filePath != null && filePath !== "" && !isProseFile(filePath)) continue;
 
     const newWeighted = weightedStemHits(newStripped, group.entries);
     if (newWeighted.totalWeight < group.threshold) continue;

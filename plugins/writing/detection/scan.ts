@@ -116,6 +116,9 @@ export function scanAll(text: string, filePath?: string): ScanResult[] {
     results.push(...weightedResults(stripped, group));
   }
 
-  results.sort((a, b) => a.line - b.line || a.col - b.col);
+  results.sort((a, b) => {
+    const byLine = a.line - b.line;
+    return byLine !== 0 ? byLine : a.col - b.col;
+  });
   return results;
 }

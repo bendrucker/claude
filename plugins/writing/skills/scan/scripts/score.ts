@@ -117,7 +117,10 @@ export function renderTable(report: ScoreReport): string {
   for (const group of report.groups) {
     const header = `${group.group} (${group.wordCount} words)`;
     const rows = group.categories
-      .toSorted((a, b) => b.density - a.density || a.category.localeCompare(b.category))
+      .toSorted((a, b) => {
+        const byDensity = b.density - a.density;
+        return byDensity !== 0 ? byDensity : a.category.localeCompare(b.category);
+      })
       .map((c) => [c.category, String(c.hits), formatDensity(c.density)]);
     if (rows.length === 0) {
       sections.push(`${header}\nNo patterns detected.`);
@@ -131,7 +134,7 @@ export function renderTable(report: ScoreReport): string {
 export async function loadCustomMatch(
   path: string | undefined,
 ): Promise<((text: string) => { count: number }) | undefined> {
-  if (!path) return undefined;
+  if (path == null || path === "") return undefined;
   const content = await Bun.file(path).text();
   return compileStemmedWordlist(content);
 }

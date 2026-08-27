@@ -62,7 +62,7 @@ describe("sentence-heading positives", () => {
     it(description, () => {
       const verdict = classifyHeadingBaseline(heading);
       expect(verdict.flagged).toBe(baselineFlagged);
-      if (kind) {
+      if (kind != null) {
         expect(verdict.kind).toBe(kind);
       }
     });

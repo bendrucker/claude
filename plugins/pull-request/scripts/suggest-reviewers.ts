@@ -41,12 +41,12 @@ export function selfIdentities(cwd?: string): Set<string> {
 
 /** The base ref to diff against (the default branch). */
 function baseRef(cwd?: string, override?: string): string | null {
-  if (override) return override;
+  if (override != null && override !== "") return override;
   const head = git("symbolic-ref --quiet refs/remotes/origin/HEAD", cwd);
-  if (head) return head.replace(/^refs\/remotes\//, "");
+  if (head !== "") return head.replace(/^refs\/remotes\//, "");
   return (
-    ["origin/main", "origin/master", "main", "master"].find((ref) =>
-      git(`rev-parse --verify --quiet ${ref}`, cwd),
+    ["origin/main", "origin/master", "main", "master"].find(
+      (ref) => git(`rev-parse --verify --quiet ${ref}`, cwd) !== "",
     ) ?? null
   );
 }
@@ -55,10 +55,12 @@ function baseRef(cwd?: string, override?: string): string | null {
 export function changedFiles(cwd?: string, base?: string): string[] {
   const ref = baseRef(cwd, base);
   const commands = [
-    ref && `diff --name-only --diff-filter=d ${ref}...HEAD`,
+    ref != null ? `diff --name-only --diff-filter=d ${ref}...HEAD` : null,
     "diff --name-only --diff-filter=d HEAD",
   ];
-  const files = commands.flatMap((c) => (c ? git(c, cwd).split("\n") : [])).filter(Boolean);
+  const files = commands
+    .flatMap((c) => (c != null && c !== "" ? git(c, cwd).split("\n") : []))
+    .filter(Boolean);
   return [...new Set(files)];
 }
 

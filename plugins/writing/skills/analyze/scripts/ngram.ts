@@ -157,7 +157,7 @@ export function processRows(
   };
   const phraseSessions = new Map<string, Set<string>>();
   for (const row of rows) {
-    if (!row.text) continue;
+    if (row.text == null || row.text === "") continue;
     for (const sent of splitSentences(cleanText(row.text))) {
       const tokens = tokenize(sent);
       if (tokens.length === 0) continue;
@@ -176,7 +176,8 @@ export function processRows(
           sessions.add(row.session_id);
           if (examples) {
             const existing = examples.get(key);
-            if (!existing || sent.length < existing.length) examples.set(key, sent);
+            if (existing == null || existing === "" || sent.length < existing.length)
+              examples.set(key, sent);
           }
         }
       }

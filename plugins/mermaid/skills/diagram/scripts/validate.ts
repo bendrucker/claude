@@ -73,7 +73,7 @@ export function extractMermaidBlocks(content: string): MermaidBlock[] {
 
 async function validateBlock(block: MermaidBlock): Promise<ValidationError | null> {
   const trimmed = block.content.trim();
-  if (!trimmed) {
+  if (trimmed === "") {
     return { line: block.line, message: "Empty mermaid block" };
   }
 

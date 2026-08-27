@@ -88,7 +88,7 @@ export function findLineNumber(content: string, pattern: string): number {
 }
 
 function getMarkerPath(sessionId: string): string {
-  return path.join(MARKER_DIR, sessionId || "unknown");
+  return path.join(MARKER_DIR, sessionId !== "" ? sessionId : "unknown");
 }
 
 export async function isCleanupAgentActive(sessionId: string): Promise<boolean> {
@@ -150,7 +150,7 @@ export async function processInput(
   }
 
   const language = getLanguage(filePath);
-  if (!language) {
+  if (language == null || language === "") {
     return null;
   }
 

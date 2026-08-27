@@ -55,7 +55,7 @@ const results = await parallel(job.shards.map((shard) => () => judgeShard(shard)
 
 let flagged = 0;
 for (const result of results) {
-  if (result && typeof result.flagged === "number") flagged += result.flagged;
+  if (typeof result?.flagged === "number") flagged += result.flagged;
 }
 
 log(`Judged ${job.shards.length} shard(s); ${flagged} flagged. Verdicts in ${job.verdictsDir}`);

@@ -99,6 +99,16 @@ export function detectRole(viewer: string, prAuthor: string): Role {
   return viewer === prAuthor ? "author" : "reviewer";
 }
 
+/** An absent or empty --role falls back to detection. A non-empty invalid value returns null. */
+export function resolveRole(
+  roleFlag: string | undefined,
+  viewer: string,
+  prAuthor: string,
+): Role | null {
+  if (roleFlag == null || roleFlag === "") return detectRole(viewer, prAuthor);
+  return Role.safeParse(roleFlag).data ?? null;
+}
+
 export function filterThreads(
   threads: Thread[],
   options: {
@@ -323,12 +333,11 @@ async function main(): Promise<void> {
     cursor = pageInfo.hasNextPage ? (pageInfo.endCursor ?? undefined) : undefined;
   } while (cursor);
 
-  const roleFlag = argv.flags.role ? Role.safeParse(argv.flags.role) : null;
-  if (roleFlag && !roleFlag.success) {
+  const role = resolveRole(argv.flags.role, viewer, prAuthor);
+  if (role == null) {
     console.error(`Invalid --role: ${argv.flags.role} (must be "author" or "reviewer")`);
     process.exit(1);
   }
-  const role: Role = roleFlag?.data ?? detectRole(viewer, prAuthor);
 
   let since: Date | undefined;
   if (argv.flags.since) {

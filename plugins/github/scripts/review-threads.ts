@@ -64,8 +64,8 @@ async function ghGraphQL<S extends z.ZodType>(
 }
 
 async function readBody(body?: string, file?: string): Promise<string> {
-  if (body) return body;
-  if (file) return (await Bun.file(file).text()).trim();
+  if (body != null && body !== "") return body;
+  if (file != null && file !== "") return (await Bun.file(file).text()).trim();
   return (await Bun.stdin.text()).trim();
 }
 
@@ -86,7 +86,7 @@ const replyCmd = command(
   async (parsed) => {
     const threadId = parsed._.threadId;
     const body = await readBody(parsed.flags.body, parsed.flags.bodyFile);
-    if (!body) {
+    if (body === "") {
       console.error("Reply body is empty");
       process.exit(1);
     }
@@ -123,7 +123,7 @@ const ThreadCommentResponse = z.looseObject({
 async function firstCommentId(threadId: string): Promise<string> {
   const result = await ghGraphQL(ThreadCommentResponse, THREAD_COMMENT_QUERY, { threadId });
   const id = result.data.node?.comments.nodes[0]?.id;
-  if (!id) {
+  if (id == null || id === "") {
     throw new Error(`No comment found for thread ${threadId}`);
   }
   return id;

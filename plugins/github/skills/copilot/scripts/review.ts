@@ -303,7 +303,7 @@ export function splitPaths(output: string): string[] {
 function collectDiff(base: string, cwd: string): Diff {
   const committed = git(["diff", `${base}...HEAD`], cwd);
   const working = git(["diff", "HEAD"], cwd);
-  const patch = [committed, working].filter((part) => part.trim()).join("\n");
+  const patch = [committed, working].filter((part) => part.trim() !== "").join("\n");
 
   const names = new Set<string>();
   for (const range of [`${base}...HEAD`, "HEAD"]) {
@@ -512,7 +512,7 @@ async function runCopilot(prompt: string, angle: Angle, options: RunOptions): Pr
     child.exited,
   ]);
 
-  const output = [stdout, stderr].filter((part) => part.trim()).join("\n");
+  const output = [stdout, stderr].filter((part) => part.trim() !== "").join("\n");
   const credits = output.match(/AI Credits\s+([\d.]+)/);
 
   return { angle, exitCode, output, credits: credits ? Number(credits[1]) : null };
@@ -669,7 +669,7 @@ async function main(): Promise<void> {
   }
   const diff = collectDiff(base, cwd);
 
-  if (!diff.patch.trim() && diff.files.length === 0) {
+  if (diff.patch.trim() === "" && diff.files.length === 0) {
     console.error(`Nothing to review against ${base}.`);
     process.exit(1);
   }
@@ -677,7 +677,7 @@ async function main(): Promise<void> {
   // The agentic worktree is checked out at HEAD, so uncommitted work would put the reviewer
   // in front of code that does not match the diff it was handed, and every finding it read
   // out of a file would be suspect.
-  if (argv.flags.agentic && git(["status", "--porcelain"], cwd).trim()) {
+  if (argv.flags.agentic && git(["status", "--porcelain"], cwd).trim() !== "") {
     console.error(`${RED}--agentic needs a clean tree: it reviews a checkout of HEAD.${RESET}`);
     console.error(`${YELLOW}Commit the working changes, or run the one-shot shape.${RESET}`);
     process.exit(1);
@@ -759,7 +759,7 @@ async function main(): Promise<void> {
   console.error(`  shape      ${argv.flags.agentic ? "agentic, capped session" : "one-shot"}`);
   console.error(`  base       ${base}`);
   console.error(
-    `  files      ${diff.files.length}${skipped.length ? ` (${skipped.length} body omitted)` : ""}`,
+    `  files      ${diff.files.length}${skipped.length !== 0 ? ` (${skipped.length} body omitted)` : ""}`,
   );
   console.error(`  angles     ${angles.length} (${angles.map((angle) => angle.id).join(", ")})`);
   console.error(

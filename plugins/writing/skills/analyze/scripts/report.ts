@@ -62,7 +62,10 @@ export function renderReport(input: ReportInput): string {
 }
 
 function renderHeader(input: ReportInput): string {
-  const project = input.projectFilter ? `\`${input.projectFilter}\`` : "(none)";
+  const project =
+    input.projectFilter != null && input.projectFilter !== ""
+      ? `\`${input.projectFilter}\``
+      : "(none)";
   return [
     `# Writing trope analysis (${input.generatedAt})`,
     "",
@@ -172,11 +175,10 @@ function renderProposedRemovals(input: ReportInput): string {
   ];
   const removable = input.ruleHealth
     .filter((r) => r.status === "remove")
-    .toSorted(
-      (a, b) =>
-        reasonRank(a.removeReason) - reasonRank(b.removeReason) ||
-        (a.modelPerM ?? 0) - (b.modelPerM ?? 0),
-    );
+    .toSorted((a, b) => {
+      const byReason = reasonRank(a.removeReason) - reasonRank(b.removeReason);
+      return byReason !== 0 ? byReason : (a.modelPerM ?? 0) - (b.modelPerM ?? 0);
+    });
   if (removable.length === 0) {
     lines.push("_No removals proposed._");
     return lines.join("\n");
@@ -325,7 +327,7 @@ function renderStructuralSignatures(input: ReportInput): string {
   lines.push("| --- | --- | --- | --- | --- | --- | --- |");
   for (const r of input.structuralSignatures) {
     lines.push(
-      `| \`${r.phrase}\` | ${r.n} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${r.sessions ?? "-"} | ${fmtLiftAgainstRate(r.lift, r.userPerM)} | ${r.example ? esc(truncate(r.example, 100)) : "-"} |`,
+      `| \`${r.phrase}\` | ${r.n} | ${fmtPerM(r.assistantPerM)} | ${fmtPerM(r.userPerM)} | ${r.sessions ?? "-"} | ${fmtLiftAgainstRate(r.lift, r.userPerM)} | ${r.example != null && r.example !== "" ? esc(truncate(r.example, 100)) : "-"} |`,
     );
   }
   return lines.join("\n");
@@ -450,7 +452,7 @@ function renderCorrectiveFeedback(input: ReportInput): string {
   for (const c of input.corrective) {
     lines.push(`### ${c.timestamp} (${c.project ?? "unknown"}): matched \`${c.matched_term}\``);
     lines.push("");
-    if (c.context_snippet) {
+    if (c.context_snippet != null && c.context_snippet !== "") {
       lines.push(`Preceding model output (${fmtNum(c.context_chars)} chars):`);
       lines.push("", "```", c.context_snippet, "```", "");
     }
@@ -506,16 +508,18 @@ function esc(s: string): string {
 
 function voiceBaselineSummary(profile: VoiceProfile | null): string {
   if (!profile) return "not loaded (run ingest-voice.ts + voice-profile.ts)";
-  return `${fmtNum(profile.documentCount)} documents, ${fmtNum(profile.totalTokens)} tokens (sources: ${profile.sources.join("+") || "none"})`;
+  const sources = profile.sources.join("+");
+  return `${fmtNum(profile.documentCount)} documents, ${fmtNum(profile.totalTokens)} tokens (sources: ${sources !== "" ? sources : "none"})`;
 }
 
 function formatQuote(quote: QuoteContext | null): string {
   if (!quote) return "(no deliverable occurrence found)";
-  const pointer = quote.filePath
-    ? quote.filePath
-    : quote.sourceFile
-      ? `${quote.sourceFile}:${quote.sourceLine ?? "?"}`
-      : "(no source pointer)";
+  const pointer =
+    quote.filePath != null && quote.filePath !== ""
+      ? quote.filePath
+      : quote.sourceFile != null && quote.sourceFile !== ""
+        ? `${quote.sourceFile}:${quote.sourceLine ?? "?"}`
+        : "(no source pointer)";
   return `"${quote.window}" (${pointer})`;
 }
 

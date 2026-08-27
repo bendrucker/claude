@@ -82,7 +82,10 @@ const SMALL_WORDS = new Set([
   "under",
 ]);
 
-const raw = argv.flags.input ? await Bun.file(argv.flags.input).text() : await Bun.stdin.text();
+const raw =
+  argv.flags.input != null && argv.flags.input !== ""
+    ? await Bun.file(argv.flags.input).text()
+    : await Bun.stdin.text();
 const { title: fmTitle, type, body } = parseIssue(raw);
 const title = argv.flags.title ?? fmTitle;
 
@@ -134,7 +137,7 @@ for (const h of headings) {
   const lowerMajor = major
     .filter((w, i) => !SMALL_WORDS.has(w.toLowerCase()) || i === 0)
     .filter((w) => /^[a-z]/.test(w));
-  if (lowerMajor.length)
+  if (lowerMajor.length !== 0)
     add(
       1,
       "minor",
@@ -235,7 +238,7 @@ if (summaryHeading)
   );
 
 // Finding 6: concise, sentence-case title from the frontmatter.
-if (title) {
+if (title !== "") {
   if (title.length > 80)
     add(6, "minor", TITLE_LINE, title, `Title is ${title.length} chars. Keep it short.`);
   if (/\(.*\)/.test(title))
@@ -272,16 +275,17 @@ const byFinding = violations.reduce<Record<number, number>>((m, v) => {
 if (argv.flags.json) {
   console.log(JSON.stringify({ title, type, score, byFinding, violations }, null, 2));
 } else {
-  console.log(`Title: ${title || "(none)"}`);
-  console.log(`Type:  ${type || "(none)"}`);
+  console.log(`Title: ${title !== "" ? title : "(none)"}`);
+  console.log(`Type:  ${type !== "" ? type : "(none)"}`);
   console.log(`Score: ${score} (lower is better) · ${violations.length} violations\n`);
-  for (const v of violations.toSorted(
-    (a, b) => SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity] || a.finding - b.finding,
-  )) {
+  for (const v of violations.toSorted((a, b) => {
+    const bySeverity = SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity];
+    return bySeverity !== 0 ? bySeverity : a.finding - b.finding;
+  })) {
     console.log(
       `  [${v.severity}] finding ${v.finding} · L${v.line} · "${v.excerpt.slice(0, 60)}"`,
     );
     console.log(`      ${v.message}`);
   }
-  if (!violations.length) console.log("  clean");
+  if (violations.length === 0) console.log("  clean");
 }

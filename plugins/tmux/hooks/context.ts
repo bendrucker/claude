@@ -14,13 +14,13 @@ const ENV_FORMAT = [
 
 function hookAsset(name: string): string {
   const root = process.env.CLAUDE_PLUGIN_ROOT;
-  if (root) return join(root, "hooks", name);
+  if (root != null && root !== "") return join(root, "hooks", name);
   return join(import.meta.dirname, name);
 }
 
 function scriptPath(name: string): string {
   const root = process.env.CLAUDE_PLUGIN_ROOT;
-  if (root) return join(root, "skills/tmux/scripts", name);
+  if (root != null && root !== "") return join(root, "skills/tmux/scripts", name);
   return join(import.meta.dirname, "..", "skills/tmux/scripts", name);
 }
 
@@ -53,7 +53,7 @@ function isSessionAttached(pane: string): boolean {
 async function writeEnvFile(envFile: string, pane: string): Promise<void> {
   try {
     const output = tmuxQuery("display-message", "-t", pane, "-p", ENV_FORMAT);
-    if (!output) return;
+    if (output == null || output === "") return;
 
     const file = Bun.file(envFile);
     const existing = (await file.exists()) ? await file.text() : "";
@@ -74,19 +74,27 @@ function buildContext(
   const sections = [PREAMBLE];
 
   const children: string[] = [];
-  if (pane) children.push(xml("pane", pane));
-  if (window) children.push(xml("window", window));
+  if (pane != null && pane !== "") children.push(xml("pane", pane));
+  if (window != null && window !== "") children.push(xml("window", window));
   if (children.length > 0) {
     sections.push(xml("tmux", { attached }, children.join("\n\n")));
   }
 
-  if (directive) sections.push(directive);
+  if (directive != null && directive !== "") sections.push(directive);
   return sections.join("\n\n");
 }
 
 async function main(): Promise<void> {
   const pane = process.env.TMUX_PANE;
-  if (!process.env.TMUX || !pane || !process.env.CLAUDE_ENV_FILE) return;
+  if (
+    process.env.TMUX == null ||
+    process.env.TMUX === "" ||
+    pane == null ||
+    pane === "" ||
+    process.env.CLAUDE_ENV_FILE == null ||
+    process.env.CLAUDE_ENV_FILE === ""
+  )
+    return;
 
   const attached = isSessionAttached(pane);
 

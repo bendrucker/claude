@@ -99,7 +99,7 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
   const command = BashInput.safeParse(input.tool_input).data?.command;
   const target = command === undefined ? null : extractTarget(command);
 
-  if (!target) {
+  if (target == null || target === "") {
     return null;
   }
 

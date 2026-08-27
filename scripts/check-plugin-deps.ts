@@ -72,7 +72,7 @@ async function checkDeps(): Promise<string[]> {
   const violations: string[] = [];
 
   for (const plugin of await loadPlugins()) {
-    if (!plugin.dir) continue;
+    if (plugin.dir == null || plugin.dir === "") continue;
 
     const declared = await getPluginDeps(plugin.dir);
     const imported = await getImportedPackages(plugin.dir);

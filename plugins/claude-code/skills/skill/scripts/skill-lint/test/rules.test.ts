@@ -246,10 +246,10 @@ describe("bangExecutionMatcher", () => {
     const content = skill(allowedTools, body);
     const result = single(bangExecutionMatcher.check(content, ""));
     expect(result.passed).toBe(passed);
-    if (severity) {
+    if (severity != null) {
       expect(result.severity).toBe(severity);
     }
-    if (message) {
+    if (message != null && message !== "") {
       expect(result.message).toContain(message);
     }
   });

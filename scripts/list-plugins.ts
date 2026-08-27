@@ -31,7 +31,7 @@ function extractPluginNames(files: string[]): string[] {
   const plugins = new Set<string>();
   for (const file of files) {
     const match = file.match(/^plugins\/([^/]+)\//);
-    if (match?.[1]) plugins.add(match[1]);
+    if (match?.[1] != null && match[1] !== "") plugins.add(match[1]);
   }
   return [...plugins];
 }
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     allowPositionals: true,
   });
 
-  const alwaysPaths = values.always ?? [];
+  const alwaysPaths = values.always;
   const changedFiles = positionals;
   const allPlugins = await getLocalPlugins();
 

@@ -21,7 +21,7 @@ export function describeComment(comment: Pick<TuicrComment, "location" | "conten
 
 /** Comments whose IDs are not yet in `seen` (skipping any without an ID, as tuicr never emits one). */
 export function newComments(seen: Set<string>, comments: TuicrComment[]): TuicrComment[] {
-  return comments.filter((comment) => comment.id && !seen.has(comment.id));
+  return comments.filter((comment) => comment.id !== "" && !seen.has(comment.id));
 }
 
 /**
@@ -43,7 +43,7 @@ async function watch(slug: string, repo: string, pollSeconds: number): Promise<v
 
   // Arm: mark existing comments seen without announcing them.
   for (const comment of readComments(repo, slug) ?? []) {
-    if (comment.id) seen.add(comment.id);
+    if (comment.id !== "") seen.add(comment.id);
   }
   console.log(`WATCHING ${slug}`);
 
@@ -69,6 +69,7 @@ if (import.meta.main) {
       repo: { type: String, default: ".", description: "Checkout path or owner/repo" },
     },
   });
-  const pollSeconds = argv._.pollSeconds ? Number(argv._.pollSeconds) : 30;
+  const pollSeconds =
+    argv._.pollSeconds != null && argv._.pollSeconds !== "" ? Number(argv._.pollSeconds) : 30;
   await watch(argv._.slug, argv.flags.repo, pollSeconds);
 }

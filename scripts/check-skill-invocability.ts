@@ -25,7 +25,7 @@ export function skillGrants(allowedTools: string[]): string[] {
     if (!match) return [];
 
     const [target] = (match[1] ?? "").trim().split(/\s+/);
-    return target ? [target] : [];
+    return target != null && target !== "" ? [target] : [];
   });
 }
 
@@ -45,7 +45,7 @@ export function violations(files: SkillFile[]): string[] {
   return files.flatMap((file) =>
     file.grants.flatMap((target) => {
       const reason = unreachable(target, byName);
-      return reason ? [`${file.path}: Skill(${target}) (${reason})`] : [];
+      return reason != null && reason !== "" ? [`${file.path}: Skill(${target}) (${reason})`] : [];
     }),
   );
 }

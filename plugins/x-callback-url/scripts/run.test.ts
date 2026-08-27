@@ -96,7 +96,8 @@ async function runScenario(scenario: Scenario): Promise<Outcome> {
 
   const runner = await writeExecutable(join(dir, "run.sh"), await Bun.file(RUN_SH).text());
   await writeExecutable(join(dir, "build.sh"), stub(scenario.build));
-  if (scenario.binary) await writeExecutable(join(dir, "xcall-stub"), stub(scenario.binary));
+  if (scenario.binary != null && scenario.binary !== "")
+    await writeExecutable(join(dir, "xcall-stub"), stub(scenario.binary));
 
   const started = Bun.nanoseconds();
   const proc = Bun.spawn([runner, "things:///version"], {
@@ -124,11 +125,12 @@ async function runScenario(scenario: Scenario): Promise<Outcome> {
 }
 
 function report(scenario: Scenario, outcome: Outcome): string {
+  const stderrLine = outcome.stderr.split("\n")[0];
   return [
     scenario.name,
     `  exit:   ${outcome.exitCode}`,
-    `  stdout: ${outcome.stdout || "(none)"}`,
-    `  stderr: ${outcome.stderr.split("\n")[0] || "(none)"}`,
+    `  stdout: ${outcome.stdout !== "" ? outcome.stdout : "(none)"}`,
+    `  stderr: ${stderrLine !== undefined && stderrLine !== "" ? stderrLine : "(none)"}`,
   ].join("\n");
 }
 

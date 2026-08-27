@@ -32,7 +32,7 @@ export function resolveRegion(
 }
 
 export function defaultValign(box: TextBox, anchor: Anchor): "top" | "middle" | "bottom" {
-  if (box.valign) return box.valign;
+  if (box.valign != null) return box.valign;
   if (box.region) return "middle";
   if (anchor === "center") return "middle";
   return anchor;

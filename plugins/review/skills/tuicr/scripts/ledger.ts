@@ -173,11 +173,11 @@ function resolveLedger(flags: {
   const repo = flags.repo ?? git(["rev-parse", "--show-toplevel"]);
   const branch = flags.branch ?? git(["branch", "--show-current"]);
   const dir = flags.dir ?? defaultLedgerDir();
-  if (!repo) {
+  if (repo == null || repo === "") {
     console.error("Could not determine repo; pass --repo");
     return process.exit(1);
   }
-  if (!branch) {
+  if (branch == null || branch === "") {
     console.error("Could not determine branch; pass --branch");
     return process.exit(1);
   }

@@ -45,7 +45,7 @@ export function parseDiff(diffText: string): ParsedDiff {
 
   function rename(toPath: string): void {
     if (!current) return;
-    if (currentKey && currentKey !== toPath) {
+    if (currentKey != null && currentKey !== "" && currentKey !== toPath) {
       files.delete(currentKey);
       files.set(toPath, current);
       currentKey = toPath;
@@ -119,7 +119,14 @@ export function parseDiff(diffText: string): ParsedDiff {
       const oldMatch = OLD_PATH.exec(line);
       if (oldMatch && oldMatch[1] !== undefined && current) {
         const oldPath = stripDevNull(oldMatch[1]);
-        if (oldPath && currentKey && oldPath !== currentKey) current.oldPath = oldPath;
+        if (
+          oldPath != null &&
+          oldPath !== "" &&
+          currentKey != null &&
+          currentKey !== "" &&
+          oldPath !== currentKey
+        )
+          current.oldPath = oldPath;
       }
       continue;
     }
@@ -128,7 +135,13 @@ export function parseDiff(diffText: string): ParsedDiff {
       const newMatch = NEW_PATH.exec(line);
       if (newMatch && newMatch[1] !== undefined && current) {
         const newPath = stripDevNull(newMatch[1]);
-        if (newPath && currentKey && newPath !== currentKey) {
+        if (
+          newPath != null &&
+          newPath !== "" &&
+          currentKey != null &&
+          currentKey !== "" &&
+          newPath !== currentKey
+        ) {
           if (current.oldPath === undefined) {
             current.oldPath = currentKey;
           }

@@ -102,7 +102,7 @@ function normalizeLines(plan: string): Set<string> {
   const lines = new Set<string>();
   for (const rawLine of plan.split("\n")) {
     const line = rawLine.trim();
-    if (line) lines.add(line);
+    if (line !== "") lines.add(line);
   }
   return lines;
 }
@@ -146,15 +146,20 @@ function isAppendOnlyRevision(previous: Set<string>, current: Set<string>): bool
   );
 }
 
+function defaultStateRoot(): string {
+  const override = process.env.CLAUDE_PLAN_MARKER_ROOT;
+  return override !== undefined && override !== "" ? override : "/tmp/claude";
+}
+
 export async function processInput(
   input: PreToolUseHookInput,
-  stateRoot = process.env.CLAUDE_PLAN_MARKER_ROOT || "/tmp/claude",
+  stateRoot = defaultStateRoot(),
 ): Promise<SyncHookJSONOutput | null> {
   const plan = ToolInput.safeParse(input.tool_input).data?.plan;
   if (plan === undefined) return null;
 
   const sessionId = input.session_id;
-  if (!sessionId) return null;
+  if (sessionId === "") return null;
 
   const dir = join(stateRoot, sessionId);
   try {

@@ -21,9 +21,9 @@ export interface EffortMarker {
 // Null when the level is unknown or the model reports no effort, so the segment
 // simply drops rather than rendering a placeholder.
 export function effortMarker(level?: string | null): EffortMarker | null {
-  if (!level) return null;
+  if (level == null || level === "") return null;
   const glyph = EFFORT_GLYPHS[level];
-  if (!glyph) return null;
+  if (glyph == null || glyph === "") return null;
   return { glyph, isDefault: level === DEFAULT_EFFORT };
 }
 

@@ -114,7 +114,7 @@ export function references(settings: Settings, source: Source): Reference[] {
   for (const [event, entries] of Object.entries(settings.hooks ?? {})) {
     for (const entry of entries) {
       for (const { command } of entry.hooks ?? []) {
-        if (!command) continue;
+        if (command == null || command === "") continue;
         for (const path of paths(command, source.prefixes)) {
           found.push({ file: source.file, event, command, path });
         }

@@ -52,8 +52,8 @@ if (!Number.isFinite(truncate)) {
 }
 
 const criteria: Filters = {};
-if (plugin) criteria.plugin = plugin;
-if (scope) criteria.scope = scope;
+if (plugin != null && plugin !== "") criteria.plugin = plugin;
+if (scope != null) criteria.scope = scope;
 const inventory = filter(await collect(), criteria);
 
 if (json) {

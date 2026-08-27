@@ -32,12 +32,12 @@ export function resolveLogPath(
   env: string | undefined = process.env.WRITING_HOOKS_LOG,
 ): string | null {
   if (env !== undefined && OFF_VALUES.has(env.toLowerCase())) return null;
-  if (env && !ON_VALUES.has(env.toLowerCase())) return env;
+  if (env != null && env !== "" && !ON_VALUES.has(env.toLowerCase())) return env;
   return join(homedir(), ".claude", "writing-hooks", "log.jsonl");
 }
 
 export function appendRunLog(entry: RunLogEntry, path: string | null = resolveLogPath()): void {
-  if (!path) return;
+  if (path == null || path === "") return;
   try {
     mkdirSync(dirname(path), { recursive: true });
     const file = Bun.file(path);

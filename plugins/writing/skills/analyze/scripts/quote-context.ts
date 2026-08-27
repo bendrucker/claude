@@ -24,7 +24,7 @@ const WORD_TOKEN = /[a-zA-Z]+/g;
 export function findQuote(phrase: string, rows: SourceRow[], radius = 60): QuoteContext | null {
   const lowered = phrase.toLowerCase();
   for (const row of rows) {
-    if (!row.text) continue;
+    if (row.text == null || row.text === "") continue;
     const idx = row.text.toLowerCase().indexOf(lowered);
     if (idx >= 0) return makeContext(row, idx, idx + phrase.length, radius);
   }
@@ -32,7 +32,7 @@ export function findQuote(phrase: string, rows: SourceRow[], radius = 60): Quote
   const needle = (lowered.match(WORD_TOKEN) ?? []).map((w) => stemmer(w));
   if (needle.length === 0) return null;
   for (const row of rows) {
-    if (!row.text) continue;
+    if (row.text == null || row.text === "") continue;
     const span = findStemmedSpan(row.text, needle);
     if (span) return makeContext(row, span.start, span.end, radius);
   }

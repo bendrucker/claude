@@ -293,6 +293,10 @@ function commandOutput(error: unknown): string | null {
 // to excluded files read as lint or format failures and block Stop.
 const LINT_ARGS = ["--no-error-on-unmatched-pattern", "-f", "agent"];
 
+// Only the per-file pass runs type-aware. The gate below pairs its batch with a
+// whole-tree --type-aware --type-check that reports the same rules, so asking
+// for them twice buys nothing and costs the gate a second type-aware run.
+//
 // --type-aware in a tree tsgolint cannot resolve reports the missing executable
 // instead of linting, and no edit clears that. `installed` skips the doomed run
 // where node_modules is absent. A tree carrying node_modules without the checker
@@ -327,7 +331,7 @@ async function runOxlintAgentBatch(files: string[]): Promise<string | null> {
   const groups = await groupByWorkingTree(files);
   const outputs = await Promise.all(
     [...groups.entries()].map(([cwd, groupFiles]) =>
-      runOxlintPass(command, [...LINT_ARGS, ...groupFiles], cwd),
+      runOx(command, [...LINT_ARGS, ...groupFiles], cwd),
     ),
   );
   const combined = outputs.filter((output): output is string => Boolean(output)).join("\n");

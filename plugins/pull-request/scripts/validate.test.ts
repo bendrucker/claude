@@ -645,11 +645,9 @@ describe("processInput", () => {
     .slice(0, 12);
 
   function createInput(command: string, cwd?: string): PreToolUseHookInput {
-    return {
-      tool_name: "Bash",
-      tool_input: { command },
-      ...(cwd ? { cwd } : {}),
-    } as PreToolUseHookInput;
+    const input: Record<string, unknown> = { tool_name: "Bash", tool_input: { command } };
+    if (cwd) input.cwd = cwd;
+    return input as PreToolUseHookInput;
   }
 
   it("returns null when command has no --body-file", async () => {

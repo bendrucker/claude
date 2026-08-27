@@ -128,9 +128,14 @@ describe("extractActivity", () => {
 });
 
 describe("extractModel", () => {
-  const withModel = (model?: string) => ({
-    message: { role: "assistant", content: [], ...(model ? { model } : {}) },
-  });
+  const withModel = (model?: string) => {
+    const message: { role: string; content: never[]; model?: string } = {
+      role: "assistant",
+      content: [],
+    };
+    if (model) message.model = model;
+    return { message };
+  };
 
   test("returns the newest assistant model", () => {
     expect(extractModel([withModel("claude-opus-4-8"), withModel("claude-fable-5")])).toBe(

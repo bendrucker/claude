@@ -160,12 +160,9 @@ export async function loadPlugins(opts?: LoadOptions): Promise<Plugin[]> {
   for (const entry of marketplace?.plugins ?? []) {
     const plugin = get(entry.name);
     const local = typeof entry.source === "string" && entry.source.startsWith("./plugins/");
-    plugin.listing = {
-      name: entry.name,
-      source: entry.source,
-      local,
-      ...(entry.description !== undefined ? { description: entry.description } : {}),
-    };
+    const listing: MarketplaceListing = { name: entry.name, source: entry.source, local };
+    if (entry.description !== undefined) listing.description = entry.description;
+    plugin.listing = listing;
   }
 
   return [...plugins.values()].sort((a, b) => a.name.localeCompare(b.name));

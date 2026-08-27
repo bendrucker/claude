@@ -36,7 +36,10 @@ mutation($subjectId: ID!, $content: ReactionContent!) {
 }
 `;
 
-async function ghGraphQL(query: string, variables: Record<string, string>): Promise<unknown> {
+async function ghGraphQL<T = unknown>(
+  query: string,
+  variables: Record<string, string>,
+): Promise<T> {
   const args = ["gh", "api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(variables)) {
     args.push("-f", `${key}=${value}`);
@@ -110,7 +113,7 @@ interface ThreadCommentResponse {
 }
 
 async function firstCommentId(threadId: string): Promise<string> {
-  const result = (await ghGraphQL(THREAD_COMMENT_QUERY, { threadId })) as ThreadCommentResponse;
+  const result = await ghGraphQL<ThreadCommentResponse>(THREAD_COMMENT_QUERY, { threadId });
   const id = result.data.node?.comments.nodes[0]?.id;
   if (!id) {
     throw new Error(`No comment found for thread ${threadId}`);

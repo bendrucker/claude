@@ -66,7 +66,9 @@ export interface Origin {
 
 export function origin(path: string): Origin {
   const plugin = path.startsWith("plugins/") ? path.split("/")[1] : undefined;
-  return { scope: scopeOf(path), path, ...(plugin ? { plugin } : {}) };
+  const result: Origin = { scope: scopeOf(path), path };
+  if (plugin) result.plugin = plugin;
+  return result;
 }
 
 /**

@@ -16,7 +16,7 @@ export interface TagActions {
 }
 
 async function fetchTags(): Promise<string[]> {
-  const tags = (await runScript("query-metadata.js", ["tags"])) as Array<{ name: string }>;
+  const tags = await runScript<Array<{ name: string }>>("query-metadata.js", ["tags"]);
   return tags.map((tag) => tag.name);
 }
 

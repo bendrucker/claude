@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { isScope, SCOPES } from "../assets";
-import { collect, filter } from "./collect";
+import { collect, filter, type Filters } from "./collect";
 import { isKind, KINDS, records, render, section } from "./report";
 
 const argv = cli({
@@ -51,10 +51,10 @@ if (!Number.isFinite(truncate)) {
   process.exit(1);
 }
 
-const inventory = filter(await collect(), {
-  ...(plugin ? { plugin } : {}),
-  ...(scope ? { scope } : {}),
-});
+const criteria: Filters = {};
+if (plugin) criteria.plugin = plugin;
+if (scope) criteria.scope = scope;
+const inventory = filter(await collect(), criteria);
 
 if (json) {
   console.log(JSON.stringify(records(inventory, kind), null, 2));

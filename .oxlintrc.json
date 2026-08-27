@@ -56,9 +56,23 @@
           }
         ]
       }
-    ]
+    ],
+    "local/no-chained-type-assertions": "error",
+    "local/no-conditional-empty-object-spread": "error",
+    "local/no-module-mocking": "error",
+    "local/no-terminal-width": "error",
+    "local/no-unknown-returns": "error"
   },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "local/no-chained-type-assertions": "off"
+      }
+    }
+  ],
   "ignorePatterns": ["**/fixtures/**", "**/*.d.ts", "**/jxa/**/*.js", ".claude/workflows/**"],
+  "jsPlugins": [{ "name": "local", "specifier": "./packages/oxlint-rules/index.ts" }],
   "env": {
     "builtin": true
   }

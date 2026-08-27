@@ -164,6 +164,9 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
 }
 
 /** The records behind a kind, for `--json`. */
+// The shape varies by `kind`, and the only caller passes the result straight
+// to JSON.stringify for --json.
+// oxlint-disable-next-line local/no-unknown-returns
 export function records(inventory: Inventory, kind: Kind): unknown {
   if (kind === "summary") return inventory;
   if (kind === "mcp") return inventory.mcpServers;

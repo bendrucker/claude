@@ -409,22 +409,26 @@ describe("ox hook", () => {
     });
 
     // An error the model cannot clear would otherwise block every Stop forever.
-    it("gives way once the issues survive the block limit", async () => {
-      const session = `limit-${Date.now()}`;
-      const transcript = await unfixableSession(session);
+    it(
+      "gives way once the issues survive the block limit",
+      async () => {
+        const session = `limit-${Date.now()}`;
+        const transcript = await unfixableSession(session);
 
-      const budget = [];
-      for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
-        budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
-      }
-      const past = await processStop(mockStopHookInput(transcript, true, session));
+        const budget = [];
+        for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
+          budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
+        }
+        const past = await processStop(mockStopHookInput(transcript, true, session));
 
-      expect(budget.map((result) => result?.decision)).toEqual(
-        Array(STOP_BLOCK_LIMIT).fill("block"),
-      );
-      expect(past?.decision).toBeUndefined();
-      expect(past?.systemMessage).toContain("no-dupe-keys");
-    }, MULTI_STOP_TIMEOUT_MS);
+        expect(budget.map((result) => result?.decision)).toEqual(
+          Array(STOP_BLOCK_LIMIT).fill("block"),
+        );
+        expect(past?.decision).toBeUndefined();
+        expect(past?.systemMessage).toContain("no-dupe-keys");
+      },
+      MULTI_STOP_TIMEOUT_MS,
+    );
 
     // Blocking without a recorded count is the runaway itself: every re-entrant
     // Stop would read zero and block again, with nothing to release it.
@@ -442,16 +446,20 @@ describe("ox hook", () => {
 
     // The budget is per round. A Stop the model did not reach through a block
     // ends the previous round, so the next one starts with its full count.
-    it("restarts the count on a stop that did not follow a block", async () => {
-      const session = `restart-${Date.now()}`;
-      const transcript = await unfixableSession(session);
+    it(
+      "restarts the count on a stop that did not follow a block",
+      async () => {
+        const session = `restart-${Date.now()}`;
+        const transcript = await unfixableSession(session);
 
-      await processStop(mockStopHookInput(transcript, false, session));
-      await processStop(mockStopHookInput(transcript, true, session));
-      const fresh = await processStop(mockStopHookInput(transcript, false, session));
+        await processStop(mockStopHookInput(transcript, false, session));
+        await processStop(mockStopHookInput(transcript, true, session));
+        const fresh = await processStop(mockStopHookInput(transcript, false, session));
 
-      expect(fresh?.decision).toBe("block");
-    }, MULTI_STOP_TIMEOUT_MS);
+        expect(fresh?.decision).toBe("block");
+      },
+      MULTI_STOP_TIMEOUT_MS,
+    );
 
     it("returns null when no files were modified", async () => {
       const transcriptPath = join(tempDir, `transcript-empty-${Date.now()}.jsonl`);

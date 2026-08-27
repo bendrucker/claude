@@ -357,21 +357,26 @@ describe("ox hook", () => {
         ?.additionalContext;
     }
 
-    it("reports a violation only the type-aware pass sees", async () => {
-      expect(await typeAwareContext("linked")).toContain("no-misused-promises");
-    });
+    it.each<{ name: string; nodeModules: NodeModules; reports: string }>([
+      {
+        name: "reports a violation only the type-aware pass sees",
+        nodeModules: "linked",
+        reports: "no-misused-promises",
+      },
+      {
+        name: "skips the type-aware pass where node_modules is absent",
+        nodeModules: "absent",
+        reports: "no-dupe-keys",
+      },
+      {
+        name: "falls back to the plain pass where node_modules omits tsgolint",
+        nodeModules: "empty",
+        reports: "no-dupe-keys",
+      },
+    ])("$name", async ({ nodeModules, reports }) => {
+      const context = await typeAwareContext(nodeModules);
 
-    it("skips the type-aware pass where node_modules is absent", async () => {
-      const context = await typeAwareContext("absent");
-
-      expect(context).toContain("no-dupe-keys");
-      expect(context).not.toContain("tsgolint");
-    });
-
-    it("falls back to the plain pass where node_modules omits tsgolint", async () => {
-      const context = await typeAwareContext("empty");
-
-      expect(context).toContain("no-dupe-keys");
+      expect(context).toContain(reports);
       expect(context).not.toContain("tsgolint");
     });
   });

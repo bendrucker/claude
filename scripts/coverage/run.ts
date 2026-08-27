@@ -61,13 +61,13 @@ async function readLcov(coverageDir: string): Promise<FileCoverage[]> {
 
 function runScope(scope: string): Promise<FileCoverage[]> {
   const coverageDir = mkdtempSync(join(tmpdir(), "cov-"));
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const child = spawn("bun", ["test", "--coverage", `--coverage-dir=${coverageDir}`, scope], {
       cwd: repoRoot,
       stdio: "ignore",
     });
     child.on("close", () => {
-      readLcov(coverageDir).then(resolve, () => resolve([]));
+      readLcov(coverageDir).then(resolve, reject);
     });
     child.on("error", () => resolve([]));
   });

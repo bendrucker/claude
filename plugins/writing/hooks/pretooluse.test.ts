@@ -48,8 +48,9 @@ function mockInput(
 // (numbering + headings) and a spaced em dash (tropes).
 const MULTI_VIOLATION = "# step 1: introduction\n\nThis — is bad\n";
 
-function contextOf(output: SyncHookJSONOutput | null): string {
-  return (output?.hookSpecificOutput as { additionalContext: string }).additionalContext;
+function contextOf(output: SyncHookJSONOutput | null): string | undefined {
+  const specific = output?.hookSpecificOutput;
+  return specific?.hookEventName === "PreToolUse" ? specific.additionalContext : undefined;
 }
 
 describe("single output per tool call", () => {

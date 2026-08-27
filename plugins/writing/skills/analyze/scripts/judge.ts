@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import * as path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import type { DeliverableRow } from "./dump";
 
 /**
@@ -142,8 +143,28 @@ export interface CriterionVerdict {
 
 export type JudgeVerdict = Record<CriterionKey, CriterionVerdict>;
 
+/** Keeps every per-criterion record exhaustive against `CriterionKey`. */
+export function byCriterion<T>(value: (key: CriterionKey) => T): Record<CriterionKey, T> {
+  return {
+    information_density: value("information_density"),
+    motivation_presence: value("motivation_presence"),
+    marketing_phrasing: value("marketing_phrasing"),
+    hedging_density: value("hedging_density"),
+    sycophancy: value("sycophancy"),
+    press_release_structure: value("press_release_structure"),
+  };
+}
+
+/** The structured-output envelope both judges send to the API. */
+export type OutputSchema = {
+  type: "object";
+  properties: Record<string, unknown>;
+  required: string[];
+  additionalProperties: false;
+};
+
 /** JSON schema for the judge's structured output (one object per chunk). */
-export function verdictSchema(): Record<string, unknown> {
+export function verdictSchema(): OutputSchema {
   const criterion = {
     type: "object",
     properties: {
@@ -165,33 +186,36 @@ export function verdictSchema(): Record<string, unknown> {
   };
 }
 
+const criterionInput = (key: CriterionKey) =>
+  z.object(
+    {
+      flagged: z.boolean({ error: `Judge verdict "${key}.flagged" must be a boolean` }),
+      span: z.union([z.string(), z.null()], {
+        error: `Judge verdict "${key}.span" must be a string or null`,
+      }),
+    },
+    { error: `Judge verdict missing criterion "${key}"` },
+  );
+
+const VerdictInput = z.object(byCriterion(criterionInput), {
+  error: "Judge verdict must be a JSON object",
+});
+
 export function parseVerdict(json: string): JudgeVerdict {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch (error) {
-    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`, { cause: error });
+    throw new Error(
+      `Judge returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("Judge verdict must be a JSON object");
+  const result = VerdictInput.safeParse(parsed);
+  if (!result.success) {
+    throw new Error(result.error.issues[0]?.message ?? "Judge verdict must be a JSON object");
   }
-  const record = parsed as Record<string, unknown>;
-  const verdict = {} as JudgeVerdict;
-  for (const criterion of JUDGE_CRITERIA) {
-    const value = record[criterion.key];
-    if (typeof value !== "object" || value === null) {
-      throw new Error(`Judge verdict missing criterion "${criterion.key}"`);
-    }
-    const entry = value as Record<string, unknown>;
-    if (typeof entry.flagged !== "boolean") {
-      throw new Error(`Judge verdict "${criterion.key}.flagged" must be a boolean`);
-    }
-    if (entry.span !== null && typeof entry.span !== "string") {
-      throw new Error(`Judge verdict "${criterion.key}.span" must be a string or null`);
-    }
-    verdict[criterion.key] = { flagged: entry.flagged, span: entry.span };
-  }
-  return verdict;
+  return result.data;
 }
 
 export function countWords(text: string): number {
@@ -231,15 +255,13 @@ export function chunkDocument(text: string, wordLimit: number = CHUNK_WORD_LIMIT
  */
 export function aggregateVerdicts(verdicts: JudgeVerdict[]): JudgeVerdict {
   if (verdicts.length === 0) throw new Error("aggregateVerdicts requires at least one verdict");
-  const aggregate = {} as JudgeVerdict;
-  for (const criterion of JUDGE_CRITERIA) {
-    const flagged = verdicts.filter((v) => v[criterion.key].flagged);
-    aggregate[criterion.key] = {
+  return byCriterion((key) => {
+    const flagged = verdicts.filter((v) => v[key].flagged);
+    return {
       flagged: flagged.length > 0,
-      span: flagged.find((v) => v[criterion.key].span !== null)?.[criterion.key].span ?? null,
+      span: flagged.find((v) => v[key].span !== null)?.[key].span ?? null,
     };
-  }
-  return aggregate;
+  });
 }
 
 /** Judges one chunk of text. The seam tests mock; the SDK call implements. */
@@ -454,18 +476,19 @@ export async function judgeCorpus(
   meta: JudgeCorpusMeta,
 ): Promise<MeaningAudit> {
   const maxSpans = meta.maxSpans ?? MAX_SAMPLE_SPANS;
-  const stats = new Map<CriterionKey, MeaningCriterionStat>(
-    JUDGE_CRITERIA.map((c) => [
-      c.key,
-      { id: c.id, question: c.question, flagged: 0, total: texts.length, spans: [] },
-    ]),
-  );
+  const stats: MeaningCriterionStat[] = JUDGE_CRITERIA.map((c) => ({
+    id: c.id,
+    question: c.question,
+    flagged: 0,
+    total: texts.length,
+    spans: [],
+  }));
   for (const text of texts) {
     const verdict = await judgeDocument(judge, text);
-    for (const criterion of JUDGE_CRITERIA) {
+    for (const [index, criterion] of JUDGE_CRITERIA.entries()) {
+      const stat = stats[index];
       const entry = verdict[criterion.key];
-      if (!entry.flagged) continue;
-      const stat = stats.get(criterion.key) as MeaningCriterionStat;
+      if (!stat || !entry.flagged) continue;
       stat.flagged++;
       if (entry.span && stat.spans.length < maxSpans) stat.spans.push(entry.span);
     }
@@ -475,7 +498,7 @@ export async function judgeCorpus(
     model: meta.model,
     documents: texts.length,
     estimatedCostUsd: meta.estimatedCostUsd,
-    criteria: JUDGE_CRITERIA.map((c) => stats.get(c.key) as MeaningCriterionStat),
+    criteria: stats,
   };
 }
 
@@ -528,7 +551,7 @@ export function meaningDetector(options: MeaningDetectorOptions = {}): MeaningDe
  * Schema for the heading baseline: one boolean per heading, by index, marking
  * whether the heading is sentence-shaped.
  */
-export function headingBatchSchema(): Record<string, unknown> {
+export function headingBatchSchema(): OutputSchema {
   return {
     type: "object",
     properties: {
@@ -550,27 +573,40 @@ export function headingBatchSchema(): Record<string, unknown> {
   };
 }
 
+const HEADING_ENTRY_ERROR = "Heading verdict entries must carry numeric index and boolean verdict";
+const HEADINGS_ERROR = 'Heading verdict missing "headings" array';
+
+const HeadingVerdicts = z.object(
+  {
+    headings: z.array(
+      z.looseObject(
+        {
+          index: z.number({ error: HEADING_ENTRY_ERROR }),
+          sentence_shaped: z.boolean({ error: HEADING_ENTRY_ERROR }),
+        },
+        { error: HEADING_ENTRY_ERROR },
+      ),
+      { error: HEADINGS_ERROR },
+    ),
+  },
+  { error: HEADINGS_ERROR },
+);
+
 export function parseHeadingVerdicts(json: string, expected: number): boolean[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch (error) {
-    throw new Error(`Heading judge returned invalid JSON: ${(error as Error).message}`, {
-      cause: error,
-    });
+    throw new Error(
+      `Heading judge returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   }
-  const record = parsed as Record<string, unknown>;
-  const entries = record.headings;
-  if (!Array.isArray(entries)) throw new Error('Heading verdict missing "headings" array');
+  const result = HeadingVerdicts.safeParse(parsed);
+  if (!result.success) throw new Error(result.error.issues[0]?.message ?? HEADINGS_ERROR);
   const verdicts = Array.from<boolean>({ length: expected }).fill(false);
   const seen = new Set<number>();
-  for (const entry of entries) {
-    const item = entry as Record<string, unknown>;
-    const index = item.index;
-    const flagged = item.sentence_shaped;
-    if (typeof index !== "number" || typeof flagged !== "boolean") {
-      throw new Error("Heading verdict entries must carry numeric index and boolean verdict");
-    }
+  for (const { index, sentence_shaped: flagged } of result.data.headings) {
     if (index < 0 || index >= expected) {
       throw new Error(`Heading verdict index ${index} out of range (expected 0..${expected - 1})`);
     }

@@ -1,16 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import type { LabeledHeading } from "./headings-eval";
-import { type CriterionKey, JUDGE_CRITERIA, type JudgeVerdict } from "./judge";
+import { byCriterion, type CriterionKey, JUDGE_CRITERIA, type JudgeVerdict } from "./judge";
 import { JUDGE_PROMPT_SHA256 } from "./judge-fixtures";
 import { runGate, scoreHeadingBaseline } from "./judge-run";
 
 function verdictFor(flags: Partial<Record<CriterionKey, boolean>>): JudgeVerdict {
-  const v = {} as JudgeVerdict;
-  for (const c of JUDGE_CRITERIA) {
-    const flagged = flags[c.key] ?? false;
-    v[c.key] = { flagged, span: flagged ? `span for ${c.id}` : null };
-  }
-  return v;
+  return byCriterion((key) => {
+    const flagged = flags[key] ?? false;
+    const id = JUDGE_CRITERIA.find((c) => c.key === key)?.id ?? key;
+    return { flagged, span: flagged ? `span for ${id}` : null };
+  });
 }
 
 describe("runGate", () => {

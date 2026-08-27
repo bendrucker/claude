@@ -193,7 +193,7 @@ function connectorDensityHits(text: string): Hits {
   const connected = sentences.filter(isConnectorSentence);
   if (connected.length < MIN_CONNECTOR_SENTENCES) return { count: 0, sample: "" };
   if (connected.length / sentences.length < CONNECTOR_DENSITY) return { count: 0, sample: "" };
-  const first = connected[0] as string;
+  const first = connected[0] ?? "";
   const i = CLAUSE_CONNECTOR.exec(first)?.index ?? 0;
   return { count: connected.length, sample: first.slice(Math.max(0, i - 20), i + 24).trim() };
 }
@@ -211,7 +211,7 @@ export function semicolonSpliceHits(text: string, minSplices: number): Hits {
     (s) => !LIST_ITEM.test(s) && SEMICOLON_SPLICE.test(s),
   );
   if (spliced.length < minSplices) return { count: 0, sample: "" };
-  const first = spliced[0] as string;
+  const first = spliced[0] ?? "";
   const i = SEMICOLON_SPLICE.exec(first)?.index ?? 0;
   return { count: spliced.length, sample: first.slice(Math.max(0, i - 20), i + 24).trim() };
 }
@@ -248,8 +248,8 @@ const ADVERSATIVE_OPENER = /^\s*(?:However|But|Yet|Nevertheless|Nonetheless|Stil
 function adversativeNegationFlipHits(text: string): Hits {
   const sentences = splitSentences(text);
   for (let i = 0; i < sentences.length - 1; i++) {
-    const current = sentences[i] as string;
-    const next = sentences[i + 1] as string;
+    const current = sentences[i] ?? "";
+    const next = sentences[i + 1] ?? "";
     if (NEGATION_CUE.test(current) && ADVERSATIVE_OPENER.test(next)) {
       return { count: 1, sample: `${current.slice(0, 60)} / ${next.slice(0, 40)}` };
     }
@@ -276,7 +276,7 @@ function questionAnswerCadenceHits(text: string): Hits {
     }
   }
   if (questionOpeners.length < QA_QUESTION_THRESHOLD) return { count: 0, sample: "" };
-  return { count: questionOpeners.length, sample: questionOpeners[0] as string };
+  return { count: questionOpeners.length, sample: questionOpeners[0] ?? "" };
 }
 
 // A salutation addresses a person before the substance starts: a greeting word,
@@ -471,7 +471,7 @@ function salutationHits(text: string): Hits {
   if (GREETING_OPENER.test(line)) return { count: 1, sample: line.slice(0, 40) };
   const address = ADDRESS_OPENER.exec(line)?.[1];
   if (!address) return { count: 0, sample: "" };
-  const head = address.split(/\s+/)[0] as string;
+  const head = address.split(/\s+/)[0] ?? "";
   if (!isNameShaped(head)) return { count: 0, sample: "" };
   return { count: 1, sample: `${address},` };
 }

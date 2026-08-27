@@ -8,7 +8,7 @@ import {
   scanIntroduced,
   semicolonSpliceHits,
 } from "../detection/tropes";
-import { formatContext, formatDecision, type HookResult } from "./io";
+import { formatContext, formatDecision, type HookResult, type ToolInput, toolInputOf } from "./io";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
@@ -68,36 +68,25 @@ function extractInlineArg(command: string, flag: string): string | null {
   return match?.[1] ?? match?.[2] ?? null;
 }
 
-function collectMultiEditPairs(toolInput: Record<string, unknown>): {
-  newText: string;
-  oldText: string;
-} {
-  const edits = toolInput.edits;
-  if (!Array.isArray(edits)) return { newText: "", oldText: "" };
-  const newParts: string[] = [];
-  const oldParts: string[] = [];
-  for (const edit of edits) {
-    if (!edit || typeof edit !== "object") continue;
-    const fields = edit as Record<string, unknown>;
-    if (typeof fields.new_string === "string") newParts.push(fields.new_string);
-    if (typeof fields.old_string === "string") oldParts.push(fields.old_string);
-  }
+function collectMultiEditPairs(toolInput: ToolInput): { newText: string; oldText: string } {
+  const edits = toolInput.edits ?? [];
+  const newParts = edits.map((edit) => edit.new_string).filter((text) => text !== undefined);
+  const oldParts = edits.map((edit) => edit.old_string).filter((text) => text !== undefined);
   return { newText: newParts.join("\n"), oldText: oldParts.join("\n") };
 }
 
 async function collectFileOpPair(
   input: PreToolUseHookInput,
 ): Promise<{ newText: string; oldText: string } | null> {
-  const toolInput = input.tool_input as Record<string, unknown>;
+  const toolInput = toolInputOf(input);
   const toolName = input.tool_name;
 
   if (toolName === "Write") {
     const content = toolInput.content;
-    if (typeof content !== "string" || content.length === 0) return null;
-    const filePath = toolInput.file_path;
+    if (!content) return null;
     let oldText = "";
-    if (typeof filePath === "string") {
-      const file = Bun.file(filePath);
+    if (toolInput.file_path !== undefined) {
+      const file = Bun.file(toolInput.file_path);
       if (await file.exists()) oldText = await file.text();
     }
     return { newText: content, oldText };
@@ -105,9 +94,8 @@ async function collectFileOpPair(
 
   if (toolName === "Edit") {
     const newString = toolInput.new_string;
-    if (typeof newString !== "string" || newString.length === 0) return null;
-    const oldString = toolInput.old_string;
-    return { newText: newString, oldText: typeof oldString === "string" ? oldString : "" };
+    if (!newString) return null;
+    return { newText: newString, oldText: toolInput.old_string ?? "" };
   }
 
   if (toolName === "MultiEdit") {
@@ -120,7 +108,7 @@ async function collectFileOpPair(
 }
 
 export async function collectText(input: PreToolUseHookInput): Promise<string[]> {
-  const toolInput = input.tool_input as Record<string, unknown>;
+  const toolInput = toolInputOf(input);
   const toolName = input.tool_name;
 
   if (FILE_OP_TOOLS.has(toolName)) {
@@ -128,19 +116,20 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     return pair ? [pair.newText] : [];
   }
 
-  if (toolName === "Bash" && typeof toolInput.command === "string") {
+  if (toolName === "Bash" && toolInput.command !== undefined) {
+    const command = toolInput.command;
     const texts: string[] = [];
-    const bodyFile = extractBodyFilePath(toolInput.command);
+    const bodyFile = extractBodyFilePath(command);
     const files = bodyFile
-      ? [bodyFile, ...extractFieldFilePaths(toolInput.command)]
-      : extractFieldFilePaths(toolInput.command);
+      ? [bodyFile, ...extractFieldFilePaths(command)]
+      : extractFieldFilePaths(command);
     for (const path of files) {
       if (await Bun.file(path).exists()) {
         texts.push(await Bun.file(path).text());
       }
     }
     for (const flag of PROSE_FLAGS) {
-      const value = extractInlineArg(toolInput.command, flag);
+      const value = extractInlineArg(command, flag);
       if (value) texts.push(value);
     }
     return texts;
@@ -152,9 +141,8 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
 const WORDLIST_PATH_PATTERN = /\/wordlists\/[^/]+\.txt$/;
 
 function isWordlistFile(input: PreToolUseHookInput): boolean {
-  const filePath = (input.tool_input as Record<string, unknown>).file_path;
-  if (typeof filePath !== "string") return false;
-  return WORDLIST_PATH_PATTERN.test(filePath);
+  const filePath = toolInputOf(input).file_path;
+  return filePath !== undefined && WORDLIST_PATH_PATTERN.test(filePath);
 }
 
 function buildFileOpReminder(
@@ -185,7 +173,7 @@ function commentSplice(comments: { newText: string; oldText: string }): string |
 async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | null> {
   const pair = await collectFileOpPair(input);
   if (!pair) return null;
-  const filePath = (input.tool_input as Record<string, unknown>).file_path as string | undefined;
+  const filePath = toolInputOf(input).file_path;
 
   // Prose rules target prose. In a code file the model's prose surface is its
   // comments, so scan those; strings and identifiers are program text the

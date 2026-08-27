@@ -37,16 +37,12 @@ function editDistance(a: CoarseTag[], b: CoarseTag[]): number {
   for (let i = 1; i <= a.length; i++) {
     const current: number[] = [i];
     for (let j = 1; j <= b.length; j++) {
-      const substitution = (previous[j - 1] as number) + (a[i - 1] === b[j - 1] ? 0 : 1);
-      current[j] = Math.min(
-        (previous[j] as number) + 1,
-        (current[j - 1] as number) + 1,
-        substitution,
-      );
+      const substitution = (previous[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1);
+      current[j] = Math.min((previous[j] ?? 0) + 1, (current[j - 1] ?? 0) + 1, substitution);
     }
     previous = current;
   }
-  return previous[b.length] as number;
+  return previous[b.length] ?? 0;
 }
 
 /** Edit distance between two tag sequences, normalized to [0, 1] by the longer length. */
@@ -70,9 +66,8 @@ export function tricolonHits(text: string): Hits {
   if (sentences.length < 3) return { count: 0, sample: "" };
   const shapes = sentences.map(tagShape);
   for (let i = 0; i + 2 < sentences.length; i++) {
-    const a = shapes[i] as CoarseTag[];
-    const b = shapes[i + 1] as CoarseTag[];
-    const c = shapes[i + 2] as CoarseTag[];
+    const [a, b, c] = [shapes[i], shapes[i + 1], shapes[i + 2]];
+    if (!a || !b || !c) continue;
     if (Math.min(a.length, b.length, c.length) < TRICOLON_MIN_TOKENS) continue;
     if (!isParallelTriple(a, b, c)) continue;
     const sample = sentences

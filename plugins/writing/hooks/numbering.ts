@@ -6,14 +6,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import type { Heading, Text } from "mdast";
+import { z } from "zod";
 import { getExtension, isMarkdownFile } from "../detection/paths";
-import {
-  type EditInput,
-  formatContext,
-  formatDecision,
-  type HookResult,
-  type WriteInput,
-} from "./io";
+import { editedContent, formatContext, formatDecision, type HookResult } from "./io";
 import { loadMarkdown } from "./mdast";
 
 export type Mode = "write" | "edit";
@@ -33,9 +28,9 @@ type MarkdownMatch = {
   column: number;
 };
 
-type AstGrepMatch = {
-  message: string;
-};
+const AstGrepMatches = z.array(z.looseObject({ message: z.string() }));
+
+const ExecFailure = z.looseObject({ stdout: z.string().optional() });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -94,15 +89,12 @@ export async function checkCode(content: string, ext: string): Promise<string | 
       }).trim();
     } catch (error) {
       // execSync throws on non-zero exit, but we want stdout
-      const execError = error as { stdout?: string };
-      result = (execError.stdout || "").trim();
+      result = (ExecFailure.safeParse(error).data?.stdout ?? "").trim();
     }
 
     if (result) {
-      const matches: AstGrepMatch[] = JSON.parse(result);
-      if (matches.length > 0) {
-        return matches[0]?.message ?? null;
-      }
+      const matches = AstGrepMatches.parse(JSON.parse(result));
+      return matches[0]?.message ?? null;
     }
   } catch {
     // sg failed or parse error
@@ -130,24 +122,11 @@ async function fileAlreadyNumbered(filePath: string, ext: string): Promise<boole
 }
 
 export async function check(input: PreToolUseHookInput, mode: Mode): Promise<HookResult | null> {
-  const toolName = input.tool_name;
+  const edited = editedContent(input);
+  if (!edited) return null;
+  const { content, filePath } = edited;
 
-  let content: string;
-  let filePath: string;
-
-  if (toolName === "Write") {
-    const toolInput = input.tool_input as WriteInput;
-    content = toolInput.content;
-    filePath = toolInput.file_path;
-  } else if (toolName === "Edit") {
-    const toolInput = input.tool_input as EditInput;
-    content = toolInput.new_string;
-    filePath = toolInput.file_path;
-  } else {
-    return null;
-  }
-
-  if (typeof content !== "string" || !hasNumberingHint(content)) return null;
+  if (!hasNumberingHint(content)) return null;
 
   const ext = getExtension(filePath);
   let match: string | null = null;

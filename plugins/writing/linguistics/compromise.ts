@@ -1,4 +1,5 @@
 import nlp from "compromise";
+import { z } from "zod";
 import type { Tagger } from "./tagger";
 import {
   CODE_SENTINEL,
@@ -9,16 +10,16 @@ import {
   type TaggedToken,
 } from "./tags";
 
-interface CompromiseTerm {
-  text: string;
-  normal?: string;
-  tags?: string[];
-}
+const CompromiseTerm = z.looseObject({
+  text: z.string().catch(""),
+  normal: z.string().optional().catch(undefined),
+  tags: z.array(z.string()).optional().catch(undefined),
+});
+type CompromiseTerm = z.infer<typeof CompromiseTerm>;
 
-interface CompromiseSentence {
-  text: string;
-  terms: CompromiseTerm[];
-}
+const CompromiseSentences = z.array(
+  z.looseObject({ text: z.string().catch(""), terms: z.array(CompromiseTerm).catch([]) }),
+);
 
 function mapTerm(term: CompromiseTerm): Pick<TaggedToken, "tag" | "finite"> {
   const tags = new Set(term.tags ?? []);
@@ -63,7 +64,7 @@ function mapTerm(term: CompromiseTerm): Pick<TaggedToken, "tag" | "finite"> {
 export const compromiseTagger: Tagger = {
   name: "compromise",
   tag(text: string): TaggedSentence[] {
-    const sentences = nlp(text).json() as CompromiseSentence[];
+    const sentences = CompromiseSentences.parse(nlp(text).json());
     return sentences.map((sentence) => ({
       text: sentence.text,
       tokens: sentence.terms.map((term) => ({

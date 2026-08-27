@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { cli } from "cleye";
+import { z } from "zod";
 import { corpusPath, profilePath, resolveDataDir, voiceBaselineDir } from "./data-dir";
 import { stemPhrase, stemTokens } from "./deliverable-audit";
 import { cleanText, splitSentences, tokenizeSentence } from "./ngram";
 import { parseCorpus, type VoiceDocument } from "./voice-corpus";
-import { computeCorpusRates, type VoiceDeltaBaseline } from "./voice-delta";
+import { computeCorpusRates, VoiceDeltaBaseline } from "./voice-delta";
 
 // Word n-gram sizes the profile records. Unigrams cover single-word tells
 // (e.g. "cleanly"); bigrams and trigrams cover phrase tells (e.g. "source of
@@ -13,27 +14,30 @@ import { computeCorpusRates, type VoiceDeltaBaseline } from "./voice-delta";
 // leading trigram (see phraseProfileMatch).
 export const PROFILE_SIZES = [1, 2, 3] as const;
 
-export interface VoiceProfile {
-  documentCount: number;
-  totalTokens: number;
+const NgramCounts = z.record(z.string(), z.record(z.string(), z.number()));
+
+export const VoiceProfile = z.object({
+  documentCount: z.number(),
+  totalTokens: z.number(),
   // n-gram size -> phrase -> count. Stored as plain objects for JSON. Built from
   // unstemmed tokens; the candidate-additions path looks these up directly.
-  ngrams: Record<string, Record<string, number>>;
+  ngrams: NgramCounts,
   // Same shape, but built from Porter-stemmed tokens via the deliverable-audit
   // stemming. The deliverable rule-health path looks these up so an inflected
   // baseline phrase ("fails loudly") matches the rule's stem ("fail loudli"),
   // mirroring how auditDeliverableCorpus stems the model's deliverable corpus.
-  stemmedNgrams: Record<string, Record<string, number>>;
+  stemmedNgrams: NgramCounts,
   // Stemmed token count, the denominator for stemmed per-million rates. Differs
   // from totalTokens because the two tokenizers split prose differently.
-  totalStemmedTokens: number;
-  generatedAt: string;
-  sources: string[];
+  totalStemmedTokens: z.number(),
+  generatedAt: z.string(),
+  sources: z.array(z.string()),
   // Voice-delta aggregate stats from the baseline corpus. Optional: profiles
   // built before this field was added will not have it. Callers should treat
   // its absence as "no baseline for voice-delta features".
-  voiceDelta?: VoiceDeltaBaseline;
-}
+  voiceDelta: VoiceDeltaBaseline.optional(),
+});
+export type VoiceProfile = z.infer<typeof VoiceProfile>;
 
 export type { VoiceDeltaBaseline };
 
@@ -106,7 +110,7 @@ export function buildProfileFromCorpus(corpusText: string, generatedAt: string):
 export async function loadProfile(path: string): Promise<VoiceProfile | null> {
   const file = Bun.file(path);
   if (!(await file.exists())) return null;
-  return (await file.json()) as VoiceProfile;
+  return VoiceProfile.parse(await file.json());
 }
 
 export interface PhraseProfileStat {

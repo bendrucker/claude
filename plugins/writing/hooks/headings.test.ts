@@ -20,7 +20,9 @@ function mockWriteInput(filePath: string, content: string): PreToolUseHookInput 
 function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
   const result = check(input);
   if (!result) return null;
-  return result.output.hookSpecificOutput as PreToolUseHookSpecificOutput;
+  const output = result.output.hookSpecificOutput;
+  if (output?.hookEventName !== "PreToolUse") return null;
+  return output;
 }
 
 const titleCaseCases: { description: string; content: string; match: boolean }[] = [

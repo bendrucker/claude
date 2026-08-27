@@ -3,19 +3,22 @@
 import { appendFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { z } from "zod";
 
-export type RunOutcome = "silent" | "context" | "ask" | "deny" | "skipped-scratch";
+export const RunOutcome = z.enum(["silent", "context", "ask", "deny", "skipped-scratch"]);
+export type RunOutcome = z.infer<typeof RunOutcome>;
 
-export type RunLogEntry = {
-  ts: string;
-  session_id: string;
-  tool: string;
-  ext: string;
-  duration_ms: number;
-  outcome: RunOutcome;
-  category?: string;
-  suppressed?: boolean;
-};
+export const RunLogEntry = z.object({
+  ts: z.string(),
+  session_id: z.string(),
+  tool: z.string(),
+  ext: z.string(),
+  duration_ms: z.number(),
+  outcome: RunOutcome,
+  category: z.string().optional(),
+  suppressed: z.boolean().optional(),
+});
+export type RunLogEntry = z.infer<typeof RunLogEntry>;
 
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
 const OFF_VALUES = new Set(["0", "false", "off"]);

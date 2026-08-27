@@ -1,5 +1,6 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 
 // Session-scoped repeat suppression: a context-tier rule that already fired
 // recently in this session gets muted instead of re-injected. The state is one
@@ -7,7 +8,8 @@ import { join } from "node:path";
 // machine's temp cleanup and needs no explicit lifecycle.
 export const SUPPRESS_WINDOW_MS = 5 * 60 * 1000;
 
-export type SessionState = Record<string, number>;
+const SessionState = z.record(z.string(), z.number());
+export type SessionState = z.infer<typeof SessionState>;
 
 function statePath(sessionId: string): string {
   const safe = sessionId.replace(/[^\w-]/g, "");
@@ -18,9 +20,8 @@ async function readState(sessionId: string): Promise<SessionState> {
   try {
     const file = Bun.file(statePath(sessionId));
     if (!(await file.exists())) return {};
-    const parsed: unknown = await file.json();
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed as SessionState;
+    const parsed = SessionState.safeParse(await file.json());
+    return parsed.success ? parsed.data : {};
   } catch {
     return {};
   }

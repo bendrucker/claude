@@ -9,6 +9,7 @@ import {
   dispatch,
   findXcallRunner,
   isSandboxBlockedHandoff,
+  resolveTagParams,
   XcallError,
   xcallBackstopMs,
 } from "./url";
@@ -306,5 +307,80 @@ describe("findXcallRunner", () => {
   test("finds nothing when the plugin is absent", async () => {
     const root = mkdtempSync(join(tmpdir(), "things-marketplace-"));
     expect(await findXcallRunner(join(root, "things"))).toBeNull();
+  });
+});
+
+describe("resolveTagParams", () => {
+  /** Stands in for the real requirer, recording what each write asked for. */
+  function stubRequirer(known: string[]) {
+    const calls: Array<{ requested: string[]; createMissing: boolean }> = [];
+    const requirer = (requested: string[], createMissing: boolean) => {
+      calls.push({ requested, createMissing });
+      const unknown = requested.filter((tag) => !known.includes(tag.toLowerCase()));
+      if (unknown.length > 0 && !createMissing) {
+        return Promise.reject(new Error(`Tag not found: ${unknown.join(", ")}`));
+      }
+      return Promise.resolve(requested.map((tag) => tag.toLowerCase()));
+    };
+    return { calls, requirer };
+  }
+
+  test("rewrites tag params to the casing Things stores", async () => {
+    const { requirer } = stubRequirer(["claude", "bug"]);
+    const params = new Map([
+      ["title", "Fix it"],
+      ["tags", "Claude, BUG"],
+    ]);
+
+    await resolveTagParams(params, false, requirer);
+    expect(params.get("tags")).toBe("claude,bug");
+    expect(params.get("title")).toBe("Fix it");
+  });
+
+  test("resolves add-tags alongside tags", async () => {
+    const { calls, requirer } = stubRequirer(["claude", "bug"]);
+    const params = new Map([
+      ["tags", "Claude"],
+      ["add-tags", "BUG"],
+    ]);
+
+    await resolveTagParams(params, false, requirer);
+    expect(params.get("tags")).toBe("claude");
+    expect(params.get("add-tags")).toBe("bug");
+    expect(calls).toEqual([
+      { requested: ["Claude"], createMissing: false },
+      { requested: ["BUG"], createMissing: false },
+    ]);
+  });
+
+  // The silent drop this guards: Things takes an unknown tag, reports success,
+  // and writes the todo without it.
+  test("rejects an unknown tag instead of dropping it", async () => {
+    const { requirer } = stubRequirer(["claude"]);
+    const params = new Map([["tags", "claude,bug"]]);
+
+    await expect(resolveTagParams(params, false, requirer)).rejects.toThrow("Tag not found: bug");
+  });
+
+  test("passes create_tags through so an unknown tag can be created", async () => {
+    const { calls, requirer } = stubRequirer(["claude"]);
+    const params = new Map([["tags", "claude,bug"]]);
+
+    await resolveTagParams(params, true, requirer);
+    expect(params.get("tags")).toBe("claude,bug");
+    expect(calls).toEqual([{ requested: ["claude", "bug"], createMissing: true }]);
+  });
+
+  test.each([
+    ["a write carrying no tag params", [["title", "Buy milk"]]],
+    ["an empty tags= that clears the todo's tags", [["tags", ""]]],
+  ] as Array<[string, Array<[string, string]>]>)("never fetches for %s", async (_, entries) => {
+    const { calls, requirer } = stubRequirer(["claude"]);
+    const params = new Map(entries);
+    const before = new Map(params);
+
+    await resolveTagParams(params, false, requirer);
+    expect(calls).toEqual([]);
+    expect(params).toEqual(before);
   });
 });

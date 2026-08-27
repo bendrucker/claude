@@ -49,6 +49,8 @@ The tag list is fetched once per process (around two seconds) and held. A miss r
 
 `update_todos` resolves both `tags` and `add_tags` before its first batch, because a rejection landing partway through would leave the earlier batches written.
 
+The CLI paths share the requirer. `inbox.ts` resolves its capture tags, and `url.ts` resolves the `tags` and `add-tags` params of any command it dispatches, taking `--create-tags` where the tools take `create_tags`. A raw `json data=...` payload is the one write that skips the gate, since its tags are already inside a JSON document the CLI hands through untouched.
+
 ## Response Size
 
 A list read returns a preview of each todo's notes rather than the whole thing. Notes are the bulk of the payload: over the logbook they measured 61% of it, median 223 characters and up to 3552, so a read that carried them in full fit a few dozen todos where the preview fits a few hundred. `get_todo` serves one todo's full notes and dates, and it reaches completed todos too, so nothing is lost by not shipping notes in every list.

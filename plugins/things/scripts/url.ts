@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import { findSiblingScript } from "../src/marketplace";
+import { requireTags, type TagRequirer } from "../src/mcp/tags";
 import { ensureThingsRunning } from "./ensure-running";
+import { parseTags } from "./tags";
 
 const AUTH_REQUIRED_COMMANDS = ["update", "update-project", "json"] as const;
 
@@ -124,7 +126,35 @@ export function findXcallRunner(
 }
 
 const BOOLEAN_ATTRIBUTES = ["completed", "canceled", "reveal", "duplicate"] as const;
-const ARRAY_ATTRIBUTES = ["tags", "add-tags"] as const;
+
+/**
+ * The params a write carries tags in. They are also the only array-valued
+ * attributes the JSON payload coerces, so `ARRAY_ATTRIBUTES` reads from here.
+ */
+const TAG_PARAMS = ["tags", "add-tags"] as const;
+const ARRAY_ATTRIBUTES = TAG_PARAMS;
+
+/**
+ * Resolves a CLI write's tag params against the tags Things holds, so the raw
+ * dispatcher rejects an unknown tag the way the MCP tools and `inbox.ts` do.
+ * Things drops a tag it does not know and reports success anyway, so a write
+ * that skips this lands with the tag missing and nothing said about it.
+ *
+ * Mutates `params` in place. A command carrying no tags is left alone and never
+ * pays for the tag fetch, and an empty `tags=` is passed through untouched
+ * because Things reads it as clearing the todo's tags.
+ */
+export async function resolveTagParams(
+  params: Map<string, string>,
+  createMissing: boolean,
+  requirer: TagRequirer = requireTags,
+): Promise<void> {
+  for (const key of TAG_PARAMS) {
+    const requested = parseTags(params.get(key));
+    if (requested.length === 0) continue;
+    params.set(key, (await requirer(requested, createMissing)).join(","));
+  }
+}
 
 interface ChecklistItem {
   type: "checklist-item";
@@ -344,6 +374,11 @@ if (import.meta.main) {
         default: true,
         description: "Use xcall to get response from Things (disable with --callback=false)",
       },
+      createTags: {
+        type: Boolean,
+        default: false,
+        description: "Create any tag that does not exist yet. Without it, an unknown tag fails",
+      },
     },
   });
 
@@ -360,6 +395,16 @@ if (import.meta.main) {
     } else {
       params.set(key, value);
     }
+  }
+
+  // Resolved before either branch, so the bulk payload built from these same
+  // params carries the stored casing too. A raw `json data=...` payload is not
+  // reached: that one is the escape hatch, and its tags go through unchecked.
+  try {
+    await resolveTagParams(params, argv.flags.createTags);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
   }
 
   const useBulkJson = command === "update" && ids.length > 1;

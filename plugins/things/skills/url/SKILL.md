@@ -47,6 +47,16 @@ Full parameters, JSON payload schema, and limits: [url-scheme.md](url-scheme.md)
 
 `show` accepts built-in list IDs: `inbox`, `today`, `anytime`, `upcoming`, `someday`, `logbook`, `tomorrow`, `deadlines`, `repeating`, `all-projects`, `logged-projects`.
 
+## Tags
+
+Things drops a tag it does not already hold and still reports success. `url.ts` resolves `tags` and `add-tags` against the stored tags first, so an unknown tag fails the call and names itself instead of vanishing from the write. Pass `--create-tags` to create the missing ones:
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts add title="Fix login" tags=bug --create-tags
+```
+
+Matching folds case, so `Bug` resolves to a stored `bug`. An empty `tags=` still clears a todo's tags. Tags inside a raw `json data=...` payload go through unchecked.
+
 ## Reorder Items
 
 ```bash

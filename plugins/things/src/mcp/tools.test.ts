@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   chunk,
   limitItems,
+  type TruncatedPayload,
   updateAttributes,
   validateCaptureTitles,
   validateNonBlank,
@@ -116,13 +117,7 @@ describe("limitItems", () => {
   });
 
   test("drops items from the end of an oversized array", () => {
-    const limited = limitItems(oversized, guidance) as {
-      truncated: boolean;
-      returned: number;
-      total: number;
-      note: string;
-      items: unknown[];
-    };
+    const limited = limitItems(oversized, guidance) as TruncatedPayload;
 
     expect(limited.truncated).toBe(true);
     expect(limited.total).toBe(400);

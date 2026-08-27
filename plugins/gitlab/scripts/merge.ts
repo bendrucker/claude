@@ -31,6 +31,9 @@ export function errorText(err: unknown): string {
 }
 
 export async function arm(
+  // arm discards what run resolves to, and Promise<void> rejects callers
+  // returning a real value.
+  // oxlint-disable-next-line local/no-unknown-returns
   run: () => Promise<unknown>,
   sleep: (ms: number) => Promise<void> = Bun.sleep,
 ): Promise<void> {

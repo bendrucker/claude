@@ -27,6 +27,9 @@ function comment(over: Partial<Comment> = {}): Comment {
   };
 }
 
+// Mirrors collectVerdicts's `unknown[]` parameter so well-formed and malformed
+// fixtures share one type.
+// oxlint-disable-next-line local/no-unknown-returns
 function shard(entries: Array<{ id: string; verdict: Verdict }>): unknown {
   return { verdicts: entries };
 }

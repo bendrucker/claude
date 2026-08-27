@@ -79,6 +79,15 @@ function fittingCount(items: unknown[]): number {
   return low;
 }
 
+/** What a capped read returns in place of the payload that overran the budget. */
+export interface TruncatedPayload {
+  truncated: true;
+  returned: number;
+  total: number;
+  note: string;
+  items: unknown[];
+}
+
 /**
  * Caps a read at {@link MAX_PAYLOAD_BYTES}, dropping items from the end and
  * saying so. An uncapped read of the logbook runs to megabytes, which a client
@@ -87,6 +96,9 @@ function fittingCount(items: unknown[]): number {
  * A payload within budget is returned untouched, so the common case keeps the
  * shape callers already parse.
  */
+// The within-budget branch returns the payload as it arrived, so only the
+// capped branch has a shape.
+// oxlint-disable-next-line local/no-unknown-returns
 export function limitItems(payload: unknown, guidance: string): unknown {
   const items = readItems(payload);
   if (items === null || payloadBytes(payload) <= MAX_PAYLOAD_BYTES) return payload;

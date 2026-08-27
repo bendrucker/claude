@@ -20,7 +20,7 @@ export function findJxaRunner(pluginRoot: string = PLUGIN_ROOT): Promise<string 
   return findSiblingScript(pluginRoot, "mac", "scripts", "jxa.ts");
 }
 
-export async function runScript(script: string, args: string[]): Promise<unknown> {
+export async function runScript<T = unknown>(script: string, args: string[]): Promise<T> {
   const runner = await findJxaRunner();
   if (!runner) {
     throw new Error("mac plugin JXA runner not found (expected plugins/mac/scripts/jxa.ts)");
@@ -49,5 +49,5 @@ export async function runScript(script: string, args: string[]): Promise<unknown
   if (result && typeof result === "object" && "error" in result) {
     throw new Error(String((result as { error: unknown }).error));
   }
-  return result;
+  return result as T;
 }

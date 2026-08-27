@@ -62,6 +62,29 @@ describe("no-chained-type-assertions", () => {
   });
 });
 
+describe("no-unknown-returns", () => {
+  const rule = "no-unknown-returns";
+
+  test.each([
+    ["a named return type", "export function f(): User { return u; }"],
+    ["a generic defaulting to unknown", "export function f<T = unknown>(): T { return v as T; }"],
+    ["an inferred return", "export function f() { return JSON.parse(s); }"],
+    ["an unknown parameter", "export function f(v: unknown): string { return String(v); }"],
+  ])("allows %s", async (_name, code) => {
+    expect(await lint(rule, code)).toEqual([]);
+  });
+
+  test.each([
+    ["a bare unknown", "export function f(): unknown { return v; }"],
+    ["a promised unknown", "export async function f(): Promise<unknown> { return v; }"],
+    ["a union carrying unknown", "export function f(): string | unknown { return v; }"],
+    ["an arrow", "export const f = (): unknown => v;"],
+    ["a function-type parameter", "export function f(run: () => unknown): void {}"],
+  ])("rejects %s", async (_name, code) => {
+    expect(await lint(rule, code)).toEqual([`local(${rule})`]);
+  });
+});
+
 describe("no-terminal-width", () => {
   const rule = "no-terminal-width";
 

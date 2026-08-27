@@ -32,6 +32,9 @@ export function applyOverlay(base: Schema, patch: Operation[]): Schema {
  * Resolve a JSON Pointer (RFC 6901) against a value. Returns undefined when any
  * segment is missing, so it doubles as an existence check.
  */
+// The value at a JSON Pointer depends on the runtime path string, so no
+// caller-declarable shape exists.
+// oxlint-disable-next-line local/no-unknown-returns
 export function getPointer(value: unknown, pointer: string): unknown {
   if (pointer === "") return value;
   const tokens = pointer

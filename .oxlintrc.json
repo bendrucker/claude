@@ -58,14 +58,14 @@
       }
     ],
     "local/no-chained-type-assertions": "error",
+    "local/no-module-mocking": "error",
     "local/no-terminal-width": "error"
   },
   "overrides": [
     {
       "files": ["**/*.test.ts"],
       "rules": {
-        "local/no-chained-type-assertions": "off",
-        "local/no-terminal-width": "off"
+        "local/no-chained-type-assertions": "off"
       }
     }
   ],

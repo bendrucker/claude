@@ -83,3 +83,27 @@ describe("no-terminal-width", () => {
     expect(await lint(rule, code)).toEqual([`local(${rule})`]);
   });
 });
+
+describe("no-module-mocking", () => {
+  const rule = "no-module-mocking";
+
+  test.each([
+    ["spying on an owned object", 'import { spyOn } from "bun:test"; spyOn(console, "log");'],
+    ["a standalone mock function", 'import { mock } from "bun:test"; const fn = mock(() => 1);'],
+    ["module on an unrelated local", "const mock = loader(); mock.module(name);"],
+    ["module on an import from elsewhere", 'import { mock } from "./fake.ts"; mock.module(name);'],
+  ])("allows %s", async (_name, code) => {
+    expect(await lint(rule, code)).toEqual([]);
+  });
+
+  test.each([
+    ["bun mock.module", 'import { mock } from "bun:test"; mock.module("./db.ts", () => ({}));'],
+    ["bun mock.module as a global", 'mock.module("./db.ts", () => ({}));'],
+    ["bun computed access", 'import { mock } from "bun:test"; mock["module"]("./db.ts", f);'],
+    ["vitest vi.mock", 'import { vi } from "vitest"; vi.mock("./db.ts");'],
+    ["vitest vi.doMock", 'import { vi } from "vitest"; vi.doMock("./db.ts");'],
+    ["jest.mock", 'import { jest } from "@jest/globals"; jest.mock("./db.ts");'],
+  ])("rejects %s", async (_name, code) => {
+    expect(await lint(rule, code)).toEqual([`local(${rule})`]);
+  });
+});

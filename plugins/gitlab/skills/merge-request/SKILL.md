@@ -36,6 +36,17 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge --squash
 ```
 
+Never call `glab mr merge` directly. It turns auto-merge on by default whenever a pipeline is running. A bare invocation then queues the MR to merge itself later instead of merging it now, silently breaking a deliberate merge order. `merge.ts` always sends `--auto-merge=<choice>` so the default cannot apply.
+
+### Inspect Before Merging
+
+`--status` prints the MR's merge readiness as JSON and exits without touching it: target branch, draft state, `detailed_merge_status`, head pipeline, and a `rebased_on_target` ancestry check computed from git rather than the API's stale conflict fields.
+
+```bash
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --status
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --status
+```
+
 ### Re-Arm Auto-Merge After a Push
 
 Pushing new commits cancels queued auto-merge and drops the MR from the merge train. GitLab does this deliberately so the new commits get a fresh pipeline and review. To keep auto-merge, re-run `merge.ts --auto-merge` after every push that intends to stay armed. The script is idempotent: it treats an already-armed MR as success and retries through the brief `approvals_syncing` window that follows a push, so re-running it is always safe.
@@ -45,6 +56,10 @@ A push also resets approvals when `reset_approvals_on_push` is on. Re-trigger re
 ### Inspect or Recover a Train
 
 To inspect the active train or clear a stuck entry via the API (`glab` has no merge-train command), see [merge-trains.md](merge-trains.md).
+
+## Stacked MRs
+
+Merging one layer of a stack leaves the layer above it targeting a branch that already merged. GitLab does not retarget it. Retarget, rebase, and verify after every layer, see [stacked-mrs.md](stacked-mrs.md).
 
 ## Patterns
 

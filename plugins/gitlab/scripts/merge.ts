@@ -76,6 +76,46 @@ export async function getMrIid(branch: string): Promise<number> {
   return mrs[0]!.iid;
 }
 
+export interface MergeRequestDetail {
+  iid: number;
+  title: string;
+  state: string;
+  draft: boolean;
+  web_url: string;
+  source_branch: string;
+  target_branch: string;
+  detailed_merge_status: string;
+  has_conflicts: boolean;
+  blocking_discussions_resolved: boolean;
+  auto_merge_enabled?: boolean;
+  head_pipeline?: { id: number; status: string } | null;
+}
+
+export async function getMergeRequest(iid: number): Promise<MergeRequestDetail> {
+  return $`glab api projects/:id/merge_requests/${iid}`.json();
+}
+
+// The API's has_conflicts/detailed_merge_status stay stale for minutes after a
+// rebase, so ancestry against the fetched target ref is the reliable "is this
+// rebased" signal. Returns null when either remote ref is missing locally.
+export async function isRebasedOnTarget(target: string, source: string): Promise<boolean | null> {
+  await $`git fetch --quiet origin ${target} ${source}`.nothrow().quiet();
+
+  const refs = await Promise.all(
+    [target, source].map((branch) =>
+      $`git rev-parse --verify --quiet origin/${branch}`.nothrow().quiet(),
+    ),
+  );
+  if (refs.some((ref) => ref.exitCode !== 0)) {
+    return null;
+  }
+
+  const ancestor = await $`git merge-base --is-ancestor origin/${target} origin/${source}`
+    .nothrow()
+    .quiet();
+  return ancestor.exitCode === 0;
+}
+
 interface MergeTrainOptions {
   projectId: number;
   iid: number;
@@ -94,19 +134,53 @@ export async function addToMergeTrain(opts: MergeTrainOptions): Promise<void> {
   );
 }
 
+// `glab mr merge` turns auto-merge on by default whenever a pipeline is running, so
+// omitting the flag arms the MR instead of merging it. Always send the caller's choice.
+export function mergeArgs(branch: string, autoMerge: boolean): string[] {
+  return [branch, `--auto-merge=${autoMerge}`, "-y"];
+}
+
 export async function mergeViaGlab(branch: string, autoMerge: boolean): Promise<void> {
-  const flags = autoMerge ? "--auto-merge" : "";
-  await arm(() => $`glab mr merge ${branch} ${{ raw: flags }} -y`);
+  await arm(() => $`glab mr merge ${mergeArgs(branch, autoMerge)}`);
 }
 
 export interface MergeActions {
   getProjectConfig(): Promise<ProjectConfig>;
   getMrIid(branch: string): Promise<number>;
+  getMergeRequest(iid: number): Promise<MergeRequestDetail>;
+  isRebasedOnTarget(target: string, source: string): Promise<boolean | null>;
   addToMergeTrain(opts: MergeTrainOptions): Promise<void>;
   mergeViaGlab(branch: string, autoMerge: boolean): Promise<void>;
 }
 
-const defaultActions: MergeActions = { getProjectConfig, getMrIid, addToMergeTrain, mergeViaGlab };
+const defaultActions: MergeActions = {
+  getProjectConfig,
+  getMrIid,
+  getMergeRequest,
+  isRebasedOnTarget,
+  addToMergeTrain,
+  mergeViaGlab,
+};
+
+export interface MergeRequestStatus extends MergeRequestDetail {
+  merge_trains_enabled: boolean;
+  rebased_on_target: boolean | null;
+}
+
+export async function status(
+  branch: string,
+  actions: MergeActions = defaultActions,
+): Promise<MergeRequestStatus> {
+  const project = await actions.getProjectConfig();
+  const iid = await actions.getMrIid(branch);
+  const mr = await actions.getMergeRequest(iid);
+
+  return {
+    ...mr,
+    merge_trains_enabled: project.merge_trains_enabled,
+    rebased_on_target: await actions.isRebasedOnTarget(mr.target_branch, mr.source_branch),
+  };
+}
 
 export async function merge(
   branch: string,
@@ -143,13 +217,22 @@ if (import.meta.main) {
         description: "Squash commits when merging",
         default: false,
       },
+      status: {
+        type: Boolean,
+        description: "Print the MR's merge readiness as JSON and exit without merging",
+        default: false,
+      },
     },
   });
 
   const branch = argv._.branch || (await $`git branch --show-current`.text()).trim();
 
-  await merge(branch, {
-    autoMerge: argv.flags.autoMerge,
-    squash: argv.flags.squash,
-  });
+  if (argv.flags.status) {
+    console.log(JSON.stringify(await status(branch), null, 2));
+  } else {
+    await merge(branch, {
+      autoMerge: argv.flags.autoMerge,
+      squash: argv.flags.squash,
+    });
+  }
 }

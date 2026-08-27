@@ -367,7 +367,228 @@ function discourseMarkerDensityHits(text: string): Hits {
   return { count: marked.length, sample: (marked[0] as string).slice(0, 60) };
 }
 
+// A salutation addresses a person before the substance starts: a greeting word,
+// or a name followed by a comma ("Dana, this fires for the entire run"). Only
+// the opening line of a comment can carry one, so the test anchors there.
+// Further down the same shape is ordinary third-person prose.
+const GREETING_OPENER = /^(?:hi|hey|hello|dear|greetings|good\s+(?:morning|afternoon|evening))\b/i;
+const ADDRESS_OPENER = /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),(?:\s|$)/;
+
+// Words that legitimately open a sentence ahead of a comma. Adverbs (-ly) and
+// gerunds (-ing) are covered by shape, so what remains is the closed set of
+// connectives, agreement words, and review idioms. A name that takes one of
+// those forms (Holly, Sterling) is invisible to the check, which is the price
+// of never denying "Otherwise, this looks right".
+const SENTENCE_OPENERS = new Set([
+  "above",
+  "after",
+  "afterward",
+  "again",
+  "agreed",
+  "ah",
+  "ahead",
+  "also",
+  "although",
+  "altogether",
+  "always",
+  "and",
+  "anyhow",
+  "anyway",
+  "anywhere",
+  "aside",
+  "assuming",
+  "because",
+  "before",
+  "below",
+  "besides",
+  "best",
+  "better",
+  "beyond",
+  "both",
+  "but",
+  "caveat",
+  "context",
+  "correct",
+  "ditto",
+  "docs",
+  "done",
+  "downstream",
+  "earlier",
+  "eh",
+  "either",
+  "elsewhere",
+  "everywhere",
+  "exactly",
+  "fair",
+  "false",
+  "fine",
+  "first",
+  "five",
+  "four",
+  "fwiw",
+  "given",
+  "good",
+  "granted",
+  "great",
+  "hence",
+  "here",
+  "hmm",
+  "however",
+  "huh",
+  "if",
+  "imho",
+  "imo",
+  "indeed",
+  "inside",
+  "instead",
+  "last",
+  "later",
+  "likewise",
+  "major",
+  "majors",
+  "maybe",
+  "meantime",
+  "meanwhile",
+  "minor",
+  "minors",
+  "moreover",
+  "neither",
+  "net",
+  "never",
+  "nevertheless",
+  "next",
+  "nit",
+  "nits",
+  "no",
+  "nonetheless",
+  "nope",
+  "not",
+  "note",
+  "notes",
+  "now",
+  "nowhere",
+  "offline",
+  "often",
+  "oh",
+  "ok",
+  "okay",
+  "once",
+  "one",
+  "online",
+  "optional",
+  "or",
+  "otherwise",
+  "outside",
+  "overall",
+  "per",
+  "perhaps",
+  "plus",
+  "question",
+  "questions",
+  "rather",
+  "regardless",
+  "right",
+  "same",
+  "scope",
+  "second",
+  "since",
+  "so",
+  "sometimes",
+  "somewhere",
+  "soon",
+  "sorry",
+  "still",
+  "style",
+  "suggestion",
+  "sure",
+  "tangent",
+  "tbh",
+  "tests",
+  "then",
+  "there",
+  "third",
+  "though",
+  "three",
+  "thus",
+  "tldr",
+  "today",
+  "together",
+  "tomorrow",
+  "tonight",
+  "true",
+  "two",
+  "types",
+  "understood",
+  "unless",
+  "unrelated",
+  "until",
+  "upstream",
+  "well",
+  "when",
+  "where",
+  "whereas",
+  "while",
+  "worse",
+  "wrong",
+  "yep",
+  "yes",
+  "yesterday",
+  "yet",
+  "ymmv",
+]);
+
+function isNameShaped(word: string): boolean {
+  const lower = word.toLowerCase();
+  if (SENTENCE_OPENERS.has(lower)) return false;
+  return !lower.endsWith("ly") && !lower.endsWith("ing");
+}
+
+// Headings are skipped so a body that opens "## Review" is judged on the line
+// that follows. stripCode has already blanked leading fenced code.
+function openingLine(text: string): string {
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.length > 0 && !trimmed.startsWith("#")) return trimmed;
+  }
+  return "";
+}
+
+function salutationHits(text: string): Hits {
+  const line = openingLine(text);
+  if (line === "") return { count: 0, sample: "" };
+  if (GREETING_OPENER.test(line)) return { count: 1, sample: line.slice(0, 40) };
+  const address = ADDRESS_OPENER.exec(line)?.[1];
+  if (!address) return { count: 0, sample: "" };
+  const head = address.split(/\s+/)[0] as string;
+  if (!isNameShaped(head)) return { count: 0, sample: "" };
+  return { count: 1, sample: `${address},` };
+}
+
 export const PATTERNS: PatternDef[] = [
+  {
+    tier: "deny",
+    layer: "grammar",
+    category: "salutation",
+    sideEffectOnly: true,
+    structural: true,
+    test: salutationHits,
+    message: (matched) =>
+      `"${matched}" opens the comment with a salutation. Nothing published addresses a person, by name or greeting: no vocative, no invented name for a username. Delete the address and open on the substance.`,
+    positives: [
+      "Dana, this fires for the entire run rather than the changed files.",
+      "Hi Dana,\n\nThe retry loop swallows the error.",
+    ],
+    negatives: [
+      "Otherwise, this looks right.",
+      "Given the constraint, the second pass is redundant.",
+      "Nit, but the constant belongs next to its only caller.",
+      "The retry loop swallows the error Dana, who wrote it, described.",
+    ],
+    evidence:
+      "Recurring corrective feedback on published comments: five vocative openers across MR, PR, and Linear drafts between 2026-05-01 and 2026-08-20. The prose rule alone did not stop the fifth.",
+    retire:
+      "Remove when vocative openers stop appearing in corrective-feedback moments. Rebuild the name-shape test instead of extending it if SENTENCE_OPENERS starts accumulating entries that are not discourse connectives, which would mean the shape is matching ordinary nouns.",
+  },
   {
     tier: "deny",
     layer: "grammar",

@@ -221,12 +221,17 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<HookResult
   if (texts.length === 0) return null;
 
   const matches = scan(texts.join("\n"), undefined, "sideEffect");
-  const deny = firstByTier(matches, "deny");
-  if (deny?.structural) {
-    return { output: formatDecision("deny", deny.message), category: deny.category };
+
+  // A structural deny blocks the call, so it outranks every other finding
+  // regardless of where its pattern sits in the catalog. Selecting the first
+  // deny of any kind would let a soft vocabulary hit that happens to be
+  // declared earlier downgrade the block to a reminder.
+  const structural = matches.find((match) => match.tier === "deny" && match.structural);
+  if (structural) {
+    return { output: formatDecision("deny", structural.message), category: structural.category };
   }
 
-  const match = deny ?? firstByTier(matches, "context");
+  const match = firstByTier(matches, "deny") ?? firstByTier(matches, "context");
   if (match) return { output: formatContext(match.message), category: match.category };
 
   return null;

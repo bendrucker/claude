@@ -29,6 +29,7 @@ The hook enforces most of these automatically; the rest ship in the scan and rev
 
 #### PR and Review Prose
 
+- No salutations. A published comment opens on the substance, never on a name or a greeting. Referring to someone in third person is fine, and never invent a name for a username.
 - Active voice in PR and review prose. Not "X is added" but "Adds X." Commit subjects take the imperative: "Add X".
 - Not "Tests cover X" but "Added tests covering X."
 - No trailing hedge adverbs ("regardless.", "nonetheless.").

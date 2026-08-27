@@ -13,6 +13,7 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   blockCountPath,
+  HookInput,
   invokesGitCommit,
   parseTranscript,
   processInput,
@@ -27,10 +28,14 @@ const execAsync = promisify(exec);
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures");
 
-// hookSpecificOutput is a union across every hook event, so narrow it to the
-// PreToolUse arm before reading the permission fields.
 function deniedBy(result: SyncHookJSONOutput | null): PreToolUseHookSpecificOutput | undefined {
-  return result?.hookSpecificOutput as PreToolUseHookSpecificOutput | undefined;
+  const output = result?.hookSpecificOutput;
+  return output?.hookEventName === "PreToolUse" ? output : undefined;
+}
+
+function contextFrom(result: SyncHookJSONOutput | null): string | undefined {
+  const output = result?.hookSpecificOutput;
+  return output?.hookEventName === "PostToolUse" ? output.additionalContext : undefined;
 }
 
 let tempDir: string;
@@ -342,9 +347,7 @@ describe("ox hook", () => {
       expect(result).not.toBeNull();
       expect(result?.hookSpecificOutput).toMatchObject({ hookEventName: "PostToolUse" });
 
-      const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
-        .additionalContext;
-      expect(additionalContext).toContain("no-dupe-keys");
+      expect(contextFrom(result)).toContain("no-dupe-keys");
       expect(await Bun.file(filePath).text()).toBe(before);
     });
 
@@ -415,14 +418,14 @@ describe("ox hook", () => {
         const session = `limit-${Date.now()}`;
         const transcript = await unfixableSession(session);
 
-        const budget = [];
+        const budget: (SyncHookJSONOutput | null)[] = [];
         for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
           budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
         }
         const past = await processStop(mockStopHookInput(transcript, true, session));
 
         expect(budget.map((result) => result?.decision)).toEqual(
-          Array(STOP_BLOCK_LIMIT).fill("block"),
+          Array.from({ length: STOP_BLOCK_LIMIT }, () => "block"),
         );
         expect(past?.decision).toBeUndefined();
         expect(past?.systemMessage).toContain("no-dupe-keys");
@@ -686,9 +689,14 @@ describe("ox hook", () => {
       expect(result?.decision).toBe("block");
     });
 
-    it("returns null for unknown event types", async () => {
-      const input = { hook_event_name: "Unknown" } as unknown as PostToolUseHookInput;
-      expect(await processInput(input)).toBeNull();
+    test.each([
+      { title: "an unrecognized event", value: { hook_event_name: "Unknown" } },
+      { title: "a missing event name", value: {} },
+      { title: "PostToolUse without a tool name", value: { hook_event_name: "PostToolUse" } },
+      { title: "Stop without a transcript path", value: { hook_event_name: "Stop" } },
+      { title: "a non-object payload", value: "Stop" },
+    ])("the boundary rejects $title", ({ value }) => {
+      expect(HookInput.safeParse(value).success).toBe(false);
     });
   });
 });

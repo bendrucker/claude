@@ -1,0 +1,9 @@
+{
+  "name": "@bendrucker/claude-decode",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

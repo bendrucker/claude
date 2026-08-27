@@ -13,6 +13,14 @@ Auto-install skips `workspace:*` specifiers. A script importing a workspace pack
 
 Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` code via relative paths (`../packages/marketplace/index`), so it runs in fresh worktrees without install. Reserve workspace specifiers for distributed plugin code, which cannot use relative imports across the plugin boundary.
 
+# Decoding External Data
+
+`JSON.parse`, subprocess stdout, file reads, and hook input on stdin all produce `unknown`. Validate each against a zod schema at the point it arrives instead of asserting a shape onto it. `user/rules/typescript.md` covers the convention.
+
+`packages/decode` wraps zod with the source label that makes a rejection traceable: `decodeJson(schema, text, "gh pr view output")`, plus `decodeStdin`, `decodeFile`, `decodeFileLines`, and `decodeJsonLines`. Repo-internal tooling imports it relatively (`../packages/decode/index`).
+
+Plugins cannot use it. A distributed plugin resolves its runtime deps through npm auto-install, which skips `workspace:*`, so a plugin declares `zod` in its own `package.json` and calls `schema.parse` directly.
+
 # Script Conventions
 
 - **Argument parsing**: use [cleye](https://github.com/privatenumber/cleye). Load the `cleye` skill for parameters, flags, and subcommands instead of reading existing scripts.

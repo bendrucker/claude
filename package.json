@@ -21,6 +21,7 @@
     "plugins/issue",
     "plugins/ui-design",
     "plugins/gitlab",
+    "packages/decode",
     "packages/validate",
     "packages/marketplace",
     "plugins/plan",
@@ -67,7 +68,8 @@
     "cleye": "^2.2.1",
     "table": "^6.9.0",
     "typescript": "^6.0.0",
-    "url-pattern": "^1.0.3"
+    "url-pattern": "^1.0.3",
+    "zod": "^4.4.3"
   },
   "overrides": {
     "@apidevtools/json-schema-ref-parser": "^15.0.0"

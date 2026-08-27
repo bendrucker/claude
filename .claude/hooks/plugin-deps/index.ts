@@ -1,7 +1,17 @@
 #!/usr/bin/env bun
 
 import { join } from "node:path";
-import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+import { decodeStdin } from "../../../packages/decode/index";
+
+const StopInput = z.looseObject({
+  hook_event_name: z.literal("Stop"),
+  cwd: z.string(),
+  stop_hook_active: z.boolean().optional(),
+});
+
+type StopInput = z.infer<typeof StopInput>;
 
 // Mirrors VIOLATION_EXIT in scripts/check-plugin-deps.ts. Deliberately a
 // literal rather than an import: importing the checker would pull its module
@@ -13,7 +23,7 @@ const VIOLATION_EXIT = 2;
 const CHECKER_PATH = join(import.meta.dirname, "..", "..", "..", "scripts", "check-plugin-deps.ts");
 
 export async function processStop(
-  input: StopHookInput,
+  input: StopInput,
   checkerPath = CHECKER_PATH,
 ): Promise<SyncHookJSONOutput | null> {
   if (input.stop_hook_active) return null;
@@ -44,10 +54,7 @@ export async function processStop(
 }
 
 async function main(): Promise<void> {
-  const input = JSON.parse(await Bun.stdin.text()) as StopHookInput;
-  if (input.hook_event_name !== "Stop") return;
-
-  const output = await processStop(input);
+  const output = await processStop(await decodeStdin(StopInput, "plugin-deps hook input"));
   if (output) process.stdout.write(`${JSON.stringify(output)}\n`);
 }
 

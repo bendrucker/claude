@@ -6,20 +6,45 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import type {
-  PostToolUseHookInput,
-  PreToolUseHookInput,
-  StopHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+import { decode, decodeJson, decodeStdin } from "../../../packages/decode/index";
 
 const execFileAsync = promisify(execFile);
 
 const OX_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "json", "jsonc"]);
 
-type HookInput = PostToolUseHookInput | PreToolUseHookInput | StopHookInput;
+const FilePathInput = z.looseObject({ file_path: z.string().optional() });
+const BashInput = z.looseObject({ command: z.string().optional() });
 
-type BashInput = { command?: string };
+const PreToolUseInput = z.looseObject({
+  hook_event_name: z.literal("PreToolUse"),
+  tool_input: z.unknown(),
+});
+
+const PostToolUseInput = z.looseObject({
+  hook_event_name: z.literal("PostToolUse"),
+  tool_name: z.string(),
+  tool_input: z.unknown(),
+});
+
+const StopInput = z.looseObject({
+  hook_event_name: z.literal("Stop"),
+  session_id: z.string(),
+  transcript_path: z.string(),
+  stop_hook_active: z.boolean().optional(),
+});
+
+export const HookInput = z.discriminatedUnion("hook_event_name", [
+  PreToolUseInput,
+  PostToolUseInput,
+  StopInput,
+]);
+
+type PreToolUseInput = z.infer<typeof PreToolUseInput>;
+type PostToolUseInput = z.infer<typeof PostToolUseInput>;
+type StopInput = z.infer<typeof StopInput>;
+type HookInput = z.infer<typeof HookInput>;
 
 // Flags git accepts between the executable and its subcommand. Enumerated
 // rather than matched as a generic `-\S+` so that a value which happens to be
@@ -43,16 +68,29 @@ export function invokesGitCommit(command: string): boolean {
   return GIT_COMMIT_PATTERN.test(stripQuoted(command));
 }
 
-interface TranscriptEntry {
-  type?: string;
-  message?: {
-    content?: Array<{
-      type: string;
-      name?: string;
-      input?: { file_path?: string };
-    }>;
-  };
-}
+const ContentBlock = z.looseObject({
+  type: z.string(),
+  name: z.string().optional(),
+  input: FilePathInput.optional(),
+});
+
+const TranscriptEntry = z.looseObject({
+  type: z.string().optional(),
+  message: z
+    .looseObject({ content: z.union([z.string(), z.array(ContentBlock)]).optional() })
+    .optional(),
+});
+
+const BinManifest = z.looseObject({
+  bin: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
+});
+
+const BlockState = z.looseObject({ blocks: z.number().optional() });
+
+const CommandFailure = z.looseObject({
+  stdout: z.string().optional(),
+  stderr: z.string().optional(),
+});
 
 function getExtension(filePath: string): string {
   const parts = filePath.split(".");
@@ -109,9 +147,7 @@ async function localBin(pkg: string, binName: string): Promise<string | null> {
     return null;
   }
   try {
-    const manifest = (await Bun.file(manifestPath).json()) as {
-      bin?: string | Record<string, string>;
-    };
+    const manifest = decode(BinManifest, await Bun.file(manifestPath).json(), manifestPath);
     const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[binName];
     return bin ? join(dirname(manifestPath), bin) : null;
   } catch {
@@ -212,10 +248,11 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
     if (!line.trim()) continue;
 
     try {
-      const entry = JSON.parse(line) as TranscriptEntry;
-      if (entry.type !== "assistant" || !entry.message?.content) continue;
+      const entry = decodeJson(TranscriptEntry, line, transcriptPath);
+      const blocks = entry.message?.content;
+      if (entry.type !== "assistant" || !Array.isArray(blocks)) continue;
 
-      for (const block of entry.message.content) {
+      for (const block of blocks) {
         if (block.type !== "tool_use") continue;
         if (block.name !== "Edit" && block.name !== "Write") continue;
 
@@ -280,8 +317,9 @@ async function groupByWorkingTree(files: string[]): Promise<Map<string | undefin
 }
 
 function commandOutput(error: unknown): string | null {
-  const { stdout, stderr } = error as { stdout?: string; stderr?: string };
-  const output = [stdout, stderr]
+  const failure = CommandFailure.safeParse(error);
+  if (!failure.success) return null;
+  const output = [failure.data.stdout, failure.data.stderr]
     .map((stream) => stream?.trim())
     .filter(Boolean)
     .join("\n");
@@ -477,14 +515,14 @@ async function runOxGate(files: string[]): Promise<string | null> {
 }
 
 export async function processPostToolUse(
-  input: PostToolUseHookInput,
+  input: PostToolUseInput,
 ): Promise<SyncHookJSONOutput | null> {
   const toolName = input.tool_name;
   if (toolName !== "Edit" && toolName !== "Write") {
     return null;
   }
 
-  const filePath = (input.tool_input as { file_path?: string }).file_path;
+  const { file_path: filePath } = decode(FilePathInput, input.tool_input, "PostToolUse tool_input");
   if (!filePath || !isOxFile(filePath)) {
     return null;
   }
@@ -517,8 +555,8 @@ export function blockCountPath(sessionId: string): string {
 
 async function priorBlocks(sessionId: string): Promise<number> {
   try {
-    const state = (await Bun.file(blockCountPath(sessionId)).json()) as { blocks?: number };
-    return typeof state.blocks === "number" ? state.blocks : 0;
+    const path = blockCountPath(sessionId);
+    return decode(BlockState, await Bun.file(path).json(), path).blocks ?? 0;
   } catch {
     return 0;
   }
@@ -539,7 +577,7 @@ async function clearBlocks(sessionId: string): Promise<void> {
   } catch {}
 }
 
-export async function processStop(input: StopHookInput): Promise<SyncHookJSONOutput | null> {
+export async function processStop(input: StopInput): Promise<SyncHookJSONOutput | null> {
   // Every exit that is not a block clears the count, so a stale one can never
   // be read back as progress through a later round's budget.
   if (!(await oxlintCommand())) {
@@ -608,12 +646,12 @@ function lines(stdout: string): string[] {
 }
 
 export async function processPreToolUse(
-  input: PreToolUseHookInput,
+  input: PreToolUseInput,
 ): Promise<SyncHookJSONOutput | null> {
   // The `Bash(git commit:*)` matcher only narrows which calls spawn this hook.
   // It fails open on shell metacharacters, and this path can return a `block`,
   // so the command is re-read here rather than trusted from the matcher.
-  const { command } = input.tool_input as BashInput;
+  const { command } = decode(BashInput, input.tool_input, "PreToolUse tool_input");
   if (!command || !invokesGitCommit(command)) {
     return null;
   }
@@ -673,16 +711,13 @@ export async function processInput(input: HookInput): Promise<SyncHookJSONOutput
   if (input.hook_event_name === "PostToolUse") {
     return processPostToolUse(input);
   }
-  if (input.hook_event_name === "Stop") {
-    return processStop(input);
-  }
-  return null;
+  return processStop(input);
 }
 
 async function main(): Promise<void> {
   let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as HookInput;
+    input = await decodeStdin(HookInput, "ox hook input");
   } catch (error) {
     console.error(
       `[ox] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

@@ -720,6 +720,66 @@ describe("scan", () => {
     });
   });
 
+  describe("salutation", () => {
+    function salutation(text: string): PatternMatch | undefined {
+      return scan(text, undefined, "sideEffect").find((m) => m.category === "salutation");
+    }
+
+    const addressed = [
+      "Dana, this fires for the entire run rather than the changed files.",
+      "Dana Reyes, the retry loop swallows the error.",
+      "Hi Dana,\n\nThe retry loop swallows the error.",
+      "Hey there,\n\nA few notes below.",
+      "Hello team, a few notes below.",
+      "Dear reviewer,\n\nA few notes below.",
+      "## Review\n\nDana, the retry loop swallows the error.",
+      "Dana,\nThe retry loop swallows the error.",
+    ];
+
+    for (const text of addressed) {
+      it(`denies: ${JSON.stringify(text.slice(0, 40))}`, () => {
+        const match = salutation(text);
+        expect(match?.tier).toBe("deny");
+        expect(match?.structural).toBe(true);
+      });
+    }
+
+    const substantive = [
+      "Otherwise, this looks right.",
+      "Given the constraint, the second pass is redundant.",
+      "Nit, but the constant belongs next to its only caller.",
+      "Overall, the shape is right.",
+      "First, the constant is unused.",
+      "Ideally, the retry budget comes from config.",
+      "Naming, formatting, and tests all read fine.",
+      "Agreed, the second pass is redundant.",
+      "The retry loop swallows the error.",
+      "Question, does the sweep cover deleted files?",
+      "`Dana`, the identifier, is a fixture name.",
+      "Today, the sweep still walks every file.",
+      "Upstream, the API dropped the field.",
+      "Tests, then the docs.",
+    ];
+
+    for (const text of substantive) {
+      it(`allows: ${JSON.stringify(text.slice(0, 40))}`, () => {
+        expect(salutation(text)).toBeUndefined();
+      });
+    }
+
+    it("ignores an address that is not on the opening line", () => {
+      expect(salutation("The sweep is too broad.\n\nDana, it fires on every run.")).toBeUndefined();
+    });
+
+    it("skips file context", () => {
+      expect(
+        scan("Dana, this fires for the entire run.", undefined, "file").find(
+          (m) => m.category === "salutation",
+        ),
+      ).toBeUndefined();
+    });
+  });
+
   describe("sideEffectOnly scoping", () => {
     const conversational = [
       { text: "You're right about that.", category: "sycophantic acknowledgment" },

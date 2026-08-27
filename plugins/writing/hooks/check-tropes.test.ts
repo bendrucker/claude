@@ -407,6 +407,44 @@ describe("Bash processInput", () => {
     }
   });
 
+  it("denies a review comment that opens with a vocative", async () => {
+    const result = await processInput(
+      mockBash(
+        `glab mr note 871 --message "Dana, this fires for the entire run rather than the changed files."`,
+      ),
+    );
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+  });
+
+  it("denies a body-file comment that opens with a greeting", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
+    const file = join(dir, "body.md");
+    await Bun.write(file, "Hi Dana,\n\nThe retry loop swallows the error.\n");
+    const result = await processInput(mockBash(`gh pr review --body-file ${file}`));
+    await rm(dir, { recursive: true, force: true });
+    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+  });
+
+  it("allows a comment that opens with a connective", async () => {
+    const result = await processInput(
+      mockBash(`glab mr note 871 --message "Otherwise, this looks right."`),
+    );
+    expect(result).toBeNull();
+  });
+
+  // A soft vocabulary deny is declared earlier in the catalog than the
+  // salutation. Selection by catalog order would report it and let the comment
+  // through with a reminder.
+  it("blocks on the salutation when a softer deny also matches", async () => {
+    const result = await processInput(
+      mockBash(`glab mr note 871 --message "Dana, we should delve into the retry budget."`),
+    );
+    expect(result?.hookSpecificOutput).toMatchObject({
+      permissionDecision: "deny",
+      permissionDecisionReason: expect.stringContaining("salutation"),
+    });
+  });
+
   it("returns null for non-text Bash commands", async () => {
     expect(await processInput(mockBash("git push origin main"))).toBeNull();
   });

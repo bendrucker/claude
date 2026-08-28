@@ -42,7 +42,7 @@ export interface SearchParams {
    * markets it does not actually reprice; `carryOn` is the filter that does.
    */
   noBasic?: boolean;
-  /** Carry-on count. Setting it to 1 is what reliably drops Basic Economy fares. */
+  /** Setting it to 1 is what reliably drops Basic Economy fares. */
   carryOn?: number;
   checked?: number;
 }

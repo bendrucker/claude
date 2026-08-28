@@ -16,7 +16,11 @@ const heavyTranscript = () =>
   `${JSON.stringify({
     message: {
       content: [
-        { type: "tool_use", name: "Write", input: { file_path: "/repo/heavy.ts", content: heavyContent } },
+        {
+          type: "tool_use",
+          name: "Write",
+          input: { file_path: "/repo/heavy.ts", content: heavyContent },
+        },
       ],
     },
   })}\n`;
@@ -25,7 +29,7 @@ async function runHook(input: Record<string, unknown>): Promise<string> {
   const proc = Bun.spawn(["bun", HOOK], { stdin: "pipe", stdout: "pipe" });
   proc.stdin.write(JSON.stringify(input));
   await proc.stdin.end();
-  const out = await proc.stdout.text();
+  const out = await new Response(proc.stdout).text();
   expect(await proc.exited).toBe(0);
   return out;
 }

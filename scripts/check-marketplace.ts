@@ -8,7 +8,9 @@ await runCheck(
     const plugins = await loadPlugins();
     return {
       header: "Plugins missing from marketplace.json:",
-      violations: plugins.filter((p) => p.dir && !p.listing?.local).map((p) => p.name),
+      violations: plugins
+        .filter((p) => p.dir !== undefined && p.listing?.local !== true)
+        .map((p) => p.name),
     };
   },
   { success: "All plugin directories are listed in marketplace.json" },

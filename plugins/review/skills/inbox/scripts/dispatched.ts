@@ -53,7 +53,7 @@ switch (command) {
 
   case "remove": {
     const { url } = argv.flags;
-    if (!url) {
+    if (url == null || url === "") {
       console.error("--url is required for remove");
       process.exit(1);
     }

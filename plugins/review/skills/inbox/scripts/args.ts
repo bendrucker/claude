@@ -4,7 +4,7 @@ export type PermissionMode = (typeof PERMISSION_MODES)[number];
 
 export function parsePermissionMode(value: string): PermissionMode {
   const mode = PERMISSION_MODES.find((m) => m === value);
-  if (!mode) {
+  if (mode == null) {
     throw new Error(
       `Invalid permission mode: ${value} (expected one of ${PERMISSION_MODES.join(", ")})`,
     );
@@ -31,7 +31,7 @@ export function buildDispatchArgs({
     "--bg",
     "--agent",
     "review",
-    ...(permissionMode ? ["--permission-mode", permissionMode] : []),
+    ...(permissionMode != null ? ["--permission-mode", permissionMode] : []),
     url,
   ];
 }

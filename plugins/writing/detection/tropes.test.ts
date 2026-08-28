@@ -50,7 +50,10 @@ describe("stripCode", () => {
   const inlineCodeLine = fc
     .tuple(
       plainSegment,
-      fc.string().map((s) => s.replace(/[`\n]/g, "") || "x"),
+      fc.string().map((s) => {
+        const stripped = s.replace(/[`\n]/g, "");
+        return stripped !== "" ? stripped : "x";
+      }),
       plainSegment,
     )
     .map(([pre, code, post]) => `${pre}\`${code}\`${post}`);

@@ -73,11 +73,14 @@ export interface TextFlags {
 export function specFromFlags(flags: TextFlags): Spec {
   const spec: Spec = {};
   const boxes: TextBox[] = [];
-  if (flags.top) boxes.push({ text: flags.top, preset: "classic", anchor: "top" });
-  if (flags.bottom) boxes.push({ text: flags.bottom, preset: "classic", anchor: "bottom" });
-  if (flags.subtitle) boxes.push({ text: flags.subtitle, preset: "subtitle" });
+  if (flags.top != null && flags.top !== "")
+    boxes.push({ text: flags.top, preset: "classic", anchor: "top" });
+  if (flags.bottom != null && flags.bottom !== "")
+    boxes.push({ text: flags.bottom, preset: "classic", anchor: "bottom" });
+  if (flags.subtitle != null && flags.subtitle !== "")
+    boxes.push({ text: flags.subtitle, preset: "subtitle" });
   if (boxes.length > 0) spec.boxes = boxes;
-  if (flags.caption) {
+  if (flags.caption != null && flags.caption !== "") {
     const position = flags.captionPosition ?? "top";
     if (position !== "top" && position !== "bottom") {
       fail("--caption-position", "expected top or bottom");

@@ -88,7 +88,7 @@ export function parseGitHubUrl(url: string): { type: string; suggestion: string 
 
   const pathMatch = RepoPath.safeParse(repoPathPattern.match(path));
   if (pathMatch.success) {
-    const subpath = pathMatch.data._ || "";
+    const subpath = pathMatch.data._ ?? "";
 
     // Empty subpath means trailing slash on repo root
     if (subpath === "") {

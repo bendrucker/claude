@@ -90,9 +90,9 @@ function summarize(d: Discussion): DiscussionSummary | null {
       : null,
   };
   const file = note.position?.new_path ?? note.position?.old_path;
-  if (file) result.file = file;
+  if (file != null && file !== "") result.file = file;
   const line = note.position?.new_line ?? note.position?.old_line;
-  if (line) result.line = line;
+  if (line != null && line !== 0) result.line = line;
   return result;
 }
 
@@ -103,20 +103,23 @@ export function truncateBody(body: string, max: number): string {
 }
 
 export function formatLocation(s: DiscussionSummary): string {
-  if (!s.file) return "";
+  if (s.file == null || s.file === "") return "";
   const loc = s.lineRange ? `${s.lineRange.start}-${s.lineRange.end}` : String(s.line ?? "");
-  return loc ? `${s.file}:${loc}` : s.file;
+  return loc !== "" ? `${s.file}:${loc}` : s.file;
 }
 
 const LOCATION_MAX_WIDTH = 40;
 
 export function formatDigest(summaries: DiscussionSummary[], truncate: number): string {
-  const rows = summaries.map((s) => ({
-    id: s.id.slice(0, 12),
-    location: formatLocation(s) || "-",
-    state: s.resolved ? "[resolved]" : "[open]",
-    body: truncateBody(s.body, truncate),
-  }));
+  const rows = summaries.map((s) => {
+    const location = formatLocation(s);
+    return {
+      id: s.id.slice(0, 12),
+      location: location !== "" ? location : "-",
+      state: s.resolved ? "[resolved]" : "[open]",
+      body: truncateBody(s.body, truncate),
+    };
+  });
   const locWidth = Math.min(Math.max(0, ...rows.map((r) => r.location.length)), LOCATION_MAX_WIDTH);
   const stateWidth = Math.max(0, ...rows.map((r) => r.state.length));
   return rows
@@ -147,7 +150,8 @@ export function filterDiscussions(discussions: Discussion[], opts: FilterOptions
   return discussions.filter((d) => {
     const note = firstNote(d);
     if (!note) return false;
-    if (opts.author && note.author.username !== opts.author) return false;
+    if (opts.author != null && opts.author !== "" && note.author.username !== opts.author)
+      return false;
     if (opts.bots && !isReviewTarget(note.author.username, opts.extra)) return false;
     if (opts.resolvable && !note.resolvable) return false;
     if (opts.unresolved && note.resolved) return false;
@@ -177,7 +181,7 @@ async function buildFilterOptions(flags: {
   bots: boolean;
 }): Promise<FilterOptions> {
   const opts: FilterOptions = {};
-  if (flags.author) opts.author = flags.author;
+  if (flags.author != null && flags.author !== "") opts.author = flags.author;
   if (flags.bots) {
     opts.bots = true;
     opts.extra = await loadExtraReviewers();
@@ -210,7 +214,7 @@ const createCmd = command(
 
     const payload: Record<string, unknown> = { body };
 
-    if (parsed.flags.file) {
+    if (parsed.flags.file != null && parsed.flags.file !== "") {
       const [refs, diffs] = await Promise.all([getDiffRefs(iid), fetchMrDiffs(iid)]);
       validateLineInDiff(diffs, parsed.flags.file, {
         line: parsed.flags.line,
@@ -288,7 +292,7 @@ const resolveCmd = command(
   async (parsed) => {
     const iid = parsed._.iid;
 
-    for (const id of parsed._.ids ?? []) {
+    for (const id of parsed._.ids) {
       await $`glab api projects/:id/merge_requests/${iid}/discussions/${id} -X PUT -f resolved=true`.text();
       console.error(`Resolved: ${id}`);
     }

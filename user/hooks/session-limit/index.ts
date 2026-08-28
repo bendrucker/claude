@@ -135,7 +135,7 @@ export function evaluate(
 // data. Unset means nothing is being written, so there is nothing to read.
 function rateLimitsPath(): string | null {
   const path = process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH;
-  return path ? expandTilde(path) : null;
+  return path != null && path !== "" ? expandTilde(path) : null;
 }
 
 function markerPath(sessionId: string): string {
@@ -166,10 +166,10 @@ export async function processInput(
   nowMs: number,
 ): Promise<SyncHookJSONOutput | null> {
   const sessionId = input.session_id;
-  if (!sessionId) return null;
+  if (sessionId === "") return null;
 
   const source = rateLimitsPath();
-  if (!source) return null;
+  if (source == null || source === "") return null;
 
   const rl = await readJson(RateLimits, source);
   if (!rl) return null;

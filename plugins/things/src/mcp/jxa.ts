@@ -28,7 +28,7 @@ const JxaFailure = z.looseObject({ error: z.unknown().transform(String) });
 // oxlint-disable-next-line local/no-unknown-returns
 export async function runScript(script: string, args: string[]): Promise<unknown> {
   const runner = await findJxaRunner();
-  if (!runner) {
+  if (runner == null || runner === "") {
     throw new Error("mac plugin JXA runner not found (expected plugins/mac/scripts/jxa.ts)");
   }
 

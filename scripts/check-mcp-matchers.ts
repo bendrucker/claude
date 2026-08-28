@@ -38,10 +38,10 @@ async function checkMatchers(): Promise<string[]> {
 
         const server = match[1];
         const tool = match[2];
-        if (!server || !tool) continue;
+        if (server == null || server === "" || tool == null || tool === "") continue;
 
         const pluginName = knownServers.get(server) ?? (enabledNames.has(server) ? server : null);
-        if (!pluginName) continue;
+        if (pluginName == null || pluginName === "") continue;
 
         const pluginVariant = `mcp__plugin_${pluginName}_${server}__${tool}`;
         if (!patterns.includes(pluginVariant)) {

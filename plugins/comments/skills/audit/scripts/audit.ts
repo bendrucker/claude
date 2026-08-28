@@ -54,7 +54,7 @@ function parseSort(value: string): SortKey {
 async function chdirToRepoRoot(): Promise<void> {
   const result = await $`git rev-parse --show-toplevel`.quiet().nothrow();
   const root = result.text().trim();
-  if (result.exitCode !== 0 || !root) {
+  if (result.exitCode !== 0 || root === "") {
     console.error("Not inside a git repository.");
     process.exit(1);
   }
@@ -97,7 +97,7 @@ const preflightCmd = command(
   async (parsed) => {
     await chdirToRepoRoot();
     const { base, mr, all, path, sort, limit, shardSize, fix } = parsed.flags;
-    const pathGlobs = path ?? [];
+    const pathGlobs = path;
     const sortKey = parseSort(sort);
 
     let comments: CollectedComment[];
@@ -111,10 +111,10 @@ const preflightCmd = command(
       comments = await collectRepo({ pathGlobs });
     } else {
       const options: DiffOptions = {};
-      if (base) options.base = base;
-      if (mr) options.mr = mr;
+      if (base != null && base !== "") options.base = base;
+      if (mr != null && mr !== "") options.mr = mr;
       let mrSource: MrSource | null = null;
-      if (mr) {
+      if (mr != null && mr !== "") {
         mrSource = await resolveMrSource(mr);
         if (!mrSource) {
           console.error("Could not resolve the merge request's source ref via glab.");
@@ -132,7 +132,7 @@ const preflightCmd = command(
     }
 
     const options: BuildJobOptions = { fix };
-    if (shardSize) options.shardSize = shardSize;
+    if (shardSize != null && shardSize !== 0) options.shardSize = shardSize;
     const descriptor = await buildJob(limited, options);
     const written = await writeJob(descriptor);
     // An --mr job records comment text from the remote MR ref, but apply trims
@@ -236,7 +236,7 @@ const applyCmd = command(
   async (parsed) => {
     await chdirToRepoRoot();
     const { job, report, fix, format, maxWidth } = parsed.flags;
-    if (!job) {
+    if (job == null || job === "") {
       console.error("--job <dir> is required.");
       process.exit(1);
     }
@@ -250,7 +250,7 @@ const applyCmd = command(
     const scope = (await scopeFile.exists())
       ? Scope.parse(JSON.parse(await scopeFile.text()))
       : { mr: null };
-    if (scope.mr && !report) {
+    if (scope.mr != null && scope.mr !== "" && !report) {
       console.error(
         `This job audited merge request !${scope.mr} from its remote source. Apply writes trims to the local tree from HEAD, so every comment would read as drift. Re-run with --report, or check out the MR branch and re-run preflight with --base.`,
       );
@@ -275,7 +275,7 @@ const applyCmd = command(
     for (const path of await judgedPaths(job)) {
       const language = languageForPath(path);
       const file = Bun.file(path);
-      if (!language || !(await file.exists())) continue;
+      if (language == null || language === "" || !(await file.exists())) continue;
       const source = await file.text();
       const editItems: EditItem[] = [];
       for (const match of matchVerdicts(path, await extractComments(source, language), verdicts)) {
@@ -299,7 +299,7 @@ const applyCmd = command(
       }
     }
 
-    if (format && !report) {
+    if (format != null && format !== "" && !report) {
       for (const [path, content] of editsByPath) {
         const formatted = await formatContent(format, path, content);
         if (formatted.formatted) {

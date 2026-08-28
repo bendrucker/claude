@@ -27,7 +27,8 @@ async function main(): Promise<void> {
   const result = await $`git diff --cached --check`.quiet().nothrow();
 
   if (result.exitCode !== 0) {
-    const output = result.stderr.toString() || result.stdout.toString();
+    const stderr = result.stderr.toString();
+    const output = stderr !== "" ? stderr : result.stdout.toString();
     const markers = output
       .split("\n")
       .filter((line) => line.includes("conflict marker"))
@@ -35,7 +36,7 @@ async function main(): Promise<void> {
       .join(", ");
 
     const denial = formatOutput(
-      `Conflict markers in staged files: ${markers || "run 'git diff --cached --check' for details"}`,
+      `Conflict markers in staged files: ${markers !== "" ? markers : "run 'git diff --cached --check' for details"}`,
     );
     process.stdout.write(`${JSON.stringify(denial)}\n`);
   }

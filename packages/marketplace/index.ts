@@ -199,7 +199,7 @@ export async function enabledPluginNames(opts?: LoadOptions): Promise<Set<string
   for (const [key, value] of Object.entries(settings?.enabledPlugins ?? {})) {
     if (!value) continue;
     const name = key.split("@")[0];
-    if (name) names.add(name);
+    if (name != null && name !== "") names.add(name);
   }
   return names;
 }

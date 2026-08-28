@@ -80,20 +80,20 @@ async function readSql(dir: string, name: string): Promise<string> {
 }
 
 function getLocalRoot(projectsDir?: string): string {
-  const dir = projectsDir || process.env.CLAUDE_PROJECTS_DIR;
-  if (dir) return dir;
+  const dir = projectsDir ?? process.env.CLAUDE_PROJECTS_DIR;
+  if (dir != null && dir !== "") return dir;
 
-  if (!process.env.HOME) {
+  if (process.env.HOME == null || process.env.HOME === "") {
     throw new Error("Cannot locate projects directory: set CLAUDE_PROJECTS_DIR or HOME");
   }
   return path.join(process.env.HOME, ".claude", "projects");
 }
 
 export function getImportsDir(importsDir?: string): string {
-  const dir = importsDir || process.env.CLAUDE_SESSION_IMPORTS_DIR;
-  if (dir) return dir;
+  const dir = importsDir ?? process.env.CLAUDE_SESSION_IMPORTS_DIR;
+  if (dir != null && dir !== "") return dir;
 
-  if (!process.env.HOME) {
+  if (process.env.HOME == null || process.env.HOME === "") {
     throw new Error("Cannot locate imports directory: set CLAUDE_SESSION_IMPORTS_DIR or HOME");
   }
   return path.join(process.env.HOME, ".claude", "session-imports");
@@ -109,7 +109,8 @@ export function importRoot(label: string, importsDir?: string): string {
 // data/<plugin>-<marketplace>/. The env var remains as an override (tests,
 // hooks, dev checkouts).
 export function getDataDir(): string {
-  if (process.env.CLAUDE_PLUGIN_DATA) return process.env.CLAUDE_PLUGIN_DATA;
+  if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "")
+    return process.env.CLAUDE_PLUGIN_DATA;
 
   const segments = import.meta.dirname.split(path.sep);
   const cacheIdx = segments.lastIndexOf("cache");
@@ -187,7 +188,7 @@ export async function enumerateHosts(
     hosts.push({
       host: imported.label,
       root: path.join(imported.root, "projects"),
-      policy: imported.manifest.policy ?? {},
+      policy: imported.manifest.policy,
     });
   }
 
@@ -263,7 +264,7 @@ async function migrateIfNeeded(db: Database): Promise<void> {
     : 0;
   // A pre-host schema (missing data/host) or an older ingestion version both mean
   // the cache predates the current import logic; drop it so the next run rebuilds.
-  if (row?.has_data && row?.has_host && version >= INDEX_VERSION) return;
+  if (row?.has_data && row.has_host && version >= INDEX_VERSION) return;
   await dropCache(db);
 }
 

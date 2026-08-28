@@ -60,7 +60,7 @@ export function compileStemmedWordlist(content: string): (text: string) => Hits 
     for (const word of words) {
       if (stems.has(stemmer(word.toLowerCase()))) {
         count++;
-        if (!sample) sample = word;
+        if (sample === "") sample = word;
       }
     }
     return { count, sample };
@@ -131,7 +131,7 @@ export function stemmedPhraseHits(text: string, phrases: StemmedPhrase[]): Hits 
     const occurrences = countSubsequence(tokens, phrase.stems);
     if (occurrences === 0) continue;
     count += occurrences;
-    if (!sample) sample = phrase.original;
+    if (sample === "") sample = phrase.original;
   }
   return { count, sample };
 }

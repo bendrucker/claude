@@ -12,7 +12,7 @@ export type HookInput = z.infer<typeof HookInput>;
 
 export function processInput(input: HookInput): SyncHookJSONOutput | null {
   const command = input.tool_input.command;
-  if (!command || !command.includes("glab")) return null;
+  if (command == null || command === "" || !command.includes("glab")) return null;
 
   const response = JSON.stringify(input.tool_response ?? "");
   if (!response.includes("invalid_grant")) return null;

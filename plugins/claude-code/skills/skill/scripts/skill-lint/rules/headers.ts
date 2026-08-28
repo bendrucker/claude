@@ -17,7 +17,7 @@ function frontmatterOffset(content: SkillContent): number {
 
 function closes(line: string, fence: Fence): boolean {
   const match = line.match(FENCE_CLOSE);
-  if (!match?.[1]) return false;
+  if (match?.[1] == null || match[1] === "") return false;
   const marker = match[1];
   return marker[0] === fence.marker && marker.length >= fence.length;
 }
@@ -37,7 +37,7 @@ export const preferHeaders: Rule = {
       }
 
       const open = line.match(FENCE_OPEN);
-      if (open?.[1]) {
+      if (open?.[1] != null && open[1] !== "") {
         fence = { marker: open[1][0] ?? "", length: open[1].length };
         return;
       }

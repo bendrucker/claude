@@ -2,6 +2,7 @@ import { describe, expect, it, test } from "bun:test";
 import {
   type Comment,
   detectRole,
+  resolveRole,
   filterThreads,
   findLastReviewDate,
   formatThreads,
@@ -70,6 +71,18 @@ describe("detectRole", () => {
     ["DouweM", "bendrucker", "reviewer"],
   ])("detectRole(viewer=%p, author=%p) -> %p", (viewer, author, expected) => {
     expect(detectRole(viewer, author)).toBe(expected);
+  });
+});
+
+describe("resolveRole", () => {
+  test.each<[string | undefined, Role | null]>([
+    ["author", "author"],
+    ["reviewer", "reviewer"],
+    [undefined, "reviewer"],
+    ["", "reviewer"],
+    ["bogus", null],
+  ])("resolveRole(flag=%p) -> %p", (flag, expected) => {
+    expect(resolveRole(flag, "DouweM", "bendrucker")).toBe(expected);
   });
 });
 

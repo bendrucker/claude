@@ -22,7 +22,7 @@ async function getPluginDirs(): Promise<string[]> {
   }
 
   const plugins = await loadPlugins();
-  return plugins.flatMap((p) => (p.dir ? [p.dir] : []));
+  return plugins.flatMap((p) => (p.dir != null && p.dir !== "" ? [p.dir] : []));
 }
 
 async function checkPlugin(pluginDir: string): Promise<string[]> {

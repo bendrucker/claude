@@ -27,16 +27,16 @@ export function gitContext(): string {
 
   const sections = [`Branch: ${branch}`];
 
-  if (status) {
+  if (status !== "") {
     sections.push(`Status:\n${status}`);
   }
 
-  if (log) {
+  if (log !== "") {
     sections.push(`Log:\n${log}`);
   }
 
   const d = diff();
-  if (d) {
+  if (d !== "") {
     sections.push(`Diff:\n${d}`);
   }
 

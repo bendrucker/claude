@@ -143,13 +143,13 @@ type OxCommand = { bin: string; prefix: string[] };
 // its directory with the `bin` path the manifest itself declares.
 async function localBin(pkg: string, binName: string): Promise<string | null> {
   const manifestPath = await binManifest(pkg);
-  if (!manifestPath) {
+  if (manifestPath == null) {
     return null;
   }
   try {
     const manifest = decode(BinManifest, await Bun.file(manifestPath).json(), manifestPath);
     const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[binName];
-    return bin ? join(dirname(manifestPath), bin) : null;
+    return bin != null && bin !== "" ? join(dirname(manifestPath), bin) : null;
   } catch {
     return null;
   }
@@ -165,7 +165,7 @@ async function binManifest(pkg: string): Promise<string | null> {
     return fileURLToPath(import.meta.resolve(`${pkg}/package.json`));
   } catch {
     const checkout = await mainCheckout();
-    if (!checkout) {
+    if (checkout == null) {
       return null;
     }
     const fallback = join(checkout, "node_modules", pkg, "package.json");
@@ -187,7 +187,7 @@ function mainCheckout(): Promise<string | null> {
         { cwd: import.meta.dirname },
       );
       const gitDir = stdout.trim();
-      return gitDir ? dirname(gitDir) : null;
+      return gitDir !== "" ? dirname(gitDir) : null;
     } catch {
       return null;
     }
@@ -205,12 +205,13 @@ async function resolveCommand(pkg: string, binName: string): Promise<OxCommand |
     return cached;
   }
   const local = await localBin(pkg, binName);
-  const global = local ? null : Bun.which(binName);
-  const resolved = local
-    ? { bin: "bun", prefix: [local] }
-    : global
-      ? { bin: global, prefix: [] }
-      : null;
+  const global = local == null ? Bun.which(binName) : null;
+  const resolved =
+    local != null
+      ? { bin: "bun", prefix: [local] }
+      : global != null
+        ? { bin: global, prefix: [] }
+        : null;
   commandCache.set(pkg, resolved);
   return resolved;
 }
@@ -229,7 +230,11 @@ async function runOx(
   cwd: string | undefined,
 ): Promise<string | null> {
   try {
-    await execFileAsync(command.bin, [...command.prefix, ...args], cwd ? { cwd } : undefined);
+    await execFileAsync(
+      command.bin,
+      [...command.prefix, ...args],
+      cwd != null && cwd !== "" ? { cwd } : undefined,
+    );
     return null;
   } catch (error) {
     return commandOutput(error);
@@ -245,7 +250,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   const candidates = new Set<string>();
 
   for (const line of content.split("\n")) {
-    if (!line.trim()) continue;
+    if (line.trim() === "") continue;
 
     try {
       const entry = decodeJson(TranscriptEntry, line, transcriptPath);
@@ -257,7 +262,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
         if (block.name !== "Edit" && block.name !== "Write") continue;
 
         const filePath = block.input?.file_path;
-        if (filePath && isOxFile(filePath)) {
+        if (filePath != null && filePath !== "" && isOxFile(filePath)) {
           candidates.add(filePath);
         }
       }
@@ -289,7 +294,8 @@ async function oxWorkingTree(filePath: string): Promise<string | undefined> {
   let toplevel: string | undefined;
   try {
     const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd: dir });
-    toplevel = stdout.trim() || undefined;
+    const root = stdout.trim();
+    toplevel = root !== "" ? root : undefined;
   } catch {
     toplevel = undefined;
   }
@@ -323,7 +329,7 @@ function commandOutput(error: unknown): string | null {
     .map((stream) => stream?.trim())
     .filter(Boolean)
     .join("\n");
-  return output || null;
+  return output !== "" ? output : null;
 }
 
 // --no-error-on-unmatched-pattern keeps oxlint/oxfmt from exiting non-zero on
@@ -349,7 +355,7 @@ async function runOxlintPass(
     return runOx(command, args, cwd);
   }
   const output = await runOx(command, ["--type-aware", ...args], cwd);
-  return output && MISSING_CHECKER.test(output) ? runOx(command, args, cwd) : output;
+  return output != null && MISSING_CHECKER.test(output) ? runOx(command, args, cwd) : output;
 }
 
 export async function runOxlintAgent(filePath: string): Promise<string | null> {
@@ -372,8 +378,8 @@ async function runOxlintAgentBatch(files: string[]): Promise<string | null> {
       runOx(command, [...LINT_ARGS, ...groupFiles], cwd),
     ),
   );
-  const combined = outputs.filter((output): output is string => Boolean(output)).join("\n");
-  return combined || null;
+  const combined = outputs.filter((output): output is string => output != null).join("\n");
+  return combined !== "" ? combined : null;
 }
 
 // oxfmt --write exits non-zero when a file has a syntax error it cannot
@@ -440,7 +446,7 @@ async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {
         return { output: null, needsInstall: true };
       }
       const output = await runOx(command, TYPE_CHECK_ARGS, cwd);
-      return output && MISSING_CHECKER.test(output)
+      return output != null && MISSING_CHECKER.test(output)
         ? { output: null, needsInstall: true }
         : { output, needsInstall: false };
     }),
@@ -448,10 +454,10 @@ async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {
 
   const combined = results
     .map((result) => result.output)
-    .filter((output): output is string => Boolean(output))
+    .filter((output): output is string => output != null)
     .join("\n");
   return {
-    output: combined || null,
+    output: combined !== "" ? combined : null,
     needsInstall: results.some((result) => result.needsInstall),
   };
 }
@@ -469,7 +475,7 @@ function formatPostToolUseOutput(filePath: string, errors: string): SyncHookJSON
 // there is no flag to narrow it, so drop the lines the scoped lint pass already
 // reported rather than showing each one twice.
 function withoutRepeats(typeOutput: string, lintOutput: string | null): string {
-  if (!lintOutput) {
+  if (lintOutput == null) {
     return typeOutput;
   }
   const reported = new Set(lintOutput.split("\n"));
@@ -481,9 +487,9 @@ function withoutRepeats(typeOutput: string, lintOutput: string | null): string {
 
 function formatSections(lintOutput: string | null, typeCheck: TypeCheckResult): string {
   const sections = [];
-  if (lintOutput) sections.push(`Lint:\n${lintOutput}`);
-  const types = typeCheck.output && withoutRepeats(typeCheck.output, lintOutput);
-  if (types) sections.push(`Types:\n${types}`);
+  if (lintOutput != null) sections.push(`Lint:\n${lintOutput}`);
+  const types = typeCheck.output != null ? withoutRepeats(typeCheck.output, lintOutput) : "";
+  if (types !== "") sections.push(`Types:\n${types}`);
   if (typeCheck.needsInstall) {
     sections.push("Types: skipped, dependencies are not installed here (`bun install`).");
   }
@@ -507,7 +513,7 @@ async function runOxGate(files: string[]): Promise<string | null> {
     runOxlintAgentBatch(files),
     runTypeCheck(files),
   ]);
-  if (!lintOutput && !typeCheck.output) {
+  if (lintOutput == null && typeCheck.output == null) {
     return null;
   }
 
@@ -523,7 +529,7 @@ export async function processPostToolUse(
   }
 
   const { file_path: filePath } = decode(FilePathInput, input.tool_input, "PostToolUse tool_input");
-  if (!filePath || !isOxFile(filePath)) {
+  if (filePath == null || filePath === "" || !isOxFile(filePath)) {
     return null;
   }
 
@@ -532,7 +538,7 @@ export async function processPostToolUse(
   }
 
   const errors = await runOxlintAgent(filePath);
-  if (!errors) {
+  if (errors == null) {
     return null;
   }
 
@@ -586,7 +592,7 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
   }
 
   const sections = await runOxGate(await parseTranscript(input.transcript_path));
-  if (!sections) {
+  if (sections == null || sections === "") {
     await clearBlocks(input.session_id);
     return null;
   }
@@ -652,7 +658,7 @@ export async function processPreToolUse(
   // It fails open on shell metacharacters, and this path can return a `block`,
   // so the command is re-read here rather than trusted from the matcher.
   const { command } = decode(BashInput, input.tool_input, "PreToolUse tool_input");
-  if (!command || !invokesGitCommit(command)) {
+  if (command == null || command === "" || !invokesGitCommit(command)) {
     return null;
   }
 
@@ -671,7 +677,7 @@ export async function processPreToolUse(
 
   const sections = await runOxGate(staged.paths);
   await restage(staged.paths);
-  if (!sections) {
+  if (sections == null || sections === "") {
     return null;
   }
   return deny(

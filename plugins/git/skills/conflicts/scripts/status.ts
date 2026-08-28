@@ -4,7 +4,7 @@ import { $ } from "bun";
 
 const files = await $`git diff --name-only --diff-filter=U`.text();
 
-if (!files.trim()) {
+if (files.trim() === "") {
   console.log("No conflicted files");
   process.exit(0);
 }

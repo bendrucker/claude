@@ -247,7 +247,7 @@ export async function mapPool<T, R>(
 }
 
 export function requireApiKey(): void {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (process.env.ANTHROPIC_API_KEY == null || process.env.ANTHROPIC_API_KEY === "") {
     throw new Error("ANTHROPIC_API_KEY is not set. The runner only works with live credentials.");
   }
 }
@@ -317,7 +317,7 @@ async function main(): Promise<void> {
   });
 
   const { armA, armB } = argv.flags;
-  if (!armA || !armB) {
+  if (armA == null || armA === "" || armB == null || armB === "") {
     console.error("Both --arm-a and --arm-b are required.\n");
     argv.showHelp();
     process.exit(1);

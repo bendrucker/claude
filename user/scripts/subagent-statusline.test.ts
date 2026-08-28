@@ -139,7 +139,7 @@ describe("extractModel", () => {
       role: "assistant",
       content: [],
     };
-    if (model) message.model = model;
+    if (model != null && model !== "") message.model = model;
     return { message };
   };
 

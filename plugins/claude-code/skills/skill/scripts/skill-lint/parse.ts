@@ -33,7 +33,7 @@ function parseFrontmatter(yamlContent: string): z.infer<typeof Frontmatter> {
 }
 
 export function countLines(text: string): number {
-  if (!text) return 0;
+  if (text === "") return 0;
   return text.split("\n").length;
 }
 

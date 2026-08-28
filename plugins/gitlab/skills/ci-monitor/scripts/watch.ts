@@ -234,7 +234,7 @@ export function parseMrUrl(url: string): {
     throw new Error(`Invalid GitLab MR URL: ${url}`);
   }
   const project = path.slice(0, markerIndex);
-  if (!project || !project.includes("/")) {
+  if (project === "" || !project.includes("/")) {
     throw new Error(`Invalid GitLab MR URL: ${url}`);
   }
   const tailPattern = new UrlPattern(":iid(/*)");
@@ -256,16 +256,16 @@ export function parseMrUrl(url: string): {
 
 export function parseProject(remoteUrl: string): string {
   const trimmed = remoteUrl.trim();
-  if (!trimmed) {
+  if (trimmed === "") {
     throw new Error("Empty remote URL");
   }
 
-  const match = trimmed.match(/^(?:ssh:\/\/[^/]+\/|[^@\s]+@[^:]+:|https?:\/\/[^/]+\/)(.+)$/);
-  if (!match?.[1]) {
+  const path = trimmed.match(/^(?:ssh:\/\/[^/]+\/|[^@\s]+@[^:]+:|https?:\/\/[^/]+\/)(.+)$/)?.at(1);
+  if (path == null || path === "") {
     throw new Error(`Could not parse remote URL: ${remoteUrl}`);
   }
 
-  const cleaned = match[1].replace(/\/$/, "").replace(/\.git$/, "");
+  const cleaned = path.replace(/\/$/, "").replace(/\.git$/, "");
   if (!cleaned.includes("/")) {
     throw new Error(`Remote URL missing group/project path: ${remoteUrl}`);
   }
@@ -416,7 +416,8 @@ function exec(command: string): ExecResult {
     const stdout = execSync(command, execOptions).toString().trim();
     return { ok: true, stdout };
   } catch (err) {
-    const stderr = err && typeof err === "object" && "stderr" in err ? streamText(err.stderr) : "";
+    const stderr =
+      typeof err === "object" && err !== null && "stderr" in err ? streamText(err.stderr) : "";
     // glab does not surface structured rate-limit metadata. Rather than
     // regexing human text we rely on the api-error counter instead.
     return { ok: false, stderr, rateLimited: false, retryAfter: "" };
@@ -524,7 +525,7 @@ function parsePipeline(parsed: unknown): { id: string; status: InternalState; sh
   const fields = PipelineEntry.safeParse(parsed);
   if (!fields.success) return null;
   const id = fields.data.id === undefined ? "" : String(fields.data.id);
-  if (!id) return null;
+  if (id === "") return null;
   return { id, status: normalizePipelineStatus(fields.data.status), sha: fields.data.sha };
 }
 
@@ -558,7 +559,7 @@ function fetchPipelineList(
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.stdout || "null");
+    parsed = JSON.parse(result.stdout !== "" ? result.stdout : "null");
   } catch (err) {
     console.error(
       `glab api returned unparseable JSON for pipelines on ${describeTarget(target)}: ${err instanceof Error ? err.message : String(err)}`,
@@ -590,7 +591,7 @@ function fetchJobs(projectEncoded: string, pipelineId: string, run: ExecFn = exe
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.stdout || "null");
+    parsed = JSON.parse(result.stdout !== "" ? result.stdout : "null");
   } catch (err) {
     console.error(
       `glab api returned unparseable JSON for jobs on pipeline ${pipelineId}: ${err instanceof Error ? err.message : String(err)}`,
@@ -723,7 +724,7 @@ function fetchPipelineById(
     };
   }
   try {
-    const pipeline = parsePipeline(JSON.parse(result.stdout || "null"));
+    const pipeline = parsePipeline(JSON.parse(result.stdout !== "" ? result.stdout : "null"));
     if (!pipeline) {
       // A successful glab call with an empty/null body for a specific pipeline
       // ID is unexpected (404s fail the exec). Surface this as a transient
@@ -811,7 +812,7 @@ function fetchInterval(projectEncoded: string, target: PipelineTarget): number {
     return DEFAULT_INTERVAL_SECONDS;
   }
   try {
-    const parsed = Entries.safeParse(JSON.parse(result.stdout || "[]"));
+    const parsed = Entries.safeParse(JSON.parse(result.stdout !== "" ? result.stdout : "[]"));
     if (parsed.success) {
       return computeInterval(pipelineDurations(parsed.data));
     }
@@ -828,7 +829,7 @@ function fetchInterval(projectEncoded: string, target: PipelineTarget): number {
 
 function detectProjectFromRemote(): string | null {
   const result = exec("git remote get-url origin");
-  if (!result.ok || !result.stdout) return null;
+  if (!result.ok || result.stdout === "") return null;
   try {
     return parseProject(result.stdout);
   } catch {
@@ -1009,18 +1010,18 @@ async function main(): Promise<void> {
   }
 
   let target: RunTarget;
-  if (mrUrl) {
+  if (mrUrl != null && mrUrl !== "") {
     target = { mode: "mr", mrUrl };
-  } else if (branch) {
+  } else if (branch != null && branch !== "") {
     const project = argv.flags.project ?? detectProjectFromRemote();
-    if (!project) {
+    if (project == null || project === "") {
       console.error("Could not infer project from git remote. Pass --project <group/project>.");
       process.exit(1);
     }
     target = { mode: "branch", project, branch };
-  } else if (pipelineId) {
+  } else if (pipelineId != null && pipelineId !== "") {
     const project = argv.flags.project ?? detectProjectFromRemote();
-    if (!project) {
+    if (project == null || project === "") {
       console.error("Could not infer project from git remote. Pass --project <group/project>.");
       process.exit(1);
     }

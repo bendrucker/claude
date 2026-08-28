@@ -27,12 +27,13 @@ async function importClosure(entry: string): Promise<string[]> {
 
   while (queue.length > 0) {
     const file = queue.pop();
-    if (!file || seen.has(file)) continue;
+    if (file == null || file === "" || seen.has(file)) continue;
     seen.add(file);
 
     const source = await Bun.file(file).text();
-    for (const [, specifier] of source.matchAll(RELATIVE_IMPORT)) {
-      if (!specifier) continue;
+    for (const match of source.matchAll(RELATIVE_IMPORT)) {
+      const specifier = match.at(1);
+      if (specifier === undefined) continue;
       const target = resolve(dirname(file), specifier);
       const path = (await Bun.file(`${target}.ts`).exists()) ? `${target}.ts` : target;
       if (path.endsWith(".ts")) queue.push(path);

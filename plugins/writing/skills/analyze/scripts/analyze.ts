@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { cli } from "cleye";
 import { corpusPath, profilePath, resolveDataDir } from "./data-dir";
@@ -192,7 +193,10 @@ async function main(): Promise<void> {
 
   const detectors: BatchDetectors = {};
   if (argv.flags.judge) {
-    if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
+    if (
+      (process.env.ANTHROPIC_API_KEY == null || process.env.ANTHROPIC_API_KEY === "") &&
+      (process.env.ANTHROPIC_AUTH_TOKEN == null || process.env.ANTHROPIC_AUTH_TOKEN === "")
+    ) {
       console.error(
         "--judge requires API credentials (ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN). Run without --judge or set one.",
       );
@@ -205,10 +209,7 @@ async function main(): Promise<void> {
   }
 
   const sessionId = process.env.CLAUDE_SESSION_ID ?? "anonymous";
-  const isolatedPath = path.join(
-    process.env.TMPDIR || "/tmp",
-    `session-analyze-${sessionId}.duckdb`,
-  );
+  const isolatedPath = path.join(tmpdir(), `session-analyze-${sessionId}.duckdb`);
   console.error(`Copying session DB to ${isolatedPath}`);
   await Bun.write(isolatedPath, Bun.file(dbPath));
 
@@ -395,7 +396,7 @@ export async function runAnalysis(
     "Computing corpus-level rate trends (action-verb opener, backtick density, template rates)",
   );
   const rateDocumentRows = deliverableRows
-    .filter((r) => r.text)
+    .filter((r) => r.text !== "")
     .map((r) => analyzeDocument(r.session_id, r.text));
   const rateTrends = aggregateTrends(rateDocumentRows);
 

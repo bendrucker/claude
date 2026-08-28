@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
@@ -14,7 +15,7 @@ let dataDir: string;
 let corpusDir: string;
 
 beforeEach(async () => {
-  tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "refresh-integration-"));
+  tmpDir = mkdtempSync(path.join(tmpdir(), "refresh-integration-"));
   dataDir = path.join(tmpDir, "data");
   corpusDir = path.join(tmpDir, "projects");
   mkdirSync(corpusDir, { recursive: true });

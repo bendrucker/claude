@@ -30,7 +30,10 @@ function firstLine(text: string): string {
  */
 function actionLabel(verdict: Verdict): string {
   if (verdict.action !== "trim") return verdict.action;
-  return verdict.trimTo || verdict.trimToLines?.length ? "trim" : "delete";
+  return (verdict.trimTo != null && verdict.trimTo !== "") ||
+    (verdict.trimToLines != null && verdict.trimToLines.length !== 0)
+    ? "trim"
+    : "delete";
 }
 
 /**
@@ -77,16 +80,16 @@ export function renderReport(items: ReportItem[], options: { fix: boolean }): st
         `  ${color.dim(`:${startLine}`)}  ${actionLabel(verdict)}  ${verdict.category}  ${conf}`,
       );
       lines.push(`      ${verdict.rationale}`);
-      if (verdict.action === "rewrite" && verdict.rewrite) {
-        if (text) lines.push(color.dim(`      old: ${firstLine(text)}`));
+      if (verdict.action === "rewrite" && verdict.rewrite != null && verdict.rewrite !== "") {
+        if (text != null && text !== "") lines.push(color.dim(`      old: ${firstLine(text)}`));
         lines.push(color.dim(`      new: ${firstLine(verdict.rewrite)}`));
       }
-      if (options.fix && verdict.suggestedFix) {
+      if (options.fix && verdict.suggestedFix != null && verdict.suggestedFix !== "") {
         lines.push(color.dim(`      fix: ${verdict.suggestedFix}`));
       }
-      if (verdict.trimTo) {
+      if (verdict.trimTo != null && verdict.trimTo !== "") {
         lines.push(color.dim(`      keep: ${firstLine(verdict.trimTo)}`));
-      } else if (verdict.trimToLines?.length) {
+      } else if (verdict.trimToLines != null && verdict.trimToLines.length !== 0) {
         lines.push(color.dim(`      keep lines: ${verdict.trimToLines.join(", ")}`));
       }
     }

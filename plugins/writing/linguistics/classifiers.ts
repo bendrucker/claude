@@ -165,7 +165,8 @@ export function hybridClassifier(tagger: Tagger): HeadingClassifier {
         const predicate = afterTokens.some(
           (token) => (token.finite && token.tag !== "AUX") || token.normal === "not",
         );
-        const preEnumerator = before[0] ? ENUMERATOR_STOPLIST.test(before[0]) : false;
+        const preEnumerator =
+          before[0] != null && before[0] !== "" ? ENUMERATOR_STOPLIST.test(before[0]) : false;
         if (before.length <= 4 && after.length >= 3 && predicate && !preEnumerator) {
           return { kind: "clause", flagged: true, evidence: ["colon-gated predicate"] };
         }

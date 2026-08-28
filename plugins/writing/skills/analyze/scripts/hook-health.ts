@@ -25,7 +25,7 @@ export type HookHealth = {
 export function parseLog(text: string): RunLogEntry[] {
   const entries: RunLogEntry[] = [];
   for (const line of text.split("\n")) {
-    if (!line.trim()) continue;
+    if (line.trim() === "") continue;
     try {
       const parsed = RunLogEntry.safeParse(JSON.parse(line));
       if (parsed.success) entries.push(parsed.data);
@@ -60,12 +60,12 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
   let lastTs = Number.NEGATIVE_INFINITY;
 
   for (const entry of entries) {
-    byOutcome[entry.outcome] = (byOutcome[entry.outcome] ?? 0) + 1;
+    byOutcome[entry.outcome] += 1;
     byTool[entry.tool] = (byTool[entry.tool] ?? 0) + 1;
     durations.push(entry.duration_ms);
     if (entry.outcome === "silent" && !entry.suppressed) silentDurations.push(entry.duration_ms);
 
-    if (entry.category) {
+    if (entry.category != null && entry.category !== "") {
       const bucket = perCategory.get(entry.category) ?? { fired: 0, suppressed: 0 };
       if (entry.suppressed) {
         bucket.suppressed += 1;
@@ -95,7 +95,7 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
       ...counts,
       share: injections > 0 ? counts.fired / injections : 0,
     }))
-    .toSorted((a, b) => b.fired - a.fired || b.suppressed - a.suppressed);
+    .toSorted((a, b) => (b.fired === a.fired ? b.suppressed - a.suppressed : b.fired - a.fired));
 
   return {
     total: entries.length,
@@ -237,7 +237,7 @@ async function readLog(path: string, since?: string): Promise<RunLogEntry[]> {
     if (await file.exists()) texts.push(await file.text());
   }
   let entries = parseLog(texts.join("\n"));
-  if (since) {
+  if (since != null && since !== "") {
     const cutoff = Date.parse(since);
     if (!Number.isNaN(cutoff)) {
       entries = entries.filter((entry) => Date.parse(entry.ts) >= cutoff);
@@ -270,7 +270,7 @@ if (import.meta.main) {
   });
 
   const path = argv.flags.log ?? resolveLogPath();
-  if (!path) {
+  if (path == null || path === "") {
     console.error("Logging is disabled (WRITING_HOOKS_LOG). Pass --log <path>.");
     process.exit(1);
   }

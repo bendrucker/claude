@@ -18,7 +18,7 @@ function run(command: string): Record<string, unknown>[] {
   return Entries.parse(JSON.parse(execFileSync("swift", [script, command], opts).toString()));
 }
 
-const ci = !!process.env.CI;
+const ci = !(process.env.CI == null || process.env.CI === "");
 
 describe.skipIf(ci)("discover.swift actions", () => {
   let actions: Record<string, unknown>[];

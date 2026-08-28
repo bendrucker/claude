@@ -20,7 +20,7 @@ export function isBot(author: Author | null | undefined): boolean {
 // comments are ignored. Absent file or unset env yields an empty set.
 export async function loadExtraReviewers(): Promise<Set<string>> {
   const dataDir = process.env.CLAUDE_PLUGIN_DATA;
-  if (!dataDir) return new Set();
+  if (dataDir == null || dataDir === "") return new Set();
   const file = Bun.file(join(dataDir, "reviewers.txt"));
   if (!(await file.exists())) return new Set();
   return parseReviewers(await file.text());

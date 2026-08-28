@@ -59,6 +59,15 @@ function text(value: unknown): string {
   return "";
 }
 
+/** The first of several parser values that normalizes to a non-empty string. */
+function firstText(...values: unknown[]): string {
+  for (const value of values) {
+    const normalized = text(value);
+    if (normalized !== "") return normalized;
+  }
+  return "";
+}
+
 function decodeEntities(input: string): string {
   return input
     .replace(/&nbsp;/g, " ")
@@ -105,8 +114,8 @@ function parseAtom(feed: Element): Post[] {
   return Elements.parse(feed.entry).map((entry) => ({
     title: stripHtml(text(entry.title)),
     url: atomLink(entry.link),
-    date: normalizeDate(text(entry.published) || text(entry.updated)),
-    excerpt: excerpt(text(entry.summary) || text(entry.content)),
+    date: normalizeDate(firstText(entry.published, entry.updated)),
+    excerpt: excerpt(firstText(entry.summary, entry.content)),
   }));
 }
 
@@ -114,13 +123,13 @@ function parseRss(channel: Element): Post[] {
   return Elements.parse(channel.item).map((item) => ({
     title: stripHtml(text(item.title)),
     url: text(item.link),
-    date: normalizeDate(text(item.pubDate) || text(item["dc:date"])),
-    excerpt: excerpt(text(item.description) || text(item["content:encoded"])),
+    date: normalizeDate(firstText(item.pubDate, item["dc:date"])),
+    excerpt: excerpt(firstText(item.description, item["content:encoded"])),
   }));
 }
 
 function normalizeDate(raw: string): string | null {
-  if (!raw) return null;
+  if (raw === "") return null;
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
@@ -153,7 +162,7 @@ function matchesTopic(post: Post, topicHint: string): boolean {
 }
 
 function withinDays(post: Post, days: number, now: number): boolean {
-  if (!post.date) return false;
+  if (post.date == null) return false;
   const age = now - new Date(post.date).getTime();
   return age >= 0 && age <= days * 24 * 60 * 60 * 1000;
 }
@@ -166,7 +175,7 @@ export async function fetchSource(source: Source, days: number, now: number): Pr
     posts: [],
   };
 
-  if (!source.feedUrl) return base;
+  if (source.feedUrl == null || source.feedUrl === "") return base;
 
   try {
     const response = await fetch(source.feedUrl, {
@@ -179,7 +188,10 @@ export async function fetchSource(source: Source, days: number, now: number): Pr
     const xml = await response.text();
     const posts = parseFeed(xml)
       .filter((post) => withinDays(post, days, now))
-      .filter((post) => (source.topicHint ? matchesTopic(post, source.topicHint) : true));
+      .filter((post) => {
+        const hint = source.topicHint;
+        return hint == null || hint === "" || matchesTopic(post, hint);
+      });
     return { ...base, posts };
   } catch (error) {
     return { ...base, error: error instanceof Error ? error.message : String(error) };

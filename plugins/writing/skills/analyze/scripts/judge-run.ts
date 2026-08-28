@@ -127,7 +127,10 @@ export function scoreHeadingBaseline(
 }
 
 function requireApiKey(): void {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
+  if (
+    (process.env.ANTHROPIC_API_KEY == null || process.env.ANTHROPIC_API_KEY === "") &&
+    (process.env.ANTHROPIC_AUTH_TOKEN == null || process.env.ANTHROPIC_AUTH_TOKEN === "")
+  ) {
     console.error(
       "Neither ANTHROPIC_API_KEY nor ANTHROPIC_AUTH_TOKEN is set. The judge runs only with live API credentials.",
     );
@@ -204,7 +207,7 @@ async function gateMain(model: string): Promise<void> {
     console.log(`FAIL ${result.id}`);
     for (const mismatch of result.mismatches) {
       console.log(
-        `  ${mismatch.criterion}: expected ${mismatch.expected}, got ${mismatch.actual}${mismatch.span ? ` (span: "${mismatch.span}")` : ""}`,
+        `  ${mismatch.criterion}: expected ${mismatch.expected}, got ${mismatch.actual}${mismatch.span != null && mismatch.span !== "" ? ` (span: "${mismatch.span}")` : ""}`,
       );
     }
   }

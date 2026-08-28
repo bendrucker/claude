@@ -125,7 +125,7 @@ export function renderPlist(descriptor: Descriptor, group: string): string {
   if (descriptor.mode !== "headless") {
     throw new Error(`renderPlist only supports mode "headless", got "${descriptor.mode}"`);
   }
-  if (!descriptor.workdir) {
+  if (descriptor.workdir == null || descriptor.workdir === "") {
     throw new Error(`descriptor "${descriptor.label}" is missing "workdir"`);
   }
 
@@ -147,7 +147,7 @@ export function renderPlist(descriptor: Descriptor, group: string): string {
   }
 
   const intervalKeys: string[] = [];
-  if (descriptor.schedule.weekday) {
+  if (descriptor.schedule.weekday != null && descriptor.schedule.weekday !== "") {
     const weekday = WEEKDAYS[descriptor.schedule.weekday];
     if (weekday === undefined) {
       throw new Error(
@@ -211,7 +211,10 @@ async function listInstalledLabels(): Promise<string[]> {
   const labels: string[] = [];
   for await (const file of glob.scan({ cwd: LAUNCH_AGENTS_DIR })) {
     const match = file.match(pattern);
-    if (match?.[1] && match[2]) labels.push(shortLabel(match[1], match[2]));
+    const unit = match?.at(1);
+    const value = match?.at(2);
+    if (unit != null && unit !== "" && value != null && value !== "")
+      labels.push(shortLabel(unit, value));
   }
   return labels;
 }
@@ -403,7 +406,7 @@ function runCommand(labelArg: string): void {
     stdout: "inherit",
     stderr: "inherit",
   });
-  process.exit(result.exitCode ?? 1);
+  process.exit(result.exitCode);
 }
 
 if (import.meta.main) {

@@ -33,9 +33,9 @@ for (const item of labeled) {
   } else tn++;
 }
 
-const precision = tp / (tp + fp) || 0;
-const recall = tp / (tp + fn) || 0;
-const f1 = (2 * precision * recall) / (precision + recall) || 0;
+const precision = tp + fp === 0 ? 0 : tp / (tp + fp);
+const recall = tp + fn === 0 ? 0 : tp / (tp + fn);
+const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
 const accuracy = (tp + tn) / labeled.length;
 
 console.log(`Labeled items: ${labeled.length}`);
@@ -66,6 +66,6 @@ console.log(`FALSE NEGATIVES (bad items missed, no lexical tell) — ${falseNega
 for (const fnItem of falseNegatives) {
   console.log(`  "${fnItem.text}"`);
   console.log(
-    `      signals fired: ${fnItem.signals.length ? fnItem.signals.join(", ") : "(none)"}`,
+    `      signals fired: ${fnItem.signals.length !== 0 ? fnItem.signals.join(", ") : "(none)"}`,
   );
 }

@@ -4,7 +4,7 @@ import { $ } from "bun";
 import { getDefaultBranch } from "../../../scripts/default-branch";
 
 const defaultBranch = await getDefaultBranch();
-if (!defaultBranch) {
+if (defaultBranch == null || defaultBranch === "") {
   console.log("Could not determine default branch");
   process.exit(0);
 }
@@ -16,7 +16,7 @@ await $`git fetch origin ${defaultBranch}`.quiet().nothrow();
 const mergeBase = (await $`git merge-base HEAD ${remote}`.quiet().nothrow()).text().trim();
 const upstreamTip = (await $`git rev-parse ${remote}`.quiet().nothrow()).text().trim();
 
-if (!mergeBase || !upstreamTip) {
+if (mergeBase === "" || upstreamTip === "") {
   console.log("Could not determine divergence");
   process.exit(0);
 }

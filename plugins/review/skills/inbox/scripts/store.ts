@@ -24,7 +24,7 @@ const LegacyState = z.object({ reviews: z.array(z.unknown()) });
 
 function resolveDataDir(dataDir?: string): string {
   const base = dataDir ?? process.env.CLAUDE_PLUGIN_DATA;
-  if (!base) {
+  if (base == null || base === "") {
     throw new Error("dataDir is required (or set CLAUDE_PLUGIN_DATA)");
   }
   return base;

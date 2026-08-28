@@ -180,12 +180,17 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
   // the overwhelming majority bad. Flag them, but require a real verb/object tail so a bare "How It
   // Works" idiom still gets caught (it is also bad here) while not over-firing on noun labels.
   const firstStem = lower[0]?.replace(/'s$/, "");
-  if (firstStem && INTERROGATIVE_OPENERS.has(firstStem) && lower.length >= 2) {
+  if (
+    firstStem != null &&
+    firstStem !== "" &&
+    INTERROGATIVE_OPENERS.has(firstStem) &&
+    lower.length >= 2
+  ) {
     signals.push(`interrogative opener "${firstStem}"`);
   }
 
   const predicate = lower.find((w) => PREDICATE_VERBS.has(w));
-  if (predicate) signals.push(`predicate verb "${predicate}"`);
+  if (predicate != null && predicate !== "") signals.push(`predicate verb "${predicate}"`);
 
   if (toks.length >= 3 && lower.some((w) => RELATIVE_PRONOUNS.has(w))) {
     signals.push("relative clause");
@@ -200,7 +205,10 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
   // reviewer"); the first word is weighted separately because some good labels open lowercase by
   // accident.
   const lowercaseContent = toks.slice(1).filter((t) => isContentWord(t) && /^[a-z]/.test(t));
-  const firstLower = toks[0] && isContentWord(toks[0]) && /^[a-z]/.test(toks[0]) ? [toks[0]] : [];
+  const firstLower =
+    toks[0] != null && toks[0] !== "" && isContentWord(toks[0]) && /^[a-z]/.test(toks[0])
+      ? [toks[0]]
+      : [];
   const lowered = [...firstLower, ...lowercaseContent];
   if (lowercaseContent.length >= 1 || lowered.length >= 2) {
     signals.push(`sentence case (${lowered.length} lowercase content words)`);

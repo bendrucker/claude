@@ -7,7 +7,9 @@ import { z } from "zod";
 const base = {
   session_id: z.string().catch(""),
   transcript_path: z.string().catch(""),
-  cwd: z.string().catch(""),
+  // The SDK types `cwd` as required, so a malformed input falls back to the
+  // hook process's own directory rather than an unusable empty path.
+  cwd: z.string().catch(() => process.cwd()),
   tool_name: z.string().catch(""),
   tool_input: z.unknown().catch(undefined),
   tool_use_id: z.string().catch(""),

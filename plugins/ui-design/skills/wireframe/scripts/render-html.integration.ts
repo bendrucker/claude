@@ -18,7 +18,7 @@ describe("render-html", () => {
   });
 
   afterAll(async () => {
-    await browser?.close();
+    await browser.close();
     await rm(tmpDir, { recursive: true, force: true });
   });
 

@@ -7,7 +7,10 @@ import { mergeDocuments, parseCorpus, serializeCorpus, type VoiceDocument } from
 // inside the (...) group on the single-line delimiter), and body lines never
 // open with "=" so none masquerade as a delimiter after trimming.
 const voiceDocument = fc.record<VoiceDocument>({
-  source: fc.string({ minLength: 1 }).map((s) => s.replace(/\s/g, "") || "x"),
+  source: fc.string({ minLength: 1 }).map((s) => {
+    const stripped = s.replace(/\s/g, "");
+    return stripped !== "" ? stripped : "x";
+  }),
   meta: fc.string().map((s) => s.replace(/[)\r\n]/g, "")),
   body: fc
     .array(fc.string().map((s) => s.replace(/[\r\n]/g, " ").replace(/^[\s=]+/, "")))

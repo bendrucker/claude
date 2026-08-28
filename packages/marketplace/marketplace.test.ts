@@ -105,9 +105,9 @@ describe("loadPlugins", () => {
   test("set differences the check scripts depend on", async () => {
     const plugins = await loadPlugins({ root });
     // check-marketplace: on disk but no local listing
-    expect(plugins.filter((p) => p.dir && !p.listing?.local).map((p) => p.name)).toEqual([
-      "orphan",
-    ]);
+    expect(
+      plugins.filter((p) => p.dir !== undefined && p.listing?.local !== true).map((p) => p.name),
+    ).toEqual(["orphan"]);
     // check-enabled-plugins: listed but not enabled
     expect(plugins.filter((p) => p.listing && !p.enabled).map((p) => p.name)).toEqual([
       "beta",

@@ -23,7 +23,7 @@ const TEMPLATE_PATHS: Record<Provider, string[]> = {
 };
 
 export async function findTemplate(provider: Provider, repoRoot: string): Promise<string | null> {
-  const paths = TEMPLATE_PATHS[provider] ?? [];
+  const paths = TEMPLATE_PATHS[provider];
   for (const p of paths) {
     const full = join(repoRoot, p);
     const file = Bun.file(full);
@@ -45,7 +45,7 @@ if (import.meta.main) {
   const repoRoot = getRepoRoot();
   const provider = Provider.safeParse(process.argv[2]).data ?? "github";
   const template = await findTemplate(provider, repoRoot);
-  if (template) {
+  if (template != null && template !== "") {
     process.stdout.write(markdown.ansi(template));
   }
 }

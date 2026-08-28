@@ -44,7 +44,7 @@ export function auditStructuralPatterns(
     const sessions = new Set<string>();
 
     for (const row of assistantRows) {
-      if (!row.text) continue;
+      if (row.text == null || row.text === "") continue;
       const stripped = stripCode(row.text);
       const hits = countHits(stripped, sp.pattern);
       if (hits > 0) {
@@ -57,7 +57,7 @@ export function auditStructuralPatterns(
     let userHits = 0;
     let userRowCount = 0;
     for (const row of userRows) {
-      if (!row.text) continue;
+      if (row.text == null || row.text === "") continue;
       const stripped = stripCode(row.text);
       const hits = countHits(stripped, sp.pattern);
       if (hits > 0) {

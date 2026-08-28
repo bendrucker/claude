@@ -38,7 +38,7 @@ export async function processInput(
   input: PostToolUseHookInput,
 ): Promise<SyncHookJSONOutput | null> {
   const filePath = filePathOf(input.tool_input);
-  if (!filePath) return null;
+  if (filePath == null || filePath === "") return null;
   if (isMemoryPath(filePath)) return null;
 
   const hadNewline = await getState("newline", filePath);
@@ -46,7 +46,7 @@ export async function processInput(
 
   await clearState("newline", filePath);
 
-  if (message) {
+  if (message != null && message !== "") {
     return {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",

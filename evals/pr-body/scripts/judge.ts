@@ -116,7 +116,10 @@ export function buildPairs(scenarios: Scenario[], rows: GenerationRow[]): Pair[]
     }
     pairs.push({ scenario, seed: Number(rawSeed), rows: { a: entry.a, b: entry.b } });
   }
-  return pairs.toSorted((x, y) => x.scenario.id.localeCompare(y.scenario.id) || x.seed - y.seed);
+  return pairs.toSorted((x, y) => {
+    const byScenario = x.scenario.id.localeCompare(y.scenario.id);
+    return byScenario !== 0 ? byScenario : x.seed - y.seed;
+  });
 }
 
 /** Randomizes which arm occupies which slot, so the judge cannot infer the arm from position. */

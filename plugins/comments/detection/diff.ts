@@ -47,18 +47,18 @@ export interface DiffOptions {
 }
 
 async function captureDiff(options: DiffOptions): Promise<string> {
-  if (options.mr) {
+  if (options.mr != null && options.mr !== "") {
     return (await $`glab mr diff ${options.mr}`.quiet().nothrow()).text();
   }
-  if (options.base) {
+  if (options.base != null && options.base !== "") {
     const mergeBase = (await $`git merge-base HEAD ${options.base}`.quiet().nothrow())
       .text()
       .trim();
-    const ref = mergeBase || options.base;
+    const ref = mergeBase !== "" ? mergeBase : options.base;
     return (await $`git diff ${ref}..HEAD`.quiet().nothrow()).text();
   }
   const head = (await $`git diff HEAD`.quiet().nothrow()).text();
-  if (head.trim()) return head;
+  if (head.trim() !== "") return head;
   return (await $`git diff --cached`.quiet().nothrow()).text();
 }
 

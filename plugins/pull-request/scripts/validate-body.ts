@@ -70,7 +70,7 @@ export function hasReflexiveScaffold(body: string): boolean {
 export function hasFileTourBullets(body: string): boolean {
   for (const match of body.matchAll(BOLD_LABEL_BULLET_PATTERN)) {
     const label = match[1];
-    if (label && looksLikeFilePath(label)) return true;
+    if (label != null && label !== "" && looksLikeFilePath(label)) return true;
   }
   return false;
 }
@@ -224,8 +224,8 @@ export function parseGhLogin(hostsYaml: string): string | null {
       continue;
     }
     if (!inGitHub) continue;
-    const match = line.match(/^\s+user:\s*(.+?)\s*$/);
-    if (match?.[1]) return match[1].replace(/^["']|["']$/g, "");
+    const user = line.match(/^\s+user:\s*(.+?)\s*$/)?.[1];
+    if (user != null && user !== "") return user.replace(/^["']|["']$/g, "");
   }
   return null;
 }
@@ -338,7 +338,7 @@ function unescapeDoubleQuoted(text: string): string {
 
 function expandTmpdir(path: string): string {
   const tmpdir = process.env.TMPDIR?.replace(/\/$/, "");
-  if (!tmpdir) return path;
+  if (tmpdir == null || tmpdir === "") return path;
   return path.replace(/\$\{TMPDIR\}|\$TMPDIR/g, tmpdir);
 }
 
@@ -454,7 +454,7 @@ function parseInlineValue(raw: string): BodySpec {
 
   for (const match of inner.matchAll(SUBSTITUTION_PATTERN)) {
     const source = match[0];
-    const index = match.index ?? 0;
+    const index = match.index;
     const literal = pushLiteral(inner.slice(cursor, index));
     if (literal) return literal;
     const substituted = source.startsWith("`") ? source.slice(1, -1) : source.slice(2, -1);
@@ -472,18 +472,18 @@ function parseInlineValue(raw: string): BodySpec {
 
 export function extractBodySpec(command: string): BodySpec {
   const flags = bodyFlags(command);
-  const fileMatch = command.match(flagValuePattern(flags.file));
-  if (fileMatch?.[1]) {
-    const path = unquote(fileMatch[1]);
+  const fileValue = command.match(flagValuePattern(flags.file))?.[1];
+  if (fileValue != null && fileValue !== "") {
+    const path = unquote(fileValue);
     if (path === "-") {
       return { kind: "unreadable", detail: "a body piped in on standard input (`-`)" };
     }
-    const part = filePart(fileMatch[1]);
+    const part = filePart(fileValue);
     if (part === null) return unreadableExpansion(path);
     return { kind: "parts", parts: [part] };
   }
-  const inlineMatch = command.match(flagValuePattern(flags.inline));
-  if (inlineMatch?.[1]) return parseInlineValue(inlineMatch[1]);
+  const inlineValue = command.match(flagValuePattern(flags.inline))?.[1];
+  if (inlineValue != null && inlineValue !== "") return parseInlineValue(inlineValue);
   return { kind: "none" };
 }
 
@@ -532,9 +532,9 @@ export function extractTitle(command: string): string | null {
   const scope = (start === -1 ? command : command.slice(start))
     .replace(flagValuePattern(flags.file, true), " ")
     .replace(flagValuePattern(flags.inline, true), " ");
-  const match = scope.match(/(?:--title|(?<![\w-])-t)[=\s]("(?:[^"\\]|\\.)*"|'[^']*'|[^\s]+)/);
-  if (!match?.[1]) return null;
-  return unescapeDoubleQuoted(unquote(match[1]));
+  const value = scope.match(/(?:--title|(?<![\w-])-t)[=\s]("(?:[^"\\]|\\.)*"|'[^']*'|[^\s]+)/)?.[1];
+  if (value == null || value === "") return null;
+  return unescapeDoubleQuoted(unquote(value));
 }
 
 function bullets(reasons: string[]): string {

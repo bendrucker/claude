@@ -41,18 +41,19 @@ function stripQuotes(token: string): string {
 
 function extractBodyFilePath(command: string): string | null {
   const match = command.match(BODY_FILE_PATTERN);
-  return match?.[1] ? stripQuotes(match[1]) : null;
+  const captured = match?.at(1);
+  return captured != null && captured !== "" ? stripQuotes(captured) : null;
 }
 
 function extractFieldFilePaths(command: string): string[] {
   const paths: string[] = [];
   for (const match of command.matchAll(FIELD_FILE_PATTERN)) {
     const path = stripQuotes(match[2] ?? "");
-    if (path && path !== "-") paths.push(path);
+    if (path !== "" && path !== "-") paths.push(path);
   }
   for (const match of command.matchAll(GIT_MESSAGE_FILE_PATTERN)) {
     const path = stripQuotes(match[1] ?? "");
-    if (path && path !== "-") paths.push(path);
+    if (path !== "" && path !== "-") paths.push(path);
   }
   return paths;
 }
@@ -83,7 +84,7 @@ async function collectFileOpPair(
 
   if (toolName === "Write") {
     const content = toolInput.content;
-    if (!content) return null;
+    if (content == null || content === "") return null;
     let oldText = "";
     if (toolInput.file_path !== undefined) {
       const file = Bun.file(toolInput.file_path);
@@ -94,7 +95,7 @@ async function collectFileOpPair(
 
   if (toolName === "Edit") {
     const newString = toolInput.new_string;
-    if (!newString) return null;
+    if (newString == null || newString === "") return null;
     return { newText: newString, oldText: toolInput.old_string ?? "" };
   }
 
@@ -120,9 +121,10 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     const command = toolInput.command;
     const texts: string[] = [];
     const bodyFile = extractBodyFilePath(command);
-    const files = bodyFile
-      ? [bodyFile, ...extractFieldFilePaths(command)]
-      : extractFieldFilePaths(command);
+    const files =
+      bodyFile != null && bodyFile !== ""
+        ? [bodyFile, ...extractFieldFilePaths(command)]
+        : extractFieldFilePaths(command);
     for (const path of files) {
       if (await Bun.file(path).exists()) {
         texts.push(await Bun.file(path).text());
@@ -130,7 +132,7 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     }
     for (const flag of PROSE_FLAGS) {
       const value = extractInlineArg(command, flag);
-      if (value) texts.push(value);
+      if (value != null && value !== "") texts.push(value);
     }
     return texts;
   }
@@ -150,7 +152,7 @@ function buildFileOpReminder(
   filePath: string | undefined,
   deny: PatternMatch,
 ): string {
-  const target = filePath ? `\`${filePath}\`` : "the file";
+  const target = filePath != null && filePath !== "" ? `\`${filePath}\`` : "the file";
   if (toolName === "Write") {
     return `${deny.message} You wrote ${target} introducing this. Issue a follow-up Edit that fixes only the trope you just introduced. Do not modify unrelated parts of the file.`;
   }
@@ -178,7 +180,7 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | n
   // Prose rules target prose. In a code file the model's prose surface is its
   // comments, so scan those; strings and identifiers are program text the
   // model did not write as prose.
-  const prose = !filePath || isProseFile(filePath);
+  const prose = filePath == null || filePath === "" || isProseFile(filePath);
   const scanPair = prose
     ? pair
     : { newText: extractComments(pair.newText), oldText: extractComments(pair.oldText) };
@@ -200,7 +202,8 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | n
 
   if (!prose) {
     const splice = commentSplice(scanPair);
-    if (splice) return { output: formatContext(splice), category: "comment splice" };
+    if (splice != null && splice !== "")
+      return { output: formatContext(splice), category: "comment splice" };
   }
 
   return null;

@@ -50,7 +50,7 @@ export function target(toolInput: unknown): string {
     fields.notebook_path,
     fields.prompt,
   ]) {
-    if (value) return value;
+    if (value != null && value !== "") return value;
   }
   return JSON.stringify(toolInput);
 }
@@ -73,12 +73,12 @@ export function resolveLogPath(
   env: string | undefined = process.env.CLAUDE_AUTO_MODE_DENIAL_LOG,
 ): string | null {
   if (env !== undefined && OFF_VALUES.has(env.toLowerCase())) return null;
-  if (env && !ON_VALUES.has(env.toLowerCase())) return env;
+  if (env != null && env !== "" && !ON_VALUES.has(env.toLowerCase())) return env;
   return join(homedir(), ".claude", "auto-mode-denials.jsonl");
 }
 
 export function append(entry: DenialRecord, path: string | null = resolveLogPath()): void {
-  if (!path) return;
+  if (path == null || path === "") return;
   mkdirSync(dirname(path), { recursive: true });
   if (Bun.file(path).size > MAX_LOG_BYTES) {
     renameSync(path, `${path}.1`);

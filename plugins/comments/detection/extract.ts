@@ -126,7 +126,7 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
       theme,
       ...(state != null && { grammarState: state }),
     });
-    const scopes = next?.getScopes() ?? [];
+    const scopes = next.getScopes() ?? [];
     openAfter.push(scopes.some(isCommentScope));
     state = next;
   }
@@ -135,7 +135,7 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
 
   const comments: Comment[] = [];
   let current: Comment | null = null;
-  tokens.forEach((lineTokens, index) => {
+  for (const [index, lineTokens] of tokens.entries()) {
     const lineNo = index + 1;
     for (const token of lineTokens) {
       if (token.content.length === 0) continue;
@@ -172,7 +172,7 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
         };
       }
     }
-  });
+  }
   if (current != null) comments.push(current);
 
   const merged = coalesceLineRuns(comments);

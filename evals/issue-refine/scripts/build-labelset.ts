@@ -57,7 +57,12 @@ for (const f of files) {
   const { title, type, body } = parseIssue(await file.text());
   samples.push({
     id,
-    type: brief.type || type || "unknown",
+    type:
+      typeof brief.type === "string" && brief.type !== ""
+        ? brief.type
+        : type !== ""
+          ? type
+          : "unknown",
     size: brief.size ?? "full",
     project: brief.project ?? "synthetic",
     brief: brief.brief,
@@ -68,4 +73,4 @@ for (const f of files) {
 
 await Bun.write(argv.flags.output, JSON.stringify(samples, null, 2));
 console.log(`wrote ${samples.length} samples to ${argv.flags.output}`);
-if (missing.length) console.log(`missing output for: ${missing.join(", ")}`);
+if (missing.length !== 0) console.log(`missing output for: ${missing.join(", ")}`);

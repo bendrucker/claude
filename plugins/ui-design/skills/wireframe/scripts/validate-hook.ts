@@ -40,7 +40,7 @@ export async function processInput(
   }
 
   const filePath = FileInput.safeParse(input.tool_input).data?.file_path;
-  if (!filePath || !isSvgFile(filePath)) {
+  if (filePath == null || filePath === "" || !isSvgFile(filePath)) {
     return null;
   }
 

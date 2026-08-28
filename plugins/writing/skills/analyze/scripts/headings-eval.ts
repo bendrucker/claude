@@ -68,7 +68,7 @@ export function dedupeHeadings(
 ): HeadingRecord[] {
   const byHeading = new Map<string, { occurrences: number; sessions: Set<string> }>();
   for (const row of rows) {
-    if (!row.text) continue;
+    if (row.text == null || row.text === "") continue;
     for (const heading of extractHeadings(row.text)) {
       let record = byHeading.get(heading);
       if (!record) {
@@ -221,7 +221,7 @@ export function parseLabelsFile(content: string): LabeledHeading[] {
   for (const line of content.split("\n")) {
     if (line.startsWith("#") || line.trim().length === 0) continue;
     const [heading, label, source] = line.split("\t");
-    if (!heading || !label) continue;
+    if (heading == null || heading === "" || label == null || label === "") continue;
     const parsed = HeadingLabel.safeParse(label);
     if (!parsed.success) {
       throw new Error(`Unknown label "${label}" for heading "${heading}"`);
@@ -312,7 +312,11 @@ async function corpusFromSessionDb(
   params: { after_date: string; before_date: string; project: string | null },
 ): Promise<DeliverableRow[]> {
   const sessionId = process.env.CLAUDE_SESSION_ID ?? "anonymous";
-  const isolatedPath = path.join(process.env.TMPDIR || "/tmp", `headings-eval-${sessionId}.duckdb`);
+  const tmp = process.env.TMPDIR;
+  const isolatedPath = path.join(
+    tmp != null && tmp !== "" ? tmp : "/tmp",
+    `headings-eval-${sessionId}.duckdb`,
+  );
   console.error(`Copying session DB to ${isolatedPath}`);
   await Bun.write(isolatedPath, Bun.file(dbPath));
 
@@ -381,11 +385,11 @@ async function main(): Promise<void> {
 
   let rows: Array<{ session_id: string; text?: string }>;
   let source: string;
-  if (argv.flags.docs) {
+  if (argv.flags.docs != null && argv.flags.docs !== "") {
     const dir = path.resolve(argv.flags.docs);
     rows = await corpusFromDocs(dir);
     source = dir;
-  } else if (argv.flags.sessionDb) {
+  } else if (argv.flags.sessionDb != null && argv.flags.sessionDb !== "") {
     rows = await corpusFromSessionDb(path.resolve(argv.flags.sessionDb), {
       after_date: since,
       before_date: until,
@@ -448,7 +452,7 @@ async function main(): Promise<void> {
   }
 
   let labeled: LabeledHeading[] | undefined;
-  if (argv.flags.labels) {
+  if (argv.flags.labels != null && argv.flags.labels !== "") {
     labeled = parseLabelsFile(await Bun.file(argv.flags.labels).text());
     const randomOnly = labeled.filter((row) => row.source === "random");
     console.log(`Labeled: ${labeled.length} rows (${randomOnly.length} random)`);

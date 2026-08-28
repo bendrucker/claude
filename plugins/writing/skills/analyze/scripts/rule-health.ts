@@ -61,7 +61,7 @@ export function buildRuleHealth(input: RuleHealthInput): CurrentRuleHealth[] {
     const surface: AuditSurface = onDeliverable ? "deliverable" : "chat";
     const quote = findQuote ? findQuote(entry, surface) : null;
 
-    if (onDeliverable && deliverableAudit) {
+    if (onDeliverable) {
       return buildDeliverableHealth(entry, deliverableAudit, voiceProfile, minCount, quote);
     }
     return buildChatHealth(entry, chatAudit, minCount, quote);
@@ -79,7 +79,7 @@ function buildChatHealth(
   const baselinePerM = row?.user_per_m ?? null;
   const modelPerM = row?.assistant_per_m ?? null;
   const lift = row?.lift ?? null;
-  const noData = !row || (modelCount === 0 && (row?.user_count ?? 0) === 0);
+  const noData = !row || (modelCount === 0 && row.user_count === 0);
 
   const { status, removeReason } = verdict(modelCount, modelPerM, baselinePerM, minCount);
   return {

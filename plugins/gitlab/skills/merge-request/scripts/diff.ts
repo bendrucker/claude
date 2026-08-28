@@ -137,7 +137,7 @@ export function exitOnRejection(): void {
 }
 
 export async function readBody(file: string | undefined): Promise<string> {
-  if (file === "-" || !file) {
+  if (file === "-" || file == null || file === "") {
     return await Bun.stdin.text();
   }
   return await Bun.file(file).text();

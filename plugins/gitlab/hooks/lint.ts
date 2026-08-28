@@ -129,10 +129,10 @@ async function gitConfigPath(cwd: string, env: LintEnv): Promise<string | null> 
 
     // Worktrees and submodules use a `.git` file: `gitdir: <path>`.
     const pointer = await env.readFile(dotGit);
-    if (pointer) {
-      const match = pointer.match(/^gitdir:\s*(.+)\s*$/m);
-      if (match?.[1]) {
-        const gitDir = isAbsolute(match[1]) ? match[1] : resolve(dir, match[1]);
+    if (pointer != null && pointer !== "") {
+      const gitdir = pointer.match(/^gitdir:\s*(.+)\s*$/m)?.at(1);
+      if (gitdir != null && gitdir !== "") {
+        const gitDir = isAbsolute(gitdir) ? gitdir : resolve(dir, gitdir);
         for (const candidate of [
           join(gitDir, "config"),
           // A linked worktree's gitdir is <main>/.git/worktrees/<name>.
@@ -153,14 +153,14 @@ async function gitConfigPath(cwd: string, env: LintEnv): Promise<string | null> 
 
 export async function originHost(cwd: string, env: LintEnv): Promise<string | null> {
   const configPath = await gitConfigPath(cwd, env);
-  if (!configPath) return null;
+  if (configPath == null || configPath === "") return null;
   const config = await env.readFile(configPath);
-  if (!config) return null;
-  const section = config.match(/\[remote "origin"\]([^[]*)/);
-  if (!section?.[1]) return null;
-  const url = section[1].match(/^\s*url\s*=\s*(.+)\s*$/m);
-  if (!url?.[1]) return null;
-  return remoteHost(url[1].trim());
+  if (config == null || config === "") return null;
+  const section = config.match(/\[remote "origin"\]([^[]*)/)?.at(1);
+  if (section == null || section === "") return null;
+  const url = section.match(/^\s*url\s*=\s*(.+)\s*$/m)?.at(1);
+  if (url == null || url === "") return null;
+  return remoteHost(url.trim());
 }
 
 export async function lintGh(command: string, cwd: string, env: LintEnv): Promise<string | null> {
@@ -170,7 +170,7 @@ export async function lintGh(command: string, cwd: string, env: LintEnv): Promis
   if (!targetsOrigin) return null;
 
   const host = await originHost(cwd, env);
-  if (host && isGitLabHost(host)) {
+  if (host != null && host !== "" && isGitLabHost(host)) {
     return `This repository's origin remote is GitLab (${host}). gh cannot resolve it; use glab instead, and load gitlab:merge-request for MR workflows (or pass -R <owner>/<repo> if you really meant a GitHub repo).`;
   }
   return null;
@@ -200,16 +200,16 @@ export async function processInput(
   env: LintEnv = defaultEnv,
 ): Promise<SyncHookJSONOutput | null> {
   const command = input.tool_input.command;
-  if (!command) return null;
+  if (command == null || command === "") return null;
 
   if (command.includes("glab")) {
     const violation = lintGlab(command);
-    if (violation) return deny(violation);
+    if (violation != null && violation !== "") return deny(violation);
   }
 
   if (/(^|\s)gh\s/.test(command)) {
     const violation = await lintGh(command, input.cwd, env);
-    if (violation) return deny(violation);
+    if (violation != null && violation !== "") return deny(violation);
   }
 
   if (command.includes("glab")) {

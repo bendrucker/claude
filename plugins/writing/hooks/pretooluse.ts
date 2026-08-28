@@ -50,7 +50,7 @@ export async function dispatch(
 ): Promise<DispatchResult> {
   const start = performance.now();
   const filePath = filePathOf(input);
-  const ext = filePath ? getExtension(filePath) : "";
+  const ext = filePath != null && filePath !== "" ? getExtension(filePath) : "";
 
   const base = {
     ts: new Date(now).toISOString(),
@@ -69,8 +69,10 @@ export async function dispatch(
   });
 
   if (isPlanMode(input)) return finish(null, "silent");
-  if (filePath && isScratchPath(filePath, input.cwd)) return finish(null, "skipped-scratch");
-  if (filePath && (isPlanPath(filePath) || isMemoryPath(filePath))) return finish(null, "silent");
+  if (filePath != null && filePath !== "" && isScratchPath(filePath, input.cwd))
+    return finish(null, "skipped-scratch");
+  if (filePath != null && filePath !== "" && (isPlanPath(filePath) || isMemoryPath(filePath)))
+    return finish(null, "silent");
 
   const mode: numbering.Mode = input.tool_name === "Edit" ? "edit" : "write";
   const checkers = [

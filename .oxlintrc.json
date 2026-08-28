@@ -74,7 +74,19 @@
     "typescript/no-unsafe-call": "error",
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
-    "typescript/no-unsafe-type-assertion": "error"
+    "typescript/no-unsafe-type-assertion": "error",
+    "typescript/strict-boolean-expressions": [
+      "error",
+      {
+        "allowString": false,
+        "allowNumber": false,
+        "allowNullableString": false,
+        "allowNullableNumber": false,
+        "allowNullableObject": true,
+        "allowNullableBoolean": true
+      }
+    ],
+    "typescript/no-unnecessary-condition": ["error", { "allowConstantLoopConditions": "always" }]
   },
   "overrides": [
     {

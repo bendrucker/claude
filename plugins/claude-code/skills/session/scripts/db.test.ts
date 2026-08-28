@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
@@ -43,7 +44,7 @@ let importsDir: string;
 // the network, which can exceed the default per-test timeout on a cold CI runner.
 // Warm the shared extension cache once so the per-test LOAD reads from disk.
 beforeAll(async () => {
-  const warmDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-warm-"));
+  const warmDir = mkdtempSync(path.join(tmpdir(), "session-warm-"));
   const warm = await getDb(warmDir);
   try {
     await loadExtensions(warm);
@@ -73,7 +74,7 @@ async function reindex() {
 }
 
 beforeEach(async () => {
-  tmpDir = mkdtempSync(path.join(process.env.TMPDIR || "/tmp", "session-test-"));
+  tmpDir = mkdtempSync(path.join(tmpdir(), "session-test-"));
   importsDir = path.join(tmpDir, "imports");
   mkdirSync(importsDir, { recursive: true });
   db = await getDb(tmpDir);

@@ -34,7 +34,7 @@ const url = argv._.url;
 const { repoPath, dataDir } = argv.flags;
 const permissionModeFlag = argv.flags.permissionMode;
 
-if (!repoPath) {
+if (repoPath == null || repoPath === "") {
   console.error("--repo-path (-C) is required: local clone the review session runs in");
   process.exit(1);
 }
@@ -42,7 +42,7 @@ if (!repoPath) {
 function resolvePermissionMode(value: string | undefined): PermissionMode | undefined {
   if (value === undefined) return undefined;
   const mode = PERMISSION_MODES.find((m) => m === value);
-  if (!mode) {
+  if (mode === undefined) {
     console.error(`--permission-mode must be one of: ${PERMISSION_MODES.join(", ")}`);
     process.exit(1);
   }
@@ -74,7 +74,7 @@ if (result.exitCode !== 0) {
 }
 
 const sessionId = parseBackgroundedId(result.stdout.toString());
-if (!sessionId) {
+if (sessionId == null || sessionId === "") {
   console.error("Warning: launched but could not read the session id from claude output");
 }
 
@@ -85,7 +85,7 @@ try {
   // The session is already running but never got recorded. Stop it so the dedup
   // set and the live sessions stay consistent. Otherwise the next dispatch sees
   // an unrecorded URL and launches a duplicate review.
-  if (sessionId) {
+  if (sessionId != null && sessionId !== "") {
     Bun.spawnSync(["claude", "stop", sessionId], { stdout: "pipe", stderr: "pipe" });
   }
   throw error;

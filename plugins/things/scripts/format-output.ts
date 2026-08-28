@@ -45,7 +45,7 @@ if (argv.flags.json) {
   process.exit(0);
 }
 
-if (argv.flags.countPrefix) {
+if (argv.flags.countPrefix != null && argv.flags.countPrefix !== "") {
   console.log(`${count} ${argv.flags.countPrefix}\n`);
 }
 

@@ -490,7 +490,8 @@ export async function judgeCorpus(
       const entry = verdict[criterion.key];
       if (!stat || !entry.flagged) continue;
       stat.flagged++;
-      if (entry.span && stat.spans.length < maxSpans) stat.spans.push(entry.span);
+      if (entry.span != null && entry.span !== "" && stat.spans.length < maxSpans)
+        stat.spans.push(entry.span);
     }
   }
   return {

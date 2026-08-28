@@ -212,11 +212,11 @@ if (import.meta.main) {
   let source: string;
   let osascriptArgs: string[];
 
-  if (expression) {
+  if (expression != null && expression !== "") {
     source = expression;
     osascriptArgs = ["-l", "JavaScript", "-e", source, ...args];
   } else {
-    if (!script) {
+    if (script == null || script === "") {
       console.error("Usage: bun jxa.ts <app> <script> [args...] or bun jxa.ts <app> -e '<expr>'");
       process.exit(1);
     }

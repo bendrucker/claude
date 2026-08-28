@@ -60,7 +60,8 @@ for (const s of saves) {
 // A save_issue update carries no title; recover it from any titled save in the session.
 const titleBySession = new Map<string, string>();
 for (const s of saves)
-  if (s.title && !titleBySession.has(s.session_id)) titleBySession.set(s.session_id, s.title);
+  if (s.title != null && s.title !== "" && !titleBySession.has(s.session_id))
+    titleBySession.set(s.session_id, s.title);
 
 const project = (p: string) =>
   p

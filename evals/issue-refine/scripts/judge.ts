@@ -50,7 +50,7 @@ const argv = cli({
 
 const mappingPath = join(argv.flags.judgeDir, "mapping.json");
 
-if (argv.flags.unblind) {
+if (argv.flags.unblind != null && argv.flags.unblind !== "") {
   const mapping = await decodeFile(Mapping, mappingPath);
   const decoded = await decodeFile(Verdicts, argv.flags.unblind);
   for (const v of Array.isArray(decoded) ? decoded : decoded.verdicts) {
@@ -60,7 +60,7 @@ if (argv.flags.unblind) {
     const s1 = `${map["1"]}=${v.scores?.["1"] ?? "?"}`;
     const s2 = `${map["2"]}=${v.scores?.["2"] ?? "?"}`;
     console.log(`\n${v.brief}: judge prefers ${better.toUpperCase()}  (${s1}, ${s2})`);
-    if (v.reason) console.log(`  ${v.reason}`);
+    if (v.reason != null && v.reason !== "") console.log(`  ${v.reason}`);
   }
   process.exit(0);
 }

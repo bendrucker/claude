@@ -42,7 +42,7 @@ describe("isScratchPath", () => {
 
   test("TMPDIR contents are scratch", () => {
     const tmpDir = process.env.TMPDIR;
-    if (!tmpDir) return;
+    if (tmpDir == null || tmpDir === "") return;
     expect(isScratchPath(`${resolve(tmpDir)}/handoff.md`)).toBe(true);
   });
 });

@@ -51,10 +51,10 @@ function bySemverDesc(a: string, b: string): number {
  * bundle, so a small file there sends us to the installer's version store.
  */
 async function findBinary(): Promise<string> {
-  if (argv.flags.binary) return argv.flags.binary;
+  if (argv.flags.binary != null && argv.flags.binary !== "") return argv.flags.binary;
 
   const onPath = Bun.which("claude");
-  if (onPath && Bun.file(onPath).size > BUNDLE_MIN_BYTES) return onPath;
+  if (onPath != null && onPath !== "" && Bun.file(onPath).size > BUNDLE_MIN_BYTES) return onPath;
 
   const versions = join(homedir(), ".local", "share", "claude", "versions");
   const entries = await readdir(versions).catch(() => []);
@@ -70,7 +70,8 @@ async function binaryVersion(binary: string): Promise<string> {
   const proc = Bun.spawn([binary, "--version"], { stdout: "pipe", stderr: "ignore" });
   const out = await new Response(proc.stdout).text();
   const version = out.match(/\d+\.\d+\.\d+/)?.[0];
-  if (!version) throw new Error(`Could not read a version from \`${binary} --version\`.`);
+  if (version == null || version === "")
+    throw new Error(`Could not read a version from \`${binary} --version\`.`);
   return version;
 }
 
@@ -99,7 +100,7 @@ async function snapshotFragments(version: string): Promise<Map<string, string>> 
   for (const line of section.split("\n")) {
     if (line.startsWith("```")) {
       if (fence) {
-        if (label && !fragments.has(label)) fragments.set(label, fence.join("\n").trim());
+        if (label !== "" && !fragments.has(label)) fragments.set(label, fence.join("\n").trim());
         fence = undefined;
       } else {
         fence = [];

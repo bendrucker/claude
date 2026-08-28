@@ -37,9 +37,9 @@ for (const { label, manifest } of imported) {
   rows.push([
     label,
     manifest.imported_at,
-    (manifest.policy?.block_egress ?? true) ? "blocked" : "allowed",
+    (manifest.policy.block_egress ?? true) ? "blocked" : "allowed",
     watermarks[label] ?? "-",
-    manifest.source || "-",
+    manifest.source !== "" ? manifest.source : "-",
   ]);
 }
 
@@ -48,7 +48,7 @@ console.log(table(rows));
 if (imported.length > 0) {
   console.log("Re-sync (copy, paste, run, then re-run import.ts):\n");
   for (const { label, root, manifest } of imported) {
-    const source = manifest.source || "<source>";
+    const source = manifest.source !== "" ? manifest.source : "<source>";
     console.log(`  ${label}:`);
     console.log(`    rsync -av --update ${source} ${path.join(root, "projects")}/`);
   }

@@ -7,7 +7,8 @@ import hooks from "./hooks.json";
 const found = hooks.hooks.PreToolUse.flatMap((matcher) => matcher.hooks)
   .map((hook) => hook.command)
   .find((command) => command.includes("--clear"));
-if (!found) throw new Error("hooks.json is missing the PreToolUse --clear command");
+if (found == null || found === "")
+  throw new Error("hooks.json is missing the PreToolUse --clear command");
 const clearCommand = found;
 
 describe("PreToolUse --clear guard", () => {

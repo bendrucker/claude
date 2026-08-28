@@ -125,7 +125,8 @@ export async function reportPaneMetadata(
   sessionId: string,
   report: DialReport | null,
 ): Promise<void> {
-  if (!process.env.HERDR_PANE_ID) return;
+  const paneId = process.env.HERDR_PANE_ID;
+  if (paneId == null || paneId === "") return;
 
   const sig = reportSignature(report);
   const path = cachePath(sessionId);
@@ -147,11 +148,11 @@ function parseToken(value: string | undefined): ContextToken | null {
 if (import.meta.main) {
   const [sessionId, token, value] = process.argv.slice(2);
   const name = parseToken(token);
-  if (sessionId) {
+  if (sessionId != null && sessionId !== "") {
     const list = Bun.spawnSync(["herdr", "pane", "list"], { timeout: HERDR_TIMEOUT_MS });
     const paneId = list.success ? findPane(list.stdout.toString(), sessionId) : null;
-    if (paneId) {
-      const report = name && value ? { token: name, value } : null;
+    if (paneId != null && paneId !== "") {
+      const report = name != null && value != null && value !== "" ? { token: name, value } : null;
       Bun.spawnSync(["herdr", ...reportArgs(paneId, report)], { timeout: HERDR_TIMEOUT_MS });
     }
   }

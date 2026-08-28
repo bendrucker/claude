@@ -21,7 +21,7 @@ export function checkBoldAsHeading(content: string): string | null {
   let result: string | null = null;
 
   visit(ast, "paragraph", (node: Paragraph) => {
-    if (result) return;
+    if (result != null && result !== "") return;
 
     const first = node.children[0];
     if (first?.type !== "strong") return;
@@ -44,7 +44,7 @@ export function checkSentenceHeading(content: string): string | null {
   let result: string | null = null;
 
   visit(ast, "heading", (node: Heading) => {
-    if (result) return;
+    if (result != null && result !== "") return;
 
     const allCode = node.children.every((child) => child.type === "inlineCode");
     if (allCode) return;
@@ -73,7 +73,7 @@ export function check(input: PreToolUseHookInput): HookResult | null {
   if (!isMarkdownFile(ext)) return null;
 
   const titleCase = checkTitleCase(content);
-  if (titleCase) {
+  if (titleCase != null && titleCase !== "") {
     return {
       output: formatContext(
         `${titleCase}. Apply AP-style title case: capitalize major words, lowercase articles/prepositions (a, an, the, in, of, etc.) unless they start the heading.`,
@@ -83,7 +83,7 @@ export function check(input: PreToolUseHookInput): HookResult | null {
   }
 
   const boldHeading = checkBoldAsHeading(content);
-  if (boldHeading) {
+  if (boldHeading != null && boldHeading !== "") {
     return {
       output: formatContext(
         `${boldHeading}. Replace the bold-colon pattern with a markdown heading (## ) at the appropriate level.`,
@@ -93,7 +93,7 @@ export function check(input: PreToolUseHookInput): HookResult | null {
   }
 
   const sentenceHeading = checkSentenceHeading(content);
-  if (sentenceHeading) {
+  if (sentenceHeading != null && sentenceHeading !== "") {
     return { output: formatContext(sentenceHeading), category: "sentence heading" };
   }
 

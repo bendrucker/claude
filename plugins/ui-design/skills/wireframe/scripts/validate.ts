@@ -21,7 +21,8 @@ export interface ValidationResult {
 type Transform = { x: number; y: number };
 
 function attr(el: XmlElement, name: string, fallback = 0): number {
-  return Number.parseFloat(el.getAttribute(name) || String(fallback));
+  const raw = el.getAttribute(name);
+  return Number.parseFloat(raw != null && raw !== "" ? raw : String(fallback));
 }
 
 function getBounds(el: XmlElement, t: Transform = { x: 0, y: 0 }): Bounds | null {
@@ -38,8 +39,9 @@ function getBounds(el: XmlElement, t: Transform = { x: 0, y: 0 }): Bounds | null
       const x = t.x + attr(el, "x");
       const y = t.y + attr(el, "y");
       const fontSize = attr(el, "font-size", 16);
-      const estimatedWidth = (el.textContent || "").length * fontSize * 0.6;
-      const anchor = el.getAttribute("text-anchor") || "start";
+      const estimatedWidth = (el.textContent ?? "").length * fontSize * 0.6;
+      const anchorAttr = el.getAttribute("text-anchor");
+      const anchor = anchorAttr != null && anchorAttr !== "" ? anchorAttr : "start";
 
       let adjustedX = x;
       if (anchor === "middle") {
@@ -77,9 +79,10 @@ function getBounds(el: XmlElement, t: Transform = { x: 0, y: 0 }): Bounds | null
 }
 
 function parseTransform(transform: string | null): Transform {
-  if (!transform) return { x: 0, y: 0 };
+  if (transform == null || transform === "") return { x: 0, y: 0 };
   const match = transform.match(/translate\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)/);
-  if (!match?.[1] || !match[2]) return { x: 0, y: 0 };
+  if (match?.[1] == null || match[1] === "" || match[2] == null || match[2] === "")
+    return { x: 0, y: 0 };
   return { x: Number.parseFloat(match[1]), y: Number.parseFloat(match[2]) };
 }
 
@@ -93,9 +96,9 @@ function getElementChildren(el: XmlElement): XmlElement[] {
 
 function getElementId(el: XmlElement, index: number): string {
   const id = el.getAttribute("id");
-  if (id) return `#${id}`;
+  if (id != null && id !== "") return `#${id}`;
   const tag = el.tagName;
-  if (tag === "text" && el.textContent) {
+  if (tag === "text" && el.textContent != null && el.textContent !== "") {
     return `<text>"${el.textContent.slice(0, 20)}"`;
   }
   return `<${tag}>[${index}]`;
@@ -126,7 +129,7 @@ function boundsEqual(a: Bounds, b: Bounds): boolean {
 function isContainer(el: XmlElement): boolean {
   if (el.tagName !== "rect") return false;
   const fill = el.getAttribute("fill");
-  return !fill || fill === "none";
+  return fill == null || fill === "" || fill === "none";
 }
 
 interface ChildInfo {
@@ -166,7 +169,7 @@ function validateGroup(
     }
 
     if (child.tagName === "g") {
-      validateGroup(child, bounds || parentBounds, currentTransform, violations);
+      validateGroup(child, bounds, currentTransform, violations);
     }
 
     const isBackground = parentBounds ? boundsEqual(bounds, parentBounds) : false;
@@ -233,10 +236,10 @@ export function validate(svgContent: string): Violation[] {
     return violations;
   }
 
-  const width = Number.parseFloat(svg.getAttribute("width") || "0");
-  const height = Number.parseFloat(svg.getAttribute("height") || "0");
+  const width = attr(svg, "width");
+  const height = attr(svg, "height");
 
-  if (!width || !height) {
+  if (width === 0 || height === 0) {
     violations.push({
       element: "<svg>",
       issue: "missing-dimensions",

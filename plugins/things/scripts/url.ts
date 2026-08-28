@@ -92,7 +92,7 @@ async function openUrl(
     // and forward it to stderr, where both the CLI and tailgate's logs read it.
     const result = background ? await $`open -g ${url}`.quiet() : await $`open ${url}`.quiet();
     const output = result.stdout.toString() + result.stderr.toString();
-    if (output) process.stderr.write(output);
+    if (output !== "") process.stderr.write(output);
   } catch (error) {
     if (error instanceof $.ShellError) {
       const stderr = error.stderr.toString();
@@ -105,9 +105,10 @@ async function openUrl(
       // ShellError's own message is only the exit code, and `.quiet()` holds
       // what `open` printed, so the diagnostic reaches a caller only if the
       // message carries it.
-      const detail = stderr.trim() || error.stdout.toString().trim();
+      const stderrDetail = stderr.trim();
+      const detail = stderrDetail !== "" ? stderrDetail : error.stdout.toString().trim();
       throw new Error(
-        `Things URL handoff failed (open exited ${error.exitCode})${detail ? `: ${detail}` : ""}`,
+        `Things URL handoff failed (open exited ${error.exitCode})${detail !== "" ? `: ${detail}` : ""}`,
         { cause: error },
       );
     }
@@ -178,7 +179,7 @@ export function coerceAttributes(attributes: Record<string, string>): Record<str
     } else if (key === "checklist-items") {
       result[key] = value
         .split("\n")
-        .filter((line) => line.trim())
+        .filter((line) => line.trim() !== "")
         .map((line) => ({ type: "checklist-item" as const, attributes: { title: line.trim() } }));
     } else {
       result[key] = value;
@@ -331,7 +332,7 @@ export async function dispatch(
   let fallbackReason = "the x-callback-url runner was not found";
   let fallbackDetail: string | null = null;
 
-  if (runner) {
+  if (runner != null && runner !== "") {
     const url = await buildUrl(command, params);
     try {
       const result = await actions.xcall(runner, url);
@@ -344,7 +345,8 @@ export async function dispatch(
       };
     } catch (error) {
       fallbackReason = describeXcallFailure(error);
-      fallbackDetail = error instanceof XcallError ? error.stderr.trim() || null : null;
+      const detail = error instanceof XcallError ? error.stderr.trim() : "";
+      fallbackDetail = detail !== "" ? detail : null;
     }
   }
 
@@ -361,7 +363,8 @@ export function warnFallback(result: DispatchResult): void {
   console.error(
     `warning: no todo id available because ${result.fallbackReason}. The change was sent fire-and-forget via open.`,
   );
-  if (result.fallbackDetail) console.error(result.fallbackDetail);
+  if (result.fallbackDetail != null && result.fallbackDetail !== "")
+    console.error(result.fallbackDetail);
 }
 
 if (import.meta.main) {
@@ -429,8 +432,8 @@ if (import.meta.main) {
     }
     if (argv.flags.callback) warnFallback(result);
   } else {
-    const singleId = ids[0];
-    if (singleId) {
+    const singleId = ids.at(0);
+    if (singleId !== undefined) {
       params.set("id", singleId);
     }
     const result = await dispatch(command, params, callbackActions);

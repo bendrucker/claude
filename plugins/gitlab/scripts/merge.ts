@@ -238,7 +238,10 @@ if (import.meta.main) {
     },
   });
 
-  const branch = argv._.branch || (await $`git branch --show-current`.text()).trim();
+  const branch =
+    argv._.branch != null && argv._.branch !== ""
+      ? argv._.branch
+      : (await $`git branch --show-current`.text()).trim();
 
   if (argv.flags.status) {
     console.log(JSON.stringify(await status(branch), null, 2));

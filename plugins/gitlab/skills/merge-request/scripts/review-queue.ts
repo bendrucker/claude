@@ -82,8 +82,9 @@ if (import.meta.main) {
     },
     async () => {
       const result = ReviewQueueResponse.parse(await $`glab api graphql -f query=${QUERY}`.json());
-      if (result.errors?.length) {
-        console.error(`GraphQL errors: ${result.errors.map((e) => e.message).join("; ")}`);
+      const errors = result.errors ?? [];
+      if (errors.length > 0) {
+        console.error(`GraphQL errors: ${errors.map((e) => e.message).join("; ")}`);
         process.exit(1);
       }
       const currentUser = result.data?.currentUser;

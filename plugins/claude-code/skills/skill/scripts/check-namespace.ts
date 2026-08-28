@@ -56,7 +56,7 @@ export function checkSkillNamespace(name: string, pluginName: string): string[] 
   if (localName === pluginName) return warnings;
 
   const stutterWarning = checkStuttering(localName, pluginName);
-  if (stutterWarning) {
+  if (stutterWarning != null && stutterWarning !== "") {
     warnings.push(`Warning: skill name after prefix ${stutterWarning}`);
     warnings.push(
       `  Consider renaming to avoid repetition (e.g., ${prefix}${pluginName}-foo -> ${prefix}foo)`,
@@ -71,21 +71,21 @@ export async function processHookInput(input: HookInput): Promise<string[]> {
 
   if (input.tool_name !== "Write" && input.tool_name !== "Edit") return warnings;
   const filePath = filePathOf(input.tool_input);
-  if (!filePath) return warnings;
+  if (filePath == null || filePath === "") return warnings;
 
   const pluginName = extractPluginName(filePath);
-  if (!pluginName) return warnings;
+  if (pluginName == null || pluginName === "") return warnings;
 
   const type = getResourceType(filePath);
   const name = await getResourceName(filePath, type);
-  if (!name) return warnings;
+  if (name == null || name === "") return warnings;
 
   if (type === "skill") {
     return checkSkillNamespace(name, pluginName);
   }
 
   const stutterWarning = checkStuttering(name, pluginName);
-  if (stutterWarning) {
+  if (stutterWarning != null && stutterWarning !== "") {
     warnings.push(`Warning: ${type} name ${stutterWarning}`);
     warnings.push(`  Qualified name would be: ${pluginName}:${name}`);
     warnings.push(

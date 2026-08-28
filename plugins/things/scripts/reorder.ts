@@ -5,7 +5,7 @@ import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
 import { dispatch, warnFallback } from "./url";
 
-const INTERMEDIATE_LIST: Record<string, string> = {
+const INTERMEDIATE_LIST: Record<string, string | undefined> = {
   today: "anytime",
   anytime: "someday",
   someday: "anytime",
@@ -46,7 +46,7 @@ export async function reorder(targetList: string, ids: string[]): Promise<Reorde
   }
 
   const intermediate = INTERMEDIATE_LIST[targetList];
-  if (!intermediate) {
+  if (intermediate === undefined) {
     throw new Error(`Invalid list: ${targetList}`);
   }
 

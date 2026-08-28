@@ -36,13 +36,13 @@ export function processHookInput(input: HookInput): string[] {
   if (input.tool_name !== "Write" && input.tool_name !== "Edit") return [];
 
   const filePath = filePathOf(input.tool_input);
-  if (!filePath) return [];
+  if (filePath == null || filePath === "") return [];
 
   const skillRoot = extractSkillRoot(filePath);
-  if (!skillRoot) return [];
+  if (skillRoot == null || skillRoot === "") return [];
 
   const warning = validateSkillPath(filePath, skillRoot);
-  return warning ? [warning] : [];
+  return warning != null && warning !== "" ? [warning] : [];
 }
 
 async function main(): Promise<void> {

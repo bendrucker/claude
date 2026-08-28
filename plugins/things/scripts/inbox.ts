@@ -30,19 +30,20 @@ export function shellQuote(value: string): string {
  */
 export function buildAttribution(sessionId: string, directory?: string): string {
   const resume = `claude --resume ${shellQuote(sessionId)}`;
-  const command = directory ? `cd ${shellQuote(directory)} && ${resume}` : resume;
+  const command =
+    directory != null && directory !== "" ? `cd ${shellQuote(directory)} && ${resume}` : resume;
   return `---\n\n🤖 Created via Claude Code (Session: ${sessionId})\n\n\`\`\`sh\n${command}\n\`\`\``;
 }
 
 export function printCaptured(params: Map<string, string>): void {
   const title = params.get("title");
-  if (title) {
+  if (title != null && title !== "") {
     console.log(`captured: ${title}`);
     return;
   }
   const titles = params.get("titles");
-  if (titles) {
-    const lines = titles.split("\n").filter((line) => line.trim());
+  if (titles != null && titles !== "") {
+    const lines = titles.split("\n").filter((line) => line.trim() !== "");
     const first = lines[0] ?? "(untitled)";
     const suffix = lines.length > 1 ? ` (+${lines.length - 1} more)` : "";
     console.log(`captured: ${first}${suffix}`);
@@ -68,7 +69,7 @@ if (import.meta.main) {
     },
   });
 
-  if (!argv.flags.sessionId) {
+  if (argv.flags.sessionId == null || argv.flags.sessionId === "") {
     console.error("--session-id is required for session attribution");
     process.exit(1);
   }
@@ -87,18 +88,21 @@ if (import.meta.main) {
 
   const attribution = buildAttribution(argv.flags.sessionId, process.cwd());
   const existing = params.get("notes");
-  params.set("notes", existing ? `${existing}\n\n${attribution}` : attribution);
+  params.set(
+    "notes",
+    existing != null && existing !== "" ? `${existing}\n\n${attribution}` : attribution,
+  );
 
   await ensureThingsRunning();
 
   try {
     // Things drops a tag it does not already know and still reports success, so
     // the CLI resolves against the stored tags for the same reason the tool does.
-    const requested = mergeTags(["claude"], argv.flags.tag ?? [], parseTags(params.get("tags")));
+    const requested = mergeTags(["claude"], argv.flags.tag, parseTags(params.get("tags")));
     params.set("tags", (await requireTags(requested, false)).join(","));
 
     const result = await dispatch("add", params);
-    if (result.id) {
+    if (result.id != null && result.id !== "") {
       console.log(`https://things.bendrucker.me/show?id=${result.id}`);
     } else {
       warnFallback(result);

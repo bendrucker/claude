@@ -12,7 +12,7 @@ export const namespaceMismatch: Rule = {
     const name = content.frontmatter.name;
     const plugin = pluginName(path);
 
-    if (typeof name !== "string" || !plugin) {
+    if (typeof name !== "string" || plugin == null || plugin === "") {
       return {
         rule: "namespace-mismatch",
         severity: "error",
@@ -57,7 +57,7 @@ export const namespaceStutter: Rule = {
     const name = content.frontmatter.name;
     const plugin = pluginName(path);
 
-    if (typeof name !== "string" || !plugin) {
+    if (typeof name !== "string" || plugin == null || plugin === "") {
       return {
         rule: "namespace-stutter",
         severity: "warn",

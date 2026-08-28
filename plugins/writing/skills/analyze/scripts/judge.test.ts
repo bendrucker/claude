@@ -365,7 +365,7 @@ describe("judgeCorpus", () => {
     );
     const marketing = audit.criteria.find((c) => c.id === "marketing-phrasing");
     expect(marketing?.flagged).toBe(8);
-    expect(marketing?.spans?.length).toBe(2);
+    expect(marketing?.spans.length).toBe(2);
   });
 });
 

@@ -40,7 +40,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   // It fails open on shell metacharacters, so the deny decision rests on the
   // command this hook reads for itself.
   const command = BashInput.safeParse(input.tool_input).data?.command;
-  if (!command || !invokesGitCommit(command)) {
+  if (command == null || command === "" || !invokesGitCommit(command)) {
     return null;
   }
 
@@ -48,7 +48,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   // the Bash command runs: a subagent working in a worktree reports that
   // worktree as `input.cwd`, and resolving the branch anywhere else reads the
   // wrong repo.
-  const dir = input.cwd ?? process.cwd();
+  const dir = input.cwd;
 
   // One rev-parse yields both the repo root (cache key) and current branch.
   // A non-zero exit means we're outside a repo; "HEAD" means detached.
@@ -57,12 +57,18 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
     return null;
   }
   const [repoRoot, currentBranch] = rev.text().trim().split("\n");
-  if (!repoRoot || !currentBranch || currentBranch === "HEAD") {
+  if (
+    repoRoot == null ||
+    repoRoot === "" ||
+    currentBranch == null ||
+    currentBranch === "" ||
+    currentBranch === "HEAD"
+  ) {
     return null;
   }
 
   const defaultBranch = await getDefaultBranch(dir, repoRoot);
-  if (!defaultBranch) {
+  if (defaultBranch == null || defaultBranch === "") {
     return null;
   }
 

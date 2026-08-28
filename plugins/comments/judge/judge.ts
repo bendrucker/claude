@@ -55,13 +55,13 @@ const VerdictInput = z
   )
   .superRefine((verdict, ctx) => {
     const rewritten = verdict.action === "rewrite";
-    if (rewritten && !verdict.rewrite) {
+    if (rewritten && (verdict.rewrite == null || verdict.rewrite === "")) {
       ctx.addIssue({
         code: "custom",
         message: `"rewrite" must be a non-empty string when action is "rewrite"`,
       });
     }
-    if (!rewritten && verdict.rewrite) {
+    if (!rewritten && verdict.rewrite != null && verdict.rewrite !== "") {
       ctx.addIssue({ code: "custom", message: `"rewrite" is only valid when action is "rewrite"` });
     }
     if (verdict.trimTo != null && verdict.action !== "trim") {

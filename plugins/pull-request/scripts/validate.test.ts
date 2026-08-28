@@ -645,7 +645,7 @@ describe("processInput", () => {
     .slice(0, 12);
 
   function createInput(command: string, cwd?: string): HookInput {
-    return { tool_input: { command }, ...(cwd && { cwd }) };
+    return { tool_input: { command }, ...(cwd != null && cwd !== "" && { cwd }) };
   }
 
   it("returns null when command has no --body-file", async () => {

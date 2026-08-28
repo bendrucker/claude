@@ -4,6 +4,7 @@ import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { $ } from "bun";
 import { cli, command } from "cleye";
+import { z } from "zod";
 import { applyToBranch, isCleanTree } from "../../../apply/branch";
 import { computeFileEdits, type EditItem } from "../../../apply/edits";
 import { formatContent } from "../../../apply/format";
@@ -20,7 +21,7 @@ import type { DiffOptions } from "../../../detection/diff";
 import { extractComments, languageForPath } from "../../../detection/extract";
 import { rankComments, type SortKey } from "../../../detection/rank";
 import type { Comment } from "../../../detection/types";
-import { buildJob, type BuildJobOptions, type JobShard, writeJob } from "../../../judge/job";
+import { buildJob, type BuildJobOptions, writeJob } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
 
 const WORKFLOW_PATH = join(import.meta.dirname, "..", "..", "..", "workflow", "judge.workflow.js");
@@ -34,10 +35,11 @@ const WORKFLOW_PATH = join(import.meta.dirname, "..", "..", "..", "workflow", "j
  */
 const AGENT_OVERHEAD_TOKENS = 25_000;
 
-const SORT_KEYS: SortKey[] = ["lines", "chars", "score"];
+const SORT_KEYS = ["lines", "chars", "score"] as const satisfies readonly SortKey[];
 
 function parseSort(value: string): SortKey {
-  if ((SORT_KEYS as string[]).includes(value)) return value as SortKey;
+  const parsed = z.enum(SORT_KEYS).safeParse(value);
+  if (parsed.success) return parsed.data;
   console.error(
     `Invalid --sort ${JSON.stringify(value)}; expected one of ${SORT_KEYS.join(", ")}.`,
   );
@@ -188,7 +190,7 @@ function toEditItem(comment: Comment, verdict: Verdict): EditItem {
   };
 }
 
-async function readJsonFiles(dir: string, prefix: string): Promise<unknown[]> {
+async function readJsonFiles<T>(dir: string, prefix: string, schema: z.ZodType<T>): Promise<T[]> {
   let names: string[];
   try {
     names = await readdir(dir);
@@ -197,13 +199,17 @@ async function readJsonFiles(dir: string, prefix: string): Promise<unknown[]> {
   }
   const matching = names.filter((name) => name.startsWith(prefix) && name.endsWith(".json"));
   return Promise.all(
-    matching.map(async (name) => JSON.parse(await Bun.file(join(dir, name)).text())),
+    matching.map(async (name) => schema.parse(JSON.parse(await Bun.file(join(dir, name)).text()))),
   );
 }
 
+const Scope = z.looseObject({ mr: z.string().nullish() });
+
+const JobShardFile = z.looseObject({ comments: z.array(z.looseObject({ path: z.string() })) });
+
 /** The files a job judged, recovered from the shards. */
 async function judgedPaths(jobDir: string): Promise<string[]> {
-  const shards = (await readJsonFiles(jobDir, "shard-")) as JobShard[];
+  const shards = await readJsonFiles(jobDir, "shard-", JobShardFile);
   const paths = new Set<string>();
   for (const shard of shards) for (const comment of shard.comments) paths.add(comment.path);
   return [...paths];
@@ -242,7 +248,7 @@ const applyCmd = command(
 
     const scopeFile = Bun.file(join(job, "scope.json"));
     const scope = (await scopeFile.exists())
-      ? (JSON.parse(await scopeFile.text()) as { mr?: string | null })
+      ? Scope.parse(JSON.parse(await scopeFile.text()))
       : { mr: null };
     if (scope.mr && !report) {
       console.error(
@@ -251,7 +257,7 @@ const applyCmd = command(
       process.exit(1);
     }
 
-    const verdictShards = await readJsonFiles(join(job, "verdicts"), "verdict-");
+    const verdictShards = await readJsonFiles(join(job, "verdicts"), "verdict-", z.unknown());
     if (verdictShards.length === 0) {
       console.error(`No verdicts in ${join(job, "verdicts")}. Run the judge workflow first.`);
       process.exit(1);

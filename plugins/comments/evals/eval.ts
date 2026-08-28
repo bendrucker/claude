@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { Glob } from "bun";
 import { cli } from "cleye";
 import { table } from "table";
+import { z } from "zod";
 import type { CommentKind, Language } from "../detection/types";
 import { loadPrompt } from "../judge/judge";
 import {
@@ -51,57 +52,85 @@ export async function loadFixtures(dir: string = FIXTURES_DIR): Promise<Fixture[
   const glob = new Glob("*.json");
   const fixtures: Fixture[] = [];
   for await (const file of glob.scan(dir)) {
-    const parsed = JSON.parse(await Bun.file(join(dir, file)).text());
+    const parsed: unknown = JSON.parse(await Bun.file(join(dir, file)).text());
     fixtures.push(validateFixture(parsed, file));
   }
   fixtures.sort((a, b) => a.id.localeCompare(b.id));
   return fixtures;
 }
 
+const nonEmpty = (name: string) =>
+  z.string({ error: `missing required string "${name}"` }).min(1, {
+    error: `missing required string "${name}"`,
+  });
+
+const FixtureInput = z
+  .looseObject(
+    {
+      id: nonEmpty("id"),
+      path: nonEmpty("path"),
+      language: nonEmpty("language"),
+      kind: z.enum(["line", "block", "docstring"], {
+        error: (issue) => `has an invalid comment kind ${JSON.stringify(issue.input)}`,
+      }) satisfies z.ZodType<CommentKind>,
+      comment: nonEmpty("comment"),
+      context: nonEmpty("context"),
+      action: z.enum(VERDICT_ACTIONS, {
+        error: (issue) => `has an invalid action ${JSON.stringify(issue.input)}`,
+      }),
+      category: z
+        .enum(SLOP_CATEGORIES, {
+          error: (issue) => `has an invalid slop category ${JSON.stringify(issue.input)}`,
+        })
+        .nullish(),
+      rewrite: z.string().nullish(),
+      trimTo: z.string().nullish(),
+      trimToLines: z.array(z.number()).nullish(),
+      source: z.string().nullish(),
+      note: z.string().nullish(),
+    },
+    { error: "is not an object" },
+  )
+  .superRefine((fixture, ctx) => {
+    if (fixture.action === "keep" && fixture.category != null) {
+      ctx.addIssue({ code: "custom", message: `is "keep" but carries a category` });
+    }
+    if (fixture.action !== "keep" && fixture.category == null) {
+      ctx.addIssue({ code: "custom", message: "has an invalid slop category null" });
+    }
+    if (fixture.action === "rewrite" && !fixture.rewrite) {
+      ctx.addIssue({ code: "custom", message: `is "rewrite" but carries no gold rewrite text` });
+    }
+    if (fixture.trimTo != null && (fixture.trimTo.length === 0 || fixture.action !== "trim")) {
+      ctx.addIssue({
+        code: "custom",
+        message: `"trimTo" must be a non-empty string on a "trim" fixture`,
+      });
+    }
+  });
+
 function validateFixture(value: unknown, file: string): Fixture {
-  if (typeof value !== "object" || value === null) {
-    throw new Error(`Fixture ${file} is not an object`);
+  const parsed = FixtureInput.safeParse(value);
+  if (!parsed.success) {
+    throw new Error(`Fixture ${file} ${parsed.error.issues[0]?.message}`);
   }
-  const record = value as Record<string, unknown>;
-  const action = record.action;
-  if (typeof action !== "string" || !VERDICT_ACTIONS.includes(action as VerdictAction)) {
-    throw new Error(`Fixture ${file} has invalid action ${JSON.stringify(action)}`);
-  }
-  const category = record.category ?? null;
-  if (action === "keep" && category !== null) {
-    throw new Error(`Fixture ${file} is "keep" but carries a category`);
-  }
-  if (action !== "keep" && !SLOP_CATEGORIES.includes(category as SlopCategory)) {
-    throw new Error(`Fixture ${file} has invalid slop category ${JSON.stringify(category)}`);
-  }
-  if (action === "rewrite" && (typeof record.rewrite !== "string" || record.rewrite.length === 0)) {
-    throw new Error(`Fixture ${file} is "rewrite" but carries no gold rewrite text`);
-  }
-  for (const key of ["id", "path", "language", "kind", "comment", "context"]) {
-    if (typeof record[key] !== "string" || record[key].length === 0) {
-      throw new Error(`Fixture ${file} missing required string "${key}"`);
-    }
-  }
+  const decoded = parsed.data;
+
   const fixture: Fixture = {
-    id: record.id as string,
-    path: record.path as string,
-    language: record.language as Language,
-    kind: record.kind as CommentKind,
-    comment: record.comment as string,
-    context: record.context as string,
-    action: action as VerdictAction,
-    category: category as SlopCategory | null,
+    id: decoded.id,
+    path: decoded.path,
+    language: decoded.language,
+    kind: decoded.kind,
+    comment: decoded.comment,
+    context: decoded.context,
+    action: decoded.action,
+    category: decoded.category ?? null,
   };
-  if (record.trimTo != null) {
-    if (typeof record.trimTo !== "string" || record.trimTo.length === 0 || action !== "trim") {
-      throw new Error(`Fixture ${file} "trimTo" must be a non-empty string on a "trim" fixture`);
-    }
-    fixture.trimTo = record.trimTo;
-  }
-  if (typeof record.rewrite === "string") fixture.rewrite = record.rewrite;
-  if (Array.isArray(record.trimToLines)) fixture.trimToLines = record.trimToLines as number[];
-  if (typeof record.source === "string") fixture.source = record.source;
-  if (typeof record.note === "string") fixture.note = record.note;
+  if (decoded.trimTo != null) fixture.trimTo = decoded.trimTo;
+  if (decoded.rewrite != null) fixture.rewrite = decoded.rewrite;
+  if (decoded.trimToLines != null) fixture.trimToLines = decoded.trimToLines;
+  if (decoded.source != null) fixture.source = decoded.source;
+  if (decoded.note != null) fixture.note = decoded.note;
   return fixture;
 }
 

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import Builder from "fast-xml-builder";
+import { z } from "zod";
 import type { CommentKind, Language } from "../detection/types";
 import { BATCH_SIZE, parseVerdict } from "../judge/judge";
 import { batchVerdictSchema, type Verdict } from "../judge/schema";
@@ -54,47 +55,54 @@ export function formatBatch(inputs: CommentJudgeInput[]): string {
   });
 }
 
+const BatchEntry = z.looseObject(
+  { index: z.int({ error: "entry index must be an integer" }), verdict: z.unknown().optional() },
+  { error: "entries must be objects" },
+);
+
+const Batch = z.looseObject(
+  { verdicts: z.array(BatchEntry, { error: `missing "verdicts" array` }) },
+  { error: "must be a JSON object" },
+);
+
 /**
  * Parses the `{ verdicts: [{ index, verdict }] }` batch shape, validating that
  * every index in 0..expected-1 is present exactly once, and returns verdicts
  * ordered by index.
  */
 export function parseBatchVerdicts(json: string, expected: number): Verdict[] {
-  let parsed: unknown;
+  let raw: unknown;
   try {
-    parsed = JSON.parse(json);
+    raw = JSON.parse(json);
   } catch (error) {
-    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`, { cause: error });
+    throw new Error(
+      `Judge returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("Judge batch must be a JSON object");
+  const parsed = Batch.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(`Judge batch ${parsed.error.issues[0]?.message}`);
   }
-  const entries = (parsed as Record<string, unknown>).verdicts;
-  if (!Array.isArray(entries)) throw new Error('Judge batch missing "verdicts" array');
-  const verdicts = Array.from<Verdict | undefined>({ length: expected });
+
+  const verdicts: (Verdict | undefined)[] = Array.from({ length: expected });
   const seen = new Set<number>();
-  for (const entry of entries) {
-    if (typeof entry !== "object" || entry === null) {
-      throw new Error("Judge batch entries must be objects");
+  for (const entry of parsed.data.verdicts) {
+    if (entry.index < 0 || entry.index >= expected) {
+      throw new Error(
+        `Judge batch index ${entry.index} out of range (expected 0..${expected - 1})`,
+      );
     }
-    const record = entry as Record<string, unknown>;
-    const index = record.index;
-    if (typeof index !== "number" || !Number.isInteger(index)) {
-      throw new Error("Judge batch entry index must be an integer");
+    if (seen.has(entry.index)) {
+      throw new Error(`Judge batch index ${entry.index} appears more than once`);
     }
-    if (index < 0 || index >= expected) {
-      throw new Error(`Judge batch index ${index} out of range (expected 0..${expected - 1})`);
-    }
-    if (seen.has(index)) {
-      throw new Error(`Judge batch index ${index} appears more than once`);
-    }
-    verdicts[index] = parseVerdict(record.verdict, `index ${index}`);
-    seen.add(index);
+    verdicts[entry.index] = parseVerdict(entry.verdict, `index ${entry.index}`);
+    seen.add(entry.index);
   }
   if (seen.size !== expected) {
     throw new Error(`Judge batch covered ${seen.size} of ${expected} comments`);
   }
-  return verdicts as Verdict[];
+  return verdicts.filter((verdict) => verdict !== undefined);
 }
 
 export async function judgeComments(

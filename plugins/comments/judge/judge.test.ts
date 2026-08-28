@@ -47,6 +47,27 @@ describe("parseVerdict", () => {
     expect(() => parseVerdict(raw({ action: "delete" }), "x")).toThrow(/"action" must be one of/);
   });
 
+  test.each<{ name: string; value: unknown; error: RegExp }>([
+    {
+      name: "rejects a category outside the taxonomy",
+      value: raw({ category: "vibes" }),
+      error: /"category" must be one of/,
+    },
+    {
+      name: "rejects a confidence outside low/medium/high",
+      value: raw({ confidence: "certain" }),
+      error: /"confidence" must be one of/,
+    },
+    {
+      name: "rejects a non-string rationale",
+      value: raw({ rationale: 7 }),
+      error: /"rationale" must be a string/,
+    },
+    { name: "rejects a non-object verdict", value: "nope", error: /must be an object/ },
+  ])("$name", ({ value, error }) => {
+    expect(() => parseVerdict(value, "x")).toThrow(error);
+  });
+
   test.each<{ name: string; over: Record<string, unknown>; error?: RegExp; trimTo?: string }>([
     {
       name: "accepts trimTo on a trim verdict",

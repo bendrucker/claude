@@ -2,11 +2,22 @@ import { describe, expect, test } from "bun:test";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 import type { CollectedComment } from "../detection/collect";
 import { commentFeatures } from "../detection/features";
 import { scoreComment } from "../detection/rank";
 import { buildJob, writeJob } from "./job";
 import { loadPrompt } from "./judge";
+
+const ShardFile = z.looseObject({ comments: z.array(z.unknown()) });
+
+const ArgsFile = z.looseObject({
+  shards: z.array(z.object({ id: z.number(), path: z.string() })),
+  promptSha: z.string(),
+  verdictsDir: z.string(),
+  promptText: z.unknown().optional(),
+  promptPath: z.string(),
+});
 
 function collected(i: number): CollectedComment {
   const text = `// comment ${i}`;
@@ -86,10 +97,12 @@ describe("writeJob", () => {
       expect(written.shards).toHaveLength(2);
       expect(written.shards.map((s: { id: number }) => s.id)).toEqual([0, 1]);
 
-      const firstShard = JSON.parse(await Bun.file(written.shards[0]?.path ?? "").text());
+      const firstShard = ShardFile.parse(
+        JSON.parse(await Bun.file(written.shards[0]?.path ?? "").text()),
+      );
       expect(firstShard.comments).toHaveLength(20);
 
-      const args = JSON.parse(await Bun.file(written.argsPath).text());
+      const args = ArgsFile.parse(JSON.parse(await Bun.file(written.argsPath).text()));
       expect(args.shards).toEqual(written.shards);
       expect(args.promptSha).toBe(descriptor.promptSha);
       expect(args.verdictsDir).toBe(written.verdictsDir);

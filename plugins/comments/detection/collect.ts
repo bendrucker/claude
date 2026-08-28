@@ -1,4 +1,5 @@
 import { $ } from "bun";
+import { z } from "zod";
 import { contextWindow } from "./context";
 import { type DiffOptions, resolveDiff } from "./diff";
 import { isExemptComment } from "./exempt";
@@ -41,15 +42,20 @@ export interface MrSource {
   ref: string;
 }
 
+const MrView = z.looseObject({
+  source_project_id: z.union([z.number(), z.string()]).nullish(),
+  diff_refs: z.looseObject({ head_sha: z.string().nullish() }).nullish(),
+  sha: z.string().nullish(),
+});
+
 export async function resolveMrSource(iid: string): Promise<MrSource | null> {
   const result = await $`glab mr view ${iid} -F json`.quiet().nothrow();
   if (result.exitCode !== 0) return null;
-  const record = JSON.parse(result.text()) as Record<string, unknown>;
-  const projectId = record.source_project_id;
-  const diffRefs = record.diff_refs as Record<string, unknown> | undefined;
-  const ref = diffRefs?.head_sha ?? record.sha;
-  if (typeof ref !== "string") return null;
-  if (typeof projectId !== "number" && typeof projectId !== "string") return null;
+  const view = MrView.safeParse(JSON.parse(result.text()));
+  if (!view.success) return null;
+  const projectId = view.data.source_project_id;
+  const ref = view.data.diff_refs?.head_sha ?? view.data.sha;
+  if (projectId == null || ref == null) return null;
   return { projectId: String(projectId), ref };
 }
 

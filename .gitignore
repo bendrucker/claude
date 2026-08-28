@@ -25,3 +25,8 @@ node_modules/
 # terminal-browser's installer drops a skill symlink into ~/.claude/skills,
 # which is this repo's user/skills. The skill belongs to that install, not here.
 /user/skills/terminal-browser
+
+# plannotator's installer drops its /plannotator-* skills into ~/.claude/skills,
+# which is this repo's user/skills. They belong to that install, not here, and
+# `install.sh` replaces them on every upgrade.
+/user/skills/plannotator*

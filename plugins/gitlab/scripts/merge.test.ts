@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { MergeActions, MergeRequestDetail } from "./merge";
-import { arm, merge, mergeArgs, status } from "./merge";
+import { arm, errorText, merge, mergeArgs, status, streamText } from "./merge";
 
 function shellError(streams: { stdout?: string; stderr?: string }): Error {
   return Object.assign(new Error("glab exited non-zero"), {
@@ -38,6 +38,44 @@ function createActions(overrides: Partial<MergeActions> = {}): MergeActions {
     ...overrides,
   };
 }
+
+describe("streamText", () => {
+  test.each<[string, unknown, string]>([
+    ["passes a string through untrimmed", "  body\n", "  body\n"],
+    ["decodes a Uint8Array", new TextEncoder().encode("body"), "body"],
+    ["drops a value that is not text", { code: 1 }, ""],
+  ])("%s", (_name, stream, expected) => {
+    expect(streamText(stream)).toBe(expected);
+  });
+});
+
+describe("errorText", () => {
+  const encode = (text: string) => new TextEncoder().encode(text);
+
+  test.each<[string, unknown, string]>([
+    [
+      "decodes Buffer streams",
+      { stdout: encode('{"message":"denied"}'), stderr: encode("") },
+      '{"message":"denied"}',
+    ],
+    [
+      "joins both streams",
+      { stdout: encode("body"), stderr: encode("glab: boom (HTTP 500)") },
+      "body\nglab: boom (HTTP 500)",
+    ],
+    ["accepts string streams", { stdout: "body", stderr: "" }, "body"],
+    ["trims surrounding whitespace", { stdout: encode("  body\n"), stderr: "" }, "body"],
+    [
+      "skips streams that are not text",
+      { stdout: { code: 1 }, stderr: encode("glab: boom") },
+      "glab: boom",
+    ],
+    ["falls back to the Error message", new Error("network down"), "network down"],
+    ["falls back to the raw value", "plain failure", "plain failure"],
+  ])("%s", (_name, err, expected) => {
+    expect(errorText(err)).toBe(expected);
+  });
+});
 
 describe("merge", () => {
   test("uses merge train API when merge trains enabled and auto-merge requested", async () => {

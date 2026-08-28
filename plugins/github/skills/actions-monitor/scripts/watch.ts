@@ -246,13 +246,18 @@ export function detectRateLimit(stderr: string): { rateLimited: boolean; retryAf
   return { rateLimited, retryAfter };
 }
 
+function streamText(stream: unknown): string {
+  if (typeof stream === "string") return stream;
+  if (stream instanceof Uint8Array) return new TextDecoder().decode(stream);
+  return "";
+}
+
 function exec(command: string): ExecResult {
   try {
     const stdout = execSync(command, execOptions).toString().trim();
     return { ok: true, stdout };
   } catch (err) {
-    const stderr =
-      err && typeof err === "object" && "stderr" in err ? String(err.stderr ?? "") : "";
+    const stderr = err && typeof err === "object" && "stderr" in err ? streamText(err.stderr) : "";
     const { rateLimited, retryAfter } = detectRateLimit(stderr);
     return { ok: false, stderr, rateLimited, retryAfter };
   }

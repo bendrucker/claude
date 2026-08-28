@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { type ExecSyncOptions, execSync } from "node:child_process";
+import { streamText } from "../../../scripts/merge";
 import { cli } from "cleye";
 import UrlPattern from "url-pattern";
 
@@ -384,8 +385,7 @@ function exec(command: string): ExecResult {
     const stdout = execSync(command, execOptions).toString().trim();
     return { ok: true, stdout };
   } catch (err) {
-    const stderr =
-      err && typeof err === "object" && "stderr" in err ? String(err.stderr ?? "") : "";
+    const stderr = err && typeof err === "object" && "stderr" in err ? streamText(err.stderr) : "";
     // glab does not surface structured rate-limit metadata. Rather than
     // regexing human text we rely on the api-error counter instead.
     return { ok: false, stderr, rateLimited: false, retryAfter: "" };

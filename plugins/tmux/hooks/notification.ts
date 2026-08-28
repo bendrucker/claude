@@ -49,20 +49,19 @@ function updateSummary(): void {
 
   const entries: NotificationEntry[] = [];
   for (const line of output.split("\n")) {
-    const match = line.match(/^@claude_notification_\d+ "?(.+?)"?$/);
-    if (match) {
-      const entry = parseEntry(match[1]!);
-      if (entry) entries.push(entry);
-    }
+    const payload = line.match(/^@claude_notification_\d+ "?(.+?)"?$/)?.[1];
+    if (payload === undefined) continue;
+    const entry = parseEntry(payload);
+    if (entry) entries.push(entry);
   }
 
-  if (entries.length === 0) {
+  const [first] = entries;
+  if (!first) {
     tmux("set-option", "-gu", "@claude_notification");
     return;
   }
 
   const toolMax = maxToolLength();
-  const first = entries[0]!;
   let text = `${first.window}:${truncate(first.tool, toolMax)}`;
   if (entries.length > 1) {
     text += ` (+${entries.length - 1})`;

@@ -312,7 +312,7 @@ if (import.meta.main) {
     }
     console.log(result.outPath);
   } catch (error) {
-    console.error(`error: ${error instanceof Error ? error.message : error}`);
+    console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }

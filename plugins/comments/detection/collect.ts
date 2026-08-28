@@ -48,7 +48,8 @@ export async function resolveMrSource(iid: string): Promise<MrSource | null> {
   const projectId = record.source_project_id;
   const diffRefs = record.diff_refs as Record<string, unknown> | undefined;
   const ref = diffRefs?.head_sha ?? record.sha;
-  if (projectId == null || typeof ref !== "string") return null;
+  if (typeof ref !== "string") return null;
+  if (typeof projectId !== "number" && typeof projectId !== "string") return null;
   return { projectId: String(projectId), ref };
 }
 

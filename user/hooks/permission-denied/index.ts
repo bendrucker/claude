@@ -70,6 +70,8 @@ if (import.meta.main) {
     // The exit code is ignored on this event, so a logging failure cannot break
     // the session. It still has to be visible: an empty log is the signal that
     // retires this hook, and a silent failure forges that signal.
-    console.error(`[permission-denied] Failed to log denial: ${error}`);
+    console.error(
+      `[permission-denied] Failed to log denial: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }

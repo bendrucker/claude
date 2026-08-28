@@ -80,6 +80,11 @@ describe("humanizeTool", () => {
     ["TodoWrite", {}, "Updating todos"],
     ["Skill", { skill: "writing:writing" }, "Running /writing:writing"],
     ["MysteryTool", {}, "MysteryTool"],
+    ["Read", { file_path: { path: "/a/b.ts" } }, "Reading "],
+    ["Grep", { pattern: {} }, "Searching"],
+    ["Grep", { query: "needle" }, "Searching needle"],
+    ["SendMessage", { summary: { text: "hi" } }, "→ message"],
+    ["Task", { description: [] }, "Spawning agent"],
   ];
 
   test.each(cases)("%s %o -> %s", (name, input, expected) => {

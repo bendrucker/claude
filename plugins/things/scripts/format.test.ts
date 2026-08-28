@@ -1,5 +1,18 @@
 import { describe, expect, mock, test } from "bun:test";
-import { selectColumns } from "./format";
+import { selectColumns, stringify } from "./format";
+
+describe("stringify", () => {
+  test.each<[unknown, string]>([
+    ["Ship it", "Ship it"],
+    [3, "3"],
+    [true, "true"],
+    [{ name: "Inbox" }, '{"name":"Inbox"}'],
+    [["a", "b"], "a, b"],
+    [[], ""],
+  ])("%o -> %s", (value, expected) => {
+    expect(stringify(value)).toBe(expected);
+  });
+});
 
 describe("selectColumns", () => {
   const headers = ["Name", "Status", "Due Date", "Project"];
@@ -7,6 +20,11 @@ describe("selectColumns", () => {
     ["Task 1", "open", "2025-01-01", "Project A"],
     ["Task 2", "completed", "2025-02-01", "Project B"],
   ];
+
+  test("fills a cell a short row does not reach", () => {
+    const [, r] = selectColumns(headers, [["Task 1", "open"]], ["name", "project"]);
+    expect(r).toEqual([["Task 1", ""]]);
+  });
 
   test.each<[string, string[] | undefined, string[], string[][] | undefined]>([
     ["returns input unchanged when columns is undefined", undefined, headers, rows],

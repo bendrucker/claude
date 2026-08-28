@@ -1,6 +1,6 @@
 # Effort Cells
 
-The cells live in [efforts.yaml](efforts.yaml), and [scripts/review-plan.ts](scripts/review-plan.ts) resolves and prints the one a review runs. No review reads this file. It holds the reasoning behind the cell assignments, for whoever changes them next.
+The cells live in [efforts.yaml](efforts.yaml), and [scripts/review-plan.ts](scripts/review-plan.ts) resolves and prints the one a review runs. No review reads this file. The `.schema.json` files beside the YAML are generated from the zod schemas in `scripts/efforts.ts` and `scripts/angles.ts` by `bun scripts/schemas.ts`, so a shape change starts there. It holds the reasoning behind the cell assignments, for whoever changes them next.
 
 ## Inline Families
 

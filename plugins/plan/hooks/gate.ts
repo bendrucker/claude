@@ -44,12 +44,12 @@ const GROWTH_MIN_EXCESS_RATIO = 0.05;
 // permissionDecisionReason and systemMessage alike, so neither the user nor the
 // transcript ever sees them. Deny is the only decision that carries a reason back.
 export const DENY_REASON =
-  "Plan text is byte-identical to the presentation that was just rejected. Rework the " +
-  "plan against the feedback from that rejection, deleting the text it superseded. If " +
-  "the rejection carried no feedback, ask what to change with AskUserQuestion.";
+  "This plan is unchanged from the one that was just rejected. Rework it against the " +
+  "rejection feedback, deleting the text the feedback superseded. If the rejection " +
+  "carried no feedback, ask what to change with AskUserQuestion.";
 
 export const APPEND_ONLY_REASON =
-  "This re-present carries nearly every prior line of the rejected plan. Rework it: " +
+  "This plan keeps nearly every line of the one that was just rejected. Rework it: " +
   "delete the text the feedback superseded rather than adding new text around it.";
 
 export function growthReason(ordinal: number, previousMax: number, length: number): string {
@@ -194,7 +194,7 @@ export async function processInput(
     return formatDecision(DENY_REASON);
   }
 
-  // Past the byte-identical check, so an unchanged resubmission neither advances
+  // Past the unchanged-text check, so an unchanged resubmission neither advances
   // the count nor raises the high-water mark. Every other presentation does,
   // denied or not: the hook cannot observe what happened after it answered.
   const presentsRaw = await readState(presentsPath);

@@ -98,7 +98,7 @@ describe("unchanged re-present", () => {
   const plan = body("alpha");
   const rewritten = body("bravo");
 
-  it("denies a byte-identical resubmission", async () => {
+  it("denies an unchanged resubmission", async () => {
     await decision(plan);
     expect(denialReason(await decision(plan))).toBe(DENY_REASON);
   });
@@ -205,7 +205,7 @@ describe("size advisory", () => {
     expect(await decision(bigPlan("b"))).toBeNull();
   });
 
-  it("gives the byte-identical reason when the oversized plan is also unchanged", async () => {
+  it("gives the unchanged-plan reason when the oversized plan is also unchanged", async () => {
     expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(sizeReason(0));
     expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(DENY_REASON);
   });
@@ -261,7 +261,7 @@ describe("append-only re-present", () => {
     expect(await decision(initial.replace("line 9", "line X"))).toBeNull();
   });
 
-  it("gives the byte-identical reason when the append-only re-present repeats", async () => {
+  it("gives the unchanged-plan reason when the append-only re-present repeats", async () => {
     await decision(initial);
     await decision(`${initial}\nline 10`);
     expect((await decision(`${initial}\nline 10`))?.permissionDecisionReason).toBe(DENY_REASON);
@@ -340,7 +340,7 @@ describe("sustained growth", () => {
     expect(await decision(grown)).toBeNull();
   });
 
-  it("still catches a byte-identical re-present after the growth denial has fired", async () => {
+  it("still catches an unchanged re-present after the growth denial has fired", async () => {
     await decision(skeletal);
     expect((await decision(grown))?.permissionDecisionReason).toBe(
       growthReason(2, skeletal.length, grown.length),
@@ -398,7 +398,7 @@ describe("recorded re-presents", () => {
   const growthTail = growthReason(0, 0, 0).split(". ").slice(1).join(". ");
 
   function rule(reason: string): string {
-    if (reason === DENY_REASON) return "byte-identical";
+    if (reason === DENY_REASON) return "unchanged";
     if (reason === APPEND_ONLY_REASON) return "append-only";
     if (reason.endsWith(growthTail)) return "growth";
     if (reason === sizeReason(0) || reason === sizeReason(1)) return "size";
@@ -436,7 +436,7 @@ describe("recorded re-presents", () => {
         "2026-07-19 dfdb8641": [
           "allowed",
           "deny:append-only",
-          "deny:byte-identical",
+          "deny:unchanged",
           "deny:append-only",
         ],
         "2026-08-12 aeebf85d": [

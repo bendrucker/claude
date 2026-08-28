@@ -19,3 +19,7 @@ export const genericGlyph = String.fromCodePoint(0xf06a9);
 
 // Cloud marker for remote agents.
 export const remoteGlyph = String.fromCodePoint(0xf0c2);
+
+// The Claude mark herdr's sidebar shows in place of its own agent glyph, which
+// is the same robot as genericGlyph above. Nerd Fonts ships cod-claude in 3.5.0.
+export const brandGlyph = String.fromCodePoint(0xec82);

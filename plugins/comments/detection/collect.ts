@@ -1,6 +1,7 @@
 import { $ } from "bun";
 import { z } from "zod";
 import { contextWindow } from "./context";
+import { measureAddedLines, type ScoredFile } from "./density";
 import { type DiffOptions, resolveDiff } from "./diff";
 import { isExemptComment } from "./exempt";
 import { extractComments, languageForPath } from "./extract";
@@ -101,6 +102,7 @@ async function collectDiffFile(
   file: FileDiff,
   options: DiffOptions,
   mrSource: MrSource | null,
+  onDensity?: (file: ScoredFile) => void,
 ): Promise<CollectedComment[]> {
   const language = languageForPath(file.path);
   if (language == null || language === "" || file.added.length === 0) return [];
@@ -110,6 +112,13 @@ async function collectDiffFile(
     return [];
   }
   if (isGeneratedFile(file.path, source)) return [];
+  if (onDensity) {
+    const added = new Set<number>();
+    for (const range of file.added) {
+      for (let n = range.start; n <= range.end; n++) added.add(n);
+    }
+    onDensity({ path: file.path, language, stats: await measureAddedLines(source, added, language) });
+  }
   const lines = source.split("\n");
   const comments = await extractComments(source, language);
   return scopeIntroduced(comments, file.added)
@@ -119,6 +128,8 @@ async function collectDiffFile(
 
 export interface CollectOptions {
   pathGlobs?: string[];
+  /** Receives each collected file's added-line density stats as it is read. */
+  onFileDensity?: (file: ScoredFile) => void;
 }
 
 /**
@@ -136,11 +147,16 @@ export async function collectDiff(
   const diffs = resolved.filter(
     (file) => matches(file.path) && !isVendoredPath(file.path, vendoredRoots),
   );
-  const perFile = await Promise.all(diffs.map((file) => collectDiffFile(file, options, mrSource)));
+  const perFile = await Promise.all(
+    diffs.map((file) => collectDiffFile(file, options, mrSource, collect.onFileDensity)),
+  );
   return perFile.flat();
 }
 
-async function collectRepoFile(path: string): Promise<CollectedComment[]> {
+async function collectRepoFile(
+  path: string,
+  onDensity?: (file: ScoredFile) => void,
+): Promise<CollectedComment[]> {
   const language = languageForPath(path);
   if (language == null || language === "") return [];
   const file = Bun.file(path);
@@ -148,6 +164,10 @@ async function collectRepoFile(path: string): Promise<CollectedComment[]> {
   const source = await file.text();
   if (isGeneratedFile(path, source)) return [];
   const lines = source.split("\n");
+  if (onDensity) {
+    const added = new Set(lines.map((_, i) => i + 1));
+    onDensity({ path, language, stats: await measureAddedLines(source, added, language) });
+  }
   const comments = await extractComments(source, language);
   return comments
     .filter((comment) => !isExemptComment(comment))
@@ -157,6 +177,6 @@ async function collectRepoFile(path: string): Promise<CollectedComment[]> {
 /** Every comment in every tracked code file, narrowed by `--path` globs. The `--all` scope. */
 export async function collectRepo(collect: CollectOptions = {}): Promise<CollectedComment[]> {
   const files = await listTrackedCodeFiles(collect);
-  const perFile = await Promise.all(files.map(collectRepoFile));
+  const perFile = await Promise.all(files.map((path) => collectRepoFile(path, collect.onFileDensity)));
   return perFile.flat();
 }

@@ -17,9 +17,10 @@ import {
   type MrSource,
   resolveMrSource,
 } from "../../../detection/collect";
+import { densityWeights, type ScoredFile } from "../../../detection/density";
 import type { DiffOptions } from "../../../detection/diff";
 import { extractComments, languageForPath } from "../../../detection/extract";
-import { rankComments, type SortKey } from "../../../detection/rank";
+import { rankCommentsWeighted, type SortKey } from "../../../detection/rank";
 import type { Comment } from "../../../detection/types";
 import { buildJob, type BuildJobOptions, writeJob } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
@@ -100,6 +101,12 @@ const preflightCmd = command(
     const pathGlobs = path;
     const sortKey = parseSort(sort);
 
+    // Per-file added-line density, gathered while collect has each file's
+    // content in hand, weights the ranking so the shard budget lands on the
+    // heaviest files first.
+    const densities: ScoredFile[] = [];
+    const onFileDensity = (file: ScoredFile) => densities.push(file);
+
     let comments: CollectedComment[];
     if (all) {
       if (!(await isCleanTree())) {
@@ -108,7 +115,7 @@ const preflightCmd = command(
         );
         process.exit(1);
       }
-      comments = await collectRepo({ pathGlobs });
+      comments = await collectRepo({ pathGlobs, onFileDensity });
     } else {
       const options: DiffOptions = {};
       if (base != null && base !== "") options.base = base;
@@ -121,10 +128,10 @@ const preflightCmd = command(
           process.exit(1);
         }
       }
-      comments = await collectDiff(options, mrSource, { pathGlobs });
+      comments = await collectDiff(options, mrSource, { pathGlobs, onFileDensity });
     }
 
-    const ranked = rankComments(comments, sortKey);
+    const ranked = rankCommentsWeighted(comments, densityWeights(densities), sortKey);
     const limited = typeof limit === "number" ? ranked.slice(0, limit) : ranked;
     if (limited.length === 0) {
       console.log(color.dim("No comments to judge."));

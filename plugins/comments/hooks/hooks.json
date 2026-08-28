@@ -1,0 +1,15 @@
+{
+  "description": "Block stop when the session's introduced comments far exceed the language baseline",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/density.ts\""
+          }
+        ]
+      }
+    ]
+  }
+}

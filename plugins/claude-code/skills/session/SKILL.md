@@ -100,6 +100,7 @@ Every query, grouped by category with a one-line gloss:
 #### Planning and Outcomes
 - `plans`: sessions using plan mode
 - `plan-iterations`: per-plan growth and carry-over
+- `plan-sizes`: weekly first/final plan size trend against the gate threshold
 - `outcomes`: session terminal states
 - `delegation`: subagent spawn model mix against the parent's main model, generic vs pinned-agent split
 - `review-precision`: per-angle verdict and fix-outcome mix for code-review findings

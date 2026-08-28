@@ -396,7 +396,7 @@ function resolveFullLabel(input: string): string {
   return fullLabel(input.slice(0, dot), input.slice(dot + 1));
 }
 
-async function runCommand(labelArg: string): Promise<void> {
+function runCommand(labelArg: string): void {
   const uid = requireUid();
   const label = resolveFullLabel(labelArg);
   const result = Bun.spawnSync(["launchctl", "kickstart", `gui/${uid}/${label}`], {
@@ -455,12 +455,12 @@ if (import.meta.main) {
           "Kickstart an installed agent immediately (<group>.<label> or full launchd label)",
       },
     },
-    async (parsed) => {
-      await runCommand(parsed._.label);
+    (parsed) => {
+      runCommand(parsed._.label);
     },
   );
 
-  cli(
+  await cli(
     {
       name: "scheduled",
       commands: [syncCmd, listCmd, statusCmd, runCmd],

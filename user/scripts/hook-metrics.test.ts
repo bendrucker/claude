@@ -121,7 +121,7 @@ test("timeHook records an error outcome and rethrows", async () => {
   const path = metricsPath();
   const boom = new Error("boom");
 
-  await expect(
+  expect(
     timeHook(
       "worktree",
       { session_id: "abc" },

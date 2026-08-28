@@ -158,12 +158,12 @@ export async function mergeViaGlab(branch: string, autoMerge: boolean): Promise<
 }
 
 export interface MergeActions {
-  getProjectConfig(): Promise<ProjectConfig>;
-  getMrIid(branch: string): Promise<number>;
-  getMergeRequest(iid: number): Promise<MergeRequestDetail>;
-  isRebasedOnTarget(target: string, source: string): Promise<boolean | null>;
-  addToMergeTrain(opts: MergeTrainOptions): Promise<void>;
-  mergeViaGlab(branch: string, autoMerge: boolean): Promise<void>;
+  getProjectConfig: () => Promise<ProjectConfig>;
+  getMrIid: (branch: string) => Promise<number>;
+  getMergeRequest: (iid: number) => Promise<MergeRequestDetail>;
+  isRebasedOnTarget: (target: string, source: string) => Promise<boolean | null>;
+  addToMergeTrain: (opts: MergeTrainOptions) => Promise<void>;
+  mergeViaGlab: (branch: string, autoMerge: boolean) => Promise<void>;
 }
 
 const defaultActions: MergeActions = {

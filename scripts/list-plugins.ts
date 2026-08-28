@@ -67,4 +67,4 @@ async function main(): Promise<void> {
   console.log(JSON.stringify(await Promise.all(plugins.map(toMatrixEntry))));
 }
 
-main();
+await main();

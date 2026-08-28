@@ -208,4 +208,4 @@ async function main() {
   for (const [category, n] of Object.entries(byCategory)) console.log(`  ${category}: ${n}`);
 }
 
-if (import.meta.main) main();
+if (import.meta.main) await main();

@@ -84,8 +84,8 @@ describe("validateFiles", () => {
     expect(results[2]?.violations.length).toBeGreaterThan(0);
   });
 
-  it("rejects on file not found", async () => {
-    await expect(validateFile("/nonexistent/file.svg")).rejects.toThrow();
+  it("rejects on file not found", () => {
+    expect(validateFile("/nonexistent/file.svg")).rejects.toThrow();
   });
 });
 

@@ -116,9 +116,9 @@ describe("judgeComments", () => {
     const inputs = Array.from({ length: total }, (_, i) => input({ text: `// comment ${i}` }));
     const callSizes: number[] = [];
     let cursor = 0;
-    const fake: CommentJudge = async (batch) => {
+    const fake: CommentJudge = (batch) => {
       callSizes.push(batch.length);
-      return batch.map(() => verdict({ rationale: `r${cursor++}` }));
+      return Promise.resolve(batch.map(() => verdict({ rationale: `r${cursor++}` })));
     };
 
     const result = await judgeComments(fake, inputs);
@@ -132,9 +132,9 @@ describe("judgeComments", () => {
 
   test("returns an empty array for no inputs without calling the judge", async () => {
     let called = false;
-    const fake: CommentJudge = async () => {
+    const fake: CommentJudge = () => {
       called = true;
-      return [];
+      return Promise.resolve([]);
     };
     expect(await judgeComments(fake, [])).toEqual([]);
     expect(called).toBe(false);

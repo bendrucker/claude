@@ -413,7 +413,7 @@ if (import.meta.main) {
 
   const callbackActions: DispatchActions = argv.flags.callback
     ? defaultActions
-    : { ...defaultActions, findXcallRunner: async () => null };
+    : { ...defaultActions, findXcallRunner: () => Promise.resolve(null) };
 
   if (useBulkJson) {
     const attributes: Record<string, string> = {};

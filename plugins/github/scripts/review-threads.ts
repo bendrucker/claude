@@ -162,7 +162,7 @@ const reactCmd = command(
 );
 
 if (import.meta.main) {
-  cli(
+  await cli(
     {
       name: "review-threads",
       commands: [replyCmd, resolveCmd, reactCmd],

@@ -249,4 +249,4 @@ async function main() {
   for (const [repo, n] of Object.entries(byRepo)) console.log(`  ${repo}: ${n}`);
 }
 
-if (import.meta.main) main();
+if (import.meta.main) await main();

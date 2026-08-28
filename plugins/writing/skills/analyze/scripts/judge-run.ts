@@ -310,7 +310,7 @@ if (import.meta.main) {
     },
   );
 
-  cli(
+  await cli(
     {
       name: "judge-run",
       help: {

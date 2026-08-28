@@ -195,13 +195,14 @@ describe("dispatch", () => {
   } {
     const calls = { xcall: [] as string[], open: [] as string[] };
     const actions: DispatchActions = {
-      findXcallRunner: async () => "/runner",
-      xcall: async (_runner, url) => {
+      findXcallRunner: () => Promise.resolve("/runner"),
+      xcall: (_runner, url) => {
         calls.xcall.push(url);
-        return "";
+        return Promise.resolve("");
       },
-      openUrl: async (command) => {
+      openUrl: (command) => {
         calls.open.push(command);
+        return Promise.resolve();
       },
       ...overrides,
     };
@@ -210,9 +211,9 @@ describe("dispatch", () => {
 
   test("runs via xcall and parses the returned id", async () => {
     const { actions, calls } = trackingActions({
-      xcall: async (_runner, url) => {
+      xcall: (_runner, url) => {
         calls.xcall.push(url);
-        return "things:///x-callback-url/add?x-things-id=ABC123&x-source=Things";
+        return Promise.resolve("things:///x-callback-url/add?x-things-id=ABC123&x-source=Things");
       },
     });
 
@@ -230,7 +231,7 @@ describe("dispatch", () => {
   });
 
   test("returns a null id when xcall surfaces no id", async () => {
-    const { actions } = trackingActions({ xcall: async () => "" });
+    const { actions } = trackingActions({ xcall: () => Promise.resolve("") });
 
     const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
 
@@ -239,7 +240,7 @@ describe("dispatch", () => {
   });
 
   test("falls back to openUrl when no runner is available", async () => {
-    const { actions, calls } = trackingActions({ findXcallRunner: async () => null });
+    const { actions, calls } = trackingActions({ findXcallRunner: () => Promise.resolve(null) });
 
     const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
 
@@ -271,9 +272,7 @@ describe("dispatch", () => {
     ["non-xcall error", new Error("spawn blew up"), "spawn blew up", null],
   ])("falls back to openUrl and reports a %s", async (_name, thrown, reason, detail) => {
     const { actions, calls } = trackingActions({
-      xcall: async () => {
-        throw thrown;
-      },
+      xcall: () => Promise.reject(thrown),
     });
 
     const result = await dispatch("add", new Map([["title", "Buy milk"]]), actions);
@@ -284,15 +283,13 @@ describe("dispatch", () => {
     expect(calls.open).toEqual(["add"]);
   });
 
-  test("propagates openUrl errors", async () => {
+  test("propagates openUrl errors", () => {
     const { actions } = trackingActions({
-      findXcallRunner: async () => null,
-      openUrl: async () => {
-        throw new Error("open blocked");
-      },
+      findXcallRunner: () => Promise.resolve(null),
+      openUrl: () => Promise.reject(new Error("open blocked")),
     });
 
-    await expect(dispatch("add", new Map([["title", "Buy milk"]]), actions)).rejects.toThrow(
+    expect(dispatch("add", new Map([["title", "Buy milk"]]), actions)).rejects.toThrow(
       "open blocked",
     );
   });
@@ -358,11 +355,11 @@ describe("resolveTagParams", () => {
 
   // The silent drop this guards: Things takes an unknown tag, reports success,
   // and writes the todo without it.
-  test("rejects an unknown tag instead of dropping it", async () => {
+  test("rejects an unknown tag instead of dropping it", () => {
     const { requirer } = stubRequirer(["claude"]);
     const params = new Map([["tags", "claude,bug"]]);
 
-    await expect(resolveTagParams(params, false, requirer)).rejects.toThrow("Tag not found: bug");
+    expect(resolveTagParams(params, false, requirer)).rejects.toThrow("Tag not found: bug");
   });
 
   test("passes create_tags through so an unknown tag can be created", async () => {

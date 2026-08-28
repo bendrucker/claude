@@ -225,4 +225,4 @@ async function main() {
   for (const [host, n] of Object.entries(byHost)) console.log(`  ${host}: ${n}`);
 }
 
-main();
+await main();

@@ -59,10 +59,10 @@ describe("render", () => {
     expect(pngBuffer.length).toBeGreaterThan(0);
   });
 
-  it("throws on invalid SVG content", async () => {
+  it("throws on invalid SVG content", () => {
     const invalidSvg = Buffer.from("not valid svg content");
     const outputPath = path.join(tmpDir, "invalid.png");
 
-    await expect(render(invalidSvg, outputPath)).rejects.toThrow();
+    expect(render(invalidSvg, outputPath)).rejects.toThrow();
   });
 });

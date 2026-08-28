@@ -188,8 +188,9 @@ describe("formatContext", () => {
   });
 });
 
-const noRemotes = async () => "";
-const githubSshRemote = async () => "remote.origin.url git@github.com:bendrucker/claude.git\n";
+const noRemotes = () => Promise.resolve("");
+const githubSshRemote = () =>
+  Promise.resolve("remote.origin.url git@github.com:bendrucker/claude.git\n");
 
 describe("processInput", () => {
   test("suggests the HTTPS retry for a Secretive refusal on a GitHub SSH clone", async () => {
@@ -231,7 +232,8 @@ describe("processInput", () => {
   });
 
   test("stays silent when a bare pull fails against an unrecognized remote", async () => {
-    const unknownRemote = async () => "remote.origin.url git@git.example.com:owner/repo.git\n";
+    const unknownRemote = () =>
+      Promise.resolve("remote.origin.url git@git.example.com:owner/repo.git\n");
     expect(await processInput(mockInput("git pull", SECRETIVE_FAILURE), unknownRemote)).toBeNull();
   });
 
@@ -243,7 +245,7 @@ describe("processInput", () => {
     },
     {
       name: "gitlab remote routes through glab",
-      remotes: async () => "remote.origin.url git@gitlab.com:owner/repo.git\n",
+      remotes: () => Promise.resolve("remote.origin.url git@gitlab.com:owner/repo.git\n"),
       expected: "url.https://gitlab.com/.insteadOf=git@gitlab.com:",
     },
   ])(

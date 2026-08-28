@@ -339,7 +339,7 @@ const summaryCmd = command(
   },
 );
 
-cli(
+await cli(
   {
     name: "discussions",
     commands: [createCmd, listCmd, resolveCmd, summaryCmd],

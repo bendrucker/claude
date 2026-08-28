@@ -59,7 +59,7 @@ const check = command({ name: "check" }, async () => {
   console.log(green("\nAll schema overlays are current with upstream."));
 });
 
-cli(
+await cli(
   {
     name: "schemas",
     commands: [check],

@@ -85,11 +85,11 @@ describe("store", () => {
 
     test("creates directory if it does not exist", async () => {
       const dir = join(tmpDir, "review-inbox");
-      await expect(readdir(dir)).rejects.toThrow();
+      expect(readdir(dir)).rejects.toThrow();
 
       await writeState({ dispatched: [] }, tmpDir);
 
-      await expect(readdir(dir)).resolves.toBeDefined();
+      expect(readdir(dir)).resolves.toBeDefined();
     });
   });
 

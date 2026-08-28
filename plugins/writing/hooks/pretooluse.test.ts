@@ -261,7 +261,7 @@ describe("heading checker gate", () => {
     "agrees with headings.check on .%s",
     async (ext) => {
       const toolInput = { file_path: `docs/note.${ext}`, content: HEADING_VIOLATION };
-      const direct = await headingCheck(mockInput("Write", toolInput));
+      const direct = headingCheck(mockInput("Write", toolInput));
       const { log } = await dispatch(mockInput("Write", toolInput));
       expect(log.category ?? null).toBe(direct?.category ?? null);
     },

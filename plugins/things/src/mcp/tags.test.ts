@@ -47,11 +47,11 @@ describe("createTagRequirer", () => {
     expect(state.fetches).toBe(2);
   });
 
-  test("names the unknown tags and what Things holds", async () => {
+  test("names the unknown tags and what Things holds", () => {
     const { actions } = stubActions(["claude"]);
     const require = createTagRequirer(actions);
 
-    await expect(require(["bug", "review"], false)).rejects.toThrow(
+    expect(require(["bug", "review"], false)).rejects.toThrow(
       "Tag not found: bug, review. Existing tags: claude. Pass create_tags to create the missing ones.",
     );
   });
@@ -64,10 +64,10 @@ describe("createTagRequirer", () => {
     expect(state.created).toEqual([["bug"]]);
   });
 
-  test("reports a tag Things accepted the create for but does not hold", async () => {
+  test("reports a tag Things accepted the create for but does not hold", () => {
     const { actions } = stubActions([]);
     const require = createTagRequirer({ ...actions, createTags: () => Promise.resolve() });
 
-    await expect(require(["bug"], true)).rejects.toThrow("Things did not create: bug");
+    expect(require(["bug"], true)).rejects.toThrow("Things did not create: bug");
   });
 });

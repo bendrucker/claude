@@ -448,7 +448,7 @@ describe("fail open", () => {
   it("reports rather than swallows an unusable state root", async () => {
     await Bun.write(join(stateRoot, "blocked"), "");
     const blocked = join(stateRoot, "blocked", "nested");
-    await expect(processInput(mockInput("My plan"), blocked)).rejects.toBeInstanceOf(
+    expect(processInput(mockInput("My plan"), blocked)).rejects.toBeInstanceOf(
       StateUnavailableError,
     );
   });

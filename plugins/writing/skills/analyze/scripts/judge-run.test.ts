@@ -13,15 +13,15 @@ function verdictFor(flags: Partial<Record<CriterionKey, boolean>>): JudgeVerdict
 }
 
 describe("runGate", () => {
-  test("rejects a stale prompt hash before any judging", async () => {
-    const judge = async () => verdictFor({});
-    await expect(runGate(judge, "0".repeat(64))).rejects.toThrow("does not match the pinned");
+  test("rejects a stale prompt hash before any judging", () => {
+    const judge = () => Promise.resolve(verdictFor({}));
+    expect(runGate(judge, "0".repeat(64))).rejects.toThrow("does not match the pinned");
   });
 
   test("passes when the judge matches every committed expectation", async () => {
     // A mock judge that flags exactly the criterion each positive fixture
     // targets and stays clean on negatives, keyed off the fixture text.
-    const judge = async (text: string) => {
+    const judge = (text: string) => {
       const flags: Partial<Record<CriterionKey, boolean>> = {};
       if (text.includes("All 12 tests pass")) flags.information_density = true;
       if (text.includes("Renamed the Config struct")) flags.motivation_presence = true;
@@ -29,7 +29,7 @@ describe("runGate", () => {
       if (text.includes("should hopefully")) flags.hedging_density = true;
       if (text.includes("Excellent question")) flags.sycophancy = true;
       if (text.includes("## Key Benefits")) flags.press_release_structure = true;
-      return verdictFor(flags);
+      return Promise.resolve(verdictFor(flags));
     };
     const results = await runGate(judge, JUDGE_PROMPT_SHA256);
     expect(results.length).toBeGreaterThan(0);
@@ -37,7 +37,7 @@ describe("runGate", () => {
   });
 
   test("reports per-criterion mismatches when the judge drifts", async () => {
-    const judge = async () => verdictFor({ marketing_phrasing: true });
+    const judge = () => Promise.resolve(verdictFor({ marketing_phrasing: true }));
     const results = await runGate(judge, JUDGE_PROMPT_SHA256);
     const negative = results.find((r) => r.id === "negative-mechanism-first");
     expect(negative?.pass).toBe(false);

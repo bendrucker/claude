@@ -1,0 +1,3 @@
+# Local-only ground truth: work-host content and regenerable metric rows.
+data/
+results/

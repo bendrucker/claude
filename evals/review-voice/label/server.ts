@@ -2,6 +2,13 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+
+const Label = z.object({
+  id: z.string().regex(/^[\w-]+$/),
+  label: z.enum(["good", "bad", "skip"]),
+  note: z.string().default(""),
+});
 
 // Local labeling server for review-voice candidates. Serves the UI, hands the
 // browser the mined candidates, and persists each verdict to labels/<id>.json so
@@ -66,14 +73,14 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/label" && req.method === "POST") {
-      const body = (await req.json()) as { id?: string; label?: string; note?: string };
-      if (!body.id || !/^[\w-]+$/.test(body.id)) return new Response("bad id", { status: 400 });
-      if (!body.label || !["good", "bad", "skip"].includes(body.label)) {
-        return new Response("bad label", { status: 400 });
-      }
+      const body = Label.safeParse(await req.json());
+      if (!body.success) return new Response(z.prettifyError(body.error), { status: 400 });
       await mkdir(argv.flags.labels, { recursive: true });
-      const record = { id: body.id, label: body.label, note: body.note ?? "" };
-      await Bun.write(join(argv.flags.labels, `${body.id}.json`), JSON.stringify(record, null, 2));
+      const record = body.data;
+      await Bun.write(
+        join(argv.flags.labels, `${record.id}.json`),
+        JSON.stringify(record, null, 2),
+      );
       return Response.json({ ok: true });
     }
 

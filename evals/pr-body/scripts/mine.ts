@@ -2,6 +2,8 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeJson } from "../../../packages/decode/index";
 
 // Mine PR bodies authored via Claude Code sessions. The session index's
 // pr_links table maps sessions to the PRs they opened; the bodies themselves
@@ -11,23 +13,23 @@ import { cli } from "cleye";
 // and work PR bodies live on private hosts anyway. The SQL below is hardcoded
 // to host = 'local' and public bendrucker/* repos; keep it that way.
 
-export interface MinedPr {
-  repository: string;
-  pr_number: number;
-  url: string;
-  opened_at: string;
-  session_id: string;
-}
+export const MinedPr = z.looseObject({
+  repository: z.string(),
+  pr_number: z.number(),
+  url: z.string(),
+  session_id: z.string(),
+});
+export type MinedPr = z.infer<typeof MinedPr>;
 
-export interface FetchedPr {
-  number: number;
-  title: string;
-  body: string;
-  url: string;
-  state: string;
-  createdAt: string;
-  author: { login: string };
-}
+export const FetchedPr = z.looseObject({
+  number: z.number(),
+  title: z.string(),
+  body: z.string(),
+  url: z.string(),
+  state: z.string(),
+  createdAt: z.string(),
+});
+export type FetchedPr = z.infer<typeof FetchedPr>;
 
 export interface Item {
   id: string;
@@ -147,7 +149,7 @@ async function queryMined(dbPath: string): Promise<MinedPr[]> {
   if (code !== 0) throw new Error(`duckdb failed (${code}): ${err.trim()}`);
   const trimmed = out.trim();
   if (!trimmed) return [];
-  return JSON.parse(trimmed) as MinedPr[];
+  return decodeJson(z.array(MinedPr), trimmed, `duckdb ${dbPath}`);
 }
 
 async function fetchRepoPrs(repo: string): Promise<Map<number, FetchedPr>> {
@@ -175,7 +177,7 @@ async function fetchRepoPrs(repo: string): Promise<Map<number, FetchedPr>> {
     proc.exited,
   ]);
   if (code !== 0) throw new Error(`gh pr list --repo ${repo} failed (${code}): ${err.trim()}`);
-  const prs = JSON.parse(out) as FetchedPr[];
+  const prs = decodeJson(z.array(FetchedPr), out, `gh pr list --repo ${repo}`);
   return new Map(prs.map((pr) => [pr.number, pr]));
 }
 

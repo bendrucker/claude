@@ -2,6 +2,9 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+
+const Feedback = z.looseObject({ id: z.string().regex(/^[\w-]+$/), feedback: z.unknown() });
 
 // Local labeling server. Serves the review UI, hands the browser the mined samples, and persists
 // reviewer feedback to feedback/<id>.json so a later analysis pass can read it back off disk.
@@ -64,10 +67,10 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/feedback" && req.method === "POST") {
-      const body = (await req.json()) as { id?: string; feedback?: unknown };
-      if (!body.id || !/^[\w-]+$/.test(body.id)) return new Response("bad id", { status: 400 });
-      const path = join(argv.flags.feedback, `${body.id}.json`);
-      await Bun.write(path, JSON.stringify(body.feedback, null, 2));
+      const body = Feedback.safeParse(await req.json());
+      if (!body.success) return new Response(z.prettifyError(body.error), { status: 400 });
+      const path = join(argv.flags.feedback, `${body.data.id}.json`);
+      await Bun.write(path, JSON.stringify(body.data.feedback, null, 2));
       return Response.json({ ok: true });
     }
 

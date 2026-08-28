@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeJson } from "../../../packages/decode/index";
 
 // Mine review-comment bodies out of the Claude Code session index. The bodies
 // posted on GitLab MRs never land inline in the `glab`/`draft-note` commands
@@ -33,13 +35,29 @@ function resolveDbPath(): string {
   return join(dataDir, "session.duckdb");
 }
 
-interface WriteRow {
-  host: string;
-  session_id: string;
-  timestamp: string;
-  file_path: string;
-  content: string;
-}
+const WriteRow = z.looseObject({
+  host: z.string(),
+  session_id: z.string(),
+  timestamp: z.string(),
+  file_path: z.string(),
+  content: z.string(),
+});
+type WriteRow = z.infer<typeof WriteRow>;
+
+const ReviewPayload = z.union([
+  z.array(z.unknown()),
+  z.looseObject({ comments: z.array(z.unknown()) }).transform((value) => value.comments),
+  z.looseObject({ notes: z.array(z.unknown()) }).transform((value) => value.notes),
+]);
+
+const Comment = z.looseObject({
+  body: z.string().optional().catch(undefined),
+  comment: z.string().optional().catch(undefined),
+  text: z.string().optional().catch(undefined),
+  file: z.string().optional().catch(undefined),
+  path: z.string().optional().catch(undefined),
+  line: z.number().optional().catch(undefined),
+});
 
 interface Candidate {
   id: string;
@@ -86,7 +104,7 @@ async function queryRows(dbPath: string): Promise<WriteRow[]> {
   if (code !== 0) throw new Error(`duckdb failed (${code}): ${err.trim()}`);
   const trimmed = out.trim();
   if (!trimmed) return [];
-  return JSON.parse(trimmed) as WriteRow[];
+  return decodeJson(z.array(WriteRow), trimmed, `duckdb ${dbPath}`);
 }
 
 function isText(fp: string): "json" | "md" | null {
@@ -102,9 +120,6 @@ function workdirOf(fp: string): string {
   return basename(dir) || dir;
 }
 
-// A review payload is either a bare array of comment objects or a wrapper with a
-// `comments`/`notes` array. Each element carries the comment body plus its diff
-// anchor. Anything else is treated as a single free-text body (a summary or reply).
 function bodiesFromJson(
   content: string,
 ): Array<{ body: string; file: string | null; line: number | null }> {
@@ -114,29 +129,24 @@ function bodiesFromJson(
   } catch {
     return [];
   }
-  const items = Array.isArray(parsed)
-    ? parsed
-    : Array.isArray((parsed as Record<string, unknown>)?.comments)
-      ? ((parsed as Record<string, unknown>).comments as unknown[])
-      : Array.isArray((parsed as Record<string, unknown>)?.notes)
-        ? ((parsed as Record<string, unknown>).notes as unknown[])
-        : null;
-  if (!items) return [];
+  const items = ReviewPayload.safeParse(parsed);
+  if (!items.success) return [];
+
   const out: Array<{ body: string; file: string | null; line: number | null }> = [];
-  for (const item of items) {
+  for (const item of items.data) {
     if (typeof item === "string") {
       out.push({ body: item, file: null, line: null });
       continue;
     }
-    if (item && typeof item === "object") {
-      const rec = item as Record<string, unknown>;
-      const body = rec.body ?? rec.comment ?? rec.text;
-      if (typeof body !== "string") continue;
-      const file =
-        typeof rec.file === "string" ? rec.file : typeof rec.path === "string" ? rec.path : null;
-      const line = typeof rec.line === "number" ? rec.line : null;
-      out.push({ body, file, line });
-    }
+    const comment = Comment.safeParse(item);
+    if (!comment.success) continue;
+    const body = comment.data.body ?? comment.data.comment ?? comment.data.text;
+    if (body === undefined) continue;
+    out.push({
+      body,
+      file: comment.data.file ?? comment.data.path ?? null,
+      line: comment.data.line ?? null,
+    });
   }
   return out;
 }

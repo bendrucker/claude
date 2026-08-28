@@ -3,6 +3,8 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
+import { z } from "zod";
+import { decodeFile } from "../../../packages/decode/index";
 
 // Summarize labeled review-voice candidates: verdict counts and the full text of
 // every "bad" case with its note, so the failing phrasings can be lifted into
@@ -33,20 +35,20 @@ const dim = (s: string) => `\x1b[90m${s}\x1b[0m`;
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
 
-interface Candidate {
-  id: string;
-  host: string;
-  workdir: string;
-  source: string;
-  file: string | null;
-  line: number | null;
-  body: string;
-}
-interface Label {
-  id: string;
-  label: "good" | "bad" | "skip";
-  note: string;
-}
+const Candidate = z.looseObject({
+  id: z.string(),
+  host: z.string(),
+  source: z.string(),
+  line: z.number().nullable(),
+  body: z.string(),
+});
+
+const Label = z.looseObject({
+  id: z.string(),
+  label: z.enum(["good", "bad", "skip"]),
+  note: z.string(),
+});
+type Label = z.infer<typeof Label>;
 
 async function readLabels(dir: string): Promise<Map<string, Label>> {
   const map = new Map<string, Label>();
@@ -58,14 +60,14 @@ async function readLabels(dir: string): Promise<Map<string, Label>> {
   }
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
-    const rec = (await Bun.file(join(dir, name)).json()) as Label;
+    const rec = await decodeFile(Label, join(dir, name));
     map.set(rec.id, rec);
   }
   return map;
 }
 
 async function main() {
-  const candidates = (await Bun.file(argv.flags.data).json()) as Candidate[];
+  const candidates = await decodeFile(z.array(Candidate), argv.flags.data);
   const labels = await readLabels(argv.flags.labels);
   const byId = new Map(candidates.map((c) => [c.id, c]));
 

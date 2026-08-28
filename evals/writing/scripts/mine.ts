@@ -2,6 +2,8 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { cli } from "cleye";
+import { z } from "zod";
+import { decodeFile, decodeJson } from "../../../packages/decode/index";
 
 // Assemble a labelable set of writing:rewrite (input, output) pairs.
 //
@@ -20,11 +22,19 @@ import { cli } from "cleye";
 // The probe SQL is hardcoded to host = 'local'; keep it that way. The synthetic
 // drafts are the only content that ships.
 
+const Draft = z.looseObject({
+  category: z.string().optional(),
+  input: z.string(),
+  output: z.string(),
+});
+
 export interface RewriteDraft {
   category: string;
   input: string;
   output: string;
 }
+
+const Probe = z.array(z.looseObject({ invocations: z.number() }));
 
 export interface Item {
   id: string;
@@ -129,7 +139,7 @@ async function probeInvocations(dbPath: string): Promise<number | null> {
     proc.exited,
   ]);
   if (code !== 0) throw new Error(`duckdb failed (${code}): ${err.trim()}`);
-  const rows = JSON.parse(out.trim() || "[]") as Array<{ invocations: number }>;
+  const rows = decodeJson(Probe, out.trim() || "[]", `duckdb ${dbPath}`);
   return rows[0]?.invocations ?? 0;
 }
 
@@ -137,10 +147,7 @@ async function loadDrafts(dir: string): Promise<RewriteDraft[]> {
   const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).toSorted();
   const drafts: RewriteDraft[] = [];
   for (const name of names) {
-    const draft = (await Bun.file(join(dir, name)).json()) as Partial<RewriteDraft>;
-    if (typeof draft.input !== "string" || typeof draft.output !== "string") {
-      throw new Error(`${name}: missing input/output string`);
-    }
+    const draft = await decodeFile(Draft, join(dir, name));
     drafts.push({
       category: draft.category ?? basename(name, ".json"),
       input: draft.input,

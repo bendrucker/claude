@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
-import { type Author, isBot, isReviewTarget, loadExtraReviewers } from "./reviewers";
+import { z } from "zod";
+import { Author, isBot, isReviewTarget, loadExtraReviewers } from "./reviewers";
 
 const QUERY = `
 query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
@@ -44,29 +45,33 @@ query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
 }
 `;
 
-export interface Comment {
-  author: Author | null;
-  body: string;
-  createdAt: string;
-}
+export const Comment = z.looseObject({
+  author: Author.nullable(),
+  body: z.string(),
+  createdAt: z.string(),
+});
+export type Comment = z.infer<typeof Comment>;
 
-export interface Thread {
-  id: string;
-  isResolved: boolean;
-  isOutdated: boolean;
-  path: string;
-  line: number | null;
-  startLine: number | null;
-  comments: { nodes: Comment[] };
-}
+export const Thread = z.looseObject({
+  id: z.string(),
+  isResolved: z.boolean(),
+  isOutdated: z.boolean(),
+  path: z.string(),
+  line: z.number().nullable(),
+  startLine: z.number().nullable(),
+  comments: z.looseObject({ nodes: z.array(Comment) }),
+});
+export type Thread = z.infer<typeof Thread>;
 
-export interface Review {
-  author: { login: string; __typename: string } | null;
-  submittedAt: string;
-  state: string;
-}
+export const Review = z.looseObject({
+  author: z.looseObject({ login: z.string(), __typename: z.string() }).nullable(),
+  submittedAt: z.string(),
+  state: z.string(),
+});
+export type Review = z.infer<typeof Review>;
 
-export type Role = "author" | "reviewer";
+export const Role = z.enum(["author", "reviewer"]);
+export type Role = z.infer<typeof Role>;
 
 export function isBotThread(thread: Thread): boolean {
   return isBot(thread.comments.nodes[0]?.author);
@@ -214,28 +219,28 @@ export function formatThreads(
   return lines.join("\n");
 }
 
-interface GraphQLResponse {
-  data: {
-    viewer: { login: string };
-    repository: {
-      pullRequest: {
-        title: string;
-        author: { login: string };
-        reviews: { nodes: Review[] };
-        reviewThreads: {
-          totalCount: number;
-          pageInfo: { hasNextPage: boolean; endCursor: string };
-          nodes: Thread[];
-        };
-      };
-    };
-  };
-}
+const GraphQLResponse = z.looseObject({
+  data: z.looseObject({
+    viewer: z.looseObject({ login: z.string() }),
+    repository: z.looseObject({
+      pullRequest: z.looseObject({
+        title: z.string(),
+        author: Author.nullable(),
+        reviews: z.looseObject({ nodes: z.array(Review) }),
+        reviewThreads: z.looseObject({
+          totalCount: z.number(),
+          pageInfo: z.looseObject({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
+          nodes: z.array(Thread),
+        }),
+      }),
+    }),
+  }),
+});
 
 async function fetchGraphQL(
   query: string,
   variables: Record<string, string | number | undefined>,
-): Promise<GraphQLResponse> {
+): Promise<z.infer<typeof GraphQLResponse>> {
   const args = ["gh", "api", "graphql", "-f", `query=${query}`];
   for (const [key, value] of Object.entries(variables)) {
     if (value != null) {
@@ -255,7 +260,7 @@ async function fetchGraphQL(
   }
 
   try {
-    return JSON.parse(stdout);
+    return GraphQLResponse.parse(JSON.parse(stdout));
   } catch {
     throw new Error(`Failed to parse GraphQL response: ${stdout.slice(0, 200)}`);
   }
@@ -307,7 +312,7 @@ async function main(): Promise<void> {
     if (!prTitle) {
       viewer = result.data.viewer.login;
       prTitle = pr.title;
-      prAuthor = pr.author.login;
+      prAuthor = pr.author?.login ?? "ghost";
       reviews = pr.reviews.nodes;
       totalCount = pr.reviewThreads.totalCount;
     }
@@ -315,15 +320,15 @@ async function main(): Promise<void> {
     allThreads.push(...pr.reviewThreads.nodes);
 
     const pageInfo = pr.reviewThreads.pageInfo;
-    cursor = pageInfo.hasNextPage ? pageInfo.endCursor : undefined;
+    cursor = pageInfo.hasNextPage ? (pageInfo.endCursor ?? undefined) : undefined;
   } while (cursor);
 
-  const roleFlag = argv.flags.role;
-  if (roleFlag && roleFlag !== "author" && roleFlag !== "reviewer") {
-    console.error(`Invalid --role: ${roleFlag} (must be "author" or "reviewer")`);
+  const roleFlag = argv.flags.role ? Role.safeParse(argv.flags.role) : null;
+  if (roleFlag && !roleFlag.success) {
+    console.error(`Invalid --role: ${argv.flags.role} (must be "author" or "reviewer")`);
     process.exit(1);
   }
-  const role: Role = (roleFlag as Role) ?? detectRole(viewer, prAuthor);
+  const role: Role = roleFlag?.data ?? detectRole(viewer, prAuthor);
 
   let since: Date | undefined;
   if (argv.flags.since) {
@@ -363,8 +368,8 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch((error) => {
-    console.error(error.message);
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
 }

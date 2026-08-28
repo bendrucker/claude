@@ -1,9 +1,17 @@
 #!/usr/bin/env bun
 
-import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 
-export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | null {
-  const command = (input.tool_input as { command?: string }).command;
+export const HookInput = z.looseObject({
+  hook_event_name: z.literal("PostToolUse"),
+  tool_input: z.looseObject({ command: z.string().optional().catch(undefined) }).catch({}),
+  tool_response: z.unknown(),
+});
+export type HookInput = z.infer<typeof HookInput>;
+
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const command = input.tool_input.command;
   if (!command || !command.includes("glab")) return null;
 
   const response = JSON.stringify(input.tool_response ?? "");
@@ -19,16 +27,16 @@ export function processInput(input: PostToolUseHookInput): SyncHookJSONOutput | 
 }
 
 async function main(): Promise<void> {
-  let input: PostToolUseHookInput;
+  let raw: unknown;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
+    raw = JSON.parse(await Bun.stdin.text());
   } catch {
     return;
   }
+  const input = HookInput.safeParse(raw);
+  if (!input.success) return;
 
-  if (input.hook_event_name !== "PostToolUse") return;
-
-  const output = processInput(input);
+  const output = processInput(input.data);
   if (output) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }

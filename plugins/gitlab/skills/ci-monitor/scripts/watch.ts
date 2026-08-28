@@ -4,6 +4,7 @@ import { type ExecSyncOptions, execSync } from "node:child_process";
 import { streamText } from "../../../scripts/merge";
 import { cli } from "cleye";
 import UrlPattern from "url-pattern";
+import { z } from "zod";
 
 const DEFAULT_INTERVAL_SECONDS = 180;
 const NO_HISTORY_INTERVAL_SECONDS = 30;
@@ -18,6 +19,41 @@ const MERGE_STATUS_RECHECK_SECONDS = 5;
 export type StatusState = "running" | "failing" | "success";
 export type InternalState = StatusState | "queued";
 export type MrState = "opened" | "closed" | "merged" | "locked";
+
+const Entries = z.array(z.unknown());
+
+// url-pattern's match() returns `any`.
+const TailMatch = z.looseObject({ iid: z.string() });
+
+const PipelineEntry = z.looseObject({
+  id: z.union([z.number(), z.string()]).optional().catch(undefined),
+  status: z.string().catch(""),
+  sha: z.string().catch(""),
+  source: z.string().catch(""),
+});
+
+const TimedPipeline = z.looseObject({
+  status: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+const JobEntry = z.looseObject({
+  name: z.string().catch(""),
+  status: z.string().catch(""),
+  allow_failure: z.boolean().catch(false),
+});
+
+const MrView = z.looseObject({
+  sha: z.string().catch(""),
+  source_branch: z.string().catch(""),
+  has_conflicts: z.boolean().catch(false),
+  merge_status: z.string().catch(""),
+  detailed_merge_status: z.string().catch(""),
+  state: z
+    .enum(["opened", "closed", "merged", "locked"])
+    .catch("opened") satisfies z.ZodType<MrState>,
+});
 
 export type Probe = {
   sha: string;
@@ -203,11 +239,11 @@ export function parseMrUrl(url: string): {
   }
   const tailPattern = new UrlPattern(":iid(/*)");
   const tail = path.slice(markerIndex + marker.length);
-  const tailMatch = tailPattern.match(tail);
-  if (!tailMatch) {
+  const tailMatch = TailMatch.safeParse(tailPattern.match(tail));
+  if (!tailMatch.success) {
     throw new Error(`Invalid GitLab MR URL: ${url}`);
   }
-  const iid = Number.parseInt(tailMatch.iid, 10);
+  const iid = Number.parseInt(tailMatch.data.iid, 10);
   if (Number.isNaN(iid)) {
     throw new Error(`Invalid MR IID in URL: ${url}`);
   }
@@ -274,22 +310,21 @@ export type PipelineRecord = {
 const EXCLUDED_PIPELINE_SOURCES = ["external", "parent_pipeline"];
 
 export function parsePipelineList(raw: unknown): PipelineRecord[] | null {
-  if (!Array.isArray(raw)) return null;
+  const entries = Entries.safeParse(raw);
+  if (!entries.success) return null;
   const records: PipelineRecord[] = [];
-  for (const entry of raw) {
-    if (!entry || typeof entry !== "object") continue;
-    const fields = entry as Record<string, unknown>;
-    const rawId = fields.id;
-    if (typeof rawId !== "number" && typeof rawId !== "string") continue;
-    const id = Number(rawId);
+  for (const entry of entries.data) {
+    const fields = PipelineEntry.safeParse(entry);
+    if (!fields.success) continue;
+    const id = Number(fields.data.id);
     // `Number("")` is 0, so an empty id would otherwise become a `run_id` of
     // "0" and get handed to the logs agent as if it were a real pipeline.
     if (!Number.isFinite(id) || id <= 0) continue;
     records.push({
       id,
-      status: normalizePipelineStatus(typeof fields.status === "string" ? fields.status : ""),
-      sha: typeof fields.sha === "string" ? fields.sha : "",
-      source: typeof fields.source === "string" ? fields.source : "",
+      status: normalizePipelineStatus(fields.data.status),
+      sha: fields.data.sha,
+      source: fields.data.source,
     });
   }
   return records;
@@ -346,15 +381,11 @@ const TIMED_PIPELINE_STATUSES = new Set(["success", "failed", "canceled"]);
 export function pipelineDurations(raw: unknown[]): number[] {
   const durations: number[] = [];
   for (const entry of raw) {
-    if (!entry || typeof entry !== "object") continue;
-    const record = entry as Record<string, unknown>;
-    const status = record.status;
-    const createdAt = record.created_at;
-    const updatedAt = record.updated_at;
-    if (typeof status !== "string" || !TIMED_PIPELINE_STATUSES.has(status)) continue;
-    if (typeof createdAt !== "string" || typeof updatedAt !== "string") continue;
-    const started = Date.parse(createdAt);
-    const ended = Date.parse(updatedAt);
+    const record = TimedPipeline.safeParse(entry);
+    if (!record.success) continue;
+    if (!TIMED_PIPELINE_STATUSES.has(record.data.status)) continue;
+    const started = Date.parse(record.data.created_at);
+    const ended = Date.parse(record.data.updated_at);
     if (Number.isNaN(started) || Number.isNaN(ended)) continue;
     const seconds = (ended - started) / 1000;
     if (seconds > 0) durations.push(seconds);
@@ -428,17 +459,17 @@ function fetchMrMetadata(
     return { ok: false, rateLimited: result.rateLimited, retryAfter: result.retryAfter };
   }
   try {
-    const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
-    const sha = typeof parsed.sha === "string" ? parsed.sha : "";
-    const sourceBranch = typeof parsed.source_branch === "string" ? parsed.source_branch : "";
-    const hasConflicts = parsed.has_conflicts === true;
-    const mergeStatus = typeof parsed.merge_status === "string" ? parsed.merge_status : "";
-    const detailedMergeStatus =
-      typeof parsed.detailed_merge_status === "string" ? parsed.detailed_merge_status : "";
-    const state = (typeof parsed.state === "string" ? parsed.state : "opened") as MrState;
+    const parsed = MrView.parse(JSON.parse(result.stdout));
     return {
       ok: true,
-      metadata: { sha, sourceBranch, hasConflicts, mergeStatus, detailedMergeStatus, state },
+      metadata: {
+        sha: parsed.sha,
+        sourceBranch: parsed.source_branch,
+        hasConflicts: parsed.has_conflicts,
+        mergeStatus: parsed.merge_status,
+        detailedMergeStatus: parsed.detailed_merge_status,
+        state: parsed.state,
+      },
     };
   } catch (err) {
     console.error(
@@ -489,15 +520,12 @@ export async function resolveMergeStatus(
   return current;
 }
 
-function parsePipeline(
-  parsed: Record<string, unknown>,
-): { id: string; status: InternalState; sha: string } | null {
-  const rawId = parsed.id;
-  const id = typeof rawId === "number" || typeof rawId === "string" ? String(rawId) : "";
+function parsePipeline(parsed: unknown): { id: string; status: InternalState; sha: string } | null {
+  const fields = PipelineEntry.safeParse(parsed);
+  if (!fields.success) return null;
+  const id = fields.data.id === undefined ? "" : String(fields.data.id);
   if (!id) return null;
-  const status = typeof parsed.status === "string" ? parsed.status : "";
-  const sha = typeof parsed.sha === "string" ? parsed.sha : "";
-  return { id, status: normalizePipelineStatus(status), sha };
+  return { id, status: normalizePipelineStatus(fields.data.status), sha: fields.data.sha };
 }
 
 export type PipelineTarget = { kind: "mr"; iid: number } | { kind: "branch"; branch: string };
@@ -569,18 +597,19 @@ function fetchJobs(projectEncoded: string, pipelineId: string, run: ExecFn = exe
     );
     return { ok: false };
   }
-  if (!Array.isArray(parsed)) {
+  const entries = Entries.safeParse(parsed);
+  if (!entries.success) {
     console.error(`glab api returned non-array JSON for jobs on pipeline ${pipelineId}`);
     return { ok: false };
   }
   const jobs: JobRecord[] = [];
-  for (const entry of parsed) {
-    if (!entry || typeof entry !== "object") continue;
-    const fields = entry as Record<string, unknown>;
+  for (const entry of entries.data) {
+    const fields = JobEntry.safeParse(entry);
+    if (!fields.success) continue;
     jobs.push({
-      name: typeof fields.name === "string" ? fields.name : "",
-      status: typeof fields.status === "string" ? fields.status : "",
-      allowFailure: fields.allow_failure === true,
+      name: fields.data.name,
+      status: fields.data.status,
+      allowFailure: fields.data.allow_failure,
     });
   }
   return { ok: true, jobs };
@@ -694,8 +723,7 @@ function fetchPipelineById(
     };
   }
   try {
-    const parsed = JSON.parse(result.stdout || "null") as Record<string, unknown> | null;
-    const pipeline = parsed ? parsePipeline(parsed) : null;
+    const pipeline = parsePipeline(JSON.parse(result.stdout || "null"));
     if (!pipeline) {
       // A successful glab call with an empty/null body for a specific pipeline
       // ID is unexpected (404s fail the exec). Surface this as a transient
@@ -783,9 +811,9 @@ function fetchInterval(projectEncoded: string, target: PipelineTarget): number {
     return DEFAULT_INTERVAL_SECONDS;
   }
   try {
-    const parsed = JSON.parse(result.stdout || "[]");
-    if (Array.isArray(parsed)) {
-      return computeInterval(pipelineDurations(parsed));
+    const parsed = Entries.safeParse(JSON.parse(result.stdout || "[]"));
+    if (parsed.success) {
+      return computeInterval(pipelineDurations(parsed.data));
     }
     console.error(
       `glab api returned non-array JSON while computing poll interval for ${label}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s`,

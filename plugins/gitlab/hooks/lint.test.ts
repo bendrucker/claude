@@ -2,10 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { defaultEnv, type LintEnv, MARKER_DIR, processInput } from "./lint";
+import { defaultEnv, type HookInput, type LintEnv, MARKER_DIR, processInput } from "./lint";
 
-function mockInput(command: string, cwd = "/repo"): PreToolUseHookInput {
+function mockInput(command: string, cwd = "/repo"): HookInput {
   return {
     session_id: "test-session",
     hook_event_name: "PreToolUse",
@@ -30,10 +29,8 @@ function fakeEnv(files: Record<string, string> = {}): LintEnv & { touched: strin
 }
 
 function decision(result: Awaited<ReturnType<typeof processInput>>) {
-  const output = result?.hookSpecificOutput as
-    | { permissionDecision?: string; permissionDecisionReason?: string; additionalContext?: string }
-    | undefined;
-  return output;
+  const output = result?.hookSpecificOutput;
+  return output?.hookEventName === "PreToolUse" ? output : undefined;
 }
 
 const GITLAB_REPO = {

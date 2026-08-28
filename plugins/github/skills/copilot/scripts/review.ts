@@ -6,6 +6,7 @@ import { dirname, join, sep } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import { getBorderCharacters, table } from "table";
+import { z } from "zod";
 
 const DEFAULT_MODEL = "gpt-5.6-terra";
 const CHEAP_MODEL = "gpt-5.6-luna";
@@ -101,22 +102,32 @@ export function daysUntilReset(resetDate: string, now: Date): number {
   return Math.max(1, Math.ceil((reset - now.getTime()) / 86_400_000));
 }
 
+const Snapshot = z.looseObject({
+  entitlement: z.number(),
+  credits_used: z.number().optional().catch(undefined),
+  remaining: z.number().optional().catch(undefined),
+});
+export type Snapshot = z.infer<typeof Snapshot>;
+
+const CopilotUser = z.looseObject({
+  quota_reset_date: z.string().optional().catch(undefined),
+  quota_snapshots: z.looseObject({ premium_interactions: z.unknown() }).optional().catch(undefined),
+});
+
 /**
  * Each figure derives the other, and an absent one must never fall back to a constant.
  * Defaulting a missing credits_used to 0 reads a nearly exhausted account as untouched, and
  * the guard then reserves against nothing and walks the session into billed overage.
  */
 export function deriveUsage(
-  snapshot: Record<string, unknown>,
+  snapshot: Snapshot,
   entitlement: number,
 ): { used: number; remaining: number } {
-  if (typeof snapshot.credits_used === "number") {
+  if (snapshot.credits_used !== undefined) {
     const used = snapshot.credits_used;
-    const remaining =
-      typeof snapshot.remaining === "number" ? snapshot.remaining : entitlement - used;
-    return { used, remaining };
+    return { used, remaining: snapshot.remaining ?? entitlement - used };
   }
-  if (typeof snapshot.remaining === "number") {
+  if (snapshot.remaining !== undefined) {
     return { used: entitlement - snapshot.remaining, remaining: snapshot.remaining };
   }
   throw new Error("premium_interactions quota reports neither credits_used nor remaining.");
@@ -136,23 +147,21 @@ export function readMeter(now: Date): Meter {
     throw new Error(`gh api /copilot_internal/user failed: ${result.stderr.toString().trim()}`);
   }
 
-  let payload: {
-    quota_reset_date?: string;
-    quota_snapshots?: { premium_interactions?: Record<string, unknown> };
-  };
+  let raw: unknown;
   try {
-    payload = JSON.parse(result.stdout.toString());
+    raw = JSON.parse(result.stdout.toString());
   } catch {
     throw new Error("gh api /copilot_internal/user returned output that is not JSON.");
   }
+  const payload = CopilotUser.parse(raw);
 
-  const snapshot = payload.quota_snapshots?.premium_interactions;
-  if (!snapshot || typeof snapshot.entitlement !== "number") {
+  const snapshot = Snapshot.safeParse(payload.quota_snapshots?.premium_interactions);
+  if (!snapshot.success) {
     throw new Error("No premium_interactions quota on this account.");
   }
 
-  const entitlement = snapshot.entitlement;
-  const { used, remaining } = deriveUsage(snapshot, entitlement);
+  const entitlement = snapshot.data.entitlement;
+  const { used, remaining } = deriveUsage(snapshot.data, entitlement);
   const resetDate = payload.quota_reset_date ?? "";
   const days = daysUntilReset(resetDate, now);
   const pace = remaining / days;

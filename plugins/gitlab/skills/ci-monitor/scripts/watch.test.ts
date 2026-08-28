@@ -301,8 +301,8 @@ describe("pipelineDurations", () => {
   ])("$name", ({ raw, expected }) => {
     const durations = pipelineDurations(raw);
     expect(durations).toHaveLength(expected.length);
-    durations.forEach((seconds, index) => {
-      expect(seconds).toBeCloseTo(expected[index] as number, 2);
+    expected.forEach((seconds, index) => {
+      expect(durations[index]).toBeCloseTo(seconds, 2);
     });
   });
 

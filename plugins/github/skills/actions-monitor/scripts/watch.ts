@@ -3,6 +3,7 @@
 import { type ExecSyncOptions, execSync } from "node:child_process";
 import { cli } from "cleye";
 import UrlPattern from "url-pattern";
+import { z } from "zod";
 
 const DEFAULT_INTERVAL_SECONDS = 180;
 const NO_HISTORY_INTERVAL_SECONDS = 30;
@@ -35,6 +36,51 @@ export type Probe = {
   mergeStateStatus: MergeStateStatus;
   prState: "OPEN" | "CLOSED" | "MERGED";
 };
+
+// url-pattern's match() returns `any`.
+const PrUrlParams = z.object({ owner: z.string(), repo: z.string(), number: z.string() });
+const RepoParams = z.object({ owner: z.string(), repo: z.string() });
+
+// gh reports a status outside the documented set as UNKNOWN, which the caller
+// already treats as undetermined.
+const MergeableField = z
+  .enum(["MERGEABLE", "CONFLICTING", "UNKNOWN"])
+  .catch("UNKNOWN") satisfies z.ZodType<Probe["mergeable"]>;
+const MergeStateStatusField = z
+  .enum(["BEHIND", "BLOCKED", "CLEAN", "DIRTY", "DRAFT", "HAS_HOOKS", "UNKNOWN", "UNSTABLE"])
+  .catch("UNKNOWN") satisfies z.ZodType<MergeStateStatus>;
+
+const PrView = z.looseObject({
+  headRefOid: z.string().catch(""),
+  headRefName: z.string().catch(""),
+  state: z.enum(["OPEN", "CLOSED", "MERGED"]).catch("OPEN"),
+  mergeable: MergeableField,
+  mergeStateStatus: MergeStateStatusField,
+});
+
+const MergeabilityView = z.looseObject({
+  mergeable: MergeableField,
+  mergeStateStatus: MergeStateStatusField,
+});
+
+const Check = z.looseObject({
+  state: z.string().optional().catch(undefined),
+  bucket: z.string().optional().catch(undefined),
+  name: z.string().optional().catch(undefined),
+});
+export type Check = z.infer<typeof Check>;
+const Checks = z.array(Check);
+
+const RunView = z.looseObject({
+  headSha: z.string().catch(""),
+  databaseId: z.union([z.number(), z.string()]).optional().catch(undefined),
+  status: z.string().catch(""),
+  conclusion: z.string().catch(""),
+});
+type RunView = z.infer<typeof RunView>;
+
+const RunList = z.array(RunView);
+const Durations = z.array(z.unknown());
 
 export type Event =
   | { type: "status"; state: StatusState; sha: string; run_id: string | null }
@@ -186,15 +232,15 @@ export function parsePrUrl(url: string): {
   const pattern = new UrlPattern("https\\://github.com/:owner/:repo/pull/:number(/*)", {
     segmentValueCharset: "a-zA-Z0-9-_.~%",
   });
-  const match = pattern.match(url);
-  if (!match) {
+  const match = PrUrlParams.safeParse(pattern.match(url));
+  if (!match.success) {
     throw new Error(`Invalid GitHub PR URL: ${url}`);
   }
-  const number = Number.parseInt(match.number, 10);
+  const number = Number.parseInt(match.data.number, 10);
   if (Number.isNaN(number)) {
     throw new Error(`Invalid PR number in URL: ${url}`);
   }
-  return { owner: match.owner, repo: match.repo, number };
+  return { owner: match.data.owner, repo: match.data.repo, number };
 }
 
 const stripGit = (s: string): string => (s.endsWith(".git") ? s.slice(0, -4) : s);
@@ -204,10 +250,10 @@ export function parseRepo(remoteUrl: string): { owner: string; repo: string } | 
   if (!trimmed) return null;
 
   const tryPattern = (pattern: string): { owner: string; repo: string } | null => {
-    const match = new UrlPattern(pattern, {
-      segmentValueCharset: "a-zA-Z0-9-_.~%",
-    }).match(trimmed);
-    return match ? { owner: match.owner, repo: stripGit(match.repo) } : null;
+    const match = RepoParams.safeParse(
+      new UrlPattern(pattern, { segmentValueCharset: "a-zA-Z0-9-_.~%" }).match(trimmed),
+    );
+    return match.success ? { owner: match.data.owner, repo: stripGit(match.data.repo) } : null;
   };
 
   const urlMatch =
@@ -284,16 +330,7 @@ export type Mergeability = {
 
 function parseMergeability(stdout: string): Mergeability | null {
   try {
-    const parsed = JSON.parse(stdout) as Record<string, unknown>;
-    const mergeable =
-      typeof parsed.mergeable === "string" && parsed.mergeable
-        ? (parsed.mergeable as Probe["mergeable"])
-        : "UNKNOWN";
-    const mergeStateStatus =
-      typeof parsed.mergeStateStatus === "string" && parsed.mergeStateStatus
-        ? (parsed.mergeStateStatus as MergeStateStatus)
-        : "UNKNOWN";
-    return { mergeable, mergeStateStatus };
+    return MergeabilityView.parse(JSON.parse(stdout));
   } catch {
     return null;
   }
@@ -339,9 +376,7 @@ const isQueuedState = (s: string): boolean =>
 // "cancel" | "pending" | "skipping"). It does NOT expose `conclusion`. Use
 // `bucket` for terminal classification and `state` to distinguish running
 // from queued.
-export function deriveChecksState(
-  checks: Array<{ state?: string; bucket?: string; name?: string }>,
-): InternalState {
+export function deriveChecksState(checks: Check[]): InternalState {
   if (checks.length === 0) {
     return "running";
   }
@@ -394,27 +429,19 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
       stderr: prResult.stderr,
     };
   }
-  let sha = "";
-  let branch = "";
-  let prState: Probe["prState"] = "OPEN";
-  let mergeable: Probe["mergeable"] = "UNKNOWN";
-  let mergeStateStatus: MergeStateStatus = "UNKNOWN";
+  let view: z.infer<typeof PrView>;
   try {
-    const parsed = JSON.parse(prResult.stdout) as Record<string, unknown>;
-    if (typeof parsed.headRefOid === "string") sha = parsed.headRefOid;
-    if (typeof parsed.headRefName === "string") branch = parsed.headRefName;
-    if (typeof parsed.state === "string") prState = parsed.state as Probe["prState"];
-    if (typeof parsed.mergeable === "string" && parsed.mergeable) {
-      mergeable = parsed.mergeable as Probe["mergeable"];
-    }
-    if (typeof parsed.mergeStateStatus === "string" && parsed.mergeStateStatus) {
-      mergeStateStatus = parsed.mergeStateStatus as MergeStateStatus;
-    }
+    view = PrView.parse(JSON.parse(prResult.stdout));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`gh pr view returned unparseable JSON for PR #${prNumber}: ${message}`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
+  const sha = view.headRefOid;
+  const branch = view.headRefName;
+  const prState = view.state;
+  const mergeable = view.mergeable;
+  const mergeStateStatus = view.mergeStateStatus;
   if (!branch) {
     const message = `gh pr view did not include headRefName for PR #${prNumber}`;
     console.error(`${message}; treating as probe failure`);
@@ -434,16 +461,10 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
   }
   let state: InternalState;
   try {
-    const parsed = JSON.parse(checksResult.stdout || "[]");
-    if (!Array.isArray(parsed)) {
-      const message = `gh pr checks returned non-array JSON for PR #${prNumber}`;
-      console.error(`${message}; treating as probe failure`);
-      return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
-    }
-    state = deriveChecksState(parsed as Record<string, unknown>[]);
+    state = deriveChecksState(Checks.parse(JSON.parse(checksResult.stdout || "[]")));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`gh pr checks returned unparseable JSON for PR #${prNumber}: ${message}`);
+    console.error(`gh pr checks returned unusable JSON for PR #${prNumber}: ${message}`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
@@ -467,8 +488,7 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
   };
 }
 
-function buildRunProbe(run: Record<string, unknown>, fallbackRunId: string | null): Probe {
-  const headSha = typeof run.headSha === "string" ? run.headSha : "";
+function buildRunProbe(run: RunView, fallbackRunId: string | null): Probe {
   const rawId = run.databaseId;
   const runId =
     typeof rawId === "number"
@@ -476,11 +496,9 @@ function buildRunProbe(run: Record<string, unknown>, fallbackRunId: string | nul
       : typeof rawId === "string" && rawId.length > 0
         ? rawId
         : fallbackRunId;
-  const status = typeof run.status === "string" ? run.status : "";
-  const conclusion = typeof run.conclusion === "string" ? run.conclusion : "";
   return {
-    sha: headSha,
-    state: deriveRunListState({ status, conclusion }),
+    sha: run.headSha,
+    state: deriveRunListState(run),
     runId,
     mergeable: "MERGEABLE",
     mergeStateStatus: "CLEAN",
@@ -503,26 +521,19 @@ export function probeBranch(repo: string, branch: string, run: ExecFn = exec): P
       stderr: result.stderr,
     };
   }
-  let parsed: unknown;
+  let runs: RunView[];
   try {
-    parsed = JSON.parse(result.stdout || "[]");
+    runs = RunList.parse(JSON.parse(result.stdout || "[]"));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`gh run list returned unparseable JSON for ${repo}@${branch}: ${message}`);
+    console.error(`gh run list returned unusable JSON for ${repo}@${branch}: ${message}`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
-  if (!Array.isArray(parsed) || parsed.length === 0) {
+  const latest = runs[0];
+  if (!latest) {
     return { kind: "empty" };
   }
-  const rawRun = parsed[0];
-  if (!rawRun || typeof rawRun !== "object") {
-    return { kind: "empty" };
-  }
-  return {
-    kind: "ok",
-    branch: null,
-    probe: buildRunProbe(rawRun as Record<string, unknown>, null),
-  };
+  return { kind: "ok", branch: null, probe: buildRunProbe(latest, null) };
 }
 
 export function computeInterval(durationsSeconds: number[]): number {
@@ -544,14 +555,8 @@ function fetchInterval(branch: string, repo: string | null): number {
     return DEFAULT_INTERVAL_SECONDS;
   }
   try {
-    const parsed = JSON.parse(result.stdout || "[]");
-    if (Array.isArray(parsed)) {
-      const numbers = parsed.filter((n): n is number => typeof n === "number");
-      return computeInterval(numbers);
-    }
-    console.error(
-      `gh run list returned non-array JSON while computing poll interval for ${branch}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s`,
-    );
+    const parsed = Durations.parse(JSON.parse(result.stdout || "[]"));
+    return computeInterval(parsed.filter((n): n is number => typeof n === "number"));
   } catch (err) {
     console.error(
       `gh run list returned unparseable JSON while computing poll interval for ${branch}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${err instanceof Error ? err.message : String(err)}`,
@@ -578,24 +583,15 @@ export function probeRunId(runId: string, repo: string, run: ExecFn = exec): Pro
       stderr: result.stderr,
     };
   }
-  let parsed: unknown;
+  let view: RunView;
   try {
-    parsed = JSON.parse(result.stdout || "{}");
+    view = RunView.parse(JSON.parse(result.stdout || "{}"));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`gh run view returned unparseable JSON for run ${runId}: ${message}`);
+    console.error(`gh run view returned unusable JSON for run ${runId}: ${message}`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
-  if (!parsed || typeof parsed !== "object") {
-    const message = `gh run view returned non-object JSON for run ${runId}`;
-    console.error(`${message}; treating as probe failure`);
-    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
-  }
-  return {
-    kind: "ok",
-    branch: null,
-    probe: buildRunProbe(parsed as Record<string, unknown>, runId),
-  };
+  return { kind: "ok", branch: null, probe: buildRunProbe(view, runId) };
 }
 
 type RunOptions = {
@@ -789,7 +785,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  await watch({ mode: "branch", repo: resolveRepo(), branch: branch as string, ...common });
+  if (!branch) return;
+  await watch({ mode: "branch", repo: resolveRepo(), branch, ...common });
 }
 
 if (import.meta.main) {

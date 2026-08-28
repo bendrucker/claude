@@ -1,9 +1,18 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import UrlPattern from "url-pattern";
+import { z } from "zod";
 
-export type WebFetchInput = { url: string; prompt: string };
+const WebFetchInput = z.looseObject({ url: z.string() });
+export type WebFetchInput = z.infer<typeof WebFetchInput>;
+
+export const HookInput = z.looseObject({ tool_input: z.unknown() });
+export type HookInput = z.infer<typeof HookInput>;
+
+// url-pattern's match() returns `any`.
+const Params = z.record(z.string(), z.string());
+const RepoPath = z.looseObject({ _: z.string().optional().catch(undefined) });
 
 type RouteMatch = {
   type: string;
@@ -66,9 +75,9 @@ export function isGitHubUrl(url: string): boolean {
 
 export function matchRoute(path: string): RouteMatch | null {
   for (const route of routes) {
-    const params = route.pattern.match(path);
-    if (params) {
-      return { type: route.type, params };
+    const params = Params.safeParse(route.pattern.match(path));
+    if (params.success) {
+      return { type: route.type, params: params.data };
     }
   }
   return null;
@@ -77,9 +86,9 @@ export function matchRoute(path: string): RouteMatch | null {
 export function parseGitHubUrl(url: string): { type: string; suggestion: string } | null {
   const path = url.slice("https://github.com/".length);
 
-  const pathMatch = repoPathPattern.match(path);
-  if (pathMatch) {
-    const subpath = pathMatch._ || "";
+  const pathMatch = RepoPath.safeParse(repoPathPattern.match(path));
+  if (pathMatch.success) {
+    const subpath = pathMatch.data._ || "";
 
     // Empty subpath means trailing slash on repo root
     if (subpath === "") {
@@ -102,8 +111,8 @@ export function parseGitHubUrl(url: string): { type: string; suggestion: string 
     return null;
   }
 
-  const baseMatch = repoBasePattern.match(path);
-  if (baseMatch) {
+  const baseMatch = Params.safeParse(repoBasePattern.match(path));
+  if (baseMatch.success) {
     return {
       type: "repo",
       suggestion: `Use: gh repo view [<repository>].`,
@@ -130,8 +139,8 @@ export function isRawGitHubUrl(url: string): boolean {
   return url.startsWith("https://raw.githubusercontent.com/");
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { url } = input.tool_input as WebFetchInput;
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const { url } = WebFetchInput.parse(input.tool_input);
 
   if (isRawGitHubUrl(url)) {
     return formatOutput(
@@ -153,9 +162,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[github/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

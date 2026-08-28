@@ -122,6 +122,7 @@
         "cleye": "^2.0.0",
         "table": "^6.9.0",
         "url-pattern": "^1.0.3",
+        "zod": "^4.4.3",
       },
     },
     "plugins/gitlab": {
@@ -132,6 +133,7 @@
         "cleye": "^2.2.1",
         "table": "^6.9.0",
         "url-pattern": "^1.0.3",
+        "zod": "^4.4.3",
       },
     },
     "plugins/go": {

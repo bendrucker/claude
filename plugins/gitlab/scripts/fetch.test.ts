@@ -1,11 +1,8 @@
 import { describe, expect, it, test } from "bun:test";
-import type {
-  PreToolUseHookInput,
-  PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
-import { formatOutput, isGitLabUrl, parseGitLabUrl, processInput } from "./fetch";
+import type { PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
+import { formatOutput, type HookInput, isGitLabUrl, parseGitLabUrl, processInput } from "./fetch";
 
-function mockInput(url: string): PreToolUseHookInput {
+function mockInput(url: string): HookInput {
   return {
     hook_event_name: "PreToolUse",
     session_id: "test",
@@ -17,10 +14,10 @@ function mockInput(url: string): PreToolUseHookInput {
   };
 }
 
-function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = processInput(input);
-  if (!result) return null;
-  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+function getOutput(input: HookInput): PreToolUseHookSpecificOutput | null {
+  const output = processInput(input)?.hookSpecificOutput;
+  if (output?.hookEventName !== "PreToolUse") return null;
+  return output;
 }
 
 describe("isGitLabUrl", () => {

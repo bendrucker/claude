@@ -3,6 +3,7 @@
 import { $ } from "bun";
 import { cli, command } from "cleye";
 import { table } from "table";
+import { z } from "zod";
 import {
   buildPosition,
   exitOnRejection,
@@ -19,33 +20,40 @@ export { parseGlabPaginated } from "./diff";
 
 exitOnRejection();
 
-type LineRange = {
-  start: { type: "new" | "old"; new_line?: number; old_line?: number };
-  end: { type: "new" | "old"; new_line?: number; old_line?: number };
-};
+const LineEnd = z.looseObject({
+  type: z.enum(["new", "old"]),
+  new_line: z.number().optional(),
+  old_line: z.number().optional(),
+});
 
-type Position = {
-  new_path?: string;
-  old_path?: string;
-  new_line?: number;
-  old_line?: number;
-  position_type?: string;
-  line_range?: LineRange | null;
-};
+const LineRange = z.looseObject({ start: LineEnd, end: LineEnd });
 
-type Note = {
-  author: { username: string };
-  body: string;
-  resolved?: boolean;
-  resolvable?: boolean;
-  position?: Position | null;
-};
+const Position = z.looseObject({
+  new_path: z.string().optional(),
+  old_path: z.string().optional(),
+  new_line: z.number().optional(),
+  old_line: z.number().optional(),
+  position_type: z.string().optional(),
+  line_range: LineRange.nullish(),
+});
+
+const Note = z.looseObject({
+  author: z.looseObject({ username: z.string() }),
+  body: z.string(),
+  resolved: z.boolean().optional(),
+  resolvable: z.boolean().optional(),
+  position: Position.nullish(),
+});
 
 // GitLab omits or nulls `notes` on some system/individual-note discussions.
-export type Discussion = {
-  id: string;
-  notes?: Note[] | null;
-};
+export const Discussion = z.looseObject({
+  id: z.string(),
+  notes: z.array(Note).nullish(),
+});
+export type Discussion = z.infer<typeof Discussion>;
+type Note = z.infer<typeof Note>;
+
+const Discussions = z.array(Discussion);
 
 function firstNote(d: Discussion): Note | null {
   return d.notes?.[0] ?? null;
@@ -252,7 +260,7 @@ const listCmd = command(
   async (parsed) => {
     const iid = parsed._.iid;
     const raw = await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
-    let discussions = parseGlabPaginated(raw) as Discussion[];
+    let discussions = Discussions.parse(parseGlabPaginated(raw));
 
     discussions = filterDiscussions(discussions, await buildFilterOptions(parsed.flags));
 
@@ -295,7 +303,7 @@ const summaryCmd = command(
   async (parsed) => {
     const iid = parsed._.iid;
     const raw = await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
-    const discussions = parseGlabPaginated(raw) as Discussion[];
+    const discussions = Discussions.parse(parseGlabPaginated(raw));
 
     const resolvable = discussions.filter((d) => firstNote(d)?.resolvable);
     const resolved = resolvable.filter((d) => firstNote(d)?.resolved);

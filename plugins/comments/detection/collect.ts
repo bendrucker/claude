@@ -171,7 +171,11 @@ async function collectRepoFile(
   const comments = await extractComments(source, language);
   if (onDensity) {
     const added = new Set(lines.map((_, i) => i + 1));
-    onDensity({ path, language, stats: await measureAddedLines(source, added, language, comments) });
+    onDensity({
+      path,
+      language,
+      stats: await measureAddedLines(source, added, language, comments),
+    });
   }
   return comments
     .filter((comment) => !isExemptComment(comment))
@@ -181,6 +185,8 @@ async function collectRepoFile(
 /** Every comment in every tracked code file, narrowed by `--path` globs. The `--all` scope. */
 export async function collectRepo(collect: CollectOptions = {}): Promise<CollectedComment[]> {
   const files = await listTrackedCodeFiles(collect);
-  const perFile = await Promise.all(files.map((path) => collectRepoFile(path, collect.onFileDensity)));
+  const perFile = await Promise.all(
+    files.map((path) => collectRepoFile(path, collect.onFileDensity)),
+  );
   return perFile.flat();
 }

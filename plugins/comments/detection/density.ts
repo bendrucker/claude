@@ -47,7 +47,10 @@ export function addInto(into: AddedLineStats, stats: AddedLineStats): void {
  * re-indented, and realigned lines don't count and each extra duplicate counts
  * once. Returns 1-based indices into the fragment's lines.
  */
-export function addedLines(oldText: string, newText: string): { fragment: string; added: Set<number> } {
+export function addedLines(
+  oldText: string,
+  newText: string,
+): { fragment: string; added: Set<number> } {
   const key = (line: string) => line.replace(/\s+/g, "");
   const oldCounts = new Map<string, number>();
   for (const line of oldText.split("\n")) {
@@ -278,9 +281,7 @@ export function sessionScore(input: ScoredFile[]): SessionScore {
   );
   const reports =
     excessChars >= REPORT_MIN_EXCESS_CHARS &&
-    (share >= REPORT_SESSION_SHARE ||
-      wordsPerCodeLine >= REPORT_WORDS_PER_CODE_LINE ||
-      heavyFile);
+    (share >= REPORT_SESSION_SHARE || wordsPerCodeLine >= REPORT_WORDS_PER_CODE_LINE || heavyFile);
   const tier: Tier =
     stats.addedLines < MIN_ADDED_LINES
       ? "none"

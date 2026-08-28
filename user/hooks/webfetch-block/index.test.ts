@@ -1,26 +1,20 @@
 import { describe, expect, it } from "bun:test";
-import type {
-  PreToolUseHookInput,
-  PreToolUseHookSpecificOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { HookInput } from "../../scripts/hook-input";
 import { formatOutput, processInput } from "./index";
 
-function mockInput(url: string): PreToolUseHookInput {
+function mockInput(url: string): HookInput {
   return {
     hook_event_name: "PreToolUse",
     session_id: "test",
-    transcript_path: "/tmp/test",
-    cwd: "/tmp",
     tool_name: "WebFetch",
     tool_input: { url, prompt: "test" },
-    tool_use_id: "test",
   };
 }
 
-function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = processInput(input);
-  if (!result) return null;
-  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+function getOutput(input: HookInput): PreToolUseHookSpecificOutput | null {
+  const specific = processInput(input)?.hookSpecificOutput;
+  return specific?.hookEventName === "PreToolUse" ? specific : null;
 }
 
 describe("formatOutput", () => {

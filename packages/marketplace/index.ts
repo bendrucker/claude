@@ -1,28 +1,33 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { z } from "zod";
+import { decodeFile } from "../decode/index";
 
-export interface HookCommand {
-  type: string;
-  command: string;
+export const HookCommand = z.looseObject({
+  type: z.string(),
+  command: z.string(),
   /** Permission rule scoping the command, e.g. `Bash(gh pr create:*)`. */
-  if?: string;
-}
+  if: z.string().optional(),
+});
+export type HookCommand = z.infer<typeof HookCommand>;
 
-export interface MatcherEntry {
-  matcher?: string;
-  hooks: HookCommand[];
-}
+export const MatcherEntry = z.looseObject({
+  matcher: z.string().optional(),
+  hooks: z.array(HookCommand),
+});
+export type MatcherEntry = z.infer<typeof MatcherEntry>;
 
-export interface HooksFile {
-  hooks: Record<string, MatcherEntry[]>;
-}
+export const HooksFile = z.looseObject({ hooks: z.record(z.string(), z.array(MatcherEntry)) });
+export type HooksFile = z.infer<typeof HooksFile>;
 
-export interface PluginManifest {
-  name: string;
-  [key: string]: unknown;
-}
+export const PluginManifest = z.looseObject({ name: z.string() });
+export type PluginManifest = z.infer<typeof PluginManifest>;
 
-export type PluginSource = string | { source: string; repo?: string };
+export const PluginSource = z.union([
+  z.string(),
+  z.looseObject({ source: z.string(), repo: z.string().optional() }),
+]);
+export type PluginSource = z.infer<typeof PluginSource>;
 
 export interface MarketplaceListing {
   name: string;
@@ -83,14 +88,19 @@ export interface LoadOptions {
   settingsPath?: string;
 }
 
-interface MarketplaceFile {
-  plugins: Array<{ name: string; source: PluginSource; description?: string }>;
-}
+const MarketplaceFile = z.looseObject({
+  plugins: z.array(
+    z.looseObject({ name: z.string(), source: PluginSource, description: z.string().optional() }),
+  ),
+});
 
-export interface SettingsFile {
-  enabledPlugins?: Record<string, boolean>;
-  extraKnownMarketplaces?: Record<string, { source: unknown }>;
-}
+export const SettingsFile = z.looseObject({
+  enabledPlugins: z.record(z.string(), z.boolean()).optional(),
+  extraKnownMarketplaces: z.record(z.string(), z.looseObject({})).optional(),
+});
+export type SettingsFile = z.infer<typeof SettingsFile>;
+
+const McpFile = z.looseObject({ mcpServers: z.record(z.string(), z.unknown()).optional() });
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..", "..");
 
@@ -102,10 +112,12 @@ function settingsPathFor(root: string, opts?: LoadOptions): string {
   return opts?.settingsPath ?? join(root, "user", "settings.json");
 }
 
-async function readJson<T>(path: string): Promise<T | undefined> {
-  const file = Bun.file(path);
-  if (!(await file.exists())) return undefined;
-  return file.json();
+async function readJson<S extends z.ZodType>(
+  schema: S,
+  path: string,
+): Promise<z.output<S> | undefined> {
+  if (!(await Bun.file(path).exists())) return undefined;
+  return decodeFile(schema, path);
 }
 
 /**
@@ -122,8 +134,8 @@ export async function loadPlugins(opts?: LoadOptions): Promise<Plugin[]> {
   const settingsPath = settingsPathFor(root, opts);
 
   const [marketplace, settings, entries] = await Promise.all([
-    readJson<MarketplaceFile>(marketplacePath),
-    readJson<SettingsFile>(settingsPath),
+    readJson(MarketplaceFile, marketplacePath),
+    readJson(SettingsFile, settingsPath),
     readdir(pluginsDir, { withFileTypes: true }),
   ]);
 
@@ -146,9 +158,9 @@ export async function loadPlugins(opts?: LoadOptions): Promise<Plugin[]> {
       plugin.dir = dir;
 
       const [manifest, hooks, mcp] = await Promise.all([
-        readJson<PluginManifest>(join(dir, ".claude-plugin", "plugin.json")),
-        readJson<HooksFile>(join(dir, "hooks", "hooks.json")),
-        readJson<{ mcpServers?: Record<string, unknown> }>(join(dir, ".mcp.json")),
+        readJson(PluginManifest, join(dir, ".claude-plugin", "plugin.json")),
+        readJson(HooksFile, join(dir, "hooks", "hooks.json")),
+        readJson(McpFile, join(dir, ".mcp.json")),
       ]);
 
       if (manifest) plugin.manifest = manifest;
@@ -171,7 +183,7 @@ export async function loadPlugins(opts?: LoadOptions): Promise<Plugin[]> {
 /** The settings file read for enabled state, or an empty object when absent. */
 export async function loadSettings(opts?: LoadOptions): Promise<SettingsFile> {
   const root = repoRoot(opts);
-  return (await readJson<SettingsFile>(settingsPathFor(root, opts))) ?? {};
+  return (await readJson(SettingsFile, settingsPathFor(root, opts))) ?? {};
 }
 
 /**
@@ -182,7 +194,7 @@ export async function loadSettings(opts?: LoadOptions): Promise<SettingsFile> {
  */
 export async function enabledPluginNames(opts?: LoadOptions): Promise<Set<string>> {
   const root = repoRoot(opts);
-  const settings = await readJson<SettingsFile>(settingsPathFor(root, opts));
+  const settings = await readJson(SettingsFile, settingsPathFor(root, opts));
   const names = new Set<string>();
   for (const [key, value] of Object.entries(settings?.enabledPlugins ?? {})) {
     if (!value) continue;

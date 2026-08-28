@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { z } from "zod";
+import { decodeFile } from "../packages/decode/index";
 import { root } from "./assets";
 import { runCheck, tracked } from "./check";
 
@@ -76,13 +78,26 @@ export function paths(command: string, prefixes: Record<string, string>): string
 
   return [...command.matchAll(pattern)]
     .filter((match) => !assigned(command, match.index))
-    .map(([, prefix, rest]) => `${prefixes[prefix as string]}${rest}`)
+    .flatMap(([, prefix, rest]) => {
+      const base = prefixes[prefix ?? ""];
+      return base === undefined ? [] : [`${base}${rest}`];
+    })
     .filter((path) => !UNMANAGED.some((prefix) => path.startsWith(prefix)));
 }
 
-interface Settings {
-  hooks?: Record<string, Array<{ hooks?: Array<{ command?: string }> }>>;
-}
+export const Settings = z.looseObject({
+  hooks: z
+    .record(
+      z.string(),
+      z.array(
+        z.looseObject({
+          hooks: z.array(z.looseObject({ command: z.string().optional() })).optional(),
+        }),
+      ),
+    )
+    .optional(),
+});
+type Settings = z.infer<typeof Settings>;
 
 export interface Reference {
   file: string;
@@ -139,10 +154,10 @@ export function violations(refs: Reference[], shippedPaths: Set<string>): string
 export async function load(): Promise<Reference[]> {
   const settings = await Promise.all(
     SOURCES.map(
-      async (source) => [source, await Bun.file(`${root}/${source.file}`).json()] as const,
+      async (source) => [source, await decodeFile(Settings, `${root}/${source.file}`)] as const,
     ),
   );
-  return settings.flatMap(([source, file]) => references(file as Settings, source));
+  return settings.flatMap(([source, file]) => references(file, source));
 }
 
 if (import.meta.main) {

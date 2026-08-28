@@ -74,17 +74,15 @@ test("toItem carries the category and sizes by output length", () => {
     input: "a".repeat(100),
     output: "b".repeat(800),
   };
-  expect(toItem(draft)).toMatchInlineSnapshot(
-    { input: expect.any(String), output: expect.any(String) },
-    `
+  const { input, output, ...item } = toItem(draft);
+  expect(input).toHaveLength(100);
+  expect(output).toHaveLength(800);
+  expect(item).toMatchInlineSnapshot(`
     {
       "category": "doc-paragraph",
       "id": "",
-      "input": Any<String>,
-      "output": Any<String>,
       "size": "full",
       "source": "synthetic",
     }
-  `,
-  );
+  `);
 });

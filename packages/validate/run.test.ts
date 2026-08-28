@@ -39,13 +39,15 @@ afterEach(() => {
 });
 
 describe("runValidation", () => {
+  const logged = (): string[] => logSpy.mock.calls.map((call) => String(call[0]));
+
   it("logs each file, a blank line, and the success message", async () => {
     const a = await writeFixture("valid-a", { name: "a" });
     const b = await writeFixture("valid-b", { name: "b" });
 
     await runValidation({ files: [a, b], schema: schemaPath });
 
-    const lines = logSpy.mock.calls.map((call) => call[0]);
+    const lines = logged();
     expect(lines).toEqual([`• ${a}`, `• ${b}`, "", "Validation passed."]);
   });
 
@@ -54,7 +56,7 @@ describe("runValidation", () => {
 
     await runValidation({ files: [file], schema: schemaPath, successMessage: "All good." });
 
-    const lines = logSpy.mock.calls.map((call) => call[0]);
+    const lines = logged();
     expect(lines.at(-1)).toBe("All good.");
   });
 
@@ -63,7 +65,7 @@ describe("runValidation", () => {
 
     await runValidation({ files: [file], schema: schemaPath, warnAdditional: true });
 
-    const lines = logSpy.mock.calls.map((call) => call[0]);
+    const lines = logged();
     expect(lines.some((line) => typeof line === "string" && line.includes("extra"))).toBe(true);
   });
 
@@ -73,7 +75,7 @@ describe("runValidation", () => {
 
     await runValidation({ files: [missing, present], schema: schemaPath });
 
-    const lines = logSpy.mock.calls.map((call) => call[0]);
+    const lines = logged();
     expect(lines).toEqual([
       `• ${missing} (not found, skipped)`,
       `• ${present}`,

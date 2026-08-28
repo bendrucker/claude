@@ -91,11 +91,10 @@ test("toItem carries session metadata and sizes the body", () => {
     createdAt: "2026-01-02T03:04:05Z",
     author: { login: "bendrucker" },
   };
-  expect(toItem(mined, fetched)).toMatchInlineSnapshot(
-    { body: expect.any(String) },
-    `
+  const { body, ...item } = toItem(mined, fetched);
+  expect(body).toHaveLength(2000);
+  expect(item).toMatchInlineSnapshot(`
     {
-      "body": Any<String>,
       "created_at": "2026-01-02T03:04:05Z",
       "id": "",
       "pr_number": 42,
@@ -106,6 +105,5 @@ test("toItem carries session metadata and sizes the body", () => {
       "title": "fix: a thing",
       "url": "https://github.com/bendrucker/claude/pull/42",
     }
-  `,
-  );
+  `);
 });

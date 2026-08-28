@@ -1,13 +1,33 @@
 import { join } from "node:path";
 import { applyPatch, type Operation } from "rfc6902";
+import { z } from "zod";
+import { decode, decodeFile } from "../decode/index";
 
-export type Schema = Record<string, unknown>;
+export const Schema = z.record(z.string(), z.unknown());
+export type Schema = z.infer<typeof Schema>;
 
-export interface SchemaSource {
-  name: string;
-  url: string;
-  patch: string;
-}
+export const SchemaSource = z.looseObject({
+  name: z.string(),
+  url: z.string(),
+  patch: z.string(),
+});
+export type SchemaSource = z.infer<typeof SchemaSource>;
+
+const Sources = z.looseObject({ schemas: z.array(SchemaSource) });
+
+const Patch = z.array(
+  z.union([
+    z.object({ op: z.literal("add"), path: z.string(), value: z.unknown() }),
+    z.object({ op: z.literal("remove"), path: z.string() }),
+    z.object({ op: z.literal("replace"), path: z.string(), value: z.unknown() }),
+    z.object({ op: z.literal("move"), from: z.string(), path: z.string() }),
+    z.object({ op: z.literal("copy"), from: z.string(), path: z.string() }),
+    z.object({ op: z.literal("test"), path: z.string(), value: z.unknown() }),
+  ]),
+) satisfies z.ZodType<Operation[]>;
+
+/** A container a JSON Pointer token can index into. */
+const Indexable = z.union([z.record(z.string(), z.unknown()), z.array(z.unknown())]);
 
 /**
  * Apply an RFC 6902 patch to a base schema, returning a new merged object.
@@ -43,8 +63,9 @@ export function getPointer(value: unknown, pointer: string): unknown {
     .map((token) => token.replace(/~1/g, "/").replace(/~0/g, "~"));
   let current: unknown = value;
   for (const token of tokens) {
-    if (current === null || typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[token];
+    const container = Indexable.safeParse(current).data;
+    if (!container) return undefined;
+    current = Array.isArray(container) ? container[Number(token)] : container[token];
     if (current === undefined) return undefined;
   }
   return current;
@@ -85,22 +106,20 @@ export function findOverlayConflicts(base: Schema, patch: Operation[]): OverlayC
 
 /** Read the overlay registry. The `patch` path in each entry is relative to schemasDir. */
 export async function loadSources(schemasDir: string): Promise<SchemaSource[]> {
-  const { schemas } = (await Bun.file(join(schemasDir, "overlays/sources.json")).json()) as {
-    schemas: SchemaSource[];
-  };
+  const { schemas } = await decodeFile(Sources, join(schemasDir, "overlays/sources.json"));
   return schemas;
 }
 
 /** Read a source's overlay patch from disk. */
 export async function loadPatch(schemasDir: string, source: SchemaSource): Promise<Operation[]> {
-  return (await Bun.file(join(schemasDir, source.patch)).json()) as Operation[];
+  return decodeFile(Patch, join(schemasDir, source.patch));
 }
 
 /** Fetch a source's upstream base schema from SchemaStore. */
 export async function fetchBase(url: string): Promise<Schema> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`fetch ${url} → ${response.status}`);
-  return response.json() as Promise<Schema>;
+  return decode(Schema, await response.json(), url);
 }
 
 /**

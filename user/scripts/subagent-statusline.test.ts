@@ -10,6 +10,7 @@ import {
   humanizeTool,
   renderTask,
   subagentModelLetter,
+  type ContentBlock,
   type Task,
 } from "./subagent-statusline";
 
@@ -93,7 +94,7 @@ describe("humanizeTool", () => {
 });
 
 describe("extractActivity", () => {
-  const assistant = (...content: object[]) => ({ message: { role: "assistant", content } });
+  const assistant = (...content: ContentBlock[]) => ({ message: { role: "assistant", content } });
 
   test("returns the latest tool call when the last assistant turn ends mid-call", () => {
     const entries = [

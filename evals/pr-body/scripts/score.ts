@@ -52,7 +52,7 @@ export interface ScoreRow {
   longSentenceDetail: string[];
   longParagraphs: number;
   narrationTells: number;
-  narrationTellCounts: Record<NarrationTell, number>;
+  narrationTellCounts: Record<string, number>;
   title: TitleMetrics | null;
 }
 
@@ -67,14 +67,14 @@ function isLongSentence(sentence: string): boolean {
   return commas >= COMMA_SPLICE_MIN_COMMAS && sentence.length > COMMA_SPLICE_MIN_CHARS;
 }
 
-export function countNarrationTells(body: string): Record<NarrationTell, number> {
+export function countNarrationTells(body: string): Record<string, number> {
   const prose = linesOutsideFences(body).join("\n");
-  const counts = {} as Record<NarrationTell, number>;
-  for (const tell of NARRATION_TELLS) {
-    const pattern = new RegExp(narrationTellSource(tell), "gi");
-    counts[tell] = (prose.match(pattern) ?? []).length;
-  }
-  return counts;
+  return Object.fromEntries(
+    NARRATION_TELLS.map((tell) => {
+      const pattern = new RegExp(narrationTellSource(tell), "gi");
+      return [tell, (prose.match(pattern) ?? []).length];
+    }),
+  );
 }
 
 export function scoreTitle(title: string): TitleMetrics {

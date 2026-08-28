@@ -1,11 +1,11 @@
 #!/usr/bin/env npx tsx
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+import { type HookInput, readHookInput } from "../../scripts/hook-input";
 import { timeHook } from "../../scripts/hook-metrics";
 
-export type BashInput = {
-  command?: string;
-};
+const BashInput = z.looseObject({ command: z.string().optional().catch(undefined) });
 
 const ALLOWED_SUBCOMMANDS = new Set(["list", "prune", "unlock"]);
 const REPLACED_SUBCOMMANDS = new Set(["add", "remove"]);
@@ -84,8 +84,8 @@ export function formatAskOutput(): SyncHookJSONOutput {
   };
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const command = (input.tool_input as BashInput).command;
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const command = BashInput.safeParse(input.tool_input).data?.command;
   if (!command) {
     return null;
   }
@@ -112,9 +112,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = await readHookInput("worktree");
   } catch (error) {
     console.error(
       `[worktree] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

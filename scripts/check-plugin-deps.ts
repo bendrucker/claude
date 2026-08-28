@@ -2,6 +2,8 @@
 
 import { join } from "node:path";
 import { Glob } from "bun";
+import { z } from "zod";
+import { decodeFile } from "../packages/decode/index";
 import { loadPlugins } from "../packages/marketplace/index";
 import { runCheck } from "./check";
 
@@ -11,6 +13,11 @@ import { runCheck } from "./check";
 // distinction to avoid reporting a crash as a violation.
 export const VIOLATION_EXIT = 2;
 
+const PackageJson = z.looseObject({
+  dependencies: z.record(z.string(), z.string()).optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+});
+
 async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
   const deps = new Set<string>();
   const glob = new Glob("**/package.json");
@@ -18,7 +25,7 @@ async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
   for await (const path of glob.scan({ cwd: pluginDir })) {
     if (path.includes("node_modules") || path.includes(".bun-cache")) continue;
     try {
-      const pkg = await Bun.file(join(pluginDir, path)).json();
+      const pkg = await decodeFile(PackageJson, join(pluginDir, path));
       for (const field of ["dependencies", "devDependencies"] as const) {
         for (const dep of Object.keys(pkg[field] ?? {})) {
           deps.add(dep);
@@ -39,7 +46,7 @@ function packageName(specifier: string): string {
     const parts = specifier.split("/");
     return `${parts[0]}/${parts[1]}`;
   }
-  return specifier.split("/")[0] as string;
+  return specifier.split("/")[0] ?? specifier;
 }
 
 async function getImportedPackages(pluginDir: string): Promise<Set<string>> {
@@ -52,8 +59,8 @@ async function getImportedPackages(pluginDir: string): Promise<Set<string>> {
 
     const content = await Bun.file(join(pluginDir, path)).text();
     for (const match of content.matchAll(/^import\s+.*?from\s+["']([^"']+)["']/gm)) {
-      const specifier = match[1] as string;
-      if (specifier.startsWith(".") || isBuiltin(specifier)) continue;
+      const specifier = match[1];
+      if (specifier === undefined || specifier.startsWith(".") || isBuiltin(specifier)) continue;
       packages.add(packageName(specifier));
     }
   }

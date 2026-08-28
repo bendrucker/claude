@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+import { type HookInput, readHookInput } from "../../scripts/hook-input";
 import { timeHook } from "../../scripts/hook-metrics";
 
-export type WebFetchInput = { url: string; prompt: string };
+const WebFetchInput = z.looseObject({ url: z.string() });
 
 type BlockedPattern = {
   pattern: RegExp;
@@ -45,8 +47,9 @@ export function formatOutput(
   };
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { url } = input.tool_input as WebFetchInput;
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const url = WebFetchInput.safeParse(input.tool_input).data?.url;
+  if (url === undefined) return null;
 
   for (const blocked of blockedPatterns) {
     if (blocked.pattern.test(url)) {
@@ -58,9 +61,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = await readHookInput("webfetch-block");
   } catch (error) {
     console.error(
       `[webfetch-block] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

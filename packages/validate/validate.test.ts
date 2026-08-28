@@ -146,7 +146,7 @@ describe("formatError", () => {
       process.env.GITHUB_ACTIONS = fixture.ci ? "true" : "";
 
       try {
-        const result = formatError(fixture.file, fixture.error as ErrorObject);
+        const result = formatError(fixture.file, fixture.error);
         expect(result).toBe(fixture.expected);
       } finally {
         for (const key of ["CI", "GITHUB_ACTIONS"] as const) {

@@ -4,34 +4,43 @@ import { appendFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { HookPermissionDecision, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 
 // `hook_events` in the session index records a hook only when it produced visible
 // output, which is a few percent of actual fires. A hook that self-times writes
 // its own denominator here, and the duration excludes process spawn and
 // interpreter start that the harness figure includes.
-export type HookOutcome =
-  | HookPermissionDecision
-  | "silent"
-  | "context"
-  | "block"
-  | "output"
-  | "error";
+export const HookOutcome = z.enum([
+  "allow",
+  "deny",
+  "ask",
+  "defer",
+  "silent",
+  "context",
+  "block",
+  "output",
+  "error",
+]) satisfies z.ZodType<
+  HookPermissionDecision | "silent" | "context" | "block" | "output" | "error"
+>;
+export type HookOutcome = z.infer<typeof HookOutcome>;
 
-export interface HookMetric {
-  ts: string;
-  session_id: string;
-  hook_event: string;
-  tool: string | null;
-  duration_ms: number;
-  outcome: HookOutcome;
-}
+export const HookMetric = z.object({
+  ts: z.string(),
+  session_id: z.string(),
+  hook_event: z.string(),
+  tool: z.string().nullable(),
+  duration_ms: z.number(),
+  outcome: HookOutcome,
+});
+export type HookMetric = z.infer<typeof HookMetric>;
 
 // Structural subset of every SDK hook input. `tool_name` is absent on the
 // non-tool events (UserPromptSubmit, Stop), so it stays optional.
 export interface HookMetricInput {
-  session_id?: string;
-  hook_event_name?: string;
-  tool_name?: string;
+  session_id?: string | undefined;
+  hook_event_name?: string | undefined;
+  tool_name?: string | undefined;
 }
 
 const MAX_LOG_BYTES = 5 * 1024 * 1024;

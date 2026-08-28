@@ -1,28 +1,33 @@
 #!/usr/bin/env bun
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 import { effortGlyph } from "./effort";
 import { genericGlyph, purposeGlyphs, remoteGlyph } from "./glyphs";
 import { modelMarker } from "./model";
 import { styleText } from "./style";
 
-export interface Task {
-  id: string;
-  description?: string;
-  type?: string;
-  name?: string;
-  status?: string;
-  startTime?: number;
-  tokenCount?: number;
-  model?: string;
-  effort?: string | number;
-}
+const str = z.string().optional().catch(undefined);
+const num = z.number().optional().catch(undefined);
 
-interface SubagentInput {
-  columns?: number;
-  transcript_path?: string;
-  tasks?: Task[];
-}
+export const Task = z.looseObject({
+  id: z.string(),
+  description: str,
+  type: str,
+  name: str,
+  status: str,
+  startTime: num,
+  tokenCount: num,
+  model: str,
+  effort: z.union([z.string(), z.number()]).optional().catch(undefined),
+});
+export type Task = z.infer<typeof Task>;
+
+const SubagentInput = z.looseObject({
+  columns: num,
+  transcript_path: str,
+  tasks: z.array(Task).optional().catch(undefined),
+});
 
 export function formatElapsed(startMs: number, nowMs: number): string {
   const elapsedS = Math.floor((nowMs - startMs) / 1000);
@@ -155,21 +160,28 @@ export function renderTask(
   return { id: task.id, content };
 }
 
-interface AgentMeta {
-  agentType?: string;
-  description?: string;
-}
+const AgentMeta = z.looseObject({ agentType: str, description: str });
+type AgentMeta = z.infer<typeof AgentMeta>;
 
-interface ContentBlock {
-  type?: string;
-  name?: string;
-  input?: Record<string, unknown>;
-  text?: string;
-}
+export const ContentBlock = z.looseObject({
+  type: str,
+  name: str,
+  input: z.record(z.string(), z.unknown()).optional().catch(undefined),
+  text: str,
+});
+export type ContentBlock = z.infer<typeof ContentBlock>;
 
-interface TranscriptEntry {
-  message?: { role?: string; content?: ContentBlock[]; model?: string };
-}
+const TranscriptEntry = z.looseObject({
+  message: z
+    .looseObject({
+      role: str,
+      content: z.array(ContentBlock).optional().catch(undefined),
+      model: str,
+    })
+    .optional()
+    .catch(undefined),
+});
+type TranscriptEntry = z.infer<typeof TranscriptEntry>;
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 const basename = (p: unknown): string => text(p).split("/").pop() ?? "";
@@ -278,7 +290,7 @@ function subagentBase(id: string, projectDir: string): string | null {
 
 async function readMeta(base: string): Promise<AgentMeta | null> {
   try {
-    return (await Bun.file(`${base}.meta.json`).json()) as AgentMeta;
+    return AgentMeta.parse(await Bun.file(`${base}.meta.json`).json());
   } catch {
     return null;
   }
@@ -299,7 +311,7 @@ async function readEntries(path: string): Promise<TranscriptEntry[]> {
     for (const line of lines) {
       if (!line.trim()) continue;
       try {
-        entries.push(JSON.parse(line) as TranscriptEntry);
+        entries.push(TranscriptEntry.parse(JSON.parse(line)));
       } catch {
         // Skip malformed lines.
       }
@@ -314,9 +326,9 @@ if (import.meta.main) {
   // Empty or malformed stdin renders nothing rather than crashing, matching the
   // bash original's tolerance of bad input.
   const raw = await Bun.stdin.text();
-  let input: SubagentInput | null = null;
+  let input: z.infer<typeof SubagentInput> | null = null;
   try {
-    if (raw.trim()) input = JSON.parse(raw) as SubagentInput;
+    if (raw.trim()) input = SubagentInput.parse(JSON.parse(raw));
   } catch {
     input = null;
   }

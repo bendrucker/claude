@@ -178,7 +178,7 @@ await runCheck(
       : (snapshots.toSorted(bySemverDesc)[0] ?? version);
     if (snapshot !== version) {
       violations.push(
-        `Installed Claude Code is ${version}; the newest snapshot is ${snapshot}. Re-extract and land references/upstream-${version}.md, then port any changes into SKILL.md, angles.md, and efforts.md.`,
+        `Installed Claude Code is ${version}; the newest snapshot is ${snapshot}. Re-extract and land references/upstream-${version}.md, then port any changes into SKILL.md, angles.yaml, and efforts.yaml.`,
       );
     }
 

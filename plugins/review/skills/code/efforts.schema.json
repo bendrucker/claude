@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bendrucker/claude/plugins/review/skills/code/efforts.schema.json",
+  "title": "Review effort cells",
+  "description": "Cell selection, budgets, and framing for the review:code skill, served by scripts/review-plan.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "spawnModel",
+    "levels",
+    "aliases",
+    "modes",
+    "families",
+    "selection",
+    "cells",
+    "framings",
+    "lowInstructions",
+    "floorInstruction",
+    "finderBudget"
+  ],
+  "properties": {
+    "spawnModel": {
+      "type": "string",
+      "description": "Model every fan-out spawn pins, substituted for {spawnModel} in the fanout mode text."
+    },
+    "levels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/level" },
+      "description": "Canonical effort levels, weakest first. A CLI level token resolves by unique prefix."
+    },
+    "aliases": {
+      "type": "object",
+      "description": "Extra spellings that resolve to a canonical level, matched by prefix alongside the level names.",
+      "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/level" }
+    },
+    "modes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fanout", "inline", "direct"],
+      "description": "One line describing how each mode runs its angles.",
+      "properties": {
+        "fanout": { "type": "string" },
+        "inline": { "type": "string" },
+        "direct": { "type": "string" }
+      }
+    },
+    "families": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Model families in match order. The entry with no match strings is the fallback and must be last.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "match"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "match": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Substrings of the active model id. Empty marks the fallback family."
+          }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "description": "family id -> level -> the cell that pair runs.",
+      "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["low", "medium", "high", "xhigh"],
+        "properties": {
+          "low": { "$ref": "#/$defs/selected" },
+          "medium": { "$ref": "#/$defs/selected" },
+          "high": { "$ref": "#/$defs/selected" },
+          "xhigh": { "$ref": "#/$defs/selected" }
+        }
+      }
+    },
+    "cells": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/cellName" },
+      "additionalProperties": { "$ref": "#/$defs/cell" }
+    },
+    "framings": {
+      "type": "object",
+      "description": "Precision/recall framing paragraphs, emitted verbatim before the find phase.",
+      "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "lowInstructions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shared", "cells"],
+      "properties": {
+        "shared": { "type": "string", "minLength": 1 },
+        "cells": {
+          "type": "object",
+          "description": "Where the low cells differ: test-hunk skipping, caps, and floors.",
+          "propertyNames": { "$ref": "#/$defs/cellName" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "floorInstruction": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Emitted on any cell with a floor. {floor} is replaced with the cell's floor."
+    },
+    "finderBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["linesPerAgent", "min", "max", "text"],
+      "description": "clamp(ceil(lines / linesPerAgent), min, max), applied on cells carrying the finder-budget modifier.",
+      "properties": {
+        "linesPerAgent": { "type": "integer", "minimum": 1 },
+        "min": { "type": "integer", "minimum": 1 },
+        "max": { "type": "integer", "minimum": 1 },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "level": { "enum": ["low", "medium", "high", "xhigh"] },
+    "cellName": {
+      "enum": [
+        "low",
+        "low-sonnet5",
+        "inline-low",
+        "medium",
+        "high",
+        "xhigh",
+        "inline-med",
+        "inline-high",
+        "inline-xhigh"
+      ]
+    },
+    "modifier": { "enum": ["finder-budget"] },
+    "selected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cell", "modifiers"],
+      "properties": {
+        "cell": { "$ref": "#/$defs/cellName" },
+        "modifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/modifier" }
+        }
+      }
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "angleSet",
+        "candidatesPerAngle",
+        "verify",
+        "sweep",
+        "cap",
+        "floor",
+        "framing",
+        "reportsVia"
+      ],
+      "properties": {
+        "mode": { "enum": ["fanout", "inline", "direct"] },
+        "angleSet": {
+          "oneOf": [{ "enum": ["core", "full"] }, { "type": "null" }],
+          "description": "Null on the direct cells, which run no angles."
+        },
+        "candidatesPerAngle": {
+          "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+        },
+        "verify": { "type": "string", "minLength": 1 },
+        "sweep": { "type": "boolean" },
+        "cap": {
+          "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }],
+          "description": "Maximum findings reported. Null where the cell sets only a floor."
+        },
+        "floor": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "string", "minLength": 1 },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Target minimum, either a count or an expression such as min(files_changed, 4)."
+        },
+        "framing": {
+          "oneOf": [{ "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, { "type": "null" }],
+          "description": "Key into framings. Null on the low cells, whose instructions carry their own framing."
+        },
+        "reportsVia": { "enum": ["ReportFindings", "text"] }
+      }
+    }
+  }
+}

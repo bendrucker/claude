@@ -16,6 +16,7 @@ allowed-tools:
   - Bash(git rev-parse:*)
   - Bash(git ls-files:*)
   - Bash(gh pr:*)
+  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
 ---
 
 # Code Review
@@ -24,7 +25,7 @@ Review the diff for correctness bugs and cleanups: $ARGUMENTS
 
 ## Arguments
 
-- **Effort level**: the first token, if it matches `^(low|med|hig|xhi|max)[a-z]*$` case-insensitively. Prefixes count: `med`, `hi`, `xh` all resolve. `xhigh` is the top of the ladder, and `max` resolves to it. `--effort <level>` is an alias, valid anywhere in the arguments, and its value goes through the same match. Ignore an unrecognized level-shaped token with a brief note naming the valid levels. Do not treat it as a target.
+- **Effort level**: the first token, when it abbreviates `low`, `medium`, `high`, `xhigh`, or `max`. Prefixes count, so `med`, `hi`, and `xh` all resolve. `--effort <level>` is an alias, valid anywhere in the arguments. Pass whichever you found to the Phase 1 script, which resolves it and prints a note if it cannot. Any other first token belongs to `<target>`, including a branch named `release` or a scope opening with `only`.
 - **`--fix`**: apply findings to the working tree after reporting. May appear anywhere.
 - **`--base <ref>`**: review against this base instead of the resolved default.
 - **`<target>`**: everything else, free-form. A PR number, branch, ref range, path, or a plain-English scope restriction ("only `src/parser.ts`", "focus on error handling", "skip the test churn").
@@ -50,19 +51,21 @@ If nothing changed, say so and stop.
 
 ## Phase 1 — Find
 
-Pick the effort cell from [efforts.md](efforts.md). It fixes the fan-out shape, the caps, and the precision/recall framing. Emit the framing before finding.
+Resolve the review plan in one call, passing the effort level and the id of the model you are running as:
 
-At `low`, follow the low-cell instructions in `efforts.md` and skip the remaining phases.
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/review-plan.ts [level] --model <model-id> [--diff-lines <n>] [--no-angles]
+```
 
-Otherwise run the selected angles from [angles.md](angles.md) and [local-angles.md](local-angles.md). Each surfaces up to its cap of candidates with `file`, `line`, a one-line `summary`, and a concrete `failure_scenario`.
+Its output is the plan: the cell, the mode, the caps, the verify rule, the framing paragraph to emit before finding, and the text of exactly the angles that cell runs. Follow it, and do not read `efforts.yaml` or `angles.yaml` yourself. `--no-angles` returns the plan block alone, for a later phase re-checking a cap.
 
-#### Fan-out cells
+A `direct` cell has no angles: follow its instructions, report, and skip the remaining phases.
 
-`medium`, `high`, and `xhigh` on the default and Sonnet families, plus `xhigh` on Fable 5. Run each angle as an independent `Agent` with `subagent_type: review:angle, model: sonnet`. Invoking this skill is the request for that fan-out, so run it whenever `Agent` is in the tool set. Give every agent the scope block, its single angle text, its candidate cap, and the cleanup-precedence block if it carries a cleanup lens. The agent pins no model, so the spawn supplies it, and breadth costs Sonnet rates whatever model is orchestrating.
+Otherwise each angle surfaces up to the cell's candidate cap, with `file`, `line`, a one-line `summary`, and a concrete `failure_scenario`.
 
-#### Inline cells
+On a `fanout` cell, run each angle as an independent `Agent` with `subagent_type: review:angle` and the model the mode line names. Invoking this skill is the request for that fan-out, so run it whenever `Agent` is in the tool set. Give every agent the scope block, the finder preamble, its single angle text, its candidate cap, and the cleanup-precedence block if it carries a cleanup lens. The agent pins no model, so the spawn supplies it, and breadth costs Sonnet rates whatever model is orchestrating.
 
-`inline-med`, `inline-high`, and `inline-xhigh`. Work through the angles in sequence yourself, in this context. Do not spawn subagents for them.
+On an `inline` cell, work through the angles in sequence yourself, in this context. Do not spawn subagents for them.
 
 #### No `Agent` tool
 
@@ -98,11 +101,11 @@ At `xhigh`, a single non-REFUTED vote carries the finding. Do not drop on uncert
 
 ## Phase 3 — Sweep
 
-Only at `xhigh` and `inline-xhigh`.
+Only when the plan says `sweep yes`.
 
 Take one more pass as a fresh reviewer holding the verified list. On fan-out cells this is one more `Agent` with `subagent_type: review:angle, model: sonnet`, carrying the sweep gap focus as its angle. On inline and degraded cells it is one more pass in this context.
 
-Re-read the diff and the enclosing functions looking ONLY for defects not already listed. Do not re-derive or re-confirm anything already there. The job is gaps. Focus on what the first pass tends to miss (see the sweep gap focus in [angles.md](angles.md)).
+Re-read the diff and the enclosing functions looking ONLY for defects not already listed. Do not re-derive or re-confirm anything already there. The job is gaps. Focus on what the first pass tends to miss, which the plan's sweep gap focus block spells out.
 
 Surface up to 8 additional candidates, each naming a defect not already on the list. If nothing new, return nothing. Do not pad.
 
@@ -118,7 +121,7 @@ Finders return paths in whatever form they saw them (absolute, repo-relative, ba
 
 ## Output
 
-When `ReportFindings` is available and the level is not `low`, call it **once** with `{level, findings}`. Do not also print the findings as text.
+When the plan reports via `ReportFindings` and the tool is available, call it **once** with `{level, findings}`. Do not also print the findings as text.
 
 Each entry carries:
 
@@ -129,7 +132,7 @@ Each entry carries:
 
 If nothing survives, call it with an empty array.
 
-Without `ReportFindings` (or at `low`), print the findings as a ranked list, one line each:
+Print the findings as a ranked list, one line each, where the plan reports via `text` or the tool is unavailable:
 
 ```
 path/to/file.ext:123 — what's wrong and the concrete failure

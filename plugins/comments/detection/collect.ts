@@ -112,15 +112,19 @@ async function collectDiffFile(
     return [];
   }
   if (isGeneratedFile(file.path, source)) return [];
+  const lines = source.split("\n");
+  const comments = await extractComments(source, language);
   if (onDensity) {
     const added = new Set<number>();
     for (const range of file.added) {
       for (let n = range.start; n <= range.end; n++) added.add(n);
     }
-    onDensity({ path: file.path, language, stats: await measureAddedLines(source, added, language) });
+    onDensity({
+      path: file.path,
+      language,
+      stats: await measureAddedLines(source, added, language, comments),
+    });
   }
-  const lines = source.split("\n");
-  const comments = await extractComments(source, language);
   return scopeIntroduced(comments, file.added)
     .filter((comment) => !isExemptComment(comment))
     .map((comment) => toCollected(file.path, language, comment, lines));
@@ -164,11 +168,11 @@ async function collectRepoFile(
   const source = await file.text();
   if (isGeneratedFile(path, source)) return [];
   const lines = source.split("\n");
+  const comments = await extractComments(source, language);
   if (onDensity) {
     const added = new Set(lines.map((_, i) => i + 1));
-    onDensity({ path, language, stats: await measureAddedLines(source, added, language) });
+    onDensity({ path, language, stats: await measureAddedLines(source, added, language, comments) });
   }
-  const comments = await extractComments(source, language);
   return comments
     .filter((comment) => !isExemptComment(comment))
     .map((comment) => toCollected(path, language, comment, lines));

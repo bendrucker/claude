@@ -30,7 +30,7 @@ export function emptyStats(): AddedLineStats {
   };
 }
 
-function addInto(into: AddedLineStats, stats: AddedLineStats): void {
+export function addInto(into: AddedLineStats, stats: AddedLineStats): void {
   into.addedLines += stats.addedLines;
   into.commentChars += stats.commentChars;
   into.codeChars += stats.codeChars;
@@ -93,11 +93,14 @@ export async function measureAddedLines(
   fragment: string,
   added: Set<number>,
   language: string,
+  extracted?: Comment[],
 ): Promise<AddedLineStats> {
   const stats = emptyStats();
   let comments: Comment[];
   try {
-    comments = (await extractComments(fragment, language)).filter((c) => !isExemptComment(c));
+    comments = (extracted ?? (await extractComments(fragment, language))).filter(
+      (c) => !isExemptComment(c),
+    );
   } catch {
     return stats;
   }

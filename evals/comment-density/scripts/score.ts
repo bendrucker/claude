@@ -7,6 +7,7 @@ import { parseUnifiedDiff } from "../../../plugins/comments/detection/diff";
 import { languageForPath } from "../../../plugins/comments/detection/extract";
 import {
   addedLines,
+  addInto,
   measureAddedLines,
   sessionScore,
   emptyStats,
@@ -102,18 +103,6 @@ interface StoredSessionRow {
 }
 
 const SESSION_ID = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
-
-function addInto(into: AddedLineStats, stats: AddedLineStats): void {
-  into.addedLines += stats.addedLines;
-  into.commentChars += stats.commentChars;
-  into.codeChars += stats.codeChars;
-  into.commentLines += stats.commentLines;
-  into.codeLines += stats.codeLines;
-  into.mixedLines += stats.mixedLines;
-  into.commentWords += stats.commentWords;
-  into.commentCount += stats.commentCount;
-  into.maxCommentChars = Math.max(into.maxCommentChars, stats.maxCommentChars);
-}
 
 /**
  * Group stored measurement rows by session id extracted from the transcript

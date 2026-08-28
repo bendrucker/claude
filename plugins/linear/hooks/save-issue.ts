@@ -1,6 +1,12 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+
+const Fields = z.record(z.string(), z.unknown());
+
+export const HookInput = z.looseObject({ tool_input: z.unknown() });
+export type HookInput = z.infer<typeof HookInput>;
 
 export type CreateIssueInput = {
   id?: string;
@@ -51,9 +57,9 @@ export function normalizeInput(toolInput: Record<string, unknown>): NormalizeRes
   return { input, mutated };
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
   const { input: normalized, mutated } = normalizeInput(
-    input.tool_input as Record<string, unknown>,
+    Fields.safeParse(input.tool_input).data ?? {},
   );
   const { id, title, state, assignee } = normalized;
 
@@ -101,9 +107,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[linear/save-issue] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

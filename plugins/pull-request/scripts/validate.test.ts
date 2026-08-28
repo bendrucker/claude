@@ -4,7 +4,6 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import {
   type BodyContext,
   type BodyPart,
@@ -19,6 +18,7 @@ import {
   hasFileTourBullets,
   hasReflexiveScaffold,
   hasRunOnProse,
+  type HookInput,
   isPersonalRepo,
   isPrBodyCommand,
   type NarrationTell,
@@ -644,10 +644,8 @@ describe("processInput", () => {
     .stdout.trim()
     .slice(0, 12);
 
-  function createInput(command: string, cwd?: string): PreToolUseHookInput {
-    const input: Record<string, unknown> = { tool_name: "Bash", tool_input: { command } };
-    if (cwd) input.cwd = cwd;
-    return input as PreToolUseHookInput;
+  function createInput(command: string, cwd?: string): HookInput {
+    return { tool_input: { command }, ...(cwd && { cwd }) };
   }
 
   it("returns null when command has no --body-file", async () => {
@@ -665,10 +663,7 @@ describe("processInput", () => {
   );
 
   it("returns null when tool_input has no command", async () => {
-    const result = await processInput({
-      tool_name: "Bash",
-      tool_input: {},
-    } as PreToolUseHookInput);
+    const result = await processInput({ tool_input: {} });
     expect(result).toBeNull();
   });
 

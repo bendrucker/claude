@@ -57,13 +57,14 @@ function payloadBytes(value: unknown): number {
  * The items a read returned: a bare array, or the `items` field of a shape that
  * carries a count alongside them.
  */
+const ItemList = z.array(z.unknown());
+const ItemsField = z.looseObject({ items: ItemList });
+const Siblings = z.record(z.string(), z.unknown());
+
 function readItems(payload: unknown): unknown[] | null {
-  if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === "object" && "items" in payload) {
-    const items = payload.items;
-    if (Array.isArray(items)) return items;
-  }
-  return null;
+  const bare = ItemList.safeParse(payload);
+  if (bare.success) return bare.data;
+  return ItemsField.safeParse(payload).data?.items ?? null;
 }
 
 /** Largest prefix of `items` that serializes within the budget. */
@@ -80,13 +81,14 @@ function fittingCount(items: unknown[]): number {
 }
 
 /** What a capped read returns in place of the payload that overran the budget. */
-export interface TruncatedPayload {
-  truncated: true;
-  returned: number;
-  total: number;
-  note: string;
-  items: unknown[];
-}
+export const TruncatedPayload = z.looseObject({
+  truncated: z.literal(true),
+  returned: z.number(),
+  total: z.number(),
+  note: z.string(),
+  items: ItemList,
+});
+export type TruncatedPayload = z.infer<typeof TruncatedPayload>;
 
 /**
  * Caps a read at {@link MAX_PAYLOAD_BYTES}, dropping items from the end and
@@ -107,7 +109,7 @@ export function limitItems(payload: unknown, guidance: string): unknown {
   const omitted = items.length - returned;
   // A payload that carries its items in a field keeps that field's siblings,
   // so a caller reading `count` still finds how many matched.
-  const siblings = Array.isArray(payload) ? {} : (payload as Record<string, unknown>);
+  const siblings = Siblings.safeParse(payload).data ?? {};
   return {
     ...siblings,
     truncated: true,

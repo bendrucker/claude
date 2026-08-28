@@ -1,20 +1,26 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { z } from "zod";
 
 // Inbox dedup state: the reviews this inbox has already dispatched a background
 // session for. Dispatch is fire-and-forget (each review lives in `claude
 // agents`, not here), so the inbox tracks its own dispatches to avoid launching
 // a second session for a PR it is already reviewing. State persists in the data
 // dir across sessions.
-export interface Dispatch {
-  url: string;
-  sessionId: string | null;
-  dispatchedAt: string;
-}
+export const Dispatch = z.object({
+  url: z.string(),
+  sessionId: z.string().nullable(),
+  dispatchedAt: z.string(),
+});
+export type Dispatch = z.infer<typeof Dispatch>;
 
-export interface InboxState {
-  dispatched: Dispatch[];
-}
+export const InboxState = z.object({ dispatched: z.array(Dispatch) });
+export type InboxState = z.infer<typeof InboxState>;
+
+// The pre-background inbox stored { reviews: [...] } of tmux-pane records. Those
+// carry no meaning for the dispatch launcher, so an old file migrates to an empty
+// dedup set rather than hard-erroring every caller on it.
+const LegacyState = z.object({ reviews: z.array(z.unknown()) });
 
 function resolveDataDir(dataDir?: string): string {
   const base = dataDir ?? process.env.CLAUDE_PLUGIN_DATA;
@@ -43,19 +49,9 @@ export async function readState(dataDir?: string): Promise<InboxState> {
   } catch (cause) {
     throw new Error(`Failed to parse state file: ${file.name}`, { cause });
   }
-  if (!data || typeof data !== "object") {
-    throw new Error(`Invalid state file: ${file.name}`);
-  }
-  const record = data as Record<string, unknown>;
-  if (Array.isArray(record.dispatched)) {
-    return { dispatched: record.dispatched as Dispatch[] };
-  }
-  // The pre-background inbox stored { reviews: [...] } of tmux-pane records.
-  // Those carry no meaning for the dispatch launcher, so migrate the old file to
-  // an empty dedup set rather than hard-erroring every caller on it.
-  if (Array.isArray(record.reviews)) {
-    return { dispatched: [] };
-  }
+  const state = InboxState.safeParse(data);
+  if (state.success) return state.data;
+  if (LegacyState.safeParse(data).success) return { dispatched: [] };
   throw new Error(`Invalid state file: ${file.name}`);
 }
 

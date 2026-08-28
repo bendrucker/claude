@@ -4,6 +4,19 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+
+const ToolInput = z.looseObject({ plan: z.string().optional().catch(undefined) });
+
+const HookInput = z.looseObject({
+  hook_event_name: z.literal("PreToolUse"),
+  session_id: z.string().catch(""),
+  transcript_path: z.string().catch(""),
+  cwd: z.string().catch(""),
+  tool_name: z.string().catch(""),
+  tool_input: z.unknown().catch(undefined),
+  tool_use_id: z.string().catch(""),
+}) satisfies z.ZodType<PreToolUseHookInput>;
 
 const SIZE_THRESHOLD = 12_000;
 
@@ -104,15 +117,12 @@ function parseLineSet(raw: string): Set<string> | null {
   }
 }
 
-type PresentHistory = { count: number; maxLength: number };
+const PresentHistory = z.object({ count: z.number(), maxLength: z.number() });
+type PresentHistory = z.infer<typeof PresentHistory>;
 
 function parsePresentHistory(raw: string): PresentHistory | null {
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const { count, maxLength } = parsed as Record<string, unknown>;
-    if (typeof count !== "number" || typeof maxLength !== "number") return null;
-    return { count, maxLength };
+    return PresentHistory.safeParse(JSON.parse(raw)).data ?? null;
   } catch {
     return null;
   }
@@ -140,8 +150,8 @@ export async function processInput(
   input: PreToolUseHookInput,
   stateRoot = process.env.CLAUDE_PLAN_MARKER_ROOT || "/tmp/claude",
 ): Promise<SyncHookJSONOutput | null> {
-  const plan = (input.tool_input as { plan?: unknown }).plan;
-  if (typeof plan !== "string") return null;
+  const plan = ToolInput.safeParse(input.tool_input).data?.plan;
+  if (plan === undefined) return null;
 
   const sessionId = input.session_id;
   if (!sessionId) return null;
@@ -222,7 +232,7 @@ function failOpen(problem: string, error: unknown): void {
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     failOpen("failed to parse hook input", error);
     return;

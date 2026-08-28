@@ -6,6 +6,7 @@
  */
 
 import { join } from "node:path";
+import { z } from "zod";
 import { findSiblingScript } from "../marketplace";
 
 const PLUGIN_ROOT = join(import.meta.dirname, "..", "..");
@@ -20,7 +21,12 @@ export function findJxaRunner(pluginRoot: string = PLUGIN_ROOT): Promise<string 
   return findSiblingScript(pluginRoot, "mac", "scripts", "jxa.ts");
 }
 
-export async function runScript<T = unknown>(script: string, args: string[]): Promise<T> {
+const JxaFailure = z.looseObject({ error: z.unknown().transform(String) });
+
+// A JXA script prints whatever Things answered, and the tool that asked decides
+// what shape that is, so this seam has no domain type of its own.
+// oxlint-disable-next-line local/no-unknown-returns
+export async function runScript(script: string, args: string[]): Promise<unknown> {
   const runner = await findJxaRunner();
   if (!runner) {
     throw new Error("mac plugin JXA runner not found (expected plugins/mac/scripts/jxa.ts)");
@@ -46,8 +52,7 @@ export async function runScript<T = unknown>(script: string, args: string[]): Pr
   }
 
   const result: unknown = JSON.parse(stdout);
-  if (result && typeof result === "object" && "error" in result) {
-    throw new Error(String(result.error));
-  }
-  return result as T;
+  const failure = JxaFailure.safeParse(result);
+  if (failure.success) throw new Error(failure.data.error);
+  return result;
 }

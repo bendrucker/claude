@@ -18,9 +18,8 @@ function mockInput(url: string): PreToolUseHookInput {
 }
 
 function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = processInput(input);
-  if (!result) return null;
-  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+  const specific = processInput(input)?.hookSpecificOutput;
+  return specific?.hookEventName === "PreToolUse" ? specific : null;
 }
 
 describe("isPublicUrl", () => {

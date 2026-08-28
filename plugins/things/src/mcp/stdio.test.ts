@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { z } from "zod";
 
 const SERVER = join(import.meta.dirname, "stdio.ts");
 
@@ -76,18 +77,23 @@ function stdoutLines(stdout: string): string[] {
   return stdout.split("\n").filter(Boolean);
 }
 
-interface Response {
-  id: number;
-  result: { isError?: boolean; content?: Array<{ text: string }>; tools?: Array<{ name: string }> };
-}
+const RpcResponse = z.looseObject({
+  id: z.number(),
+  result: z.looseObject({
+    isError: z.boolean().optional(),
+    content: z.array(z.looseObject({ text: z.string() })).optional(),
+    tools: z.array(z.looseObject({ name: z.string() })).optional(),
+  }),
+});
+type RpcResponse = z.infer<typeof RpcResponse>;
 
 /**
  * The result the server sent for one request. Keyed by id because responses do
  * not come back in request order: a `tools/list` is answered synchronously
  * while a `tools/call` goes through schema validation first.
  */
-function responseTo(lines: string[], id: number): Response["result"] {
-  const responses = lines.map((line) => JSON.parse(line) as Response);
+function responseTo(lines: string[], id: number): RpcResponse["result"] {
+  const responses = lines.map((line) => RpcResponse.parse(JSON.parse(line)));
   const match = responses.find((response) => response.id === id);
   if (!match) throw new Error(`no response for request ${id}`);
   return match.result;
@@ -107,7 +113,9 @@ describe("stdio server", () => {
   // framing. Every diagnostic in the closure has to reach stderr instead.
   test("writes nothing but JSON-RPC to stdout", () => {
     for (const line of lines) {
-      expect(() => JSON.parse(line)).not.toThrow();
+      expect(() => {
+        JSON.parse(line);
+      }).not.toThrow();
     }
     expect(lines).toHaveLength(HANDSHAKE.length - 1);
   });

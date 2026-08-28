@@ -3,6 +3,16 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
+
+const Injection = z.object({
+  hookSpecificOutput: z.looseObject({
+    hookEventName: z.string(),
+    additionalContext: z.string(),
+  }),
+});
+
+const injection = (stdout: string) => Injection.parse(JSON.parse(stdout)).hookSpecificOutput;
 
 const scriptPath = join(import.meta.dirname, "plan-inject.sh");
 
@@ -40,9 +50,9 @@ async function opusTranscript(): Promise<string> {
 
 test("emits additionalContext JSON on first plan-mode tool call", async () => {
   const stdout = await run({ permission_mode: "plan", session_id: "t1" });
-  const parsed = JSON.parse(stdout);
-  expect(parsed.hookSpecificOutput.hookEventName).toBe("PreToolUse");
-  expect(parsed.hookSpecificOutput.additionalContext).toContain("Planning Guidelines");
+  const parsed = injection(stdout);
+  expect(parsed.hookEventName).toBe("PreToolUse");
+  expect(parsed.additionalContext).toContain("Planning Guidelines");
 });
 
 test("touches the marker so a second call short-circuits", async () => {
@@ -76,9 +86,9 @@ test("injects once EnterPlanMode has landed, whatever mode the call carried", as
     permission_mode: "auto",
     session_id: "t1",
   });
-  const parsed = JSON.parse(stdout);
-  expect(parsed.hookSpecificOutput.hookEventName).toBe("PostToolUse");
-  expect(parsed.hookSpecificOutput.additionalContext).toContain("Planning Guidelines");
+  const parsed = injection(stdout);
+  expect(parsed.hookEventName).toBe("PostToolUse");
+  expect(parsed.additionalContext).toContain("Planning Guidelines");
 });
 
 test("leaves the marker unspent when EnterPlanMode never lands", async () => {
@@ -96,6 +106,6 @@ test("re-injects for a different session id", async () => {
 test("includes delegation guidance when the model is expensive", async () => {
   const transcript_path = await opusTranscript();
   const stdout = await run({ permission_mode: "plan", session_id: "t1", transcript_path });
-  const parsed = JSON.parse(stdout);
-  expect(parsed.hookSpecificOutput.additionalContext).toContain("# Delegation");
+  const parsed = injection(stdout);
+  expect(parsed.additionalContext).toContain("# Delegation");
 });

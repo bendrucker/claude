@@ -1,12 +1,9 @@
 #!/usr/bin/env bun
 
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { filePathOf, PostToolUse } from "./hook-input";
 import { isMemoryPath } from "./memory-path";
 import { clearState, getState } from "./state";
-
-type ToolInput = {
-  file_path?: string;
-};
 
 export async function preserveNewlineState(
   filePath: string,
@@ -40,7 +37,7 @@ export async function preserveNewlineState(
 export async function processInput(
   input: PostToolUseHookInput,
 ): Promise<SyncHookJSONOutput | null> {
-  const { file_path: filePath } = input.tool_input as ToolInput;
+  const filePath = filePathOf(input.tool_input);
   if (!filePath) return null;
   if (isMemoryPath(filePath)) return null;
 
@@ -64,7 +61,7 @@ export async function processInput(
 async function main(): Promise<void> {
   let input: PostToolUseHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
+    input = PostToolUse.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[newline/preserve] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

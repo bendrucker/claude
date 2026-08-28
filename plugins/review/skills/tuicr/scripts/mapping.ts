@@ -37,7 +37,7 @@ const mapCmd = command(
       commentList = decodeComments(await Bun.file(comments).text());
       diffText = await Bun.file(diff).text();
     } catch (error) {
-      console.error((error as Error).message);
+      console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
 

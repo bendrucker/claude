@@ -1,6 +1,12 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+
+const BashInput = z.looseObject({ command: z.string().optional().catch(undefined) });
+
+export const HookInput = z.looseObject({ tool_input: z.unknown() });
+export type HookInput = z.infer<typeof HookInput>;
 import { getDefaultState } from "./save-issue";
 
 const SHELL_OPERATORS = /\s*(?:&&|\|\||[|;])\s*/;
@@ -25,8 +31,8 @@ export function isSingleInvocation(command: string): boolean {
   return LEADING_CREATE.test(command.trim().replace(ENV_PREFIX, ""));
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { command } = input.tool_input as { command?: string };
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const command = BashInput.safeParse(input.tool_input).data?.command;
   if (!command || !CREATE.test(command)) return null;
   if (HAS_STATE.test(command) || HAS_START.test(command)) return null;
 
@@ -54,9 +60,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[linear/cli-create] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

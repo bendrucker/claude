@@ -1,5 +1,9 @@
-export type PresetName = "classic" | "label" | "subtitle";
-export type Anchor = "top" | "bottom" | "center";
+import { z } from "zod";
+
+export const PresetName = z.enum(["classic", "label", "subtitle"]);
+export type PresetName = z.infer<typeof PresetName>;
+export const Anchor = z.enum(["top", "bottom", "center"]);
+export type Anchor = z.infer<typeof Anchor>;
 
 export interface PresetStyle {
   fontFamily: string;

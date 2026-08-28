@@ -3,20 +3,22 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
-import { type CommentSide, decodeComments, deriveAnchor, type TuicrComment } from "./comment";
+import { z } from "zod";
+import { CommentSide, decodeComments, deriveAnchor, type TuicrComment } from "./comment";
 
 export type { CommentSide, TuicrComment } from "./comment";
 
-export interface LedgerRecord {
-  id: string;
-  path: string;
-  anchor: { side: CommentSide; line: number };
-  content: string;
-  resolved: boolean;
-  action?: string;
-  ref?: string;
-  updatedAt: string;
-}
+export const LedgerRecord = z.object({
+  id: z.string(),
+  path: z.string(),
+  anchor: z.object({ side: CommentSide, line: z.number() }),
+  content: z.string(),
+  resolved: z.boolean(),
+  action: z.string().optional(),
+  ref: z.string().optional(),
+  updatedAt: z.string(),
+});
+export type LedgerRecord = z.infer<typeof LedgerRecord>;
 
 export interface LedgerOptions {
   dir: string;
@@ -37,11 +39,12 @@ function sanitize(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-interface LedgerFile {
-  repo: string;
-  branch: string;
-  records: LedgerRecord[];
-}
+const LedgerFile = z.object({
+  repo: z.string(),
+  branch: z.string(),
+  records: z.array(LedgerRecord),
+});
+type LedgerFile = z.infer<typeof LedgerFile>;
 
 export class Ledger {
   private readonly dir: string;
@@ -75,7 +78,7 @@ export class Ledger {
     if (!(await file.exists())) {
       return new Map();
     }
-    const data = JSON.parse(await file.text()) as LedgerFile;
+    const data = LedgerFile.parse(JSON.parse(await file.text()));
     return new Map(data.records.map((record) => [record.id, record]));
   }
 

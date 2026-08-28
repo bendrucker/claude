@@ -1,12 +1,9 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { filePathOf, PreToolUse } from "./hook-input";
 import { isMemoryPath } from "./memory-path";
 import { setState } from "./state";
-
-type ToolInput = {
-  file_path?: string;
-};
 
 export async function hasTrailingNewline(filePath: string): Promise<boolean | null> {
   const file = Bun.file(filePath);
@@ -23,7 +20,7 @@ export async function hasTrailingNewline(filePath: string): Promise<boolean | nu
 }
 
 export async function processInput(input: PreToolUseHookInput): Promise<void> {
-  const { file_path: filePath } = input.tool_input as ToolInput;
+  const filePath = filePathOf(input.tool_input);
   if (!filePath) return;
   if (isMemoryPath(filePath)) return;
 
@@ -39,7 +36,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<void> {
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = PreToolUse.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[newline/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

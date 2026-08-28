@@ -3,7 +3,10 @@
 import { execSync } from "node:child_process";
 import { join } from "node:path";
 import { markdown } from "bun";
-export type Provider = "github" | "gitlab";
+import { z } from "zod";
+
+export const Provider = z.enum(["github", "gitlab"]);
+export type Provider = z.infer<typeof Provider>;
 
 const TEMPLATE_PATHS: Record<Provider, string[]> = {
   github: [
@@ -40,7 +43,7 @@ function getRepoRoot(): string {
 
 if (import.meta.main) {
   const repoRoot = getRepoRoot();
-  const provider = (process.argv[2] as Provider) || "github";
+  const provider = Provider.safeParse(process.argv[2]).data ?? "github";
   const template = await findTemplate(provider, repoRoot);
   if (template) {
     process.stdout.write(markdown.ansi(template));

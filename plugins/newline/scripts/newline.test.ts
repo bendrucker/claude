@@ -3,11 +3,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type {
-  PostToolUseHookInput,
-  PostToolUseHookSpecificOutput,
-  PreToolUseHookInput,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { PostToolUseHookInput, PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import fc from "fast-check";
 import { processInput as checkInput, hasTrailingNewline } from "./check";
 import { processInput as ensureInput, ensureTrailingNewline } from "./ensure";
@@ -148,8 +144,10 @@ describe("ensure.ts", () => {
       await Bun.write(filePath, content);
       const output = await ensureInput(mockPostToolInput(filePath));
       if (expectAdded) {
-        const hookOutput = output?.hookSpecificOutput as PostToolUseHookSpecificOutput | undefined;
-        expect(hookOutput?.additionalContext).toContain("Added trailing newline");
+        const specific = output?.hookSpecificOutput;
+        expect(specific?.hookEventName === "PostToolUse" && specific.additionalContext).toContain(
+          "Added trailing newline",
+        );
       } else {
         expect(output).toBeNull();
       }
@@ -204,7 +202,7 @@ describe("preserve.ts", () => {
       await Bun.write(filePath, content);
       const result = await preserveNewlineState(filePath, state);
       if (contains) {
-        expect(result).toContain(message as string);
+        expect(result).toContain(message ?? "");
       } else {
         expect(result).toBe(message);
       }

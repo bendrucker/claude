@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { z } from "zod";
 import { readState } from "./store";
 
-type QueueEntry = { url: string };
+const Queue = z.array(z.looseObject({ url: z.string() }));
 
 export type FetchResult = { ok: true; urls: string[] } | { ok: false; reason: string };
 
@@ -23,7 +24,7 @@ export async function fetchUrls(command: string): Promise<FetchResult> {
     return { ok: false, reason: detail };
   }
   try {
-    const entries = JSON.parse(stdoutText) as QueueEntry[];
+    const entries = Queue.parse(JSON.parse(stdoutText));
     return { ok: true, urls: entries.map((entry) => entry.url) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

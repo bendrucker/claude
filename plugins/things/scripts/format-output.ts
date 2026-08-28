@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { cli } from "cleye";
+import { z } from "zod";
 import { formatDate, selectColumns, stringify, table } from "./format";
 
 const argv = cli({
@@ -21,16 +22,23 @@ const argv = cli({
   },
 });
 
-const raw = await Bun.stdin.text();
-const data = JSON.parse(raw);
+const Row = z.record(z.string(), z.unknown());
+const Failure = z.looseObject({ error: z.unknown() });
+const Rows = z.array(Row);
+const Wrapped = z.looseObject({ items: Rows.optional(), count: z.number().optional() });
 
-if (data && typeof data === "object" && "error" in data) {
-  console.error(data.error);
+const data: unknown = JSON.parse(await Bun.stdin.text());
+
+const failure = Failure.safeParse(data);
+if (failure.success) {
+  console.error(failure.data.error);
   process.exit(1);
 }
 
-const items: Record<string, unknown>[] = Array.isArray(data) ? data : (data.items ?? []);
-const count = Array.isArray(data) ? items.length : (data.count ?? items.length);
+const bare = Rows.safeParse(data);
+const wrapped = Wrapped.safeParse(data);
+const items = bare.success ? bare.data : (wrapped.data?.items ?? []);
+const count = bare.success ? items.length : (wrapped.data?.count ?? items.length);
 
 if (argv.flags.json) {
   console.log(JSON.stringify(data, null, 2));

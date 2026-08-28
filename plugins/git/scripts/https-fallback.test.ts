@@ -251,9 +251,10 @@ describe("processInput", () => {
     async ({ remotes, expected }) => {
       const result = await processInput(mockInput("git pull", SECRETIVE_FAILURE), remotes);
       expect(result).not.toBeNull();
-      const context = (result?.hookSpecificOutput as { additionalContext: string })
-        .additionalContext;
-      expect(context).toContain(expected);
+      const specific = result?.hookSpecificOutput;
+      expect(
+        specific?.hookEventName === "PostToolUseFailure" && specific.additionalContext,
+      ).toContain(expected);
     },
   );
 });

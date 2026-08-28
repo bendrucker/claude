@@ -3,8 +3,7 @@
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
 import { getDefaultBranch } from "./default-branch";
-
-type BashInput = { command?: string };
+import { BashInput, PreToolUse } from "./hook-input";
 
 // Flags git accepts between the executable and its subcommand. Enumerated
 // rather than matched as a generic `-\S+` so that a value which happens to be
@@ -40,7 +39,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   // The `Bash(git commit:*)` condition only narrows which calls spawn this hook.
   // It fails open on shell metacharacters, so the deny decision rests on the
   // command this hook reads for itself.
-  const { command } = input.tool_input as BashInput;
+  const command = BashInput.safeParse(input.tool_input).data?.command;
   if (!command || !invokesGitCommit(command)) {
     return null;
   }
@@ -77,7 +76,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = PreToolUse.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[git/block-default-branch-commit] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

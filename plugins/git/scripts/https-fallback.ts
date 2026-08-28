@@ -5,6 +5,7 @@ import type {
   SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
+import { BashInput, PostToolUseFailure } from "./hook-input";
 
 /**
  * Secretive gates every signature behind Touch ID, so an unattended `ssh` gets
@@ -157,7 +158,7 @@ export async function processInput(
   input: PostToolUseFailureHookInput,
   readRemotes: (cwd: string) => Promise<string> = readRemoteUrls,
 ): Promise<SyncHookJSONOutput | null> {
-  const command = (input.tool_input as { command?: string } | null)?.command;
+  const command = BashInput.safeParse(input.tool_input).data?.command;
   if (!command) return null;
 
   if (!gitNetworkSubcommand(command)) return null;
@@ -181,7 +182,7 @@ export async function processInput(
 async function main(): Promise<void> {
   let input: PostToolUseFailureHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PostToolUseFailureHookInput;
+    input = PostToolUseFailure.parse(JSON.parse(await Bun.stdin.text()));
   } catch {
     return;
   }

@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 
-export type FileInput = {
-  file_path?: string;
-};
+const FileInput = z.looseObject({ file_path: z.string().optional().catch(undefined) });
+export type FileInput = z.infer<typeof FileInput>;
+
+export const HookInput = z.looseObject({ tool_input: z.unknown() });
+export type HookInput = z.infer<typeof HookInput>;
 
 const GENERATED_MARKER = /^\/\/\s*Code\s+generated.*DO\s+NOT\s+EDIT\.$/;
 
@@ -35,8 +38,8 @@ export function isGeneratedFile(content: string): boolean {
   return foundMarker && foundCode;
 }
 
-export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
-  const { file_path: filePath } = input.tool_input as FileInput;
+export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
+  const filePath = FileInput.safeParse(input.tool_input).data?.file_path;
 
   if (!filePath || !filePath.endsWith(".go")) {
     return null;
@@ -63,9 +66,9 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[go/check] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

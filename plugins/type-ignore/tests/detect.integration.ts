@@ -68,8 +68,9 @@ describe("type-ignore detection hook", () => {
 
       const result = await processInput(input);
       expect(result).not.toBeNull();
-      const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
-        .additionalContext;
+      const specific = result?.hookSpecificOutput;
+      const additionalContext =
+        specific?.hookEventName === "PostToolUse" ? (specific.additionalContext ?? "") : "";
       expect(additionalContext).toContain("@ts-ignore");
       expect(additionalContext).toContain("type-ignore:fixer");
     });
@@ -82,8 +83,9 @@ describe("type-ignore detection hook", () => {
 
       const result = await processInput(input);
       expect(result).not.toBeNull();
-      const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
-        .additionalContext;
+      const specific = result?.hookSpecificOutput;
+      const additionalContext =
+        specific?.hookEventName === "PostToolUse" ? (specific.additionalContext ?? "") : "";
       expect(additionalContext).toContain("@ts-expect-error");
     });
 
@@ -96,8 +98,9 @@ describe("type-ignore detection hook", () => {
 
       const result = await processInput(input);
       expect(result).not.toBeNull();
-      const additionalContext = (result?.hookSpecificOutput as { additionalContext: string })
-        .additionalContext;
+      const specific = result?.hookSpecificOutput;
+      const additionalContext =
+        specific?.hookEventName === "PostToolUse" ? (specific.additionalContext ?? "") : "";
       expect(additionalContext).toContain("type: ignore");
     });
 
@@ -167,9 +170,10 @@ describe("type-ignore detection hook", () => {
     it("formats output with file, line, and pattern", () => {
       const result = formatOutput("/path/to/file.ts", 42, "@ts-ignore");
 
-      expect(result.hookSpecificOutput?.hookEventName).toBe("PostToolUse");
-      const additionalContext = (result.hookSpecificOutput as { additionalContext: string })
-        .additionalContext;
+      const specific = result.hookSpecificOutput;
+      expect(specific?.hookEventName).toBe("PostToolUse");
+      const additionalContext =
+        specific?.hookEventName === "PostToolUse" ? (specific.additionalContext ?? "") : "";
       expect(additionalContext).toContain("file.ts:42");
       expect(additionalContext).toContain("@ts-ignore");
       expect(additionalContext).toContain("type-ignore:fixer");

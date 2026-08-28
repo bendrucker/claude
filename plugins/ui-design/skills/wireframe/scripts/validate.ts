@@ -287,8 +287,8 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("/bun")) {
-  main().catch((error) => {
-    console.error("Error:", error.message);
+  main().catch((error: unknown) => {
+    console.error("Error:", error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
 }

@@ -22,9 +22,8 @@ function mockInput(command: string, cwd: string): PreToolUseHookInput {
 }
 
 async function getOutput(input: PreToolUseHookInput): Promise<PreToolUseHookSpecificOutput | null> {
-  const result = await processInput(input);
-  if (!result) return null;
-  return result.hookSpecificOutput as PreToolUseHookSpecificOutput;
+  const specific = (await processInput(input))?.hookSpecificOutput;
+  return specific?.hookEventName === "PreToolUse" ? specific : null;
 }
 
 describe("invokesGitCommit", () => {

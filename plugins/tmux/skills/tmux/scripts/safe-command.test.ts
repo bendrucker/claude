@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { z } from "zod";
 
 const script = join(import.meta.dir, "safe-command.sh");
 
@@ -14,12 +15,13 @@ async function run(command: string): Promise<string> {
   return output.trim();
 }
 
+const Decision = z.looseObject({
+  hookSpecificOutput: z.looseObject({ permissionDecision: z.string().optional() }).optional(),
+});
+
 function isAllow(output: string): boolean {
   if (!output) return false;
-  const parsed = JSON.parse(output) as {
-    hookSpecificOutput?: { permissionDecision?: string };
-  };
-  return parsed.hookSpecificOutput?.permissionDecision === "allow";
+  return Decision.parse(JSON.parse(output)).hookSpecificOutput?.permissionDecision === "allow";
 }
 
 describe("safe-command", () => {

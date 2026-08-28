@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
 import {
   chunk,
   limitItems,
-  type TruncatedPayload,
+  TruncatedPayload,
   updateAttributes,
   validateCaptureTitles,
   validateNonBlank,
@@ -117,7 +118,7 @@ describe("limitItems", () => {
   });
 
   test("drops items from the end of an oversized array", () => {
-    const limited = limitItems(oversized, guidance) as TruncatedPayload;
+    const limited = TruncatedPayload.parse(limitItems(oversized, guidance));
 
     expect(limited.truncated).toBe(true);
     expect(limited.total).toBe(400);
@@ -129,11 +130,9 @@ describe("limitItems", () => {
   });
 
   test("keeps the other fields of an oversized object payload", () => {
-    const limited = limitItems({ count: 400, items: oversized }, guidance) as {
-      count: number;
-      truncated: boolean;
-      total: number;
-    };
+    const limited = TruncatedPayload.extend({ count: z.number() }).parse(
+      limitItems({ count: 400, items: oversized }, guidance),
+    );
 
     expect(limited.count).toBe(400);
     expect(limited.truncated).toBe(true);

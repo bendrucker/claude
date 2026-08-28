@@ -2,8 +2,22 @@
 
 import { extname } from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 
 import { validate } from "./validate";
+
+const FileInput = z.looseObject({ file_path: z.string().optional().catch(undefined) });
+
+const HookInput = z.looseObject({
+  hook_event_name: z.literal("PostToolUse"),
+  session_id: z.string().catch(""),
+  transcript_path: z.string().catch(""),
+  cwd: z.string().catch(""),
+  tool_name: z.string().catch(""),
+  tool_input: z.unknown().catch(undefined),
+  tool_response: z.unknown().catch(undefined),
+  tool_use_id: z.string().catch(""),
+}) satisfies z.ZodType<PostToolUseHookInput>;
 
 export function isSvgFile(filePath: string): boolean {
   return extname(filePath) === ".svg";
@@ -25,7 +39,7 @@ export async function processInput(
     return null;
   }
 
-  const filePath = (input.tool_input as { file_path?: string }).file_path;
+  const filePath = FileInput.safeParse(input.tool_input).data?.file_path;
   if (!filePath || !isSvgFile(filePath)) {
     return null;
   }
@@ -49,7 +63,7 @@ Fix these layout issues before rendering.`);
 async function main(): Promise<void> {
   let input: PostToolUseHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch {
     return;
   }

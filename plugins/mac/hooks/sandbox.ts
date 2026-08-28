@@ -2,8 +2,19 @@
 
 import { basename, extname } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 
-type ToolInput = { command: string };
+const ToolInput = z.looseObject({ command: z.string().optional().catch(undefined) });
+
+const HookInput = z.looseObject({
+  hook_event_name: z.literal("PreToolUse"),
+  session_id: z.string().catch(""),
+  transcript_path: z.string().catch(""),
+  cwd: z.string().catch(""),
+  tool_name: z.string().catch(""),
+  tool_input: z.unknown().catch(undefined),
+  tool_use_id: z.string().catch(""),
+}) satisfies z.ZodType<PreToolUseHookInput>;
 
 const SHELL_OPERATORS = /\s*(?:&&|\|\||[|;])\s*/;
 const SCRIPT_INTERPRETERS = new Set(["bun", "node"]);
@@ -25,7 +36,7 @@ export function extractCommands(command: string): Invocation[] {
     let i = 0;
 
     // skip env var prefixes (FOO=bar)
-    while (i < tokens.length && /^[A-Za-z_]\w*=/.test(tokens[i] as string)) {
+    while (i < tokens.length && /^[A-Za-z_]\w*=/.test(tokens[i] ?? "")) {
       i++;
     }
 
@@ -63,7 +74,7 @@ export async function hasBypassMarker(path: string): Promise<boolean> {
   return head ? head.includes(SCRIPT_MARKER) : false;
 }
 
-function disableSandbox(toolInput: Record<string, unknown>): SyncHookJSONOutput {
+function disableSandbox(toolInput: z.infer<typeof ToolInput>): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
@@ -78,11 +89,10 @@ export async function processInput(
 ): Promise<SyncHookJSONOutput | null> {
   if (platform !== "darwin") return null;
 
-  const toolInput = input.tool_input as Record<string, unknown>;
-  const { command } = toolInput as ToolInput;
-  if (!command) return null;
+  const toolInput = ToolInput.safeParse(input.tool_input).data;
+  if (!toolInput?.command) return null;
 
-  for (const { scriptArg } of extractCommands(command)) {
+  for (const { scriptArg } of extractCommands(toolInput.command)) {
     if (scriptArg && (await hasBypassMarker(scriptArg))) {
       return disableSandbox(toolInput);
     }
@@ -94,7 +104,7 @@ export async function processInput(
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[mac/sandbox] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

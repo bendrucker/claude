@@ -1,9 +1,13 @@
 #!/usr/bin/env bun
 
 import { extname } from "node:path";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 
-type BashInput = { command: string };
+const BashInput = z.looseObject({ command: z.string() });
+
+export const HookInput = z.looseObject({ tool_input: z.unknown() });
+export type HookInput = z.infer<typeof HookInput>;
 
 // Characters that end a simple command, splice another one into it, or hide a
 // word from it. A command carrying any of them outside quotes is not a lone
@@ -91,9 +95,9 @@ function extractTarget(command: string): string | null {
   return tokens.at(-1) ?? null;
 }
 
-export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {
-  const { command } = input.tool_input as BashInput;
-  const target = extractTarget(command);
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const command = BashInput.safeParse(input.tool_input).data?.command;
+  const target = command === undefined ? null : extractTarget(command);
 
   if (!target) {
     return null;
@@ -121,9 +125,9 @@ export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | n
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[shortcuts/open] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

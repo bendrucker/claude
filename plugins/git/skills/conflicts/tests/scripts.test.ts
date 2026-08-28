@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { $ } from "bun";
+import { z } from "zod";
 import {
   createConflictFixture,
   createDivergenceFixture,
@@ -40,7 +41,18 @@ describe("conflicts scripts", () => {
   });
 
   describe("check-markers.ts", () => {
-    const hookInput = JSON.stringify({ tool_name: "Bash", tool_input: { command: "git commit" } });
+    const hookInput = JSON.stringify({
+      hook_event_name: "PreToolUse",
+      tool_name: "Bash",
+      tool_input: { command: "git commit" },
+    });
+
+    const Denial = z.object({
+      hookSpecificOutput: z.looseObject({
+        permissionDecision: z.string(),
+        permissionDecisionReason: z.string(),
+      }),
+    });
 
     test("outputs deny JSON when markers in staged files", async () => {
       await $`git add file.txt`.cwd(fixture.path).quiet();
@@ -49,9 +61,9 @@ describe("conflicts scripts", () => {
         .cwd(fixture.path)
         .text();
 
-      const output = JSON.parse(result);
-      expect(output.hookSpecificOutput.permissionDecision).toBe("deny");
-      expect(output.hookSpecificOutput.permissionDecisionReason).toContain("Conflict markers");
+      const { hookSpecificOutput } = Denial.parse(JSON.parse(result));
+      expect(hookSpecificOutput.permissionDecision).toBe("deny");
+      expect(hookSpecificOutput.permissionDecisionReason).toContain("Conflict markers");
     });
 
     test("outputs nothing when no markers", async () => {

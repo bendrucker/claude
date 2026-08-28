@@ -1,19 +1,19 @@
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import { headingCaseViolations } from "./heading-case";
 import { LINKING_VERBS } from "./linguistics/heading";
 import { countProseWords, headingTexts, linesOutsideFences, stripEmphasis } from "./markdown";
 import { classifyPrHeading } from "./sentence-heading";
 
-function hasBashCommand(input: unknown): input is { command: string } {
-  return (
-    typeof input === "object" &&
-    input !== null &&
-    "command" in input &&
-    typeof input.command === "string"
-  );
-}
+const BashInput = z.looseObject({ command: z.string() });
+
+export const HookInput = z.looseObject({
+  cwd: z.string().optional(),
+  tool_input: z.unknown(),
+});
+export type HookInput = z.infer<typeof HookInput>;
 
 const TEST_COUNT_PATTERN =
   /[Aa]dded [0-9]+ (unit |integration )?tests|[0-9]+ (unit |integration )?tests|[0-9]+ assertions|[0-9]+ pass(?:ed|es)?,\s*[0-9]+ fail/;
@@ -681,13 +681,10 @@ export function unreadableBodyReason(detail: string): string {
   return `The hook cannot read ${detail}, so none of the body checks ran. Write the body to a file in its own Bash call, then pass that path: \`--body-file <path>\` on \`gh\`, \`--description-file <path>\` on \`glab\`.`;
 }
 
-export async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
-  if (!hasBashCommand(input.tool_input)) {
-    return null;
-  }
-  const { command } = input.tool_input;
+export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
+  const command = BashInput.safeParse(input.tool_input).data?.command;
 
-  if (!isPrBodyCommand(command)) {
+  if (command === undefined || !isPrBodyCommand(command)) {
     return null;
   }
 

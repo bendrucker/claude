@@ -179,6 +179,21 @@ export interface DensityScore {
 /** Weight floor per introduced comment: a short comment still costs a reader an interruption. */
 export const MIN_COMMENT_CHARS = 90;
 
+/** Comments a file must introduce before their average size scales the per-comment floor. */
+export const TERSE_MIN_COMMENTS = 5;
+/** Average comment size the floor targets; a run of shorter comments scales it up. */
+export const TERSE_AVG_CHARS = 78;
+/** Ceiling on the terse floor multiplier. */
+export const TERSE_MAX_FACTOR = 2.25;
+
+/** Floor on one file's comment weight, charged per comment rather than per char. */
+export function commentWeightFloor(stats: AddedLineStats): number {
+  const flat = MIN_COMMENT_CHARS * stats.commentCount;
+  if (stats.commentCount < TERSE_MIN_COMMENTS) return flat;
+  const average = stats.commentChars / stats.commentCount;
+  return flat * Math.min(TERSE_MAX_FACTOR, Math.max(1, TERSE_AVG_CHARS / Math.max(1, average)));
+}
+
 /** Share at or above which added lines are a documentation edit, never escalated. */
 export const DOCS_PASS_SHARE = 0.95;
 
@@ -186,7 +201,7 @@ export function densityScore(stats: AddedLineStats, language: string): DensitySc
   const chars = stats.commentChars + stats.codeChars;
   const b = baselineFor(language);
   const expected = (b / (1 - b)) * stats.codeChars;
-  const weighted = Math.max(stats.commentChars, MIN_COMMENT_CHARS * stats.commentCount);
+  const weighted = Math.max(stats.commentChars, commentWeightFloor(stats));
   const share = chars === 0 ? 0 : stats.commentChars / chars;
   return {
     share,

@@ -107,9 +107,9 @@
   {
     "repo": "/Users/ben/src/oapi-codegen/oapi-codegen",
     "sha": "c6bc7c587515948af319ed804c216aa9fc940f5c",
-    "grade": 2,
+    "grade": 1,
     "docsIntent": false,
-    "confidence": "medium"
+    "confidence": "high"
   },
   {
     "repo": "/Users/ben/src/slopus/happy",

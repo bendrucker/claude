@@ -164,19 +164,27 @@ describe("append-only re-present", () => {
 });
 
 describe("size advisory", () => {
-  const bigPlan = (seed: string) => seed + "x".repeat(12_001);
+  const bigPlan = (seed: string) => seed + "x".repeat(10_001);
 
-  it("denies a plan over 12k characters", async () => {
-    expect(denialReason(await decision(bigPlan("a")))).toContain("exceeds 12k characters");
+  it("denies a plan over 10k characters", async () => {
+    expect(denialReason(await decision(bigPlan("a")))).toContain("exceeds 10k characters");
   });
 
-  it("stays silent at exactly 12k characters", async () => {
-    expect(await decision("x".repeat(12_000))).toBeNull();
+  it("stays silent at exactly 10k characters", async () => {
+    expect(await decision("x".repeat(10_000))).toBeNull();
   });
 
-  it("denies at most once per session", async () => {
+  it("re-arms while the rework stays over, with a still-over reason, then stops", async () => {
+    expect(denialReason(await decision(bigPlan("a")))).toContain("exceeds 10k characters");
+    expect(denialReason(await decision(bigPlan("b")))).toContain("still over 10k characters");
+    expect(await decision(bigPlan("c"))).toBeNull();
+  });
+
+  it("does not spend a fire on a rework that lands under the threshold", async () => {
     expect((await decision(bigPlan("a")))?.permissionDecision).toBe("deny");
-    expect(await decision(bigPlan("b"))).toBeNull();
+    expect(await decision("a short plan")).toBeNull();
+    expect((await decision(bigPlan("b")))?.permissionDecision).toBe("deny");
+    expect(await decision(bigPlan("c"))).toBeNull();
   });
 
   it("denies again in a different session", async () => {
@@ -184,9 +192,15 @@ describe("size advisory", () => {
     expect((await decision(bigPlan("a"), "session-2"))?.permissionDecision).toBe("deny");
   });
 
+  it("stays spent when the marker holds the legacy pre-count value", async () => {
+    await decision(bigPlan("a"));
+    await Bun.write(join(stateRoot, "session-1", "exit-plan-size-asked"), "asked");
+    expect(await decision(bigPlan("b"))).toBeNull();
+  });
+
   it("gives the byte-identical reason when the oversized plan is also unchanged", async () => {
     expect((await decision(bigPlan("a")))?.permissionDecisionReason).toContain(
-      "exceeds 12k characters",
+      "exceeds 10k characters",
     );
     expect((await decision(bigPlan("a")))?.permissionDecisionReason).toContain("byte-identical");
   });
@@ -254,12 +268,12 @@ describe("append-only re-present", () => {
     const pad = "x".repeat(120);
     const padded = (count: number, prefix: string) =>
       Array.from({ length: count }, (_, i) => `${prefix} ${i} ${pad}`);
-    const base = padded(90, "line").join("\n");
-    expect(base.length).toBeLessThan(12_000);
+    const base = padded(72, "line").join("\n");
+    expect(base.length).toBeLessThan(10_000);
     await decision(base);
 
-    const grown = [...padded(90, "line"), ...padded(5, "new")].join("\n");
-    expect(grown.length).toBeGreaterThan(12_000);
+    const grown = [...padded(72, "line"), ...padded(8, "new")].join("\n");
+    expect(grown.length).toBeGreaterThan(10_000);
     expect(denialReason(await decision(grown))).toContain("carries nearly every prior line");
     // Append-only denies before the size check, so the size branch never runs and
     // records no marker: one prompt for append-only, no second prompt for size.
@@ -345,7 +359,7 @@ describe("sustained growth", () => {
 // The oversized rule needs no prior state, so one piped payload covers it.
 describe("harness invocation", () => {
   it("emits the oversized decision when run as the harness runs it", async () => {
-    const { stdout, stderr, exitCode } = await runGate(mockInput("x".repeat(12_001)));
+    const { stdout, stderr, exitCode } = await runGate(mockInput("x".repeat(10_001)));
     const emitted: unknown = JSON.parse(stdout);
 
     expect({ exitCode, stderr, decision: emitted }).toMatchInlineSnapshot(`
@@ -354,7 +368,7 @@ describe("harness invocation", () => {
           "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": "This plan exceeds 12k characters. The session that implements it reads it cold and reads nothing else. Consolidate superseded content into <plan>-decisions.md or split the scope.",
+            "permissionDecisionReason": "This plan exceeds 10k characters. The session that implements it reads it cold and reads nothing else. Move depth to <plan>-<topic>.md sidecars the plan links (decisions is the common one) or split the scope.",
           },
         },
         "exitCode": 0,

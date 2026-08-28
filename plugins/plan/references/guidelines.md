@@ -51,8 +51,8 @@ The plan is a do-now spec for a session that reads nothing else:
 - Open with the non-negotiable conventions and a stop condition (implement, ship, end). Without a stop condition, the implementing session absorbs the next job too.
 - Stamp the plan with the commit it was written against (`**Planned at**: commit <short SHA>, <date>`) and make the executor's first instruction a drift check: `git diff --stat <SHA>..HEAD -- <the plan's in-scope paths>`. A `⏰` check-in fires days later against a repo that has moved, and the file records nothing else about what it was true of. When a listed path has changed, compare the plan's excerpts against the live code before executing, and treat a mismatch as an assumption stop.
 - Deferred design goes to a separate linked file the implementer is told not to open, with one pointer line in the plan. A handoff plan heavy with deferred design forces the implementing session to re-plan work the original session never resolved.
-- Resolved decisions and research synthesis move to a companion `<plan>-decisions.md` that the plan links.
-- Keep plans focused and under roughly 10k characters. Past that, plans get rejected: split the scope or consolidate before presenting.
+- Depth moves to `<plan>-<topic>.md` sidecar files the plan links. `decisions` is the common topic, holding resolved decisions and research synthesis. Add topics (`research`, `api-notes`) as the material warrants.
+- Plans over 10k characters are denied at presentation. The brief stays under that limit. Depth goes to sidecars, or the scope splits.
 
 ## Assumption Stops
 
@@ -80,7 +80,7 @@ A redirect is new input scoped to what it names. Rework the file toward the stan
 
 - Revise the sections the feedback covers. Untouched sections stay untouched. If a rejection arrives with no feedback, ask what to change instead of guessing at a revision.
 - When feedback supersedes a decision, delete the superseded text. Do not write around it, soften it, or annotate it.
-- Cut any content whose reader is the user in this conversation rather than the implementer in a fresh session: research residue, decision narration, restated feedback. Resolved research moves to `<plan>-decisions.md`.
+- Cut any content whose reader is the user in this conversation rather than the implementer in a fresh session: research residue, decision narration, restated feedback. Resolved research moves to a `<plan>-<topic>.md` sidecar.
 - A finished plan reads as if it were written once. Any sentence that only makes sense to a reader who saw an earlier draft ("changed since last plan", "previously considered", "now uses") is diary. The chat holds the history and the plan links the transcript.
 - A ruled-out approach survives only when the implementer would otherwise re-propose it: one line under `## Alternatives`, the approach and why it loses. Everything else is deleted, not parked.
 - Treat every AskUserQuestion answer from this session as a constraint. Before ExitPlanMode, verify the plan satisfies each one.

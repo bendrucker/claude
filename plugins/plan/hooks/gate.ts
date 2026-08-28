@@ -18,7 +18,11 @@ const HookInput = z.looseObject({
   tool_use_id: z.string().catch(""),
 }) satisfies z.ZodType<PreToolUseHookInput>;
 
-const SIZE_THRESHOLD = 12_000;
+const SIZE_THRESHOLD = 10_000;
+// The size rule re-arms while a re-present is still over the threshold, so a
+// rework that shrinks but not enough is caught once more. The cap keeps a deny
+// loop impossible: past it, the presentation goes to the user's own approval.
+const SIZE_MAX_FIRES = 2;
 
 // A re-present that keeps nearly every prior line and drops almost none regrew
 // the document instead of consolidating superseded design and revising it.
@@ -55,15 +59,22 @@ function growthReason(ordinal: number, previousMax: number, length: number): str
   return (
     `Presentation ${ordinal} is larger than any before it (${previousMax} -> ${length} chars). ` +
     "If redirects added scope, that growth is right. Otherwise it is residue the fresh " +
-    "session pays for: delete superseded design, move resolved research to " +
-    "<plan>-decisions.md, and keep only what the implementer builds from."
+    "session pays for: delete superseded design, move resolved research to a " +
+    "<plan>-<topic>.md sidecar, and keep only what the implementer builds from."
   );
 }
 
-const SIZE_REASON =
-  "This plan exceeds 12k characters. The session that implements it reads it cold and " +
-  "reads nothing else. Consolidate superseded content into <plan>-decisions.md or " +
-  "split the scope.";
+function sizeReason(priorFires: number): string {
+  const opening =
+    priorFires > 0
+      ? "This rework is still over 10k characters. Cut deeper or split. "
+      : "This plan exceeds 10k characters. ";
+  return (
+    `${opening}The session that implements it reads it cold and reads nothing else. ` +
+    "Move depth to <plan>-<topic>.md sidecars the plan links (decisions is the " +
+    "common one) or split the scope."
+  );
+}
 
 export class StateUnavailableError extends Error {
   constructor(directory: string, cause: unknown) {
@@ -216,9 +227,14 @@ export async function processInput(
     return formatDecision(growthReason(ordinal, history.maxLength, plan.length));
   }
 
-  if (plan.length > SIZE_THRESHOLD && (await readState(askedPath)) === null) {
-    await writeState(askedPath, "asked");
-    return formatDecision(SIZE_REASON);
+  if (plan.length > SIZE_THRESHOLD) {
+    // A pre-count marker file holds "asked", which parses to NaN and fails the
+    // integer check: a session that already spent its one legacy fire stays spent.
+    const priorFires = Number((await readState(askedPath)) ?? 0);
+    if (Number.isInteger(priorFires) && priorFires < SIZE_MAX_FIRES) {
+      await writeState(askedPath, String(priorFires + 1));
+      return formatDecision(sizeReason(priorFires));
+    }
   }
 
   return null;

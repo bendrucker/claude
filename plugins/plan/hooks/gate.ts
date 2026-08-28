@@ -43,36 +43,31 @@ const GROWTH_MIN_EXCESS_RATIO = 0.05;
 // runs its own plan-approval prompt, and the harness drops the hook's
 // permissionDecisionReason and systemMessage alike, so neither the user nor the
 // transcript ever sees them. Deny is the only decision that carries a reason back.
-const DENY_REASON =
-  "Plan text is byte-identical to the presentation that was just rejected. The plan " +
-  "is the whole brief a fresh session implements from, so resubmitting it unchanged " +
-  "cannot land. Rework it against the feedback since that presentation, deleting what " +
-  "the feedback superseded. If the rejection carried none, ask with AskUserQuestion.";
+export const DENY_REASON =
+  "Plan text is byte-identical to the presentation that was just rejected. Rework the " +
+  "plan against the feedback from that rejection, deleting the text it superseded. If " +
+  "the rejection carried no feedback, ask what to change with AskUserQuestion.";
 
-const APPEND_ONLY_REASON =
-  "This re-present carries nearly every prior line. A plan this close to the rejected " +
-  "one needs reworking, not re-presenting. It will not be revised interactively. It " +
-  "goes whole to a fresh session, so delete what the feedback superseded instead of " +
-  "writing around it.";
+export const APPEND_ONLY_REASON =
+  "This re-present carries nearly every prior line of the rejected plan. Rework it: " +
+  "delete the text the feedback superseded rather than adding new text around it.";
 
-function growthReason(ordinal: number, previousMax: number, length: number): string {
+export function growthReason(ordinal: number, previousMax: number, length: number): string {
   return (
     `Presentation ${ordinal} is larger than any before it (${previousMax} -> ${length} chars). ` +
-    "If redirects added scope, that growth is right. Otherwise it is residue the fresh " +
-    "session pays for: delete superseded design, move resolved research to a " +
-    "<plan>-<topic>.md sidecar, and keep only what the implementer builds from."
+    "Growth from added scope is fine. Otherwise, delete superseded design and move " +
+    "finished research into a <plan>-<topic>.md file the plan links."
   );
 }
 
-function sizeReason(priorFires: number): string {
+export function sizeReason(priorFires: number): string {
   const opening =
     priorFires > 0
-      ? "This rework is still over 10k characters. Cut deeper or split. "
+      ? "This rework is still over 10k characters. Cut it further. "
       : "This plan exceeds 10k characters. ";
   return (
-    `${opening}The session that implements it reads it cold and reads nothing else. ` +
-    "Move depth to <plan>-<topic>.md sidecars the plan links (decisions is the " +
-    "common one) or split the scope."
+    `${opening}Move supporting detail into <plan>-<topic>.md files the plan links ` +
+    "(<plan>-decisions.md is the common one), or split the work into smaller plans."
   );
 }
 

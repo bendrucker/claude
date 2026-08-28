@@ -22,7 +22,7 @@ Every check denies, including the three that read as advice. A `PreToolUse` hook
 
 A missing session id or a plan that is not a string fails open silently, since neither is a fault. Anything else, an unusable state directory or a crash mid-decision, prints to stderr and exits 1: the presentation still goes through, and the failure is visible rather than reading as a plan that passed every check.
 
-The gate reads a plan that will be handed whole to a fresh session, since a rejection usually ends the session and the plan travels by injection into the next one. Its reasons say so: a re-present close to the rejected plan needs reworking rather than re-presenting, because nothing about the rejection travels with the file.
+Each denial reason states the fix directly: rework against the feedback, delete superseded text, move detail to sidecar files, or split the plan.
 
 `plan:review` reads the approved plan from the file Claude Code writes under `~/.claude/plans/` and injects into the session on plan exit. It forks a clean-context agent that diffs the plan against the branch's base (resolved from the open PR, not assumed to be `main`) using the rubric in `skills/review/references/divergence.md`.
 

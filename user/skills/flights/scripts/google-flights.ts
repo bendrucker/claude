@@ -155,7 +155,7 @@ const STOPS = /(Nonstop|\d+ stops?)/;
 /**
  * The connecting airports appear in a second, qualified rendering of the stop
  * count ("1 stop in CLT") that sits later in the tail than the bare one, so it
- * needs its own search rather than an optional group on STOPS.
+ * needs its own search.
  */
 const STOPS_VIA = /\d+ stops? in ([A-Z]{3}(?:, [A-Z]{3})*)/;
 /**
@@ -254,7 +254,7 @@ export interface GridCell {
   out: string;
   back: string | null;
   price: number;
-  /** Google's own marking. It calls out two tiers, not one. */
+  /** Google's own marking for the tier. */
   tier: "cheapest" | "low" | null;
 }
 
@@ -265,11 +265,11 @@ const GRID_DATE = /StaticText "([A-Z][a-z]{2} \d{1,2})"/g;
 /**
  * Reads the Date grid out of an accessibility snapshot.
  *
- * The grid is an overlay on the results URL rather than a page of its own, and
- * it is the one part of Google Flights that `read` cannot see, so this parses a
- * snapshot. Round-trip cells carry both dates in the button's accessible name,
- * which makes the pairing exact. One-way cells carry no date at all and are
- * matched positionally against the header row instead.
+ * The grid is an overlay on the results URL, and it is the one part of Google
+ * Flights that `read` cannot see, so this parses a snapshot. Round-trip cells
+ * carry both dates in the button's accessible name, which makes the pairing
+ * exact. One-way cells carry no date at all and are matched positionally
+ * against the header row instead.
  */
 export function parseGrid(text: string): GridCell[] {
   const start = text.indexOf('grid "Date grid"');

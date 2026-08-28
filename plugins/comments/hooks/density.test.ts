@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
+
+const Decision = z.object({ decision: z.string(), reason: z.string() });
 
 const HOOK = join(import.meta.dirname, "density.ts");
 
@@ -27,7 +30,7 @@ const heavyTranscript = () =>
 
 async function runHook(input: Record<string, unknown>): Promise<string> {
   const proc = Bun.spawn(["bun", HOOK], { stdin: "pipe", stdout: "pipe" });
-  proc.stdin.write(JSON.stringify(input));
+  await proc.stdin.write(JSON.stringify(input));
   await proc.stdin.end();
   const out = await new Response(proc.stdout).text();
   expect(await proc.exited).toBe(0);
@@ -44,7 +47,7 @@ describe("density Stop hook", () => {
   test("blocks a strong-tier session with a marked reason", async () => {
     const path = await writeTranscript(heavyTranscript());
     const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
-    const decision = JSON.parse(out) as { decision: string; reason: string };
+    const decision = Decision.parse(JSON.parse(out));
     expect(decision.decision).toBe("block");
     expect(decision.reason).toStartWith("comment-density:");
     expect(decision.reason).toContain("heavy.ts");

@@ -3,28 +3,29 @@
 import { cli } from "cleye";
 import { join } from "node:path";
 import { table } from "table";
-import type { ScoresFile } from "./score";
+import { z } from "zod";
+import { decodeFile } from "../../../packages/decode/index";
 
 const root = join(import.meta.dirname, "..");
 
-interface CommitLabel {
-  repo: string;
-  sha: string;
-  grade: number;
-  docsIntent: boolean;
-  confidence: string;
-}
+const CommitLabel = z.object({
+  repo: z.string(),
+  sha: z.string(),
+  grade: z.number(),
+  docsIntent: z.boolean(),
+  confidence: z.string(),
+});
 
-interface SessionLabel {
-  id: string;
-  host: string;
-  grade: number;
-  docsIntent: boolean;
-}
+const SessionLabel = z.object({
+  id: z.string(),
+  host: z.string(),
+  grade: z.number(),
+  docsIntent: z.boolean(),
+});
 
 /** Ranks with ties averaged, as Spearman requires. */
 function ranks(values: number[]): number[] {
-  const order = values.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
+  const order = values.map((v, i) => ({ v, i })).toSorted((a, b) => a.v - b.v);
   const out = Array.from({ length: values.length }, () => 0);
   let pos = 0;
   while (pos < order.length) {
@@ -41,11 +42,12 @@ function ranks(values: number[]): number[] {
   return out;
 }
 
+const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+
 export function spearman(a: number[], b: number[]): number {
   if (a.length < 2) return NaN;
   const ra = ranks(a);
   const rb = ranks(b);
-  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
   const ma = mean(ra);
   const mb = mean(rb);
   let num = 0;
@@ -78,6 +80,17 @@ function prf(
 
 const fires = (tier: string) => tier === "report" || tier === "strong";
 
+const fmt = (n: number) => (Number.isNaN(n) ? "NaN" : n.toFixed(3));
+
+const Score = z.object({ excessChars: z.number(), tier: z.string() }).loose();
+const ScoreRow = z.object({ measurable: z.boolean(), score: Score.nullable() }).loose();
+const Scores = z
+  .object({
+    commits: z.array(ScoreRow.extend({ repo: z.string(), sha: z.string() })),
+    sessions: z.record(z.string(), ScoreRow),
+  })
+  .loose();
+
 async function main(): Promise<void> {
   const argv = cli({
     name: "metrics",
@@ -97,14 +110,13 @@ async function main(): Promise<void> {
     },
   });
 
-  const scores = (await Bun.file(argv.flags.scores).json()) as ScoresFile;
-  const commitLabels = (await Bun.file(
-    join(root, "labels", "commits.json"),
-  ).json()) as CommitLabel[];
-  const sessionLabels = (await Bun.file(
+  const scores = await decodeFile(Scores, argv.flags.scores);
+  const commitLabels = await decodeFile(z.array(CommitLabel), join(root, "labels", "commits.json"));
+  const sessionLabels = await decodeFile(
+    z.array(SessionLabel),
     join(root, "labels", "sessions.json"),
-  ).json()) as SessionLabel[];
-  const complaintIds = (await Bun.file(join(root, "labels", "complaints.json")).json()) as string[];
+  );
+  const complaintIds = await decodeFile(z.array(z.string()), join(root, "labels", "complaints.json"));
 
   const commitScores = new Map(scores.commits.map((c) => [`${c.repo}@${c.sha}`, c]));
   const commitUnits = commitLabels.flatMap((label) => {
@@ -202,7 +214,6 @@ async function main(): Promise<void> {
   const existing = (await Bun.file(historyPath).exists()) ? await Bun.file(historyPath).text() : "";
   await Bun.write(historyPath, `${existing}${JSON.stringify(record)}\n`);
 
-  const fmt = (n: number) => (Number.isNaN(n) ? "NaN" : n.toFixed(3));
   console.log(
     table([
       ["metric", "value", "constraint"],
@@ -218,7 +229,7 @@ async function main(): Promise<void> {
       ["objective (rho + sessionPrecision)", fmt(metrics.objective), ""],
     ]),
   );
-  const noteSuffix = argv.flags.note ? `, note: ${argv.flags.note}` : "";
+  const noteSuffix = argv.flags.note == null ? "" : `, note: ${argv.flags.note}`;
   console.log(
     `commits ${counts.commitsMeasurable}/${counts.commitsLabeled} measurable, sessions ${counts.sessionsMeasurable}/${counts.sessionsLabeled}, complaints ${counts.complaintsMeasurable}/${counts.complaintsLabeled}${noteSuffix}`,
   );

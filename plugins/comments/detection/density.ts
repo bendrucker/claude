@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { extractComments, languageForPath } from "./extract";
 import { isExemptComment } from "./exempt";
 import type { Comment } from "./types";
@@ -47,20 +48,21 @@ export function addInto(into: AddedLineStats, stats: AddedLineStats): void {
  * re-indented, and realigned lines don't count and each extra duplicate counts
  * once. Returns 1-based indices into the fragment's lines.
  */
+const lineKey = (line: string) => line.replace(/\s+/g, "");
+
 export function addedLines(
   oldText: string,
   newText: string,
 ): { fragment: string; added: Set<number> } {
-  const key = (line: string) => line.replace(/\s+/g, "");
   const oldCounts = new Map<string, number>();
   for (const line of oldText.split("\n")) {
-    const k = key(line);
+    const k = lineKey(line);
     oldCounts.set(k, (oldCounts.get(k) ?? 0) + 1);
   }
   const added = new Set<number>();
   const newLines = newText.split("\n");
   newLines.forEach((line, i) => {
-    const k = key(line);
+    const k = lineKey(line);
     const remaining = oldCounts.get(k) ?? 0;
     if (remaining > 0) {
       oldCounts.set(k, remaining - 1);
@@ -267,7 +269,7 @@ export function sessionScore(input: ScoredFile[]): SessionScore {
   const scored = files.map((file) => {
     addInto(stats, file.stats);
     const { share, excessChars } = densityScore(file.stats, file.language);
-    return { ...file, share, excessChars };
+    return { path: file.path, language: file.language, stats: file.stats, share, excessChars };
   });
   const chars = stats.commentChars + stats.codeChars;
   const share = chars === 0 ? 0 : stats.commentChars / chars;
@@ -294,7 +296,7 @@ export function sessionScore(input: ScoredFile[]): SessionScore {
             : "none";
   const worstFiles = scored
     .filter((file) => file.excessChars > 0)
-    .sort((a, b) => b.excessChars - a.excessChars)
+    .toSorted((a, b) => b.excessChars - a.excessChars)
     .slice(0, WORST_FILES);
   return { stats, share, wordsPerCodeLine, excessChars, tier, worstFiles };
 }
@@ -314,13 +316,25 @@ export function densityWeights(files: ScoredFile[]): Map<string, number> {
   );
 }
 
-interface EditInput {
-  file_path?: string;
-  old_string?: string;
-  new_string?: string;
-  content?: string;
-  edits?: Array<{ old_string?: string; new_string?: string }>;
-}
+const EditInput = z.object({
+  file_path: z.string().optional(),
+  old_string: z.string().optional(),
+  new_string: z.string().optional(),
+  content: z.string().optional(),
+  edits: z
+    .array(z.object({ old_string: z.string().optional(), new_string: z.string().optional() }))
+    .optional(),
+});
+
+const EditToolUse = z.object({
+  type: z.literal("tool_use"),
+  name: z.enum(["Edit", "Write", "MultiEdit"]),
+  input: EditInput,
+});
+
+const TranscriptLine = z.object({
+  message: z.object({ content: z.array(z.unknown()) }).optional(),
+});
 
 /** Path segments marking scratch output the score ignores. */
 const SKIP_PATHS = ["/scratchpad/", "/tmp/", "/tasks/"];
@@ -339,21 +353,20 @@ export async function scoreTranscript(
   const perFile = new Map<string, ScoredFile>();
   for (const line of content.split("\n")) {
     if (!line.includes('"tool_use"')) continue;
-    let record: Record<string, unknown>;
+    let parsed: unknown;
     try {
-      record = JSON.parse(line) as Record<string, unknown>;
+      parsed = JSON.parse(line);
     } catch {
       continue;
     }
-    const message = record.message as { content?: Array<Record<string, unknown>> } | undefined;
-    if (!Array.isArray(message?.content)) continue;
-    for (const block of message.content) {
-      if (block.type !== "tool_use") continue;
-      const name = block.name as string;
-      if (name !== "Edit" && name !== "Write" && name !== "MultiEdit") continue;
-      const input = block.input as EditInput;
+    const record = TranscriptLine.safeParse(parsed);
+    if (!record.success || record.data.message == null) continue;
+    for (const raw of record.data.message.content) {
+      const block = EditToolUse.safeParse(raw);
+      if (!block.success) continue;
+      const { name, input } = block.data;
       const path = input.file_path;
-      if (!path) continue;
+      if (path == null || path === "") continue;
       if (SKIP_PATHS.some((part) => path.includes(part))) continue;
       const language = languageForPath(path);
       if (language == null) continue;
@@ -369,6 +382,7 @@ export async function scoreTranscript(
         if (added.size === 0) continue;
         const entry = perFile.get(path) ?? { path, language, stats: emptyStats() };
         perFile.set(path, entry);
+        // oxlint-disable-next-line no-await-in-loop -- Shiki extraction is CPU-bound and the accumulator is shared, so parallelizing buys nothing.
         addInto(entry.stats, await measureAddedLines(fragment, added, language));
       }
     }

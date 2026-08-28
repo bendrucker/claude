@@ -120,7 +120,7 @@ describe("addedLines", () => {
 
   test("duplicate counts once per extra occurrence", () => {
     const { added } = addedLines("a", "a\na\na");
-    expect([...added].sort((a, b) => a - b)).toEqual([2, 3]);
+    expect([...added].toSorted((a, b) => a - b)).toEqual([2, 3]);
   });
 
   test("changed line is added at its new index", () => {

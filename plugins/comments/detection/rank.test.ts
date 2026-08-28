@@ -117,7 +117,7 @@ describe("rankCommentsWeighted", () => {
 
   const pathedArb = fc
     .tuple(commentArb, fc.constantFrom("a.ts", "b.ts", "c.ts"))
-    .map(([c, path]) => ({ ...c, path }));
+    .map(([c, path]) => Object.assign({}, c, { path }));
 
   test("matches rankComments when no path has a weight", () => {
     fc.assert(

@@ -3,6 +3,8 @@
 import { cli } from "cleye";
 import { $ } from "bun";
 import { join } from "node:path";
+import { z } from "zod";
+import { decodeFile } from "../../../packages/decode/index";
 import { parseUnifiedDiff } from "../../../plugins/comments/detection/diff";
 import { languageForPath } from "../../../plugins/comments/detection/extract";
 import {
@@ -12,7 +14,6 @@ import {
   sessionScore,
   emptyStats,
   MIN_ADDED_LINES,
-  type AddedLineStats,
   type ScoredFile,
   type SessionScore,
 } from "../../../plugins/comments/detection/density";
@@ -72,35 +73,52 @@ export async function scoreCommit(repo: string, sha: string): Promise<SessionSco
     return null;
   }
   const diffText = diff.text();
-  if (!diffText.trim()) return null;
+  if (diffText.trim() === "") return null;
   const files: ScoredFile[] = [];
   for (const file of parseUnifiedDiff(diffText)) {
     const language = languageForPath(file.path);
     if (language == null) continue;
     if (VENDOR.test(file.path)) continue;
     if (SKIP_PATHS.some((part) => file.path.includes(part))) continue;
+    // oxlint-disable-next-line no-await-in-loop -- serialized git subprocesses against one repo. Fanning out thrashes the object store for no wall-clock win.
     const content = await gitShow(repo, sha, file.path);
     if (content == null || content.length > MAX_FILE_CHARS) continue;
     const added = addedSet(file.added);
     // Drop lines the diff calls added whose content the parent already carried,
     // so a reindent or realignment introduces no comments.
+    // oxlint-disable-next-line no-await-in-loop -- same serialized git access as above.
     const parent = await gitShow(repo, `${sha}^`, file.path);
     if (parent != null) {
       const reshaped = addedLines(parent, content).added;
       for (const line of added) if (!reshaped.has(line)) added.delete(line);
     }
     if (added.size === 0) continue;
+    // oxlint-disable-next-line no-await-in-loop -- Shiki extraction is CPU-bound, so parallelizing buys nothing.
     const stats = await measureAddedLines(content, added, language);
     files.push({ path: file.path, language, stats });
   }
   return sessionScore(files);
 }
 
-interface StoredSessionRow {
-  session: string;
-  edits: number;
-  files: Array<{ path: string } & AddedLineStats>;
-}
+const StatsFields = {
+  addedLines: z.number(),
+  commentChars: z.number(),
+  codeChars: z.number(),
+  commentLines: z.number(),
+  codeLines: z.number(),
+  mixedLines: z.number(),
+  commentWords: z.number(),
+  commentCount: z.number(),
+  maxCommentChars: z.number(),
+};
+
+const StoredSessionRow = z.object({
+  session: z.string(),
+  edits: z.number(),
+  files: z.array(z.object({ path: z.string(), ...StatsFields })),
+});
+
+type StoredSessionRow = z.output<typeof StoredSessionRow>;
 
 const SESSION_ID = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
 
@@ -113,16 +131,22 @@ export async function loadStoredRows(dataPath: string): Promise<Map<string, Stor
   const content = await Bun.file(dataPath).text();
   let malformed = 0;
   for (const line of content.split("\n")) {
-    if (!line.trim()) continue;
-    let row: StoredSessionRow;
+    if (line.trim() === "") continue;
+    let parsed: unknown;
     try {
-      row = JSON.parse(line) as StoredSessionRow;
+      parsed = JSON.parse(line);
     } catch {
       malformed++;
       continue;
     }
-    const id = row.session?.match(SESSION_ID)?.[1];
-    if (!id) continue;
+    const decoded = StoredSessionRow.safeParse(parsed);
+    if (!decoded.success) {
+      malformed++;
+      continue;
+    }
+    const row = decoded.data;
+    const id = row.session.match(SESSION_ID)?.[1];
+    if (id == null) continue;
     const rows = bySession.get(id) ?? [];
     rows.push(row);
     bySession.set(id, rows);
@@ -137,7 +161,7 @@ export async function loadStoredRows(dataPath: string): Promise<Map<string, Stor
 export function scoreStoredSession(rows: StoredSessionRow[]): SessionScore {
   const perFile = new Map<string, ScoredFile>();
   for (const row of rows) {
-    for (const file of row.files ?? []) {
+    for (const file of row.files) {
       if (SKIP_PATHS.some((part) => file.path.includes(part))) continue;
       const language = languageForPath(file.path) ?? "unknown";
       const entry = perFile.get(file.path) ?? { path: file.path, language, stats: emptyStats() };
@@ -174,22 +198,26 @@ async function main(): Promise<void> {
     },
   });
 
-  const commitLabels = (await Bun.file(join(root, "labels", "commits.json")).json()) as Array<
-    CommitLabelRef & Record<string, unknown>
-  >;
-  const sessionLabels = (await Bun.file(join(root, "labels", "sessions.json")).json()) as Array<{
-    id: string;
-  }>;
-  const complaintIds = (await Bun.file(join(root, "labels", "complaints.json")).json()) as string[];
+  const commitLabels = await decodeFile(
+    z.array(z.object({ repo: z.string(), sha: z.string() }).loose()),
+    join(root, "labels", "commits.json"),
+  );
+  const sessionLabels = await decodeFile(
+    z.array(z.object({ id: z.string() }).loose()),
+    join(root, "labels", "sessions.json"),
+  );
+  const complaintIds = await decodeFile(z.array(z.string()), join(root, "labels", "complaints.json"));
 
   const commits: CommitScoreRow[] = [];
   for (const { repo, sha } of commitLabels) {
+    // oxlint-disable-next-line no-await-in-loop -- commits score sequentially: each spawns its own git subprocess chain against local repos.
     const exists = await $`git -C ${repo} cat-file -e ${sha}^{commit}`.quiet().nothrow();
     if (exists.exitCode !== 0) {
       console.error(`warning: repo or sha not present locally, skipping ${repo} ${sha}`);
       commits.push({ repo, sha, measurable: false, score: null });
       continue;
     }
+    // oxlint-disable-next-line no-await-in-loop -- same sequential scoring as above.
     const score = await scoreCommit(repo, sha);
     const measurable = score != null && score.stats.addedLines >= MIN_ADDED_LINES;
     commits.push({ repo, sha, measurable, score });

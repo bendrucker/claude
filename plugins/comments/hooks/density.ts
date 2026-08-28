@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 
 import { basename } from "node:path";
+import { z } from "zod";
 import { scoreTranscript } from "../detection/density";
 
-interface StopInput {
-  hook_event_name?: string;
-  transcript_path?: string;
-  stop_hook_active?: boolean;
-}
+const StopInput = z.object({
+  hook_event_name: z.string().optional(),
+  transcript_path: z.string().optional(),
+  stop_hook_active: z.boolean().optional(),
+});
 
 /** Stable token at the start of every block reason, scanned for to avoid re-blocking. */
 const MARKER = "comment-density:";
@@ -19,16 +20,16 @@ function blockedRecently(transcript: string): boolean {
 }
 
 async function main(): Promise<void> {
-  let input: StopInput;
+  let input: z.output<typeof StopInput>;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as StopInput;
+    input = StopInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch {
     return;
   }
   if (input.hook_event_name !== "Stop") return;
-  if (input.stop_hook_active) return;
+  if (input.stop_hook_active === true) return;
   const path = input.transcript_path;
-  if (!path) return;
+  if (path == null || path === "") return;
 
   let transcript: string;
   try {

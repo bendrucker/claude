@@ -52,6 +52,6 @@ export function rankCommentsWeighted<T extends Comment & { path: string }>(
       comment,
       weighted: scoreComment(comment)[sort] * (weights.get(comment.path) ?? 1),
     }))
-    .sort((a, b) => b.weighted - a.weighted)
+    .toSorted((a, b) => b.weighted - a.weighted)
     .map((entry) => entry.comment);
 }

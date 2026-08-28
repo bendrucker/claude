@@ -70,6 +70,33 @@ describe("density Stop hook", () => {
     expect(out).toBe("");
   });
 
+  test("still blocks when the marker only appears inside a tool payload", async () => {
+    const markerEdit = `${JSON.stringify({
+      message: {
+        content: [
+          {
+            type: "tool_use",
+            name: "Write",
+            input: { file_path: "/repo/hook.ts", content: 'const MARKER = "comment-density:";' },
+          },
+        ],
+      },
+    })}\n`;
+    const path = await writeTranscript(heavyTranscript() + markerEdit);
+    const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
+    expect(Decision.parse(JSON.parse(out)).decision).toBe("block");
+  });
+
+  test("stays silent when a prior block reason appears as a text content block", async () => {
+    const marker = `${JSON.stringify({
+      type: "user",
+      message: { content: [{ type: "text", text: "comment-density: prior block" }] },
+    })}\n`;
+    const path = await writeTranscript(heavyTranscript() + marker);
+    const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
+    expect(out).toBe("");
+  });
+
   test("stays silent on a clean session", async () => {
     const path = await writeTranscript(
       `${JSON.stringify({

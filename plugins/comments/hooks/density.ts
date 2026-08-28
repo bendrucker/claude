@@ -15,11 +15,37 @@ const MARKER = "comment-density:";
 
 const TAIL_LINES = 200;
 
+const TextBlock = z.object({ type: z.literal("text"), text: z.string() });
+
+const TailLine = z.object({
+  message: z.object({ content: z.union([z.string(), z.array(z.unknown())]) }).optional(),
+});
+
+/**
+ * A prior block surfaces as message text carrying the marker. Matching only
+ * text content keeps tool payloads (say, an edit to this file) from
+ * suppressing a live block.
+ */
 function blockedRecently(transcript: string): boolean {
   return transcript
     .split("\n")
     .slice(-TAIL_LINES)
-    .some((line) => line.includes(MARKER));
+    .some((line) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        return false;
+      }
+      const decoded = TailLine.safeParse(parsed);
+      if (!decoded.success || decoded.data.message == null) return false;
+      const content = decoded.data.message.content;
+      if (typeof content === "string") return content.includes(MARKER);
+      return content.some((block) => {
+        const text = TextBlock.safeParse(block);
+        return text.success && text.data.text.includes(MARKER);
+      });
+    });
 }
 
 async function main(): Promise<void> {

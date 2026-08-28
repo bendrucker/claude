@@ -58,7 +58,7 @@ const IATA = /^[A-Z]{3}$/;
 
 function encodeLeg(leg: Leg, nonstop: boolean): number[] {
   // The date's length prefix is hardcoded to 10, so anything but YYYY-MM-DD
-  // produces a message that parses into the wrong fields rather than failing.
+  // silently produces a message that parses into the wrong fields.
   if (!DATE.test(leg.date)) {
     throw new Error(`date must be YYYY-MM-DD, got ${JSON.stringify(leg.date)}`);
   }
@@ -230,8 +230,8 @@ export function parseResults(text: string): Row[] {
       stops: stops?.[1] ?? "?",
       via: via?.[1]?.split(", ") ?? [],
       price: present(price) ? Number(price.replaceAll(",", "")) : null,
-      // Google states the restriction rather than the fare name, and the phrasing
-      // survives layout changes better than a "N carry-on bag" string does.
+      // Google states the restriction, and that phrasing survives layout changes
+      // better than a "N carry-on bag" string does.
       basic: tail.includes("overhead bin access"),
       redEye: Boolean(plus) && minutesOfDay(depart) >= RED_EYE_AFTER,
     });

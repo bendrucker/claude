@@ -15,8 +15,7 @@ import {
   type Tier,
 } from "./density";
 
-const allAdded = (fragment: string) =>
-  new Set(fragment.split("\n").map((_, i) => i + 1));
+const allAdded = (fragment: string) => new Set(fragment.split("\n").map((_, i) => i + 1));
 
 const measure = (fragment: string, language: string) =>
   measureAddedLines(fragment, allAdded(fragment), language);
@@ -103,9 +102,7 @@ describe("measureAddedLines", () => {
   test("only added lines are measured", async () => {
     const fragment = ["// old comment", "const x = 1;"].join("\n");
     const result = await measureAddedLines(fragment, new Set([2]), "typescript");
-    expect(result).toEqual(
-      stats({ addedLines: 1, codeChars: 9, codeLines: 1 }),
-    );
+    expect(result).toEqual(stats({ addedLines: 1, codeChars: 9, codeLines: 1 }));
   });
 
   test("unknown language extracts no comments, so lines measure as code", async () => {
@@ -123,7 +120,7 @@ describe("addedLines", () => {
 
   test("duplicate counts once per extra occurrence", () => {
     const { added } = addedLines("a", "a\na\na");
-    expect([...added].sort()).toEqual([2, 3]);
+    expect([...added].sort((a, b) => a - b)).toEqual([2, 3]);
   });
 
   test("changed line is added at its new index", () => {
@@ -148,13 +145,14 @@ describe("densityScore", () => {
     );
     expect(score.share).toBe(0.5);
     expect(score.wordsPerCodeLine).toBe(4);
-    expect(score.excessChars).toBeCloseTo(100 - (0.11 / 0.89) * 100, 5);
+    const b = baselineFor("typescript");
+    expect(score.excessChars).toBeCloseTo(100 - (b / (1 - b)) * 100, 5);
   });
 
   test("comment share at the baseline has no excess", () => {
     const b = baselineFor("go");
-    expect(b).toBe(0.23);
-    const score = densityScore(stats({ commentChars: 230, codeChars: 770 }), "go");
+    expect(b).toBe(0.22);
+    const score = densityScore(stats({ commentChars: 220, codeChars: 780 }), "go");
     expect(score.excessChars).toBe(0);
   });
 
@@ -164,7 +162,11 @@ describe("densityScore", () => {
 });
 
 describe("sessionScore tiers", () => {
-  const file = (path: string, overrides: Partial<AddedLineStats>, language = "typescript"): ScoredFile => ({
+  const file = (
+    path: string,
+    overrides: Partial<AddedLineStats>,
+    language = "typescript",
+  ): ScoredFile => ({
     path,
     language,
     stats: stats(overrides),
@@ -173,28 +175,36 @@ describe("sessionScore tiers", () => {
   test.each<[string, ScoredFile[], Tier]>([
     [
       "docs-pass share never escalates despite huge excess",
-      [file("a.ts", { commentChars: 2000, codeChars: 100 })],
+      [file("a.ts", { commentChars: 2000, codeChars: 100, addedLines: 30 })],
       "docs-pass",
     ],
     [
       "total excess over the strong threshold",
-      [file("a.ts", { commentChars: 1500, codeChars: 1000 })],
+      [file("a.ts", { commentChars: 2900, codeChars: 1000, addedLines: 30 })],
       "strong",
     ],
     [
       "session share over the report threshold",
-      [file("a.ts", { commentChars: 300, codeChars: 600 })],
+      [file("a.ts", { commentChars: 800, codeChars: 600, addedLines: 30 })],
       "report",
     ],
     [
       "wordsPerCodeLine over the report threshold",
-      [file("a.ts", { commentChars: 50, codeChars: 500, commentWords: 100, codeLines: 40 })],
+      [
+        file("a.ts", {
+          commentChars: 800,
+          codeChars: 500,
+          commentWords: 100,
+          codeLines: 40,
+          addedLines: 30,
+        }),
+      ],
       "report",
     ],
     [
       "one heavy file over the per-file share threshold",
       [
-        file("a.ts", { commentChars: 200, codeChars: 150 }),
+        file("a.ts", { commentChars: 760, codeChars: 150, commentCount: 3, addedLines: 30 }),
         file("b.ts", { codeChars: 3000 }),
       ],
       "report",
@@ -202,7 +212,7 @@ describe("sessionScore tiers", () => {
     [
       "heavy file under 300 chars is ignored by the per-file clause",
       [
-        file("a.ts", { commentChars: 200, codeChars: 50 }),
+        file("a.ts", { commentChars: 200, codeChars: 50, commentCount: 3, addedLines: 30 }),
         file("b.ts", { codeChars: 3000 }),
       ],
       "none",
@@ -256,7 +266,7 @@ describe("scoreTranscript", () => {
       toolUse("Write", { file_path: "/repo/readme.txt", content: "plain text" }),
       toolUse("Read", { file_path: "/repo/a.ts" }),
       JSON.stringify({ type: "user", message: { content: "not an edit" } }),
-      "not json but mentions \"tool_use\"",
+      'not json but mentions "tool_use"',
     ];
     const dir = mkdtempSync(join(tmpdir(), "density-"));
     const path = join(dir, "session.jsonl");
@@ -290,6 +300,6 @@ describe("scoreTranscript", () => {
       maxCommentChars: 13,
     });
     expect(session.stats.addedLines).toBe(6);
-    expect(session.tier).toBe("report");
+    expect(session.tier).toBe("none");
   });
 });

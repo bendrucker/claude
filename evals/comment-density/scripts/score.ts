@@ -6,9 +6,11 @@ import { join } from "node:path";
 import { parseUnifiedDiff } from "../../../plugins/comments/detection/diff";
 import { languageForPath } from "../../../plugins/comments/detection/extract";
 import {
+  addedLines,
   measureAddedLines,
   sessionScore,
   emptyStats,
+  MIN_ADDED_LINES,
   type AddedLineStats,
   type ScoredFile,
   type SessionScore,
@@ -74,6 +76,13 @@ export async function scoreCommit(repo: string, sha: string): Promise<SessionSco
     const content = await gitShow(repo, sha, file.path);
     if (content == null || content.length > MAX_FILE_CHARS) continue;
     const added = addedSet(file.added);
+    // Drop lines the diff calls added whose content the parent already carried,
+    // so a reindent or realignment introduces no comments.
+    const parent = await gitShow(repo, `${sha}^`, file.path);
+    if (parent != null) {
+      const reshaped = addedLines(parent, content).added;
+      for (const line of added) if (!reshaped.has(line)) added.delete(line);
+    }
     if (added.size === 0) continue;
     const stats = await measureAddedLines(content, added, language);
     files.push({ path: file.path, language, stats });
@@ -183,7 +192,8 @@ async function main(): Promise<void> {
       continue;
     }
     const score = await scoreCommit(repo, sha);
-    commits.push({ repo, sha, measurable: score != null, score });
+    const measurable = score != null && score.stats.addedLines >= MIN_ADDED_LINES;
+    commits.push({ repo, sha, measurable, score });
   }
 
   const stored = await loadStoredRows(argv.flags.sessions);
@@ -196,7 +206,13 @@ async function main(): Promise<void> {
       sessions[id] = { id, measurable: false, rows: 0, score: null };
       continue;
     }
-    sessions[id] = { id, measurable: true, rows: rows.length, score: scoreStoredSession(rows) };
+    const score = scoreStoredSession(rows);
+    sessions[id] = {
+      id,
+      measurable: score.stats.addedLines >= MIN_ADDED_LINES,
+      rows: rows.length,
+      score,
+    };
   }
 
   const scores: ScoresFile = { generatedAt: new Date().toISOString(), commits, sessions };

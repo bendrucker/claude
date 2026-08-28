@@ -43,21 +43,24 @@ function addInto(into: AddedLineStats, stats: AddedLineStats): void {
 }
 
 /**
- * Multiset line diff: a new-text line is added when it exceeds that line's
- * occurrence count in the old text, so moved lines don't count and each extra
- * duplicate counts once. Returns 1-based indices into the fragment's lines.
+ * Multiset line diff keyed on a line's non-whitespace content, so moved,
+ * re-indented, and realigned lines don't count and each extra duplicate counts
+ * once. Returns 1-based indices into the fragment's lines.
  */
 export function addedLines(oldText: string, newText: string): { fragment: string; added: Set<number> } {
+  const key = (line: string) => line.replace(/\s+/g, "");
   const oldCounts = new Map<string, number>();
   for (const line of oldText.split("\n")) {
-    oldCounts.set(line, (oldCounts.get(line) ?? 0) + 1);
+    const k = key(line);
+    oldCounts.set(k, (oldCounts.get(k) ?? 0) + 1);
   }
   const added = new Set<number>();
   const newLines = newText.split("\n");
   newLines.forEach((line, i) => {
-    const remaining = oldCounts.get(line) ?? 0;
+    const k = key(line);
+    const remaining = oldCounts.get(k) ?? 0;
     if (remaining > 0) {
-      oldCounts.set(line, remaining - 1);
+      oldCounts.set(k, remaining - 1);
     } else {
       added.add(i + 1);
     }
@@ -103,7 +106,9 @@ export async function measureAddedLines(
   for (const c of comments) {
     for (let ln = c.startLine; ln <= c.endLine; ln++) {
       const text = lines[ln - 1] ?? "";
-      const start = ln === c.startLine ? c.startColumn : 0;
+      // A coalesced run of line comments holds its column on every line, so
+      // code to the left of an aligned trailing comment stays code.
+      const start = ln === c.startLine || c.kind === "line" ? c.startColumn : 0;
       const end = ln === c.endLine ? c.endColumn : text.length;
       const list = intervals.get(ln) ?? [];
       list.push([start, end]);
@@ -139,16 +144,21 @@ export async function measureAddedLines(
   return stats;
 }
 
-/** Calibrated per-language human comment-share floors (median pre-change file share). */
+/** Calibrated per-language comment-share floors (median pre-change file share). */
 export const BASELINES: Record<string, number> = {
-  go: 0.23,
-  python: 0.14,
-  typescript: 0.11,
-  ruby: 0.11,
-  cpp: 0.09,
-  shellscript: 0.03,
-  rust: 0.04,
-  tsx: 0.04,
+  sql: 0.35,
+  rust: 0.23,
+  go: 0.22,
+  toml: 0.14,
+  cpp: 0.125,
+  python: 0.07,
+  ruby: 0.06,
+  javascript: 0.05,
+  yaml: 0.05,
+  shellscript: 0.04,
+  typescript: 0,
+  vue: 0.03,
+  tsx: 0,
 };
 
 export const DEFAULT_BASELINE = 0.1;
@@ -162,18 +172,26 @@ export interface DensityScore {
   share: number;
   /** Prose words of introduced comments per added code line. */
   wordsPerCodeLine: number;
-  /** Comment chars beyond what the language baseline predicts for this much code. */
+  /** Comment weight beyond what the language baseline predicts for this much code. */
   excessChars: number;
 }
+
+/** Weight floor per introduced comment: a short comment still costs a reader an interruption. */
+export const MIN_COMMENT_CHARS = 90;
+
+/** Share at or above which added lines are a documentation edit, never escalated. */
+export const DOCS_PASS_SHARE = 0.95;
 
 export function densityScore(stats: AddedLineStats, language: string): DensityScore {
   const chars = stats.commentChars + stats.codeChars;
   const b = baselineFor(language);
   const expected = (b / (1 - b)) * stats.codeChars;
+  const weighted = Math.max(stats.commentChars, MIN_COMMENT_CHARS * stats.commentCount);
+  const share = chars === 0 ? 0 : stats.commentChars / chars;
   return {
-    share: chars === 0 ? 0 : stats.commentChars / chars,
+    share,
     wordsPerCodeLine: stats.commentWords / Math.max(1, stats.codeLines),
-    excessChars: Math.max(0, stats.commentChars - expected),
+    excessChars: share >= DOCS_PASS_SHARE ? 0 : Math.max(0, weighted - expected),
   };
 }
 
@@ -181,10 +199,14 @@ export type Tier = "docs-pass" | "none" | "report" | "strong";
 
 /** A file must carry this many non-ws chars before the per-file tier clauses apply. */
 export const FILE_MIN_CHARS = 300;
-/** Session share at or above this is a deliberate documentation pass, never escalated. */
-export const DOCS_PASS_SHARE = 0.95;
+/** A file must introduce this many distinct comments before it alone can report. */
+export const FILE_MIN_COMMENTS = 3;
+/** Below this many added lines a unit carries too little signal to tier. */
+export const MIN_ADDED_LINES = 30;
 /** Total excess chars at or above this escalates to strong. */
-export const STRONG_EXCESS_CHARS = 1300;
+export const STRONG_EXCESS_CHARS = 2800;
+/** No report below this much surplus comment prose. */
+export const REPORT_MIN_EXCESS_CHARS = 750;
 /** Session share at or above this reports. */
 export const REPORT_SESSION_SHARE = 0.25;
 /** Session words-per-code-line at or above this reports. */
@@ -210,7 +232,16 @@ export interface SessionScore {
   worstFiles: Array<ScoredFile & { share: number; excessChars: number }>;
 }
 
-export function sessionScore(files: ScoredFile[]): SessionScore {
+/** Machine-written files: their comments are generator output, not authorship. */
+const GENERATED_PATH =
+  /(\.gen\.|\.pb\.|_pb2\.|[._]generated\.|\.d\.ts$|(^|\/)(gen|generated)\.[a-z]+$|(^|\/)generated\/)/;
+
+export function isGeneratedPath(path: string): boolean {
+  return GENERATED_PATH.test(path);
+}
+
+export function sessionScore(input: ScoredFile[]): SessionScore {
+  const files = input.filter((file) => !isGeneratedPath(file.path));
   const stats = emptyStats();
   const scored = files.map((file) => {
     addInto(stats, file.stats);
@@ -224,18 +255,24 @@ export function sessionScore(files: ScoredFile[]): SessionScore {
   const heavyFile = scored.some(
     (file) =>
       file.stats.commentChars + file.stats.codeChars >= FILE_MIN_CHARS &&
+      file.stats.commentCount >= FILE_MIN_COMMENTS &&
       file.share >= REPORT_FILE_SHARE,
   );
+  const reports =
+    excessChars >= REPORT_MIN_EXCESS_CHARS &&
+    (share >= REPORT_SESSION_SHARE ||
+      wordsPerCodeLine >= REPORT_WORDS_PER_CODE_LINE ||
+      heavyFile);
   const tier: Tier =
-    share >= DOCS_PASS_SHARE
-      ? "docs-pass"
-      : excessChars >= STRONG_EXCESS_CHARS
-        ? "strong"
-        : share >= REPORT_SESSION_SHARE ||
-            wordsPerCodeLine >= REPORT_WORDS_PER_CODE_LINE ||
-            heavyFile
-          ? "report"
-          : "none";
+    stats.addedLines < MIN_ADDED_LINES
+      ? "none"
+      : share >= DOCS_PASS_SHARE
+        ? "docs-pass"
+        : excessChars >= STRONG_EXCESS_CHARS
+          ? "strong"
+          : reports
+            ? "report"
+            : "none";
   const worstFiles = scored
     .filter((file) => file.excessChars > 0)
     .sort((a, b) => b.excessChars - a.excessChars)

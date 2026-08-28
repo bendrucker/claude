@@ -151,7 +151,7 @@
     "sha": "bb3efee9c14dd71e144070db3809c5aa3b3bc92c",
     "grade": 1,
     "docsIntent": false,
-    "confidence": "medium"
+    "confidence": "high"
   },
   {
     "repo": "/Users/ben/src/oapi-codegen/oapi-codegen",
@@ -207,7 +207,7 @@
     "sha": "014765252fc858970a8e534402ab3c39a17ef855",
     "grade": 1,
     "docsIntent": false,
-    "confidence": "high"
+    "confidence": "medium"
   },
   {
     "repo": "/Users/ben/src/max-sixty/worktrunk",

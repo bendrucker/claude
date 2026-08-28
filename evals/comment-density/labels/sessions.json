@@ -2,8 +2,9 @@
   {
     "id": "b00f1341-e777-4f81-a2fd-5bb93272e3f8",
     "host": "local",
-    "grade": 1,
-    "docsIntent": false
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "medium"
   },
   {
     "id": "9a14c36e-f9ee-4839-8c45-9bad64d033e9",
@@ -51,7 +52,8 @@
     "id": "1fa6d7ea-3425-41dc-b6d8-be8265b365d0",
     "host": "local",
     "grade": 1,
-    "docsIntent": false
+    "docsIntent": false,
+    "confidence": "medium"
   },
   {
     "id": "b9eb4948-eacf-471d-9f90-e86fa157a338",
@@ -104,8 +106,9 @@
   {
     "id": "fbf9f704-c5dc-40fe-84d1-f7636400c1c5",
     "host": "local",
-    "grade": 1,
-    "docsIntent": false
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "medium"
   },
   {
     "id": "269c7998-2be7-49cc-9722-f2544a5b8703",
@@ -158,8 +161,9 @@
   {
     "id": "691bf961-3335-4123-919e-3a1b9a45d978",
     "host": "local",
-    "grade": 1,
-    "docsIntent": false
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "medium"
   },
   {
     "id": "14693c36-5eb8-41c5-9362-aa05915124b5",

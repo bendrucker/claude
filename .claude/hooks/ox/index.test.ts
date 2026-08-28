@@ -21,6 +21,7 @@ import type {
   StopHookInput,
   SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import {
   blockCountPath,
   HookInput,
@@ -37,6 +38,8 @@ import {
 // Every check here spawns oxlint and oxfmt over a real fixture, and the
 // type-aware pass alone outruns the 5s default on CI.
 setDefaultTimeout(30_000);
+
+const Reported = z.looseObject({ additionalContext: z.string().optional() });
 
 const execAsync = promisify(exec);
 
@@ -370,8 +373,7 @@ describe("ox hook", () => {
       const result = await processPostToolUse(
         mockPostToolUseInput("Edit", { file_path: filePath }),
       );
-      return (result?.hookSpecificOutput as { additionalContext: string } | undefined)
-        ?.additionalContext;
+      return Reported.safeParse(result?.hookSpecificOutput).data?.additionalContext;
     }
 
     it.each<{ name: string; nodeModules: NodeModules; reports: string }>([

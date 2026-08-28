@@ -22,6 +22,7 @@ export interface JXAArray<T> {
 export function toArray<T>(jxaArr: JXAArray<T>): T[] {
   const arr: T[] = [];
   for (let i = 0; i < jxaArr.length; i++) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a JXA bridge array is dense over 0..length-1, which noUncheckedIndexedAccess cannot express.
     arr.push(jxaArr[i] as T);
   }
   return arr;

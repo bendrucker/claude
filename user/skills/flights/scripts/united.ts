@@ -43,9 +43,12 @@ const ORIGIN = /^([A-Z]{3})Origin /;
 const DESTINATION = /^([A-Z]{3})Destination /;
 const DURATION = /^(.+?)Duration /;
 const FLIGHT = /^([A-Z0-9]{2} \d{1,4})(?: \((.+?)\))?Flight Number /;
-const MILES = /^([\d,.]+)k?\s*miles$/i;
-const BARE_MILES = /^([\d,.]+)k$/i;
-const TAXES = /^\+?\$([\d,.]+)$/;
+// Each amount has to open on a digit. A punctuation-only match such as "$," or
+// "., " survives `replaceAll` as an empty string, and `Number("")` is 0, which
+// reads downstream as a real price of zero rather than a failed parse.
+const MILES = /^(\d[\d,.]*)k?\s*miles$/i;
+const BARE_MILES = /^(\d[\d,.]*)k$/i;
+const TAXES = /^\+?\$(\d[\d,.]*)$/;
 const AWARD_TYPE = /^((?:Saver|Everyday) Award)$/;
 const FARE_CLASS = /^(United .+ \([A-Z]{1,2}\))$/;
 
@@ -166,6 +169,9 @@ export function parseAwardResults(text: string): UnitedFlight[] {
   return flights;
 }
 
+const IATA = /^[A-Z]{3}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * Search on united.com. `at` is what switches the results between dollars and
  * miles, and is the whole of the award search.
@@ -176,6 +182,15 @@ export function searchUrl(
   date: string,
   award = false,
 ): string {
+  for (const code of [origin, destination]) {
+    if (!IATA.test(code)) {
+      throw new Error(`airport must be a 3-letter IATA code, got ${JSON.stringify(code)}`);
+    }
+  }
+  if (!DATE.test(date)) {
+    throw new Error(`date must be YYYY-MM-DD, got ${JSON.stringify(date)}`);
+  }
+
   const params = new URLSearchParams({
     f: origin,
     t: destination,
@@ -193,17 +208,10 @@ export function searchUrl(
   return `https://www.united.com/en/us/fsr/choose-flights?${params}`;
 }
 
-export function awardSearchUrl(origin: string, destination: string, date: string): string {
-  return searchUrl(origin, destination, date, true);
-}
-
 const DIM = "\x1b[90m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
 const RESET = "\x1b[0m";
-
-const IATA = /^[A-Z]{3}$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function minutesOfDay(time: string): number {
   const match = /(\d+):(\d+)/.exec(time);
@@ -272,14 +280,6 @@ const urlCmd = command(
   },
   (parsed) => {
     const { origin, destination, date } = parsed._;
-    for (const code of [origin, destination]) {
-      if (!IATA.test(code)) {
-        throw new Error(`airport must be a 3-letter IATA code, got ${JSON.stringify(code)}`);
-      }
-    }
-    if (!DATE.test(date)) {
-      throw new Error(`date must be YYYY-MM-DD, got ${JSON.stringify(date)}`);
-    }
     console.log(searchUrl(origin, destination, date, parsed.flags.award));
   },
 );
@@ -296,13 +296,13 @@ const parseCmd = command(
   },
   async (parsed) => {
     const flights = parseAwardResults(await Bun.stdin.text());
+    if (flights.length === 0) {
+      console.error("no flights parsed. The page may not have rendered yet.");
+      process.exit(1);
+    }
     if (parsed.flags.json) {
       console.log(JSON.stringify(flights, null, 2));
       return;
-    }
-    if (flights.length === 0) {
-      console.error("no flights parsed — page may not have rendered yet");
-      process.exit(1);
     }
     console.log(render(flights));
 
@@ -312,7 +312,7 @@ const parseCmd = command(
     console.log(
       saver.length > 0
         ? `${GREEN}saver space on ${saver.map((flight) => flight.flight ?? `${flight.departTime} connection`).join(", ")}${RESET}`
-        : `${YELLOW}no saver space; everything here is dynamically priced${RESET}`,
+        : `${YELLOW}no saver space. Everything here is dynamically priced.${RESET}`,
     );
   },
 );

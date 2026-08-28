@@ -224,4 +224,22 @@ describe("searchUrl", () => {
     expect(url).toContain("t=ORD");
     expect(url).toContain("d=2026-04-15");
   });
+
+  // The validation used to sit in the CLI handler, so anything importing
+  // searchUrl directly built a united.com URL out of whatever it was handed.
+  test.each<[string, string]>([
+    ["a city name", "Chicago"],
+    ["a lowercase code", "ord"],
+    ["a two-letter code", "OR"],
+  ])("rejects %s as an airport", (_label, destination) => {
+    expect(() => searchUrl("LAX", destination, "2026-04-15")).toThrow(/3-letter IATA code/);
+  });
+
+  test.each<[string, string]>([
+    ["a slashed date", "2026/04/15"],
+    ["a short date", "26-04-15"],
+    ["an empty date", ""],
+  ])("rejects %s", (_label, date) => {
+    expect(() => searchUrl("LAX", "ORD", date)).toThrow(/date must be YYYY-MM-DD/);
+  });
 });

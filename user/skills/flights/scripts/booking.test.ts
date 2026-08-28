@@ -42,6 +42,12 @@ describe("parseBooking", () => {
     expect(parseBooking(PAGE).total).toBe(470);
   });
 
+  test("reads a half-rendered total as absent rather than as zero", () => {
+    // A comma with no digits used to match the price shape, and `Number("")` is
+    // 0, so a page caught mid-render reported a $0 booking.
+    expect(parseBooking(PAGE.replace("$470", "$,")).total).toBeNull();
+  });
+
   test("reads a segment", () => {
     const [segment] = parseBooking(PAGE).segments;
 

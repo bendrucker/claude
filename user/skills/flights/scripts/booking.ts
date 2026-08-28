@@ -34,7 +34,9 @@ export interface Booking {
 const TRAVEL_TIME = "Travel time: ";
 const IATA_SUFFIX = /\(([A-Z]{3})\)\s*$/;
 const FLIGHT = /^(.+?)\s+([A-Z0-9]{2}\s?\d{1,4})$/;
-const PRICE = /^\$([\d,]+)$/;
+// The leading digit is required. A comma-only match survives `replaceAll` as an
+// empty string, and `Number("")` is 0, which renders as a real $0 fare.
+const PRICE = /^\$(\d[\d,]*)$/;
 const BULLET = /^-\s*(.+)$/;
 const LEGROOM = /legroom/i;
 

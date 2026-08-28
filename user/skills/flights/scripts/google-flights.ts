@@ -20,8 +20,10 @@ const CABINS = {
 
 export type Cabin = keyof typeof CABINS;
 
-function isCabin(value: string): value is Cabin {
-  return value in CABINS;
+// `in` also answers true for inherited keys, which would let `toString` and
+// `constructor` through as cabins and encode a garbage byte.
+export function isCabin(value: string): value is Cabin {
+  return Object.hasOwn(CABINS, value);
 }
 
 const ROUND_TRIP = 1;
@@ -91,14 +93,16 @@ export function tfs(params: SearchParams): string {
   const message = [0x08, 0x1c, 0x10, 0x02];
   for (const leg of legs) message.push(...encodeLeg(leg, nonstop));
   message.push(0x40, 0x01, 0x48, CABINS[cabin]);
-  if (params.carryOn !== undefined) {
-    // Each count is emitted as one raw protobuf byte, so anything outside a single
-    // byte would wrap silently and encode a bag count nobody asked for.
+  if (params.carryOn !== undefined || params.checked !== undefined) {
+    // Both counts share one field group, so asking for a checked bag alone still
+    // has to emit the carry-on byte. Each count is emitted as one raw protobuf
+    // byte, so anything outside a single byte would wrap silently and encode a
+    // bag count nobody asked for.
     message.push(
       0x6a,
       0x04,
       0x10,
-      bags(params.carryOn, "carry-on"),
+      bags(params.carryOn ?? 0, "carry-on"),
       0x18,
       bags(params.checked ?? 0, "checked"),
     );
@@ -216,7 +220,8 @@ export function parseResults(text: string): Row[] {
     const end = match.index + whole.length;
     const nextBlock = blocks[position + 1]?.index ?? normalized.length;
     const tail = normalized.slice(end, Math.min(end + TAIL, nextBlock));
-    const price = /\$([\d,]+)/.exec(tail)?.[1];
+    // Requiring a leading digit keeps a half-rendered "$," from parsing as $0.
+    const price = /\$(\d[\d,]*)/.exec(tail)?.[1];
     const stops = STOPS.exec(tail);
     const via = STOPS_VIA.exec(tail);
 
@@ -259,7 +264,7 @@ export interface GridCell {
 }
 
 /** Round-trip cells name both of their dates. One-way cells name neither. */
-const GRID_CELL = /button "\$([\d,]+)((?:, [^",]+)*)"/g;
+const GRID_CELL = /button "\$(\d[\d,]*)((?:, [^",]+)*)"/g;
 const GRID_DATE = /StaticText "([A-Z][a-z]{2} \d{1,2})"/g;
 
 /**
@@ -310,6 +315,15 @@ export function parseGrid(text: string): GridCell[] {
     price: cell.price,
     tier: cell.tier,
   }));
+}
+
+// cleye casts a Number flag with `Number()` and does not check the result, so a
+// non-numeric --truncate arrives as NaN and slices every airline name to "".
+function width(truncate: number): number {
+  if (!Number.isInteger(truncate) || truncate < 1) {
+    throw new Error(`--truncate must be a whole number of at least 1, got ${truncate}`);
+  }
+  return truncate;
 }
 
 function render(rows: Row[], truncate: number): string {
@@ -395,18 +409,27 @@ const parseCmd = command(
     },
   },
   async (parsed) => {
-    let rows = parseResults(await Bun.stdin.text());
+    const parsedRows = parseResults(await Bun.stdin.text());
+    // An empty page and a filter that matched nothing are different failures, and
+    // retrying the page load only helps the first. Report them apart.
+    if (parsedRows.length === 0) {
+      console.error("no itineraries parsed. The page may not have rendered yet.");
+      process.exit(1);
+    }
+
+    let rows = parsedRows;
     if (parsed.flags.noRedEye) rows = rows.filter((row) => !row.redEye);
     if (parsed.flags.noBasic) rows = rows.filter((row) => !row.basic);
+    if (rows.length === 0) {
+      console.error(`every one of the ${parsedRows.length} itineraries was filtered out`);
+      process.exit(1);
+    }
+
     if (parsed.flags.json) {
       console.log(JSON.stringify(rows, null, 2));
       return;
     }
-    if (rows.length === 0) {
-      console.error("no itineraries parsed — page may not have rendered yet");
-      process.exit(1);
-    }
-    console.log(render(rows, parsed.flags.truncate));
+    console.log(render(rows, width(parsed.flags.truncate)));
   },
 );
 
@@ -450,13 +473,13 @@ const bookingCmd = command(
   },
   async (parsed) => {
     const booking = parseBooking(await Bun.stdin.text());
+    if (booking.segments.length === 0) {
+      console.error("no segments parsed. The page may not have rendered yet.");
+      process.exit(1);
+    }
     if (parsed.flags.json) {
       console.log(JSON.stringify(booking, null, 2));
       return;
-    }
-    if (booking.segments.length === 0) {
-      console.error("no segments parsed — page may not have rendered yet");
-      process.exit(1);
     }
 
     for (const segment of booking.segments) {
@@ -497,13 +520,13 @@ const gridCmd = command(
   },
   async (parsed) => {
     const cells = parseGrid(await Bun.stdin.text());
+    if (cells.length === 0) {
+      console.error("no grid parsed. Snapshot the page after clicking 'Date grid'.");
+      process.exit(1);
+    }
     if (parsed.flags.json) {
       console.log(JSON.stringify(cells, null, 2));
       return;
-    }
-    if (cells.length === 0) {
-      console.error("no grid parsed — snapshot the page after clicking 'Date grid'");
-      process.exit(1);
     }
     console.log(renderGrid(cells));
     console.log(

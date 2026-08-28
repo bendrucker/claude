@@ -26,22 +26,25 @@ If that came back `{}`, the config is missing. Run the search on what the reques
 
 ```json
 {
-  "home": { "primary": "SFO", "metro": ["SFO", "OAK", "SJC"] },
+  "home": { "primary": "LAX", "metro": ["LAX", "BUR", "LGB"] },
   "loyalty": { "carrier": "UA", "program": "MileagePlus", "status": "none" },
   "miles": { "centsPerPointThreshold": 1.5 },
   "filters": {
     "hard": ["no Basic Economy", "no red-eyes", "no 2+ stop itineraries"],
     "soft": ["prefer nonstop", "avoid arrivals after midnight"]
   },
-  "cabin": { "default": "economy plus" },
+  "cabin": { "default": "economy" },
   "preferences": [
     "Aircraft type matters. Say which one every row is.",
+    "Take Economy Plus when the fare gap is under $40.",
     "Show a few real options, not one pick."
   ]
 }
 ```
 
 `preferences` is prose, read and applied per search rather than scored. Every key is optional, and any object may carry a `note` string for context that does not fit the field.
+
+`cabin.default` names a search cabin, one of `economy`, `premium`, `business`, or `first`, and passes straight to `--cabin`. Economy Plus is a United seat product rather than a search cabin, so a preference for it belongs in `preferences` and gets read off the results.
 
 ## Boundaries
 
@@ -69,7 +72,7 @@ Skip the round when the request already answers these.
 
 Cheap pass first, expensive pass second.
 
-#### Google Flights
+### Google Flights
 
 Run every shape here. It is fast, needs no login, and gives market context across carriers.
 
@@ -77,7 +80,7 @@ For flexible dates, open the **Date grid** first. It prices a whole window of da
 
 Where the grid does not reach, a round trip still decomposes: the cheapest round trip equals the cheapest outbound one-way plus the cheapest return one-way, verified to within a dollar. So N departure dates against M return dates costs `N + M` queries, not `N × M`.
 
-#### united.com
+### united.com
 
 Run the shortlist only. It is slow and needs a login, but it is the only truth for what United will sell, and the only source for award pricing. Use it on the handful of shapes that survived the Google pass.
 
@@ -87,7 +90,9 @@ Bound the work. Say up front how many queries the plan needs, and if a shape get
 
 ## Filters
 
-Hard filters come from `filters.hard`, defaulting to Basic Economy, red-eyes, and two or more stops. The parser marks the first two and drops them on request, so let the tool apply them rather than filtering by eye. The reference gives the flags.
+Hard filters come from `filters.hard`, defaulting to Basic Economy, red-eyes, and two or more stops. The parser marks the first two and drops them on request, so let the tool apply those rather than filtering by eye. The reference gives the flags.
+
+Stop count has no flag. Build it into the search instead: omit `--stops` and the URL asks Google for nonstops only. Where connections are wanted, read the stop count off the `Stops` column.
 
 Soft, shown but marked down: tight connections, arrivals near midnight, departures needing a pre-dawn wake-up.
 

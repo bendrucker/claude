@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseGrid, parseResults, searchUrl, tfs, type SearchParams } from "./google-flights";
+import {
+  isCabin,
+  parseGrid,
+  parseResults,
+  searchUrl,
+  tfs,
+  type SearchParams,
+} from "./google-flights";
 
 // `tfs` is a protobuf message Google parses positionally, so a wrong byte does
 // not fail. It silently searches for something else. These snapshots are the
@@ -87,6 +94,38 @@ describe("tfs", () => {
       tfs({ legs: [{ date: "2026-04-15", origin: "LAX", destination: "ORD" }], carryOn }),
     ).toThrow(/carry-on bags must be a whole number/);
   });
+
+  test("encodes a checked bag asked for on its own", () => {
+    // Both counts share one protobuf field group, so gating the group on carryOn
+    // alone dropped a checked-bag-only search back to no bag filter at all.
+    const checkedOnly = tfs({
+      legs: [{ date: "2026-04-15", origin: "LAX", destination: "ORD" }],
+      checked: 1,
+    });
+    const noBags = tfs({ legs: [{ date: "2026-04-15", origin: "LAX", destination: "ORD" }] });
+
+    expect(checkedOnly).not.toBe(noBags);
+    expect(checkedOnly).toBe(
+      tfs({
+        legs: [{ date: "2026-04-15", origin: "LAX", destination: "ORD" }],
+        carryOn: 0,
+        checked: 1,
+      }),
+    );
+  });
+});
+
+describe("isCabin", () => {
+  test.each(["economy", "premium", "business", "first"])("accepts %s", (cabin) => {
+    expect(isCabin(cabin)).toBe(true);
+  });
+
+  test.each(["toString", "constructor", "hasOwnProperty", "__proto__", "economy plus", ""])(
+    "rejects %p, which `in` would have accepted off the prototype",
+    (cabin) => {
+      expect(isCabin(cabin)).toBe(false);
+    },
+  );
 });
 
 describe("parseGrid", () => {
@@ -209,6 +248,14 @@ describe("parseResults", () => {
       ["United", null],
       ["Alaska", 274],
     ]);
+  });
+
+  test("reads a half-rendered price as absent rather than as zero", () => {
+    // The page flaps between full and empty while rendering. A comma with no
+    // digits used to match, and `Number("")` is 0, so it showed as a $0 fare.
+    const [row] = parseResults(itinerary({ airline: "United", price: "$," }));
+
+    expect(row?.price).toBeNull();
   });
 
   test("flags Basic Economy by its restriction", () => {

@@ -25,7 +25,7 @@ bun user/skills/flights/scripts/google-flights.ts url LAX ORD 2026-04-15 2026-04
 | `H<n>` | cabin: 1 economy, 2 premium economy, 3 business, 4 first |
 | `j\x04\x10<carry>\x18<checked>` | bag counts |
 | `p\x01` | fixed |
-| `\x82\x01\x0b\x08\xff×9\x01` | fixed |
+| `\x82\x01\x0b\x08\xff\xff\xff\xff\xff\xff\xff\xff\xff\x01` | fixed, nine `\xff` bytes between the `\x08` and the `\x01` |
 | `\x98\x01\x01` | trip type: 1 round trip, 2 one-way |
 | `\xc8\x01\x01` | exclude Basic Economy |
 
@@ -81,7 +81,7 @@ Grid prices track the filters already applied to the search, including the carry
 
 Use `read`, never `snapshot`. `agent-browser snapshot` flaps between a full tree and an empty one on the same Google Flights page. `read` is stable. Use `read` for everything here.
 
-This is the opposite of united.com, where snapshot is required because every interaction needs a ref. Google Flights needs no clicks once the URL carries the search.
+This is the opposite of united.com, where snapshot is required because every interaction needs a ref. The results list needs no clicks once the URL carries the search. The Date grid and the booking page are the two places that do, and both are covered below.
 
 ```bash
 agent-browser --session flights open "<url>" && sleep 8 && agent-browser --session flights read > dump.txt
@@ -115,7 +115,13 @@ Carrier names are the weak spot. On a codeshare Google appends an operator note 
 
 Worth two clicks for a shortlisted itinerary. It carries what the results list omits: flight numbers, aircraft, Google's on-time warning, legroom, and the full fare ladder.
 
+The two clicks are the itinerary row, then the fare that opens under it. Both need a ref, so this is the one place a snapshot is worth taking, purely to find them:
+
 ```bash
+agent-browser --session flights snapshot | grep -i "button .*\$"
+agent-browser --session flights click "<itinerary ref>" && sleep 4
+agent-browser --session flights click "<fare ref>" && sleep 6
+agent-browser --session flights read > booking-dump.txt
 bun user/skills/flights/scripts/google-flights.ts booking < booking-dump.txt
 ```
 

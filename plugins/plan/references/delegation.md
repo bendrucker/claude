@@ -1,6 +1,6 @@
 # Delegation
 
-Claude Code ships no auto-downgrade. A subagent inherits the orchestrator's model unless a lever sets otherwise, so an expensive orchestrator spawns expensive subagents by default. A review of a month of spawns found the generic path (`general-purpose`, `Plan`, bare `claude`) almost never delegated down: reasoning-grade tokens went to log reading and mechanical edits.
+A subagent inherits the orchestrator's model unless the spawn or the agent definition sets one, so an expensive orchestrator spawns expensive subagents by default.
 
 When the orchestrator runs on an expensive model (Opus, Fable, Mythos), the plan must carry a Delegation section that lays out the agent/model/effort DAG:
 

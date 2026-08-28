@@ -9,7 +9,14 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import recorded from "./fixtures/re-presents.json";
-import { processInput, StateUnavailableError } from "./gate";
+import {
+  APPEND_ONLY_REASON,
+  DENY_REASON,
+  growthReason,
+  processInput,
+  sizeReason,
+  StateUnavailableError,
+} from "./gate";
 
 const GateOutput = z.object({
   hookSpecificOutput: z.looseObject({
@@ -91,9 +98,9 @@ describe("unchanged re-present", () => {
   const plan = body("alpha");
   const rewritten = body("bravo");
 
-  it("denies a byte-identical resubmission", async () => {
+  it("denies an unchanged resubmission", async () => {
     await decision(plan);
-    expect(denialReason(await decision(plan))).toContain("byte-identical");
+    expect(denialReason(await decision(plan))).toBe(DENY_REASON);
   });
 
   it("denies repeatedly until the text changes", async () => {
@@ -140,7 +147,7 @@ describe("append-only re-present", () => {
   it("denies when the re-present keeps nearly all prior lines and only adds new ones", async () => {
     await decision(basePlan);
     const grown = `${basePlan}\n## Rollout\n- Ship behind a flag\n- Monitor error rates`;
-    expect(denialReason(await decision(grown))).toContain("carries nearly every prior line");
+    expect(denialReason(await decision(grown))).toBe(APPEND_ONLY_REASON);
   });
 
   it("allows a genuine revision that rewrites most of the plan", async () => {
@@ -164,19 +171,27 @@ describe("append-only re-present", () => {
 });
 
 describe("size advisory", () => {
-  const bigPlan = (seed: string) => seed + "x".repeat(12_001);
+  const bigPlan = (seed: string) => seed + "x".repeat(10_001);
 
-  it("denies a plan over 12k characters", async () => {
-    expect(denialReason(await decision(bigPlan("a")))).toContain("exceeds 12k characters");
+  it("denies a plan over 10k characters", async () => {
+    expect(denialReason(await decision(bigPlan("a")))).toBe(sizeReason(0));
   });
 
-  it("stays silent at exactly 12k characters", async () => {
-    expect(await decision("x".repeat(12_000))).toBeNull();
+  it("stays silent at exactly 10k characters", async () => {
+    expect(await decision("x".repeat(10_000))).toBeNull();
   });
 
-  it("denies at most once per session", async () => {
+  it("re-arms while the rework stays over, with a still-over reason, then stops", async () => {
+    expect(denialReason(await decision(bigPlan("a")))).toBe(sizeReason(0));
+    expect(denialReason(await decision(bigPlan("b")))).toBe(sizeReason(1));
+    expect(await decision(bigPlan("c"))).toBeNull();
+  });
+
+  it("does not spend a fire on a rework that lands under the threshold", async () => {
     expect((await decision(bigPlan("a")))?.permissionDecision).toBe("deny");
-    expect(await decision(bigPlan("b"))).toBeNull();
+    expect(await decision("a short plan")).toBeNull();
+    expect((await decision(bigPlan("b")))?.permissionDecision).toBe("deny");
+    expect(await decision(bigPlan("c"))).toBeNull();
   });
 
   it("denies again in a different session", async () => {
@@ -184,11 +199,15 @@ describe("size advisory", () => {
     expect((await decision(bigPlan("a"), "session-2"))?.permissionDecision).toBe("deny");
   });
 
-  it("gives the byte-identical reason when the oversized plan is also unchanged", async () => {
-    expect((await decision(bigPlan("a")))?.permissionDecisionReason).toContain(
-      "exceeds 12k characters",
-    );
-    expect((await decision(bigPlan("a")))?.permissionDecisionReason).toContain("byte-identical");
+  it("stays spent when the marker holds the legacy pre-count value", async () => {
+    await decision(bigPlan("a"));
+    await Bun.write(join(stateRoot, "session-1", "exit-plan-size-asked"), "asked");
+    expect(await decision(bigPlan("b"))).toBeNull();
+  });
+
+  it("gives the unchanged-plan reason when the oversized plan is also unchanged", async () => {
+    expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(sizeReason(0));
+    expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(DENY_REASON);
   });
 });
 
@@ -201,7 +220,7 @@ describe("append-only re-present", () => {
   it("denies when a re-present keeps nearly all prior lines and only adds new ones", async () => {
     await decision(initial);
     const appended = `${initial}\nline 10`;
-    expect(denialReason(await decision(appended))).toContain("carries nearly every prior line");
+    expect(denialReason(await decision(appended))).toBe(APPEND_ONLY_REASON);
   });
 
   it("denies a line swap that carries the document at zero net growth", async () => {
@@ -209,7 +228,7 @@ describe("append-only re-present", () => {
     await decision(base);
     // Trade 3 lines for 3 new ones: carry-over 0.94, no net size change.
     const swapped = [...lines(47), ...lines(3, "swapped")].join("\n");
-    expect(denialReason(await decision(swapped))).toContain("carries nearly every prior line");
+    expect(denialReason(await decision(swapped))).toBe(APPEND_ONLY_REASON);
   });
 
   it("returns null for a genuine revision with low carry-over", async () => {
@@ -242,25 +261,23 @@ describe("append-only re-present", () => {
     expect(await decision(initial.replace("line 9", "line X"))).toBeNull();
   });
 
-  it("gives the byte-identical reason when the append-only re-present repeats", async () => {
+  it("gives the unchanged-plan reason when the append-only re-present repeats", async () => {
     await decision(initial);
     await decision(`${initial}\nline 10`);
-    expect((await decision(`${initial}\nline 10`))?.permissionDecisionReason).toContain(
-      "byte-identical",
-    );
+    expect((await decision(`${initial}\nline 10`))?.permissionDecisionReason).toBe(DENY_REASON);
   });
 
   it("denies once for append-only, not size, when the re-present is also oversized", async () => {
     const pad = "x".repeat(120);
     const padded = (count: number, prefix: string) =>
       Array.from({ length: count }, (_, i) => `${prefix} ${i} ${pad}`);
-    const base = padded(90, "line").join("\n");
-    expect(base.length).toBeLessThan(12_000);
+    const base = padded(72, "line").join("\n");
+    expect(base.length).toBeLessThan(10_000);
     await decision(base);
 
-    const grown = [...padded(90, "line"), ...padded(5, "new")].join("\n");
-    expect(grown.length).toBeGreaterThan(12_000);
-    expect(denialReason(await decision(grown))).toContain("carries nearly every prior line");
+    const grown = [...padded(72, "line"), ...padded(8, "new")].join("\n");
+    expect(grown.length).toBeGreaterThan(10_000);
+    expect(denialReason(await decision(grown))).toBe(APPEND_ONLY_REASON);
     // Append-only denies before the size check, so the size branch never runs and
     // records no marker: one prompt for append-only, no second prompt for size.
     expect(readdirSync(join(stateRoot, "session-1"))).not.toContain("exit-plan-size-asked");
@@ -279,8 +296,8 @@ describe("sustained growth", () => {
 
   it("denies a second present above the high-water mark", async () => {
     await decision(skeletal);
-    expect(denialReason(await decision(grown))).toContain(
-      `Presentation 2 is larger than any before it (${skeletal.length} -> ${grown.length} chars)`,
+    expect(denialReason(await decision(grown))).toBe(
+      growthReason(2, skeletal.length, grown.length),
     );
   });
 
@@ -323,10 +340,12 @@ describe("sustained growth", () => {
     expect(await decision(grown)).toBeNull();
   });
 
-  it("still catches a byte-identical re-present after the growth denial has fired", async () => {
+  it("still catches an unchanged re-present after the growth denial has fired", async () => {
     await decision(skeletal);
-    expect((await decision(grown))?.permissionDecisionReason).toContain("larger than any before");
-    expect((await decision(grown))?.permissionDecisionReason).toContain("byte-identical");
+    expect((await decision(grown))?.permissionDecisionReason).toBe(
+      growthReason(2, skeletal.length, grown.length),
+    );
+    expect((await decision(grown))?.permissionDecisionReason).toBe(DENY_REASON);
   });
 
   it("does not spend the denial on a plan that barely clears the high-water mark", async () => {
@@ -345,7 +364,7 @@ describe("sustained growth", () => {
 // The oversized rule needs no prior state, so one piped payload covers it.
 describe("harness invocation", () => {
   it("emits the oversized decision when run as the harness runs it", async () => {
-    const { stdout, stderr, exitCode } = await runGate(mockInput("x".repeat(12_001)));
+    const { stdout, stderr, exitCode } = await runGate(mockInput("x".repeat(10_001)));
     const emitted: unknown = JSON.parse(stdout);
 
     expect({ exitCode, stderr, decision: emitted }).toMatchInlineSnapshot(`
@@ -354,7 +373,7 @@ describe("harness invocation", () => {
           "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": "This plan exceeds 12k characters. The session that implements it reads it cold and reads nothing else. Consolidate superseded content into <plan>-decisions.md or split the scope.",
+            "permissionDecisionReason": "This plan exceeds 10k characters. Move supporting detail into <plan>-<topic>.md files the plan links (<plan>-decisions.md is the common one), or split the work into smaller plans.",
           },
         },
         "exitCode": 0,
@@ -375,12 +394,16 @@ describe("harness invocation", () => {
 // decided nothing for its first month. A label naming only the rule would have
 // read as healthy throughout.
 describe("recorded re-presents", () => {
-  const RULES: [needle: string, label: string][] = [
-    ["byte-identical", "byte-identical"],
-    ["carries nearly every prior line", "append-only"],
-    ["larger than any before it", "growth"],
-    ["exceeds 12k characters", "size"],
-  ];
+  // The growth reason opens with per-presentation numbers, so match its fixed tail.
+  const growthTail = growthReason(0, 0, 0).split(". ").slice(1).join(". ");
+
+  function rule(reason: string): string {
+    if (reason === DENY_REASON) return "unchanged";
+    if (reason === APPEND_ONLY_REASON) return "append-only";
+    if (reason.endsWith(growthTail)) return "growth";
+    if (reason === sizeReason(0) || reason === sizeReason(1)) return "size";
+    return "unrecognized";
+  }
 
   function label(run: GateRun): string {
     if (run.exitCode !== 0 || run.stderr !== "")
@@ -388,8 +411,7 @@ describe("recorded re-presents", () => {
     if (run.stdout.trim() === "") return "allowed";
     const { hookSpecificOutput } = GateOutput.parse(JSON.parse(run.stdout));
     const reason = hookSpecificOutput.permissionDecisionReason ?? "";
-    const rule = RULES.find(([needle]) => reason.includes(needle))?.[1] ?? "unrecognized";
-    return `${hookSpecificOutput.permissionDecision}:${rule}`;
+    return `${hookSpecificOutput.permissionDecision}:${rule(reason)}`;
   }
 
   it("decides every recorded presentation the same way across process boundaries", async () => {
@@ -414,7 +436,7 @@ describe("recorded re-presents", () => {
         "2026-07-19 dfdb8641": [
           "allowed",
           "deny:append-only",
-          "deny:byte-identical",
+          "deny:unchanged",
           "deny:append-only",
         ],
         "2026-08-12 aeebf85d": [

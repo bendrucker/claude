@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { table } from "table";
-import { type RunLogEntry, type RunOutcome, resolveLogPath } from "../../../hooks/run-log";
+import { RunLogEntry, type RunOutcome, resolveLogPath } from "../../../hooks/run-log";
 
 export type CategoryHealth = {
   category: string;
@@ -27,10 +27,8 @@ export function parseLog(text: string): RunLogEntry[] {
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     try {
-      const parsed: unknown = JSON.parse(line);
-      if (parsed && typeof parsed === "object" && "outcome" in parsed) {
-        entries.push(parsed as RunLogEntry);
-      }
+      const parsed = RunLogEntry.safeParse(JSON.parse(line));
+      if (parsed.success) entries.push(parsed.data);
     } catch {
       // A torn write from a concurrent session produces a partial line.
     }

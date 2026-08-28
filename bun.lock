@@ -279,6 +279,7 @@
         "stemmer": "^2.0.1",
         "table": "^6.9.0",
         "unist-util-visit": "^5.1.0",
+        "zod": "^4.4.3",
       },
       "devDependencies": {
         "@types/mdast": "^4.0.4",

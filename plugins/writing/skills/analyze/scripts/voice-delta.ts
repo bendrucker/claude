@@ -15,6 +15,8 @@
 // per-document flags. They are rates-only in every surface. Only ungoverned
 // features may produce per-document flags.
 
+import { z } from "zod";
+
 export type Provenance = "skill-prescribed" | "skill-encouraged" | "ungoverned";
 
 export interface VoiceDeltaFeature {
@@ -398,9 +400,10 @@ export function computeCorpusRates(texts: string[]): Map<string, FeatureRate> {
 // comparison. Computed during profile build from the baseline corpus.
 // When a loaded profile predates this extension (voiceDelta missing), each
 // feature degrades to a "no baseline" display.
-export interface VoiceDeltaBaseline {
+export const VoiceDeltaBaseline = z.object({
   // Feature id -> mean rate across the baseline corpus.
-  rates: Record<string, number>;
-  documentCount: number;
-  computedAt: string;
-}
+  rates: z.record(z.string(), z.number()),
+  documentCount: z.number(),
+  computedAt: z.string(),
+});
+export type VoiceDeltaBaseline = z.infer<typeof VoiceDeltaBaseline>;

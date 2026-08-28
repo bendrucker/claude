@@ -5,7 +5,7 @@ import { visit } from "unist-util-visit";
 import { getExtension, isMarkdownFile } from "../detection/paths";
 import { classifyHeadingBaseline } from "../linguistics/heading";
 import { headingCaseViolations } from "./heading-case";
-import { type EditInput, formatContext, type HookResult, type WriteInput } from "./io";
+import { editedContent, formatContext, type HookResult } from "./io";
 
 // Reports the exact re-casing rather than just naming the heading, so the fix
 // needs no second guess about which words AP lowercases.
@@ -65,22 +65,9 @@ export function checkSentenceHeading(content: string): string | null {
 }
 
 export function check(input: PreToolUseHookInput): HookResult | null {
-  const toolName = input.tool_name;
-
-  let content: string;
-  let filePath: string;
-
-  if (toolName === "Write") {
-    const toolInput = input.tool_input as WriteInput;
-    content = toolInput.content;
-    filePath = toolInput.file_path;
-  } else if (toolName === "Edit") {
-    const toolInput = input.tool_input as EditInput;
-    content = toolInput.new_string;
-    filePath = toolInput.file_path;
-  } else {
-    return null;
-  }
+  const edited = editedContent(input);
+  if (!edited) return null;
+  const { content, filePath } = edited;
 
   const ext = getExtension(filePath);
   if (!isMarkdownFile(ext)) return null;

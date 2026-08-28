@@ -1,17 +1,19 @@
+import { z } from "zod";
 import { type DeliverableAudit, isDeliverableSurface } from "./deliverable-audit";
 import type { QuoteContext } from "./quote-context";
 import type { VoiceProfile } from "./voice-profile";
 import { phraseProfileStatStemmed } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 
-export interface FtsAuditRow {
-  term: string;
-  assistant_count: number;
-  user_count: number;
-  assistant_per_m: number | null;
-  user_per_m: number | null;
-  lift: number | null;
-}
+export const FtsAuditRow = z.object({
+  term: z.string(),
+  assistant_count: z.number(),
+  user_count: z.number(),
+  assistant_per_m: z.number().nullable(),
+  user_per_m: z.number().nullable(),
+  lift: z.number().nullable(),
+});
+export type FtsAuditRow = z.infer<typeof FtsAuditRow>;
 
 export type RemoveReason = "dead" | "not distinctive";
 export type AuditSurface = "chat" | "deliverable";

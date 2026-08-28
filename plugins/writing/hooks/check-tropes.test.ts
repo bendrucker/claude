@@ -10,21 +10,39 @@ async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOut
   return (await check(input))?.output ?? null;
 }
 
-function mockWrite(content: string): PreToolUseHookInput {
+function contextOf(output: SyncHookJSONOutput | null): string | undefined {
+  const specific = output?.hookSpecificOutput;
+  return specific?.hookEventName === "PreToolUse" ? specific.additionalContext : undefined;
+}
+
+function denialOf(output: SyncHookJSONOutput | null): {
+  decision: string | undefined;
+  reason: string | undefined;
+} {
+  const specific = output?.hookSpecificOutput;
+  if (specific?.hookEventName !== "PreToolUse") return { decision: undefined, reason: undefined };
+  return { decision: specific.permissionDecision, reason: specific.permissionDecisionReason };
+}
+
+function mockWrite(content: string, filePath = "test.md"): PreToolUseHookInput {
   return {
     hook_event_name: "PreToolUse",
     session_id: "test",
     transcript_path: "/tmp/test",
     cwd: "/tmp",
     tool_name: "Write",
-    tool_input: { file_path: "test.md", content },
+    tool_input: { file_path: filePath, content },
     tool_use_id: "test",
   };
 }
 
-function mockEdit(newString: string, oldString?: string): PreToolUseHookInput {
+function mockEdit(
+  newString: string,
+  oldString?: string,
+  filePath = "test.md",
+): PreToolUseHookInput {
   const toolInput: Record<string, unknown> = {
-    file_path: "test.md",
+    file_path: filePath,
     new_string: newString,
   };
   if (oldString !== undefined) toolInput.old_string = oldString;
@@ -76,15 +94,17 @@ describe("wordlist files", () => {
     ],
     ["skips Edit to wordlist file", "Edit", "delve\nadded entry\n"],
   ])("%s", async (_name, tool, content) => {
-    const input = tool === "Write" ? mockWrite(content) : mockEdit(content);
-    (input.tool_input as Record<string, unknown>).file_path = wordlistPath;
+    const input =
+      tool === "Write"
+        ? mockWrite(content, wordlistPath)
+        : mockEdit(content, undefined, wordlistPath);
     expect(await processInput(input)).toBeNull();
   });
 
   it("does not skip non-wordlist .txt files", async () => {
-    const input = mockWrite("delve into the data is the way forward.");
-    (input.tool_input as Record<string, unknown>).file_path = "/tmp/notes.txt";
-    const result = await processInput(input);
+    const result = await processInput(
+      mockWrite("delve into the data is the way forward.", "/tmp/notes.txt"),
+    );
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 });
@@ -100,15 +120,11 @@ describe("connector density file scoping", () => {
   });
 
   it("skips connector density in shell scripts", async () => {
-    const input = mockWrite(denseText);
-    (input.tool_input as Record<string, unknown>).file_path = "deploy.sh";
-    expect(await processInput(input)).toBeNull();
+    expect(await processInput(mockWrite(denseText, "deploy.sh"))).toBeNull();
   });
 
   it("skips connector density in TypeScript files", async () => {
-    const input = mockWrite(denseText);
-    (input.tool_input as Record<string, unknown>).file_path = "index.ts";
-    expect(await processInput(input)).toBeNull();
+    expect(await processInput(mockWrite(denseText, "index.ts"))).toBeNull();
   });
 });
 
@@ -116,7 +132,7 @@ describe("Write/Edit", () => {
   it("returns reminder for Write with spaced em dash", async () => {
     const result = await processInput(mockWrite("This \u2014 is bad"));
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-    const ctx = (result?.hookSpecificOutput as { additionalContext: string }).additionalContext;
+    const ctx = contextOf(result);
     expect(ctx).toContain("follow-up Edit");
   });
 
@@ -185,9 +201,9 @@ describe("diff-aware filtering", () => {
     const dir = mkdtempSync(join(tmpdir(), "trope-diff-"));
     const file = join(dir, "doc.md");
     await Bun.write(file, "Title \u2014 already here in the existing file.\n");
-    const input = mockWrite("Title \u2014 already here in the existing file.\nAdded line.\n");
-    (input.tool_input as Record<string, unknown>).file_path = file;
-    const result = await processInput(input);
+    const result = await processInput(
+      mockWrite("Title \u2014 already here in the existing file.\nAdded line.\n", file),
+    );
     await rm(dir, { recursive: true, force: true });
     expect(result).toBeNull();
   });
@@ -196,9 +212,9 @@ describe("diff-aware filtering", () => {
     const dir = mkdtempSync(join(tmpdir(), "trope-diff-"));
     const file = join(dir, "doc.md");
     await Bun.write(file, "Title \u2014 already here.\n");
-    const input = mockWrite("Title \u2014 already here.\nNow another \u2014 line.\n");
-    (input.tool_input as Record<string, unknown>).file_path = file;
-    const result = await processInput(input);
+    const result = await processInput(
+      mockWrite("Title \u2014 already here.\nNow another \u2014 line.\n", file),
+    );
     await rm(dir, { recursive: true, force: true });
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
@@ -211,9 +227,7 @@ describe("diff-aware filtering", () => {
 
 describe("semicolon splices", () => {
   function codeEdit(newString: string, oldString: string): PreToolUseHookInput {
-    const input = mockEdit(newString, oldString);
-    (input.tool_input as Record<string, unknown>).file_path = "index.ts";
-    return input;
+    return mockEdit(newString, oldString, "index.ts");
   }
 
   it("flags a code-file edit introducing a spliced comment", async () => {
@@ -221,7 +235,7 @@ describe("semicolon splices", () => {
       codeEdit("// keep sorted; callers rely on order\nconst x = 1;", "const x = 1;"),
     );
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-    const ctx = (result?.hookSpecificOutput as { additionalContext: string }).additionalContext;
+    const ctx = contextOf(result);
     expect(ctx).toContain("semicolon");
   });
 
@@ -439,10 +453,9 @@ describe("Bash processInput", () => {
     const result = await processInput(
       mockBash(`glab mr note 871 --message "Dana, we should delve into the retry budget."`),
     );
-    expect(result?.hookSpecificOutput).toMatchObject({
-      permissionDecision: "deny",
-      permissionDecisionReason: expect.stringContaining("salutation"),
-    });
+    const denial = denialOf(result);
+    expect(denial.decision).toBe("deny");
+    expect(denial.reason).toContain("salutation");
   });
 
   it("returns null for non-text Bash commands", async () => {

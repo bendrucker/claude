@@ -51,7 +51,9 @@ async function getOutput(
 ): Promise<PreToolUseHookSpecificOutput | null> {
   const result = await check(input, mode);
   if (!result) return null;
-  return result.output.hookSpecificOutput as PreToolUseHookSpecificOutput;
+  const output = result.output.hookSpecificOutput;
+  if (output?.hookEventName !== "PreToolUse") return null;
+  return output;
 }
 
 describe("formatDecision", () => {

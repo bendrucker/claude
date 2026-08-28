@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { mkdirSync } from "node:fs";
 import { cli } from "cleye";
+import { z } from "zod";
 import { corpusPath, resolveDataDir, voiceBaselineDir } from "./data-dir";
 import { mergeDocuments, parseCorpus, serializeCorpus, type VoiceDocument } from "./voice-corpus";
 
@@ -67,6 +68,10 @@ async function collectIncoming(): Promise<VoiceDocument[]> {
   throw new Error(`Unknown source: ${argv.flags.source}. Use 'github' or 'file'.`);
 }
 
+const SearchResults = z.array(
+  z.object({ url: z.string(), body: z.string(), createdAt: z.string() }),
+);
+
 async function fetchGithub(): Promise<VoiceDocument[]> {
   const author = argv.flags.author;
   if (!author) {
@@ -97,11 +102,7 @@ async function fetchGithub(): Promise<VoiceDocument[]> {
     throw new Error(`gh search prs failed (exit ${exitCode}): ${stderr.trim()}`);
   }
 
-  const results = JSON.parse(stdout) as Array<{
-    url: string;
-    body: string;
-    createdAt: string;
-  }>;
+  const results = SearchResults.parse(JSON.parse(stdout));
 
   return results
     .filter((pr) => pr.body && pr.body.trim().length >= 30)

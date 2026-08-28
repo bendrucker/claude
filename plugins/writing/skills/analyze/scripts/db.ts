@@ -1,13 +1,18 @@
 import * as path from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
+import { z } from "zod";
 
 const QUERIES_DIR = path.join(import.meta.dirname, "..", "resources", "queries");
 
 export interface Database {
   run(sql: string): Promise<void>;
-  query<T>(sql: string): Promise<T[]>;
+  query<T>(sql: string, schema: z.ZodType<T>): Promise<T[]>;
   setParams(params: Record<string, string | null>): Promise<void>;
-  runQuery<T>(queryName: string, params?: Record<string, string | null>): Promise<T[]>;
+  runQuery<T>(
+    queryName: string,
+    schema: z.ZodType<T>,
+    params?: Record<string, string | null>,
+  ): Promise<T[]>;
   execQuery(queryName: string, params?: Record<string, string | null>): Promise<void>;
   close(): void;
 }
@@ -20,10 +25,10 @@ export async function openSessionDb(dbPath: string): Promise<Database> {
     await connection.run(sql);
   }
 
-  async function query<T>(sql: string): Promise<T[]> {
+  async function query<T>(sql: string, schema: z.ZodType<T>): Promise<T[]> {
     const reader = await connection.runAndReadAll(sql);
     const rows = reader.getRowObjectsJS();
-    return rows.map(narrowBigints) as T[];
+    return z.array(schema).parse(rows.map(narrowBigints));
   }
 
   async function setParams(params: Record<string, string | null>): Promise<void> {
@@ -41,10 +46,14 @@ export async function openSessionDb(dbPath: string): Promise<Database> {
     query,
     setParams,
 
-    async runQuery<T>(queryName: string, params: Record<string, string | null> = {}): Promise<T[]> {
+    async runQuery<T>(
+      queryName: string,
+      schema: z.ZodType<T>,
+      params: Record<string, string | null> = {},
+    ): Promise<T[]> {
       await setParams(params);
       const sql = await readSql(queryName);
-      return query<T>(sql);
+      return query(sql, schema);
     },
 
     async execQuery(queryName: string, params: Record<string, string | null> = {}): Promise<void> {

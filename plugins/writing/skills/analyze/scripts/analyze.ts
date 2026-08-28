@@ -7,12 +7,12 @@ import { corpusPath, profilePath, resolveDataDir } from "./data-dir";
 import { type Database, openSessionDb } from "./db";
 import { auditDeliverableCorpus } from "./deliverable-audit";
 import {
-  type CorrectionRow,
-  type CorrectiveRow,
-  type DeliverableRow,
-  type ModelSummaryRow,
+  CorrectionRow,
+  CorrectiveRow,
+  DeliverableRow,
+  ModelSummaryRow,
   serializeCorpus,
-  type TextRow,
+  TextRow,
   totalChars,
 } from "./dump";
 import { escapeRegex, frustrationRegex, gatedRegex } from "./frustration";
@@ -21,7 +21,7 @@ import { computeLift, excludePhrases, processCorpus, processRows } from "./ngram
 import { findQuote } from "./quote-context";
 import { aggregateTrends, analyzeDocument } from "./rate-detectors";
 import { type CandidatePhrase, type ReportInput, renderReport } from "./report";
-import { buildRuleHealth, type FtsAuditRow } from "./rule-health";
+import { buildRuleHealth, FtsAuditRow } from "./rule-health";
 import { auditStructuralPatterns } from "./structural";
 import { type TagSignatureRow, tagSequence } from "./tag-ngram";
 import { computeCorpusRates } from "./voice-delta";
@@ -268,14 +268,14 @@ export async function runAnalysis(
 
   console.error("Auditing wordlists via FTS");
   const auditTerms = wordlistEntries.map((e) => e.phrase.toLowerCase()).join(",");
-  const auditRows = await db.runQuery<FtsAuditRow>("fts-phrase-audit", { terms: auditTerms });
+  const auditRows = await db.runQuery("fts-phrase-audit", FtsAuditRow, { terms: auditTerms });
   const auditByTerm = new Map(auditRows.map((r) => [r.term, r]));
 
   console.error("Fetching model summary");
-  const modelSummary = await db.runQuery<ModelSummaryRow>("model-summary", baseParams);
+  const modelSummary = await db.runQuery("model-summary", ModelSummaryRow, baseParams);
 
   console.error("Dumping all assistant text");
-  const assistantRows = await db.runQuery<TextRow>("text-export", {
+  const assistantRows = await db.runQuery("text-export", TextRow, {
     ...baseParams,
     role: "assistant",
     model: config.modelFilter,
@@ -283,13 +283,13 @@ export async function runAnalysis(
   });
 
   console.error("Dumping deliverable-prose corpus (Write/Edit/Bash tool inputs)");
-  const deliverableRows = await db.runQuery<DeliverableRow>("deliverable-prose", {
+  const deliverableRows = await db.runQuery("deliverable-prose", DeliverableRow, {
     ...baseParams,
     model: config.modelFilter,
   });
 
   console.error("Dumping user corpus (human input only)");
-  const userRows = await db.runQuery<TextRow>("text-export", {
+  const userRows = await db.runQuery("text-export", TextRow, {
     ...baseParams,
     role: "user",
     model: null,
@@ -372,13 +372,13 @@ export async function runAnalysis(
     }));
 
   console.error("Fetching correction candidates");
-  const corrections = await db.runQuery<CorrectionRow>("correction-candidates", baseParams);
+  const corrections = await db.runQuery("correction-candidates", CorrectionRow, baseParams);
 
   console.error("Fetching corrective feedback (frustration lexicon)");
   const primaryPattern = frustrationRegex();
   const primaryRe = new RegExp(primaryPattern, "i");
   const combinedLexicon = `(?:${primaryPattern})|(?:${gatedRegex()})`;
-  const rawCorrective = await db.runQuery<CorrectiveRow>("corrective-feedback", {
+  const rawCorrective = await db.runQuery("corrective-feedback", CorrectiveRow, {
     ...baseParams,
     lexicon: combinedLexicon,
     max_user_chars: "400",

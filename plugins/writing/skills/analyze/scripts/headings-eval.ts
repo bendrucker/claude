@@ -22,12 +22,13 @@ import { cli } from "cleye";
 import type { Heading, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { table } from "table";
+import { z } from "zod";
 import { visit } from "unist-util-visit";
 import { CLASSIFIERS } from "../../../linguistics/classifiers";
 import type { HeadingClassifier, HeadingKind } from "../../../linguistics/heading";
 import { powerFromCurrentSample } from "../../../linguistics/power";
 import { openSessionDb } from "./db";
-import type { DeliverableRow } from "./dump";
+import { DeliverableRow } from "./dump";
 
 export interface HeadingRecord {
   heading: string;
@@ -149,21 +150,23 @@ export function evaluateClassifiers(
 /** Wilson score interval for a binomial proportion (95%). */
 export function wilson(successes: number, n: number): { lo: number; hi: number } {
   if (n === 0) return { lo: 0, hi: 1 };
-  const z = 1.96;
+  const zScore = 1.96;
   const p = successes / n;
-  const denom = 1 + z ** 2 / n;
-  const center = (p + z ** 2 / (2 * n)) / denom;
-  const margin = (z * Math.sqrt((p * (1 - p)) / n + z ** 2 / (4 * n ** 2))) / denom;
+  const denom = 1 + zScore ** 2 / n;
+  const center = (p + zScore ** 2 / (2 * n)) / denom;
+  const margin = (zScore * Math.sqrt((p * (1 - p)) / n + zScore ** 2 / (4 * n ** 2))) / denom;
   return { lo: Math.max(0, center - margin), hi: Math.min(1, center + margin) };
 }
 
-export const LABELS: HeadingKind[] = [
+export const LABELS = [
   "noun-phrase",
   "clause",
   "imperative",
   "interrogative",
   "fragment",
-];
+] as const satisfies readonly HeadingKind[];
+
+const HeadingLabel = z.enum(LABELS);
 
 export const SHOULD_FLAG = new Set<HeadingKind>(["clause", "imperative"]);
 
@@ -219,12 +222,13 @@ export function parseLabelsFile(content: string): LabeledHeading[] {
     if (line.startsWith("#") || line.trim().length === 0) continue;
     const [heading, label, source] = line.split("\t");
     if (!heading || !label) continue;
-    if (!LABELS.includes(label as HeadingKind)) {
+    const parsed = HeadingLabel.safeParse(label);
+    if (!parsed.success) {
       throw new Error(`Unknown label "${label}" for heading "${heading}"`);
     }
     labeled.push({
       heading,
-      label: label as HeadingKind,
+      label: parsed.data,
       source: source === "disagreement" ? "disagreement" : "random",
     });
   }
@@ -315,7 +319,7 @@ async function corpusFromSessionDb(
   const db = await openSessionDb(isolatedPath);
   try {
     console.error("Dumping deliverable-prose corpus");
-    return await db.runQuery<DeliverableRow>("deliverable-prose", params);
+    return await db.runQuery("deliverable-prose", DeliverableRow, params);
   } finally {
     db.close();
   }

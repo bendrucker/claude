@@ -1,5 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import {
+  byCriterion,
   aggregateVerdicts,
   CHUNK_WORD_LIMIT,
   type CriterionKey,
@@ -24,18 +25,12 @@ import {
 } from "./judge";
 
 function verdict(overrides: Partial<Record<CriterionKey, boolean | string>> = {}): JudgeVerdict {
-  const v = {} as JudgeVerdict;
-  for (const c of JUDGE_CRITERIA) {
-    const override = overrides[c.key];
-    if (override === undefined) {
-      v[c.key] = { flagged: false, span: null };
-    } else if (typeof override === "boolean") {
-      v[c.key] = { flagged: override, span: null };
-    } else {
-      v[c.key] = { flagged: true, span: override };
-    }
-  }
-  return v;
+  return byCriterion((key) => {
+    const override = overrides[key];
+    if (override === undefined) return { flagged: false, span: null };
+    if (typeof override === "boolean") return { flagged: override, span: null };
+    return { flagged: true, span: override };
+  });
 }
 
 describe("JUDGE_CRITERIA", () => {
@@ -93,7 +88,7 @@ describe("prompt artifact", () => {
 
 describe("verdictSchema", () => {
   test("requires every criterion and forbids extras", () => {
-    const schema = verdictSchema() as { required: string[]; additionalProperties: boolean };
+    const schema = verdictSchema();
     expect(schema.required).toEqual(JUDGE_CRITERIA.map((c) => c.key));
     expect(schema.additionalProperties).toBe(false);
   });
@@ -115,24 +110,35 @@ describe("parseVerdict", () => {
   });
 
   test("rejects a missing criterion", () => {
-    const partial: Record<string, unknown> = JSON.parse(JSON.stringify(verdict()));
-    delete partial.hedging_density;
+    const { hedging_density: _dropped, ...partial } = verdict();
     expect(() => parseVerdict(JSON.stringify(partial))).toThrow(
       'missing criterion "hedging_density"',
     );
   });
 
-  test("rejects non-boolean flagged and non-string span", () => {
-    const bad = JSON.parse(JSON.stringify(verdict())) as Record<
-      string,
-      { flagged: unknown; span: unknown }
-    >;
-    const sycophancy = bad.sycophancy as { flagged: unknown; span: unknown };
-    sycophancy.flagged = "yes";
-    expect(() => parseVerdict(JSON.stringify(bad))).toThrow("must be a boolean");
-    sycophancy.flagged = true;
-    sycophancy.span = 7;
-    expect(() => parseVerdict(JSON.stringify(bad))).toThrow("must be a string or null");
+  test.each<{ name: string; sycophancy: unknown; error: string }>([
+    {
+      name: "non-boolean flagged",
+      sycophancy: { flagged: "yes", span: null },
+      error: "must be a boolean",
+    },
+    {
+      name: "non-string span",
+      sycophancy: { flagged: true, span: 7 },
+      error: "must be a string or null",
+    },
+    {
+      name: "a non-object criterion",
+      sycophancy: "flagged",
+      error: 'missing criterion "sycophancy"',
+    },
+    { name: "a non-object verdict", sycophancy: undefined, error: "must be a JSON object" },
+  ])("rejects $name", ({ name, sycophancy, error }) => {
+    const json =
+      name === "a non-object verdict"
+        ? JSON.stringify(["not", "an", "object"])
+        : JSON.stringify({ ...verdict(), sycophancy });
+    expect(() => parseVerdict(json)).toThrow(error);
   });
 });
 
@@ -193,7 +199,7 @@ describe("judgeDocument", () => {
       seen.push(chunk);
       return verdict({ information_density: seen.length === 2 });
     };
-    const long = `${Array(1400).fill("alpha").join(" ")}\n\n${Array(1400).fill("beta").join(" ")}`;
+    const long = `${Array.from({ length: 1400 }, () => "alpha").join(" ")}\n\n${Array.from({ length: 1400 }, () => "beta").join(" ")}`;
     const result = await judgeDocument(judge, long);
     expect(seen.length).toBe(2);
     expect(result.information_density.flagged).toBe(true);
@@ -202,7 +208,9 @@ describe("judgeDocument", () => {
 
 describe("estimateCost", () => {
   test("counts one call per chunk and prices by model", async () => {
-    const longDoc = Array(3).fill(Array(1200).fill("word").join(" ")).join("\n\n");
+    const longDoc = Array.from({ length: 3 }, () =>
+      Array.from({ length: 1200 }, () => "word").join(" "),
+    ).join("\n\n");
     const docs = ["short doc one", longDoc];
     const estimate = await estimateCost(docs, { promptText: "prompt words here" });
     expect(estimate.calls).toBe(4);
@@ -224,7 +232,10 @@ describe("estimateCost", () => {
   });
 
   test("heading estimate counts one call per batch, not per heading", async () => {
-    const headings = Array(HEADING_BATCH_SIZE * 2 + 1).fill("Deployment Topology");
+    const headings = Array.from(
+      { length: HEADING_BATCH_SIZE * 2 + 1 },
+      () => "Deployment Topology",
+    );
     const batches: string[] = [];
     const estimate = await estimateHeadingCost(headings, {
       promptText: "prompt words here",
@@ -240,7 +251,9 @@ describe("estimateCost", () => {
 
   test("a 200-document run of 1k-word PR bodies stays under a dollar on haiku", async () => {
     const prompt = await loadPrompt();
-    const docs = Array(200).fill(Array(1000).fill("word").join(" "));
+    const docs = Array.from({ length: 200 }, () =>
+      Array.from({ length: 1000 }, () => "word").join(" "),
+    );
     const estimate = await estimateCost(docs, { promptText: prompt.text });
     expect(estimate.usd).toBeLessThan(1);
   });
@@ -304,7 +317,7 @@ describe("judgeCorpus", () => {
       verdict(),
     ];
     let i = 0;
-    const judge = async () => verdicts[i++] as JudgeVerdict;
+    const judge = async () => verdicts[i++] ?? verdict();
     const audit = await judgeCorpus(judge, ["a", "b", "c"], {
       promptSha256: "abc123",
       model: "claude-haiku-4-5",
@@ -340,12 +353,16 @@ describe("judgeCorpus", () => {
 
   test("caps sampled spans", async () => {
     const judge = async () => verdict({ marketing_phrasing: "seamless" });
-    const audit = await judgeCorpus(judge, Array(8).fill("doc"), {
-      promptSha256: "abc",
-      model: "claude-haiku-4-5",
-      estimatedCostUsd: 0,
-      maxSpans: 2,
-    });
+    const audit = await judgeCorpus(
+      judge,
+      Array.from({ length: 8 }, () => "doc"),
+      {
+        promptSha256: "abc",
+        model: "claude-haiku-4-5",
+        estimatedCostUsd: 0,
+        maxSpans: 2,
+      },
+    );
     const marketing = audit.criteria.find((c) => c.id === "marketing-phrasing");
     expect(marketing?.flagged).toBe(8);
     expect(marketing?.spans?.length).toBe(2);
@@ -380,7 +397,10 @@ describe("judgeHeadings", () => {
       batches.push(headings.length);
       return headings.map(() => false);
     };
-    const verdicts = await judgeHeadings(judge, Array(HEADING_BATCH_SIZE + 3).fill("Heading"));
+    const verdicts = await judgeHeadings(
+      judge,
+      Array.from({ length: HEADING_BATCH_SIZE + 3 }, () => "Heading"),
+    );
     expect(batches).toEqual([HEADING_BATCH_SIZE, 3]);
     expect(verdicts.length).toBe(HEADING_BATCH_SIZE + 3);
   });

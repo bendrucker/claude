@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import {
   getExtension,
   isMarkdownFile,
@@ -9,7 +10,7 @@ import {
   isScratchPath,
 } from "../detection/paths";
 import * as tropes from "./check-tropes";
-import { type HookResult, isPlanMode, type SyncHookJSONOutput, tierOf } from "./io";
+import { type HookResult, isPlanMode, type SyncHookJSONOutput, tierOf, toolInputOf } from "./io";
 import * as numbering from "./numbering";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
@@ -25,8 +26,7 @@ export type DispatchResult = {
 
 function filePathOf(input: PreToolUseHookInput): string | undefined {
   if (!FILE_OP_TOOLS.has(input.tool_name)) return undefined;
-  const filePath = (input.tool_input as Record<string, unknown>).file_path;
-  return typeof filePath === "string" ? filePath : undefined;
+  return toolInputOf(input).file_path;
 }
 
 // Every heading check is markdown-only: `headings.check` returns null for any
@@ -118,10 +118,21 @@ export async function dispatch(
   );
 }
 
+const HookInput = z.looseObject({
+  hook_event_name: z.literal("PreToolUse"),
+  session_id: z.string().catch(""),
+  transcript_path: z.string().catch(""),
+  cwd: z.string().catch(""),
+  permission_mode: z.string().catch(""),
+  tool_name: z.string(),
+  tool_input: z.unknown().catch(undefined),
+  tool_use_id: z.string().catch(""),
+}) satisfies z.ZodType<PreToolUseHookInput>;
+
 async function main(): Promise<void> {
   let input: PreToolUseHookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[writing/pretooluse] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

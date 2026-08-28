@@ -1,48 +1,60 @@
-export interface TextRow {
-  session_id: string;
-  text: string;
-}
+import { z } from "zod";
 
-export interface DeliverableRow {
-  session_id: string;
-  source_file: string | null;
-  source_line: number | null;
-  file_path: string | null;
-  text: string;
-}
+// DuckDB hands TIMESTAMP columns back as Date. Reports render the ISO form.
+const Timestamp = z
+  .union([z.string(), z.date()])
+  .transform((value) => (typeof value === "string" ? value : value.toISOString()));
 
-export interface CorrectiveRow {
-  session_id: string;
-  project: string | null;
-  timestamp: string;
-  user_chars: number;
-  user_text: string;
-  user_source_file: string | null;
-  user_source_line: number | null;
-  matched_term: string;
-  context_chars: number | null;
-  context_snippet: string | null;
-}
+export const TextRow = z.object({
+  session_id: z.string(),
+  text: z.string(),
+});
+export type TextRow = z.infer<typeof TextRow>;
 
-export interface CorrectionRow {
-  session_id: string;
-  project: string | null;
-  assistant_timestamp: string;
-  user_timestamp: string;
-  assistant_chars: number;
-  user_chars: number;
-  assistant_snippet: string;
-  user_snippet: string;
-  prose_signal: boolean;
-}
+export const DeliverableRow = z.object({
+  session_id: z.string(),
+  source_file: z.string().nullable(),
+  source_line: z.number().nullable(),
+  file_path: z.string().nullable(),
+  text: z.string(),
+});
+export type DeliverableRow = z.infer<typeof DeliverableRow>;
 
-export interface ModelSummaryRow {
-  model: string;
-  text_items: number;
-  messages: number;
-  sessions: number;
-  total_chars: number;
-}
+export const CorrectiveRow = z.object({
+  session_id: z.string(),
+  project: z.string().nullable(),
+  timestamp: Timestamp,
+  user_chars: z.number(),
+  user_text: z.string(),
+  user_source_file: z.string().nullable(),
+  user_source_line: z.number().nullable(),
+  matched_term: z.string(),
+  context_chars: z.number().nullable(),
+  context_snippet: z.string().nullable(),
+});
+export type CorrectiveRow = z.infer<typeof CorrectiveRow>;
+
+export const CorrectionRow = z.object({
+  session_id: z.string(),
+  project: z.string().nullable(),
+  assistant_timestamp: Timestamp,
+  user_timestamp: Timestamp,
+  assistant_chars: z.number(),
+  user_chars: z.number(),
+  assistant_snippet: z.string(),
+  user_snippet: z.string(),
+  prose_signal: z.boolean(),
+});
+export type CorrectionRow = z.infer<typeof CorrectionRow>;
+
+export const ModelSummaryRow = z.object({
+  model: z.string(),
+  text_items: z.number(),
+  messages: z.number(),
+  sessions: z.number(),
+  total_chars: z.number(),
+});
+export type ModelSummaryRow = z.infer<typeof ModelSummaryRow>;
 
 export function serializeCorpus(rows: Array<{ text?: string }>): string {
   return rows

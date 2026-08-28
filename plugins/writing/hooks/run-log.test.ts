@@ -46,12 +46,12 @@ describe("appendRunLog", () => {
 
     const lines = (await Bun.file(path).text()).trim().split("\n");
     expect(lines).toHaveLength(2);
-    expect(JSON.parse(lines[0] as string)).toMatchObject({
+    expect(JSON.parse(lines[0] ?? "")).toMatchObject({
       outcome: "context",
       category: "numbering",
       tool: "Write",
     });
-    expect(JSON.parse(lines[1] as string)).toMatchObject({ suppressed: true });
+    expect(JSON.parse(lines[1] ?? "")).toMatchObject({ suppressed: true });
   });
 
   it("does nothing when logging is disabled", () => {
@@ -72,6 +72,6 @@ describe("appendRunLog", () => {
     expect(rotated.size).toBe(filler.length);
     const fresh = (await Bun.file(path).text()).trim().split("\n");
     expect(fresh).toHaveLength(1);
-    expect(JSON.parse(fresh[0] as string)).toMatchObject({ outcome: "deny" });
+    expect(JSON.parse(fresh[0] ?? "")).toMatchObject({ outcome: "deny" });
   });
 });

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "yaml": "^2.7.1"
+    "yaml": "^2.7.1",
+    "zod": "^4.4.3"
   }
 }

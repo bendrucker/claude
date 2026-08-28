@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { basename } from "node:path";
-import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { filePathOf, HookInput } from "./hook-input";
 
 export function extractPluginName(filePath: string): string | null {
   const match = filePath.match(/plugins\/([^/]+)\//);
@@ -66,11 +66,11 @@ export function checkSkillNamespace(name: string, pluginName: string): string[] 
   return warnings;
 }
 
-export async function processHookInput(input: PostToolUseHookInput): Promise<string[]> {
+export async function processHookInput(input: HookInput): Promise<string[]> {
   const warnings: string[] = [];
 
   if (input.tool_name !== "Write" && input.tool_name !== "Edit") return warnings;
-  const filePath = (input.tool_input as { file_path?: string }).file_path;
+  const filePath = filePathOf(input.tool_input);
   if (!filePath) return warnings;
 
   const pluginName = extractPluginName(filePath);
@@ -97,9 +97,9 @@ export async function processHookInput(input: PostToolUseHookInput): Promise<str
 }
 
 async function main(): Promise<void> {
-  let input: PostToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch {
     return;
   }

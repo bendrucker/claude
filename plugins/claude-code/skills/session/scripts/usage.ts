@@ -2,6 +2,7 @@
 import * as path from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
+import { z } from "zod";
 import { getDataDir, sessionDbPath } from "./db";
 
 const QUERIES_DIR = path.join(import.meta.dirname, "..", "resources", "queries");
@@ -17,7 +18,7 @@ const sqlString = (value: string): string => `'${value.replace(/'/g, "''")}'`;
 // Query read-only so a concurrent refresh (or parallel read-only agents) never contends
 // for the write lock. SET VARIABLE lines are prepended to the named query's SQL rather
 // than duplicating it here.
-async function query<T>(dbPath: string, sql: string): Promise<T[]> {
+async function query<T>(dbPath: string, sql: string, schema: z.ZodType<T>): Promise<T[]> {
   const proc = Bun.spawn(["duckdb", "-readonly", "-json", dbPath], {
     stdin: Buffer.from(sql),
     stdout: "pipe",
@@ -29,7 +30,7 @@ async function query<T>(dbPath: string, sql: string): Promise<T[]> {
     proc.exited,
   ]);
   if (code !== 0) throw new Error(err.trim() || `duckdb exited ${code}`);
-  return JSON.parse(out.trim() || "[]") as T[];
+  return z.array(schema).parse(JSON.parse(out.trim() || "[]"));
 }
 
 function setVariables(vars: Record<string, string | number | undefined>): string {
@@ -52,27 +53,28 @@ const localTime = (ts: string): string =>
 
 const num = (n: number): string => Math.round(n).toLocaleString();
 
-interface Bucket {
-  bucket: string;
-  msgs: number;
-  cost_usd_est: number;
-  input_tokens: number;
-  output_tokens: number;
-  cache_write_tokens: number;
-  cache_read_tokens: number;
-  cache_miss_ratio: number;
-  max_context_tokens: number;
-  top_model: string | null;
-}
+const Bucket = z.object({
+  bucket: z.string(),
+  msgs: z.number(),
+  cost_usd_est: z.number(),
+  input_tokens: z.number(),
+  output_tokens: z.number(),
+  cache_write_tokens: z.number(),
+  cache_read_tokens: z.number(),
+  cache_miss_ratio: z.number(),
+  max_context_tokens: z.number(),
+  top_model: z.string().nullable(),
+});
+type Bucket = z.infer<typeof Bucket>;
 
-interface SessionCost {
-  session_id: string;
-  host: string;
-  repo: string | null;
-  msgs: number;
-  cost_usd_est: number;
-  last_activity: string;
-}
+const SessionCost = z.object({
+  session_id: z.string(),
+  host: z.string(),
+  repo: z.string().nullable(),
+  msgs: z.number(),
+  cost_usd_est: z.number(),
+  last_activity: z.string(),
+});
 
 function daysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
@@ -81,7 +83,7 @@ function daysAgo(days: number): string {
 async function renderTopSessions(dbPath: string, host: string | undefined, days: number) {
   const querySql = await Bun.file(path.join(QUERIES_DIR, "top-sessions.sql")).text();
   const sql = setVariables({ after_date: daysAgo(days), host }) + querySql;
-  const rows = await query<SessionCost>(dbPath, sql);
+  const rows = await query(dbPath, sql, SessionCost);
   if (rows.length === 0) {
     console.log(`No sessions with usage in the last ${days} days.`);
     return;
@@ -109,7 +111,7 @@ async function renderTimeline(
 ) {
   const querySql = await Bun.file(path.join(QUERIES_DIR, "usage-timeline.sql")).text();
   const sql = setVariables({ session, host, bucket_minutes: bucket }) + querySql;
-  const rows = await query<Bucket>(dbPath, sql);
+  const rows = await query(dbPath, sql, Bucket);
   if (rows.length === 0) {
     console.log(`No assistant usage found for session ${session}.`);
     return;

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { $ } from "bun";
+import { z } from "zod";
 import {
   compactDatabase,
   type Database,
@@ -86,8 +87,9 @@ afterEach(async () => {
 
 describe("sessions view", () => {
   it("returns sessions sorted by start time descending", async () => {
-    const rows = await db.query<{ start_time: Date }>(
+    const rows = await db.query(
       "SELECT * FROM sessions ORDER BY start_time DESC",
+      z.object({ start_time: z.date() }),
     );
     expect(rows.length).toBeGreaterThan(0);
     for (let i = 1; i < rows.length; i++) {
@@ -96,8 +98,9 @@ describe("sessions view", () => {
   });
 
   it("includes summary when present", async () => {
-    const rows = await db.query<{ summary: string }>(
+    const rows = await db.query(
       "SELECT summary FROM sessions WHERE session_id = 'summary-session'",
+      z.object({ summary: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.summary).toBe(
@@ -106,8 +109,9 @@ describe("sessions view", () => {
   });
 
   it("includes project metadata", async () => {
-    const rows = await db.query<{ project_path: string; git_branch: string }>(
+    const rows = await db.query(
       "SELECT project_path, git_branch FROM sessions WHERE session_id = 'basic-session'",
+      z.object({ project_path: z.string(), git_branch: z.string() }),
     );
     expect(rows[0]?.project_path).toBe("/Users/test/project");
     expect(rows[0]?.git_branch).toBe("main");
@@ -116,12 +120,15 @@ describe("sessions view", () => {
 
 describe("search", () => {
   it("finds sessions matching keyword", async () => {
-    const rows = await runQuery(db, "search", { query: "error", ...queryParams({ limit: "10" }) });
+    const rows = await runQuery(db, "search", z.unknown(), {
+      query: "error",
+      ...queryParams({ limit: "10" }),
+    });
     expect(rows.length).toBeGreaterThan(0);
   });
 
   it("returns empty for non-matching query", async () => {
-    const rows = await runQuery(db, "search", {
+    const rows = await runQuery(db, "search", z.unknown(), {
       ...queryParams({ limit: "10" }),
       query: "zzzznonexistentzzzz",
     });
@@ -129,7 +136,7 @@ describe("search", () => {
   });
 
   it("filters by project", async () => {
-    const rows = await runQuery<{ project_path: string }>(db, "search", {
+    const rows = await runQuery(db, "search", z.object({ project_path: z.string() }), {
       ...queryParams({ project: "webapp", limit: "10" }),
       query: "authentication",
     });
@@ -140,12 +147,15 @@ describe("search", () => {
   });
 
   it("respects limit", async () => {
-    const rows = await runQuery(db, "search", { query: "the", ...queryParams({ limit: "2" }) });
+    const rows = await runQuery(db, "search", z.unknown(), {
+      query: "the",
+      ...queryParams({ limit: "2" }),
+    });
     expect(rows.length).toBeLessThanOrEqual(2);
   });
 
   it("matches summary content", async () => {
-    const rows = await runQuery<{ session_id: string }>(db, "search", {
+    const rows = await runQuery(db, "search", z.object({ session_id: z.string() }), {
       ...queryParams({ limit: "10" }),
       query: "database connection pooling",
     });
@@ -156,7 +166,12 @@ describe("search", () => {
 
 describe("stats", () => {
   it("aggregates tool usage", async () => {
-    const rows = await runQuery<{ tool_name: string; uses: number }>(db, "stats", filterParams());
+    const rows = await runQuery(
+      db,
+      "stats",
+      z.object({ tool_name: z.string(), uses: z.bigint() }),
+      filterParams(),
+    );
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
       expect(row.tool_name).toBeTruthy();
@@ -165,16 +180,16 @@ describe("stats", () => {
   });
 
   it("sorts by uses descending", async () => {
-    const rows = await runQuery<{ uses: number }>(db, "stats", filterParams());
-    for (let i = 1; i < rows.length; i++) {
-      expect(rows[i - 1]?.uses).toBeGreaterThanOrEqual(rows[i]?.uses as number);
-    }
+    const rows = await runQuery(db, "stats", z.object({ uses: z.bigint() }), filterParams());
+    const uses = rows.map((row) => Number(row.uses));
+    expect(uses).toEqual(uses.toSorted((a, b) => b - a));
   });
 
   it("includes aggregate totals", async () => {
-    const rows = await runQuery<{ total_sessions: number; total_tool_uses: number }>(
+    const rows = await runQuery(
       db,
       "stats",
+      z.object({ total_sessions: z.bigint(), total_tool_uses: z.bigint() }),
       filterParams(),
     );
     expect(rows[0]?.total_sessions).toBeGreaterThan(0);
@@ -182,11 +197,12 @@ describe("stats", () => {
   });
 
   it("includes non-zero error_rate_pct for tools with errors", async () => {
-    const rows = await runQuery<{
-      tool_name: string;
-      errors: number;
-      error_rate_pct: number;
-    }>(db, "stats", filterParams());
+    const rows = await runQuery(
+      db,
+      "stats",
+      z.object({ tool_name: z.string(), errors: z.bigint(), error_rate_pct: z.number() }),
+      filterParams(),
+    );
     const withErrors = rows.filter((r) => r.errors > 0);
     expect(withErrors.length).toBeGreaterThan(0);
     for (const row of withErrors) {
@@ -197,9 +213,10 @@ describe("stats", () => {
 
 describe("errors", () => {
   it("returns error rows", async () => {
-    const rows = await runQuery<{ error_content: string; tool_name: string; session_id: string }>(
+    const rows = await runQuery(
       db,
       "errors",
+      z.object({ error_content: z.string(), tool_name: z.string(), session_id: z.string() }),
       queryParams({ error_type: null }),
     );
     expect(rows.length).toBeGreaterThan(0);
@@ -212,9 +229,10 @@ describe("errors", () => {
   });
 
   it("classifies rejection and failure error types", async () => {
-    const rows = await runQuery<{ error_type: string }>(
+    const rows = await runQuery(
       db,
       "errors",
+      z.object({ error_type: z.string() }),
       queryParams({ error_type: null }),
     );
     const types = rows.map((r) => r.error_type);
@@ -223,9 +241,10 @@ describe("errors", () => {
   });
 
   it("filters by error_type", async () => {
-    const rows = await runQuery<{ error_type: string }>(
+    const rows = await runQuery(
       db,
       "errors",
+      z.object({ error_type: z.string() }),
       queryParams({ error_type: "rejection" }),
     );
     expect(rows.length).toBeGreaterThan(0);
@@ -237,11 +256,10 @@ describe("errors", () => {
 
 describe("permission_requests", () => {
   it("returns rejected tool calls with tool details", async () => {
-    const rows = await db.query<{
-      tool_name: string;
-      tool_id: string;
-      session_id: string;
-    }>("SELECT * FROM permission_requests");
+    const rows = await db.query(
+      "SELECT * FROM permission_requests",
+      z.object({ tool_name: z.string(), tool_id: z.string(), session_id: z.string() }),
+    );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.tool_name).toBe("Bash");
     expect(rows[0]?.tool_id).toBe("tool-1");
@@ -251,12 +269,15 @@ describe("permission_requests", () => {
 
 describe("sandbox_bypasses", () => {
   it("returns sandbox bypass calls", async () => {
-    const rows = await db.query<{
-      command: string;
-      description: string;
-      tool_id: string;
-      session_id: string;
-    }>("SELECT * FROM sandbox_bypasses");
+    const rows = await db.query(
+      "SELECT * FROM sandbox_bypasses",
+      z.object({
+        command: z.string(),
+        description: z.string(),
+        tool_id: z.string(),
+        session_id: z.string(),
+      }),
+    );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.command).toContain("osascript");
     expect(rows[0]?.description).toBe("Query Things via JXA");
@@ -264,10 +285,10 @@ describe("sandbox_bypasses", () => {
   });
 
   it("links to the prior failed sandboxed call", async () => {
-    const rows = await db.query<{
-      retried_tool_id: string | null;
-      retried_error: string | null;
-    }>("SELECT retried_tool_id, retried_error FROM sandbox_bypasses");
+    const rows = await db.query(
+      "SELECT retried_tool_id, retried_error FROM sandbox_bypasses",
+      z.object({ retried_tool_id: z.string().nullable(), retried_error: z.string().nullable() }),
+    );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.retried_tool_id).toBe("tool-4a");
     expect(rows[0]?.retried_error).toContain("Connection Invalid");
@@ -276,9 +297,10 @@ describe("sandbox_bypasses", () => {
 
 describe("permissions query", () => {
   it("returns permission requests with filters", async () => {
-    const rows = await runQuery<{ tool_name: string; target: string }>(
+    const rows = await runQuery(
       db,
       "permissions",
+      z.object({ tool_name: z.string(), target: z.string() }),
       queryParams(),
     );
     expect(rows).toHaveLength(1);
@@ -287,9 +309,10 @@ describe("permissions query", () => {
   });
 
   it("filters by project", async () => {
-    const rows = await runQuery<{ tool_name: string }>(
+    const rows = await runQuery(
       db,
       "permissions",
+      z.object({ tool_name: z.string() }),
       queryParams({ project: "nonexistent" }),
     );
     expect(rows).toHaveLength(0);
@@ -298,9 +321,10 @@ describe("permissions query", () => {
 
 describe("sandbox query", () => {
   it("returns sandbox bypasses with retry detection", async () => {
-    const rows = await runQuery<{ command: string; is_retry: boolean; prior_error: string | null }>(
+    const rows = await runQuery(
       db,
       "sandbox",
+      z.object({ command: z.string(), is_retry: z.boolean(), prior_error: z.string().nullable() }),
       queryParams(),
     );
     expect(rows).toHaveLength(1);
@@ -312,12 +336,14 @@ describe("sandbox query", () => {
 
 describe("incremental refresh", () => {
   it("produces no duplicates on repeated indexing", async () => {
-    const before = await db.query<{ session_id: string }>(
+    const before = await db.query(
       "SELECT * FROM sessions ORDER BY session_id",
+      z.object({ session_id: z.string() }),
     );
     await reindex();
-    const after = await db.query<{ session_id: string }>(
+    const after = await db.query(
       "SELECT * FROM sessions ORDER BY session_id",
+      z.object({ session_id: z.string() }),
     );
     expect(after).toEqual(before);
   });
@@ -325,8 +351,9 @@ describe("incremental refresh", () => {
 
 describe("sessions without message container/type/id", () => {
   it("indexes alongside sessions that have them", async () => {
-    const rows = await db.query<{ session_id: string; project_path: string }>(
+    const rows = await db.query(
       "SELECT session_id, project_path FROM sessions WHERE session_id = 'no-container-session'",
+      z.object({ session_id: z.string(), project_path: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.project_path).toBe("/Users/test/project");
@@ -335,8 +362,9 @@ describe("sessions without message container/type/id", () => {
 
 describe("malformed JSONL", () => {
   it("imports valid messages from files with invalid lines", async () => {
-    const rows = await db.query<{ user_messages: number; assistant_messages: number }>(
+    const rows = await db.query(
       "SELECT user_messages, assistant_messages FROM sessions WHERE session_id = 'malformed-session'",
+      z.object({ user_messages: z.bigint(), assistant_messages: z.bigint() }),
     );
     expect(rows).toHaveLength(1);
     expect(Number(rows[0]?.user_messages)).toBe(1);
@@ -370,13 +398,15 @@ describe("type drift across imports", () => {
 
     await reindex();
 
-    const [typeRow] = await db.query<{ data_type: string }>(
+    const [typeRow] = await db.query(
       "SELECT data_type FROM information_schema.columns WHERE table_name = 'raw' AND column_name = 'data'",
+      z.object({ data_type: z.string() }),
     );
     expect(typeRow?.data_type).toBe("JSON");
 
-    const rows = await db.query<{ session_id: string }>(
+    const rows = await db.query(
       "SELECT session_id FROM sessions ORDER BY session_id",
+      z.object({ session_id: z.string() }),
     );
     expect(rows.length).toBeGreaterThan(0);
   });
@@ -384,7 +414,11 @@ describe("type drift across imports", () => {
 
 describe("discovery", () => {
   it("returns column metadata via the schema query", async () => {
-    const rows = await runQuery<{ table_name: string; column_name: string }>(db, "schema");
+    const rows = await runQuery(
+      db,
+      "schema",
+      z.object({ table_name: z.string(), column_name: z.string() }),
+    );
     const tables = new Set(rows.map((r) => r.table_name));
     expect(tables.has("raw")).toBe(true);
     expect(tables.has("messages")).toBe(true);
@@ -393,7 +427,7 @@ describe("discovery", () => {
   });
 
   it("samples JSON keys from raw.data via the keys query", async () => {
-    const rows = await runQuery<{ key: string; occurrences: number }>(db, "keys");
+    const rows = await runQuery(db, "keys", z.object({ key: z.string(), occurrences: z.bigint() }));
     expect(rows.length).toBeGreaterThan(0);
     const keys = new Set(rows.map((r) => r.key));
     expect(keys.has("sessionId")).toBe(true);
@@ -402,71 +436,77 @@ describe("discovery", () => {
   });
 
   it("describes messages with the expected pinned columns", async () => {
-    const rows = await db.query<{ column_name: string }>("DESCRIBE messages");
+    const rows = await db.query("DESCRIBE messages", z.object({ column_name: z.string() }));
     const cols = rows.map((r) => r.column_name);
-    expect(cols).toEqual(
-      expect.arrayContaining([
-        "session_id",
-        "type",
-        "project_path",
-        "git_branch",
-        "is_meta",
-        "is_sidechain",
-        "duration_ms",
-        "timestamp",
-        "input_tokens",
-        "output_tokens",
-        "source_file",
-        "source_line",
-        "data",
-        "content_text",
-        "summary",
-      ]),
-    );
+    const pinned = [
+      "session_id",
+      "type",
+      "project_path",
+      "git_branch",
+      "is_meta",
+      "is_sidechain",
+      "duration_ms",
+      "timestamp",
+      "input_tokens",
+      "output_tokens",
+      "source_file",
+      "source_line",
+      "data",
+      "content_text",
+      "summary",
+    ];
+    expect(pinned.filter((col) => !cols.includes(col))).toEqual([]);
   });
 });
 
 describe("text_content view", () => {
   it("excludes tool_use and tool_result content items", async () => {
-    const rows = await db.query<{ n: bigint }>(
+    const rows = await db.query(
       "SELECT COUNT(*) AS n FROM text_content WHERE raw_text ILIKE '%tool_use%' OR raw_text ILIKE '%tool_result%'",
+      z.object({ n: z.bigint() }),
     );
-    const toolRows = await db.query<{ n: bigint }>(
+    const toolRows = await db.query(
       "SELECT COUNT(*) AS n FROM content_items WHERE type IN ('tool_use', 'tool_result')",
+      z.object({ n: z.bigint() }),
     );
     expect(toolRows[0]!.n).toBeGreaterThan(0n);
     expect(rows[0]!.n).toBe(0n);
   });
 
   it("filters out empty text items", async () => {
-    const rows = await db.query<{ n: bigint }>(
+    const rows = await db.query(
       "SELECT COUNT(*) AS n FROM text_content WHERE raw_text IS NULL OR length(trim(raw_text)) = 0",
+      z.object({ n: z.bigint() }),
     );
     expect(rows[0]!.n).toBe(0n);
   });
 
   it("populates role from the parent message", async () => {
-    const rows = await db.query<{ role: string }>(
+    const rows = await db.query(
       "SELECT DISTINCT role FROM text_content ORDER BY role",
+      z.object({ role: z.string() }),
     );
     expect(rows.map((r) => r.role)).toEqual(["assistant", "user"]);
   });
 
   it("populates model on assistant rows and leaves it null on user rows", async () => {
-    const assistant = await db.query<{ model: string | null }>(
+    const assistant = await db.query(
       "SELECT model FROM text_content WHERE role = 'assistant' AND session_id = 'trope-session' LIMIT 1",
+      z.object({ model: z.string().nullable() }),
     );
     expect(assistant[0]?.model).toContain("claude");
 
-    const user = await db.query<{ n: bigint }>(
+    const user = await db.query(
       "SELECT COUNT(*) AS n FROM text_content WHERE role = 'user' AND model IS NOT NULL",
+      z.object({ n: z.bigint() }),
     );
     expect(user[0]!.n).toBe(0n);
   });
 
   it("strips fenced code blocks from text but preserves raw_text", async () => {
-    const rows = await db.query<{ text: string; raw_text: string }>(
+    const rows = await db.query(
       "SELECT text, raw_text FROM text_content WHERE session_id = 'trope-session' AND raw_text ILIKE '%```%' LIMIT 1",
+      z.object({ text: z.string(), raw_text: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]!.raw_text).toContain("```");
@@ -475,8 +515,9 @@ describe("text_content view", () => {
   });
 
   it("strips inline backtick code from text", async () => {
-    const rows = await db.query<{ text: string; raw_text: string }>(
+    const rows = await db.query(
       "SELECT text, raw_text FROM text_content WHERE session_id = 'trope-session' AND raw_text ILIKE '%`authenticate()`%' LIMIT 1",
+      z.object({ text: z.string(), raw_text: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]!.raw_text).toContain("`authenticate()`");
@@ -485,8 +526,9 @@ describe("text_content view", () => {
   });
 
   it("retains source_file and source_line for traceability", async () => {
-    const rows = await db.query<{ source_file: string; source_line: bigint }>(
+    const rows = await db.query(
       "SELECT source_file, source_line FROM text_content WHERE session_id = 'trope-session' LIMIT 1",
+      z.object({ source_file: z.string(), source_line: z.bigint() }),
     );
     expect(rows[0]!.source_file).toContain("trope.jsonl");
     expect(Number(rows[0]!.source_line)).toBeGreaterThan(0);
@@ -508,9 +550,10 @@ describe("text-export query", () => {
   }
 
   it("returns rows filtered by role", async () => {
-    const rows = await runQuery<{ role: string }>(
+    const rows = await runQuery(
       db,
       "text-export",
+      z.object({ role: z.string() }),
       exportParams({ role: "user" }),
     );
     expect(rows.length).toBeGreaterThan(0);
@@ -518,9 +561,10 @@ describe("text-export query", () => {
   });
 
   it("filters by model glob", async () => {
-    const rows = await runQuery<{ model: string }>(
+    const rows = await runQuery(
       db,
       "text-export",
+      z.object({ model: z.string() }),
       exportParams({ model: "claude-opus-*" }),
     );
     expect(rows.length).toBeGreaterThan(0);
@@ -528,9 +572,10 @@ describe("text-export query", () => {
   });
 
   it("filters by min_chars on cleaned text", async () => {
-    const rows = await runQuery<{ text: string }>(
+    const rows = await runQuery(
       db,
       "text-export",
+      z.object({ text: z.string() }),
       exportParams({ min_chars: "200" }),
     );
     for (const row of rows) expect(row.text.length).toBeGreaterThanOrEqual(200);
@@ -549,44 +594,52 @@ describe("phrase-lift query", () => {
   }
 
   it("counts phrase occurrences per role and model", async () => {
-    const rows = await runQuery<{
-      role: string;
-      model: string | null;
-      phrase_count: bigint;
-    }>(db, "phrase-lift", liftParams());
+    const rows = await runQuery(
+      db,
+      "phrase-lift",
+      z.object({ role: z.string(), model: z.string().nullable(), phrase_count: z.number() }),
+      liftParams(),
+    );
 
     const assistant = rows.find((r) => r.role === "assistant" && r.model?.includes("opus"));
     expect(assistant).toBeDefined();
-    expect(Number(assistant!.phrase_count)).toBeGreaterThanOrEqual(3);
+    expect(assistant?.phrase_count).toBeGreaterThanOrEqual(3);
 
     const user = rows.find((r) => r.role === "user");
     expect(user).toBeDefined();
-    expect(Number(user!.phrase_count)).toBe(0);
+    expect(user?.phrase_count).toBe(0);
   });
 
   it("is case-insensitive", async () => {
-    const lower = await runQuery<{ phrase_count: bigint }>(
+    const lower = await runQuery(
       db,
       "phrase-lift",
+      z.object({ phrase_count: z.number() }),
       liftParams({ phrase: "reaching for" }),
     );
-    const upper = await runQuery<{ phrase_count: bigint }>(
+    const upper = await runQuery(
       db,
       "phrase-lift",
+      z.object({ phrase_count: z.number() }),
       liftParams({ phrase: "REACHING FOR" }),
     );
-    const sum = (rows: { phrase_count: bigint }[]) =>
-      rows.reduce((acc, r) => acc + Number(r.phrase_count), 0);
+    const sum = (rows: { phrase_count: number }[]) =>
+      rows.reduce((acc, r) => acc + r.phrase_count, 0);
     expect(sum(lower)).toBe(sum(upper));
     expect(sum(lower)).toBeGreaterThan(0);
   });
 
   it("computes per_1m_chars for rows with phrase occurrences", async () => {
-    const rows = await runQuery<{
-      role: string;
-      model: string | null;
-      per_1m_chars: number | null;
-    }>(db, "phrase-lift", liftParams());
+    const rows = await runQuery(
+      db,
+      "phrase-lift",
+      z.object({
+        role: z.string(),
+        model: z.string().nullable(),
+        per_1m_chars: z.number().nullable(),
+      }),
+      liftParams(),
+    );
     const assistant = rows.find((r) => r.role === "assistant" && r.model?.includes("opus"));
     expect(assistant!.per_1m_chars).not.toBeNull();
     expect(assistant!.per_1m_chars!).toBeGreaterThan(0);
@@ -595,11 +648,12 @@ describe("phrase-lift query", () => {
 
 describe("model-summary query", () => {
   it("aggregates per-model counts over assistant text", async () => {
-    const rows = await runQuery<{
-      model: string;
-      messages: bigint;
-      total_chars: bigint;
-    }>(db, "model-summary", { after_date: null, before_date: null, project: null, host: null });
+    const rows = await runQuery(
+      db,
+      "model-summary",
+      z.object({ model: z.string(), messages: z.bigint(), total_chars: z.bigint() }),
+      { after_date: null, before_date: null, project: null, host: null },
+    );
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
       expect(row.model).toBeTruthy();
@@ -615,8 +669,9 @@ describe("cross-machine history", () => {
     await reindex();
 
     for (const tbl of ["sessions", "messages", "content_items"]) {
-      const rows = await db.query<{ host: string }>(
+      const rows = await db.query(
         `SELECT DISTINCT host FROM ${tbl} ORDER BY host`,
+        z.object({ host: z.string() }),
       );
       expect(rows.map((r) => r.host)).toEqual(["local", "work"]);
     }
@@ -626,23 +681,35 @@ describe("cross-machine history", () => {
     await importFixtureHost("work");
     await reindex();
 
-    const scoped = await runQuery<{ host: string }>(
+    const scoped = await runQuery(
       db,
       "search",
+      z.object({ host: z.string() }),
       queryParams({ host: "work", query: "error" }),
     );
     expect(scoped.length).toBeGreaterThan(0);
     expect(scoped.every((r) => r.host === "work")).toBe(true);
 
-    const spanned = await runQuery<{ host: string }>(db, "search", queryParams({ query: "error" }));
+    const spanned = await runQuery(
+      db,
+      "search",
+      z.object({ host: z.string() }),
+      queryParams({ query: "error" }),
+    );
     expect(new Set(spanned.map((r) => r.host))).toEqual(new Set(["local", "work"]));
 
-    const scopedStats = await runQuery<{ total_sessions: number }>(
+    const scopedStats = await runQuery(
       db,
       "stats",
+      z.object({ total_sessions: z.bigint() }),
       filterParams({ host: "work" }),
     );
-    const allStats = await runQuery<{ total_sessions: number }>(db, "stats", filterParams());
+    const allStats = await runQuery(
+      db,
+      "stats",
+      z.object({ total_sessions: z.bigint() }),
+      filterParams(),
+    );
     expect(Number(allStats[0]?.total_sessions)).toBe(Number(scopedStats[0]?.total_sessions) * 2);
   });
 
@@ -656,8 +723,9 @@ describe("cross-machine history", () => {
     }
     await reindex();
 
-    const [row] = await db.query<{ n: bigint }>(
+    const [row] = await db.query(
       "SELECT COUNT(*) AS n FROM sessions WHERE host = 'archive'",
+      z.object({ n: z.bigint() }),
     );
     expect(Number(row?.n)).toBeGreaterThan(0);
   });
@@ -665,8 +733,9 @@ describe("cross-machine history", () => {
   it("forget removes a host's rows and synced files", async () => {
     await importFixtureHost("gone");
     await reindex();
-    const [before] = await db.query<{ n: bigint }>(
+    const [before] = await db.query(
       "SELECT COUNT(*) AS n FROM raw WHERE host = 'gone'",
+      z.object({ n: z.bigint() }),
     );
     expect(Number(before?.n)).toBeGreaterThan(0);
 
@@ -676,12 +745,14 @@ describe("cross-machine history", () => {
     await db.run("DELETE FROM meta WHERE host = $host", { host: "gone" });
     await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
 
-    const [after] = await db.query<{ n: bigint }>(
+    const [after] = await db.query(
       "SELECT COUNT(*) AS n FROM raw WHERE host = 'gone'",
+      z.object({ n: z.bigint() }),
     );
     expect(Number(after?.n)).toBe(0);
-    const sessions = await db.query<{ host: string }>(
+    const sessions = await db.query(
       "SELECT DISTINCT host FROM sessions ORDER BY host",
+      z.object({ host: z.string() }),
     );
     expect(sessions.map((r) => r.host)).toEqual(["local"]);
     expect(dirExists(path.join(importsDir, "gone"))).toBe(false);
@@ -692,13 +763,15 @@ describe("cross-machine history", () => {
     await importFixtureHost("beta");
     await reindex();
 
-    const hosts = await db.query<{ host: string }>(
+    const hosts = await db.query(
       "SELECT host FROM sessions WHERE session_id = 'basic-session' ORDER BY host",
+      z.object({ host: z.string() }),
     );
     expect(hosts.map((r) => r.host)).toEqual(["alpha", "beta", "local"]);
 
-    const counts = await db.query<{ host: string; n: bigint }>(
+    const counts = await db.query(
       "SELECT host, COUNT(*) AS n FROM sessions GROUP BY host ORDER BY host",
+      z.object({ host: z.string(), n: z.bigint() }),
     );
     expect(counts.map((r) => r.host)).toEqual(["alpha", "beta", "local"]);
     const distinct = new Set(counts.map((r) => Number(r.n)));
@@ -709,7 +782,10 @@ describe("cross-machine history", () => {
 
 describe("lossless ingestion", () => {
   it("ingests non-chat record types into raw", async () => {
-    const rows = await db.query<{ type: string }>("SELECT DISTINCT type FROM raw ORDER BY type");
+    const rows = await db.query(
+      "SELECT DISTINCT type FROM raw ORDER BY type",
+      z.object({ type: z.string().nullable() }),
+    );
     const types = rows.map((r) => r.type);
     for (const t of ["attachment", "system", "permission-mode", "queue-operation"]) {
       expect(types).toContain(t);
@@ -717,8 +793,9 @@ describe("lossless ingestion", () => {
   });
 
   it("exposes the full record taxonomy via the records view", async () => {
-    const rows = await db.query<{ kind: string; n: bigint }>(
+    const rows = await db.query(
       "SELECT kind, COUNT(*) AS n FROM records GROUP BY kind",
+      z.object({ kind: z.string().nullable(), n: z.bigint() }),
     );
     const kinds = new Set(rows.map((r) => r.kind));
     expect(kinds).toContain("attachment:hook_success");
@@ -729,13 +806,14 @@ describe("lossless ingestion", () => {
 
 describe("hook_events", () => {
   it("parses a deny decision and reason from the stdout JSON of a hook_success", async () => {
-    const [row] = await db.query<{
-      decision: string;
-      reason: string;
-      command: string;
-      blocked: boolean;
-    }>(
+    const [row] = await db.query(
       "SELECT decision, reason, command, blocked FROM hook_events WHERE tool_use_id = 'hk-write-1' AND kind = 'hook_success'",
+      z.object({
+        decision: z.string(),
+        reason: z.string(),
+        command: z.string(),
+        blocked: z.boolean(),
+      }),
     );
     expect(row?.decision).toBe("deny");
     expect(row?.reason).toContain("numbered sequences");
@@ -744,16 +822,18 @@ describe("hook_events", () => {
   });
 
   it("unwraps the message from a hook_blocking_error", async () => {
-    const [row] = await db.query<{ reason: string; blocked: boolean }>(
+    const [row] = await db.query(
       "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error' AND session_id = 'hooks-session'",
+      z.object({ reason: z.string(), blocked: z.boolean() }),
     );
     expect(row?.reason).toBe("Biome check failed. Auto-fix was attempted but issues remain.");
     expect(row?.blocked).toBe(true);
   });
 
   it("classifies an ask decision as a non-blocking interruption", async () => {
-    const rows = await db.query<{ decision: string }>(
+    const rows = await db.query(
       "SELECT decision FROM hook_events WHERE command LIKE '%check-tropes%'",
+      z.object({ decision: z.string() }),
     );
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) expect(r.decision).toBe("ask");
@@ -762,7 +842,10 @@ describe("hook_events", () => {
 
 describe("hook_blocks view", () => {
   it("surfaces deny, ask, and block decisions", async () => {
-    const rows = await db.query<{ decision: string }>("SELECT decision FROM hook_blocks");
+    const rows = await db.query(
+      "SELECT decision FROM hook_blocks",
+      z.object({ decision: z.string() }),
+    );
     const decisions = new Set(rows.map((r) => r.decision));
     expect(decisions).toContain("deny");
     expect(decisions).toContain("ask");
@@ -770,18 +853,20 @@ describe("hook_blocks view", () => {
   });
 });
 
-type Latency = {
-  hook: string;
-  p95_ms: bigint | null;
-  ambient_p50_ms: bigint | null;
-  excess_p95_ms: bigint | null;
-};
+const Latency = z.object({
+  hook: z.string(),
+  p95_ms: z.bigint().nullable(),
+  ambient_p50_ms: z.bigint().nullable(),
+  excess_p95_ms: z.bigint().nullable(),
+});
+type Latency = z.infer<typeof Latency>;
 
 describe("hooks query", () => {
   it("aggregates runs, blocks, and asks per hook", async () => {
-    const rows = await runQuery<{ hook: string; runs: bigint; blocks: bigint; asks: bigint }>(
+    const rows = await runQuery(
       db,
       "hooks",
+      z.object({ hook: z.string(), runs: z.bigint(), blocks: z.bigint(), asks: z.bigint() }),
       filterParams({ event: null, hook: null }),
     );
     const tropes = rows.find((r) => r.hook.includes("check-tropes"));
@@ -792,9 +877,10 @@ describe("hooks query", () => {
   });
 
   it("filters by hook glob", async () => {
-    const rows = await runQuery<{ hook: string }>(
+    const rows = await runQuery(
       db,
       "hooks",
+      z.object({ hook: z.string() }),
       filterParams({ event: null, hook: "*check-tropes*" }),
     );
     expect(rows.length).toBe(1);
@@ -805,7 +891,7 @@ describe("hooks query", () => {
     // The culprit outnumbers its peers in its hour, so this also guards
     // leave-one-out: a self-inclusive baseline would sit at the culprit's own
     // ~3000ms and report no excess.
-    const rows = await runQuery<Latency>(db, "hooks", filterParams({ event: null, hook: null }));
+    const rows = await runQuery(db, "hooks", Latency, filterParams({ event: null, hook: null }));
     const culprit = rows.find((r) => r.hook.includes("culprit.ts"));
     expect(Number(culprit?.p95_ms)).toBeGreaterThan(2500);
     expect(Number(culprit?.ambient_p50_ms)).toBeLessThan(200);
@@ -813,7 +899,7 @@ describe("hooks query", () => {
   });
 
   it("does not attribute a host-wide slowdown to any one hook", async () => {
-    const rows = await runQuery<Latency>(db, "hooks", filterParams({ event: null, hook: null }));
+    const rows = await runQuery(db, "hooks", Latency, filterParams({ event: null, hook: null }));
     const ambient = rows.find((r) => r.hook.includes("ambient-a.ts"));
     expect(Number(ambient?.p95_ms)).toBeGreaterThan(2500);
     expect(Number(ambient?.ambient_p50_ms)).toBeGreaterThan(2500);
@@ -821,9 +907,10 @@ describe("hooks query", () => {
   });
 
   it("computes the ambient baseline before the hook filter", async () => {
-    const rows = await runQuery<Latency>(
+    const rows = await runQuery(
       db,
       "hooks",
+      Latency,
       filterParams({ event: null, hook: "*culprit*" }),
     );
     expect(rows.length).toBe(1);
@@ -834,7 +921,7 @@ describe("hooks query", () => {
   });
 
   it("reports no baseline for a hook with no timed runs", async () => {
-    const rows = await runQuery<Latency>(db, "hooks", filterParams({ event: null, hook: null }));
+    const rows = await runQuery(db, "hooks", Latency, filterParams({ event: null, hook: null }));
     const stop = rows.find((r) => r.hook === "Stop");
     expect(stop?.ambient_p50_ms).toBeNull();
     // GREATEST skips NULL arguments, so a missing baseline must not read as zero excess.
@@ -842,7 +929,7 @@ describe("hooks query", () => {
   });
 
   it("excludes untimed runs of a hook that has a baseline", async () => {
-    const rows = await runQuery<Latency>(db, "hooks", filterParams({ event: null, hook: null }));
+    const rows = await runQuery(db, "hooks", Latency, filterParams({ event: null, hook: null }));
     // partly-timed.ts has one 3000ms run against 70ms peers plus nine untimed
     // runs. Counting those as zero excess would drag the p95 down to ~1600.
     const partly = rows.find((r) => r.hook.includes("partly-timed.ts"));
@@ -853,13 +940,18 @@ describe("hooks query", () => {
 
 describe("catalog-reinjection-thrash-sessions query", () => {
   it("splits catalog injections into main-thread and sidechain", async () => {
-    const rows = await runQuery<{
-      session_id: string;
-      main_injections: bigint;
-      sidechain_injections: bigint;
-      main_ktokens: number;
-      sidechain_ktokens: number;
-    }>(db, "catalog-reinjection-thrash-sessions", filterParams({ min_injections: "6" }));
+    const rows = await runQuery(
+      db,
+      "catalog-reinjection-thrash-sessions",
+      z.object({
+        session_id: z.string(),
+        main_injections: z.bigint(),
+        sidechain_injections: z.bigint(),
+        main_ktokens: z.number(),
+        sidechain_ktokens: z.number(),
+      }),
+      filterParams({ min_injections: "6" }),
+    );
     const row = rows.find((r) => r.session_id === "delegation-session");
     expect(Number(row?.main_injections)).toBe(2);
     expect(Number(row?.sidechain_injections)).toBe(12);
@@ -867,26 +959,28 @@ describe("catalog-reinjection-thrash-sessions query", () => {
   });
 });
 
-type Blocked = {
-  hook: string;
-  blocks: bigint;
-  denies: bigint;
-  asks: bigint;
-  recovered_denies: bigint;
-  subagent_blocks: bigint;
-  sessions: bigint;
-  agent_threads: bigint;
-  storm_threads: bigint;
-  max_burst: bigint;
-};
+const Blocked = z.object({
+  hook: z.string(),
+  blocks: z.bigint(),
+  denies: z.bigint(),
+  asks: z.bigint(),
+  recovered_denies: z.bigint(),
+  subagent_blocks: z.bigint(),
+  sessions: z.bigint(),
+  agent_threads: z.bigint(),
+  storm_threads: z.bigint(),
+  max_burst: z.bigint(),
+});
+type Blocked = z.infer<typeof Blocked>;
 
 describe("subagent attribution", () => {
   it("labels a workflow-nested subagent, which lives one directory deeper", async () => {
     // Roughly 40% of subagent transcripts land under subagents/workflows/wf_<id>/.
     // A pattern anchored on subagents/<file>.jsonl misses every one of them and
     // silently reclassifies the rows as main-thread.
-    const rows = await db.query<{ agent_id: string | null }>(
+    const rows = await db.query(
       "SELECT agent_id FROM tool_calls WHERE tool_id = 'attr-deny-1'",
+      z.object({ agent_id: z.string().nullable() }),
     );
     expect(rows).toEqual([{ agent_id: "agent-nested" }]);
   });
@@ -894,8 +988,9 @@ describe("subagent attribution", () => {
   it("credits a spawn echoed into the subagent transcript to the parent", async () => {
     // The Agent tool_use appears in both transcripts under different uuids. The parent
     // made the call, so the main-thread copy has to win the cross-file dedup.
-    const rows = await db.query<{ agent_id: string | null }>(
+    const rows = await db.query(
       "SELECT agent_id FROM tool_calls WHERE tool_id = 'attr-spawn-1'",
+      z.object({ agent_id: z.string().nullable() }),
     );
     expect(rows).toEqual([{ agent_id: null }]);
   });
@@ -903,7 +998,7 @@ describe("subagent attribution", () => {
 
 describe("hook-blocks query", () => {
   it("groups by signature and counts repeat storms within a session", async () => {
-    const rows = await runQuery<Blocked>(db, "hook-blocks", filterParams({ hook: null }));
+    const rows = await runQuery(db, "hook-blocks", Blocked, filterParams({ hook: null }));
     const emdash = rows.find((r) => r.hook.includes("check-tropes"));
     expect(Number(emdash?.blocks)).toBe(2);
     expect(Number(emdash?.asks)).toBe(2);
@@ -913,7 +1008,7 @@ describe("hook-blocks query", () => {
   });
 
   it("recovers a PreToolUse deny that left no hook record", async () => {
-    const rows = await runQuery<Blocked>(db, "hook-blocks", filterParams({ hook: null }));
+    const rows = await runQuery(db, "hook-blocks", Blocked, filterParams({ hook: null }));
     const denied = rows.find((r) => r.hook === "git:block-default-branch-commit");
     // One deny on a main thread plus three from the subagent fixtures.
     expect(Number(denied?.blocks)).toBe(4);
@@ -926,7 +1021,7 @@ describe("hook-blocks query", () => {
     // sessionId. Keyed on the session, hooks-session's one main-thread deny and two
     // subagent denies read as a single burst of 3 by the parent. They are three
     // independent contexts, so the worst burst is the one subagent that hit it twice.
-    const rows = await runQuery<Blocked>(db, "hook-blocks", filterParams({ hook: null }));
+    const rows = await runQuery(db, "hook-blocks", Blocked, filterParams({ hook: null }));
     const denied = rows.find((r) => r.hook === "git:block-default-branch-commit");
     expect(Number(denied?.max_burst)).toBe(2);
     expect(Number(denied?.sessions)).toBe(2);
@@ -937,8 +1032,9 @@ describe("hook-blocks query", () => {
   });
 
   it("names the subagent that was denied and leaves the parent's own deny unlabelled", async () => {
-    const rows = await db.query<{ tool_use_id: string; agent_id: string | null }>(
+    const rows = await db.query(
       "SELECT tool_use_id, agent_id FROM hook_denies WHERE tool_use_id LIKE 'hk-%deny-1'",
+      z.object({ tool_use_id: z.string(), agent_id: z.string().nullable() }),
     );
     expect(Object.fromEntries(rows.map((r) => [r.tool_use_id, r.agent_id]))).toEqual({
       "hk-deny-1": null,
@@ -949,9 +1045,10 @@ describe("hook-blocks query", () => {
   it("does not recount an ask the user declined as a recovered deny", async () => {
     // A declined ask leaves both a hook record and an error carrying the same reason
     // text. Counting both would inflate every hook that asks.
-    const rows = await runQuery<{ hook: string; recovered_denies: bigint }>(
+    const rows = await runQuery(
       db,
       "hook-blocks",
+      z.object({ hook: z.string(), recovered_denies: z.bigint() }),
       filterParams({ hook: null }),
     );
     const emdash = rows.find((r) => r.hook.includes("check-tropes"));
@@ -961,9 +1058,10 @@ describe("hook-blocks query", () => {
 
 describe("hook-origin-split query", () => {
   it("counts a project-dir .claude/hooks script as project_local, not shared config", async () => {
-    const rows = await runQuery<{ origin: string; fires: bigint; total_s: number }>(
+    const rows = await runQuery(
       db,
       "hook-origin-split",
+      z.object({ origin: z.string(), fires: z.bigint(), total_s: z.number().nullable() }),
       filterParams(),
     );
     const local = rows.find((r) => r.origin === "project_local");
@@ -978,9 +1076,10 @@ describe("hook-origin-split query", () => {
 
 describe("fields discovery query", () => {
   it("enumerates the keys of an attachment kind via schema inference", async () => {
-    const rows = await runQuery<{ field: string; json_type: string }>(
+    const rows = await runQuery(
       db,
       "fields",
+      z.object({ field: z.string(), json_type: z.string() }),
       filterParams({ kind: "attachment:hook_success", path: "$.attachment" }),
     );
     const fields = new Set(rows.map((r) => r.field));
@@ -992,7 +1091,12 @@ describe("fields discovery query", () => {
 
 describe("activity query", () => {
   it("counts human and automated interaction signals", async () => {
-    const rows = await runQuery<{ signal: string; count: bigint }>(db, "activity", filterParams());
+    const rows = await runQuery(
+      db,
+      "activity",
+      z.object({ signal: z.string(), count: z.bigint() }),
+      filterParams(),
+    );
     const bySignal = new Map(rows.map((r) => [r.signal, Number(r.count)]));
     expect(bySignal.get("interruptions")).toBe(1);
     expect(bySignal.get("auto-continuations")).toBe(1);
@@ -1007,17 +1111,19 @@ describe("activity query", () => {
   });
 
   it("scopes timestamp-less signals by their session's last activity", async () => {
-    const windowed = await runQuery<{ signal: string; count: bigint }>(
+    const windowed = await runQuery(
       db,
       "activity",
+      z.object({ signal: z.string(), count: z.bigint() }),
       filterParams({ after_date: "2024-01-01", before_date: "2024-02-15" }),
     );
     const inWindow = new Map(windowed.map((r) => [r.signal, Number(r.count)]));
     expect(inWindow.get("prompts submitted")).toBe(2);
 
-    const later = await runQuery<{ signal: string; count: bigint }>(
+    const later = await runQuery(
       db,
       "activity",
+      z.object({ signal: z.string(), count: z.bigint() }),
       filterParams({ after_date: "2025-01-01" }),
     );
     const outOfWindow = new Map(later.map((r) => [r.signal, Number(r.count)]));
@@ -1027,8 +1133,9 @@ describe("activity query", () => {
 
 describe("diagnostics view and query", () => {
   it("unnests one row per diagnostic with severity, source, and code", async () => {
-    const rows = await db.query<{ severity: string; source: string; code: string; file: string }>(
+    const rows = await db.query(
       "SELECT severity, source, code, file FROM diagnostics ORDER BY severity",
+      z.object({ severity: z.string(), source: z.string(), code: z.string(), file: z.string() }),
     );
     expect(rows).toHaveLength(2);
     expect(rows[0]?.severity).toBe("Error");
@@ -1038,9 +1145,10 @@ describe("diagnostics view and query", () => {
   });
 
   it("groups recurring diagnostics by code", async () => {
-    const rows = await runQuery<{ code: string; occurrences: bigint; files: bigint }>(
+    const rows = await runQuery(
       db,
       "diagnostics",
+      z.object({ code: z.string(), occurrences: z.bigint(), files: z.bigint() }),
       filterParams(),
     );
     const imp = rows.find((r) => r.code === "unresolved-import");
@@ -1051,17 +1159,19 @@ describe("diagnostics view and query", () => {
 
 describe("file_operations view and files query", () => {
   it("captures file edits with the attributed skill", async () => {
-    const [row] = await db.query<{ operation: string; attribution_skill: string }>(
+    const [row] = await db.query(
       "SELECT operation, attribution_skill FROM file_operations WHERE file_path = '/Users/test/project/doc.md' AND operation = 'Write'",
+      z.object({ operation: z.string(), attribution_skill: z.string() }),
     );
     expect(row?.operation).toBe("Write");
     expect(row?.attribution_skill).toBe("writing:writing");
   });
 
   it("ranks files by edits", async () => {
-    const rows = await runQuery<{ file_path: string; edits: bigint }>(
+    const rows = await runQuery(
       db,
       "files",
+      z.object({ file_path: z.string(), edits: z.bigint() }),
       filterParams({ limit: "20" }),
     );
     const doc = rows.find((r) => r.file_path === "/Users/test/project/doc.md");
@@ -1071,8 +1181,9 @@ describe("file_operations view and files query", () => {
 
 describe("pr_links view", () => {
   it("dedupes re-emitted links to one row keeping the first emission's timestamp", async () => {
-    const rows = await db.query<{ pr_number: bigint; repository: string; ts: string }>(
+    const rows = await db.query(
       "SELECT pr_number, repository, timestamp::VARCHAR AS ts FROM pr_links WHERE session_id = 'hooks-session'",
+      z.object({ pr_number: z.bigint(), repository: z.string(), ts: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(Number(rows[0]?.pr_number)).toBe(42);
@@ -1086,9 +1197,10 @@ describe("outcomes query", () => {
     Object.fromEntries(rows.map((r) => [r.metric, Number(r.count)]));
 
   it("classifies every session's terminal state", async () => {
-    const rows = await runQuery<{ metric: string; count: bigint }>(
+    const rows = await runQuery(
       db,
       "outcomes",
+      z.object({ metric: z.string(), count: z.bigint() }),
       filterParams({ ongoing_hours: null }),
     );
     // shipped covers both signals: hooks-session via its pr-link record,
@@ -1105,9 +1217,10 @@ describe("outcomes query", () => {
   });
 
   it("widens the ongoing window via ongoing_hours without reclassifying shipped work", async () => {
-    const rows = await runQuery<{ metric: string; count: bigint }>(
+    const rows = await runQuery(
       db,
       "outcomes",
+      z.object({ metric: z.string(), count: z.bigint() }),
       filterParams({ ongoing_hours: "1000" }),
     );
     // 1000 hours reaches past the corpus start, so every unshipped session
@@ -1131,21 +1244,22 @@ describe("delegation query", () => {
   // generic call with an explicit `model: sonnet` override resolved via the tool
   // result's `resolvedModel` rather than a transcript join (actual sonnet, cheaper
   // override).
-  type DelegationRow = {
-    parent_family: string;
-    path: string;
-    actual_family: string;
-    spawns: bigint;
-    path_spawns: bigint;
-    pct_of_path: number;
-    override_rate_pct: number;
-    cheaper_override_rate_pct: number;
-    expensive_output_tokens: bigint;
-    expensive_cache_creation_tokens: bigint;
-  };
+  const DelegationRow = z.object({
+    parent_family: z.string(),
+    path: z.string(),
+    actual_family: z.string(),
+    spawns: z.bigint(),
+    path_spawns: z.bigint(),
+    pct_of_path: z.number(),
+    override_rate_pct: z.number(),
+    cheaper_override_rate_pct: z.number(),
+    expensive_output_tokens: z.bigint(),
+    expensive_cache_creation_tokens: z.bigint(),
+  });
+  type DelegationRow = z.infer<typeof DelegationRow>;
 
   async function delegationRows() {
-    return runQuery<DelegationRow>(db, "delegation", filterParams());
+    return runQuery(db, "delegation", DelegationRow, filterParams());
   }
 
   it("excludes fork spawns entirely", async () => {
@@ -1229,26 +1343,28 @@ describe("review-precision query", () => {
   // carries two correctness findings on one line (same file:line, different claim) at
   // high effort, plus a documentation finding from a user-typed /code-review, which
   // carries no skill attribution.
-  type PrecisionRow = {
-    category: string;
-    level: string;
-    findings: bigint;
-    sessions: bigint;
-    confirmed: bigint;
-    plausible: bigint;
-    refuted: bigint;
-    unverified: bigint;
-    confirmed_pct: number | null;
-    fixed: bigint;
-    no_change: bigint;
-    skipped: bigint;
-    acted_pct: number | null;
-  };
+  const PrecisionRow = z.object({
+    category: z.string(),
+    level: z.string(),
+    findings: z.bigint(),
+    sessions: z.bigint(),
+    confirmed: z.bigint(),
+    plausible: z.bigint(),
+    refuted: z.bigint(),
+    unverified: z.bigint(),
+    confirmed_pct: z.number().nullable(),
+    fixed: z.bigint(),
+    no_change: z.bigint(),
+    skipped: z.bigint(),
+    acted_pct: z.number().nullable(),
+  });
+  type PrecisionRow = z.infer<typeof PrecisionRow>;
 
   function precisionRows(overrides: Record<string, string | null> = {}) {
-    return runQuery<PrecisionRow>(
+    return runQuery(
       db,
       "review-precision",
+      PrecisionRow,
       filterParams({ skill: null, min_findings: null, ...overrides }),
     );
   }
@@ -1321,8 +1437,9 @@ describe("change catalog", () => {
     await backdate(late);
     await reindex();
 
-    const rows = await db.query<{ session_id: string }>(
+    const rows = await db.query(
       "SELECT session_id FROM raw WHERE session_id = 'late-session'",
+      z.object({ session_id: z.string() }),
     );
     expect(rows).toHaveLength(1);
   });
@@ -1350,8 +1467,9 @@ describe("change catalog", () => {
     );
     await reindex();
 
-    const [row] = await db.query<{ n: bigint }>(
+    const [row] = await db.query(
       "SELECT COUNT(*) AS n FROM raw WHERE host = 'edited' AND source_file = $path",
+      z.object({ n: z.bigint() }),
       { path: target },
     );
     const originalLines = original.trim().split("\n").length;
@@ -1368,8 +1486,9 @@ describe("change catalog", () => {
       "-Users-test-project",
       "basic.jsonl",
     );
-    const [before] = await db.query<{ n: bigint }>(
+    const [before] = await db.query(
       "SELECT COUNT(*) AS n FROM raw WHERE host = 'shrinking' AND source_file = $path",
+      z.object({ n: z.bigint() }),
       { path: target },
     );
     expect(Number(before?.n)).toBeGreaterThan(0);
@@ -1379,8 +1498,9 @@ describe("change catalog", () => {
 
     for (const table of ["raw", "content_items", "indexed_files"]) {
       const column = table === "indexed_files" ? "path" : "source_file";
-      const [after] = await db.query<{ n: bigint }>(
+      const [after] = await db.query(
         `SELECT COUNT(*) AS n FROM ${table} WHERE host = 'shrinking' AND ${column} = $path`,
+        z.object({ n: z.bigint() }),
         { path: target },
       );
       expect(Number(after?.n)).toBe(0);
@@ -1393,8 +1513,9 @@ describe("change catalog", () => {
     await rm(path.join(importsDir, "unmounted", "projects"), { recursive: true, force: true });
     await reindex();
 
-    const [row] = await db.query<{ n: bigint }>(
+    const [row] = await db.query(
       "SELECT COUNT(*) AS n FROM raw WHERE host = 'unmounted'",
+      z.object({ n: z.bigint() }),
     );
     expect(Number(row?.n)).toBeGreaterThan(0);
   });
@@ -1405,8 +1526,9 @@ describe("change catalog", () => {
     async () => {
       await importFixtureHost("guarded");
       await reindex();
-      const [before] = await db.query<{ n: bigint }>(
+      const [before] = await db.query(
         "SELECT COUNT(*) AS n FROM raw WHERE host = 'guarded'",
+        z.object({ n: z.bigint() }),
       );
       expect(Number(before?.n)).toBeGreaterThan(0);
 
@@ -1418,8 +1540,9 @@ describe("change catalog", () => {
         await $`chmod 755 ${subdir}`.quiet();
       }
 
-      const [after] = await db.query<{ n: bigint }>(
+      const [after] = await db.query(
         "SELECT COUNT(*) AS n FROM raw WHERE host = 'guarded'",
+        z.object({ n: z.bigint() }),
       );
       expect(Number(after?.n)).toBe(Number(before?.n));
     },
@@ -1432,7 +1555,10 @@ describe("view versioning", () => {
     await db.run("UPDATE index_meta SET views_hash = 'stale'");
     await reindex();
 
-    const rows = await db.query<{ tool_name: string }>("SELECT tool_name FROM tool_calls LIMIT 1");
+    const rows = await db.query(
+      "SELECT tool_name FROM tool_calls LIMIT 1",
+      z.object({ tool_name: z.string() }),
+    );
     expect(rows.length).toBeGreaterThan(0);
   });
 
@@ -1440,38 +1566,42 @@ describe("view versioning", () => {
     await db.run("DROP VIEW tool_calls");
     await reindex();
 
-    await expect(db.query("SELECT * FROM tool_calls LIMIT 1")).rejects.toThrow();
+    await expect(db.query("SELECT * FROM tool_calls LIMIT 1", z.unknown())).rejects.toThrow();
   });
 });
 
 describe("compactDatabase", () => {
   it("rewrites the file preserving tables, views, and macros", async () => {
-    const [before] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM raw");
+    const [before] = await db.query("SELECT COUNT(*) AS n FROM raw", z.object({ n: z.bigint() }));
     db.close();
 
     await compactDatabase(tmpDir);
 
     db = await getDb(tmpDir);
-    const [after] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM raw");
+    const [after] = await db.query("SELECT COUNT(*) AS n FROM raw", z.object({ n: z.bigint() }));
     expect(after?.n).toBe(before?.n);
     // sessions exercises both a view and the project_id macro.
-    const sessions = await db.query<{ session_id: string }>("SELECT session_id FROM sessions");
+    const sessions = await db.query(
+      "SELECT session_id FROM sessions",
+      z.object({ session_id: z.string() }),
+    );
     expect(sessions.length).toBeGreaterThan(0);
   });
 });
 
 describe("source_line", () => {
   it("numbers ingested rows 1..N per file", async () => {
-    const rows = await db.query<{
-      source_file: string;
-      n: bigint;
-      lo: bigint;
-      hi: bigint;
-      d: bigint;
-    }>(
+    const rows = await db.query(
       `SELECT source_file, COUNT(*) AS n, MIN(source_line) AS lo,
               MAX(source_line) AS hi, COUNT(DISTINCT source_line) AS d
        FROM raw WHERE host = 'local' GROUP BY source_file`,
+      z.object({
+        source_file: z.string(),
+        n: z.bigint(),
+        lo: z.bigint(),
+        hi: z.bigint(),
+        d: z.bigint(),
+      }),
     );
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
@@ -1484,16 +1614,18 @@ describe("source_line", () => {
 
 describe("attribution and skill-activity query", () => {
   it("exposes attribution on tool_calls", async () => {
-    const [row] = await db.query<{ attribution_skill: string }>(
+    const [row] = await db.query(
       "SELECT attribution_skill FROM tool_calls WHERE tool_id = 'hk-write-1'",
+      z.object({ attribution_skill: z.string() }),
     );
     expect(row?.attribution_skill).toBe("writing:writing");
   });
 
   it("aggregates attributed work and tokens per skill", async () => {
-    const rows = await runQuery<{ skill: string; assistant_turns: bigint }>(
+    const rows = await runQuery(
       db,
       "skill-activity",
+      z.object({ skill: z.string(), assistant_turns: z.bigint() }),
       filterParams(),
     );
     const writing = rows.find((r) => r.skill === "writing:writing");
@@ -1502,18 +1634,20 @@ describe("attribution and skill-activity query", () => {
 });
 
 describe("skill-auto-vs-explicit query", () => {
-  type Split = {
-    skill_name: string;
-    model_auto: bigint;
-    chained: bigint;
-    explicit: bigint;
-    total: bigint;
-  };
+  const Split = z.object({
+    skill_name: z.string(),
+    model_auto: z.bigint(),
+    chained: z.bigint(),
+    explicit: z.bigint(),
+    total: z.bigint(),
+  });
+  type Split = z.infer<typeof Split>;
 
   it("counts a Skill call carrying args as model routing, not an explicit invocation", async () => {
-    const rows = await runQuery<Split>(
+    const rows = await runQuery(
       db,
       "skill-auto-vs-explicit",
+      Split,
       filterParams({ min_calls: null }),
     );
     const peer = rows.find((r) => r.skill_name === "review:peer");
@@ -1523,9 +1657,10 @@ describe("skill-auto-vs-explicit query", () => {
   });
 
   it("counts a typed slash command as explicit and a skill-attributed call as chained", async () => {
-    const rows = await runQuery<Split>(
+    const rows = await runQuery(
       db,
       "skill-auto-vs-explicit",
+      Split,
       filterParams({ min_calls: null }),
     );
     const peer = rows.find((r) => r.skill_name === "review:peer");
@@ -1537,9 +1672,10 @@ describe("skill-auto-vs-explicit query", () => {
   });
 
   it("keeps an unnamespaced skill from absorbing unparsed command markers", async () => {
-    const rows = await runQuery<Split>(
+    const rows = await runQuery(
       db,
       "skill-auto-vs-explicit",
+      Split,
       filterParams({ min_calls: null }),
     );
     const solo = rows.find((r) => r.skill_name === "solo");
@@ -1550,14 +1686,15 @@ describe("skill-auto-vs-explicit query", () => {
 
 describe("plan_calls view and plans query", () => {
   it("classifies a redirected plan as outcome=redirected with plan_seq=1", async () => {
-    const rows = await db.query<{
-      session_id: string;
-      outcome: string;
-      plan_seq: bigint;
-      plan_chars: bigint;
-      plan_file: string;
-    }>(
+    const rows = await db.query(
       "SELECT session_id, outcome, plan_seq, plan_chars, plan_file FROM plan_calls WHERE session_id = 'plan-session' ORDER BY plan_seq",
+      z.object({
+        session_id: z.string(),
+        outcome: z.string(),
+        plan_seq: z.bigint(),
+        plan_chars: z.bigint(),
+        plan_file: z.string(),
+      }),
     );
     expect(rows).toHaveLength(2);
     expect(rows[0]?.outcome).toBe("redirected");
@@ -1567,20 +1704,18 @@ describe("plan_calls view and plans query", () => {
   });
 
   it("classifies the second plan (after approval) as outcome=approved with plan_seq=2", async () => {
-    const rows = await db.query<{ outcome: string; plan_seq: bigint }>(
+    const rows = await db.query(
       "SELECT outcome, plan_seq FROM plan_calls WHERE session_id = 'plan-session' ORDER BY plan_seq",
+      z.object({ outcome: z.string(), plan_seq: z.bigint() }),
     );
     expect(rows[1]?.outcome).toBe("approved");
     expect(Number(rows[1]?.plan_seq)).toBe(2);
   });
 
   it("aggregates plan_sessions with correct counts and replan tier", async () => {
-    const [row] = await db.query<{
-      plan_count: bigint;
-      redirect_count: bigint;
-      approved_count: bigint;
-    }>(
+    const [row] = await db.query(
       "SELECT plan_count, redirect_count, approved_count FROM plan_sessions WHERE session_id = 'plan-session'",
+      z.object({ plan_count: z.bigint(), redirect_count: z.bigint(), approved_count: z.bigint() }),
     );
     expect(Number(row?.plan_count)).toBe(2);
     expect(Number(row?.redirect_count)).toBe(1);
@@ -1588,9 +1723,10 @@ describe("plan_calls view and plans query", () => {
   });
 
   it("reports the session via the plans query with replan_tier=replan", async () => {
-    const rows = await runQuery<{ session_id: string; replan_tier: string; plan_count: bigint }>(
+    const rows = await runQuery(
       db,
       "plans",
+      z.object({ session_id: z.string(), replan_tier: z.string(), plan_count: z.bigint() }),
       { after_date: null, before_date: null, project: null, host: null, min_plans: null },
     );
     const row = rows.find((r) => r.session_id === "plan-session");
@@ -1600,7 +1736,7 @@ describe("plan_calls view and plans query", () => {
   });
 
   it("excludes sessions below min_plans threshold", async () => {
-    const rows = await runQuery<{ session_id: string }>(db, "plans", {
+    const rows = await runQuery(db, "plans", z.object({ session_id: z.string() }), {
       after_date: null,
       before_date: null,
       project: null,
@@ -1613,8 +1749,9 @@ describe("plan_calls view and plans query", () => {
   it("classifies a terminal rejection with no edits after as outcome=handoff", async () => {
     // handoff-session ends on a rejected plan followed only by a Read, the
     // reject-and-handoff workflow (implement from the plan file in a fresh session).
-    const rows = await db.query<{ outcome: string }>(
+    const rows = await db.query(
       "SELECT outcome FROM plan_calls WHERE session_id = 'handoff-session'",
+      z.object({ outcome: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.outcome).toBe("handoff");
@@ -1624,33 +1761,37 @@ describe("plan_calls view and plans query", () => {
     // The harness has shipped more than one approval string. Matching only "approved
     // your plan" dropped this one into 'unknown', which reads as a plan the user never
     // approved. A new wording should fail here rather than silently misclassify.
-    const rows = await db.query<{ outcome: string }>(
+    const rows = await db.query(
       "SELECT outcome FROM plan_calls WHERE session_id = 'plan-approve-variant-session'",
+      z.object({ outcome: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.outcome).toBe("approved");
   });
 
   it("keeps a terminal rejection followed by file edits as outcome=redirected", async () => {
-    const rows = await db.query<{ outcome: string }>(
+    const rows = await db.query(
       "SELECT outcome FROM plan_calls WHERE session_id = 'plan-abandon-session'",
+      z.object({ outcome: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.outcome).toBe("redirected");
   });
 
   it("counts handoffs separately from redirects in plan_sessions", async () => {
-    const [row] = await db.query<{ redirect_count: bigint; handoff_count: bigint }>(
+    const [row] = await db.query(
       "SELECT redirect_count, handoff_count FROM plan_sessions WHERE session_id = 'handoff-session'",
+      z.object({ redirect_count: z.bigint(), handoff_count: z.bigint() }),
     );
     expect(Number(row?.redirect_count)).toBe(0);
     expect(Number(row?.handoff_count)).toBe(1);
   });
 
   it("tiers a handoff-only session as single, keyed on mid-session redirects", async () => {
-    const rows = await runQuery<{ session_id: string; replan_tier: string; handoff_count: bigint }>(
+    const rows = await runQuery(
       db,
       "plans",
+      z.object({ session_id: z.string(), replan_tier: z.string(), handoff_count: z.bigint() }),
       { after_date: null, before_date: null, project: null, host: null, min_plans: null },
     );
     const handoff = rows.find((r) => r.session_id === "handoff-session");
@@ -1663,21 +1804,22 @@ describe("plan-iterations query", () => {
   // plan-iterations-session presents three plans: A,B,C (rejected) -> A,B,C,D,E
   // (rejected, append-only) -> A,D,F (approved, a real prune). Exercises growth,
   // carry-over, and removal in the same session.
-  type PlanIterationRow = {
-    sid: string;
-    plan_seq: bigint;
-    outcome: string;
-    lines_added: bigint | null;
-    lines_removed: bigint | null;
-    lines_carried: bigint | null;
-    carry_over_ratio: number | null;
-    secs_since_prev: bigint | null;
-    secs_to_first_plan: bigint | null;
-    human_msgs: bigint;
-  };
+  const PlanIterationRow = z.object({
+    sid: z.string(),
+    plan_seq: z.bigint(),
+    outcome: z.string(),
+    lines_added: z.bigint().nullable(),
+    lines_removed: z.bigint().nullable(),
+    lines_carried: z.bigint().nullable(),
+    carry_over_ratio: z.number().nullable(),
+    secs_since_prev: z.bigint().nullable(),
+    secs_to_first_plan: z.bigint().nullable(),
+    human_msgs: z.bigint(),
+  });
+  type PlanIterationRow = z.infer<typeof PlanIterationRow>;
 
   async function planIterationRows() {
-    const rows = await runQuery<PlanIterationRow>(db, "plan-iterations", {
+    const rows = await runQuery(db, "plan-iterations", PlanIterationRow, {
       after_date: null,
       before_date: null,
       project: null,
@@ -1731,7 +1873,7 @@ describe("plan-iterations query", () => {
   });
 
   it("excludes sessions below min_plans threshold", async () => {
-    const rows = await runQuery<PlanIterationRow>(db, "plan-iterations", {
+    const rows = await runQuery(db, "plan-iterations", PlanIterationRow, {
       after_date: null,
       before_date: null,
       project: null,
@@ -1746,26 +1888,30 @@ describe("replayed line dedupe", () => {
   // replay.jsonl duplicates its tool_use, tool_result, and hook attachment lines
   // verbatim (same uuid) further down the file, the rewind/resume replay shape.
   it("keeps one content_items row per replayed tool_use and tool_result", async () => {
-    const uses = await db.query<{ n: bigint }>(
+    const uses = await db.query(
       "SELECT COUNT(*) AS n FROM content_items WHERE type = 'tool_use' AND id = 'rp-tool-1'",
+      z.object({ n: z.bigint() }),
     );
     expect(Number(uses[0]?.n)).toBe(1);
-    const results = await db.query<{ n: bigint }>(
+    const results = await db.query(
       "SELECT COUNT(*) AS n FROM content_items WHERE type = 'tool_result' AND tool_use_id = 'rp-tool-1'",
+      z.object({ n: z.bigint() }),
     );
     expect(Number(results[0]?.n)).toBe(1);
   });
 
   it("keeps one tool_calls row per replayed tool_use", async () => {
-    const rows = await db.query<{ n: bigint }>(
+    const rows = await db.query(
       "SELECT COUNT(*) AS n FROM tool_calls WHERE tool_id = 'rp-tool-1'",
+      z.object({ n: z.bigint() }),
     );
     expect(Number(rows[0]?.n)).toBe(1);
   });
 
   it("keeps one hook_events row per replayed hook attachment", async () => {
-    const rows = await db.query<{ n: bigint }>(
+    const rows = await db.query(
       "SELECT COUNT(*) AS n FROM hook_events WHERE session_id = 'replay-session' AND kind = 'hook_blocking_error'",
+      z.object({ n: z.bigint() }),
     );
     expect(Number(rows[0]?.n)).toBe(1);
   });
@@ -1773,14 +1919,19 @@ describe("replayed line dedupe", () => {
 
 describe("stop-hook-noop-detector query", () => {
   it("counts blocking errors so a Stop gate is not a noop candidate", async () => {
-    const rows = await runQuery<{
-      command: string;
-      fires: bigint;
-      with_stdout: bigint;
-      with_decision: bigint;
-      nonzero_exit: bigint;
-      blocks: bigint;
-    }>(db, "stop-hook-noop-detector", filterParams());
+    const rows = await runQuery(
+      db,
+      "stop-hook-noop-detector",
+      z.object({
+        command: z.string(),
+        fires: z.bigint(),
+        with_stdout: z.bigint(),
+        with_decision: z.bigint(),
+        nonzero_exit: z.bigint(),
+        blocks: z.bigint(),
+      }),
+      filterParams(),
+    );
     // Blocking errors carry no command, so they group under the bare hook name.
     const gate = rows.find((r) => r.command === "Stop");
     expect(gate).toBeDefined();
@@ -1793,13 +1944,14 @@ describe("plan-sections query", () => {
   const plansGlob = path.join(plansFixtureDir, "*.md");
   const featurePlan = path.join(plansFixtureDir, "feature-plan.md");
 
-  type Section = {
-    session_id: string | null;
-    outcome: string | null;
-    title: string;
-    level: number;
-    file_path: string;
-  };
+  const Section = z.object({
+    session_id: z.string().nullable(),
+    outcome: z.string().nullable(),
+    title: z.string(),
+    level: z.number(),
+    file_path: z.string(),
+  });
+  type Section = z.infer<typeof Section>;
 
   beforeEach(async () => {
     await loadExtensions(db);
@@ -1856,7 +2008,7 @@ describe("plan-sections query", () => {
   }
 
   it("parses one row per section with level and title", async () => {
-    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    const rows = await runQuery(db, "plan-sections", Section, { plans_glob: plansGlob });
     const feature = rows.filter((r) => r.file_path === featurePlan);
     expect(feature.map((r) => r.title)).toEqual([
       "Feature Plan",
@@ -1869,7 +2021,7 @@ describe("plan-sections query", () => {
   });
 
   it("finds plans whose sections lack a Verification heading", async () => {
-    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    const rows = await runQuery(db, "plan-sections", Section, { plans_glob: plansGlob });
     const byFile = new Map<string, Set<string>>();
     for (const r of rows) {
       if (!byFile.has(r.file_path)) byFile.set(r.file_path, new Set());
@@ -1884,7 +2036,7 @@ describe("plan-sections query", () => {
 
   it("joins sections to the session that produced the plan", async () => {
     await insertDiskPlan();
-    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    const rows = await runQuery(db, "plan-sections", Section, { plans_glob: plansGlob });
 
     const feature = rows.filter((r) => r.file_path === featurePlan);
     expect(feature.length).toBeGreaterThan(0);
@@ -1902,7 +2054,7 @@ describe("plan-sections query", () => {
   it("omits a plan whose planFilePath does not exist on disk (cross-host/deleted)", async () => {
     // The plan-session fixture's planFilePath is /Users/test/.claude/plans/plan-session.md,
     // outside the glob. The LEFT JOIN from sections means that plan yields no section rows.
-    const rows = await runQuery<Section>(db, "plan-sections", { plans_glob: plansGlob });
+    const rows = await runQuery(db, "plan-sections", Section, { plans_glob: plansGlob });
     expect(rows.some((r) => r.session_id === "plan-session")).toBe(false);
   });
 });
@@ -1910,24 +2062,26 @@ describe("plan-sections query", () => {
 describe("skill-config-vs-observed query", () => {
   const skillsFixtureDir = path.join(import.meta.dirname, "..", "fixtures", "skills");
 
-  type SkillRow = {
-    source: string;
-    skill_name: string;
-    description_chars: bigint;
-    disable_model_invocation: boolean;
-    calls: bigint;
-    sessions: bigint;
-    last_seen: Date | null;
-  };
+  const SkillRow = z.object({
+    source: z.string(),
+    skill_name: z.string(),
+    description_chars: z.bigint(),
+    disable_model_invocation: z.boolean(),
+    calls: z.bigint(),
+    sessions: z.bigint(),
+    last_seen: z.date().nullable(),
+  });
+  type SkillRow = z.infer<typeof SkillRow>;
 
   beforeEach(async () => {
     await loadExtensions(db);
   });
 
   async function skillRows(overrides: Record<string, string | null> = {}) {
-    return runQuery<SkillRow>(
+    return runQuery(
       db,
       "skill-config-vs-observed",
+      SkillRow,
       filterParams({
         skill: null,
         plugin_skill_glob: path.join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
@@ -1957,7 +2111,9 @@ describe("skill-config-vs-observed query", () => {
   it("sorts zero-fire skills first across all three sources", async () => {
     const rows = await skillRows();
     const zero = rows.filter((r) => Number(r.calls) === 0).map((r) => r.skill_name);
-    expect(zero).toEqual(expect.arrayContaining(["review:inbox", "never-used", "scratch"]));
+    expect(
+      ["review:inbox", "never-used", "scratch"].filter((name) => !zero.includes(name)),
+    ).toEqual([]);
     expect(rows.slice(0, zero.length).every((r) => Number(r.calls) === 0)).toBe(true);
 
     const never = rows.find((r) => r.skill_name === "never-used");
@@ -1977,7 +2133,13 @@ describe("skill-config-vs-observed query", () => {
 describe("index-health query", () => {
   const projectsGlob = path.join(fixturesDir, "**", "*.jsonl");
 
-  type Health = { check_name: string; status: string; subject: string; detail: string };
+  const Health = z.object({
+    check_name: z.string(),
+    status: z.string(),
+    subject: z.string(),
+    detail: z.string(),
+  });
+  type Health = z.infer<typeof Health>;
 
   function healthParams(overrides: Record<string, string | null> = {}) {
     return {
@@ -1993,9 +2155,10 @@ describe("index-health query", () => {
   it("alerts when recovered hook denies outnumber the denies hook_events recorded", async () => {
     // A window wide enough to cover the whole fixture corpus, so the check reads the
     // same rows regardless of when the newest fixture record is dated.
-    const rows = await runQuery<Health>(
+    const rows = await runQuery(
       db,
       "index-health",
+      Health,
       healthParams({ deny_window_days: "100000" }),
     );
     const deny = rows.find((r) => r.check_name === "hook-deny-invisible");
@@ -2009,7 +2172,7 @@ describe("index-health query", () => {
   });
 
   it("flags a kind that went silent beyond its own historical gap", async () => {
-    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const rows = await runQuery(db, "index-health", Health, healthParams());
     const silent = rows.filter((r) => r.check_name === "stream-silent");
     expect(silent.map((r) => r.subject)).toEqual(["attachment:health-quiet"]);
     expect(silent[0]?.status).toBe("alert");
@@ -2017,7 +2180,7 @@ describe("index-health query", () => {
   });
 
   it("classifies a silent kind with a live successor field as migrated, not dead", async () => {
-    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const rows = await runQuery(db, "index-health", Health, healthParams());
     const migrated = rows.filter((r) => r.check_name === "stream-migrated");
     expect(migrated.map((r) => r.subject)).toEqual(["system:api_error"]);
     expect(migrated[0]?.status).toBe("info");
@@ -2026,21 +2189,21 @@ describe("index-health query", () => {
   });
 
   it("reports a kind first seen late in the corpus as new, not kinds as old as the index", async () => {
-    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const rows = await runQuery(db, "index-health", Health, healthParams());
     const fresh = rows.filter((r) => r.check_name === "stream-new");
     expect(fresh.map((r) => r.subject)).toEqual(["attachment:health-fresh"]);
     expect(fresh[0]?.status).toBe("info");
   });
 
   it("summarizes kinds whose rows carry no timestamp", async () => {
-    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const rows = await runQuery(db, "index-health", Health, healthParams());
     const nullTs = rows.find((r) => r.check_name === "null-timestamp-kinds");
     expect(nullTs?.status).toBe("info");
     expect(nullTs?.detail).toContain("health-marker (2)");
   });
 
   it("reports the corpus window per host and no disk gap when the glob matches", async () => {
-    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const rows = await runQuery(db, "index-health", Health, healthParams());
     const windows = rows.filter((r) => r.check_name === "corpus-window");
     expect(windows.map((r) => r.subject)).toEqual(["local"]);
     expect(rows.some((r) => r.check_name === "disk-not-indexed")).toBe(false);
@@ -2054,9 +2217,10 @@ describe("index-health query", () => {
       path.join(extraDir, "unindexed.jsonl"),
       '{"type":"user","message":{"role":"user","content":"hi"},"sessionId":"extra","timestamp":"2024-02-01T00:00:00.000Z","uuid":"ex-1"}\n',
     );
-    const rows = await runQuery<Health>(
+    const rows = await runQuery(
       db,
       "index-health",
+      Health,
       healthParams({ projects_glob: path.join(tmpDir, "extra-projects", "**", "*.jsonl") }),
     );
     const missing = rows.find((r) => r.check_name === "disk-not-indexed");
@@ -2084,7 +2248,7 @@ describe("index-health query", () => {
       })}\n`,
     );
     await reindex();
-    const rows = await runQuery<Health>(db, "index-health", healthParams());
+    const rows = await runQuery(db, "index-health", Health, healthParams());
     const staleness = rows.filter((r) => r.check_name === "host-staleness");
     // exactly the imported host: local never alerts, its remediation (re-sync)
     // does not apply
@@ -2098,9 +2262,10 @@ describe("frontmatter query", () => {
   it("parses name and description from a SKILL.md frontmatter", async () => {
     await loadExtensions(db);
     const skill = path.join(import.meta.dirname, "..", "SKILL.md");
-    const rows = await runQuery<{ file_path: string; name: string; description: string }>(
+    const rows = await runQuery(
       db,
       "frontmatter",
+      z.object({ file_path: z.string(), name: z.string(), description: z.string() }),
       { frontmatter_glob: skill },
     );
     expect(rows).toHaveLength(1);
@@ -2120,8 +2285,9 @@ describe("cost-rate macros", () => {
     ["claude-haiku-4", 1, 5],
     ["some-unknown-model", 5, 25],
   ])("rates %s at input %d / output %d per MTok", async (model, input, output) => {
-    const [row] = await db.query<{ i: number; o: number }>(
+    const [row] = await db.query(
       "SELECT model_input_rate($m) AS i, model_output_rate($m) AS o",
+      z.object({ i: z.number(), o: z.number() }),
       { m: model },
     );
     expect(Number(row?.i)).toBe(input);
@@ -2141,12 +2307,17 @@ describe("model_family macro", () => {
     ["claude-haiku-4", "haiku"],
     ["some-unknown-model", "other"],
   ])("collapses %s to %s", async (model, family) => {
-    const [row] = await db.query<{ f: string }>("SELECT model_family($m) AS f", { m: model });
+    const [row] = await db.query("SELECT model_family($m) AS f", z.object({ f: z.string() }), {
+      m: model,
+    });
     expect(row?.f).toBe(family);
   });
 
   it("returns NULL for a NULL model", async () => {
-    const [row] = await db.query<{ f: string | null }>("SELECT model_family(NULL) AS f");
+    const [row] = await db.query(
+      "SELECT model_family(NULL) AS f",
+      z.object({ f: z.string().nullable() }),
+    );
     expect(row?.f).toBeNull();
   });
 });
@@ -2247,13 +2418,14 @@ describe("message_usage cost columns and usage queries", () => {
 
   it("exposes the TTL split and sidechain/source_file columns on message_usage", async () => {
     await insertUsage("usage-cols-session");
-    const [row] = await db.query<{
-      cache_1h_tokens: bigint;
-      cache_5m_tokens: bigint;
-      is_sidechain: boolean;
-      source_file: string;
-    }>(
+    const [row] = await db.query(
       "SELECT cache_1h_tokens, cache_5m_tokens, is_sidechain, source_file FROM message_usage WHERE message_id = 'usage-cols-session-a'",
+      z.object({
+        cache_1h_tokens: z.bigint(),
+        cache_5m_tokens: z.bigint(),
+        is_sidechain: z.boolean(),
+        source_file: z.string(),
+      }),
     );
     expect(Number(row?.cache_1h_tokens)).toBe(3000);
     expect(Number(row?.cache_5m_tokens)).toBe(2000);
@@ -2263,18 +2435,23 @@ describe("message_usage cost columns and usage queries", () => {
 
   it("usage-timeline buckets the session with exact cost and shape signals", async () => {
     await insertUsage("usage-timeline-session");
-    const rows = await runQuery<{
-      msgs: bigint;
-      cost_usd_est: number;
-      cache_miss_ratio: number;
-      max_context_tokens: bigint;
-      sidechain_share: number;
-      top_model: string;
-    }>(db, "usage-timeline", {
-      session: "usage-timeline-session",
-      host: null,
-      bucket_minutes: null,
-    });
+    const rows = await runQuery(
+      db,
+      "usage-timeline",
+      z.object({
+        msgs: z.bigint(),
+        cost_usd_est: z.number(),
+        cache_miss_ratio: z.number(),
+        max_context_tokens: z.bigint(),
+        sidechain_share: z.number(),
+        top_model: z.string(),
+      }),
+      {
+        session: "usage-timeline-session",
+        host: null,
+        bucket_minutes: null,
+      },
+    );
     expect(rows).toHaveLength(1);
     const [b] = rows;
     expect(Number(b?.msgs)).toBe(2);
@@ -2287,19 +2464,24 @@ describe("message_usage cost columns and usage queries", () => {
 
   it("usage-spikes ranks the burn window with its repo", async () => {
     await insertUsage("usage-spikes-session");
-    const rows = await runQuery<{
-      session_id: string;
-      repo: string;
-      msgs: bigint;
-      cost_usd_est: number;
-    }>(db, "usage-spikes", {
-      after_date: null,
-      before_date: null,
-      project: null,
-      host: null,
-      bucket_minutes: null,
-      limit: null,
-    });
+    const rows = await runQuery(
+      db,
+      "usage-spikes",
+      z.object({
+        session_id: z.string(),
+        repo: z.string().nullable(),
+        msgs: z.bigint(),
+        cost_usd_est: z.number(),
+      }),
+      {
+        after_date: null,
+        before_date: null,
+        project: null,
+        host: null,
+        bucket_minutes: null,
+        limit: null,
+      },
+    );
     const mine = rows.find((r) => r.session_id === "usage-spikes-session");
     expect(mine).toBeDefined();
     expect(mine?.repo).toBe("usage-proj");
@@ -2309,16 +2491,21 @@ describe("message_usage cost columns and usage queries", () => {
 
   it("top-sessions ranks the session by cost with host and repo", async () => {
     await insertUsage("top-sessions-session");
-    const rows = await runQuery<{
-      session_id: string;
-      host: string;
-      repo: string;
-      msgs: bigint;
-      cost_usd_est: number;
-    }>(db, "top-sessions", {
-      after_date: null,
-      host: null,
-    });
+    const rows = await runQuery(
+      db,
+      "top-sessions",
+      z.object({
+        session_id: z.string(),
+        host: z.string(),
+        repo: z.string().nullable(),
+        msgs: z.bigint(),
+        cost_usd_est: z.number(),
+      }),
+      {
+        after_date: null,
+        host: null,
+      },
+    );
     const mine = rows.find((r) => r.session_id === "top-sessions-session");
     expect(mine).toBeDefined();
     expect(mine?.host).toBe("local");

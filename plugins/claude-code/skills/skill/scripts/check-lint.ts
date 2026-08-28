@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 
 import { basename, dirname } from "node:path";
-import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { filePathOf, HookInput } from "./hook-input";
 import { lintSkill as defaultLintSkill } from "./skill-lint";
 import type { SkillLintResult } from "./skill-lint/types";
 
@@ -20,10 +21,10 @@ async function lintMessages(skillDir: string, lintSkill: LintSkillFn): Promise<s
 }
 
 export async function processPostToolUse(
-  input: PostToolUseHookInput,
+  input: HookInput,
   lintSkill: LintSkillFn = defaultLintSkill,
 ): Promise<SyncHookJSONOutput | null> {
-  const filePath = (input.tool_input as { file_path?: string }).file_path;
+  const filePath = filePathOf(input.tool_input);
   if (!filePath || basename(filePath) !== "SKILL.md") return null;
 
   const messages = await lintMessages(dirname(filePath), lintSkill);
@@ -38,9 +39,9 @@ export async function processPostToolUse(
 }
 
 async function main(): Promise<void> {
-  let input: PostToolUseHookInput;
+  let input: HookInput;
   try {
-    input = JSON.parse(await Bun.stdin.text()) as PostToolUseHookInput;
+    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
       `[skill-lint] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,

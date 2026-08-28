@@ -4,6 +4,7 @@
 // when the probe in docs/settings.md succeeds.
 import { rm } from "node:fs/promises";
 import { cli } from "cleye";
+import { z } from "zod";
 import {
   dirExists,
   ensureSchema,
@@ -41,9 +42,13 @@ const db = await getDb(getDataDir());
 let deleted = 0;
 try {
   await ensureSchema(db);
-  const [row] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM raw WHERE host = $host", {
-    host: label,
-  });
+  const [row] = await db.query(
+    "SELECT COUNT(*) AS n FROM raw WHERE host = $host",
+    z.object({ n: z.bigint() }),
+    {
+      host: label,
+    },
+  );
   deleted = Number(row?.n ?? 0n);
   // One transaction: a partial forget that kept indexed_files rows would make a
   // later re-import of the same label skip every unchanged file while raw stays

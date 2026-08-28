@@ -5,6 +5,7 @@
 import * as path from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
+import { z } from "zod";
 import { getDataDir, getDb, LOCAL_HOST, listImportedHosts, sessionDbPath } from "./db";
 
 cli({ name: "hosts", flags: {} });
@@ -15,8 +16,9 @@ async function lastImports(): Promise<Record<string, string>> {
   if (!(await Bun.file(sessionDbPath(dataDir)).exists())) return {};
   const db = await getDb(dataDir);
   try {
-    const rows = await db.query<{ host: string; last_import: string | null }>(
+    const rows = await db.query(
       "SELECT host, strftime(last_import, '%Y-%m-%d %H:%M') AS last_import FROM meta",
+      z.object({ host: z.string(), last_import: z.string().nullable() }),
     );
     return Object.fromEntries(rows.map((r) => [r.host, r.last_import ?? "-"]));
   } catch {

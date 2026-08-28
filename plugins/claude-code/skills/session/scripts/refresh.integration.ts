@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as path from "node:path";
 import { $ } from "bun";
+import { z } from "zod";
 import { getDb } from "./db";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
@@ -51,7 +52,7 @@ async function run(...args: string[]) {
 async function countRows(): Promise<number> {
   const db = await getDb(dataDir);
   try {
-    const [row] = await db.query<{ n: bigint }>("SELECT COUNT(*) AS n FROM raw");
+    const [row] = await db.query("SELECT COUNT(*) AS n FROM raw", z.object({ n: z.bigint() }));
     return Number(row?.n ?? 0n);
   } finally {
     db.close();

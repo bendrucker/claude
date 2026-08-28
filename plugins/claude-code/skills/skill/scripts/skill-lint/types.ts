@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type Severity = "error" | "warn" | "info";
 
 export interface RuleResult {
@@ -27,12 +29,15 @@ export interface SkillLintResult {
   };
 }
 
+// The rules report a non-string name or description themselves, so both stay
+// optional here rather than failing the parse.
+export const Frontmatter = z.looseObject({
+  name: z.string().optional().catch(undefined),
+  description: z.string().optional().catch(undefined),
+});
+
 export interface SkillContent {
-  frontmatter: {
-    name?: string;
-    description?: string;
-    [key: string]: unknown;
-  };
+  frontmatter: z.infer<typeof Frontmatter>;
   body: string;
   raw: string;
 }

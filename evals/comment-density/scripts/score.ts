@@ -206,7 +206,10 @@ async function main(): Promise<void> {
     z.array(z.object({ id: z.string() }).loose()),
     join(root, "labels", "sessions.json"),
   );
-  const complaintIds = await decodeFile(z.array(z.string()), join(root, "labels", "complaints.json"));
+  const complaintIds = await decodeFile(
+    z.array(z.string()),
+    join(root, "labels", "complaints.json"),
+  );
 
   const commits: CommitScoreRow[] = [];
   for (const { repo, sha } of commitLabels) {

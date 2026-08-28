@@ -16,7 +16,10 @@ const MARKER = "comment-density:";
 const TAIL_LINES = 200;
 
 function blockedRecently(transcript: string): boolean {
-  return transcript.split("\n").slice(-TAIL_LINES).some((line) => line.includes(MARKER));
+  return transcript
+    .split("\n")
+    .slice(-TAIL_LINES)
+    .some((line) => line.includes(MARKER));
 }
 
 async function main(): Promise<void> {

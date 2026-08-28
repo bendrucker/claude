@@ -143,7 +143,15 @@ describe("rankCommentsWeighted", () => {
     const a = pathed("// tie", "a.ts");
     const b = pathed("// tie", "b.ts");
     const input = [a, b];
-    expect(rankCommentsWeighted(input, new Map([["a.ts", 1], ["b.ts", 1]]))).toEqual([a, b]);
+    expect(
+      rankCommentsWeighted(
+        input,
+        new Map([
+          ["a.ts", 1],
+          ["b.ts", 1],
+        ]),
+      ),
+    ).toEqual([a, b]);
     expect(input).toEqual([a, b]);
   });
 });

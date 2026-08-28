@@ -116,7 +116,10 @@ async function main(): Promise<void> {
     z.array(SessionLabel),
     join(root, "labels", "sessions.json"),
   );
-  const complaintIds = await decodeFile(z.array(z.string()), join(root, "labels", "complaints.json"));
+  const complaintIds = await decodeFile(
+    z.array(z.string()),
+    join(root, "labels", "complaints.json"),
+  );
 
   const commitScores = new Map(scores.commits.map((c) => [`${c.repo}@${c.sha}`, c]));
   const commitUnits = commitLabels.flatMap((label) => {

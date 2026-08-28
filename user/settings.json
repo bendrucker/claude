@@ -426,7 +426,8 @@
     "typescript-lsp@claude-plugins-official": true,
     "gopls-lsp@claude-plugins-official": true,
     "atuin@bendrucker": true,
-    "comments@bendrucker": true
+    "comments@bendrucker": true,
+    "plannotator@plannotator": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -474,6 +475,13 @@
         "source": "github",
         "repo": "vercel-labs/agent-browser",
         "ref": "v0.33.2"
+      }
+    },
+    "plannotator": {
+      "source": {
+        "source": "github",
+        "repo": "backnotprop/plannotator",
+        "ref": "v0.27.9"
       }
     }
   },

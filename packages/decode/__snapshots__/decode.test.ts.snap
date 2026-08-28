@@ -1,0 +1,63 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`failure messages malformed JSON names the source and echoes the input 1`] = `
+"gh pr view output: invalid JSON: JSON Parse error: Unexpected EOF
+  received: {"number":"
+`;
+
+exports[`failure messages empty input 1`] = `
+"gh pr view output: invalid JSON: JSON Parse error: Unexpected EOF
+  received: (empty)"
+`;
+
+exports[`failure messages whitespace-only input 1`] = `
+"gh pr view output: invalid JSON: JSON Parse error: Unexpected EOF
+  received: (empty)"
+`;
+
+exports[`failure messages JSON null against an object schema 1`] = `
+"gh pr view output did not match its schema:
+  ✖ Invalid input: expected object, received null"
+`;
+
+exports[`failure messages wrong type at the root 1`] = `
+"gh pr view output did not match its schema:
+  ✖ Invalid input: expected object, received string"
+`;
+
+exports[`failure messages missing and mistyped fields report every issue 1`] = `
+"gh pr view output did not match its schema:
+  ✖ Invalid input: expected number, received string → at number
+  ✖ Invalid input: expected string, received undefined → at title
+  ✖ Invalid input: expected object, received undefined → at author"
+`;
+
+exports[`failure messages a nested path is spelled out 1`] = `
+"gh pr view output did not match its schema:
+  ✖ Invalid input: expected string, received number → at author.login"
+`;
+
+exports[`failure messages array index appears in the path 1`] = `
+"gh pr view output did not match its schema:
+  ✖ Invalid input: expected string, received number → at [1].name"
+`;
+
+exports[`failure messages an oversized payload is truncated in the echo 1`] = `
+"gh pr view output: invalid JSON: JSON Parse error: Expected '}'
+  received: {"number":99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999…"
+`;
+
+exports[`decode reports a syntax-free failure without an input echo 1`] = `
+"catalog entry did not match its schema:
+  ✖ Invalid input: expected string, received number → at name"
+`;
+
+exports[`decodeJsonLines a bad record reports its 1-based line number 1`] = `
+"transcript line 2 did not match its schema:
+  ✖ Invalid input: expected string, received number → at name"
+`;
+
+exports[`decodeJsonLines blank lines do not shift the reported line number 1`] = `
+"transcript line 4 did not match its schema:
+  ✖ Invalid input: expected string, received number → at name"
+`;

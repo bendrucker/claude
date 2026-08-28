@@ -98,10 +98,12 @@ async function setupCliStubs(root: string): Promise<{ binDir: string; logPath: s
   await mkdir(binDir, { recursive: true });
   for (const cli of ["gh", "glab"]) {
     const stub = join(binDir, cli);
+    // oxlint-disable-next-line no-await-in-loop -- two known CLIs, so concurrency buys nothing.
     await Bun.write(
       stub,
       `#!/bin/sh\nprintf '%s %s\\n' ${cli} "$*" >> ${JSON.stringify(logPath)}\nexit 0\n`,
     );
+    // oxlint-disable-next-line no-await-in-loop -- two known CLIs, so concurrency buys nothing.
     await run(["chmod", "+x", stub], root);
   }
   await Bun.write(logPath, "");
@@ -207,6 +209,7 @@ async function main(): Promise<void> {
     const { binDir, logPath } = await setupCliStubs(root);
 
     for (const testCase of CASES) {
+      // oxlint-disable-next-line no-await-in-loop -- the cases share one repo, one stub bin directory, and one call log.
       const { failures, output } = await runCase(testCase, root, binDir, logPath);
       if (failures.length === 0) {
         console.log(`PASS ${testCase.name}`);

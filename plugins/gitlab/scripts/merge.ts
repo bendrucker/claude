@@ -51,6 +51,7 @@ export async function arm(
 ): Promise<void> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
+      // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one failed transiently.
       await run();
       return;
     } catch (err) {
@@ -59,6 +60,7 @@ export async function arm(
         return;
       }
       if (attempt < MAX_ATTEMPTS && TRANSIENT.some((t) => message.includes(t))) {
+        // oxlint-disable-next-line no-await-in-loop -- backoff between retries.
         await sleep(RETRY_DELAY_MS);
         continue;
       }

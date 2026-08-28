@@ -115,6 +115,7 @@ export async function detect(root: string, options: DetectOptions = {}): Promise
   for (const provider of PROVIDERS) {
     let config: string | null = null;
     for (const path of provider.configs) {
+      // oxlint-disable-next-line no-await-in-loop -- first match wins: the scan stops at the first config a provider ships.
       if (await Bun.file(join(root, path)).exists()) {
         config = path;
         break;

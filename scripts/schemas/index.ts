@@ -20,6 +20,7 @@ const check = command({ name: "check" }, async () => {
   let failed = false;
   let warned = false;
   for (const source of await loadSources(SCHEMAS_DIR)) {
+    // oxlint-disable-next-line no-await-in-loop -- each source prints its verdict as it is checked, so the fetches follow the printed order.
     const [base, patch] = await Promise.all([
       fetchBase(source.url),
       loadPatch(SCHEMAS_DIR, source),

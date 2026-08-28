@@ -69,20 +69,21 @@ async function getImportedPackages(pluginDir: string): Promise<Set<string>> {
 }
 
 async function checkDeps(): Promise<string[]> {
-  const violations: string[] = [];
+  const perPlugin = await Promise.all(
+    (await loadPlugins()).map(async (plugin) => {
+      if (plugin.dir == null || plugin.dir === "") return [];
 
-  for (const plugin of await loadPlugins()) {
-    if (plugin.dir == null || plugin.dir === "") continue;
+      const [declared, imported] = await Promise.all([
+        getPluginDeps(plugin.dir),
+        getImportedPackages(plugin.dir),
+      ]);
 
-    const declared = await getPluginDeps(plugin.dir);
-    const imported = await getImportedPackages(plugin.dir);
-
-    for (const pkg of imported) {
-      if (!declared.has(pkg) && !declared.has(`@types/${pkg}`)) {
-        violations.push(`${plugin.name}: missing dependency "${pkg}"`);
-      }
-    }
-  }
+      return [...imported]
+        .filter((pkg) => !declared.has(pkg) && !declared.has(`@types/${pkg}`))
+        .map((pkg) => `${plugin.name}: missing dependency "${pkg}"`);
+    }),
+  );
+  const violations = perPlugin.flat();
 
   return violations;
 }

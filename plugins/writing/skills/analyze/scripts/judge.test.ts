@@ -410,12 +410,14 @@ describe("hook wall", () => {
   test("no hook or detection module imports the judge", async () => {
     const glob = new Bun.Glob("**/*.ts");
     const root = `${import.meta.dirname}/../../../`;
-    for (const dir of ["hooks", "detection", "linguistics"]) {
-      for await (const file of glob.scan(`${root}${dir}`)) {
-        const source = await Bun.file(`${root}${dir}/${file}`).text();
-        expect(source).not.toMatch(/from\s+["'][^"']*judge["']/);
-        expect(source).not.toContain("@anthropic-ai/sdk");
-      }
-    }
+    await Promise.all(
+      ["hooks", "detection", "linguistics"].map(async (dir) => {
+        for await (const file of glob.scan(`${root}${dir}`)) {
+          const source = await Bun.file(`${root}${dir}/${file}`).text();
+          expect(source).not.toMatch(/from\s+["'][^"']*judge["']/);
+          expect(source).not.toContain("@anthropic-ai/sdk");
+        }
+      }),
+    );
   });
 });

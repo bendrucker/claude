@@ -70,6 +70,7 @@ export type FileViolations = { path: string; violations: ScanResult[] };
 export async function scanFiles(files: string[]): Promise<FileViolations[]> {
   const results: FileViolations[] = [];
   for (const path of files) {
+    // oxlint-disable-next-line no-await-in-loop -- audit runs over an arbitrary tree; reading every file at once would hold the whole corpus in memory.
     const text = await Bun.file(path).text();
     const violations = scanAll(text, path);
     if (violations.length > 0) results.push({ path, violations });
@@ -118,8 +119,8 @@ function printSummary(results: FileViolations[]): void {
 
 async function collectAcross(paths: string[]): Promise<string[]> {
   const files = new Set<string>();
-  for (const path of paths) {
-    for (const file of await collectFiles(path)) files.add(file);
+  for (const collected of await Promise.all(paths.map(collectFiles))) {
+    for (const file of collected) files.add(file);
   }
   return [...files].toSorted();
 }

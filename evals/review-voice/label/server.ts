@@ -42,12 +42,15 @@ async function readAllLabels(): Promise<Record<string, unknown>> {
   } catch {
     return out;
   }
-  for (const name of names) {
-    if (!name.endsWith(".json")) continue;
-    try {
-      out[name.replace(/\.json$/, "")] = await Bun.file(join(argv.flags.labels, name)).json();
-    } catch {}
-  }
+  await Promise.all(
+    names
+      .filter((name) => name.endsWith(".json"))
+      .map(async (name) => {
+        try {
+          out[name.replace(/\.json$/, "")] = await Bun.file(join(argv.flags.labels, name)).json();
+        } catch {}
+      }),
+  );
   return out;
 }
 

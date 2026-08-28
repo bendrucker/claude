@@ -74,20 +74,23 @@ const briefs = [
 ].toSorted();
 
 const mapping: Record<string, Record<string, string>> = {};
-const blocks: string[] = [];
-for (const brief of briefs) {
-  const flip = Math.random() < 0.5;
-  const slot1 = flip ? "after" : "before";
-  const slot2 = flip ? "before" : "after";
-  mapping[brief] = { "1": slot1, "2": slot2 };
-  const v1 = await Bun.file(join(argv.flags.out, `${brief}.${slot1}.md`)).text();
-  const v2 = await Bun.file(join(argv.flags.out, `${brief}.${slot2}.md`)).text();
-  await Bun.write(join(argv.flags.judgeDir, `${brief}.1.md`), v1);
-  await Bun.write(join(argv.flags.judgeDir, `${brief}.2.md`), v2);
-  blocks.push(
-    `#### Brief: ${brief}\n\n--- Version 1 ---\n${v1.trim()}\n\n--- Version 2 ---\n${v2.trim()}`,
-  );
-}
+const blocks = await Promise.all(
+  briefs.map(async (brief) => {
+    const flip = Math.random() < 0.5;
+    const slot1 = flip ? "after" : "before";
+    const slot2 = flip ? "before" : "after";
+    mapping[brief] = { "1": slot1, "2": slot2 };
+    const [v1, v2] = await Promise.all([
+      Bun.file(join(argv.flags.out, `${brief}.${slot1}.md`)).text(),
+      Bun.file(join(argv.flags.out, `${brief}.${slot2}.md`)).text(),
+    ]);
+    await Promise.all([
+      Bun.write(join(argv.flags.judgeDir, `${brief}.1.md`), v1),
+      Bun.write(join(argv.flags.judgeDir, `${brief}.2.md`), v2),
+    ]);
+    return `#### Brief: ${brief}\n\n--- Version 1 ---\n${v1.trim()}\n\n--- Version 2 ---\n${v2.trim()}`;
+  }),
+);
 await Bun.write(mappingPath, JSON.stringify(mapping, null, 2));
 
 const rubric = await Bun.file(argv.flags.rubric).text();

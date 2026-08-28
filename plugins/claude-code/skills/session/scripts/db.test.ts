@@ -670,6 +670,7 @@ describe("cross-machine history", () => {
     await reindex();
 
     for (const tbl of ["sessions", "messages", "content_items"]) {
+      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the suite; concurrent statements on it interleave.
       const rows = await db.query(
         `SELECT DISTINCT host FROM ${tbl} ORDER BY host`,
         z.object({ host: z.string() }),
@@ -720,6 +721,7 @@ describe("cross-machine history", () => {
     // (mtime, size), so an old-mtime file on a new host is still a new path.
     await importFixtureHost("archive");
     for (const rel of ["-Users-test-project/basic.jsonl", "-Users-test-webapp/webapp.jsonl"]) {
+      // oxlint-disable-next-line no-await-in-loop -- two fixture files; concurrency buys nothing.
       await backdate(path.join(importsDir, "archive", "projects", rel));
     }
     await reindex();
@@ -1499,6 +1501,7 @@ describe("change catalog", () => {
 
     for (const table of ["raw", "content_items", "indexed_files"]) {
       const column = table === "indexed_files" ? "path" : "source_file";
+      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the suite; concurrent statements on it interleave.
       const [after] = await db.query(
         `SELECT COUNT(*) AS n FROM ${table} WHERE host = 'shrinking' AND ${column} = $path`,
         z.object({ n: z.bigint() }),
@@ -1998,6 +2001,7 @@ describe("plan-sections query", () => {
       ["assistant", assistant, "2026-02-01T10:00:00"],
       ["user", result, "2026-02-01T10:01:00"],
     ] as const) {
+      // oxlint-disable-next-line no-await-in-loop -- rows insert in fixture order on one connection so the assertions see a fixed layout.
       await db.run(
         `INSERT INTO raw (host, session_id, type, project_path, timestamp, data)
          VALUES ('local', 'disk-plan-session', $type, '/Users/test/project',
@@ -2395,6 +2399,7 @@ describe("message_usage cost columns and usage queries", () => {
     ];
     let line = 1;
     for (const r of rows) {
+      // oxlint-disable-next-line no-await-in-loop -- rows insert in fixture order on one connection so source_line stays deterministic.
       await db.run(
         `INSERT INTO raw
            (host, session_id, type, project_path, is_sidechain, timestamp,

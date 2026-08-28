@@ -39,12 +39,15 @@ async function readAllFeedback(): Promise<Record<string, unknown>> {
   } catch {
     return out;
   }
-  for (const n of names) {
-    if (!n.endsWith(".json")) continue;
-    try {
-      out[n.replace(/\.json$/, "")] = await Bun.file(join(argv.flags.feedback, n)).json();
-    } catch {}
-  }
+  await Promise.all(
+    names
+      .filter((n) => n.endsWith(".json"))
+      .map(async (n) => {
+        try {
+          out[n.replace(/\.json$/, "")] = await Bun.file(join(argv.flags.feedback, n)).json();
+        } catch {}
+      }),
+  );
   return out;
 }
 

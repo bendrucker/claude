@@ -13,7 +13,7 @@ describe("findSiblingScript", () => {
 
   async function tree(...paths: string[]): Promise<string> {
     const root = mkdtempSync(join(tmpdir(), "things-marketplace-"));
-    for (const path of paths) await Bun.write(join(root, path), "");
+    await Promise.all(paths.map((path) => Bun.write(join(root, path), "")));
     return root;
   }
 

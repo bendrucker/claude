@@ -42,34 +42,36 @@ const argv = cli({
 });
 
 const files = (await readdir(argv.flags.briefs)).filter((f) => f.endsWith(".json")).toSorted();
-const samples: unknown[] = [];
-const missing: string[] = [];
 
-for (const f of files) {
-  const brief = await decodeFile(Brief, join(argv.flags.briefs, f));
-  const id = brief.id ?? basename(f, ".json");
-  const outPath = join(argv.flags.out, `${id}.md`);
-  const file = Bun.file(outPath);
-  if (!(await file.exists())) {
-    missing.push(id);
-    continue;
-  }
-  const { title, type, body } = parseIssue(await file.text());
-  samples.push({
-    id,
-    type:
-      typeof brief.type === "string" && brief.type !== ""
-        ? brief.type
-        : type !== ""
-          ? type
-          : "unknown",
-    size: brief.size ?? "full",
-    project: brief.project ?? "synthetic",
-    brief: brief.brief,
-    title,
-    refined: body,
-  });
-}
+const loaded = await Promise.all(
+  files.map(async (f) => {
+    const brief = await decodeFile(Brief, join(argv.flags.briefs, f));
+    const id = brief.id ?? basename(f, ".json");
+    const file = Bun.file(join(argv.flags.out, `${id}.md`));
+    if (!(await file.exists())) return { id, sample: null };
+    const { title, type, body } = parseIssue(await file.text());
+    return {
+      id,
+      sample: {
+        id,
+        type:
+          typeof brief.type === "string" && brief.type !== ""
+            ? brief.type
+            : type !== ""
+              ? type
+              : "unknown",
+        size: brief.size ?? "full",
+        project: brief.project ?? "synthetic",
+        brief: brief.brief,
+        title,
+        refined: body,
+      },
+    };
+  }),
+);
+
+const samples: unknown[] = loaded.flatMap((entry) => (entry.sample ? [entry.sample] : []));
+const missing: string[] = loaded.filter((entry) => !entry.sample).map((entry) => entry.id);
 
 await Bun.write(argv.flags.output, JSON.stringify(samples, null, 2));
 console.log(`wrote ${samples.length} samples to ${argv.flags.output}`);

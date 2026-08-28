@@ -48,8 +48,10 @@ async function cleanupStrayDatabases(): Promise<void> {
   const strayDirs = new Set([path.join(tmpdir(), "claude-session"), "/tmp/claude-session"]);
   for (const dir of strayDirs) {
     if (path.resolve(dir) === path.resolve(dataDir)) continue;
+    // oxlint-disable-next-line no-await-in-loop -- two known stray directories; concurrency buys nothing.
     if (!(await Bun.file(sessionDbPath(dir)).exists())) continue;
     try {
+      // oxlint-disable-next-line no-await-in-loop -- two known stray directories; concurrency buys nothing.
       await rm(dir, { recursive: true, force: true });
       console.error(`refresh: removed stale index at ${dir}`);
     } catch (err) {
@@ -72,13 +74,16 @@ async function stampIsFresh(): Promise<boolean> {
 async function openWithRetry(): Promise<Database | null> {
   for (let attempt = 0; ; attempt++) {
     try {
+      // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one hit the write lock.
       return await getDb(dataDir);
     } catch (err) {
       if (!/lock/i.test(String(err)) || attempt >= 3) {
+        // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one hit the write lock.
         if ((await Bun.file(dbPath).exists()) && /lock/i.test(String(err))) return null;
         throw err;
       }
     }
+    // oxlint-disable-next-line no-await-in-loop -- backoff between lock retries.
     await Bun.sleep(250);
   }
 }

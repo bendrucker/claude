@@ -125,11 +125,13 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
       bodyFile != null && bodyFile !== ""
         ? [bodyFile, ...extractFieldFilePaths(command)]
         : extractFieldFilePaths(command);
-    for (const path of files) {
-      if (await Bun.file(path).exists()) {
-        texts.push(await Bun.file(path).text());
-      }
-    }
+    const bodies = await Promise.all(
+      files.map(async (path) => {
+        const file = Bun.file(path);
+        return (await file.exists()) ? await file.text() : null;
+      }),
+    );
+    texts.push(...bodies.filter((body) => body !== null));
     for (const flag of PROSE_FLAGS) {
       const value = extractInlineArg(command, flag);
       if (value != null && value !== "") texts.push(value);

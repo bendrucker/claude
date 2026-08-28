@@ -57,6 +57,7 @@ async function watch(slug: string, repo: string, pollSeconds: number): Promise<v
       seen.add(comment.id);
       console.log(describeComment(comment));
     }
+    // oxlint-disable-next-line no-await-in-loop -- poll interval between reads of the tuicr session.
     await Bun.sleep(pollSeconds * 1000);
   }
 }

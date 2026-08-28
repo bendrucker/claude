@@ -93,6 +93,7 @@ export async function processInput(
   if (toolInput?.command == null || toolInput.command === "") return null;
 
   for (const { scriptArg } of extractCommands(toolInput.command)) {
+    // oxlint-disable-next-line no-await-in-loop -- first match wins: the scan stops at the first command carrying a bypass marker.
     if (scriptArg != null && scriptArg !== "" && (await hasBypassMarker(scriptArg))) {
       return disableSandbox(toolInput);
     }

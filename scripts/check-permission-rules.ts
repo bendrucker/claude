@@ -42,11 +42,21 @@ const SettingsPermissions = z.union([
   z.array(z.unknown()).transform(() => ({ permissions: undefined })),
 ]);
 
+async function loadTracked(pattern: string): Promise<{ file: string; raw: string | null }[]> {
+  return Promise.all(
+    (await tracked(pattern, root)).map(async (file) => ({
+      file,
+      raw: await readTracked(file, root),
+    })),
+  );
+}
+
 async function checkSettings(): Promise<string[]> {
   const violations: string[] = [];
 
-  for (const file of await tracked("*settings*.json", root)) {
-    const raw = await readTracked(file, root);
+  const settings = await loadTracked("*settings*.json");
+
+  for (const { file, raw } of settings) {
     if (raw === null) continue;
 
     const { permissions } = decodeJson(SettingsPermissions, raw, file);
@@ -71,8 +81,9 @@ function frontmatterRules(value: unknown): string[] {
 async function checkFrontmatter(): Promise<string[]> {
   const violations: string[] = [];
 
-  for (const file of await tracked("*.md", root)) {
-    const raw = await readTracked(file, root);
+  const markdown = await loadTracked("*.md");
+
+  for (const { file, raw } of markdown) {
     if (raw === null || !raw.startsWith("---")) continue;
 
     let data: Frontmatter;

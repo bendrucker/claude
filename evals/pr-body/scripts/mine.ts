@@ -219,6 +219,7 @@ async function main() {
   const repos = [...new Set(mined.map((m) => m.repository))].toSorted();
   const fetched = new Map<string, Map<number, FetchedPr>>();
   for (const repo of repos) {
+    // oxlint-disable-next-line no-await-in-loop -- each repo is a paginated GitHub API sweep; serializing keeps the run inside the REST rate limit.
     fetched.set(repo, await fetchRepoPrs(repo));
   }
 

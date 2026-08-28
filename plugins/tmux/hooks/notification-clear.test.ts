@@ -22,6 +22,7 @@ describe("PreToolUse --clear guard", () => {
     };
     for (const [name, body] of Object.entries(stubs)) {
       const path = join(binDir, name);
+      // oxlint-disable-next-line no-await-in-loop -- two stub scripts; concurrency buys nothing.
       await Bun.write(path, `#!/bin/sh\necho "${name} $*" >> "$CALL_LOG"\n${body}`);
       Bun.spawnSync(["chmod", "+x", path]);
     }

@@ -22,15 +22,14 @@ export async function lintSkill(skillDir: string): Promise<SkillLintResult> {
   const refs = findReferences(content.body);
   const referenceResults = await Promise.all(refs.map((ref) => lintReference(skillDir, ref)));
 
-  let totalTokens = estimateTokens(raw);
-  for (const ref of referenceResults) {
-    const refPath = path.join(skillDir, ref.path);
-    const refFile = Bun.file(refPath);
-    if (await refFile.exists()) {
-      const refContent = await refFile.text();
-      totalTokens += estimateTokens(refContent);
-    }
-  }
+  const refTokens = await Promise.all(
+    referenceResults.map(async (ref) => {
+      const refFile = Bun.file(path.join(skillDir, ref.path));
+      if (!(await refFile.exists())) return 0;
+      return estimateTokens(await refFile.text());
+    }),
+  );
+  const totalTokens = refTokens.reduce((sum, tokens) => sum + tokens, estimateTokens(raw));
 
   for (const ref of referenceResults) {
     results.push(...ref.results);

@@ -34,8 +34,10 @@ export async function openSessionDb(dbPath: string): Promise<Database> {
   async function setParams(params: Record<string, string | null>): Promise<void> {
     for (const [key, value] of Object.entries(params)) {
       if (value === null) {
+        // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
         await connection.run(`SET VARIABLE "${key}" = NULL`);
       } else {
+        // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
         await connection.run(`SET VARIABLE "${key}" = $value`, { value });
       }
     }
@@ -60,6 +62,7 @@ export async function openSessionDb(dbPath: string): Promise<Database> {
       await setParams(params);
       const sql = await readSql(queryName);
       for (const stmt of splitStatements(sql)) {
+        // oxlint-disable-next-line no-await-in-loop -- statements from one query file apply in order on a single connection.
         await connection.run(stmt);
       }
     },

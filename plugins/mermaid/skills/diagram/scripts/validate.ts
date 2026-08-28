@@ -89,6 +89,7 @@ async function validateBlock(block: MermaidBlock): Promise<ValidationError | nul
 export async function validateBlocks(blocks: MermaidBlock[]): Promise<ValidationError[]> {
   const errors: ValidationError[] = [];
   for (const block of blocks) {
+    // oxlint-disable-next-line no-await-in-loop -- mermaid parses through a shared global parser; concurrent parses interleave its state.
     const error = await validateBlock(block);
     if (error) {
       errors.push(error);
@@ -129,6 +130,7 @@ async function main() {
   let hasErrors = false;
 
   for (const file of files) {
+    // oxlint-disable-next-line no-await-in-loop -- mermaid parses through a shared global parser; concurrent parses interleave its state.
     const result = await validateFile(file);
     results.push(result);
     if (result.errors.length > 0) {

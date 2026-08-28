@@ -242,6 +242,7 @@ const upsertCmd = command(
     const ledger = await resolveLedger(parsed.flags);
     const comments = decodeComments(await Bun.stdin.text());
     for (const comment of comments) {
+      // oxlint-disable-next-line no-await-in-loop -- upsert is a read-modify-write of one ledger file; concurrent upserts drop comments.
       await ledger.upsert(comment);
     }
     console.error(`Upserted ${comments.length} comment(s)`);

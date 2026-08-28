@@ -235,6 +235,7 @@ async function readLog(path: string, since?: string): Promise<RunLogEntry[]> {
   const texts: string[] = [];
   for (const candidate of [`${path}.1`, path]) {
     const file = Bun.file(candidate);
+    // oxlint-disable-next-line no-await-in-loop -- the rotated log and the live log concatenate in that order.
     if (await file.exists()) texts.push(await file.text());
   }
   let entries = parseLog(texts.join("\n"));

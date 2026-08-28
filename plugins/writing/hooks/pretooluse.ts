@@ -85,6 +85,7 @@ export async function dispatch(
   const results: HookResult[] = [];
   for (const checker of checkers) {
     try {
+      // oxlint-disable-next-line no-await-in-loop -- three checkers, each reported individually when it throws; concurrency buys nothing.
       const result = await checker();
       if (result) results.push(result);
     } catch (error) {
@@ -105,10 +106,12 @@ export async function dispatch(
   for (const result of ordered) {
     const tier = tierOf(result.output);
     if (tier === "context" && result.suppressible !== false) {
+      // oxlint-disable-next-line no-await-in-loop -- the loop returns at the first unsuppressed result, and recentlyFired reads state recordFired writes.
       if (await recentlyFired(input.session_id, result.category, now)) {
         suppressed ??= result;
         continue;
       }
+      // oxlint-disable-next-line no-await-in-loop -- the loop returns at the first unsuppressed result, and recentlyFired reads state recordFired writes.
       await recordFired(input.session_id, result.category, now);
     }
     return finish(result.output, tier, { category: result.category });

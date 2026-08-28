@@ -127,7 +127,9 @@ export async function runWithRetry(
     if (result.code === 0 || !isRetriableAppleEventsError(result.code, result.stderr)) {
       return result;
     }
+    // oxlint-disable-next-line no-await-in-loop -- backoff before retrying a transient Apple Events failure.
     await sleep(delay);
+    // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one returned a retriable error.
     result = await run(args);
   }
   return result;

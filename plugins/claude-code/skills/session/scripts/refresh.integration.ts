@@ -126,7 +126,9 @@ describe("refresh.ts", () => {
     const initial = Bun.file(dbPath).size;
 
     for (let i = 0; i < 5; i++) {
+      // oxlint-disable-next-line no-await-in-loop -- the test measures growth across repeated reimports, so each cycle must follow the last.
       await touchCorpusFile(path.join("-Users-test-project", "basic.jsonl"));
+      // oxlint-disable-next-line no-await-in-loop -- the test measures growth across repeated reimports, so each cycle must follow the last.
       const { exitCode } = await run("--refresh");
       expect(exitCode).toBe(0);
     }

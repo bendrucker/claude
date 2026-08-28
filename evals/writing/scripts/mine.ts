@@ -150,15 +150,16 @@ async function probeInvocations(dbPath: string): Promise<number | null> {
 
 async function loadDrafts(dir: string): Promise<RewriteDraft[]> {
   const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).toSorted();
-  const drafts: RewriteDraft[] = [];
-  for (const name of names) {
-    const draft = await decodeFile(Draft, join(dir, name));
-    drafts.push({
-      category: draft.category ?? basename(name, ".json"),
-      input: draft.input,
-      output: draft.output,
-    });
-  }
+  const drafts = await Promise.all(
+    names.map(async (name) => {
+      const draft = await decodeFile(Draft, join(dir, name));
+      return {
+        category: draft.category ?? basename(name, ".json"),
+        input: draft.input,
+        output: draft.output,
+      };
+    }),
+  );
   return drafts;
 }
 

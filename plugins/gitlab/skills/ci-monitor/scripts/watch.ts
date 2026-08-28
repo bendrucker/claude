@@ -515,6 +515,7 @@ export async function resolveMergeStatus(
       }
     }
     if (attempt < MERGE_STATUS_UNKNOWN_RETRIES - 1) {
+      // oxlint-disable-next-line no-await-in-loop -- backoff between merge-status rechecks.
       await sleepFn(MERGE_STATUS_RECHECK_SECONDS * 1000);
     }
   }
@@ -942,6 +943,7 @@ async function watch(options: RunOptions): Promise<void> {
       // same cycle as a stale `success`, ahead of the terminal return below.
       let probe = result.probe;
       if (target.mode === "mr" && iid !== null && probeIsUndetermined(probe)) {
+        // oxlint-disable-next-line no-await-in-loop -- poll loop: each cycle reads state the previous cycle left behind.
         const resolved = await resolveMergeStatus(projectEncoded, iid, exec, sleep);
         probe = {
           ...probe,
@@ -960,6 +962,7 @@ async function watch(options: RunOptions): Promise<void> {
         : DEFAULT_INTERVAL_SECONDS;
     }
 
+    // oxlint-disable-next-line no-await-in-loop -- poll interval between API cycles.
     await sleep((intervalSeconds ?? DEFAULT_INTERVAL_SECONDS) * 1000);
   }
 }

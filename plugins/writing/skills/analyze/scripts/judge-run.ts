@@ -62,6 +62,7 @@ export async function runGate(judge: ChunkJudge, promptSha256: string): Promise<
   }
   const results: GateResult[] = [];
   for (const fixture of JUDGE_FIXTURES) {
+    // oxlint-disable-next-line no-await-in-loop -- one judge API call per fixture; serializing keeps the gate inside the rate limit.
     const verdict = await judgeDocument(judge, fixture.text);
     const mismatches: GateMismatch[] = [];
     for (const criterion of JUDGE_CRITERIA) {
@@ -162,10 +163,7 @@ function renderAudit(audit: MeaningAudit): string {
 async function filesMain(paths: string[], model: string, limit: number): Promise<void> {
   requireApiKey();
   const prompt = await loadPrompt();
-  const texts: string[] = [];
-  for (const p of paths.slice(0, limit)) {
-    texts.push(await Bun.file(p).text());
-  }
+  const texts = await Promise.all(paths.slice(0, limit).map((p) => Bun.file(p).text()));
   const cost = await estimateCost(texts, {
     promptText: prompt.text,
     model,

@@ -135,6 +135,7 @@ async function pointerConfigPath(
     // The shared config lives two levels up.
     resolve(gitDir, "..", "..", "config"),
   ]) {
+    // oxlint-disable-next-line no-await-in-loop -- first match wins: the shared config is only probed when the direct one misses.
     if (await env.fileExists(candidate)) return candidate;
   }
   return null;
@@ -145,9 +146,11 @@ async function gitConfigPath(cwd: string, env: LintEnv): Promise<string | null> 
   for (;;) {
     const dotGit = join(dir, ".git");
     const direct = join(dotGit, "config");
+    // oxlint-disable-next-line no-await-in-loop -- walks up to the parent directory only after the current one misses.
     if (await env.fileExists(direct)) return direct;
 
     // Worktrees and submodules use a `.git` file: `gitdir: <path>`.
+    // oxlint-disable-next-line no-await-in-loop -- walks up to the parent directory only after the current one misses.
     const pointer = await env.readFile(dotGit);
     if (pointer != null && pointer !== "") return pointerConfigPath(dir, pointer, env);
 

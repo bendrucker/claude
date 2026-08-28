@@ -58,11 +58,12 @@ async function readLabels(dir: string): Promise<Map<string, Label>> {
   } catch {
     return map;
   }
-  for (const name of names) {
-    if (!name.endsWith(".json")) continue;
-    const rec = await decodeFile(Label, join(dir, name));
-    map.set(rec.id, rec);
-  }
+  const records = await Promise.all(
+    names
+      .filter((name) => name.endsWith(".json"))
+      .map(async (name) => decodeFile(Label, join(dir, name))),
+  );
+  for (const rec of records) map.set(rec.id, rec);
   return map;
 }
 

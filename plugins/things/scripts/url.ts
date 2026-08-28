@@ -155,6 +155,7 @@ export async function resolveTagParams(
   for (const key of TAG_PARAMS) {
     const requested = parseTags(params.get(key));
     if (requested.length === 0) continue;
+    // oxlint-disable-next-line no-await-in-loop -- the requirer caches the tag list across calls and creates the missing ones.
     params.set(key, (await requirer(requested, createMissing)).join(","));
   }
 }

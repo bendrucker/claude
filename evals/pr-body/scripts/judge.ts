@@ -325,6 +325,7 @@ async function main(): Promise<void> {
   };
   for (const row of judged) {
     addUsage(total, row.usage);
+    // oxlint-disable-next-line no-await-in-loop -- emit appends to a single FileSink; carried-over judgments must be written back in order.
     await emit(row);
   }
   let done = 0;

@@ -43,10 +43,13 @@ export async function applyToBranch(
   try {
     await $`git read-tree HEAD`.env(env).quiet();
     for (const [path, content] of editsByPath) {
+      // oxlint-disable-next-line no-await-in-loop -- the edits write into one GIT_INDEX_FILE; git update-index cannot run concurrently against it.
       const mode = await headMode(path);
+      // oxlint-disable-next-line no-await-in-loop -- the edits write into one GIT_INDEX_FILE; git update-index cannot run concurrently against it.
       const blob = (await $`git hash-object -w --stdin < ${Buffer.from(content)}`.quiet())
         .text()
         .trim();
+      // oxlint-disable-next-line no-await-in-loop -- the edits write into one GIT_INDEX_FILE; git update-index cannot run concurrently against it.
       await $`git update-index --cacheinfo ${`${mode},${blob},${path}`}`.env(env).quiet();
     }
     const tree = (await $`git write-tree`.env(env).quiet()).text().trim();

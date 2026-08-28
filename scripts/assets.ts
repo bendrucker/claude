@@ -47,6 +47,7 @@ export async function* assetPaths(patterns: string[]): AsyncGenerator<string> {
   for (const pattern of patterns) {
     // `dot` reaches the project scope under `.claude/`. A pattern whose
     // directory is absent yields nothing.
+    // oxlint-disable-next-line no-await-in-loop -- an async generator streaming matches in pattern order; the consumer drives it.
     for await (const path of new Bun.Glob(pattern).scan({ cwd: root, dot: true })) {
       if (!isFixture(path)) yield path;
     }

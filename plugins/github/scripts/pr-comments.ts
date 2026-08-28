@@ -323,6 +323,7 @@ async function main(): Promise<void> {
     const variables: Record<string, string | number | undefined> = { owner, repo, number };
     if (cursor != null && cursor !== "") variables.cursor = cursor;
 
+    // oxlint-disable-next-line no-await-in-loop -- cursor pagination: each page's cursor comes from the response before it.
     const result = await fetchGraphQL(QUERY, variables);
     const pr = result.data.repository.pullRequest;
 

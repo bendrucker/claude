@@ -11,6 +11,7 @@ if (files.trim() === "") {
 
 for (const file of files.trim().split("\n")) {
   try {
+    // oxlint-disable-next-line no-await-in-loop -- each conflicted file prints its own line, so reads follow the printed order.
     const content = await Bun.file(file).text();
     const count = (content.match(/^<{7} /gm) || []).length;
     console.log(`- ${file} (${count} conflict${count !== 1 ? "s" : ""})`);

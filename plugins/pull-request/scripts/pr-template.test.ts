@@ -25,11 +25,13 @@ describe("findTemplate", () => {
   });
 
   async function writeFiles(files: TemplateFile[]) {
-    for (const [file, content] of files) {
-      const dest = path.join(tempDir, file);
-      mkdirSync(path.dirname(dest), { recursive: true });
-      await Bun.write(dest, content);
-    }
+    await Promise.all(
+      files.map(([file, content]) => {
+        const dest = path.join(tempDir, file);
+        mkdirSync(path.dirname(dest), { recursive: true });
+        return Bun.write(dest, content);
+      }),
+    );
   }
 
   test.each<[string, TemplateFile[], "github" | "gitlab", string | null]>([

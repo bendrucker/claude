@@ -156,7 +156,7 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
         rows: inventory.mcpServers.map((m) => [m.name, m.plugin, m.path]),
       };
     default:
-      throw new Error(`Unknown inventory kind: ${kind}`);
+      throw new Error(`Unknown inventory kind: ${String(kind)}`);
   }
 }
 

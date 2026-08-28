@@ -1,0 +1,994 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renders the default / low plan 1`] = `
+"CELL low   family default   level low
+
+  mode    direct: one diff read, then findings. No angles, no phases.
+  verify  none
+  cap     4
+  report  text
+
+INSTRUCTIONS
+Skip the phase structure entirely: one diff read, then findings. Read the unified diff in one tool call. No subagents, no full-file reads.
+
+Flag runtime-correctness bugs visible from the hunk alone: inverted/wrong condition, off-by-one, null/undefined deref where adjacent lines show the value can be absent, removed guard, falsy-zero check, missing \`await\`, wrong-variable copy-paste, error swallowed in a catch that should propagate. Also flag — still from the hunk alone — new code that duplicates an existing helper visible in the diff context, and dead code the diff leaves behind.
+
+Do **not** flag style, naming, perf, missing tests, or anything outside the hunk.
+
+Output one line per finding, most-severe first: \`path/to/file.ext:123 — what's wrong and the concrete failure\`.
+
+Output at most 4 findings, and emit exactly \`(none)\` when nothing qualifies.
+
+Skip test/fixture hunks (\`test/\`, \`spec/\`, \`__tests__/\`, \`*_test.*\`, \`*.test.*\`, \`fixtures/\`, \`testdata/\`), which are not reviewed at this level."
+`;
+
+exports[`renders the default / medium plan 1`] = `
+"CELL medium   family default   level medium
+
+  mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
+  angles      core (8)
+  candidates  6 per angle
+  verify      1 vote, 3-state ladder
+  cap         8
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **precision** at medium effort: every finding you surface should be one a maintainer would act on.
+
+FINDER PREAMBLE (give to every angle agent)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
+`;
+
+exports[`renders the default / high plan 1`] = `
+"CELL high   family default   level high
+
+  mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
+  angles      core (8)
+  candidates  6 per angle
+  verify      1 vote, recall-biased ladder
+  cap         10
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at high effort: catch every real bug a careful reviewer would catch in one sitting. At this level, catching real bugs matters more than avoiding false positives. Err on the side of surfacing.
+
+FINDER PREAMBLE (give to every angle agent)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
+`;
+
+exports[`renders the default / xhigh plan 1`] = `
+"CELL xhigh   family default   level xhigh
+
+  mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
+  angles      full (14)
+  candidates  8 per angle
+  verify      1 vote, recall-biased, a single non-REFUTED carries
+  sweep       yes
+  cap         15
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at extra-high effort: catch every real bug. At this level, catching real bugs matters more than avoiding false positives — a missed bug ships. Err on the side of surfacing.
+
+FINDER PREAMBLE (give to every angle agent)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Angle D — language-pitfall specialist
+
+Scan for the classic pitfalls of the diff's language/framework — for example: JS falsy-zero, \`==\` coercion, closure-captured loop var; Python mutable default args, late-binding closures; Go nil-map write, range-var capture; SQL injection; timezone/DST drift; float equality. Flag any instance the diff introduces.
+
+### Angle E — wrapper/proxy correctness
+
+When the PR adds or modifies a type that wraps another (cache, proxy, decorator, adapter): check that every method routes to the wrapped instance and not back through a registry/session/global — e.g. a caching provider holding a \`delegate\` field that resolves IDs via \`session.get(...)\` instead of \`delegate.get(...)\` will re-enter the cache or recurse. Also check that the wrapper forwards all the methods the callers actually use.
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
+
+### Type Discipline
+
+Flag a raw primitive where the surrounding code already declares a domain type for the same thing: a bare string id beside a declared id type, a duration or byte count as a plain number where a unit type exists, a path kept as text past the point something parses it. Name the existing type. Also flag booleans on one record or signature that encode a lifecycle rather than independent facts (\`isLoading\` beside \`isDone\`), and name the combination that has no meaning.
+
+### Discoverability
+
+Flag an exported name whose plain-text search returns the wrong window: a one-word name (\`diff\`, \`queue\`, \`run\`), an unqualified verb (\`validate\`, \`format\`), a bare-role filename (\`utils\`, \`types\`), two spellings of one concept (\`orgId\` beside \`organizationId\`), or a name whose behavior changed underneath it. A symbol copied to a second definition site instead of moved counts too.
+
+### Coupling
+
+Flag Feature Envy (a function reading or writing another module's data more than its own), Data Clumps (the same few parameters travelling together through several signatures), Shotgun Surgery (one logical change forcing scattered edits across this diff), Divergent Change (one file edited for several unrelated reasons), and Message Chains (\`a.b().c().d()\` binding the caller to every hop's shape). Name the smell and the move that removes it. Skip a shape a repo convention endorses or a linter enforces.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut.
+
+SWEEP GAP FOCUS
+The sweep pass hunts only for what the first pass tends to miss: moved/extracted code that dropped a guard or anchor; second-tier footguns (dataclass default evaluated once, \`hash()\` non-determinism, lock-scope shrink, predicate methods with side effects); setup/teardown asymmetry in tests; config defaults flipped."
+`;
+
+exports[`renders the claude-sonnet-5 / low plan 1`] = `
+"CELL low-sonnet5   family claude-sonnet-5   level low
+
+  mode    direct: one diff read, then findings. No angles, no phases.
+  verify  none
+  floor   min(files_changed, 4)
+  report  text
+
+FLOOR
+Target at least min(files_changed, 4) findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+INSTRUCTIONS
+Skip the phase structure entirely: one diff read, then findings. Read the unified diff in one tool call. No subagents, no full-file reads.
+
+Flag runtime-correctness bugs visible from the hunk alone: inverted/wrong condition, off-by-one, null/undefined deref where adjacent lines show the value can be absent, removed guard, falsy-zero check, missing \`await\`, wrong-variable copy-paste, error swallowed in a catch that should propagate. Also flag — still from the hunk alone — new code that duplicates an existing helper visible in the diff context, and dead code the diff leaves behind.
+
+Do **not** flag style, naming, perf, missing tests, or anything outside the hunk.
+
+Output one line per finding, most-severe first: \`path/to/file.ext:123 — what's wrong and the concrete failure\`.
+
+Target \`min(files_changed, 4)\` findings, and take one more pass over the largest changed file and any removed blocks before settling for fewer.
+
+Skip test/fixture hunks (\`test/\`, \`spec/\`, \`__tests__/\`, \`*_test.*\`, \`*.test.*\`, \`fixtures/\`, \`testdata/\`), which are not reviewed at this level."
+`;
+
+exports[`renders the claude-sonnet-5 / medium plan 1`] = `
+"CELL medium   family claude-sonnet-5   level medium
+
+  mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
+  angles      core (8)
+  candidates  6 per angle
+  verify      1 vote, 3-state ladder
+  cap         8
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **precision** at medium effort: every finding you surface should be one a maintainer would act on.
+
+FINDER PREAMBLE (give to every angle agent)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
+`;
+
+exports[`renders the claude-sonnet-5 / high plan 1`] = `
+"CELL high   family claude-sonnet-5   level high
+
+  mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
+  angles      core (8)
+  candidates  6 per angle
+  verify      1 vote, recall-biased ladder
+  cap         10
+  report      ReportFindings
+
+FINDER BUDGET
+Scale the finder fleet to the diff size instead of using a fixed one-agent-per-angle fan-out. Run \`git diff --numstat\` over the review range, sum the changed lines, and re-run this script with \`--diff-lines <n>\` to get the count. Deal the cell's angle set across that many agents in whole angles. A fleet smaller than the set gives some agents more than one angle. The committed-range count is a floor: uncommitted changes are not in it, so scale up if Phase 0 found additional working-tree scope.
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at high effort: catch every real bug a careful reviewer would catch in one sitting. At this level, catching real bugs matters more than avoiding false positives. Err on the side of surfacing.
+
+FINDER PREAMBLE (give to every angle agent)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
+`;
+
+exports[`renders the claude-sonnet-5 / xhigh plan 1`] = `
+"CELL xhigh   family claude-sonnet-5   level xhigh
+
+  mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
+  angles      full (14)
+  candidates  8 per angle
+  verify      1 vote, recall-biased, a single non-REFUTED carries
+  sweep       yes
+  cap         15
+  report      ReportFindings
+
+FINDER BUDGET
+Scale the finder fleet to the diff size instead of using a fixed one-agent-per-angle fan-out. Run \`git diff --numstat\` over the review range, sum the changed lines, and re-run this script with \`--diff-lines <n>\` to get the count. Deal the cell's angle set across that many agents in whole angles. A fleet smaller than the set gives some agents more than one angle. The committed-range count is a floor: uncommitted changes are not in it, so scale up if Phase 0 found additional working-tree scope.
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at extra-high effort: catch every real bug. At this level, catching real bugs matters more than avoiding false positives — a missed bug ships. Err on the side of surfacing.
+
+FINDER PREAMBLE (give to every angle agent)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Angle D — language-pitfall specialist
+
+Scan for the classic pitfalls of the diff's language/framework — for example: JS falsy-zero, \`==\` coercion, closure-captured loop var; Python mutable default args, late-binding closures; Go nil-map write, range-var capture; SQL injection; timezone/DST drift; float equality. Flag any instance the diff introduces.
+
+### Angle E — wrapper/proxy correctness
+
+When the PR adds or modifies a type that wraps another (cache, proxy, decorator, adapter): check that every method routes to the wrapped instance and not back through a registry/session/global — e.g. a caching provider holding a \`delegate\` field that resolves IDs via \`session.get(...)\` instead of \`delegate.get(...)\` will re-enter the cache or recurse. Also check that the wrapper forwards all the methods the callers actually use.
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
+
+### Type Discipline
+
+Flag a raw primitive where the surrounding code already declares a domain type for the same thing: a bare string id beside a declared id type, a duration or byte count as a plain number where a unit type exists, a path kept as text past the point something parses it. Name the existing type. Also flag booleans on one record or signature that encode a lifecycle rather than independent facts (\`isLoading\` beside \`isDone\`), and name the combination that has no meaning.
+
+### Discoverability
+
+Flag an exported name whose plain-text search returns the wrong window: a one-word name (\`diff\`, \`queue\`, \`run\`), an unqualified verb (\`validate\`, \`format\`), a bare-role filename (\`utils\`, \`types\`), two spellings of one concept (\`orgId\` beside \`organizationId\`), or a name whose behavior changed underneath it. A symbol copied to a second definition site instead of moved counts too.
+
+### Coupling
+
+Flag Feature Envy (a function reading or writing another module's data more than its own), Data Clumps (the same few parameters travelling together through several signatures), Shotgun Surgery (one logical change forcing scattered edits across this diff), Divergent Change (one file edited for several unrelated reasons), and Message Chains (\`a.b().c().d()\` binding the caller to every hop's shape). Name the smell and the move that removes it. Skip a shape a repo convention endorses or a linter enforces.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut.
+
+SWEEP GAP FOCUS
+The sweep pass hunts only for what the first pass tends to miss: moved/extracted code that dropped a guard or anchor; second-tier footguns (dataclass default evaluated once, \`hash()\` non-determinism, lock-scope shrink, predicate methods with side effects); setup/teardown asymmetry in tests; config defaults flipped."
+`;
+
+exports[`renders the claude-opus-4-8 / low plan 1`] = `
+"CELL inline-low   family claude-opus-4-8   level low
+
+  mode    direct: one diff read, then findings. No angles, no phases.
+  verify  none
+  cap     8
+  floor   min(files_changed, 4)
+  report  text
+
+FLOOR
+Target at least min(files_changed, 4) findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+INSTRUCTIONS
+Skip the phase structure entirely: one diff read, then findings. Read the unified diff in one tool call. No subagents, no full-file reads.
+
+Flag runtime-correctness bugs visible from the hunk alone: inverted/wrong condition, off-by-one, null/undefined deref where adjacent lines show the value can be absent, removed guard, falsy-zero check, missing \`await\`, wrong-variable copy-paste, error swallowed in a catch that should propagate. Also flag — still from the hunk alone — new code that duplicates an existing helper visible in the diff context, and dead code the diff leaves behind.
+
+Do **not** flag style, naming, perf, missing tests, or anything outside the hunk.
+
+Output one line per finding, most-severe first: \`path/to/file.ext:123 — what's wrong and the concrete failure\`.
+
+Output at most 8 findings, targeting at least \`min(files_changed, 4)\` and widening to other hunks before stopping.
+
+Review test and fixture hunks too."
+`;
+
+exports[`renders the claude-opus-4-8 / medium plan 1`] = `
+"CELL inline-med   family claude-opus-4-8   level medium
+
+  mode        inline: work through the angles in sequence in this context, no subagents
+  angles      core (8)
+  candidates  6 per angle
+  verify      dedup only, no verify pass
+  cap         8
+  floor       4
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at high effort: catch every real bug a careful reviewer would catch in one sitting. At this level, catching real bugs matters more than avoiding false positives. Err on the side of surfacing.
+
+FLOOR
+Target at least 4 findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+FINDER PREAMBLE (applies to every angle)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
+`;
+
+exports[`renders the claude-opus-4-8 / high plan 1`] = `
+"CELL inline-high   family claude-opus-4-8   level high
+
+  mode        inline: work through the angles in sequence in this context, no subagents
+  angles      core (8)
+  candidates  6 per angle
+  verify      dedup only, no verify pass
+  cap         10
+  floor       5
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at high effort: catch every real bug a careful reviewer would catch in one sitting. At this level, catching real bugs matters more than avoiding false positives. Err on the side of surfacing.
+
+FLOOR
+Target at least 5 findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+FINDER PREAMBLE (applies to every angle)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
+`;
+
+exports[`renders the claude-opus-4-8 / xhigh plan 1`] = `
+"CELL inline-xhigh   family claude-opus-4-8   level xhigh
+
+  mode        inline: work through the angles in sequence in this context, no subagents
+  angles      full (14)
+  candidates  8 per angle
+  verify      dedup only, no verify pass
+  sweep       yes
+  cap         15
+  floor       7
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at extra-high effort: catch every real bug. At this level, catching real bugs matters more than avoiding false positives — a missed bug ships. Err on the side of surfacing.
+
+FLOOR
+Target at least 7 findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+FINDER PREAMBLE (applies to every angle)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Angle D — language-pitfall specialist
+
+Scan for the classic pitfalls of the diff's language/framework — for example: JS falsy-zero, \`==\` coercion, closure-captured loop var; Python mutable default args, late-binding closures; Go nil-map write, range-var capture; SQL injection; timezone/DST drift; float equality. Flag any instance the diff introduces.
+
+### Angle E — wrapper/proxy correctness
+
+When the PR adds or modifies a type that wraps another (cache, proxy, decorator, adapter): check that every method routes to the wrapped instance and not back through a registry/session/global — e.g. a caching provider holding a \`delegate\` field that resolves IDs via \`session.get(...)\` instead of \`delegate.get(...)\` will re-enter the cache or recurse. Also check that the wrapper forwards all the methods the callers actually use.
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
+
+### Type Discipline
+
+Flag a raw primitive where the surrounding code already declares a domain type for the same thing: a bare string id beside a declared id type, a duration or byte count as a plain number where a unit type exists, a path kept as text past the point something parses it. Name the existing type. Also flag booleans on one record or signature that encode a lifecycle rather than independent facts (\`isLoading\` beside \`isDone\`), and name the combination that has no meaning.
+
+### Discoverability
+
+Flag an exported name whose plain-text search returns the wrong window: a one-word name (\`diff\`, \`queue\`, \`run\`), an unqualified verb (\`validate\`, \`format\`), a bare-role filename (\`utils\`, \`types\`), two spellings of one concept (\`orgId\` beside \`organizationId\`), or a name whose behavior changed underneath it. A symbol copied to a second definition site instead of moved counts too.
+
+### Coupling
+
+Flag Feature Envy (a function reading or writing another module's data more than its own), Data Clumps (the same few parameters travelling together through several signatures), Shotgun Surgery (one logical change forcing scattered edits across this diff), Divergent Change (one file edited for several unrelated reasons), and Message Chains (\`a.b().c().d()\` binding the caller to every hop's shape). Name the smell and the move that removes it. Skip a shape a repo convention endorses or a linter enforces.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut.
+
+SWEEP GAP FOCUS
+The sweep pass hunts only for what the first pass tends to miss: moved/extracted code that dropped a guard or anchor; second-tier footguns (dataclass default evaluated once, \`hash()\` non-determinism, lock-scope shrink, predicate methods with side effects); setup/teardown asymmetry in tests; config defaults flipped."
+`;
+
+exports[`renders the claude-fable-5 / low plan 1`] = `
+"CELL inline-low   family claude-fable-5   level low
+
+  mode    direct: one diff read, then findings. No angles, no phases.
+  verify  none
+  cap     8
+  floor   min(files_changed, 4)
+  report  text
+
+FLOOR
+Target at least min(files_changed, 4) findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+INSTRUCTIONS
+Skip the phase structure entirely: one diff read, then findings. Read the unified diff in one tool call. No subagents, no full-file reads.
+
+Flag runtime-correctness bugs visible from the hunk alone: inverted/wrong condition, off-by-one, null/undefined deref where adjacent lines show the value can be absent, removed guard, falsy-zero check, missing \`await\`, wrong-variable copy-paste, error swallowed in a catch that should propagate. Also flag — still from the hunk alone — new code that duplicates an existing helper visible in the diff context, and dead code the diff leaves behind.
+
+Do **not** flag style, naming, perf, missing tests, or anything outside the hunk.
+
+Output one line per finding, most-severe first: \`path/to/file.ext:123 — what's wrong and the concrete failure\`.
+
+Output at most 8 findings, targeting at least \`min(files_changed, 4)\` and widening to other hunks before stopping.
+
+Review test and fixture hunks too."
+`;
+
+exports[`renders the claude-fable-5 / medium plan 1`] = `
+"CELL inline-med   family claude-fable-5   level medium
+
+  mode        inline: work through the angles in sequence in this context, no subagents
+  angles      core (8)
+  candidates  6 per angle
+  verify      dedup only, no verify pass
+  cap         8
+  floor       4
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at high effort: catch every real bug a careful reviewer would catch in one sitting. At this level, catching real bugs matters more than avoiding false positives. Err on the side of surfacing.
+
+FLOOR
+Target at least 4 findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+FINDER PREAMBLE (applies to every angle)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
+`;
+
+exports[`renders the claude-fable-5 / high plan 1`] = `
+"CELL inline-high   family claude-fable-5   level high
+
+  mode        inline: work through the angles in sequence in this context, no subagents
+  angles      core (8)
+  candidates  6 per angle
+  verify      dedup only, no verify pass
+  cap         10
+  floor       5
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at high effort: catch every real bug a careful reviewer would catch in one sitting. At this level, catching real bugs matters more than avoiding false positives. Err on the side of surfacing.
+
+FLOOR
+Target at least 5 findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+FINDER PREAMBLE (applies to every angle)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
+`;
+
+exports[`renders the claude-fable-5 / xhigh plan 1`] = `
+"CELL xhigh   family claude-fable-5   level xhigh
+
+  mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
+  angles      full (14)
+  candidates  8 per angle
+  verify      1 vote, recall-biased, a single non-REFUTED carries
+  sweep       yes
+  cap         15
+  report      ReportFindings
+
+FRAMING (emit verbatim before Phase 1)
+> You are reviewing for **recall** at extra-high effort: catch every real bug. At this level, catching real bugs matters more than avoiding false positives — a missed bug ships. Err on the side of surfacing.
+
+FINDER PREAMBLE (give to every angle agent)
+Every candidate carries \`file\`, \`line\`, a one-line \`summary\`, and a concrete \`failure_scenario\` — the user-visible consequence (error, wrong output, data loss), not an intermediate state (value stale, set grows).
+
+Do not let one angle's conclusions suppress another's. If two angles flag the same line for different reasons, record both.
+
+ANGLES
+### Angle A — line-by-line diff scan
+
+Read every hunk in the diff, line by line. Then Read the enclosing function for each hunk — bugs in unchanged lines of a touched function are in scope (the PR re-exposes or fails to fix them). For every line ask: what input, state, timing, or platform makes this line wrong? Look for inverted/wrong conditions, off-by-one, null/undefined deref, missing \`await\`, falsy-zero checks, wrong-variable copy-paste, error swallowed in catch, unescaped regex metachars.
+
+### Angle B — removed-behavior auditor
+
+For every line the diff DELETES or replaces, name the invariant or behavior it enforced, then search the new code for where that invariant is re-established. If you can't find it, that's a candidate: a removed guard, a dropped error path, a narrowed validation, a deleted test that was covering a real case.
+
+### Angle C — cross-file tracer
+
+For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+
+### Angle D — language-pitfall specialist
+
+Scan for the classic pitfalls of the diff's language/framework — for example: JS falsy-zero, \`==\` coercion, closure-captured loop var; Python mutable default args, late-binding closures; Go nil-map write, range-var capture; SQL injection; timezone/DST drift; float equality. Flag any instance the diff introduces.
+
+### Angle E — wrapper/proxy correctness
+
+When the PR adds or modifies a type that wraps another (cache, proxy, decorator, adapter): check that every method routes to the wrapped instance and not back through a registry/session/global — e.g. a caching provider holding a \`delegate\` field that resolves IDs via \`session.get(...)\` instead of \`delegate.get(...)\` will re-enter the cache or recurse. Also check that the wrapper forwards all the methods the callers actually use.
+
+### Reuse
+
+The angles above hunt for bugs; this one and the next two hunt for cleanup in the changed code. Flag new code that re-implements something the codebase already has — Grep shared/utility modules and files adjacent to the change, and name the existing helper to call instead.
+
+### Simplification
+
+Flag unnecessary complexity the diff adds: redundant or derivable state, copy-paste with slight variation, deep nesting, dead code left behind. Name the simpler form that does the same job.
+
+### Efficiency
+
+Flag wasted work the diff introduces: redundant computation or repeated I/O, independent operations run sequentially, blocking work added to startup or hot paths. Also flag long-lived objects built from closures or captured environments — they keep the entire enclosing scope alive for the object's lifetime (a memory leak when that scope holds large values); prefer a class/struct that copies only the fields it needs. Name the cheaper alternative.
+
+### Altitude
+
+Two shapes, both anchored in what the diff set out to do.
+
+The change does not reach its own goal. Name what the diff prevents, from its commit message, a comment it adds, or the bug it cites, then trace whether the changed line prevents it: a guard added inside a scope the failure escapes, a fix applied at one call site when every caller shares the defective path, a hardcoded list inside a mechanism whose stated purpose is staying current. Cite the path that still reaches the bad state.
+
+The diff creates an invariant nothing enforces where it breaks. An import another module now depends on, a parameter callers must now pass, a required call order, a referenced path that must exist. The type, guard, or anchoring comment sits a level above the code that depends on it. Name the edit or call that violates it and what fails.
+
+Both need a fix inside the code this change introduced. Skip structure the diff did not create, defects whose real fix lives in another repository or another vendor's product, and code that only differs from how its neighbors are organized: a builder to match sibling modules, a lookup table where a branch is, a shared schema over a local guard. Drop a candidate whose own reasoning concedes the current form is a deliberate tradeoff.
+
+### Conventions (CLAUDE.md)
+
+Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
+
+Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
+
+### Type Discipline
+
+Flag a raw primitive where the surrounding code already declares a domain type for the same thing: a bare string id beside a declared id type, a duration or byte count as a plain number where a unit type exists, a path kept as text past the point something parses it. Name the existing type. Also flag booleans on one record or signature that encode a lifecycle rather than independent facts (\`isLoading\` beside \`isDone\`), and name the combination that has no meaning.
+
+### Discoverability
+
+Flag an exported name whose plain-text search returns the wrong window: a one-word name (\`diff\`, \`queue\`, \`run\`), an unqualified verb (\`validate\`, \`format\`), a bare-role filename (\`utils\`, \`types\`), two spellings of one concept (\`orgId\` beside \`organizationId\`), or a name whose behavior changed underneath it. A symbol copied to a second definition site instead of moved counts too.
+
+### Coupling
+
+Flag Feature Envy (a function reading or writing another module's data more than its own), Data Clumps (the same few parameters travelling together through several signatures), Shotgun Surgery (one logical change forcing scattered edits across this diff), Divergent Change (one file edited for several unrelated reasons), and Message Chains (\`a.b().c().d()\` binding the caller to every hop's shape). Name the smell and the move that removes it. Skip a shape a repo convention endorses or a linter enforces.
+
+CLEANUP PRECEDENCE
+Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut.
+
+SWEEP GAP FOCUS
+The sweep pass hunts only for what the first pass tends to miss: moved/extracted code that dropped a guard or anchor; second-tier footguns (dataclass default evaluated once, \`hash()\` non-determinism, lock-scope shrink, predicate methods with side effects); setup/teardown asymmetry in tests; config defaults flipped."
+`;

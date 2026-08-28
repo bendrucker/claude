@@ -232,6 +232,9 @@
         "table": "^6.9.0",
         "zod": "^4.4.3",
       },
+      "devDependencies": {
+        "ajv": "^8.17.1",
+      },
     },
     "plugins/shortcuts": {
       "name": "shortcuts",

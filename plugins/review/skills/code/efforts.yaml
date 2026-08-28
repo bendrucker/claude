@@ -1,0 +1,227 @@
+# yaml-language-server: $schema=./efforts.schema.json
+
+# The review's shape, chosen by (model family, effort level).
+# Rationale for the cell assignments lives in efforts.md. This file is the data behind them.
+
+spawnModel: sonnet
+
+levels:
+  - low
+  - medium
+  - high
+  - xhigh
+
+aliases:
+  max: xhigh
+
+modes:
+  fanout: "fan-out: one Agent per angle, subagent_type review:angle, model {spawnModel}"
+  inline: "inline: work through the angles in sequence in this context, no subagents"
+  direct: "direct: one diff read, then findings. No angles, no phases."
+
+families:
+  - id: claude-sonnet-5
+    match:
+      - claude-sonnet-5
+  - id: claude-opus-4-8
+    match:
+      - claude-opus-4-8
+  - id: claude-fable-5
+    match:
+      - claude-fable-5
+  - id: default
+    match: []
+
+selection:
+  default:
+    low:
+      cell: low
+      modifiers: []
+    medium:
+      cell: medium
+      modifiers: []
+    high:
+      cell: high
+      modifiers: []
+    xhigh:
+      cell: xhigh
+      modifiers: []
+  claude-sonnet-5:
+    low:
+      cell: low-sonnet5
+      modifiers: []
+    medium:
+      cell: medium
+      modifiers: []
+    high:
+      cell: high
+      modifiers:
+        - finder-budget
+    xhigh:
+      cell: xhigh
+      modifiers:
+        - finder-budget
+  claude-opus-4-8:
+    low:
+      cell: inline-low
+      modifiers: []
+    medium:
+      cell: inline-med
+      modifiers: []
+    high:
+      cell: inline-high
+      modifiers: []
+    xhigh:
+      cell: inline-xhigh
+      modifiers: []
+  claude-fable-5:
+    low:
+      cell: inline-low
+      modifiers: []
+    medium:
+      cell: inline-med
+      modifiers: []
+    high:
+      cell: inline-high
+      modifiers: []
+    xhigh:
+      cell: xhigh
+      modifiers: []
+
+cells:
+  low:
+    mode: direct
+    angleSet: null
+    candidatesPerAngle: null
+    verify: none
+    sweep: false
+    cap: 4
+    floor: null
+    framing: null
+    reportsVia: text
+  low-sonnet5:
+    mode: direct
+    angleSet: null
+    candidatesPerAngle: null
+    verify: none
+    sweep: false
+    cap: null
+    floor: min(files_changed, 4)
+    framing: null
+    reportsVia: text
+  inline-low:
+    mode: direct
+    angleSet: null
+    candidatesPerAngle: null
+    verify: none
+    sweep: false
+    cap: 8
+    floor: min(files_changed, 4)
+    framing: null
+    reportsVia: text
+  medium:
+    mode: fanout
+    angleSet: core
+    candidatesPerAngle: 6
+    verify: 1 vote, 3-state ladder
+    sweep: false
+    cap: 8
+    floor: null
+    framing: precision
+    reportsVia: ReportFindings
+  high:
+    mode: fanout
+    angleSet: core
+    candidatesPerAngle: 6
+    verify: 1 vote, recall-biased ladder
+    sweep: false
+    cap: 10
+    floor: null
+    framing: recall-high
+    reportsVia: ReportFindings
+  xhigh:
+    mode: fanout
+    angleSet: full
+    candidatesPerAngle: 8
+    verify: 1 vote, recall-biased, a single non-REFUTED carries
+    sweep: true
+    cap: 15
+    floor: null
+    framing: recall-xhigh
+    reportsVia: ReportFindings
+  inline-med:
+    mode: inline
+    angleSet: core
+    candidatesPerAngle: 6
+    verify: dedup only, no verify pass
+    sweep: false
+    cap: 8
+    floor: 4
+    framing: recall-high
+    reportsVia: ReportFindings
+  inline-high:
+    mode: inline
+    angleSet: core
+    candidatesPerAngle: 6
+    verify: dedup only, no verify pass
+    sweep: false
+    cap: 10
+    floor: 5
+    framing: recall-high
+    reportsVia: ReportFindings
+  inline-xhigh:
+    mode: inline
+    angleSet: full
+    candidatesPerAngle: 8
+    verify: dedup only, no verify pass
+    sweep: true
+    cap: 15
+    floor: 7
+    framing: recall-xhigh
+    reportsVia: ReportFindings
+
+framings:
+  precision: |
+    You are reviewing for **precision** at medium effort: every finding you surface should be one a maintainer would act on.
+
+  recall-high: |
+    You are reviewing for **recall** at high effort: catch every real bug a careful reviewer would catch in one sitting. At this level, catching real bugs matters more than avoiding false positives. Err on the side of surfacing.
+
+  recall-xhigh: |
+    You are reviewing for **recall** at extra-high effort: catch every real bug. At this level, catching real bugs matters more than avoiding false positives — a missed bug ships. Err on the side of surfacing.
+
+lowInstructions:
+  shared: |
+    Skip the phase structure entirely: one diff read, then findings. Read the unified diff in one tool call. No subagents, no full-file reads.
+
+    Flag runtime-correctness bugs visible from the hunk alone: inverted/wrong condition, off-by-one, null/undefined deref where adjacent lines show the value can be absent, removed guard, falsy-zero check, missing `await`, wrong-variable copy-paste, error swallowed in a catch that should propagate. Also flag — still from the hunk alone — new code that duplicates an existing helper visible in the diff context, and dead code the diff leaves behind.
+
+    Do **not** flag style, naming, perf, missing tests, or anything outside the hunk.
+
+    Output one line per finding, most-severe first: `path/to/file.ext:123 — what's wrong and the concrete failure`.
+
+  cells:
+    low: |
+      Output at most 4 findings, and emit exactly `(none)` when nothing qualifies.
+
+      Skip test/fixture hunks (`test/`, `spec/`, `__tests__/`, `*_test.*`, `*.test.*`, `fixtures/`, `testdata/`), which are not reviewed at this level.
+
+    low-sonnet5: |
+      Target `min(files_changed, 4)` findings, and take one more pass over the largest changed file and any removed blocks before settling for fewer.
+
+      Skip test/fixture hunks (`test/`, `spec/`, `__tests__/`, `*_test.*`, `*.test.*`, `fixtures/`, `testdata/`), which are not reviewed at this level.
+
+    inline-low: |
+      Output at most 8 findings, targeting at least `min(files_changed, 4)` and widening to other hunks before stopping.
+
+      Review test and fixture hunks too.
+
+floorInstruction: |
+  Target at least {floor} findings. If fewer genuine findings exist, emit what you have. Do not invent findings to hit the floor.
+
+finderBudget:
+  linesPerAgent: 150
+  min: 2
+  max: 8
+  text: |
+    Scale the finder fleet to the diff size instead of using a fixed one-agent-per-angle fan-out. Run `git diff --numstat` over the review range, sum the changed lines, and re-run this script with `--diff-lines <n>` to get the count. Deal the cell's angle set across that many agents in whole angles. A fleet smaller than the set gives some agents more than one angle. The committed-range count is a floor: uncommitted changes are not in it, so scale up if Phase 0 found additional working-tree scope.

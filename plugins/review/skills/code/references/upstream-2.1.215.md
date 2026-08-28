@@ -2,7 +2,7 @@
 
 Binary: `/opt/homebrew/Caskroom/claude-code@latest/2.1.215/claude` (247 MB, Bun single-file executable).
 
-Cell names here are upstream's. The `inline-low`, `inline-med`, `inline-high`, and `inline-xhigh` cells in [efforts.md](../efforts.md) are upstream's `o48-low-v1`, `o48-med-v1`, `o48-high-v1`, and `o48-xhigh-v1`, renamed because more than one model family now selects them.
+Cell names here are upstream's. The `inline-low`, `inline-med`, `inline-high`, and `inline-xhigh` cells in [efforts.yaml](../efforts.yaml) are upstream's `o48-low-v1`, `o48-med-v1`, `o48-high-v1`, and `o48-xhigh-v1`, renamed because more than one model family now selects them.
 
 ## Method note (important correction)
 

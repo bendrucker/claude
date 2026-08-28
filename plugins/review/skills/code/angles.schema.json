@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bendrucker/claude/plugins/review/skills/code/angles.schema.json",
+  "title": "Review finder angles",
+  "description": "Finder angles for review:code, with the preamble and precedence blocks every finder receives.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["preamble", "angles", "cleanupPrecedence", "sweepGapFocus"],
+  "properties": {
+    "preamble": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Candidate shape and the no-suppression rule, given to every finder."
+    },
+    "angles": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Angles in the order finders receive them.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "kind", "sets", "text"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9-]*$" },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Heading the finder sees above its angle text."
+          },
+          "kind": { "enum": ["correctness", "cleanup", "altitude", "conventions"] },
+          "sets": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "enum": ["core", "full"] },
+            "description": "Angle sets this angle belongs to. Stated rather than derived, so the xhigh-only angles are explicit."
+          },
+          "text": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "cleanupPrecedence": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Emitted when the selected set carries a cleanup, altitude, or conventions angle."
+    },
+    "sweepGapFocus": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Emitted when the cell runs a sweep pass."
+    }
+  }
+}

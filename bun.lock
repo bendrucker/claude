@@ -35,6 +35,13 @@
         "fast-xml-parser": "^5.0.0",
       },
     },
+    "evals/comment-density": {
+      "name": "@bendrucker/comment-density-eval",
+      "dependencies": {
+        "cleye": "^2.2.1",
+        "table": "^6.9.0",
+      },
+    },
     "evals/pr-body": {
       "name": "pr-body-eval",
       "dependencies": {
@@ -371,6 +378,8 @@
     "@bendrucker/claude-validate": ["@bendrucker/claude-validate@workspace:packages/validate"],
 
     "@bendrucker/claude-writing": ["@bendrucker/claude-writing@workspace:plugins/writing"],
+
+    "@bendrucker/comment-density-eval": ["@bendrucker/comment-density-eval@workspace:evals/comment-density"],
 
     "@bendrucker/type-ignore": ["@bendrucker/type-ignore@workspace:plugins/type-ignore"],
 

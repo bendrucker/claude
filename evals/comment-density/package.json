@@ -1,0 +1,9 @@
+{
+  "name": "@bendrucker/comment-density-eval",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "table": "^6.9.0"
+  }
+}

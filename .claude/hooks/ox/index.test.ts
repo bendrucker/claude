@@ -1,4 +1,14 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, test } from "bun:test";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  setDefaultTimeout,
+  test,
+} from "bun:test";
 import { exec } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,6 +33,10 @@ import {
   runOxlintAgent,
   STOP_BLOCK_LIMIT,
 } from ".";
+
+// Every check here spawns oxlint and oxfmt over a real fixture, and the
+// type-aware pass alone outruns the 5s default on CI.
+setDefaultTimeout(30_000);
 
 const execAsync = promisify(exec);
 
@@ -385,10 +399,6 @@ describe("ox hook", () => {
   });
 
   describe("processStop", () => {
-    // Each Stop runs a whole-tree type-aware check, so a test driving the gate
-    // three times needs a budget the 5s default does not give it on CI.
-    const MULTI_STOP_TIMEOUT_MS = 30_000;
-
     // A session holding one lint error oxfmt cannot fix, stopped repeatedly.
     // Each block-budget test drives its own so the on-disk count stays its own.
     async function unfixableSession(session: string): Promise<string> {
@@ -412,26 +422,22 @@ describe("ox hook", () => {
     });
 
     // An error the model cannot clear would otherwise block every Stop forever.
-    it(
-      "gives way once the issues survive the block limit",
-      async () => {
-        const session = `limit-${Date.now()}`;
-        const transcript = await unfixableSession(session);
+    it("gives way once the issues survive the block limit", async () => {
+      const session = `limit-${Date.now()}`;
+      const transcript = await unfixableSession(session);
 
-        const budget: (SyncHookJSONOutput | null)[] = [];
-        for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
-          budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
-        }
-        const past = await processStop(mockStopHookInput(transcript, true, session));
+      const budget: (SyncHookJSONOutput | null)[] = [];
+      for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
+        budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
+      }
+      const past = await processStop(mockStopHookInput(transcript, true, session));
 
-        expect(budget.map((result) => result?.decision)).toEqual(
-          Array.from({ length: STOP_BLOCK_LIMIT }, () => "block"),
-        );
-        expect(past?.decision).toBeUndefined();
-        expect(past?.systemMessage).toContain("no-dupe-keys");
-      },
-      MULTI_STOP_TIMEOUT_MS,
-    );
+      expect(budget.map((result) => result?.decision)).toEqual(
+        Array.from({ length: STOP_BLOCK_LIMIT }, () => "block"),
+      );
+      expect(past?.decision).toBeUndefined();
+      expect(past?.systemMessage).toContain("no-dupe-keys");
+    });
 
     // Blocking without a recorded count is the runaway itself: every re-entrant
     // Stop would read zero and block again, with nothing to release it.
@@ -449,20 +455,16 @@ describe("ox hook", () => {
 
     // The budget is per round. A Stop the model did not reach through a block
     // ends the previous round, so the next one starts with its full count.
-    it(
-      "restarts the count on a stop that did not follow a block",
-      async () => {
-        const session = `restart-${Date.now()}`;
-        const transcript = await unfixableSession(session);
+    it("restarts the count on a stop that did not follow a block", async () => {
+      const session = `restart-${Date.now()}`;
+      const transcript = await unfixableSession(session);
 
-        await processStop(mockStopHookInput(transcript, false, session));
-        await processStop(mockStopHookInput(transcript, true, session));
-        const fresh = await processStop(mockStopHookInput(transcript, false, session));
+      await processStop(mockStopHookInput(transcript, false, session));
+      await processStop(mockStopHookInput(transcript, true, session));
+      const fresh = await processStop(mockStopHookInput(transcript, false, session));
 
-        expect(fresh?.decision).toBe("block");
-      },
-      MULTI_STOP_TIMEOUT_MS,
-    );
+      expect(fresh?.decision).toBe("block");
+    });
 
     it("returns null when no files were modified", async () => {
       const transcriptPath = join(tempDir, `transcript-empty-${Date.now()}.jsonl`);

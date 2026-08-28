@@ -117,7 +117,10 @@ function parseFares(lines: string[]): AwardFare[] {
     });
   }
 
-  // Each cabin's pricing block renders twice on the page.
+  // Each cabin's pricing block renders twice on the page. Keying the dedup on the
+  // cabin label assumes United shows one offer per label, which held across every
+  // dump checked. A separate offer tier arrives under its own label, as
+  // "Business/First (lowest)" does.
   return fares.filter(
     (fare, index) =>
       fares.findIndex(

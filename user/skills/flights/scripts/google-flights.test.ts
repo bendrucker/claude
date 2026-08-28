@@ -77,6 +77,16 @@ describe("tfs", () => {
   test("requires a leg", () => {
     expect(() => tfs({ legs: [] })).toThrow(/at least one leg/);
   });
+
+  test.each<[string, number]>([
+    ["a count past a byte", 256],
+    ["a negative count", -1],
+    ["a fraction", 1.5],
+  ])("rejects %s of bags, which would wrap to a different number", (_label, carryOn) => {
+    expect(() =>
+      tfs({ legs: [{ date: "2026-04-15", origin: "LAX", destination: "ORD" }], carryOn }),
+    ).toThrow(/carry-on bags must be a whole number/);
+  });
 });
 
 describe("parseGrid", () => {
@@ -124,6 +134,25 @@ describe("parseGrid", () => {
   test("ignores prices outside the grid", () => {
     expect(parseGrid('button "$999, Nov 1 to Nov 2"')).toEqual([]);
   });
+
+  test("stops one-way cells at the last header date", () => {
+    // The results list sits under the grid overlay and its fare buttons carry the
+    // same shape, so the header count is what separates a cell from a result.
+    const text = `
+    - grid "Date grid" [ref=e27]
+      - StaticText "Nov 8"
+      - StaticText "Nov 9"
+      - button "$234, cheapest price" [ref=e39]
+      - button "$329" [ref=e40]
+    - list "Results"
+      - button "$612" [ref=e80]
+`;
+
+    expect(parseGrid(text)).toEqual([
+      { out: "Nov 8", back: null, price: 234, tier: "cheapest" },
+      { out: "Nov 9", back: null, price: 329, tier: null },
+    ]);
+  });
 });
 
 describe("searchUrl", () => {
@@ -167,6 +196,19 @@ describe("parseResults", () => {
       price: 274,
       basic: false,
     });
+  });
+
+  test("leaves a field the itinerary omits unfilled by the next one", () => {
+    // The tail scanned after each block is wide enough to reach the following
+    // itinerary, so a missing price would otherwise be read off its neighbour.
+    const text =
+      itinerary({ airline: "United", price: "" }) + itinerary({ airline: "Alaska", price: "$274" });
+    const rows = parseResults(text);
+
+    expect(rows.map((row) => [row.airline, row.price])).toEqual([
+      ["United", null],
+      ["Alaska", 274],
+    ]);
   });
 
   test("flags Basic Economy by its restriction", () => {

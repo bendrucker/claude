@@ -75,6 +75,15 @@ function encodeLeg(leg: Leg, nonstop: boolean): number[] {
   return [0x1a, body.length, ...body];
 }
 
+const MAX_BAGS = 9;
+
+function bags(count: number, label: string): number {
+  if (!Number.isInteger(count) || count < 0 || count > MAX_BAGS) {
+    throw new Error(`${label} bags must be a whole number from 0 to ${MAX_BAGS}, got ${count}`);
+  }
+  return count;
+}
+
 export function tfs(params: SearchParams): string {
   const { legs, cabin = "economy", nonstop = true, noBasic = false } = params;
   if (legs.length === 0) throw new Error("at least one leg is required");
@@ -83,7 +92,16 @@ export function tfs(params: SearchParams): string {
   for (const leg of legs) message.push(...encodeLeg(leg, nonstop));
   message.push(0x40, 0x01, 0x48, CABINS[cabin]);
   if (params.carryOn !== undefined) {
-    message.push(0x6a, 0x04, 0x10, params.carryOn, 0x18, params.checked ?? 0);
+    // Each count is emitted as one raw protobuf byte, so anything outside a single
+    // byte would wrap silently and encode a bag count nobody asked for.
+    message.push(
+      0x6a,
+      0x04,
+      0x10,
+      bags(params.carryOn, "carry-on"),
+      0x18,
+      bags(params.checked ?? 0, "checked"),
+    );
   }
   message.push(0x70, 0x01);
   message.push(0x82, 0x01, 0x0b, 0x08, ...Array<number>(9).fill(0xff), 0x01);
@@ -170,7 +188,9 @@ export function parseResults(text: string): Row[] {
   const seen = new Set<string>();
   const rows: Row[] = [];
 
-  for (const match of normalized.matchAll(BLOCK)) {
+  const blocks = [...normalized.matchAll(BLOCK)];
+
+  for (const [position, match] of blocks.entries()) {
     const [whole, depart, departDay, arriveTime, plus, arriveDay, airline, duration] = match;
     if (
       !present(whole) ||
@@ -190,8 +210,12 @@ export function parseResults(text: string): Row[] {
     if (seen.has(key)) continue;
     seen.add(key);
 
+    // The tail holds the fields Google renders after the itinerary line. Stopping
+    // at the next itinerary keeps a field this one omitted from being filled in
+    // from the following result, which would misprice or misroute the row.
     const end = match.index + whole.length;
-    const tail = normalized.slice(end, end + TAIL);
+    const nextBlock = blocks[position + 1]?.index ?? normalized.length;
+    const tail = normalized.slice(end, Math.min(end + TAIL, nextBlock));
     const price = /\$([\d,]+)/.exec(tail)?.[1];
     const stops = STOPS.exec(tail);
     const via = STOPS_VIA.exec(tail);
@@ -276,9 +300,11 @@ export function parseGrid(text: string): GridCell[] {
 
   if (cells.length > 0) return cells;
 
-  // One-way: the header dates run in the same order as the cells.
+  // One-way: the header dates run in the same order as the cells. The grid has no
+  // closing marker in the tree, so the header count is what bounds it. Any further
+  // price button belongs to the results list underneath.
   const dates = [...scope.matchAll(GRID_DATE)].map((match) => match[1] ?? "");
-  return positional.map((cell, index) => ({
+  return positional.slice(0, dates.length).map((cell, index) => ({
     out: dates[index] ?? "?",
     back: null,
     price: cell.price,

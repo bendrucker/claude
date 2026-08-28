@@ -20,6 +20,10 @@ const CABINS = {
 
 export type Cabin = keyof typeof CABINS;
 
+function isCabin(value: string): value is Cabin {
+  return value in CABINS;
+}
+
 const ROUND_TRIP = 1;
 const ONE_WAY = 2;
 
@@ -43,8 +47,10 @@ export interface SearchParams {
   checked?: number;
 }
 
+// Protobuf string fields carry UTF-8. Dates and IATA codes are validated ASCII
+// before they get here, so the encoding is one byte per character either way.
 function ascii(value: string): number[] {
-  return [...value].map((char) => char.charCodeAt(0));
+  return [...new TextEncoder().encode(value)];
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -148,6 +154,12 @@ function minutesOfDay(time: string): number {
   return (hour + (pm ? 12 : 0)) * 60 + Number(match[2]);
 }
 
+// A field the page did not supply arrives as undefined when the capture group
+// went unmatched and as an empty string when it matched nothing. Both mean absent.
+function present(value: string | null | undefined): value is string {
+  return value != null && value !== "";
+}
+
 export function parseResults(text: string): Row[] {
   const lines = text
     .split("\n")
@@ -160,7 +172,15 @@ export function parseResults(text: string): Row[] {
 
   for (const match of normalized.matchAll(BLOCK)) {
     const [whole, depart, departDay, arriveTime, plus, arriveDay, airline, duration] = match;
-    if (!whole || !depart || !departDay || !arriveTime || !arriveDay || !airline || !duration)
+    if (
+      !present(whole) ||
+      !present(depart) ||
+      !present(departDay) ||
+      !present(arriveTime) ||
+      !present(arriveDay) ||
+      !present(airline) ||
+      !present(duration)
+    )
       continue;
     // A duration in the carrier slot means the regex lined up with some other
     // repeated layout on the page. Skip it.
@@ -179,13 +199,13 @@ export function parseResults(text: string): Row[] {
     rows.push({
       depart,
       departDay,
-      arrive: plus ? `${arriveTime}+${plus}` : arriveTime,
+      arrive: present(plus) ? `${arriveTime}+${plus}` : arriveTime,
       arriveDay,
       airline: airline.replace(OPERATED_BY, "").trim(),
       duration,
       stops: stops?.[1] ?? "?",
       via: via?.[1]?.split(", ") ?? [],
-      price: price ? Number(price.replaceAll(",", "")) : null,
+      price: present(price) ? Number(price.replaceAll(",", "")) : null,
       // Google states the restriction rather than the fare name, and the phrasing
       // survives layout changes better than a "N carry-on bag" string does.
       basic: tail.includes("overhead bin access"),
@@ -193,7 +213,7 @@ export function parseResults(text: string): Row[] {
     });
   }
 
-  return rows.sort((a, b) => minutesOfDay(a.depart) - minutesOfDay(b.depart));
+  return rows.toSorted((a, b) => minutesOfDay(a.depart) - minutesOfDay(b.depart));
 }
 
 const DIM = "\x1b[90m";
@@ -245,8 +265,10 @@ export function parseGrid(text: string): GridCell[] {
         : null;
     const span = /, ([A-Z][a-z]{2} \d{1,2}) to ([A-Z][a-z]{2} \d{1,2})/.exec(rest);
 
-    if (span?.[1] && span[2]) {
-      cells.push({ out: span[1], back: span[2], price, tier });
+    const out = span?.[1];
+    const back = span?.[2];
+    if (present(out) && present(back)) {
+      cells.push({ out, back, price, tier });
     } else {
       positional.push({ price, tier });
     }
@@ -259,7 +281,8 @@ export function parseGrid(text: string): GridCell[] {
   return positional.map((cell, index) => ({
     out: dates[index] ?? "?",
     back: null,
-    ...cell,
+    price: cell.price,
+    tier: cell.tier,
   }));
 }
 
@@ -310,15 +333,15 @@ const urlCmd = command(
   (parsed) => {
     const { origin, destination, depart } = parsed._;
     const back = parsed._.return;
-    const cabin = parsed.flags.cabin as Cabin;
-    if (!(cabin in CABINS)) {
+    const cabin = parsed.flags.cabin;
+    if (!isCabin(cabin)) {
       throw new Error(
         `unknown cabin ${JSON.stringify(cabin)}; expected ${Object.keys(CABINS).join(", ")}`,
       );
     }
 
     const legs: Leg[] = [{ date: depart, origin, destination }];
-    if (back) legs.push({ date: back, origin: destination, destination: origin });
+    if (present(back)) legs.push({ date: back, origin: destination, destination: origin });
 
     console.log(
       searchUrl({
@@ -380,10 +403,11 @@ function renderGrid(cells: GridCell[]): string {
   const backs = [...new Set(cells.map((cell) => cell.back))];
   return table([
     ["out \\ back", ...backs.map((back) => back ?? "?")],
-    ...outs.map((out) => [
-      out,
-      ...backs.map((back) => money(cells.find((cell) => cell.out === out && cell.back === back))),
-    ]),
+    ...outs.map((out) =>
+      [out].concat(
+        backs.map((back) => money(cells.find((cell) => cell.out === out && cell.back === back))),
+      ),
+    ),
   ]);
 }
 
@@ -413,8 +437,8 @@ const bookingCmd = command(
       console.log(
         `${segment.origin} -> ${segment.destination}  ${segment.departTime} - ${segment.arriveTime}  ${segment.duration}  ${segment.carrier} ${segment.flight}  ${segment.aircraft}`,
       );
-      if (segment.warning) console.log(`  ${RED}${segment.warning}${RESET}`);
-      if (segment.legroom) console.log(`  ${DIM}${segment.legroom}${RESET}`);
+      if (present(segment.warning)) console.log(`  ${RED}${segment.warning}${RESET}`);
+      if (present(segment.legroom)) console.log(`  ${DIM}${segment.legroom}${RESET}`);
     }
 
     if (booking.fares.length > 0) {
@@ -463,7 +487,7 @@ const gridCmd = command(
 );
 
 if (import.meta.main) {
-  cli(
+  void cli(
     {
       name: "google-flights",
       commands: [urlCmd, parseCmd, gridCmd, bookingCmd],

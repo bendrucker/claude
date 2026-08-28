@@ -38,14 +38,20 @@ const PRICE = /^\$([\d,]+)$/;
 const BULLET = /^-\s*(.+)$/;
 const LEGROOM = /legroom/i;
 
+// A field the page did not supply arrives as undefined when the line is missing
+// and as an empty string when the line is there but blank. Both mean absent.
+function present(value: string | null | undefined): value is string {
+  return value != null && value !== "";
+}
+
 function money(value: string | undefined): number | null {
-  if (!value) return null;
-  const match = PRICE.exec(value.trim());
-  return match?.[1] ? Number(match[1].replaceAll(",", "")) : null;
+  if (!present(value)) return null;
+  const digits = PRICE.exec(value.trim())?.[1];
+  return present(digits) ? Number(digits.replaceAll(",", "")) : null;
 }
 
 function airport(line: string | undefined): string | null {
-  return line ? (IATA_SUFFIX.exec(line)?.[1] ?? null) : null;
+  return present(line) ? (IATA_SUFFIX.exec(line)?.[1] ?? null) : null;
 }
 
 function parseSegments(lines: string[]): Segment[] {
@@ -62,19 +68,20 @@ function parseSegments(lines: string[]): Segment[] {
     const cabin = lines[index + 4];
     const aircraftLine = lines[index + 5];
     if (
-      !origin ||
-      !destination ||
-      !departTime ||
-      !arriveTime ||
-      !flightLine ||
-      !cabin ||
-      !aircraftLine
+      !present(origin) ||
+      !present(destination) ||
+      !present(departTime) ||
+      !present(arriveTime) ||
+      !present(flightLine) ||
+      !present(cabin) ||
+      !present(aircraftLine)
     )
       continue;
 
     const flightMatch = FLIGHT.exec(flightLine);
-    if (!flightMatch?.[1] || !flightMatch[2]) continue;
-    const [, carrier, flight] = flightMatch;
+    const carrier = flightMatch?.[1];
+    const flight = flightMatch?.[2];
+    if (!present(carrier) || !present(flight)) continue;
 
     // The aircraft line repeats the flight code with no separator, as in
     // "Airbus A320UA 817". Trimming the code off the end leaves the aircraft.
@@ -86,9 +93,9 @@ function parseSegments(lines: string[]): Segment[] {
     let warning: string | null = null;
     for (let cursor = index + 6; cursor < lines.length; cursor++) {
       const detail = lines[cursor];
-      if (!detail || detail.startsWith(TRAVEL_TIME) || detail.startsWith("###")) break;
+      if (!present(detail) || detail.startsWith(TRAVEL_TIME) || detail.startsWith("###")) break;
       const bullet = BULLET.exec(detail)?.[1];
-      if (bullet) {
+      if (present(bullet)) {
         amenities.push(bullet);
         continue;
       }
@@ -126,9 +133,9 @@ function parseFares(lines: string[]): Fare[] {
     let price: number | null = null;
     for (let cursor = index + 1; cursor < lines.length; cursor++) {
       const detail = lines[cursor];
-      if (!detail || detail.startsWith("###")) break;
+      if (!present(detail) || detail.startsWith("###")) break;
       const bullet = BULLET.exec(detail)?.[1];
-      if (bullet) {
+      if (present(bullet)) {
         amenities.push(bullet);
         continue;
       }

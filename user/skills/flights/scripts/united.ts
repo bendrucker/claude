@@ -58,10 +58,16 @@ const CABINS = new Set([
   "First",
 ]);
 
+// A field the page did not supply arrives as undefined when the capture group
+// went unmatched and as an empty string when it matched nothing. Both mean absent.
+function present(value: string | null | undefined): value is string {
+  return value != null && value !== "";
+}
+
 function miles(token: string): number | null {
-  const match = MILES.exec(token) ?? BARE_MILES.exec(token);
-  if (!match?.[1]) return null;
-  const value = Number(match[1].replaceAll(",", ""));
+  const digits = (MILES.exec(token) ?? BARE_MILES.exec(token))?.[1];
+  if (!present(digits)) return null;
+  const value = Number(digits.replaceAll(",", ""));
   if (Number.isNaN(value)) return null;
   // "22.5k" is thousands. A bare "22500" is already absolute.
   return /k$/i.test(token.replace(/\s*miles$/i, "")) ? Math.round(value * 1000) : value;
@@ -69,8 +75,8 @@ function miles(token: string): number | null {
 
 function firstMatch(lines: string[], pattern: RegExp): string | null {
   for (const line of lines) {
-    const match = pattern.exec(line);
-    if (match?.[1]) return match[1];
+    const captured = pattern.exec(line)?.[1];
+    if (present(captured)) return captured;
   }
   return null;
 }
@@ -104,7 +110,7 @@ function parseFares(lines: string[]): AwardFare[] {
       // With a discount the page lists the old price first, then the new one.
       miles: available ? (discounted ? (amounts[1] ?? null) : (amounts[0] ?? null)) : null,
       standardMiles: available && discounted ? (amounts[0] ?? null) : null,
-      taxes: available && taxes ? Number(taxes.replaceAll(",", "")) : null,
+      taxes: available && present(taxes) ? Number(taxes.replaceAll(",", "")) : null,
       awardType: firstMatch(scope, AWARD_TYPE),
       fareClass: firstMatch(scope, FARE_CLASS),
       available,
@@ -132,13 +138,14 @@ export function parseAwardResults(text: string): UnitedFlight[] {
   for (const [position, start] of starts.entries()) {
     const block = lines.slice(start, starts[position + 1] ?? lines.length);
     const flightLine = block.find((line) => FLIGHT.test(line));
-    const flightMatch = flightLine ? FLIGHT.exec(flightLine) : null;
+    const flightMatch = present(flightLine) ? FLIGHT.exec(flightLine) : null;
 
     const departTime = firstMatch(block, DEPARTING);
     const arriveTime = firstMatch(block, ARRIVING);
     const origin = firstMatch(block, ORIGIN);
     const destination = firstMatch(block, DESTINATION);
-    if (!departTime || !arriveTime || !origin || !destination) continue;
+    if (!present(departTime) || !present(arriveTime) || !present(origin) || !present(destination))
+      continue;
 
     flights.push({
       stops: block[0] ?? "?",
@@ -204,7 +211,7 @@ function minutesOfDay(time: string): number {
 
 export function render(flights: UnitedFlight[]): string {
   const body: string[][] = [];
-  const ordered = [...flights].sort(
+  const ordered = flights.toSorted(
     (a, b) => minutesOfDay(a.departTime) - minutesOfDay(b.departTime),
   );
 
@@ -229,12 +236,12 @@ export function render(flights: UnitedFlight[]): string {
       // belongs to, so only the first row of a flight carries it.
       const lead = index === 0 ? cells : ["", "", "", "", "", ""];
       const saver = fare.awardType?.startsWith("Saver");
-      const miles = fare.miles?.toLocaleString() ?? "";
+      const cost = fare.miles?.toLocaleString() ?? "";
       const bucket = fare.fareClass ?? `${DIM}dynamic${RESET}`;
       body.push([
         ...lead,
         fare.cabin,
-        saver ? `${GREEN}${miles}${RESET}` : miles,
+        saver ? `${GREEN}${cost}${RESET}` : cost,
         saver ? `${GREEN}${fare.fareClass ?? "saver"}${RESET}` : bucket,
       ]);
     }
@@ -308,7 +315,7 @@ const parseCmd = command(
 );
 
 if (import.meta.main) {
-  cli(
+  void cli(
     {
       name: "united",
       commands: [urlCmd, parseCmd],

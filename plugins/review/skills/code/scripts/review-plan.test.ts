@@ -1,25 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import Ajv2020 from "ajv/dist/2020";
-import anglesSchema from "../angles.schema.json";
-import effortsSchema from "../efforts.schema.json";
-import {
-  finderAgents,
-  load,
-  render,
-  resolveFamily,
-  resolveLevel,
-  resolvePlan,
-} from "./review-plan";
+import { anglesIn } from "./angles";
+import { finderAgents, resolveFamily, resolveLevel } from "./efforts";
+import { load, resolvePlan } from "./plan";
+import { render } from "./render";
+import { documentNames, schemaObject, schemaPath, serialize } from "./schemas";
 
 const SKILL_DIR = join(import.meta.dirname, "..");
 const { efforts, angles } = await load(SKILL_DIR);
 
-const pairs = Object.keys(efforts.selection).flatMap((family) =>
-  efforts.levels.map((level) => [family, level] as const),
+const selections = Object.entries(efforts.selection).flatMap(([family, levels]) =>
+  Object.entries(levels).map(([level, { cell, modifiers }]) => ({
+    family,
+    level,
+    cell,
+    modifiers,
+  })),
 );
 
-test.each(pairs)("renders the %s / %s plan", (family, level) => {
+test.each(selections)("renders the $family / $level plan", ({ family, level }) => {
   expect(
     render(resolvePlan(efforts, angles, { family, level }), { angles: true }),
   ).toMatchSnapshot();
@@ -42,6 +41,11 @@ describe("level tokens", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toContain("low, medium, high, xhigh");
   });
+
+  test("an exact level name beats a longer prefix match", () => {
+    const shadowed = { ...efforts, aliases: { ...efforts.aliases, highest: "xhigh" } };
+    expect(resolveLevel("high", shadowed)).toEqual({ ok: true, level: "high" });
+  });
 });
 
 test.each([
@@ -54,37 +58,18 @@ test.each([
   expect(resolveFamily(model, efforts)).toBe(family);
 });
 
-describe("schemas", () => {
-  const ajv = new Ajv2020({ strict: true, allErrors: true });
-
-  test.each([
-    ["efforts", effortsSchema, efforts],
-    ["angles", anglesSchema, angles],
-  ])("%s.yaml validates against its schema", (_, schema, data) => {
-    const validate = ajv.compile(schema);
-    expect(validate(data) ? [] : validate.errors).toEqual([]);
-  });
+test.each([...documentNames])("%s.schema.json matches the zod schema", async (name) => {
+  const committed = await Bun.file(schemaPath(SKILL_DIR, name)).text();
+  expect(schemaObject(committed)).toEqual(schemaObject(serialize(name)));
 });
 
 describe("cross-file invariants", () => {
-  const selections = Object.entries(efforts.selection).flatMap(([family, levels]) =>
-    Object.entries(levels).map(([level, selected]) => ({
-      family,
-      level,
-      cell: selected.cell,
-      modifiers: selected.modifiers,
-    })),
-  );
-
   test.each(selections)("$family/$level selects a declared cell", ({ cell }) => {
     expect(Object.keys(efforts.cells)).toContain(cell);
   });
 
   test.each(Object.entries(efforts.cells))("cell %s resolves its angles and framing", (_, cell) => {
-    const set = cell.angleSet;
-    if (set !== null) {
-      expect(angles.angles.filter((angle) => angle.sets.includes(set))).not.toBeEmpty();
-    }
+    if (cell.angleSet !== null) expect(anglesIn(angles, cell.angleSet)).not.toBeEmpty();
     if (cell.framing !== null) expect(efforts.framings).toHaveProperty(cell.framing);
   });
 
@@ -114,14 +99,8 @@ describe("cross-file invariants", () => {
     );
   });
 
-  test("an exact level name beats a longer prefix match", () => {
-    const shadowed = { ...efforts, aliases: { ...efforts.aliases, highest: "xhigh" } };
-    expect(resolveLevel("high", shadowed)).toEqual({ ok: true, level: "high" });
-  });
-
   test("core is a subset of full", () => {
-    const core = angles.angles.filter((angle) => angle.sets.includes("core"));
-    expect(core.every((angle) => angle.sets.includes("full"))).toBe(true);
+    expect(anglesIn(angles, "core").every((angle) => angle.sets.includes("full"))).toBe(true);
   });
 });
 

@@ -285,15 +285,15 @@ export function sessionScore(input: ScoredFile[]): SessionScore {
     excessChars >= REPORT_MIN_EXCESS_CHARS &&
     (share >= REPORT_SESSION_SHARE || wordsPerCodeLine >= REPORT_WORDS_PER_CODE_LINE || heavyFile);
   // A comment-only file can push the aggregate share past the docs-pass bar
-  // while a separate code file carries strong excess, so docs-pass yields to
-  // any non-docs file that is strong on its own.
-  const strongFile = scored.some(
-    (file) => file.share < DOCS_PASS_SHARE && file.excessChars >= STRONG_EXCESS_CHARS,
-  );
+  // while code files carry strong excess, so docs-pass yields when the
+  // non-docs files sum to strong on their own.
+  const codeExcess = scored
+    .filter((file) => file.share < DOCS_PASS_SHARE)
+    .reduce((sum, file) => sum + file.excessChars, 0);
   const tier: Tier =
     stats.addedLines < MIN_ADDED_LINES
       ? "none"
-      : share >= DOCS_PASS_SHARE && !strongFile
+      : share >= DOCS_PASS_SHARE && codeExcess < STRONG_EXCESS_CHARS
         ? "docs-pass"
         : excessChars >= STRONG_EXCESS_CHARS
           ? "strong"

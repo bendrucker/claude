@@ -19,11 +19,13 @@ const TextBlock = z.object({ type: z.literal("text"), text: z.string() });
 
 const TailLine = z.object({
   message: z.object({ content: z.union([z.string(), z.array(z.unknown())]) }).optional(),
+  attachment: z.object({ stdout: z.string().optional() }).optional(),
 });
 
 /**
- * A prior block surfaces as message text carrying the marker. Matching only
- * text content keeps tool payloads (say, an edit to this file) from
+ * A prior block leaves two records: a hook attachment whose stdout carries the
+ * block JSON, and Stop-hook-feedback message text carrying the reason. Matching
+ * those channels keeps tool payloads (say, an edit to this file) from
  * suppressing a live block.
  */
 function blockedRecently(transcript: string): boolean {
@@ -38,8 +40,10 @@ function blockedRecently(transcript: string): boolean {
         return false;
       }
       const decoded = TailLine.safeParse(parsed);
-      if (!decoded.success || decoded.data.message == null) return false;
-      const content = decoded.data.message.content;
+      if (!decoded.success) return false;
+      if (decoded.data.attachment?.stdout?.includes(MARKER) === true) return true;
+      const content = decoded.data.message?.content;
+      if (content == null) return false;
       if (typeof content === "string") return content.includes(MARKER);
       return content.some((block) => {
         const text = TextBlock.safeParse(block);

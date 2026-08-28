@@ -192,6 +192,15 @@ describe("sessionScore tiers", () => {
       "strong",
     ],
     [
+      "strong excess spread across code files escapes the docs-pass umbrella",
+      [
+        file("docs.ts", { commentChars: 60000, addedLines: 30 }),
+        file("one.ts", { commentChars: 1800, codeChars: 1200, addedLines: 15 }),
+        file("two.ts", { commentChars: 1800, codeChars: 1200, addedLines: 15 }),
+      ],
+      "strong",
+    ],
+    [
       "session share over the report threshold",
       [file("a.ts", { commentChars: 800, codeChars: 600, addedLines: 30 })],
       "report",

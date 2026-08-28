@@ -87,6 +87,19 @@ describe("density Stop hook", () => {
     expect(Decision.parse(JSON.parse(out)).decision).toBe("block");
   });
 
+  test("stays silent when a prior block's hook attachment carries the marker", async () => {
+    const attachment = `${JSON.stringify({
+      attachment: {
+        type: "hook_blocking_error",
+        hookName: "Stop",
+        stdout: '{"decision":"block","reason":"comment-density: prior block"}',
+      },
+    })}\n`;
+    const path = await writeTranscript(heavyTranscript() + attachment);
+    const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
+    expect(out).toBe("");
+  });
+
   test("stays silent when a prior block reason appears as a text content block", async () => {
     const marker = `${JSON.stringify({
       type: "user",

@@ -120,6 +120,26 @@ function isGitLabHost(host: string): boolean {
   return host.split(".").includes("gitlab");
 }
 
+async function pointerConfigPath(
+  dir: string,
+  pointer: string,
+  env: LintEnv,
+): Promise<string | null> {
+  const gitdir = pointer.match(/^gitdir:\s*(.+)\s*$/m)?.at(1);
+  if (gitdir == null || gitdir === "") return null;
+
+  const gitDir = isAbsolute(gitdir) ? gitdir : resolve(dir, gitdir);
+  for (const candidate of [
+    join(gitDir, "config"),
+    // A linked worktree's gitdir is <main>/.git/worktrees/<name>.
+    // The shared config lives two levels up.
+    resolve(gitDir, "..", "..", "config"),
+  ]) {
+    if (await env.fileExists(candidate)) return candidate;
+  }
+  return null;
+}
+
 async function gitConfigPath(cwd: string, env: LintEnv): Promise<string | null> {
   let dir = cwd;
   for (;;) {
@@ -129,21 +149,7 @@ async function gitConfigPath(cwd: string, env: LintEnv): Promise<string | null> 
 
     // Worktrees and submodules use a `.git` file: `gitdir: <path>`.
     const pointer = await env.readFile(dotGit);
-    if (pointer != null && pointer !== "") {
-      const gitdir = pointer.match(/^gitdir:\s*(.+)\s*$/m)?.at(1);
-      if (gitdir != null && gitdir !== "") {
-        const gitDir = isAbsolute(gitdir) ? gitdir : resolve(dir, gitdir);
-        for (const candidate of [
-          join(gitDir, "config"),
-          // A linked worktree's gitdir is <main>/.git/worktrees/<name>.
-          // The shared config lives two levels up.
-          resolve(gitDir, "..", "..", "config"),
-        ]) {
-          if (await env.fileExists(candidate)) return candidate;
-        }
-      }
-      return null;
-    }
+    if (pointer != null && pointer !== "") return pointerConfigPath(dir, pointer, env);
 
     const parent = dirname(dir);
     if (parent === dir) return null;

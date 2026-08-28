@@ -307,7 +307,7 @@ export type PipelineRecord = {
 // pipelines are children whose status the parent already aggregates, so a green
 // child says nothing about the run as a whole. Either one can outrank the real
 // pipeline by id and produce a false green.
-const EXCLUDED_PIPELINE_SOURCES = ["external", "parent_pipeline"];
+const EXCLUDED_PIPELINE_SOURCES = new Set(["external", "parent_pipeline"]);
 
 export function parsePipelineList(raw: unknown): PipelineRecord[] | null {
   const entries = Entries.safeParse(raw);
@@ -340,7 +340,7 @@ export function selectPipeline(
   records: PipelineRecord[],
   prefer: "merge-request" | "branch",
 ): PipelineRecord | null {
-  const eligible = records.filter((record) => !EXCLUDED_PIPELINE_SOURCES.includes(record.source));
+  const eligible = records.filter((record) => !EXCLUDED_PIPELINE_SOURCES.has(record.source));
   const mergeRequestPipelines = eligible.filter(
     (record) => record.source === "merge_request_event",
   );

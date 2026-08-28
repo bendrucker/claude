@@ -92,7 +92,8 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
   const categories = [...perCategory.entries()]
     .map(([category, counts]) => ({
       category,
-      ...counts,
+      fired: counts.fired,
+      suppressed: counts.suppressed,
       share: injections > 0 ? counts.fired / injections : 0,
     }))
     .toSorted((a, b) => (b.fired === a.fired ? b.suppressed - a.suppressed : b.fired - a.fired));

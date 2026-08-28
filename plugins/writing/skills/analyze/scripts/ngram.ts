@@ -144,6 +144,39 @@ export interface ProcessRowsOptions {
   examples?: Map<string, string>;
 }
 
+interface NgramSessionInput {
+  tokens: string[];
+  n: number;
+  sessionId: string;
+  sentence: string;
+  phraseSessions: Map<string, Set<string>>;
+  examples: Map<string, string> | undefined;
+}
+
+function recordNgramSessions({
+  tokens,
+  n,
+  sessionId,
+  sentence,
+  phraseSessions,
+  examples,
+}: NgramSessionInput): void {
+  for (let i = 0; i <= tokens.length - n; i++) {
+    const key = tokens.slice(i, i + n).join(" ");
+    let sessions = phraseSessions.get(key);
+    if (sessions === undefined) {
+      sessions = new Set();
+      phraseSessions.set(key, sessions);
+    }
+    sessions.add(sessionId);
+    if (examples !== undefined) {
+      const existing = examples.get(key);
+      if (existing == null || existing === "" || sentence.length < existing.length)
+        examples.set(key, sentence);
+    }
+  }
+}
+
 export function processRows(
   rows: Array<{ session_id: string; text?: string }>,
   sizes: number[] = [2, 3, 4],
@@ -166,20 +199,14 @@ export function processRows(
         const counts = stats.ngrams.get(n);
         if (!counts) continue;
         addNgrams(counts, tokens, n);
-        for (let i = 0; i <= tokens.length - n; i++) {
-          const key = tokens.slice(i, i + n).join(" ");
-          let sessions = phraseSessions.get(key);
-          if (!sessions) {
-            sessions = new Set();
-            phraseSessions.set(key, sessions);
-          }
-          sessions.add(row.session_id);
-          if (examples) {
-            const existing = examples.get(key);
-            if (existing == null || existing === "" || sent.length < existing.length)
-              examples.set(key, sent);
-          }
-        }
+        recordNgramSessions({
+          tokens,
+          n,
+          sessionId: row.session_id,
+          sentence: sent,
+          phraseSessions,
+          examples,
+        });
       }
     }
   }

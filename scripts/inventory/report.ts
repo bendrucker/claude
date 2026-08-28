@@ -69,12 +69,14 @@ function counts(inventory: Inventory): Columns {
         inventory.plugins.length,
         `${inventory.plugins.filter((p) => p.enabled).length} enabled`,
       ),
-      ...scoped.map(({ kind, items }) => [
-        kind,
-        ...SCOPES.map((scope) => String(items.filter((item) => item.scope === scope).length)),
-        String(items.length),
-        "",
-      ]),
+      ...scoped.map(({ kind, items }) => {
+        const row = [kind];
+        for (const scope of SCOPES) {
+          row.push(String(items.filter((item) => item.scope === scope).length));
+        }
+        row.push(String(items.length), "");
+        return row;
+      }),
       pluginOnly("mcp", inventory.mcpServers.length, ""),
     ],
   };

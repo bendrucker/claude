@@ -81,11 +81,11 @@ export async function allMatcherEntries(): Promise<MatcherEntryContext[]> {
     Promise.all(
       SOURCES.map(async ({ file }) => {
         const parsed = await decodeFile(SettingsHooks, join(root, file));
-        return [...settingsEntries(file, parsed.hooks ?? {})];
+        return Array.from(settingsEntries(file, parsed.hooks ?? {}));
       }),
     ),
   ]);
-  return [...plugins.flatMap((plugin) => [...matcherEntries(plugin)]), ...settings.flat()];
+  return [...plugins.flatMap((plugin) => Array.from(matcherEntries(plugin))), ...settings.flat()];
 }
 
 if (import.meta.main) {

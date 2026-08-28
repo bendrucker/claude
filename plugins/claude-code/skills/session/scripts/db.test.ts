@@ -438,7 +438,7 @@ describe("discovery", () => {
 
   it("describes messages with the expected pinned columns", async () => {
     const rows = await db.query("DESCRIBE messages", z.object({ column_name: z.string() }));
-    const cols = rows.map((r) => r.column_name);
+    const cols = new Set(rows.map((r) => r.column_name));
     const pinned = [
       "session_id",
       "type",
@@ -456,7 +456,7 @@ describe("discovery", () => {
       "content_text",
       "summary",
     ];
-    expect(pinned.filter((col) => !cols.includes(col))).toEqual([]);
+    expect(pinned.filter((col) => !cols.has(col))).toEqual([]);
   });
 });
 
@@ -1274,9 +1274,9 @@ describe("delegation query", () => {
 
   it("separates the generic path from the pinned-agent path", async () => {
     const rows = await delegationRows();
-    const generic = rows.filter((r) => r.parent_family === "opus" && r.path === "generic");
+    const generic = rows.find((r) => r.parent_family === "opus" && r.path === "generic");
     const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
-    expect(Number(generic[0]?.path_spawns)).toBe(3);
+    expect(Number(generic?.path_spawns)).toBe(3);
     expect(Number(pinned[0]?.path_spawns)).toBe(1);
     expect(pinned.map((r) => r.actual_family)).toEqual(["haiku"]);
   });
@@ -1313,13 +1313,13 @@ describe("delegation query", () => {
 
   it("computes override and cheaper-override rates as a fraction of every spawn in the group", async () => {
     const rows = await delegationRows();
-    const generic = rows.filter((r) => r.parent_family === "opus" && r.path === "generic");
+    const generic = rows.find((r) => r.parent_family === "opus" && r.path === "generic");
     // 2 of 3 generic spawns carried an explicit override (haiku, sonnet), and
     // both were cheaper than the opus main model.
-    expect(generic[0]?.override_rate_pct).toBeCloseTo(66.7, 1);
-    expect(generic[0]?.cheaper_override_rate_pct).toBeCloseTo(66.7, 1);
-    const pinned = rows.filter((r) => r.parent_family === "opus" && r.path === "pinned");
-    expect(pinned[0]?.override_rate_pct).toBe(0);
+    expect(generic?.override_rate_pct).toBeCloseTo(66.7, 1);
+    expect(generic?.cheaper_override_rate_pct).toBeCloseTo(66.7, 1);
+    const pinned = rows.find((r) => r.parent_family === "opus" && r.path === "pinned");
+    expect(pinned?.override_rate_pct).toBe(0);
   });
 
   it("sums expensive-model spend only from spawns whose actual family is opus/fable", async () => {

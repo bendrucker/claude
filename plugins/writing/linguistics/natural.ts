@@ -14,7 +14,7 @@ export const naturalTagger: Tagger = {
     const words = tokenizer.tokenize(text);
     const tokens = brill.tag(words).taggedWords.map((tagged) => {
       const normal = tagged.token.toLowerCase();
-      const mapped =
+      const { tag, finite } =
         normal === CODE_SENTINEL
           ? { tag: "CODE" as const, finite: false }
           : mapPenn(tagged.tag, normal);
@@ -22,7 +22,8 @@ export const naturalTagger: Tagger = {
         text: tagged.token,
         normal,
         fine: [tagged.tag],
-        ...mapped,
+        tag,
+        finite,
       };
     });
     return [{ text, tokens }];

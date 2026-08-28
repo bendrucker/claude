@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { mergeDocuments, parseCorpus, serializeCorpus, type VoiceDocument } from "./voice-corpus";
 
 // A document that survives serialize/parse: the source is a single non-empty

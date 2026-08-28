@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import type { CoarseTag } from "./tags";
 import { normalizedDistance, tagShape, tricolonHits } from "./tricolon";
 

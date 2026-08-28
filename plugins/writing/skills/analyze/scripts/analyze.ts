@@ -335,13 +335,12 @@ export async function runAnalysis(
       const baseline = voiceProfile
         ? phraseProfileStat(voiceProfile, r.phrase)
         : { count: 0, perMillion: 0 };
-      return {
-        ...r,
+      return Object.assign(r, {
         sessions: sessionCounts.get(r.phrase) ?? 0,
         baselineCount: baseline.count,
         baselinePerM: baseline.perMillion,
         quote: findQuote(r.phrase, deliverableRows),
-      };
+      });
     });
 
   console.error("Auditing deliverable corpus for wordlist rules");
@@ -366,11 +365,12 @@ export async function runAnalysis(
     .filter((r) => r.lift >= config.tagMinLift)
     .filter((r) => (tagAssistant.sessionSpread.get(r.phrase) ?? 0) >= minSessions)
     .slice(0, config.tagTop)
-    .map((r) => ({
-      ...r,
-      sessions: tagAssistant.sessionSpread.get(r.phrase) ?? 0,
-      example: tagExamples.get(r.phrase) ?? null,
-    }));
+    .map((r) =>
+      Object.assign(r, {
+        sessions: tagAssistant.sessionSpread.get(r.phrase) ?? 0,
+        example: tagExamples.get(r.phrase) ?? null,
+      }),
+    );
 
   console.error("Fetching correction candidates");
   const corrections = await db.runQuery("correction-candidates", CorrectionRow, baseParams);

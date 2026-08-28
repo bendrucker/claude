@@ -288,6 +288,21 @@ describe("renderTask", () => {
     expect(strip(out.content)).toContain("· 1m 5s · 1.5k");
   });
 
+  test.each<{ name: string; task: Task; expected: string }>([
+    {
+      name: "epoch start still renders elapsed",
+      task: { id: "a", name: "x", startTime: 0, tokenCount: 1500 },
+      expected: "x · 1m 5s · 1.5k",
+    },
+    {
+      name: "omitted start drops the elapsed segment",
+      task: { id: "a", name: "x", tokenCount: 1500 },
+      expected: "x · 1.5k",
+    },
+  ])("$name", ({ task, expected }) => {
+    expect(strip(renderTask(task, null, now, null).content)).toEndWith(expected);
+  });
+
   test("type name trails after the meta as dim text", () => {
     const out = renderTask(
       { id: "a", description: "search", startTime: 0, tokenCount: 1500 },

@@ -38,7 +38,7 @@ export function normalizeInput(toolInput: Record<string, unknown>): NormalizeRes
   const keys = Object.keys(input);
   const wrapperKey = keys.length === 1 ? keys[0] : undefined;
   if (wrapperKey && WRAPPER_KEYS.includes(wrapperKey) && isFieldObject(input[wrapperKey])) {
-    input = input[wrapperKey] as Record<string, unknown>;
+    input = input[wrapperKey];
     mutated = true;
   }
 
@@ -48,7 +48,7 @@ export function normalizeInput(toolInput: Record<string, unknown>): NormalizeRes
     mutated = true;
   }
 
-  return { input: input as CreateIssueInput & Record<string, unknown>, mutated };
+  return { input, mutated };
 }
 
 export function processInput(input: PreToolUseHookInput): SyncHookJSONOutput | null {

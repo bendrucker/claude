@@ -74,7 +74,7 @@ describe("prompt artifact", () => {
   test("criteria appear in the prompt in rubric order", async () => {
     const prompt = await loadPrompt();
     const positions = JUDGE_CRITERIA.map((c) => prompt.text.indexOf(`### \`${c.key}\``));
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    expect(positions.toSorted((a, b) => a - b)).toEqual(positions);
   });
 
   test("hash is the sha256 of the file contents", async () => {

@@ -60,7 +60,7 @@ function payloadBytes(value: unknown): number {
 function readItems(payload: unknown): unknown[] | null {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === "object" && "items" in payload) {
-    const items = (payload as { items: unknown }).items;
+    const items = payload.items;
     if (Array.isArray(items)) return items;
   }
   return null;
@@ -606,6 +606,7 @@ export function registerTools(server: McpServer): void {
             applied.length
               ? `${message}\nAlready updated: ${applied.join(", ")}. Retry only the remaining IDs.`
               : message,
+            { cause: error },
           );
         }
         applied.push(...batch);

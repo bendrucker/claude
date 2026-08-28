@@ -22,7 +22,7 @@ if (!argv.flags.version || !argv.flags.brief) {
 }
 
 const brief = await Bun.file(argv.flags.brief).json();
-const files = (await readdir(argv.flags.version)).filter((f) => f.endsWith(".md")).sort();
+const files = (await readdir(argv.flags.version)).filter((f) => f.endsWith(".md")).toSorted();
 
 const skillBlocks: string[] = [];
 for (const f of files) {

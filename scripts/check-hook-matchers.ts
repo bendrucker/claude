@@ -68,7 +68,7 @@ function* settingsEntries(file: string, hooks: HooksFile["hooks"]): Generator<Ma
  * repo's hook entries live in settings rather than a plugin, and a matcher
  * defect is equally silent in either.
  */
-export async function entries(): Promise<MatcherEntryContext[]> {
+export async function allMatcherEntries(): Promise<MatcherEntryContext[]> {
   const [plugins, settings] = await Promise.all([
     loadPlugins(),
     Promise.all(
@@ -85,7 +85,7 @@ if (import.meta.main) {
   await runCheck(
     async () => ({
       header: "Hook matchers that cannot fire:",
-      violations: violations(await entries()),
+      violations: violations(await allMatcherEntries()),
     }),
     { success: 'All hook matchers match tool names and every "if" holds one permission rule' },
   );

@@ -87,7 +87,7 @@ describe("isPrBodyCommand", () => {
 });
 
 const literal = (text: string): BodyPart => ({ kind: "literal", text });
-const file = (path: string): BodyPart => ({ kind: "file", path });
+const file = (filePath: string): BodyPart => ({ kind: "file", path: filePath });
 const parts = (...items: BodyPart[]): BodySpec => ({ kind: "parts", parts: items });
 
 describe("extractBodySpec", () => {

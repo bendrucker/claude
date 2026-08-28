@@ -229,7 +229,7 @@ describe("append-only re-present", () => {
   it("stays silent when the re-present adds no new lines", async () => {
     await decision(initial);
     // Same lines, reordered: full carry-over, nothing introduced.
-    const reordered = [...lines(10)].reverse().join("\n");
+    const reordered = lines(10).toReversed().join("\n");
     expect(await decision(reordered)).toBeNull();
   });
 

@@ -56,7 +56,7 @@ const briefs = [
   ...new Set(
     files.filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.(before|after)\.md$/, "")),
   ),
-].sort();
+].toSorted();
 
 const mapping: Record<string, Record<string, string>> = {};
 const blocks: string[] = [];

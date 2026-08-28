@@ -48,7 +48,7 @@ function fail(path: string, message: string): never {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && Array.isArray(value) === false;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function validateFraction(value: unknown, path: string): number {

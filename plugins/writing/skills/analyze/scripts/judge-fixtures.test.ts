@@ -44,9 +44,9 @@ describe("fixture tuples", () => {
       const expectations = Object.entries(fixture.expect);
       if (fixture.kind === "synthetic-negative") {
         expect(expectations.length).toBe(JUDGE_CRITERIA.length);
-        expect(expectations.every(([, flagged]) => flagged === false)).toBe(true);
+        expect(expectations.every(([, flagged]) => !flagged)).toBe(true);
       } else {
-        expect(expectations.some(([, flagged]) => flagged === true)).toBe(true);
+        expect(expectations.some(([, flagged]) => flagged)).toBe(true);
       }
     }
   });

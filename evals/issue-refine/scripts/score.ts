@@ -277,7 +277,7 @@ if (argv.flags.json) {
   console.log(`Title: ${title || "(none)"}`);
   console.log(`Type:  ${type || "(none)"}`);
   console.log(`Score: ${score} (lower is better) · ${violations.length} violations\n`);
-  for (const v of violations.sort(
+  for (const v of violations.toSorted(
     (a, b) => SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity] || a.finding - b.finding,
   )) {
     console.log(

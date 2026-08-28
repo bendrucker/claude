@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { HookCommand, MatcherEntryContext } from "../packages/marketplace/index";
-import { entries, violations } from "./check-hook-matchers";
+import { allMatcherEntries, violations } from "./check-hook-matchers";
 
 function entry(matcher: string | undefined, ...ifs: (string | undefined)[]): MatcherEntryContext {
   const hooks: HookCommand[] = ifs.map((rule) => {
@@ -8,9 +8,9 @@ function entry(matcher: string | undefined, ...ifs: (string | undefined)[]): Mat
     if (rule !== undefined) hook.if = rule;
     return hook;
   });
-  const entry: MatcherEntryContext["entry"] = { hooks };
-  if (matcher !== undefined) entry.matcher = matcher;
-  return { file: "plugins/example/hooks/hooks.json", entry };
+  const hookEntry: MatcherEntryContext["entry"] = { hooks };
+  if (matcher !== undefined) hookEntry.matcher = matcher;
+  return { file: "plugins/example/hooks/hooks.json", entry: hookEntry };
 }
 
 test.each<{ name: string; entries: MatcherEntryContext[]; expected: number }>([
@@ -66,7 +66,7 @@ test("the pull-request matcher that never fired", () => {
 // The ox commit gate sat behind a `Bash(git commit:*)` matcher in project
 // settings and never fired, because this check only ever read plugin hooks.
 test("scans both settings files alongside the plugins", async () => {
-  const files = new Set((await entries()).map((context) => context.file));
+  const files = new Set((await allMatcherEntries()).map((context) => context.file));
   expect(files).toContain("user/settings.json");
   expect(files).toContain(".claude/settings.json");
 });

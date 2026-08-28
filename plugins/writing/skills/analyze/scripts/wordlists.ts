@@ -15,7 +15,7 @@ export async function loadWordlists(dir: string): Promise<WordlistEntry[]> {
     throw err;
   }
   const entries: WordlistEntry[] = [];
-  for (const file of files.sort()) {
+  for (const file of files.toSorted()) {
     const text = await Bun.file(path.join(dir, file)).text();
     for (const rawLine of text.split("\n")) {
       const line = rawLine.replace(/#.*$/, "").trim();

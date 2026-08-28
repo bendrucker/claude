@@ -38,9 +38,9 @@ const rangeArb: fc.Arbitrary<LineRange> = fc
   .map(({ start, span }) => ({ start, end: start + span }));
 
 /** Independent oracle: enumerate the comment's lines and test membership in the range. */
-function sharesLine(comment: Comment, range: LineRange): boolean {
-  for (let line = comment.startLine; line <= comment.endLine; line++) {
-    if (line >= range.start && line <= range.end) return true;
+function sharesLine(target: Comment, bounds: LineRange): boolean {
+  for (let line = target.startLine; line <= target.endLine; line++) {
+    if (line >= bounds.start && line <= bounds.end) return true;
   }
   return false;
 }

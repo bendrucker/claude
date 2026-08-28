@@ -47,7 +47,7 @@ export async function runScript<T = unknown>(script: string, args: string[]): Pr
 
   const result: unknown = JSON.parse(stdout);
   if (result && typeof result === "object" && "error" in result) {
-    throw new Error(String((result as { error: unknown }).error));
+    throw new Error(String(result.error));
   }
   return result as T;
 }

@@ -1,5 +1,5 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import type { Heading, Paragraph, Strong, Text } from "mdast";
+import type { Heading, Paragraph, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { getExtension, isMarkdownFile } from "../detection/paths";
@@ -26,8 +26,7 @@ export function checkBoldAsHeading(content: string): string | null {
     const first = node.children[0];
     if (first?.type !== "strong") return;
 
-    const strong = first as Strong;
-    const text = strong.children
+    const text = first.children
       .filter((child): child is Text => child.type === "text")
       .map((child) => child.value)
       .join("");

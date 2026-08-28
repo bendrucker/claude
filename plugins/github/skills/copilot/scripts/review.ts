@@ -307,7 +307,7 @@ function collectDiff(base: string, cwd: string): Diff {
     names.add(path);
   }
 
-  return { base, patch, files: [...names].sort() };
+  return { base, patch, files: [...names].toSorted() };
 }
 
 const PREAMBLE = `You are reviewing a code change as a second opinion. The author already reviewed it with a different model, so repeating what that model would notice is worthless. Your value is the defect it missed.

@@ -648,13 +648,13 @@ function deny(reason: string): SyncHookJSONOutput {
 
 export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
   if (input.hook_event_name === "PreToolUse") {
-    return processPreToolUse(input as PreToolUseHookInput);
+    return processPreToolUse(input);
   }
   if (input.hook_event_name === "PostToolUse") {
-    return processPostToolUse(input as PostToolUseHookInput);
+    return processPostToolUse(input);
   }
   if (input.hook_event_name === "Stop") {
-    return processStop(input as StopHookInput);
+    return processStop(input);
   }
   return null;
 }

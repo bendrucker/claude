@@ -13,7 +13,7 @@ function pctColor(pct: number): (text: string) => string {
 }
 
 function sortByCoverage(reports: FileCoverage[]): FileCoverage[] {
-  return [...reports].sort((a, b) => lineCoverage(a).pct - lineCoverage(b).pct);
+  return reports.toSorted((a, b) => lineCoverage(a).pct - lineCoverage(b).pct);
 }
 
 export function terminalReport(reports: FileCoverage[]): string {

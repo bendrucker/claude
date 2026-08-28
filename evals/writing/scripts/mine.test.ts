@@ -24,7 +24,7 @@ test("weave preserves the multiset", () => {
   fc.assert(
     fc.property(fc.array(fc.integer({ min: 0, max: 100 })), (lengths) => {
       const woven = weave(lengths, (n) => n);
-      expect([...woven].sort((a, b) => a - b)).toEqual([...lengths].sort((a, b) => a - b));
+      expect(woven.toSorted((a, b) => a - b)).toEqual(lengths.toSorted((a, b) => a - b));
     }),
   );
 });

@@ -96,7 +96,7 @@ export async function dispatch(
   // Stable sort: within a tier the earliest checker keeps priority. A
   // suppressed winner falls through to the next result rather than muting
   // findings whose categories never fired.
-  const ordered = [...results].sort(
+  const ordered = results.toSorted(
     (a, b) => TIER_RANK[tierOf(a.output)] - TIER_RANK[tierOf(b.output)],
   );
   let suppressed: HookResult | undefined;

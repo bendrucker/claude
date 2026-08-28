@@ -130,7 +130,7 @@ export function findLastReviewDate(reviews: Review[], viewer: string, role: Role
       ? reviews.filter((r) => r.author?.__typename === "User" && r.author.login !== viewer)
       : reviews.filter((r) => r.author?.login === viewer);
 
-  const sorted = relevant.sort(
+  const sorted = relevant.toSorted(
     (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
   );
 

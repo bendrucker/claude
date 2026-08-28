@@ -60,7 +60,7 @@ export function toItem(draft: RewriteDraft): Item {
 // Interleave longest and shortest so a truncated labeling session still spans
 // both the multi-paragraph rewrites and the tight one-liners.
 export function weave<T>(items: T[], length: (item: T) => number): T[] {
-  const sorted = [...items].sort((a, b) => length(b) - length(a));
+  const sorted = items.toSorted((a, b) => length(b) - length(a));
   const woven: T[] = [];
   let lo = 0;
   let hi = sorted.length - 1;
@@ -90,7 +90,7 @@ export function selectSample(candidates: Item[], limit: number): Item[] {
       weave(arr, (i) => i.output.length),
     );
   }
-  const order = [...buckets.keys()].sort();
+  const order = [...buckets.keys()].toSorted();
   const selected: Item[] = [];
   let added = true;
   while (added && selected.length < limit) {
@@ -134,7 +134,7 @@ async function probeInvocations(dbPath: string): Promise<number | null> {
 }
 
 async function loadDrafts(dir: string): Promise<RewriteDraft[]> {
-  const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).sort();
+  const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).toSorted();
   const drafts: RewriteDraft[] = [];
   for (const name of names) {
     const draft = (await Bun.file(join(dir, name)).json()) as Partial<RewriteDraft>;

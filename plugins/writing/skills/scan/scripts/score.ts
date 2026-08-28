@@ -117,8 +117,7 @@ export function renderTable(report: ScoreReport): string {
   for (const group of report.groups) {
     const header = `${group.group} (${group.wordCount} words)`;
     const rows = group.categories
-      .slice()
-      .sort((a, b) => b.density - a.density || a.category.localeCompare(b.category))
+      .toSorted((a, b) => b.density - a.density || a.category.localeCompare(b.category))
       .map((c) => [c.category, String(c.hits), formatDensity(c.density)]);
     if (rows.length === 0) {
       sections.push(`${header}\nNo patterns detected.`);

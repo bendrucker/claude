@@ -214,7 +214,7 @@ export function scanJsonlFiles(root: string): ScannedFile[] {
 async function applySchema(db: Database): Promise<void> {
   const files = readdirSync(SCHEMA_DIR)
     .filter((f) => f.endsWith(".sql"))
-    .sort();
+    .toSorted();
   for (const file of files) {
     const sql = await Bun.file(path.join(SCHEMA_DIR, file)).text();
     await db.run(sql);
@@ -247,13 +247,11 @@ async function migrateIfNeeded(db: Database): Promise<void> {
   `);
   // Querying index_meta is only safe once the table exists.
   const version = row?.has_version
-    ? Number(
-        (
-          await db.query<{ version: number }>(
-            "SELECT COALESCE(MAX(version), 0) AS version FROM index_meta",
-          )
-        )[0]?.version ?? 0,
-      )
+    ? ((
+        await db.query<{ version: number }>(
+          "SELECT COALESCE(MAX(version), 0) AS version FROM index_meta",
+        )
+      )[0]?.version ?? 0)
     : 0;
   // A pre-host schema (missing data/host) or an older ingestion version both mean
   // the cache predates the current import logic; drop it so the next run rebuilds.

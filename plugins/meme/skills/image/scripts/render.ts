@@ -35,19 +35,19 @@ const MIN_WIDTH = 400;
 
 const IMPACT_PATH = "/System/Library/Fonts/Supplemental/Impact.ttf";
 
-let classicFamily: string | undefined;
+let cachedFamily: string | undefined;
 
 async function classicFontFamily(): Promise<string> {
-  if (classicFamily) return classicFamily;
+  if (cachedFamily) return cachedFamily;
   if (await Bun.file(IMPACT_PATH).exists()) {
     GlobalFonts.registerFromPath(IMPACT_PATH, "Impact");
-    classicFamily = "Impact";
+    cachedFamily = "Impact";
   } else if (GlobalFonts.has("Arial Black")) {
-    classicFamily = "Arial Black";
+    cachedFamily = "Arial Black";
   } else {
-    classicFamily = "sans-serif";
+    cachedFamily = "sans-serif";
   }
-  return classicFamily;
+  return cachedFamily;
 }
 
 interface ResolvedFont {

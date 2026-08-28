@@ -31,7 +31,7 @@ const argv = cli({
   },
 });
 
-const files = (await readdir(argv.flags.briefs)).filter((f) => f.endsWith(".json")).sort();
+const files = (await readdir(argv.flags.briefs)).filter((f) => f.endsWith(".json")).toSorted();
 const samples: unknown[] = [];
 const missing: string[] = [];
 

@@ -99,6 +99,7 @@ async function openUrl(
       if (isSandboxBlockedHandoff(stderr)) {
         throw new Error(
           `Things URL handoff was blocked by the Claude Code sandbox (LaunchServices procNotFound / -10810 / -10673). Launch Services handoff requires sandbox.allowAppleEvents in user/settings.json. Original stderr: ${stderr.trim()}`,
+          { cause: error },
         );
       }
       // ShellError's own message is only the exit code, and `.quiet()` holds
@@ -107,6 +108,7 @@ async function openUrl(
       const detail = stderr.trim() || error.stdout.toString().trim();
       throw new Error(
         `Things URL handoff failed (open exited ${error.exitCode})${detail ? `: ${detail}` : ""}`,
+        { cause: error },
       );
     }
     throw error;

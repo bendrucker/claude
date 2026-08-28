@@ -385,9 +385,7 @@ function exec(command: string): ExecResult {
     return { ok: true, stdout };
   } catch (err) {
     const stderr =
-      err && typeof err === "object" && "stderr" in err
-        ? String((err as { stderr: unknown }).stderr ?? "")
-        : "";
+      err && typeof err === "object" && "stderr" in err ? String(err.stderr ?? "") : "";
     // glab does not surface structured rate-limit metadata. Rather than
     // regexing human text we rely on the api-error counter instead.
     return { ok: false, stderr, rateLimited: false, retryAfter: "" };
@@ -837,7 +835,7 @@ function isTerminal(events: Event[], mode: RunTarget["mode"]): boolean {
   );
 }
 
-async function run(options: RunOptions): Promise<void> {
+async function watch(options: RunOptions): Promise<void> {
   const target = options.target;
   let projectEncoded: string;
   let iid: number | null = null;
@@ -1004,7 +1002,7 @@ async function main(): Promise<void> {
     throw new Error("No target specified");
   }
 
-  await run({
+  await watch({
     target,
     intervalSeconds: argv.flags.interval ?? null,
     maxMinutes: argv.flags.maxMinutes,

@@ -221,8 +221,12 @@ export function filter(inventory: Inventory, { plugin, scope }: Filters): Invent
   };
 }
 
+function owned(items: Origin[], name: string): number {
+  return items.filter((item) => item.plugin === name).length;
+}
+
 function byName<T extends { name: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) => a.name.localeCompare(b.name));
+  return items.toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function collect(): Promise<Inventory> {
@@ -242,12 +246,9 @@ export async function collect(): Promise<Inventory> {
         ? [...hookEntries(`plugins/${plugin.name}/hooks/hooks.json`, plugin.hooks.hooks)]
         : [],
     ),
-    ...fromSkills.flatMap(({ hooks }) => hooks),
+    ...fromSkills.flatMap(({ hooks: skillHooks }) => skillHooks),
     ...settings.flat(),
   ];
-
-  const owned = (items: Origin[], name: string): number =>
-    items.filter((item) => item.plugin === name).length;
 
   return {
     plugins: plugins.map((plugin) => ({

@@ -2,7 +2,8 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc"],
   "categories": {
-    "correctness": "error"
+    "correctness": "error",
+    "suspicious": "error"
   },
   "rules": {
     "prefer-template": "error",
@@ -19,7 +20,9 @@
       }
     ],
     "no-unused-expressions": ["error", { "allowTernary": true }],
+    "no-underscore-dangle": ["error", { "allow": ["__typename", "__dirname"] }],
     "no-unsafe-optional-chaining": "off",
+    "typescript/no-unsafe-type-assertion": "off",
     "typescript/restrict-template-expressions": "off",
     "typescript/await-thenable": "off",
     "typescript/no-base-to-string": "off",
@@ -67,7 +70,8 @@
     {
       "files": ["**/*.test.ts"],
       "rules": {
-        "local/no-chained-type-assertions": "off"
+        "local/no-chained-type-assertions": "off",
+        "unicorn/consistent-function-scoping": "off"
       }
     }
   ],

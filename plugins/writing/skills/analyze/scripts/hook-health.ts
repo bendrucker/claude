@@ -97,7 +97,7 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
       ...counts,
       share: injections > 0 ? counts.fired / injections : 0,
     }))
-    .sort((a, b) => b.fired - a.fired || b.suppressed - a.suppressed);
+    .toSorted((a, b) => b.fired - a.fired || b.suppressed - a.suppressed);
 
   return {
     total: entries.length,

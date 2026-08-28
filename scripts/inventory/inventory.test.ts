@@ -210,7 +210,7 @@ test("plugin agents keep the namespace they are dispatched by", async () => {
   const { agents } = await collect();
   const logs = agents.filter((agent) => agent.path.endsWith("/agents/logs.md"));
 
-  expect(logs.map((agent) => agent.name).sort()).toEqual(["github:logs", "gitlab:logs"]);
+  expect(logs.map((agent) => agent.name).toSorted()).toEqual(["github:logs", "gitlab:logs"]);
 });
 
 test("filter narrows every kind to one plugin", () => {

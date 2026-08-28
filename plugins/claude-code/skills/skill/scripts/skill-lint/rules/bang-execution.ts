@@ -23,11 +23,11 @@ function bashMatchers(allowedTools: unknown): string[] {
   return matchers;
 }
 
-function matchesBang(matcherCommand: string, bangCommands: string[]): boolean {
+function matchesBang(matcherCommand: string, commands: string[]): boolean {
   const star = matcherCommand.indexOf("*");
   if (star === -1) return false;
   const prefix = matcherCommand.slice(0, star);
-  return bangCommands.some((command) => command.startsWith(prefix));
+  return commands.some((command) => command.startsWith(prefix));
 }
 
 export const bangExecutionMatcher: Rule = {

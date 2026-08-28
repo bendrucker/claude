@@ -106,7 +106,7 @@ export function buildPairs(scenarios: Scenario[], rows: GenerationRow[]): Pair[]
     }
     pairs.push({ scenario, seed: Number(rawSeed), rows: { a: entry.a, b: entry.b } });
   }
-  return pairs.sort((x, y) => x.scenario.id.localeCompare(y.scenario.id) || x.seed - y.seed);
+  return pairs.toSorted((x, y) => x.scenario.id.localeCompare(y.scenario.id) || x.seed - y.seed);
 }
 
 /** Randomizes which arm occupies which slot, so the judge cannot infer the arm from position. */
@@ -179,7 +179,7 @@ export function parseVerdict(jsonText: string): Verdict {
   try {
     parsed = JSON.parse(jsonText);
   } catch (error) {
-    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`);
+    throw new Error(`Judge returned invalid JSON: ${(error as Error).message}`, { cause: error });
   }
   if (typeof parsed !== "object" || parsed === null) {
     throw new Error("Judge verdict must be a JSON object");

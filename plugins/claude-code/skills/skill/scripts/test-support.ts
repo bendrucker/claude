@@ -14,5 +14,5 @@ export function makePostToolUseInput(
     tool_input: { file_path: "/tmp/file", content: "" },
     tool_response: { type: "create", filePath: "/tmp/file", content: "" },
     ...overrides,
-  } as PostToolUseHookInput;
+  };
 }

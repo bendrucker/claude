@@ -15,9 +15,8 @@ async function checkQuoting(): Promise<string[]> {
     for (const { file, command: hook } of hookCommands(plugin)) {
       if (!hook.command?.includes("${CLAUDE_PLUGIN_ROOT}")) continue;
 
-      for (const _match of hook.command.matchAll(UNQUOTED_PATH)) {
+      if (hook.command.search(UNQUOTED_PATH) !== -1) {
         violations.push(`${file}: ${hook.command}`);
-        break;
       }
     }
   }

@@ -115,7 +115,7 @@ export function renderPlist(descriptor: Descriptor, group: string): string {
   const label = fullLabel(group, descriptor.label);
   const workdir = expandHome(descriptor.workdir);
   const permissionMode = descriptor.permission_mode ?? "acceptEdits";
-  const command = `claude -p ${JSON.stringify(descriptor.command)} --permission-mode ${permissionMode}`;
+  const invocation = `claude -p ${JSON.stringify(descriptor.command)} --permission-mode ${permissionMode}`;
   const home = homedir();
   const stdout = join(home, "Library/Logs", `claude-${group}-${descriptor.label}.log`);
   const stderr = join(home, "Library/Logs", `claude-${group}-${descriptor.label}.err.log`);
@@ -155,7 +155,7 @@ export function renderPlist(descriptor: Descriptor, group: string): string {
 \t<array>
 \t\t<string>/bin/zsh</string>
 \t\t<string>-lc</string>
-\t\t${plistString(command)}
+\t\t${plistString(invocation)}
 \t</array>
 \t<key>WorkingDirectory</key>
 \t${plistString(workdir)}
@@ -198,8 +198,10 @@ export function parseDescriptor(text: string, source: string): Descriptor {
     throw new Error(`${source}: unknown "mode" ${JSON.stringify(mode)}`);
   }
 
-  const command = data.command;
-  if (typeof command !== "string" || !command) throw new Error(`${source}: missing "command"`);
+  const commandText = data.command;
+  if (typeof commandText !== "string" || !commandText) {
+    throw new Error(`${source}: missing "command"`);
+  }
 
   const workdir = data.workdir;
   if (workdir !== undefined && typeof workdir !== "string") {
@@ -215,7 +217,7 @@ export function parseDescriptor(text: string, source: string): Descriptor {
     label,
     schedule: { at: schedule.at, weekday, day },
     mode,
-    command,
+    command: commandText,
     workdir,
     permission_mode: permissionMode,
   };
@@ -227,7 +229,7 @@ export async function listDescriptors(dir: string): Promise<DescriptorFile[]> {
   for await (const file of glob.scan({ cwd: dir, absolute: true })) {
     results.push({ descriptor: parseDescriptor(await Bun.file(file).text(), file), file });
   }
-  return results.sort((a, b) => a.descriptor.label.localeCompare(b.descriptor.label));
+  return results.toSorted((a, b) => a.descriptor.label.localeCompare(b.descriptor.label));
 }
 
 /** Short-form (`<group>.<label>`) identifiers for every `me.bendrucker.claude.*` agent installed on this machine. */
@@ -386,7 +388,7 @@ async function listCommand(dirs: string[], withLoadState: boolean): Promise<void
     const installedForGroup = new Set(installedAll.filter((l) => l.startsWith(`${group}.`)));
     const all = new Set([...declared.keys(), ...installedForGroup]);
 
-    for (const label of [...all].sort()) {
+    for (const label of [...all].toSorted()) {
       const entry = declared.get(label);
       const installed = installedForGroup.has(label);
       const row = [

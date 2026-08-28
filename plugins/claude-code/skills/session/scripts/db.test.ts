@@ -1686,7 +1686,7 @@ describe("plan-iterations query", () => {
     });
     return rows
       .filter((r) => r.sid === "plan-ite")
-      .sort((a, b) => Number(a.plan_seq) - Number(b.plan_seq));
+      .toSorted((a, b) => Number(a.plan_seq) - Number(b.plan_seq));
   }
 
   it("leaves growth/removal/carry-over and secs_since_prev null on the first present", async () => {
@@ -1970,7 +1970,7 @@ describe("skill-config-vs-observed query", () => {
 
   it("filters configured names by skill glob", async () => {
     const rows = await skillRows({ skill: "review:*" });
-    expect(rows.map((r) => r.skill_name).sort()).toEqual(["review:inbox", "review:peer"]);
+    expect(rows.map((r) => r.skill_name).toSorted()).toEqual(["review:inbox", "review:peer"]);
   });
 });
 

@@ -63,9 +63,14 @@ async function gitShow(repo: string, sha: string, path: string): Promise<string 
 
 /** Re-measure a commit's added lines from its local repo through the live scorer. */
 export async function scoreCommit(repo: string, sha: string): Promise<SessionScore | null> {
-  const diffText = (
-    await $`git -C ${repo} diff-tree -p --no-commit-id --no-renames -r ${sha}`.quiet().nothrow()
-  ).text();
+  const diff = await $`git -C ${repo} diff-tree -p --no-commit-id --no-renames -r ${sha}`
+    .quiet()
+    .nothrow();
+  if (diff.exitCode !== 0) {
+    console.error(`scoreCommit: git diff-tree failed for ${repo}@${sha}, excluding the commit`);
+    return null;
+  }
+  const diffText = diff.text();
   if (!diffText.trim()) return null;
   const files: ScoredFile[] = [];
   for (const file of parseUnifiedDiff(diffText)) {
@@ -117,12 +122,14 @@ function addInto(into: AddedLineStats, stats: AddedLineStats): void {
 export async function loadStoredRows(dataPath: string): Promise<Map<string, StoredSessionRow[]>> {
   const bySession = new Map<string, StoredSessionRow[]>();
   const content = await Bun.file(dataPath).text();
+  let malformed = 0;
   for (const line of content.split("\n")) {
     if (!line.trim()) continue;
     let row: StoredSessionRow;
     try {
       row = JSON.parse(line) as StoredSessionRow;
     } catch {
+      malformed++;
       continue;
     }
     const id = row.session?.match(SESSION_ID)?.[1];
@@ -130,6 +137,9 @@ export async function loadStoredRows(dataPath: string): Promise<Map<string, Stor
     const rows = bySession.get(id) ?? [];
     rows.push(row);
     bySession.set(id, rows);
+  }
+  if (malformed > 0) {
+    console.error(`loadStoredRows: skipped ${malformed} malformed line(s) in ${dataPath}`);
   }
   return bySession;
 }

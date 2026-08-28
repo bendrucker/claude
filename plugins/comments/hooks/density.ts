@@ -14,7 +14,6 @@ const MARKER = "comment-density:";
 
 const TAIL_LINES = 200;
 
-/** Whether a prior density block already landed near the end of the transcript. */
 function blockedRecently(transcript: string): boolean {
   return transcript.split("\n").slice(-TAIL_LINES).some((line) => line.includes(MARKER));
 }

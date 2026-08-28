@@ -186,7 +186,7 @@ export const TERSE_AVG_CHARS = 78;
 /** Ceiling on the terse floor multiplier. */
 export const TERSE_MAX_FACTOR = 2.25;
 
-/** Floor on one file's comment weight, charged per comment rather than per char. */
+/** Floor on one file's comment weight, charged per comment. */
 export function commentWeightFloor(stats: AddedLineStats): number {
   const flat = MIN_COMMENT_CHARS * stats.commentCount;
   if (stats.commentCount < TERSE_MIN_COMMENTS) return flat;

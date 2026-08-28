@@ -1,0 +1,13 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`tfs encodes one-way nonstop economy 1`] = `"CBwQAhogEgoyMDI2LTA0LTE1KABqBwgBEgNMQVhyBwgBEgNPUkRAAUgBcAGCAQsI____________AZgBAg"`;
+
+exports[`tfs encodes round trip 1`] = `"CBwQAhogEgoyMDI2LTA0LTE1KABqBwgBEgNMQVhyBwgBEgNPUkQaIBIKMjAyNi0wNC0yMCgAagcIARIDT1JEcgcIARIDTEFYQAFIAXABggELCP___________wGYAQE"`;
+
+exports[`tfs encodes connections allowed 1`] = `"CBwQAhoeEgoyMDI2LTA0LTE1agcIARIDTEFYcgcIARIDT1JEQAFIAXABggELCP___________wGYAQI"`;
+
+exports[`tfs encodes business cabin 1`] = `"CBwQAhogEgoyMDI2LTA0LTE1KABqBwgBEgNMQVhyBwgBEgNPUkRAAUgDcAGCAQsI____________AZgBAg"`;
+
+exports[`tfs encodes one carry-on, which is what drops Basic Economy 1`] = `"CBwQAhogEgoyMDI2LTA0LTE1KABqBwgBEgNMQVhyBwgBEgNPUkRAAUgBagQQARgAcAGCAQsI____________AZgBAg"`;
+
+exports[`tfs encodes checked bag 1`] = `"CBwQAhogEgoyMDI2LTA0LTE1KABqBwgBEgNMQVhyBwgBEgNPUkRAAUgBagQQARgBcAGCAQsI____________AZgBAg"`;

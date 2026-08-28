@@ -1,0 +1,43 @@
+{
+  "$schema": "../node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "promise", "node", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "env": {
+    "builtin": true
+  },
+  "rules": {
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "max-depth": "error",
+    "no-await-in-loop": "error",
+    "no-template-curly-in-string": "warn",
+    "no-underscore-dangle": ["error", { "allow": ["__typename", "__dirname"] }],
+    "no-unsafe-optional-chaining": "off",
+    "no-unused-expressions": ["error", { "allowTernary": true }],
+    "no-unused-vars": [
+      "error",
+      {
+        "args": "after-used",
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "prefer-template": "error",
+    "import/no-named-as-default-member": "error",
+    "oxc/no-map-spread": "error",
+    "unicorn/prefer-array-find": "error",
+    "unicorn/prefer-set-has": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": [{ "name": "local", "specifier": "./index.ts" }],
+  "rules": {
+    "local/no-chained-type-assertions": "error",
+    "local/no-conditional-empty-object-spread": "error",
+    "local/no-module-mocking": "error",
+    "local/no-terminal-width": "error",
+    "local/no-unknown-returns": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "local/no-chained-type-assertions": "off"
+      }
+    }
+  ]
+}

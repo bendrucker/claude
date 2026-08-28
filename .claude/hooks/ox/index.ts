@@ -293,12 +293,34 @@ function commandOutput(error: unknown): string | null {
 // to excluded files read as lint or format failures and block Stop.
 const LINT_ARGS = ["--no-error-on-unmatched-pattern", "-f", "agent"];
 
+// Only the per-file pass runs type-aware. The gate below pairs its batch with a
+// whole-tree --type-aware --type-check that reports the same rules, so asking
+// for them twice buys nothing and costs the gate a second type-aware run.
+//
+// --type-aware in a tree tsgolint cannot resolve reports the missing executable
+// instead of linting, and no edit clears that. `installed` skips the doomed run
+// where node_modules is absent. A tree carrying node_modules without the checker
+// shows up only in the diagnostics, so the plain pass runs as a fallback to
+// recover the findings that need no type information.
+async function runOxlintPass(
+  command: OxCommand,
+  args: string[],
+  cwd: string | undefined,
+): Promise<string | null> {
+  if (!(await installed(cwd))) {
+    return runOx(command, args, cwd);
+  }
+  const output = await runOx(command, ["--type-aware", ...args], cwd);
+  return output && MISSING_CHECKER.test(output) ? runOx(command, args, cwd) : output;
+}
+
 export async function runOxlintAgent(filePath: string): Promise<string | null> {
   const command = await oxlintCommand();
   if (!command) {
     return null;
   }
-  return runOx(command, [...LINT_ARGS, filePath], await oxWorkingTree(filePath));
+  const cwd = await oxWorkingTree(filePath);
+  return runOxlintPass(command, [...LINT_ARGS, filePath], cwd);
 }
 
 async function runOxlintAgentBatch(files: string[]): Promise<string | null> {
@@ -353,12 +375,10 @@ async function installed(cwd: string | undefined): Promise<boolean> {
 
 type TypeCheckResult = { output: string | null; needsInstall: boolean };
 
-// Type-aware lint rules stay off in .oxlintrc.json; --type-aware is enabled
-// only because --type-check requires the same type-info plumbing. There is no
-// useful per-file mode, so this runs whole-tree, once per working tree the
-// gated files resolve to. --quiet drops warnings: whole-tree they run to dozens
-// of lines the turn did not cause, and the batch lint pass above already
-// reports them for the files actually edited. --no-error-on-unmatched-pattern
+// There is no useful per-file mode, so this runs whole-tree, once per working
+// tree the gated files resolve to. --quiet drops warnings: whole-tree they run
+// to dozens of lines the turn did not cause, and the batch lint pass above
+// already reports them for the files actually edited. --no-error-on-unmatched-pattern
 // covers a tree whose config ignores everything in it, which otherwise exits
 // non-zero with "No files found to lint" and reads as a type failure.
 const TYPE_CHECK_ARGS = [

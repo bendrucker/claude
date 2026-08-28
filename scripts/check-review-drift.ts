@@ -126,6 +126,7 @@ async function snapshotFragments(version: string): Promise<Map<string, string>> 
  * either form so a match still means the prompt text is byte-identical.
  */
 function fragmentPattern(fragment: string): RegExp {
+  // oxlint-disable-next-line typescript/no-misused-spread -- code points are the unit here: each is escaped or rewritten as its own \uXXXX form.
   const escaped = [...fragment]
     .map((char) => {
       const code = char.codePointAt(0) as number;

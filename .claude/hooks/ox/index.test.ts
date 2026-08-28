@@ -128,6 +128,36 @@ async function createIgnoredFixture(baseDir: string): Promise<string> {
   return filePath;
 }
 
+// The type-aware pass is skipped where node_modules is absent and falls back to
+// the plain pass where it is present without tsgolint, so `nodeModules` picks
+// which of the three shapes a fixture exercises. The empty tree stands in for a
+// partial install: node_modules exists, the checker is not in it.
+type NodeModules = "linked" | "empty" | "absent";
+
+async function createTypeAwareFixture(
+  baseDir: string,
+  { nodeModules }: { nodeModules: NodeModules },
+): Promise<string> {
+  const repoDir = await mkdtemp(join(baseDir, "type-aware-repo-"));
+  await execAsync("git init", { cwd: repoDir });
+  await Bun.write(
+    join(repoDir, ".oxlintrc.json"),
+    JSON.stringify({
+      plugins: ["typescript"],
+      rules: { "typescript/no-misused-promises": "error", "no-dupe-keys": "error" },
+    }),
+  );
+  if (nodeModules === "linked") {
+    const repoRoot = join(import.meta.dirname, "..", "..", "..");
+    await execAsync(`ln -s "${join(repoRoot, "node_modules")}" node_modules`, { cwd: repoDir });
+  } else if (nodeModules === "empty") {
+    await mkdir(join(repoDir, "node_modules"));
+  }
+  const filePath = join(repoDir, "schedule.ts");
+  await Bun.write(filePath, await Bun.file(join(FIXTURES_DIR, "type-aware.ts")).text());
+  return filePath;
+}
+
 describe("ox hook", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ox-test-"));
@@ -317,9 +347,45 @@ describe("ox hook", () => {
       expect(additionalContext).toContain("no-dupe-keys");
       expect(await Bun.file(filePath).text()).toBe(before);
     });
+
+    async function typeAwareContext(nodeModules: NodeModules): Promise<string | undefined> {
+      const filePath = await createTypeAwareFixture(tempDir, { nodeModules });
+      const result = await processPostToolUse(
+        mockPostToolUseInput("Edit", { file_path: filePath }),
+      );
+      return (result?.hookSpecificOutput as { additionalContext: string } | undefined)
+        ?.additionalContext;
+    }
+
+    it.each<{ name: string; nodeModules: NodeModules; reports: string }>([
+      {
+        name: "reports a violation only the type-aware pass sees",
+        nodeModules: "linked",
+        reports: "no-misused-promises",
+      },
+      {
+        name: "skips the type-aware pass where node_modules is absent",
+        nodeModules: "absent",
+        reports: "no-dupe-keys",
+      },
+      {
+        name: "falls back to the plain pass where node_modules omits tsgolint",
+        nodeModules: "empty",
+        reports: "no-dupe-keys",
+      },
+    ])("$name", async ({ nodeModules, reports }) => {
+      const context = await typeAwareContext(nodeModules);
+
+      expect(context).toContain(reports);
+      expect(context).not.toContain("tsgolint");
+    });
   });
 
   describe("processStop", () => {
+    // Each Stop runs a whole-tree type-aware check, so a test driving the gate
+    // three times needs a budget the 5s default does not give it on CI.
+    const MULTI_STOP_TIMEOUT_MS = 30_000;
+
     // A session holding one lint error oxfmt cannot fix, stopped repeatedly.
     // Each block-budget test drives its own so the on-disk count stays its own.
     async function unfixableSession(session: string): Promise<string> {
@@ -343,22 +409,26 @@ describe("ox hook", () => {
     });
 
     // An error the model cannot clear would otherwise block every Stop forever.
-    it("gives way once the issues survive the block limit", async () => {
-      const session = `limit-${Date.now()}`;
-      const transcript = await unfixableSession(session);
+    it(
+      "gives way once the issues survive the block limit",
+      async () => {
+        const session = `limit-${Date.now()}`;
+        const transcript = await unfixableSession(session);
 
-      const budget = [];
-      for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
-        budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
-      }
-      const past = await processStop(mockStopHookInput(transcript, true, session));
+        const budget = [];
+        for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
+          budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
+        }
+        const past = await processStop(mockStopHookInput(transcript, true, session));
 
-      expect(budget.map((result) => result?.decision)).toEqual(
-        Array(STOP_BLOCK_LIMIT).fill("block"),
-      );
-      expect(past?.decision).toBeUndefined();
-      expect(past?.systemMessage).toContain("no-dupe-keys");
-    });
+        expect(budget.map((result) => result?.decision)).toEqual(
+          Array(STOP_BLOCK_LIMIT).fill("block"),
+        );
+        expect(past?.decision).toBeUndefined();
+        expect(past?.systemMessage).toContain("no-dupe-keys");
+      },
+      MULTI_STOP_TIMEOUT_MS,
+    );
 
     // Blocking without a recorded count is the runaway itself: every re-entrant
     // Stop would read zero and block again, with nothing to release it.
@@ -376,16 +446,20 @@ describe("ox hook", () => {
 
     // The budget is per round. A Stop the model did not reach through a block
     // ends the previous round, so the next one starts with its full count.
-    it("restarts the count on a stop that did not follow a block", async () => {
-      const session = `restart-${Date.now()}`;
-      const transcript = await unfixableSession(session);
+    it(
+      "restarts the count on a stop that did not follow a block",
+      async () => {
+        const session = `restart-${Date.now()}`;
+        const transcript = await unfixableSession(session);
 
-      await processStop(mockStopHookInput(transcript, false, session));
-      await processStop(mockStopHookInput(transcript, true, session));
-      const fresh = await processStop(mockStopHookInput(transcript, false, session));
+        await processStop(mockStopHookInput(transcript, false, session));
+        await processStop(mockStopHookInput(transcript, true, session));
+        const fresh = await processStop(mockStopHookInput(transcript, false, session));
 
-      expect(fresh?.decision).toBe("block");
-    });
+        expect(fresh?.decision).toBe("block");
+      },
+      MULTI_STOP_TIMEOUT_MS,
+    );
 
     it("returns null when no files were modified", async () => {
       const transcriptPath = join(tempDir, `transcript-empty-${Date.now()}.jsonl`);

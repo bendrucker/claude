@@ -842,11 +842,14 @@ function wrapAt(text: string, column: number, indent = ""): string {
 }
 
 // Greedy fill leaves a line longer than column - (MAX_WORD + 1) and never
-// longer than column. Deriving the column floor from that keeps every generated
-// non-final line inside [WRAP_MIN_LINE, WRAP_MAX_LINE], so the generator only
-// emits documents the detector actually claims to catch.
+// longer than column. A list item spends LIST_INDENT of that budget on its
+// hanging indent, which the detector measures trimmed and so does not count.
+// Deriving the column floor from all three keeps every generated non-final line
+// inside [WRAP_MIN_LINE, WRAP_MAX_LINE], so the generator only emits documents
+// the detector actually claims to catch.
 const MAX_WORD = 9;
-const MIN_COLUMN = WRAP_MIN_LINE + MAX_WORD + 1;
+const LIST_INDENT = 2;
+const MIN_COLUMN = WRAP_MIN_LINE + MAX_WORD + 1 + LIST_INDENT;
 const MAX_COLUMN = WRAP_MAX_LINE;
 
 const word = fc
@@ -870,7 +873,9 @@ const proseDocument = fc
 function wrapDocument(doc: string, column: number): string {
   return doc
     .split("\n\n")
-    .map((b) => (b.startsWith("- ") ? wrapAt(b, column, "  ") : wrapAt(b, column)))
+    .map((b) =>
+      b.startsWith("- ") ? wrapAt(b, column, " ".repeat(LIST_INDENT)) : wrapAt(b, column),
+    )
     .join("\n\n");
 }
 

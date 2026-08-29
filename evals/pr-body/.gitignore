@@ -2,3 +2,10 @@
 data/
 feedback/
 results/
+
+# Regenerated per run by scripts/fixtures.ts.
+fixtures/
+
+# promptfoo run output.
+output.json
+output.*.json

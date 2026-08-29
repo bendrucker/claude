@@ -1,0 +1,40 @@
+{
+  "evalId": "eval-def-2026-08-20T09:30:00",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-08-20T09:30:00.000Z",
+    "prompts": [
+      {
+        "label": "current",
+        "provider": "anthropic:claude-agent-sdk",
+        "metrics": {
+          "cost": 0.7,
+          "testPassCount": 7,
+          "testFailCount": 1,
+          "testErrorCount": 0,
+          "tokenUsage": { "total": 150000 }
+        }
+      },
+      {
+        "label": "revised",
+        "provider": "anthropic:claude-agent-sdk",
+        "metrics": {
+          "cost": 0.8,
+          "testPassCount": 8,
+          "testFailCount": 0,
+          "testErrorCount": 0,
+          "tokenUsage": { "total": 160000 }
+        }
+      }
+    ],
+    "results": [],
+    "stats": { "successes": 15, "failures": 1, "errors": 0 }
+  },
+  "config": { "description": "pr-body" },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.122.2",
+    "platform": "linux",
+    "evaluationCreatedAt": "2026-08-20T09:30:00.000Z"
+  }
+}

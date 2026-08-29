@@ -1,0 +1,162 @@
+name: eval
+
+# CI runs use tracked fixtures only (evals/<suite>/fixtures materialized from
+# in-repo skill sources plus evals/<suite>/scenarios/). S3 corpora never reach
+# this workflow.
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    # Manual dispatch always runs every suite. A PR run additionally needs
+    # the `eval` label, since these are live model calls against a budget.
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'eval')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      suites: ${{ steps.filter.outputs.changes || steps.all.outputs.suites }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Suite -> path mapping. A suite name must match its evals/<suite>
+      # directory, and the workflow_dispatch fallback list below must stay
+      # in sync with the filter keys here.
+      - name: Detect touched suites
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            pr-body:
+              - 'plugins/pull-request/**'
+              - 'evals/pr-body/**'
+
+      - name: Run all suites
+        if: github.event_name == 'workflow_dispatch'
+        id: all
+        run: echo 'suites=["pr-body"]' >> "$GITHUB_OUTPUT"
+
+  eval:
+    needs: changes
+    if: needs.changes.outputs.suites != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJson(needs.changes.outputs.suites) }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PROMPTFOO_CONFIG_DIR: ${{ github.workspace }}/.promptfoo
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/bun-install
+
+      # cases.json is generated from scenarios/ and drifts silently. The check costs
+      # nothing and runs ahead of the credential gate, so drift fails the job before
+      # a single model call is billed.
+      - name: Check eval cases
+        if: matrix.suite == 'pr-body'
+        run: bun run --cwd evals/pr-body cases --check
+
+      - name: Check for eval credentials
+        id: check
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip notice
+        if: steps.check.outputs.has_key == 'false'
+        run: echo "::notice::ANTHROPIC_API_KEY is not set, so the ${{ matrix.suite }} eval is skipped. Add the secret to enable live runs."
+
+      # A suite whose providers point at a fixture tree declares a `fixtures`
+      # script. The tree is git-ignored, so the run materializes it first.
+      - name: Run promptfoo eval
+        if: steps.check.outputs.has_key == 'true'
+        working-directory: evals/${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          if jq -e '.scripts.fixtures' package.json > /dev/null 2>&1; then
+            bun run fixtures
+          fi
+          bunx promptfoo eval --no-progress-bar -o output.json
+
+      - name: Upload results
+        if: steps.check.outputs.has_key == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptfoo-${{ matrix.suite }}-${{ github.run_id }}
+          path: evals/${{ matrix.suite }}/output.json
+
+      - name: Summarize results
+        if: steps.check.outputs.has_key == 'true'
+        id: summary
+        working-directory: evals/${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          successes=$(jq '.results.stats.successes' output.json)
+          failures=$(jq '.results.stats.failures' output.json)
+          errors=$(jq '.results.stats.errors' output.json)
+          total=$((successes + failures + errors))
+          pass_rate=$(awk -v s="$successes" -v t="$total" 'BEGIN { printf (t > 0) ? "%.1f" : "0.0", (t > 0 ? s / t * 100 : 0) }')
+          total_cost=$(jq '([.results.results[].cost // 0] | add // 0) * 100 | round / 100' output.json)
+          {
+            echo "pass_rate=$pass_rate"
+            echo "total_cost=$total_cost"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "## promptfoo eval: ${{ matrix.suite }}"
+            echo ""
+            echo "pass rate: ${pass_rate}% ($successes/$total) · total cost: \$${total_cost}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update PR comment
+        if: steps.check.outputs.has_key == 'true' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUITE: ${{ matrix.suite }}
+          PASS_RATE: ${{ steps.summary.outputs.pass_rate }}
+          TOTAL_COST: ${{ steps.summary.outputs.total_cost }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          marker="<!-- promptfoo-eval:${SUITE} -->"
+          body=$(cat <<BODY
+          ${marker}
+          ### promptfoo eval: \`${SUITE}\`
+
+          | metric | value |
+          | --- | --- |
+          | pass rate | ${PASS_RATE}% |
+          | total cost | \$${TOTAL_COST} |
+
+          [Full run](${RUN_URL})
+          BODY
+          )
+          existing_id=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"${marker}\")) | .id" | head -n1)
+          if [ -n "$existing_id" ]; then
+            gh api "repos/${REPO}/issues/comments/${existing_id}" -X PATCH -f body="$body"
+          else
+            gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -X POST -f body="$body"
+          fi

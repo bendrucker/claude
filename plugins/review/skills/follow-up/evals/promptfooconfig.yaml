@@ -1,0 +1,130 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: review:follow-up skill quality suite
+
+providers:
+  - id: anthropic:claude-agent-sdk
+    config:
+      model: claude-sonnet-5
+      apiKeyRequired: false
+      permission_mode: bypassPermissions
+      allow_dangerously_skip_permissions: true
+      setting_sources: []
+      max_budget_usd: 0.75
+      max_turns: 25
+      # The provider only hands the session read-only file tools when working_dir is
+      # set, and the skill is graded on how it reads and applies its own body, so the
+      # session needs Read, Grep, Glob, and LS. Bash is the tool name, not a
+      # permission specifier: an entry like "Bash(gh:*)" here would register a tool by
+      # that literal name, and the skill's context block runs `git`, so the Skill tool
+      # itself errors out when no shell is allowed. Several rubrics grade whether the
+      # skill fans out to read-only sub-agents, which is the Task tool. The provider
+      # adds Task on its own only when `agents` is configured.
+      working_dir: ./workdir
+      append_allowed_tools:
+        - Bash
+        - Task
+      # The skill only reads, so nothing here should ever write. The denials pin that
+      # and bind under bypassPermissions.
+      disallowed_tools:
+        - "Bash(git commit:*)"
+        - "Bash(git push:*)"
+        - "Bash(gh pr comment:*)"
+        - "Bash(gh pr review:*)"
+        - "Bash(glab mr note:*)"
+      plugins:
+        - type: local
+          path: ../../..
+      skills:
+        - review:follow-up
+
+defaultTest:
+  options:
+    provider:
+      id: anthropic:messages:claude-sonnet-5
+      config:
+        apiKeyRequired: false
+        apiKey: "{{ env.ANTHROPIC_GRADER_API_KEY | default('') }}"
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  - description: GitHub reviewer follow-up with sub-agent fix judging
+    vars:
+      prompt: Check if my review comments were addressed on https://github.com/acme/api-server/pull/247
+    assert:
+      - type: llm-rubric
+        value: Uses --role reviewer to fetch only threads started by the authenticated user
+      - type: llm-rubric
+        value: Syncs to the latest pushed state before judging, preferring the gh API diff over a local checkout
+      - type: llm-rubric
+        value: Dispatches read-only Explore sub-agents (Task tool) to read the post-review diff and judge fix quality
+      - type: llm-rubric
+        value: Returns code-grounded per-thread verdicts (addressed / partial / not addressed / dismissed) rather than a uniform status table
+      - type: llm-rubric
+        value: Treats resolution status as a signal and flags status-vs-code mismatches as findings
+      - type: llm-rubric
+        value: Leads with what needs attention and collapses cleanly-addressed threads
+      - type: llm-rubric
+        value: Ends with a graded recommendation (approve / approve with comments / request changes) including a minor-nit lane
+      - type: llm-rubric
+        value: "The output matches this intent: an attention-ranked assessment of how well each fix grasped the concern, with a graded re-review recommendation."
+
+  - description: GitLab MR baseline diffing with correct sub-agent fan-out
+    vars:
+      prompt: I reviewed https://gitlab.example.com/team/service/-/merge_requests/89 yesterday. Were my comments addressed?
+    assert:
+      - type: llm-rubric
+        value: "Detects GitLab from URL and loads gitlab:api and gitlab:merge-request skills"
+      - type: llm-rubric
+        value: Uses discussions.ts list with --resolvable --author to fetch reviewer threads
+      - type: llm-rubric
+        value: Establishes the review baseline from MR versions / diff_refs and diffs baseline-to-head, not the whole MR
+      - type: llm-rubric
+        value: "Does not count a 'changed line in version N' system note as a substantive author reply"
+      - type: llm-rubric
+        value: Dispatches Explore sub-agents that read the diff and return compact structured verdicts, never raw diffs to the main session
+      - type: llm-rubric
+        value: Flags new issues the fixes introduced and any unverified author claims separately from thread verdicts
+      - type: llm-rubric
+        value: Does not load GitHub MCP tools for GitLab MRs
+      - type: llm-rubric
+        value: "The output matches this intent: an attention-ranked fix-quality assessment built from sub-agent verdicts, ending in a graded recommendation."
+
+  - description: silently resolved threads verified against the diff
+    vars:
+      prompt: Follow up on my feedback for https://github.com/org/repo/pull/55 -- some threads were resolved but I didn't see replies
+    assert:
+      - type: llm-rubric
+        value: Fetches both resolved and unresolved threads started by the reviewer
+      - type: llm-rubric
+        value: Flags resolved threads that have no substantive author reply
+      - type: llm-rubric
+        value: Has sub-agents read the post-review diff to judge whether each silently resolved thread was actually addressed
+      - type: llm-rubric
+        value: Reports a status mismatch when a thread is resolved but the code shows no real fix
+      - type: llm-rubric
+        value: Suggests reopening threads where the fix is missing or mechanical
+      - type: llm-rubric
+        value: "The output matches this intent: identification of silently resolved threads with a code-grounded verdict on whether each was actually fixed."
+
+  - description: multi-round re-review with batched sub-agents and attention ranking
+    vars:
+      prompt: Round 3 of my review on https://gitlab.example.com/whirlai/api/-/merge_requests/548 -- 19 threads, check if they're actually fixed this time
+    assert:
+      - type: llm-rubric
+        value: Syncs and fetches before judging so it never assesses a worktree behind origin
+      - type: llm-rubric
+        value: Diffs from the last-reviewed MR version to head rather than re-reading the full multi-round diff
+      - type: llm-rubric
+        value: Batches the 19 threads by file into Explore sub-agents, falling back to per-thread when a file carries many
+      - type: llm-rubric
+        value: Catches a thread that is resolved but only partially or mechanically fixed and marks it focus=true
+      - type: llm-rubric
+        value: Distinguishes a fix that meets the underlying intent from one that mechanically satisfies the literal wording
+      - type: llm-rubric
+        value: Collapses the cleanly-addressed threads to a count and leads with the ones needing attention
+      - type: llm-rubric
+        value: Ends with a graded recommendation including the option to approve while requesting trivial follow-ups
+      - type: llm-rubric
+        value: "The output matches this intent: a per-thread fix-quality verdict that catches threads marked resolved but only mechanically or partially fixed, ranked by attention."

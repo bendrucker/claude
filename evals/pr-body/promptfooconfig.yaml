@@ -1,0 +1,208 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "pr-body: shipped pull-request:create guidance against a revision"
+
+prompts:
+  - label: create-pr
+    raw: |
+      Use the pull-request:create skill to open a pull request for the change on
+      this branch.
+
+      Repository: {{repo}} ({{tier}} audience)
+      Branch: {{branch}}, based on {{base}}
+      Review bot: none configured for this repository
+      PR template: none
+
+      What the diff does:
+
+      {{diffSummary}}
+
+      Notes from the session that produced the change. Decisions taken, evidence
+      gathered, alternatives rejected, work deferred. Use what serves a reviewer.
+
+      {{substance}}
+
+      This sandbox has no git remote and no network, so skip the staging, commit,
+      push, and create steps. Draft only: return the title and body you would ship.
+
+# The two arms differ in one file inside the fixture plugin, materialized by
+# scripts/fixtures.ts. Anchors keep everything else identical, so a score delta is
+# attributable to the guidance. Each fixture plugin ships only the create skill,
+# and `setting_sources: []` keeps user and project config out of the session, so
+# `skills: all` resolves to exactly `pull-request:create`.
+x-arm-config: &armConfig
+  model: claude-sonnet-5
+  apiKeyRequired: false
+  setting_sources: []
+  permission_mode: bypassPermissions
+  allow_dangerously_skip_permissions: true
+  skills: all
+  max_turns: 12
+  # A stop for a runaway loop, well above what a completed draft costs.
+  max_budget_usd: 0.75
+  output_format:
+    type: json_schema
+    schema:
+      type: object
+      required: [title, body]
+      additionalProperties: false
+      properties:
+        title: { type: string }
+        body: { type: string }
+
+providers:
+  - id: anthropic:claude-agent-sdk
+    label: current
+    config:
+      <<: *armConfig
+      working_dir: ./fixtures/current/project
+      plugins:
+        - type: local
+          path: ./fixtures/current/pull-request
+  - id: anthropic:claude-agent-sdk
+    label: revised
+    config:
+      <<: *armConfig
+      working_dir: ./fixtures/revised/project
+      plugins:
+        - type: local
+          path: ./fixtures/revised/pull-request
+
+tests: file://cases.json
+
+defaultTest:
+  options:
+    # Never promptfoo's default OpenAI grader. `apiKeyRequired: false` rides the same
+    # Claude Code login the arms use, so a local run needs no key at all. Set
+    # ANTHROPIC_GRADER_API_KEY to grade against the API instead. Leave ANTHROPIC_API_KEY
+    # unset locally: the arms hand their whole environment to the Claude Code
+    # subprocess, which takes an API key over the claude.ai login. CI sets only
+    # ANTHROPIC_API_KEY, where the override renders empty and the provider falls
+    # through to it. Sonnet 5 rejects `temperature`, so the grader carries no
+    # sampling parameters and promptfoo's response cache is what pins a regrade.
+    provider: &grader
+      id: anthropic:messages:claude-sonnet-5
+      config:
+        apiKeyRequired: false
+        apiKey: "{{ env.ANTHROPIC_GRADER_API_KEY | default('') }}"
+        max_tokens: 4096
+  assert:
+    - type: is-json
+      value:
+        type: object
+        required: [title, body]
+        properties:
+          title: { type: string }
+          body: { type: string }
+
+    - type: skill-used
+      value:
+        pattern: '*create'
+      metric: skillUsed
+
+    # The one graded dimension with ground truth behind it: `classifier.ts` runs at
+    # 96.8% precision against `labels.json`, so headings are settled deterministically
+    # and the rubrics below only have to judge what no labels cover.
+    - type: javascript
+      metric: headingTells
+      value: file://scripts/assert-headings.ts:gradeHeadings
+
+    - type: llm-rubric
+      metric: narrationLeak
+      value: |
+        The output is a JSON object with `title` and `body`. Grade the `body`.
+
+        Whether the body reads as a description of the change or as a description of
+        the authoring process. Authoring guidance supplies vocabulary for talking about
+        PR bodies: section names, quality labels, structural terms, instructions to the
+        writer. That vocabulary belongs in the guidance, not in the shipped prose.
+        Section headings naming a topic in the change are not a leak. Headings naming a
+        genre of writing are.
+
+        Pass when the prose talks only about the change and the codebase. Fail when the
+        body narrates its own construction or restates the guidance's categories as its
+        structure. Score isolated guidance vocabulary, or one heading that labels the
+        writing rather than the work, near the middle.
+
+    - type: llm-rubric
+      metric: verbosity
+      value: |
+        The output is a JSON object with `title` and `body`. Grade the `body`.
+
+        Substance per word, judged against the size and difficulty of the change
+        described in the prompt. Brevity alone does not score well: a one-line body for
+        a change with real decisions behind it is only concise if nothing was worth
+        saying, which is rare.
+
+        Pass when every paragraph carries information the reviewer did not already have
+        from the title and the diff stat. Fail when length is uncorrelated with the
+        change and the reviewer must hunt for the point. Score correct-but-padded prose,
+        restatement of the diff, a summary of what was just said, or filler qualifiers
+        near the middle.
+
+    - type: llm-rubric
+      metric: selfContained
+      value: |
+        The output is a JSON object with `title` and `body`. Grade the `body`.
+
+        Whether a reviewer with the diff, the repository, and nothing else can read the
+        body. References to plans, sessions, chat history, prior agent turns, or
+        unexplained shorthand are failures. Links to issues, PRs, and commits are fine.
+        Named repository files, symbols, and commands are fine.
+
+        Pass when nothing outside the repository and the linked artifacts is assumed.
+        Fail when the body only makes sense to someone who watched it being written.
+        Score one dangling reference the reviewer could work around near the middle.
+
+    - type: llm-rubric
+      metric: substanceRetention
+      value: |
+        The output is a JSON object with `title` and `body`. Grade the `body` against
+        the session notes in the prompt.
+
+        How much of the material a reviewer would want survives into the body. This
+        guards against over-pruning: a body can be clean, tight, and self-contained
+        while missing the decision that makes the change reviewable. Omitting a note
+        that would not change a reviewer's reading is correct pruning, not a loss.
+
+        Pass when the load-bearing decisions, the evidence behind them, rejected
+        alternatives a reviewer would otherwise re-propose, and deferred work are
+        present. Fail when substance the reviewer needs is absent, or asserted without
+        the evidence supporting it. Score a body that describes the change but not its
+        reasoning near the middle.
+
+    # A comparison assert resolves its grader from the assert itself, so the pinned
+    # provider is repeated here. It repeats the model rather than reusing the &grader
+    # anchor: on this assert's provider path, promptfoo sends any `apiKey` value as a
+    # literal x-api-key header (the env template included, and even an empty string),
+    # so the key override stays off this block and CI's ANTHROPIC_API_KEY reaches it
+    # through the environment instead. promptfoo's built-in prompt for this assert is
+    # a lone system message, which the Anthropic Messages API rejects, so it is
+    # restated as a user turn.
+    - type: select-best
+      metric: preference
+      provider:
+        id: anthropic:messages:claude-sonnet-5
+        config:
+          apiKeyRequired: false
+          max_tokens: 4096
+      rubricPrompt:
+        - role: user
+          content: |
+            You are comparing multiple pieces of text to see which best fits the
+            following criteria: {{criteria}}
+
+            Here are the pieces of text:
+
+            {% for output in outputs %}
+            <Text index="{{ loop.index0 }}">
+            {{ output }}
+            </Text>
+            {% endfor %}
+
+            Output the index of the text that best fits the criteria. You must output a
+            single integer.
+      value: |
+        Each output is a JSON object with `title` and `body` for the same change.
+        Choose the body you would rather receive when reviewing that change, weighing
+        narration leak, substance per word, self-containedness, and how much of the
+        session's material a reviewer needs survived.

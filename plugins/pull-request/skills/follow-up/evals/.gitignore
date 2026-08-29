@@ -1,0 +1,9 @@
+# Scratch cwd for the eval sessions. The directory has to exist before a run,
+# so it stays tracked through .gitkeep while anything a session leaves behind
+# stays out of git.
+/workdir/*
+!/workdir/.gitkeep
+
+# promptfoo run output.
+/output.json
+/output.*.json

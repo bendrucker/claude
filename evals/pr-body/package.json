@@ -1,7 +1,18 @@
 {
   "name": "pr-body-eval",
   "private": true,
+  "scripts": {
+    "cases": "bun scripts/cases.ts",
+    "fixtures": "bun scripts/fixtures.ts",
+    "eval": "bun scripts/fixtures.ts && PROMPTFOO_CONFIG_DIR=$HOME/.cache/promptfoo promptfoo eval",
+    "eval:smoke": "bun scripts/fixtures.ts && PROMPTFOO_CONFIG_DIR=$HOME/.cache/promptfoo promptfoo eval --filter-first-n 2",
+    "eval:view": "PROMPTFOO_CONFIG_DIR=$HOME/.cache/promptfoo promptfoo view",
+    "results": "bun ../scripts/export-run.ts --suite pr-body"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0"
+  },
+  "devDependencies": {
+    "promptfoo": "0.122.2"
   }
 }

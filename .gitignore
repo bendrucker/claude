@@ -16,6 +16,10 @@ node_modules/
 # The plan gate's recorded ExitPlanMode presentations, same again.
 !plugins/plan/hooks/fixtures/
 
+# Exported promptfoo runs. The durable copy is the S3 corpus, and exports can carry
+# work-repo content, so they never land in this public repo.
+/evals/results/
+
 # Generated coverage output (bun test --coverage)
 /coverage/
 # The coverage tooling lives in a directory named `coverage`. Re-include it

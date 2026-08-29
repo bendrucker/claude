@@ -105,12 +105,27 @@ describe("density Stop hook", () => {
       attachment: {
         type: "hook_blocking_error",
         hookName: "Stop",
+        hookEvent: "Stop",
         stdout: '{"decision":"block","reason":"comment-density: prior block"}',
       },
     })}\n`;
     const path = await writeTranscript(heavyTranscript() + attachment);
     const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
     expect(out).toBe("");
+  });
+
+  test("still blocks when a non-Stop hook's stdout mentions the marker", async () => {
+    const attachment = `${JSON.stringify({
+      attachment: {
+        type: "hook_success",
+        hookName: "PostToolUse",
+        hookEvent: "PostToolUse",
+        stdout: "linted a file mentioning comment-density: in its source",
+      },
+    })}\n`;
+    const path = await writeTranscript(heavyTranscript() + attachment);
+    const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
+    expect(Decision.parse(JSON.parse(out)).decision).toBe("block");
   });
 
   test("stays silent when a prior block reason appears as a text content block", async () => {

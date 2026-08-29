@@ -18,6 +18,7 @@ import {
   probeRunId,
   registerApiError,
   resolveMergeable,
+  selectRunId,
   type WatcherState,
 } from "./watch";
 
@@ -122,12 +123,59 @@ describe("deriveChecksState", () => {
       "failing",
     ],
     [
-      "any check in cancel bucket",
+      "a cancelled check alongside passing checks",
       [
         { state: "SUCCESS", bucket: "pass", name: "a" },
         { state: "CANCELLED", bucket: "cancel", name: "b" },
       ],
+      "success",
+    ],
+    [
+      "a skipped check alongside passing checks",
+      [
+        { state: "SUCCESS", bucket: "pass", name: "a" },
+        { state: "SKIPPED", bucket: "skipping", name: "b" },
+      ],
+      "success",
+    ],
+    [
+      "skipped and cancelled checks alongside an in-flight check",
+      [
+        { state: "SKIPPED", bucket: "skipping", name: "a" },
+        { state: "CANCELLED", bucket: "cancel", name: "b" },
+        { state: "IN_PROGRESS", bucket: "pending", name: "c" },
+      ],
+      "running",
+    ],
+    [
+      "skipped and cancelled checks alongside a failing check",
+      [
+        { state: "SKIPPED", bucket: "skipping", name: "a" },
+        { state: "CANCELLED", bucket: "cancel", name: "b" },
+        { state: "FAILURE", bucket: "fail", name: "c" },
+      ],
       "failing",
+    ],
+    [
+      "every check skipped or cancelled",
+      [
+        { state: "SKIPPED", bucket: "skipping", name: "a" },
+        { state: "CANCELLED", bucket: "cancel", name: "b" },
+      ],
+      "success",
+    ],
+    // Shape captured from a green PR whose automerge and claude workflows are
+    // skipped on every push. Skipped workflows are routine, so a skip that
+    // counts against the PR turns every such PR permanently failing.
+    [
+      "captured green payload with skipped automerge and claude workflows",
+      [
+        { state: "SUCCESS", bucket: "pass", name: "lint" },
+        { state: "SKIPPED", bucket: "skipping", name: "claude" },
+        { state: "SUCCESS", bucket: "pass", name: "build" },
+        { state: "SKIPPED", bucket: "skipping", name: "automerge" },
+      ],
+      "success",
     ],
     [
       "any check is IN_PROGRESS",
@@ -152,14 +200,6 @@ describe("deriveChecksState", () => {
         { state: "SUCCESS", bucket: "pass", name: "b" },
       ],
       "running",
-    ],
-    [
-      "all checks pass or skip",
-      [
-        { state: "SUCCESS", bucket: "pass", name: "a" },
-        { state: "SKIPPED", bucket: "skipping", name: "b" },
-      ],
-      "success",
     ],
     // Exact shape captured from `gh pr checks <num> --json state,bucket,name`
     // against a fully-green PR. If this assertion ever flips back to "running"
@@ -479,6 +519,54 @@ describe("parseRepo", () => {
   });
 });
 
+describe("selectRunId", () => {
+  // Captured from a PR whose newest branch run is the skipped Claude Code
+  // workflow while the failure came from `lint`. The failing event names the
+  // run `github:logs` will fetch, so naming a skipped run spends a dispatch on
+  // a run with no failing jobs.
+  const runs = [
+    { databaseId: 33220884467, headSha: "sha-head", conclusion: "skipped" },
+    { databaseId: 33223106137, headSha: "sha-head", conclusion: "cancelled" },
+    { databaseId: 33220042301, headSha: "sha-head", conclusion: "failure" },
+    { databaseId: 33219000000, headSha: "sha-old", conclusion: "failure" },
+  ];
+
+  it("skips over skipped and cancelled runs to the run that failed", () => {
+    expect(selectRunId(runs, "sha-head", "failing")).toBe("33220042301");
+  });
+
+  test.each(["skipped", "cancelled"])(
+    "returns null when the only %s runs cannot explain a failing check",
+    (conclusion) => {
+      const noFailure = [{ databaseId: 1, headSha: "sha-head", conclusion }];
+      expect(selectRunId(noFailure, "sha-head", "failing")).toBeNull();
+    },
+  );
+
+  it("returns null when the failure is a check with no Actions run", () => {
+    const allGreen = [{ databaseId: 1, headSha: "sha-head", conclusion: "success" }];
+    expect(selectRunId(allGreen, "sha-head", "failing")).toBeNull();
+  });
+
+  it("ignores runs from other SHAs", () => {
+    expect(selectRunId(runs, "sha-other", "failing")).toBeNull();
+    expect(selectRunId(runs, "sha-other", "running")).toBeNull();
+  });
+
+  test.each<InternalState>(["running", "queued", "success"])(
+    "names the newest run for the SHA when state is %s",
+    (state) => {
+      expect(selectRunId(runs, "sha-head", state)).toBe("33220884467");
+    },
+  );
+
+  it("tolerates entries gh could not shape", () => {
+    expect(
+      selectRunId([null, "x", {}, { databaseId: 7, headSha: "sha-head" }], "sha-head", "running"),
+    ).toBe("7");
+  });
+});
+
 describe("deriveRunListState", () => {
   test.each<[string, string, InternalState]>([
     ["completed", "failure", "failing"],
@@ -598,7 +686,10 @@ describe("probePr (gh schema integration)", () => {
     const { exec, remaining } = makeExec([
       { match: "gh pr view 42", result: ok(prJson) },
       { match: "gh pr checks 42", result: ok(checksJson) },
-      { match: "gh run list --repo owner/repo --branch feature/x", result: ok("999") },
+      {
+        match: "gh run list --repo owner/repo --commit abc123",
+        result: ok(JSON.stringify([{ databaseId: 999, headSha: "abc123", conclusion: "success" }])),
+      },
     ]);
     const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("ok");
@@ -622,7 +713,7 @@ describe("probePr (gh schema integration)", () => {
       if (command.startsWith("gh pr checks")) {
         return ok(JSON.stringify([{ state: "SUCCESS", bucket: "pass", name: "x" }]));
       }
-      if (command.startsWith("gh run list")) return ok("");
+      if (command.startsWith("gh run list")) return ok("[]");
       throw new Error(`unexpected: ${command}`);
     };
     probePr(42, "owner/repo", recordingExec);
@@ -655,7 +746,9 @@ describe("probePr (gh schema integration)", () => {
       if (command.startsWith("gh pr checks")) {
         return ok(JSON.stringify([{ state: "SUCCESS", bucket: "pass", name: "x" }]));
       }
-      if (command.startsWith("gh run list")) return ok("999");
+      if (command.startsWith("gh run list")) {
+        return ok(JSON.stringify([{ databaseId: 999, headSha: "abc123", conclusion: "success" }]));
+      }
       throw new Error(`unexpected: ${command}`);
     };
     probePr(42, "owner/repo", recordingExec);
@@ -673,12 +766,105 @@ describe("probePr (gh schema integration)", () => {
     const { exec } = makeExec([
       { match: "gh pr view", result: ok(prJson) },
       { match: "gh pr checks", result: ok(checksJson) },
-      { match: "gh run list", result: ok("123") },
+      {
+        match: "gh run list",
+        result: ok(JSON.stringify([{ databaseId: 123, headSha: "abc123", conclusion: "failure" }])),
+      },
     ]);
     const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("ok");
     if (result.kind !== "ok") return;
     expect(result.probe.state).toBe("failing");
+  });
+
+  it("names the failed run, not the branch's newest skipped run, on a failing PR", () => {
+    const checksJson = JSON.stringify([
+      { state: "SUCCESS", bucket: "pass", name: "build" },
+      { state: "FAILURE", bucket: "fail", name: "lint" },
+      { state: "SKIPPED", bucket: "skipping", name: "claude" },
+    ]);
+    const runsJson = JSON.stringify([
+      { databaseId: 33220884467, headSha: "abc123", conclusion: "skipped" },
+      { databaseId: 33223106137, headSha: "abc123", conclusion: "cancelled" },
+      { databaseId: 33220042301, headSha: "abc123", conclusion: "failure" },
+    ]);
+    const { exec } = makeExec([
+      { match: "gh pr view", result: ok(prJson) },
+      { match: "gh pr checks", result: ok(checksJson) },
+      { match: "gh run list", result: ok(runsJson) },
+    ]);
+    const result = probePr(42, "owner/repo", exec);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.probe.state).toBe("failing");
+    expect(result.probe.runId).toBe("33220042301");
+  });
+
+  it("emits a null run_id when the failing check is not an Actions run", () => {
+    const checksJson = JSON.stringify([
+      { state: "SUCCESS", bucket: "pass", name: "build" },
+      { state: "FAILURE", bucket: "fail", name: "Greptile Review" },
+    ]);
+    const runsJson = JSON.stringify([
+      { databaseId: 33220884467, headSha: "abc123", conclusion: "skipped" },
+      { databaseId: 33223106137, headSha: "abc123", conclusion: "success" },
+    ]);
+    const { exec } = makeExec([
+      { match: "gh pr view", result: ok(prJson) },
+      { match: "gh pr checks", result: ok(checksJson) },
+      { match: "gh run list", result: ok(runsJson) },
+    ]);
+    const result = probePr(42, "owner/repo", exec);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.probe.state).toBe("failing");
+    expect(result.probe.runId).toBeNull();
+  });
+
+  it("stays green when the only non-passing checks are skipped and cancelled", () => {
+    const checksJson = JSON.stringify([
+      { state: "SUCCESS", bucket: "pass", name: "build" },
+      { state: "SKIPPED", bucket: "skipping", name: "claude" },
+      { state: "CANCELLED", bucket: "cancel", name: "automerge" },
+    ]);
+    const runsJson = JSON.stringify([
+      { databaseId: 33220884467, headSha: "abc123", conclusion: "skipped" },
+    ]);
+    const { exec } = makeExec([
+      { match: "gh pr view", result: ok(prJson) },
+      { match: "gh pr checks", result: ok(checksJson) },
+      { match: "gh run list", result: ok(runsJson) },
+    ]);
+    const result = probePr(42, "owner/repo", exec);
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.probe.state).toBe("success");
+  });
+
+  it("requests gh run list with the fields run attribution needs (regression)", () => {
+    const seen: string[] = [];
+    const recordingExec: ExecFn = (command) => {
+      seen.push(command);
+      if (command.startsWith("gh pr view")) return ok(prJson);
+      if (command.startsWith("gh pr checks")) {
+        return ok(JSON.stringify([{ state: "SUCCESS", bucket: "pass", name: "x" }]));
+      }
+      if (command.startsWith("gh run list")) return ok("[]");
+      throw new Error(`unexpected: ${command}`);
+    };
+    probePr(42, "owner/repo", recordingExec);
+    const runsCall = seen.find((c) => c.startsWith("gh run list"));
+    expect(runsCall).toContain("--json databaseId,headSha,conclusion");
+    expect(runsCall).toContain("--commit abc123");
+  });
+
+  it("returns kind=error when gh run list emits unparseable JSON", () => {
+    const { exec } = makeExec([
+      { match: "gh pr view", result: ok(prJson) },
+      { match: "gh pr checks", result: ok(JSON.stringify([])) },
+      { match: "gh run list", result: ok("not json") },
+    ]);
+    expect(probePr(42, "owner/repo", exec).kind).toBe("error");
   });
 
   it("emits state=queued when all checks pending in QUEUED state", () => {
@@ -689,7 +875,10 @@ describe("probePr (gh schema integration)", () => {
     const { exec } = makeExec([
       { match: "gh pr view", result: ok(prJson) },
       { match: "gh pr checks", result: ok(checksJson) },
-      { match: "gh run list", result: ok("123") },
+      {
+        match: "gh run list",
+        result: ok(JSON.stringify([{ databaseId: 123, headSha: "abc123", conclusion: "failure" }])),
+      },
     ]);
     const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("ok");

@@ -66,6 +66,8 @@ The script exits on `status:success`, `pr-closed`, `merged`, and `max-time-reach
 
 On a `status` event with `state == "failing"`, invoke the `github:logs` agent via the `Agent` tool, passing the `run_id` and the PR URL (or branch name) from the event. It returns a structured JSON summary of the failing jobs and persists the raw logs to a known temp path; read that file for more context.
 
+A failing event with `"run_id": null` means no Actions run failed: the red check is an external status (a hosted reviewer, a deployment) with no job logs to fetch. Skip the `github:logs` dispatch and name the failing checks from `gh pr checks` instead.
+
 - `conflicts` / `mergeable-unknown` (PR mode): note the SHA; the caller (e.g. `pull-request:babysit`) decides whether to resolve or run an authoritative local check. `mergeable-unknown` means GitHub could not settle mergeability after bounded re-polling.
 - `queued-timeout` / `api-error`: surface to the user.
 - `rate-limited`: back off and retry once the window passes.

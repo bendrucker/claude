@@ -375,6 +375,10 @@ export async function resolveMergeable(
 const isQueuedState = (s: string): boolean =>
   s === "QUEUED" || s === "PENDING" || s === "WAITING" || s === "REQUESTED" || s === "EXPECTED";
 
+// A skipped or cancelled check reports no verdict on the PR: it neither fails
+// the target nor stands in for a check that passed.
+const NEUTRAL_BUCKETS = new Set(["cancel", "skipping"]);
+
 // `gh pr checks --json` exposes a unified `state` (status when in-flight,
 // conclusion when complete) and a normalized `bucket` ("pass" | "fail" |
 // "cancel" | "pending" | "skipping"). It does NOT expose `conclusion`. Use
@@ -384,18 +388,60 @@ export function deriveChecksState(checks: Check[]): InternalState {
   if (checks.length === 0) {
     return "running";
   }
-  const buckets = checks.map((c) => (c.bucket ?? "").toLowerCase());
-  if (buckets.some((b) => b === "fail" || b === "cancel")) {
+  const decisive = checks.filter((c) => !NEUTRAL_BUCKETS.has((c.bucket ?? "").toLowerCase()));
+  if (decisive.length === 0) {
+    return "success";
+  }
+  const buckets = decisive.map((c) => (c.bucket ?? "").toLowerCase());
+  if (buckets.some((b) => b === "fail")) {
     return "failing";
   }
-  const states = checks.map((c) => (c.state ?? "").toUpperCase());
+  const states = decisive.map((c) => (c.state ?? "").toUpperCase());
   if (states.some((s) => s === "IN_PROGRESS")) return "running";
   const anyQueued = states.some(isQueuedState);
   const allQueued = states.every(isQueuedState);
   if (allQueued && anyQueued) return "queued";
   if (anyQueued) return "running";
-  if (buckets.every((b) => b === "pass" || b === "skipping")) return "success";
+  if (buckets.every((b) => b === "pass")) return "success";
   return "running";
+}
+
+// Headroom over the runs one commit can trigger, counting re-runs.
+const RUN_LOOKUP_LIMIT = 50;
+
+// Conclusions worth pulling logs for. `cancelled` and `skipped` are excluded:
+// neither leaves failing job output behind.
+const FAILED_CONCLUSIONS = new Set(["failure", "timed_out", "startup_failure", "action_required"]);
+
+type RunListEntry = { databaseId: string | null; headSha: string; conclusion: string };
+
+function parseRunListEntry(value: unknown): RunListEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const entry = value as Record<string, unknown>;
+  const id =
+    typeof entry.databaseId === "number"
+      ? String(entry.databaseId)
+      : typeof entry.databaseId === "string" && entry.databaseId.length > 0
+        ? entry.databaseId
+        : null;
+  return {
+    databaseId: id,
+    headSha: typeof entry.headSha === "string" ? entry.headSha : "",
+    conclusion: typeof entry.conclusion === "string" ? entry.conclusion.toLowerCase() : "",
+  };
+}
+
+// `github:logs` fetches whatever run a failing event names, so a failing event
+// must name a run that actually failed. A PR can also fail on a check that is
+// no Actions run at all (an external reviewer, a hosted status), which leaves
+// nothing to fetch and so no run id.
+export function selectRunId(runs: unknown[], sha: string, state: InternalState): string | null {
+  const forSha = runs
+    .map(parseRunListEntry)
+    .filter((r): r is RunListEntry => r !== null && r.headSha === sha);
+  const match =
+    state === "failing" ? forSha.find((r) => FAILED_CONCLUSIONS.has(r.conclusion)) : forSha[0];
+  return match ? match.databaseId : null;
 }
 
 export function deriveRunListState(run: { status?: string; conclusion?: string }): InternalState {
@@ -474,18 +520,31 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
-  const runIdResult = run(
-    `gh run list --repo ${repo} --branch ${branch} --limit 1 --json databaseId --jq '.[0].databaseId // ""'`,
+  const runsResult = run(
+    `gh run list --repo ${repo} --commit ${sha} --limit ${RUN_LOOKUP_LIMIT} --json databaseId,headSha,conclusion`,
   );
-  if (!runIdResult.ok) {
+  if (!runsResult.ok) {
     return {
       kind: "error",
-      rateLimited: runIdResult.rateLimited,
-      retryAfter: runIdResult.retryAfter,
-      stderr: runIdResult.stderr,
+      rateLimited: runsResult.rateLimited,
+      retryAfter: runsResult.retryAfter,
+      stderr: runsResult.stderr,
     };
   }
-  const runId = runIdResult.stdout !== "" ? runIdResult.stdout : null;
+  let runId: string | null;
+  try {
+    const parsed = JSON.parse(runsResult.stdout || "[]");
+    if (!Array.isArray(parsed)) {
+      const message = `gh run list returned non-array JSON for ${repo}@${sha}`;
+      console.error(`${message}; treating as probe failure`);
+      return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
+    }
+    runId = selectRunId(parsed, sha, state);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`gh run list returned unparseable JSON for ${repo}@${sha}: ${message}`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
+  }
 
   return {
     kind: "ok",

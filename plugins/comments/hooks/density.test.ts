@@ -114,6 +114,23 @@ describe("density Stop hook", () => {
     expect(out).toBe("");
   });
 
+  test("stays silent when a prior block's reason sits in blockingError", async () => {
+    const attachment = `${JSON.stringify({
+      attachment: {
+        type: "hook_blocking_error",
+        hookName: "Stop",
+        hookEvent: "Stop",
+        blockingError: {
+          blockingError: "comment-density: this session's added comments run over the baseline.",
+          command: "bun hooks/density.ts",
+        },
+      },
+    })}\n`;
+    const path = await writeTranscript(heavyTranscript() + attachment);
+    const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
+    expect(out).toBe("");
+  });
+
   test("still blocks when a non-Stop hook's stdout mentions the marker", async () => {
     const attachment = `${JSON.stringify({
       attachment: {

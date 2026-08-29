@@ -20,7 +20,11 @@ const TextBlock = z.object({ type: z.literal("text"), text: z.string() });
 const TailLine = z.object({
   message: z.object({ content: z.union([z.string(), z.array(z.unknown())]) }).optional(),
   attachment: z
-    .object({ hookEvent: z.string().optional(), stdout: z.string().optional() })
+    .object({
+      hookEvent: z.string().optional(),
+      stdout: z.string().optional(),
+      blockingError: z.object({ blockingError: z.string().optional() }).optional(),
+    })
     .optional(),
 });
 
@@ -48,7 +52,11 @@ function blockedRecently(transcript: string): boolean {
       const decoded = TailLine.safeParse(parsed);
       if (!decoded.success) return false;
       const attachment = decoded.data.attachment;
-      if (attachment?.hookEvent === "Stop" && attachment.stdout?.includes(MARKER) === true) {
+      if (
+        attachment?.hookEvent === "Stop" &&
+        (attachment.stdout?.includes(MARKER) === true ||
+          attachment.blockingError?.blockingError?.includes(MARKER) === true)
+      ) {
         return true;
       }
       const content = decoded.data.message?.content;

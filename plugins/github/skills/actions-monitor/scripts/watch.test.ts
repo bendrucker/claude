@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
 import {
+  AttributionRun,
   clearApiErrors,
   computeInterval,
   deriveChecksState,
@@ -539,9 +540,9 @@ describe("selectRunId", () => {
     workflowDatabaseId: number,
     createdAt = "2026-08-28T00:00:00Z",
     headSha = "sha-head",
-  ) => ({ databaseId, headSha, conclusion, workflowDatabaseId, createdAt });
+  ) => AttributionRun.parse({ databaseId, headSha, conclusion, workflowDatabaseId, createdAt });
 
-  test.each<[string, unknown[], string | null]>([
+  test.each<[string, AttributionRun[], string | null]>([
     [
       "picks the failed run past skipped and cancelled ones",
       [run(1, "skipped", 10), run(2, "cancelled", 20), run(3, "failure", 30)],
@@ -568,9 +569,8 @@ describe("selectRunId", () => {
       null,
     ],
     ["runs from another commit", [run(1, "failure", 10, undefined, "sha-other")], null],
-    ["entries gh could not shape", [null, "x", {}, run(1, "failure", 10)], "1"],
   ])("%s -> %p", (_name, runs, expected) => {
-    expect(selectRunId(runs, "sha-head")).toBe(expected as string);
+    expect(selectRunId(runs, "sha-head")).toBe(expected);
   });
 });
 
@@ -874,6 +874,18 @@ describe("probePr (gh schema integration)", () => {
     const result = probePr(42, "owner/repo", exec);
     expect(result.kind).toBe("ok");
     expect(remaining()).toEqual([]);
+  });
+
+  it("returns kind=error when gh run list emits an entry that is not a run", () => {
+    const { exec } = makeExec([
+      { match: "gh pr view", result: ok(prJson) },
+      {
+        match: "gh pr checks",
+        result: ok(JSON.stringify([{ state: "FAILURE", bucket: "fail", name: "x" }])),
+      },
+      { match: "gh run list", result: ok(JSON.stringify([null, "x"])) },
+    ]);
+    expect(probePr(42, "owner/repo", exec).kind).toBe("error");
   });
 
   it("returns kind=error when gh run list emits unparseable JSON", () => {

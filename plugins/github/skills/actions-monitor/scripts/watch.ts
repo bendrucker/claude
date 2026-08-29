@@ -416,31 +416,22 @@ const RUN_LOOKUP_LIMIT = 50;
 // naming it costs a dispatch that finds nothing.
 const FAILED_CONCLUSIONS = new Set(["failure", "timed_out"]);
 
-type RunListEntry = {
-  databaseId: string | null;
-  headSha: string;
-  conclusion: string;
-  workflow: string;
-  createdAt: string;
-};
+// `gh run list` reports an id as a number, but the event schema carries it as a
+// string.
+const RunId = z
+  .union([z.number(), z.string()])
+  .transform(String)
+  .catch("") satisfies z.ZodType<string>;
 
-function runIdFrom(value: unknown): string | null {
-  if (typeof value === "number") return String(value);
-  if (typeof value === "string" && value.length > 0) return value;
-  return null;
-}
-
-function parseRunListEntry(value: unknown): RunListEntry | null {
-  if (!value || typeof value !== "object") return null;
-  const entry = value as Record<string, unknown>;
-  return {
-    databaseId: runIdFrom(entry.databaseId),
-    headSha: typeof entry.headSha === "string" ? entry.headSha : "",
-    conclusion: typeof entry.conclusion === "string" ? entry.conclusion.toLowerCase() : "",
-    workflow: runIdFrom(entry.workflowDatabaseId) ?? "",
-    createdAt: typeof entry.createdAt === "string" ? entry.createdAt : "",
-  };
-}
+export const AttributionRun = z.looseObject({
+  databaseId: RunId,
+  headSha: z.string().catch(""),
+  conclusion: z.string().catch(""),
+  workflowDatabaseId: RunId,
+  createdAt: z.string().catch(""),
+});
+export type AttributionRun = z.infer<typeof AttributionRun>;
+const AttributionRuns = z.array(AttributionRun);
 
 // `github:logs` fetches whatever run a failing event names, so a failing event
 // must name a run that actually failed. A PR can also fail on a check that is
@@ -451,17 +442,19 @@ function parseRunListEntry(value: unknown): RunListEntry | null {
 // later run of the same workflow has already replaced from being named again.
 // The caller scopes the query by commit; the `headSha` filter is
 // belt-and-suspenders over that.
-export function selectRunId(runs: unknown[], sha: string): string | null {
-  const newestPerWorkflow = new Map<string, RunListEntry>();
-  for (const value of runs) {
-    const entry = parseRunListEntry(value);
-    if (!entry || entry.headSha !== sha) continue;
-    const key = entry.workflow || `run:${entry.databaseId}`;
+export function selectRunId(runs: AttributionRun[], sha: string): string | null {
+  const newestPerWorkflow = new Map<string, AttributionRun>();
+  for (const entry of runs) {
+    if (entry.headSha !== sha) continue;
+    const key =
+      entry.workflowDatabaseId !== "" ? entry.workflowDatabaseId : `run:${entry.databaseId}`;
     const seen = newestPerWorkflow.get(key);
     if (!seen || entry.createdAt > seen.createdAt) newestPerWorkflow.set(key, entry);
   }
-  const failed = [...newestPerWorkflow.values()].find((r) => FAILED_CONCLUSIONS.has(r.conclusion));
-  return failed ? failed.databaseId : null;
+  const failed = [...newestPerWorkflow.values()].find((r) =>
+    FAILED_CONCLUSIONS.has(r.conclusion.toLowerCase()),
+  );
+  return failed && failed.databaseId !== "" ? failed.databaseId : null;
 }
 
 export function deriveRunListState(run: { status?: string; conclusion?: string }): InternalState {
@@ -517,7 +510,7 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
     console.error(`${message}; treating as probe failure`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
-  if (!sha) {
+  if (sha === "") {
     const message = `gh pr view did not include headRefOid for PR #${prNumber}`;
     console.error(`${message}; treating as probe failure`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
@@ -545,8 +538,8 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
-  // Only a failing event carries the run id anywhere, so a green or in-flight
-  // poll skips the lookup rather than spending an API call on it every cycle.
+  // Only a failing event carries a run id, so a green or in-flight poll skips
+  // the lookup and its API call.
   let runId: string | null = null;
   if (state === "failing") {
     const runsResult = run(
@@ -561,16 +554,13 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
       };
     }
     try {
-      const parsed = JSON.parse(runsResult.stdout || "[]");
-      if (!Array.isArray(parsed)) {
-        const message = `gh run list returned non-array JSON for ${repo}@${sha}`;
-        console.error(`${message}; treating as probe failure`);
-        return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
-      }
-      runId = selectRunId(parsed, sha);
+      const runs = AttributionRuns.parse(
+        JSON.parse(runsResult.stdout !== "" ? runsResult.stdout : "[]"),
+      );
+      runId = selectRunId(runs, sha);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`gh run list returned unparseable JSON for ${repo}@${sha}: ${message}`);
+      console.error(`gh run list returned unusable JSON for ${repo}@${sha}: ${message}`);
       return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
     }
   }

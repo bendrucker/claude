@@ -50,6 +50,7 @@ Lead with intent: why the change exists, the decisions a reviewer can't reconstr
 - Default to prose. Write a small PR as one paragraph with no headings. Add `##` sections only when the body is long enough to need them. Base length on substance, not diff size.
 - Reference the motivating issue at the end of the opening (`Closes #N`, `Fixes #N`, or bare `#N` if not closing). Never touch the issue itself: no comments, labels, milestones, or assignees.
 - Wrap code identifiers in backticks, but leave bare anything the platform auto-links: commit SHAs and issue/MR refs (`#N`, `!N`, `owner/repo#N`). Backticked refs don't auto-link.
+- Write one line per paragraph and one line per list item. The body soft-wraps when it renders, so hard-wrapping at a column just narrows it.
 
 Load the `writing` skill for the full set of tropes to avoid.
 

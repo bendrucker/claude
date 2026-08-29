@@ -4,6 +4,8 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import fc from "fast-check";
+import { fromMarkdown } from "mdast-util-from-markdown";
 import {
   type BodyContext,
   type BodyPart,
@@ -16,6 +18,7 @@ import {
   hasBacktickedRef,
   hasCiStatusRollCall,
   hasFileTourBullets,
+  hardWrappedParagraphs,
   hasReflexiveScaffold,
   hasRunOnProse,
   type HookInput,
@@ -27,7 +30,10 @@ import {
   processInput,
   resolveBody,
   sentenceShapedHeadings,
+  unwrapBody,
   validateBody,
+  WRAP_MAX_LINE,
+  WRAP_MIN_LINE,
 } from "./validate-body";
 
 function getPermissionDecision(result: Awaited<ReturnType<typeof validateBody>>) {
@@ -814,5 +820,153 @@ describe("processInput", () => {
     expect(getPermissionDecision(result)).toBe("deny");
     expect(getAdditionalContext(result)).toBeUndefined();
     expect(getDenyReason(result)).toContain("Also worth addressing in the same edit:");
+  });
+});
+
+// Greedy fill at a column: the thing the detector exists to catch. `indent`
+// prefixes continuation lines so a wrapped list item keeps its hanging indent.
+function wrapAt(text: string, column: number, indent = ""): string {
+  const lines: string[] = [];
+  let current = "";
+  for (const word of text.split(" ")) {
+    const candidate = current === "" ? word : `${current} ${word}`;
+    if (candidate.length > column && current !== "") {
+      lines.push(current);
+      current = indent + word;
+      continue;
+    }
+    current = candidate;
+  }
+  lines.push(current);
+  return lines.join("\n");
+}
+
+// Greedy fill leaves a line longer than column - (MAX_WORD + 1) and never
+// longer than column. Deriving the column floor from that keeps every generated
+// non-final line inside [WRAP_MIN_LINE, WRAP_MAX_LINE], so the generator only
+// emits documents the detector actually claims to catch.
+const MAX_WORD = 9;
+const MIN_COLUMN = WRAP_MIN_LINE + MAX_WORD + 1;
+const MAX_COLUMN = WRAP_MAX_LINE;
+
+const word = fc
+  .string({
+    minLength: 3,
+    maxLength: MAX_WORD,
+    unit: fc.constantFrom(..."abcdefghijklmnopqrstuvwxyz"),
+  })
+  .filter((w) => w.length >= 3);
+
+/** A block long enough to wrap at any column in range: at least 25 words. */
+const block = fc.array(word, { minLength: 25, maxLength: 60 }).map((words) => words.join(" "));
+
+const wrapColumn = fc.integer({ min: MIN_COLUMN, max: MAX_COLUMN });
+
+/** A document of one-line paragraphs and one-line list items. */
+const proseDocument = fc
+  .array(fc.record({ text: block, bullet: fc.boolean() }), { minLength: 1, maxLength: 4 })
+  .map((blocks) => blocks.map(({ text, bullet }) => (bullet ? `- ${text}` : text)).join("\n\n"));
+
+function wrapDocument(doc: string, column: number): string {
+  return doc
+    .split("\n\n")
+    .map((b) => (b.startsWith("- ") ? wrapAt(b, column, "  ") : wrapAt(b, column)))
+    .join("\n\n");
+}
+
+/**
+ * What the body renders to. Positions differ after an unwrap by construction,
+ * and mdast keeps the newline inside a text node's value, so both are normalized
+ * away. What survives is the structure a reader sees.
+ */
+function renderedShape(body: string): string {
+  return JSON.stringify(fromMarkdown(body), (key, value) => {
+    if (key === "position") return undefined;
+    if (key === "value" && typeof value === "string") return value.replace(/\s+/g, " ");
+    return value;
+  });
+}
+
+describe("hardWrappedParagraphs", () => {
+  it("flags a document wrapped at any column in range", () => {
+    fc.assert(
+      fc.property(proseDocument, wrapColumn, (doc, column) => {
+        expect(hardWrappedParagraphs(wrapDocument(doc, column)).length).toBeGreaterThan(0);
+      }),
+    );
+  });
+
+  it("leaves a document alone when every block is on one line", () => {
+    fc.assert(
+      fc.property(proseDocument, (doc) => {
+        expect(hardWrappedParagraphs(doc)).toEqual([]);
+      }),
+    );
+  });
+
+  it("recovers the original document when unwrapping a wrapped one", () => {
+    fc.assert(
+      fc.property(proseDocument, wrapColumn, (doc, column) => {
+        expect(unwrapBody(wrapDocument(doc, column))).toBe(doc);
+      }),
+    );
+  });
+
+  it("converges in one pass, so a single retry always clears the deny", () => {
+    fc.assert(
+      fc.property(proseDocument, wrapColumn, (doc, column) => {
+        expect(hardWrappedParagraphs(unwrapBody(wrapDocument(doc, column)))).toEqual([]);
+      }),
+    );
+  });
+
+  it("never changes what the body renders to", () => {
+    fc.assert(
+      fc.property(proseDocument, wrapColumn, (doc, column) => {
+        const wrapped = wrapDocument(doc, column);
+        expect(renderedShape(unwrapBody(wrapped))).toBe(renderedShape(wrapped));
+      }),
+    );
+  });
+
+  const LONG = "The resolver caches every lookup it performs and evicts on a timer";
+
+  test.each<[string, string, boolean]>([
+    ["wrapped paragraph", `${LONG} that\n${LONG} runs every thirty seconds here.`, true],
+    ["one-line paragraph", `${LONG} that runs every thirty seconds.`, false],
+    ["wrapped list item", `- ${LONG} that\n  ${LONG} runs every thirty seconds here.`, true],
+    ["one-line list items", `- ${LONG} once.\n- ${LONG} twice.`, false],
+    [
+      "table",
+      "| Month | Rate | Notes about the month that make the row long |\n|---|---|---|\n| June | 0.5% | The rate was low and stayed low all month |",
+      false,
+    ],
+    ["fenced code", `\`\`\`ts\nconst first = "${LONG}";\nconst second = "${LONG}";\n\`\`\``, false],
+    ["two-space hard break", `${LONG} that  \n${LONG} runs every thirty seconds here.`, false],
+    [
+      "short deliberate lines",
+      "Discovery: 8a4c11372239\nDiscovery: 7b7e5d6ca37e\nDiscovery: db1ce0b102e0",
+      false,
+    ],
+    [
+      "line past the ceiling",
+      `${LONG} and it also does a great many other things besides that one.\n${LONG} here.`,
+      false,
+    ],
+    ["nested list", `- ${LONG} once.\n  - ${LONG} twice.`, false],
+  ])("%s", (_name, body, expected) => {
+    expect(hardWrappedParagraphs(body).length > 0).toBe(expected);
+  });
+});
+
+describe("validateBody wrapping", () => {
+  it("denies a wrapped body and hands back the corrected paragraph", () => {
+    const body =
+      "The resolver caches every lookup it performs and evicts\non a timer that runs every thirty seconds in the background.";
+    const result = validateBody(body);
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain(
+      "The resolver caches every lookup it performs and evicts on a timer that runs every thirty seconds in the background.",
+    );
   });
 });

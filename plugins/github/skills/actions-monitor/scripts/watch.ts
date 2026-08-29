@@ -411,18 +411,20 @@ export function deriveChecksState(checks: Check[]): InternalState {
 // Headroom over the runs one commit can trigger, counting re-runs.
 const RUN_LOOKUP_LIMIT = 50;
 
-// Conclusions worth pulling logs for. `cancelled` and `skipped` are excluded:
-// neither leaves failing job output behind.
-const FAILED_CONCLUSIONS = new Set(["failure", "timed_out", "startup_failure", "action_required"]);
+// Conclusions that leave failing job output behind. A run that was cancelled,
+// skipped, blocked on approval, or that never started has no logs to fetch, so
+// naming it costs a dispatch that finds nothing.
+const FAILED_CONCLUSIONS = new Set(["failure", "timed_out"]);
 
 type RunListEntry = {
   databaseId: string | null;
   headSha: string;
   conclusion: string;
   workflow: string;
+  createdAt: string;
 };
 
-function id(value: unknown): string | null {
+function runIdFrom(value: unknown): string | null {
   if (typeof value === "number") return String(value);
   if (typeof value === "string" && value.length > 0) return value;
   return null;
@@ -432,10 +434,11 @@ function parseRunListEntry(value: unknown): RunListEntry | null {
   if (!value || typeof value !== "object") return null;
   const entry = value as Record<string, unknown>;
   return {
-    databaseId: id(entry.databaseId),
+    databaseId: runIdFrom(entry.databaseId),
     headSha: typeof entry.headSha === "string" ? entry.headSha : "",
     conclusion: typeof entry.conclusion === "string" ? entry.conclusion.toLowerCase() : "",
-    workflow: id(entry.workflowDatabaseId) ?? "",
+    workflow: runIdFrom(entry.workflowDatabaseId) ?? "",
+    createdAt: typeof entry.createdAt === "string" ? entry.createdAt : "",
   };
 }
 
@@ -444,21 +447,21 @@ function parseRunListEntry(value: unknown): RunListEntry | null {
 // no Actions run at all (an external reviewer, a hosted status), which leaves
 // nothing to fetch and so no run id.
 //
-// gh lists runs newest first, so the first run of a workflow is that workflow's
-// current state for the commit. Collapsing to it keeps a failure that a later
-// run of the same workflow has already replaced from being reported again.
-export function selectRunId(runs: unknown[], sha: string, state: InternalState): string | null {
-  const current = new Map<string, RunListEntry>();
+// Collapsing each workflow to its newest run for the commit keeps a failure a
+// later run of the same workflow has already replaced from being named again.
+// The caller scopes the query by commit; the `headSha` filter is
+// belt-and-suspenders over that.
+export function selectRunId(runs: unknown[], sha: string): string | null {
+  const newestPerWorkflow = new Map<string, RunListEntry>();
   for (const value of runs) {
     const entry = parseRunListEntry(value);
     if (!entry || entry.headSha !== sha) continue;
     const key = entry.workflow || `run:${entry.databaseId}`;
-    if (!current.has(key)) current.set(key, entry);
+    const seen = newestPerWorkflow.get(key);
+    if (!seen || entry.createdAt > seen.createdAt) newestPerWorkflow.set(key, entry);
   }
-  const latest = [...current.values()];
-  const match =
-    state === "failing" ? latest.find((r) => FAILED_CONCLUSIONS.has(r.conclusion)) : latest[0];
-  return match ? match.databaseId : null;
+  const failed = [...newestPerWorkflow.values()].find((r) => FAILED_CONCLUSIONS.has(r.conclusion));
+  return failed ? failed.databaseId : null;
 }
 
 export function deriveRunListState(run: { status?: string; conclusion?: string }): InternalState {
@@ -514,6 +517,11 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
     console.error(`${message}; treating as probe failure`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
+  if (!sha) {
+    const message = `gh pr view did not include headRefOid for PR #${prNumber}`;
+    console.error(`${message}; treating as probe failure`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
+  }
 
   const checksResult = run(
     `gh pr checks ${prNumber} --repo ${repo} --required=false --json state,bucket,name`,
@@ -537,30 +545,34 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
-  const runsResult = run(
-    `gh run list --repo ${repo} --commit ${sha} --limit ${RUN_LOOKUP_LIMIT} --json databaseId,headSha,conclusion,workflowDatabaseId`,
-  );
-  if (!runsResult.ok) {
-    return {
-      kind: "error",
-      rateLimited: runsResult.rateLimited,
-      retryAfter: runsResult.retryAfter,
-      stderr: runsResult.stderr,
-    };
-  }
-  let runId: string | null;
-  try {
-    const parsed = JSON.parse(runsResult.stdout || "[]");
-    if (!Array.isArray(parsed)) {
-      const message = `gh run list returned non-array JSON for ${repo}@${sha}`;
-      console.error(`${message}; treating as probe failure`);
+  // Only a failing event carries the run id anywhere, so a green or in-flight
+  // poll skips the lookup rather than spending an API call on it every cycle.
+  let runId: string | null = null;
+  if (state === "failing") {
+    const runsResult = run(
+      `gh run list --repo ${repo} --commit ${sha} --limit ${RUN_LOOKUP_LIMIT} --json databaseId,headSha,conclusion,workflowDatabaseId,createdAt`,
+    );
+    if (!runsResult.ok) {
+      return {
+        kind: "error",
+        rateLimited: runsResult.rateLimited,
+        retryAfter: runsResult.retryAfter,
+        stderr: runsResult.stderr,
+      };
+    }
+    try {
+      const parsed = JSON.parse(runsResult.stdout || "[]");
+      if (!Array.isArray(parsed)) {
+        const message = `gh run list returned non-array JSON for ${repo}@${sha}`;
+        console.error(`${message}; treating as probe failure`);
+        return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
+      }
+      runId = selectRunId(parsed, sha);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`gh run list returned unparseable JSON for ${repo}@${sha}: ${message}`);
       return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
     }
-    runId = selectRunId(parsed, sha, state);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`gh run list returned unparseable JSON for ${repo}@${sha}: ${message}`);
-    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
   return {

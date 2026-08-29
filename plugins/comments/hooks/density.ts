@@ -22,13 +22,17 @@ const TailLine = z.object({
   attachment: z.object({ stdout: z.string().optional() }).optional(),
 });
 
+/** Prefix the harness puts on the message that relays a block reason. */
+const FEEDBACK = "Stop hook feedback";
+
 /**
  * A prior block leaves two records: a hook attachment whose stdout carries the
- * block JSON, and Stop-hook-feedback message text carrying the reason. Matching
- * those channels keeps tool payloads (say, an edit to this file) from
- * suppressing a live block.
+ * block JSON, and a feedback message relaying the reason. Matching only those
+ * channels keeps tool payloads and ordinary prose mentioning the marker (say,
+ * work on this file) from suppressing a live block.
  */
 function blockedRecently(transcript: string): boolean {
+  const relayed = (text: string): boolean => text.includes(MARKER) && text.includes(FEEDBACK);
   return transcript
     .split("\n")
     .slice(-TAIL_LINES)
@@ -44,10 +48,10 @@ function blockedRecently(transcript: string): boolean {
       if (decoded.data.attachment?.stdout?.includes(MARKER) === true) return true;
       const content = decoded.data.message?.content;
       if (content == null) return false;
-      if (typeof content === "string") return content.includes(MARKER);
+      if (typeof content === "string") return relayed(content);
       return content.some((block) => {
         const text = TextBlock.safeParse(block);
-        return text.success && text.data.text.includes(MARKER);
+        return text.success && relayed(text.data.text);
       });
     });
 }

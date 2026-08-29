@@ -63,11 +63,24 @@ describe("density Stop hook", () => {
     expect(out).toBe("");
   });
 
-  test("stays silent when the transcript tail carries a prior block marker", async () => {
-    const marker = `${JSON.stringify({ type: "user", message: { content: "comment-density: prior block" } })}\n`;
+  test("stays silent when the tail carries relayed Stop-hook feedback", async () => {
+    const marker = `${JSON.stringify({
+      type: "user",
+      message: { content: "Stop hook feedback:\n[density]: comment-density: prior block" },
+    })}\n`;
     const path = await writeTranscript(heavyTranscript() + marker);
     const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
     expect(out).toBe("");
+  });
+
+  test("still blocks when ordinary message text mentions the marker", async () => {
+    const mention = `${JSON.stringify({
+      type: "user",
+      message: { content: "let's rename the comment-density: marker constant" },
+    })}\n`;
+    const path = await writeTranscript(heavyTranscript() + mention);
+    const out = await runHook({ hook_event_name: "Stop", transcript_path: path });
+    expect(Decision.parse(JSON.parse(out)).decision).toBe("block");
   });
 
   test("still blocks when the marker only appears inside a tool payload", async () => {
@@ -103,7 +116,11 @@ describe("density Stop hook", () => {
   test("stays silent when a prior block reason appears as a text content block", async () => {
     const marker = `${JSON.stringify({
       type: "user",
-      message: { content: [{ type: "text", text: "comment-density: prior block" }] },
+      message: {
+        content: [
+          { type: "text", text: "Stop hook feedback:\n[density]: comment-density: prior block" },
+        ],
+      },
     })}\n`;
     const path = await writeTranscript(heavyTranscript() + marker);
     const out = await runHook({ hook_event_name: "Stop", transcript_path: path });

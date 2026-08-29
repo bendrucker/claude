@@ -122,13 +122,16 @@ describe("deriveChecksState", () => {
       ],
       "failing",
     ],
+    // A cancelled check is not a failure, but GitHub does not count it as
+    // passing either, so calling the PR green here exits the watcher on a PR
+    // branch protection still blocks.
     [
       "a cancelled check alongside passing checks",
       [
         { state: "SUCCESS", bucket: "pass", name: "a" },
         { state: "CANCELLED", bucket: "cancel", name: "b" },
       ],
-      "success",
+      "running",
     ],
     [
       "a skipped check alongside passing checks",
@@ -161,6 +164,14 @@ describe("deriveChecksState", () => {
       [
         { state: "SKIPPED", bucket: "skipping", name: "a" },
         { state: "CANCELLED", bucket: "cancel", name: "b" },
+      ],
+      "running",
+    ],
+    [
+      "every check skipped",
+      [
+        { state: "SKIPPED", bucket: "skipping", name: "a" },
+        { state: "SKIPPED", bucket: "skipping", name: "b" },
       ],
       "success",
     ],
@@ -525,10 +536,15 @@ describe("selectRunId", () => {
   // run `github:logs` will fetch, so naming a skipped run spends a dispatch on
   // a run with no failing jobs.
   const runs = [
-    { databaseId: 33220884467, headSha: "sha-head", conclusion: "skipped" },
-    { databaseId: 33223106137, headSha: "sha-head", conclusion: "cancelled" },
-    { databaseId: 33220042301, headSha: "sha-head", conclusion: "failure" },
-    { databaseId: 33219000000, headSha: "sha-old", conclusion: "failure" },
+    { databaseId: 33220884467, headSha: "sha-head", conclusion: "skipped", workflowDatabaseId: 1 },
+    {
+      databaseId: 33223106137,
+      headSha: "sha-head",
+      conclusion: "cancelled",
+      workflowDatabaseId: 2,
+    },
+    { databaseId: 33220042301, headSha: "sha-head", conclusion: "failure", workflowDatabaseId: 3 },
+    { databaseId: 33219000000, headSha: "sha-old", conclusion: "failure", workflowDatabaseId: 3 },
   ];
 
   it("skips over skipped and cancelled runs to the run that failed", () => {
@@ -559,6 +575,23 @@ describe("selectRunId", () => {
       expect(selectRunId(runs, "sha-head", state)).toBe("33220884467");
     },
   );
+
+  it("ignores a failure a later run of the same workflow replaced", () => {
+    const rerun = [
+      { databaseId: 200, headSha: "sha-head", conclusion: "success", workflowDatabaseId: 3 },
+      { databaseId: 100, headSha: "sha-head", conclusion: "failure", workflowDatabaseId: 3 },
+    ];
+    expect(selectRunId(rerun, "sha-head", "failing")).toBeNull();
+  });
+
+  it("names a workflow's own failure even when another workflow re-ran green", () => {
+    const mixed = [
+      { databaseId: 200, headSha: "sha-head", conclusion: "success", workflowDatabaseId: 3 },
+      { databaseId: 150, headSha: "sha-head", conclusion: "failure", workflowDatabaseId: 4 },
+      { databaseId: 100, headSha: "sha-head", conclusion: "failure", workflowDatabaseId: 3 },
+    ];
+    expect(selectRunId(mixed, "sha-head", "failing")).toBe("150");
+  });
 
   it("tolerates entries gh could not shape", () => {
     expect(
@@ -821,11 +854,11 @@ describe("probePr (gh schema integration)", () => {
     expect(result.probe.runId).toBeNull();
   });
 
-  it("stays green when the only non-passing checks are skipped and cancelled", () => {
+  it("stays green when the only non-passing checks are skipped", () => {
     const checksJson = JSON.stringify([
       { state: "SUCCESS", bucket: "pass", name: "build" },
       { state: "SKIPPED", bucket: "skipping", name: "claude" },
-      { state: "CANCELLED", bucket: "cancel", name: "automerge" },
+      { state: "SKIPPED", bucket: "skipping", name: "automerge" },
     ]);
     const runsJson = JSON.stringify([
       { databaseId: 33220884467, headSha: "abc123", conclusion: "skipped" },
@@ -854,7 +887,7 @@ describe("probePr (gh schema integration)", () => {
     };
     probePr(42, "owner/repo", recordingExec);
     const runsCall = seen.find((c) => c.startsWith("gh run list"));
-    expect(runsCall).toContain("--json databaseId,headSha,conclusion");
+    expect(runsCall).toContain("--json databaseId,headSha,conclusion,workflowDatabaseId");
     expect(runsCall).toContain("--commit abc123");
   });
 

@@ -375,9 +375,11 @@ export async function resolveMergeable(
 const isQueuedState = (s: string): boolean =>
   s === "QUEUED" || s === "PENDING" || s === "WAITING" || s === "REQUESTED" || s === "EXPECTED";
 
-// A skipped or cancelled check reports no verdict on the PR: it neither fails
-// the target nor stands in for a check that passed.
-const NEUTRAL_BUCKETS = new Set(["cancel", "skipping"]);
+// GitHub counts a skipped required check as passing, so a skip is settled and
+// says nothing about the PR either way. A cancelled check is a verdict the PR
+// never got: it does not fail the target, but it cannot stand in for a check
+// that passed, so it holds the PR at running until something re-runs it.
+const SKIPPED_BUCKET = "skipping";
 
 // `gh pr checks --json` exposes a unified `state` (status when in-flight,
 // conclusion when complete) and a normalized `bucket` ("pass" | "fail" |
@@ -388,7 +390,7 @@ export function deriveChecksState(checks: Check[]): InternalState {
   if (checks.length === 0) {
     return "running";
   }
-  const decisive = checks.filter((c) => !NEUTRAL_BUCKETS.has((c.bucket ?? "").toLowerCase()));
+  const decisive = checks.filter((c) => (c.bucket ?? "").toLowerCase() !== SKIPPED_BUCKET);
   if (decisive.length === 0) {
     return "success";
   }
@@ -413,21 +415,27 @@ const RUN_LOOKUP_LIMIT = 50;
 // neither leaves failing job output behind.
 const FAILED_CONCLUSIONS = new Set(["failure", "timed_out", "startup_failure", "action_required"]);
 
-type RunListEntry = { databaseId: string | null; headSha: string; conclusion: string };
+type RunListEntry = {
+  databaseId: string | null;
+  headSha: string;
+  conclusion: string;
+  workflow: string;
+};
+
+function id(value: unknown): string | null {
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string" && value.length > 0) return value;
+  return null;
+}
 
 function parseRunListEntry(value: unknown): RunListEntry | null {
   if (!value || typeof value !== "object") return null;
   const entry = value as Record<string, unknown>;
-  const id =
-    typeof entry.databaseId === "number"
-      ? String(entry.databaseId)
-      : typeof entry.databaseId === "string" && entry.databaseId.length > 0
-        ? entry.databaseId
-        : null;
   return {
-    databaseId: id,
+    databaseId: id(entry.databaseId),
     headSha: typeof entry.headSha === "string" ? entry.headSha : "",
     conclusion: typeof entry.conclusion === "string" ? entry.conclusion.toLowerCase() : "",
+    workflow: id(entry.workflowDatabaseId) ?? "",
   };
 }
 
@@ -435,12 +443,21 @@ function parseRunListEntry(value: unknown): RunListEntry | null {
 // must name a run that actually failed. A PR can also fail on a check that is
 // no Actions run at all (an external reviewer, a hosted status), which leaves
 // nothing to fetch and so no run id.
+//
+// gh lists runs newest first, so the first run of a workflow is that workflow's
+// current state for the commit. Collapsing to it keeps a failure that a later
+// run of the same workflow has already replaced from being reported again.
 export function selectRunId(runs: unknown[], sha: string, state: InternalState): string | null {
-  const forSha = runs
-    .map(parseRunListEntry)
-    .filter((r): r is RunListEntry => r !== null && r.headSha === sha);
+  const current = new Map<string, RunListEntry>();
+  for (const value of runs) {
+    const entry = parseRunListEntry(value);
+    if (!entry || entry.headSha !== sha) continue;
+    const key = entry.workflow || `run:${entry.databaseId}`;
+    if (!current.has(key)) current.set(key, entry);
+  }
+  const latest = [...current.values()];
   const match =
-    state === "failing" ? forSha.find((r) => FAILED_CONCLUSIONS.has(r.conclusion)) : forSha[0];
+    state === "failing" ? latest.find((r) => FAILED_CONCLUSIONS.has(r.conclusion)) : latest[0];
   return match ? match.databaseId : null;
 }
 
@@ -521,7 +538,7 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
   }
 
   const runsResult = run(
-    `gh run list --repo ${repo} --commit ${sha} --limit ${RUN_LOOKUP_LIMIT} --json databaseId,headSha,conclusion`,
+    `gh run list --repo ${repo} --commit ${sha} --limit ${RUN_LOOKUP_LIMIT} --json databaseId,headSha,conclusion,workflowDatabaseId`,
   );
   if (!runsResult.ok) {
     return {

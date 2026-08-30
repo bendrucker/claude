@@ -59,6 +59,8 @@ Compare `git rev-parse HEAD` against the event's `sha`. If HEAD is newer, a fix 
 
 The monitor skill's flow has already invoked the provider's logs agent (`github:logs` or `gitlab:logs`) and produced a summary plus a log-file path. Read the summary to decide triviality.
 
+A failing event carrying no run id has no logs agent behind it: the red check is an external status rather than a CI run. Read the failing check names from the provider's CLI (`gh pr checks`, `glab ci status`), report them, and call `TaskStop`.
+
 Check whether the start SHA's CI run had the same failure. If so, it's pre-existing, not a regression from this branch. Report it and call `TaskStop`.
 
 For trivial failures (lint, type, format, lockfile), attempt a fix. Reproduce the CI step locally to verify (skip reproduction for lockfile-only changes). Commit, push. The watcher picks up the new SHA on its next poll.

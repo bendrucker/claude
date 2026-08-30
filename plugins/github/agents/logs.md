@@ -51,3 +51,4 @@ Keep `lines` short (10 to 50 lines per job). The caller can read `log_file` for 
 
 - Do not analyze root causes or suggest fixes. Extract and summarize.
 - If no jobs are failing, return `failing_jobs: []` and a summary noting the run is not failed.
+- If the run id is missing or null, no Actions run failed. Return `failing_jobs: []` with that summary and run no `gh run view`.

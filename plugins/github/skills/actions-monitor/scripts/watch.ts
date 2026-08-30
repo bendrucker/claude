@@ -375,6 +375,12 @@ export async function resolveMergeable(
 const isQueuedState = (s: string): boolean =>
   s === "QUEUED" || s === "PENDING" || s === "WAITING" || s === "REQUESTED" || s === "EXPECTED";
 
+// GitHub counts a skipped required check as passing, so a skip is settled and
+// says nothing about the PR either way. A cancelled check is a verdict the PR
+// never got: it does not fail the target, but it cannot stand in for a check
+// that passed, so it holds the PR at running until something re-runs it.
+const SKIPPED_BUCKET = "skipping";
+
 // `gh pr checks --json` exposes a unified `state` (status when in-flight,
 // conclusion when complete) and a normalized `bucket` ("pass" | "fail" |
 // "cancel" | "pending" | "skipping"). It does NOT expose `conclusion`. Use
@@ -384,18 +390,71 @@ export function deriveChecksState(checks: Check[]): InternalState {
   if (checks.length === 0) {
     return "running";
   }
-  const buckets = checks.map((c) => (c.bucket ?? "").toLowerCase());
-  if (buckets.some((b) => b === "fail" || b === "cancel")) {
+  const decisive = checks.filter((c) => (c.bucket ?? "").toLowerCase() !== SKIPPED_BUCKET);
+  if (decisive.length === 0) {
+    return "success";
+  }
+  const buckets = decisive.map((c) => (c.bucket ?? "").toLowerCase());
+  if (buckets.some((b) => b === "fail")) {
     return "failing";
   }
-  const states = checks.map((c) => (c.state ?? "").toUpperCase());
+  const states = decisive.map((c) => (c.state ?? "").toUpperCase());
   if (states.some((s) => s === "IN_PROGRESS")) return "running";
   const anyQueued = states.some(isQueuedState);
   const allQueued = states.every(isQueuedState);
   if (allQueued && anyQueued) return "queued";
   if (anyQueued) return "running";
-  if (buckets.every((b) => b === "pass" || b === "skipping")) return "success";
+  if (buckets.every((b) => b === "pass")) return "success";
   return "running";
+}
+
+// Headroom over the runs one commit can trigger, counting re-runs.
+const RUN_LOOKUP_LIMIT = 50;
+
+// Conclusions that leave failing job output behind. A run that was cancelled,
+// skipped, blocked on approval, or that never started has no logs to fetch, so
+// naming it costs a dispatch that finds nothing.
+const FAILED_CONCLUSIONS = new Set(["failure", "timed_out"]);
+
+// `gh run list` reports an id as a number, but the event schema carries it as a
+// string.
+const RunId = z
+  .union([z.number(), z.string()])
+  .transform(String)
+  .catch("") satisfies z.ZodType<string>;
+
+export const AttributionRun = z.looseObject({
+  databaseId: RunId,
+  headSha: z.string().catch(""),
+  conclusion: z.string().catch(""),
+  workflowDatabaseId: RunId,
+  createdAt: z.string().catch(""),
+});
+export type AttributionRun = z.infer<typeof AttributionRun>;
+const AttributionRuns = z.array(AttributionRun);
+
+// `github:logs` fetches whatever run a failing event names, so a failing event
+// must name a run that actually failed. A PR can also fail on a check that is
+// no Actions run at all (an external reviewer, a hosted status), which leaves
+// nothing to fetch and so no run id.
+//
+// Collapsing each workflow to its newest run for the commit keeps a failure a
+// later run of the same workflow has already replaced from being named again.
+// The caller scopes the query by commit; the `headSha` filter is
+// belt-and-suspenders over that.
+export function selectRunId(runs: AttributionRun[], sha: string): string | null {
+  const newestPerWorkflow = new Map<string, AttributionRun>();
+  for (const entry of runs) {
+    if (entry.headSha !== sha) continue;
+    const key =
+      entry.workflowDatabaseId !== "" ? entry.workflowDatabaseId : `run:${entry.databaseId}`;
+    const seen = newestPerWorkflow.get(key);
+    if (!seen || entry.createdAt > seen.createdAt) newestPerWorkflow.set(key, entry);
+  }
+  const failed = [...newestPerWorkflow.values()].find((r) =>
+    FAILED_CONCLUSIONS.has(r.conclusion.toLowerCase()),
+  );
+  return failed && failed.databaseId !== "" ? failed.databaseId : null;
 }
 
 export function deriveRunListState(run: { status?: string; conclusion?: string }): InternalState {
@@ -451,6 +510,11 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
     console.error(`${message}; treating as probe failure`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
+  if (sha === "") {
+    const message = `gh pr view did not include headRefOid for PR #${prNumber}`;
+    console.error(`${message}; treating as probe failure`);
+    return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
+  }
 
   const checksResult = run(
     `gh pr checks ${prNumber} --repo ${repo} --required=false --json state,bucket,name`,
@@ -474,18 +538,32 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
 
-  const runIdResult = run(
-    `gh run list --repo ${repo} --branch ${branch} --limit 1 --json databaseId --jq '.[0].databaseId // ""'`,
-  );
-  if (!runIdResult.ok) {
-    return {
-      kind: "error",
-      rateLimited: runIdResult.rateLimited,
-      retryAfter: runIdResult.retryAfter,
-      stderr: runIdResult.stderr,
-    };
+  // Only a failing event carries a run id, so a green or in-flight poll skips
+  // the lookup and its API call.
+  let runId: string | null = null;
+  if (state === "failing") {
+    const runsResult = run(
+      `gh run list --repo ${repo} --commit ${sha} --limit ${RUN_LOOKUP_LIMIT} --json databaseId,headSha,conclusion,workflowDatabaseId,createdAt`,
+    );
+    if (!runsResult.ok) {
+      return {
+        kind: "error",
+        rateLimited: runsResult.rateLimited,
+        retryAfter: runsResult.retryAfter,
+        stderr: runsResult.stderr,
+      };
+    }
+    try {
+      const runs = AttributionRuns.parse(
+        JSON.parse(runsResult.stdout !== "" ? runsResult.stdout : "[]"),
+      );
+      runId = selectRunId(runs, sha);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`gh run list returned unusable JSON for ${repo}@${sha}: ${message}`);
+      return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
+    }
   }
-  const runId = runIdResult.stdout !== "" ? runIdResult.stdout : null;
 
   return {
     kind: "ok",

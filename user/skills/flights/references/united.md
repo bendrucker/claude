@@ -34,12 +34,12 @@ https://www.united.com/en/us/fsr/choose-flights?f=<ORIG>&t=<DEST>&d=<YYYY-MM-DD>
 
 - `f`, `t`, `d` are origin, destination, and `YYYY-MM-DD`.
 - **`at=1` switches the results from dollars to miles.** `at=0` gives cash. This single parameter is the whole award search.
-- `tt=1` is one-way. One-way queries are the right unit here, matching the decomposition described in the skill.
+- `tt=1` is one-way, which is what `united.ts url` builds. Awards price per direction, so one-way is the correct unit for `at=1`. A cash round trip can price differently from two one-ways, and this path will not show that. Confirm a round-trip cash fare on Google.
 - `px` is passenger count.
 
 ```bash
-bun user/skills/flights/scripts/united.ts url SFO EWR 2026-11-11
-bun user/skills/flights/scripts/united.ts url SFO EWR 2026-11-11 --award
+bun ~/.claude/skills/flights/scripts/united.ts url SFO EWR 2026-11-11
+bun ~/.claude/skills/flights/scripts/united.ts url SFO EWR 2026-11-11 --award
 ```
 
 ## The Basic-versus-Standard Trap
@@ -131,7 +131,8 @@ button "Economy Plus® (Extra legroom) From $470 ... select to view fare options
 Extract the departure time from the name rather than trusting row order:
 
 ```bash
-grep -n 'button "Seats for the flight' snap.txt \
+agent-browser --session flights-united --profile Default --headed --idle-timeout 0 snapshot > "$TMPDIR/snap.txt"
+grep -n 'button "Seats for the flight' "$TMPDIR/snap.txt" \
   | sed -E 's/.*at ([0-9:]+ [AP]M) and arrive.*ref=(e[0-9]+).*/\1 \2/'
 ```
 
@@ -152,8 +153,8 @@ Click `Accept cookies` once per profile before anything else. The error message 
 `at=1`, then parse the page text:
 
 ```bash
-bun user/skills/flights/scripts/united.ts parse < award-dump.txt
-bun user/skills/flights/scripts/united.ts parse --json < award-dump.txt
+bun ~/.claude/skills/flights/scripts/united.ts parse < "$TMPDIR/award-dump.txt"
+bun ~/.claude/skills/flights/scripts/united.ts parse --json < "$TMPDIR/award-dump.txt"
 ```
 
 - Prices show a cardmember discount as `Was` / `Now`. The `Now` figure is what gets charged.

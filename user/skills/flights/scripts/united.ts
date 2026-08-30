@@ -3,6 +3,8 @@
 import { cli, command } from "cleye";
 import { table } from "table";
 
+import { AMOUNT, amount, present } from "./page-text";
+
 // united.com's award results page is the only source for mileage pricing and
 // fare classes. Its rendered text repeats every value twice, once as the visible
 // label and once inside the screen-reader description ("3:00 PMDeparting at
@@ -43,12 +45,9 @@ const ORIGIN = /^([A-Z]{3})Origin /;
 const DESTINATION = /^([A-Z]{3})Destination /;
 const DURATION = /^(.+?)Duration /;
 const FLIGHT = /^([A-Z0-9]{2} \d{1,4})(?: \((.+?)\))?Flight Number /;
-// Each amount has to open on a digit. A punctuation-only match such as "$," or
-// "., " survives `replaceAll` as an empty string, and `Number("")` is 0, which
-// reads downstream as a real price of zero rather than a failed parse.
-const MILES = /^(\d[\d,.]*)k?\s*miles$/i;
-const BARE_MILES = /^(\d[\d,.]*)k$/i;
-const TAXES = /^\+?\$(\d[\d,.]*)$/;
+const MILES = new RegExp(String.raw`^(${AMOUNT})k?\s*miles$`, "i");
+const BARE_MILES = new RegExp(String.raw`^(${AMOUNT})k$`, "i");
+const TAXES = new RegExp(String.raw`^\+?\$(${AMOUNT})$`);
 const AWARD_TYPE = /^((?:Saver|Everyday) Award)$/;
 const FARE_CLASS = /^(United .+ \([A-Z]{1,2}\))$/;
 
@@ -61,17 +60,9 @@ const CABINS = new Set([
   "First",
 ]);
 
-// A field the page did not supply arrives as undefined when the capture group
-// went unmatched and as an empty string when it matched nothing. Both mean absent.
-function present(value: string | null | undefined): value is string {
-  return value != null && value !== "";
-}
-
 function miles(token: string): number | null {
-  const digits = (MILES.exec(token) ?? BARE_MILES.exec(token))?.[1];
-  if (!present(digits)) return null;
-  const value = Number(digits.replaceAll(",", ""));
-  if (Number.isNaN(value)) return null;
+  const value = amount((MILES.exec(token) ?? BARE_MILES.exec(token))?.[1]);
+  if (value === null) return null;
   // "22.5k" is thousands. A bare "22500" is already absolute.
   return /k$/i.test(token.replace(/\s*miles$/i, "")) ? Math.round(value * 1000) : value;
 }
@@ -113,7 +104,7 @@ function parseFares(lines: string[]): AwardFare[] {
       // With a discount the page lists the old price first, then the new one.
       miles: available ? (discounted ? (amounts[1] ?? null) : (amounts[0] ?? null)) : null,
       standardMiles: available && discounted ? (amounts[0] ?? null) : null,
-      taxes: available && present(taxes) ? Number(taxes.replaceAll(",", "")) : null,
+      taxes: available ? amount(taxes) : null,
       awardType: firstMatch(scope, AWARD_TYPE),
       fareClass: firstMatch(scope, FARE_CLASS),
       available,
@@ -298,6 +289,14 @@ const parseCmd = command(
     const flights = parseAwardResults(await Bun.stdin.text());
     if (flights.length === 0) {
       console.error("no flights parsed. The page may not have rendered yet.");
+      process.exit(1);
+    }
+    // A sold-out cabin still renders its label and prices itself at zero, so a
+    // genuinely empty award map arrives as fares marked unavailable. Itineraries
+    // carrying no fare block at all mean pricing had not rendered yet, which
+    // must not be reported as "no saver space" on a successful exit.
+    if (flights.every((flight) => flight.fares.length === 0)) {
+      console.error("itineraries parsed, but no award pricing. The page may still be rendering.");
       process.exit(1);
     }
     if (parsed.flags.json) {

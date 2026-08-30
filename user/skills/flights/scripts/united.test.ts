@@ -194,6 +194,15 @@ describe("parseAwardResults", () => {
   test("skips a block with no itinerary", () => {
     expect(parseAwardResults("NONSTOP\nsome unrelated text\n")).toEqual([]);
   });
+
+  // The CLI reports a sold-out route and a page that stopped short of its
+  // pricing differently, and this is the difference it reads. A sold-out cabin
+  // still renders its label, so it survives as a fare marked unavailable. An
+  // itinerary whose pricing never rendered carries no fare at all.
+  test("distinguishes a sold-out cabin from pricing that never rendered", () => {
+    expect(parseAwardResults(flight(UNAVAILABLE))[0]?.fares).toMatchObject([{ available: false }]);
+    expect(parseAwardResults(flight(""))[0]?.fares).toEqual([]);
+  });
 });
 
 describe("render", () => {

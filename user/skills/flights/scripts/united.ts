@@ -3,6 +3,8 @@
 import { cli, command } from "cleye";
 import { table } from "table";
 
+import { AMOUNT, amount, present, THOUSANDS } from "./page-text";
+
 // united.com's award results page is the only source for mileage pricing and
 // fare classes. Its rendered text repeats every value twice, once as the visible
 // label and once inside the screen-reader description ("3:00 PMDeparting at
@@ -43,12 +45,9 @@ const ORIGIN = /^([A-Z]{3})Origin /;
 const DESTINATION = /^([A-Z]{3})Destination /;
 const DURATION = /^(.+?)Duration /;
 const FLIGHT = /^([A-Z0-9]{2} \d{1,4})(?: \((.+?)\))?Flight Number /;
-// Each amount has to open on a digit. A punctuation-only match such as "$," or
-// "., " survives `replaceAll` as an empty string, and `Number("")` is 0, which
-// reads downstream as a real price of zero rather than a failed parse.
-const MILES = /^(\d[\d,.]*)k?\s*miles$/i;
-const BARE_MILES = /^(\d[\d,.]*)k$/i;
-const TAXES = /^\+?\$(\d[\d,.]*)$/;
+const MILES = new RegExp(String.raw`^(${THOUSANDS})k?\s*miles$`, "i");
+const BARE_MILES = new RegExp(String.raw`^(${THOUSANDS})k$`, "i");
+const TAXES = new RegExp(String.raw`^\+?\$(${AMOUNT})$`);
 const AWARD_TYPE = /^((?:Saver|Everyday) Award)$/;
 const FARE_CLASS = /^(United .+ \([A-Z]{1,2}\))$/;
 
@@ -61,17 +60,9 @@ const CABINS = new Set([
   "First",
 ]);
 
-// A field the page did not supply arrives as undefined when the capture group
-// went unmatched and as an empty string when it matched nothing. Both mean absent.
-function present(value: string | null | undefined): value is string {
-  return value != null && value !== "";
-}
-
 function miles(token: string): number | null {
-  const digits = (MILES.exec(token) ?? BARE_MILES.exec(token))?.[1];
-  if (!present(digits)) return null;
-  const value = Number(digits.replaceAll(",", ""));
-  if (Number.isNaN(value)) return null;
+  const value = amount((MILES.exec(token) ?? BARE_MILES.exec(token))?.[1]);
+  if (value === null) return null;
   // "22.5k" is thousands. A bare "22500" is already absolute.
   return /k$/i.test(token.replace(/\s*miles$/i, "")) ? Math.round(value * 1000) : value;
 }
@@ -113,7 +104,7 @@ function parseFares(lines: string[]): AwardFare[] {
       // With a discount the page lists the old price first, then the new one.
       miles: available ? (discounted ? (amounts[1] ?? null) : (amounts[0] ?? null)) : null,
       standardMiles: available && discounted ? (amounts[0] ?? null) : null,
-      taxes: available && present(taxes) ? Number(taxes.replaceAll(",", "")) : null,
+      taxes: available ? amount(taxes) : null,
       awardType: firstMatch(scope, AWARD_TYPE),
       fareClass: firstMatch(scope, FARE_CLASS),
       available,
@@ -300,6 +291,23 @@ const parseCmd = command(
       console.error("no flights parsed. The page may not have rendered yet.");
       process.exit(1);
     }
+    // A sold-out cabin still renders its label and prices itself at zero, so a
+    // genuinely empty award map arrives as fares marked unavailable. An
+    // itinerary carrying no fare block at all means its pricing had not
+    // rendered, and reporting that as no award space would be wrong.
+    const unpriced = flights.filter((flight) => flight.fares.length === 0);
+    if (unpriced.length === flights.length) {
+      console.error("itineraries parsed, but no award pricing. The page may still be rendering.");
+      process.exit(1);
+    }
+    // Partial pricing still prints, since the itineraries that did price are
+    // worth reading. What it cannot support is a claim about the whole route.
+    if (unpriced.length > 0) {
+      console.error(
+        `${YELLOW}${unpriced.length} of ${flights.length} itineraries carried no award pricing. Re-read the page before treating this as the whole route.${RESET}`,
+      );
+    }
+
     if (parsed.flags.json) {
       console.log(JSON.stringify(flights, null, 2));
       return;
@@ -309,11 +317,14 @@ const parseCmd = command(
     const saver = flights.filter((flight) =>
       flight.fares.some((fare) => fare.available && fare.awardType?.startsWith("Saver")),
     );
-    console.log(
-      saver.length > 0
-        ? `${GREEN}saver space on ${saver.map((flight) => flight.flight ?? `${flight.departTime} connection`).join(", ")}${RESET}`
-        : `${YELLOW}no saver space. Everything here is dynamically priced.${RESET}`,
-    );
+    if (saver.length > 0) {
+      const named = saver.map((flight) => flight.flight ?? `${flight.departTime} connection`);
+      console.log(`${GREEN}saver space on ${named.join(", ")}${RESET}`);
+    } else if (unpriced.length > 0) {
+      console.log(`${YELLOW}no saver space among the itineraries that priced.${RESET}`);
+    } else {
+      console.log(`${YELLOW}no saver space. Everything here is dynamically priced.${RESET}`);
+    }
   },
 );
 

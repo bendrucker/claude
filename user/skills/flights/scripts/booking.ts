@@ -1,3 +1,5 @@
+import { AMOUNT, amount, present } from "./page-text";
+
 // Google Flights' booking page carries what the results list omits: flight
 // numbers, aircraft, on-time reputation, legroom, and the full fare ladder.
 // Reaching it costs two clicks, so the skill only opens it for shortlisted
@@ -34,22 +36,12 @@ export interface Booking {
 const TRAVEL_TIME = "Travel time: ";
 const IATA_SUFFIX = /\(([A-Z]{3})\)\s*$/;
 const FLIGHT = /^(.+?)\s+([A-Z0-9]{2}\s?\d{1,4})$/;
-// The leading digit is required. A comma-only match survives `replaceAll` as an
-// empty string, and `Number("")` is 0, which renders as a real $0 fare.
-const PRICE = /^\$(\d[\d,]*)$/;
+const PRICE = new RegExp(String.raw`^\$(${AMOUNT})$`);
 const BULLET = /^-\s*(.+)$/;
 const LEGROOM = /legroom/i;
 
-// A field the page did not supply arrives as undefined when the line is missing
-// and as an empty string when the line is there but blank. Both mean absent.
-function present(value: string | null | undefined): value is string {
-  return value != null && value !== "";
-}
-
 function money(value: string | undefined): number | null {
-  if (!present(value)) return null;
-  const digits = PRICE.exec(value.trim())?.[1];
-  return present(digits) ? Number(digits.replaceAll(",", "")) : null;
+  return present(value) ? amount(PRICE.exec(value.trim())?.[1]) : null;
 }
 
 function airport(line: string | undefined): string | null {

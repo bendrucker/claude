@@ -4,6 +4,7 @@ import { cli, command } from "cleye";
 import { table } from "table";
 
 import { parseBooking } from "./booking";
+import { AMOUNT, amount, present } from "./page-text";
 
 // Google Flights encodes an entire search into the `tfs` query parameter: a
 // protobuf message, base64url-encoded without padding. Building it directly
@@ -167,6 +168,7 @@ const STOPS_VIA = /\d+ stops? in ([A-Z]{3}(?:, [A-Z]{3})*)/;
  * with no separator: "AlaskaOperated by Alaska as Hawaiian Airlines".
  */
 const OPERATED_BY = /Operated by.*$/s;
+const PRICE = new RegExp(String.raw`\$(${AMOUNT})`);
 
 function minutesOfDay(time: string): number {
   const match = /(\d+):(\d+)/.exec(time);
@@ -174,12 +176,6 @@ function minutesOfDay(time: string): number {
   const hour = Number(match[1]) % 12;
   const pm = time.toUpperCase().includes("PM");
   return (hour + (pm ? 12 : 0)) * 60 + Number(match[2]);
-}
-
-// A field the page did not supply arrives as undefined when the capture group
-// went unmatched and as an empty string when it matched nothing. Both mean absent.
-function present(value: string | null | undefined): value is string {
-  return value != null && value !== "";
 }
 
 export function parseResults(text: string): Row[] {
@@ -220,8 +216,7 @@ export function parseResults(text: string): Row[] {
     const end = match.index + whole.length;
     const nextBlock = blocks[position + 1]?.index ?? normalized.length;
     const tail = normalized.slice(end, Math.min(end + TAIL, nextBlock));
-    // Requiring a leading digit keeps a half-rendered "$," from parsing as $0.
-    const price = /\$(\d[\d,]*)/.exec(tail)?.[1];
+    const price = amount(PRICE.exec(tail)?.[1]);
     const stops = STOPS.exec(tail);
     const via = STOPS_VIA.exec(tail);
 
@@ -234,7 +229,7 @@ export function parseResults(text: string): Row[] {
       duration,
       stops: stops?.[1] ?? "?",
       via: via?.[1]?.split(", ") ?? [],
-      price: present(price) ? Number(price.replaceAll(",", "")) : null,
+      price,
       // Google states the restriction, and that phrasing survives layout changes
       // better than a "N carry-on bag" string does.
       basic: tail.includes("overhead bin access"),
@@ -264,7 +259,7 @@ export interface GridCell {
 }
 
 /** Round-trip cells name both of their dates. One-way cells name neither. */
-const GRID_CELL = /button "\$(\d[\d,]*)((?:, [^",]+)*)"/g;
+const GRID_CELL = new RegExp(String.raw`button "\$(${AMOUNT})((?:, [^",]+)*)"`, "g");
 const GRID_DATE = /StaticText "([A-Z][a-z]{2} \d{1,2})"/g;
 
 /**
@@ -285,7 +280,8 @@ export function parseGrid(text: string): GridCell[] {
   const positional: Array<Pick<GridCell, "price" | "tier">> = [];
 
   for (const match of scope.matchAll(GRID_CELL)) {
-    const price = Number((match[1] ?? "").replaceAll(",", ""));
+    const price = amount(match[1]);
+    if (price === null) continue;
     const rest = match[2] ?? "";
     const tier = rest.includes("cheapest price")
       ? "cheapest"

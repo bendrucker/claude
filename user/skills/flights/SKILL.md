@@ -11,14 +11,15 @@ allowed-tools:
   - AskUserQuestion
   - Bash(cat ~/.config/claude-flights/*)
   - Bash(agent-browser:*)
-  - Bash(bun:*)
+  - Bash(bun ~/.claude/skills/flights/scripts/:*)
+  - Bash(sleep:*)
+  - Bash(grep:*)
+  - Bash(sed:*)
   - Read
   - Write
 ---
 
 # Flights
-
-Search flights the way I actually decide: fully loaded prices, real departure times, and a shortlist short enough to act on.
 
 Preferences: !`cat ~/.config/claude-flights/config.json 2>/dev/null || echo '{}'`
 
@@ -46,9 +47,11 @@ If that came back `{}`, the config is missing. Run the search on what the reques
 
 `cabin.default` names a search cabin, one of `economy`, `premium`, `business`, or `first`, and passes straight to `--cabin`. Economy Plus is a United seat product rather than a search cabin, so a preference for it belongs in `preferences` and gets read off the results.
 
+The parsers live in `~/.claude/skills/flights/scripts/`. Invoke them by that path. The session's working directory is wherever the request came from.
+
 ## Boundaries
 
-These are absolute. They do not bend because a page makes the next step convenient.
+These do not bend because a page makes the next step convenient.
 
 - Read as far as **fare selection and view-only seat maps**. Stop there.
 - Never enter passenger or payment details. Never click `Purchase`, `Confirm`, `Hold`, or `FareLock`. Never spend miles or money.
@@ -59,18 +62,16 @@ These are absolute. They do not bend because a page makes the next step convenie
 
 ## Intake
 
-Ask before searching only what changes the search, and only what the request and config leave open. One `AskUserQuestion` round, not an interview.
+Ask before searching only what changes the search, and only what the request and config leave open. One `AskUserQuestion` round.
 
 - **Baggage.** A bike changes the airline, the aircraft, and sometimes the airport. Skis and oversized cases do the same. Ask when the trip's purpose suggests gear.
 - **Ground plan at each end.** Whether transit works, or someone is driving, decides how much an inconvenient airport actually costs.
 - **Who is paying**, when the answer changes whether miles are on the table.
 - **Shape**, when the request implies flexibility without pinning it down. Enumerate the shapes to compare rather than guessing one.
 
-Skip the round when the request already answers these.
-
 ## Search
 
-Cheap pass first, expensive pass second.
+Cheap pass first, expensive pass second. Say up front how many queries the plan needs, and if a shape gets dropped for budget, say which and why, so the coverage stated matches the coverage run.
 
 ### Google Flights
 
@@ -78,19 +79,23 @@ Run every shape here. It is fast, needs no login, and gives market context acros
 
 For flexible dates, open the **Date grid** first. It prices a whole window of date pairs in one page load, which answers "is there a better fare a day either side" without a query per date. Use it to pick the shortlist, then price those dates properly.
 
-Where the grid does not reach, a round trip still decomposes: the cheapest round trip equals the cheapest outbound one-way plus the cheapest return one-way, verified to within a dollar. So N departure dates against M return dates costs `N + M` queries, not `N × M`.
+Where the grid does not reach, search the departure dates and the return dates as one-ways, so N departure dates against M return dates costs `N + M` queries rather than `N × M`.
+
+Their sum matched the round trip to within a dollar on the US domestic markets checked, which makes the decomposition a shortlisting tool rather than a quote. Round-trip fares diverge from twice a one-way on many international markets and under some fare rules. Price the pair being recommended as an actual round trip, and report that number.
 
 ### united.com
 
 Run the shortlist only. It is slow and needs a login, but it is the only truth for what United will sell, and the only source for award pricing. Use it on the handful of shapes that survived the Google pass.
 
-See [`references/google-flights.md`](references/google-flights.md) and [`references/united.md`](references/united.md) for the mechanics. Both encode gotchas that cost real debugging time. Read the relevant one before driving that site.
+Award pricing renders only for a signed-in session. `united.ts parse` exits non-zero when a page carries itineraries but no award pricing, which is the signal to check sign-in and re-read the page rather than to report the route as having no space.
 
-Bound the work. Say up front how many queries the plan needs, and if a shape gets dropped for budget, say which and why, so the coverage stated matches the coverage run.
+`united.ts` builds one-way URLs only, so a round-trip cash fare gets confirmed on Google.
+
+See [`references/google-flights.md`](references/google-flights.md) and [`references/united.md`](references/united.md) for the mechanics. Read the relevant one before driving that site.
 
 ## Filters
 
-Hard filters come from `filters.hard`, defaulting to Basic Economy, red-eyes, and two or more stops. The parser marks the first two and drops them on request, so let the tool apply those rather than filtering by eye. The reference gives the flags.
+`filters.hard` lists what to exclude, defaulting to Basic Economy, red-eyes, and itineraries with two or more stops. The parser marks Basic Economy and red-eyes and drops them on request, so let the tool apply those rather than filtering by eye. The reference gives the flags.
 
 Stop count has no flag. Build it into the search instead: omit `--stops` and the URL asks Google for nonstops only. Where connections are wanted, read the stop count off the `Stops` column.
 
@@ -100,7 +105,7 @@ Nearby dates are worth a look. Flag a win within a day of the requested date, bu
 
 ## Pricing
 
-Quote the **fully loaded** price by default: what actually gets paid, seat included, not a headline fare that gets topped up later.
+Quote the **fully loaded** price by default: what actually gets paid, seat included, rather than a headline fare that gets topped up later.
 
 Break the seat out as its own line so the base fare and the upgrade stay separately visible. Some trips split who pays which part.
 
@@ -110,7 +115,7 @@ For cash against miles, compute cents per point:
 cpp = (cash_fare - award_taxes) / miles * 100
 ```
 
-Compare that against `miles.centsPerPointThreshold`, defaulting to 1.5 if unset. Report cash, miles, and cpp for every option regardless of which one wins, and say which the arithmetic favors. A saver award is worth calling out by name, because saver space is scarce and dynamic pricing usually lands well below the threshold.
+Both figures come off the same itinerary, and the cash fare is united.com's, since that is the purchase the miles replace. Compare the result against `miles.centsPerPointThreshold`, defaulting to 1.5 if unset. Report cash, miles, and cpp for every option regardless of which one wins, and say which the arithmetic favors. A saver award is worth calling out by name, because saver space is scarce and dynamic pricing usually lands well below the threshold.
 
 ## Output
 

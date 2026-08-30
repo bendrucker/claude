@@ -7,8 +7,8 @@ The cheap pass. No login, fast, covers every carrier. Use it to explore shapes a
 Build the URL directly. Never drive the search form. Google Flights encodes an entire search into the `tfs` query parameter, a protobuf message in unpadded base64url. Constructing it directly turns each query into a single page load, where driving the form costs a load plus a settle wait per field.
 
 ```bash
-bun user/skills/flights/scripts/google-flights.ts url LAX ORD 2026-04-15
-bun user/skills/flights/scripts/google-flights.ts url LAX ORD 2026-04-15 2026-04-20 --stops
+bun ~/.claude/skills/flights/scripts/google-flights.ts url LAX ORD 2026-04-15
+bun ~/.claude/skills/flights/scripts/google-flights.ts url LAX ORD 2026-04-15 2026-04-20 --stops
 ```
 
 `tfs()` in `scripts/google-flights.ts` is the encoder. Its field map, recovered by reading the `tfs` Google itself produces and verified byte-for-byte against real search URLs:
@@ -56,8 +56,8 @@ It is an overlay on the results URL, not a page of its own:
 ```bash
 agent-browser --session flights open "<url>" && sleep 9 \
   && agent-browser --session flights find text "Date grid" click && sleep 7 \
-  && agent-browser --session flights snapshot > grid.txt
-bun user/skills/flights/scripts/google-flights.ts grid < grid.txt
+  && agent-browser --session flights snapshot > "$TMPDIR/grid.txt"
+bun ~/.claude/skills/flights/scripts/google-flights.ts grid < "$TMPDIR/grid.txt"
 ```
 
 **Snapshot, not read.** This is the one exception to the read-everywhere rule above. `read` returns the results list underneath and never shows the grid, so the click looks like it silently failed. Take a snapshot instead.
@@ -71,7 +71,9 @@ The two encode dates differently, which `parseGrid()` handles:
 | Round trip | `"$467, cheapest price, Nov 8 to Nov 13"` | the label itself |
 | One-way | `"$234, cheapest price"` | position against the header row |
 
-Google marks two tiers, `cheapest price` and `low price`, and a fourth label `selected` marks the dates currently searched. All four shapes appear in one grid, so a regex that only allows `cheapest price` silently drops a third of the cells.
+Google marks two tiers, `cheapest price` and `low price`, and a third label `selected` marks the dates currently searched. A cell can carry a tier and `selected` together, or neither, so a regex that only allows `cheapest price` silently drops a third of the cells.
+
+Grid labels carry no year. A window opened on a late-December search shows `Jan 3` for a date in the following year, so resolve each cell against the dates the search was built from before turning one back into `YYYY-MM-DD`.
 
 `Scroll left` and `Scroll right` buttons move the window if the useful dates fall outside it.
 
@@ -84,8 +86,8 @@ Use `read`, never `snapshot`. `agent-browser snapshot` flaps between a full tree
 This is the opposite of united.com, where snapshot is required because every interaction needs a ref. The results list needs no clicks once the URL carries the search. The Date grid and the booking page are the two places that do, and both are covered below.
 
 ```bash
-agent-browser --session flights open "<url>" && sleep 8 && agent-browser --session flights read > dump.txt
-bun user/skills/flights/scripts/google-flights.ts parse < dump.txt
+agent-browser --session flights open "<url>" && sleep 8 && agent-browser --session flights read > "$TMPDIR/dump.txt"
+bun ~/.claude/skills/flights/scripts/google-flights.ts parse < "$TMPDIR/dump.txt"
 ```
 
 **Run one query per Bash tool call.** Chaining open, sleep, and read inside a single call is correct and preferred. Splitting them across calls, or looping several queries in one call, is what crashes the daemon. After a crash the session resets to `about:blank`.
@@ -121,8 +123,8 @@ The two clicks are the itinerary row, then the fare that opens under it. Both ne
 agent-browser --session flights snapshot | grep -i "button .*\$"
 agent-browser --session flights click "<itinerary ref>" && sleep 4
 agent-browser --session flights click "<fare ref>" && sleep 6
-agent-browser --session flights read > booking-dump.txt
-bun user/skills/flights/scripts/google-flights.ts booking < booking-dump.txt
+agent-browser --session flights read > "$TMPDIR/booking-dump.txt"
+bun ~/.claude/skills/flights/scripts/google-flights.ts booking < "$TMPDIR/booking-dump.txt"
 ```
 
 `parseBooking()` anchors on the `Travel time: ` line and walks outward for times and airports, forward for flight, cabin, and aircraft. The aircraft line repeats the flight code with no separator, as in `Airbus A320UA 817`, so the code gets trimmed off the end.

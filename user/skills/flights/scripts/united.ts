@@ -3,7 +3,7 @@
 import { cli, command } from "cleye";
 import { table } from "table";
 
-import { AMOUNT, amount, present } from "./page-text";
+import { AMOUNT, amount, present, THOUSANDS } from "./page-text";
 
 // united.com's award results page is the only source for mileage pricing and
 // fare classes. Its rendered text repeats every value twice, once as the visible
@@ -45,8 +45,8 @@ const ORIGIN = /^([A-Z]{3})Origin /;
 const DESTINATION = /^([A-Z]{3})Destination /;
 const DURATION = /^(.+?)Duration /;
 const FLIGHT = /^([A-Z0-9]{2} \d{1,4})(?: \((.+?)\))?Flight Number /;
-const MILES = new RegExp(String.raw`^(${AMOUNT})k?\s*miles$`, "i");
-const BARE_MILES = new RegExp(String.raw`^(${AMOUNT})k$`, "i");
+const MILES = new RegExp(String.raw`^(${THOUSANDS})k?\s*miles$`, "i");
+const BARE_MILES = new RegExp(String.raw`^(${THOUSANDS})k$`, "i");
 const TAXES = new RegExp(String.raw`^\+?\$(${AMOUNT})$`);
 const AWARD_TYPE = /^((?:Saver|Everyday) Award)$/;
 const FARE_CLASS = /^(United .+ \([A-Z]{1,2}\))$/;
@@ -292,13 +292,22 @@ const parseCmd = command(
       process.exit(1);
     }
     // A sold-out cabin still renders its label and prices itself at zero, so a
-    // genuinely empty award map arrives as fares marked unavailable. Itineraries
-    // carrying no fare block at all mean pricing had not rendered yet, which
-    // must not be reported as "no saver space" on a successful exit.
-    if (flights.every((flight) => flight.fares.length === 0)) {
+    // genuinely empty award map arrives as fares marked unavailable. An
+    // itinerary carrying no fare block at all means its pricing had not
+    // rendered, and reporting that as no award space would be wrong.
+    const unpriced = flights.filter((flight) => flight.fares.length === 0);
+    if (unpriced.length === flights.length) {
       console.error("itineraries parsed, but no award pricing. The page may still be rendering.");
       process.exit(1);
     }
+    // Partial pricing still prints, since the itineraries that did price are
+    // worth reading. What it cannot support is a claim about the whole route.
+    if (unpriced.length > 0) {
+      console.error(
+        `${YELLOW}${unpriced.length} of ${flights.length} itineraries carried no award pricing. Re-read the page before treating this as the whole route.${RESET}`,
+      );
+    }
+
     if (parsed.flags.json) {
       console.log(JSON.stringify(flights, null, 2));
       return;
@@ -308,11 +317,14 @@ const parseCmd = command(
     const saver = flights.filter((flight) =>
       flight.fares.some((fare) => fare.available && fare.awardType?.startsWith("Saver")),
     );
-    console.log(
-      saver.length > 0
-        ? `${GREEN}saver space on ${saver.map((flight) => flight.flight ?? `${flight.departTime} connection`).join(", ")}${RESET}`
-        : `${YELLOW}no saver space. Everything here is dynamically priced.${RESET}`,
-    );
+    if (saver.length > 0) {
+      const named = saver.map((flight) => flight.flight ?? `${flight.departTime} connection`);
+      console.log(`${GREEN}saver space on ${named.join(", ")}${RESET}`);
+    } else if (unpriced.length > 0) {
+      console.log(`${YELLOW}no saver space among the itineraries that priced.${RESET}`);
+    } else {
+      console.log(`${YELLOW}no saver space. Everything here is dynamically priced.${RESET}`);
+    }
   },
 );
 

@@ -28,6 +28,8 @@ describe("AMOUNT", () => {
     ["$1,23", null],
     ["$12,34", null],
     ["$5.", null],
+    // A cents field caught one digit in would otherwise read as $249.90.
+    ["$249.9", null],
     ["$", null],
     ["$,", null],
   ];

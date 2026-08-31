@@ -100,15 +100,25 @@ describe("sessions view", () => {
     }
   });
 
-  it("includes summary when present", async () => {
+  it("prefers a custom title over the generated ones, taking the last one written", async () => {
     const rows = await db.query(
-      "SELECT summary FROM sessions WHERE session_id = 'summary-session'",
-      z.object({ summary: z.string() }),
+      "SELECT label, label_source FROM sessions WHERE session_id = 'labeled-session'",
+      z.object({ label: z.string(), label_source: z.string() }),
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.summary).toBe(
-      "Fixed database connection pooling issue causing timeouts under load",
+    expect(rows[0]?.label).toBe("db-pool-sizing-final");
+    expect(rows[0]?.label_source).toBe("custom-title");
+  });
+
+  it("falls back to the generated title, and leaves an untitled session null", async () => {
+    const rows = await db.query(
+      "SELECT session_id, label FROM sessions WHERE session_id IN ('ai-titled-session', 'unlabeled-session') ORDER BY session_id",
+      z.object({ session_id: z.string(), label: z.string().nullable() }),
     );
+    expect(rows).toEqual([
+      { session_id: "ai-titled-session", label: "Retry budget for the ingest worker" },
+      { session_id: "unlabeled-session", label: null },
+    ]);
   });
 
   it("includes project metadata", async () => {
@@ -157,13 +167,12 @@ describe("search", () => {
     expect(rows.length).toBeLessThanOrEqual(2);
   });
 
-  it("matches summary content", async () => {
+  it("matches a session label that appears nowhere in the transcript", async () => {
     const rows = await runQuery(db, "search", z.object({ session_id: z.string() }), {
       ...queryParams({ limit: "10" }),
-      query: "database connection pooling",
+      query: "db-pool-sizing-final",
     });
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.some((r) => r.session_id === "summary-session")).toBe(true);
+    expect(rows.map((r) => r.session_id)).toEqual(["labeled-session"]);
   });
 });
 
@@ -220,7 +229,7 @@ describe("errors", () => {
       db,
       "errors",
       z.object({ error_content: z.string(), tool_name: z.string(), session_id: z.string() }),
-      queryParams({ error_type: null }),
+      queryParams(),
     );
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
@@ -231,42 +240,61 @@ describe("errors", () => {
     expect(rows.some((r) => r.session_id === "tools-session")).toBe(true);
   });
 
-  it("classifies rejection and failure error types", async () => {
+  it("reports failures only, leaving every denial to the permissions query", async () => {
     const rows = await runQuery(
       db,
       "errors",
-      z.object({ error_type: z.string() }),
-      queryParams({ error_type: null }),
-    );
-    const types = rows.map((r) => r.error_type);
-    expect(types).toContain("rejection");
-    expect(types).toContain("failure");
-  });
-
-  it("filters by error_type", async () => {
-    const rows = await runQuery(
-      db,
-      "errors",
-      z.object({ error_type: z.string() }),
-      queryParams({ error_type: "rejection" }),
+      z.object({ error_type: z.string(), denial_kind: z.string().nullable() }),
+      queryParams({ limit: "100" }),
     );
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
-      expect(row.error_type).toBe("rejection");
+      expect(row.error_type).toBe("failure");
+      expect(row.denial_kind).toBeNull();
     }
   });
 });
 
 describe("permission_requests", () => {
+  it("reports every denial kind, not just the ones the result string names", async () => {
+    const rows = await db.query(
+      "SELECT tool_id, denial_kind, kind_source FROM permission_requests WHERE session_id = 'denials-session' ORDER BY tool_id",
+      z.object({ tool_id: z.string(), denial_kind: z.string(), kind_source: z.string() }),
+    );
+    expect(rows).toEqual([
+      { tool_id: "deny-tool-1", denial_kind: "user-rejected", kind_source: "field" },
+      { tool_id: "deny-tool-2", denial_kind: "permission-rule", kind_source: "field" },
+      { tool_id: "deny-tool-3", denial_kind: "automode-blocked", kind_source: "field" },
+      { tool_id: "deny-tool-4", denial_kind: "automode-unavailable", kind_source: "field" },
+      { tool_id: "deny-tool-5", denial_kind: "user-rejected", kind_source: "result-string" },
+    ]);
+  });
+
   it("returns rejected tool calls with tool details", async () => {
     const rows = await db.query(
-      "SELECT * FROM permission_requests",
+      "SELECT * FROM permission_requests WHERE session_id = 'tools-session'",
       z.object({ tool_name: z.string(), tool_id: z.string(), session_id: z.string() }),
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.tool_name).toBe("Bash");
     expect(rows[0]?.tool_id).toBe("tool-1");
     expect(rows[0]?.session_id).toBe("tools-session");
+  });
+
+  it("counts a rejection the harness marked but the result string does not name", async () => {
+    const rows = await db.query(
+      "SELECT error_type, denial_kind FROM tool_errors WHERE tool_id = 'deny-tool-1'",
+      z.object({ error_type: z.string(), denial_kind: z.string() }),
+    );
+    expect(rows).toEqual([{ error_type: "rejection", denial_kind: "user-rejected" }]);
+  });
+
+  it("leaves a permission-rule denial as a failure so hook_denies still recovers it", async () => {
+    const rows = await db.query(
+      "SELECT error_type, denial_kind FROM tool_errors WHERE tool_id = 'deny-tool-2'",
+      z.object({ error_type: z.string(), denial_kind: z.string() }),
+    );
+    expect(rows).toEqual([{ error_type: "failure", denial_kind: "permission-rule" }]);
   });
 });
 
@@ -303,12 +331,20 @@ describe("permissions query", () => {
     const rows = await runQuery(
       db,
       "permissions",
-      z.object({ tool_name: z.string(), target: z.string() }),
-      queryParams(),
+      z.object({ tool_name: z.string(), target: z.string().nullable() }),
+      queryParams({ project: "api", limit: "100" }),
     );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.tool_name).toBe("Bash");
-    expect(rows[0]?.target).toContain("npm test");
+    expect(rows.some((r) => r.tool_name === "Bash" && r.target?.includes("npm test"))).toBe(true);
+  });
+
+  it("filters to one denial kind", async () => {
+    const rows = await runQuery(
+      db,
+      "permissions",
+      z.object({ denial_kind: z.string() }),
+      queryParams({ denial_kind: "automode-blocked", limit: "100" }),
+    );
+    expect(rows.map((r) => r.denial_kind)).toEqual(["automode-blocked"]);
   });
 
   it("filters by project", async () => {
@@ -456,9 +492,11 @@ describe("discovery", () => {
       "source_line",
       "data",
       "content_text",
-      "summary",
+      "prompt_source",
+      "interrupted_message_id",
     ];
     expect(pinned.filter((col) => !cols.has(col))).toEqual([]);
+    expect(cols.has("summary")).toBe(false);
   });
 });
 
@@ -1125,8 +1163,12 @@ describe("activity query", () => {
       filterParams(),
     );
     const bySignal = new Map(rows.map((r) => [r.signal, Number(r.count)]));
+    expect(bySignal.get("prompt: typed")).toBe(2);
+    expect(bySignal.get("prompt: queued")).toBe(1);
+    expect(bySignal.get("prompt: system")).toBe(1);
+    // `promptSource` calls this turn `queued`; the attachment says who queued it.
+    expect(bySignal.get("queued command: auto-continuation")).toBe(1);
     expect(bySignal.get("interruptions")).toBe(1);
-    expect(bySignal.get("auto-continuations")).toBe(1);
     expect(bySignal.get("compactions")).toBe(1);
     expect(bySignal.get("mode: auto")).toBe(1);
     // hooks-session contributes one, plan-iterations-session (added for the
@@ -1145,7 +1187,7 @@ describe("activity query", () => {
       filterParams({ after_date: "2024-01-01", before_date: "2024-02-15" }),
     );
     const inWindow = new Map(windowed.map((r) => [r.signal, Number(r.count)]));
-    expect(inWindow.get("prompts submitted")).toBe(2);
+    expect(inWindow.get("mode: plan")).toBe(2);
 
     const later = await runQuery(
       db,
@@ -1154,7 +1196,7 @@ describe("activity query", () => {
       filterParams({ after_date: "2025-01-01" }),
     );
     const outOfWindow = new Map(later.map((r) => [r.signal, Number(r.count)]));
-    expect(outOfWindow.get("prompts submitted")).toBe(0);
+    expect(outOfWindow.get("mode: plan")).toBeUndefined();
   });
 });
 
@@ -1236,8 +1278,8 @@ describe("outcomes query", () => {
       "sessions: shipped": 2,
       "sessions: ongoing": 1,
       "sessions: handed-off": 1,
-      "sessions: abandoned-with-edits": 2,
-      "sessions: no-artifact": 16,
+      "sessions: abandoned-with-edits": 3,
+      "sessions: no-artifact": 18,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1254,7 +1296,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 20,
+      "sessions: ongoing": 23,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -2122,25 +2164,60 @@ describe("replayed line dedupe", () => {
 });
 
 describe("stop-hook-noop-detector query", () => {
+  const NoopRow = z.object({
+    command: z.string(),
+    fires: z.bigint(),
+    total_ms: z.bigint(),
+    events: z.bigint(),
+    with_stdout: z.bigint(),
+    with_decision: z.bigint(),
+    nonzero_exit: z.bigint(),
+    blocks: z.bigint(),
+    gated_stops: z.bigint(),
+  });
+
+  async function detect() {
+    const rows = await runQuery(db, "stop-hook-noop-detector", NoopRow, filterParams());
+    return new Map(rows.map((r) => [r.command, r]));
+  }
+
+  it("surfaces a hook that fires and writes nothing to the attachment channel", async () => {
+    const silent = (await detect()).get("bun ${CLAUDE_PLUGIN_ROOT}/hooks/silent-stop.ts");
+    expect(silent).toBeDefined();
+    expect(Number(silent?.fires)).toBe(2);
+    expect(Number(silent?.total_ms)).toBe(82);
+    expect(Number(silent?.events)).toBe(0);
+    expect(Number(silent?.with_stdout)).toBe(0);
+    expect(Number(silent?.blocks)).toBe(0);
+  });
+
+  it("pairs a rostered hook with the attachments it wrote", async () => {
+    const test = (await detect()).get("make test-unit");
+    expect(Number(test?.fires)).toBe(1);
+    expect(Number(test?.events)).toBe(1);
+  });
+
   it("counts blocking errors so a Stop gate is not a noop candidate", async () => {
-    const rows = await runQuery(
-      db,
-      "stop-hook-noop-detector",
-      z.object({
-        command: z.string(),
-        fires: z.bigint(),
-        with_stdout: z.bigint(),
-        with_decision: z.bigint(),
-        nonzero_exit: z.bigint(),
-        blocks: z.bigint(),
-      }),
-      filterParams(),
-    );
-    // Blocking errors carry no command, so they group under the bare hook name.
-    const gate = rows.find((r) => r.command === "Stop");
+    // Blocking errors carry no command, so they group under the bare hook name, and the
+    // roster names the hook that ran rather than the event, so they match no fires.
+    const gate = (await detect()).get("Stop");
     expect(gate).toBeDefined();
-    expect(Number(gate?.blocks)).toBe(Number(gate?.fires));
+    expect(Number(gate?.fires)).toBe(0);
+    expect(Number(gate?.blocks)).toBe(Number(gate?.events));
     expect(Number(gate?.blocks)).toBeGreaterThan(0);
+  });
+
+  it("marks the hooks that ran at a gated Stop, since the gate names no command", async () => {
+    const rows = await detect();
+    // Both rostered hooks share the blocked Stop's toolUseID. `silent-stop` also fires at
+    // an ungated Stop, so a silent hook that may be the gate is distinguishable from one
+    // that never ran at a blocked Stop.
+    expect(Number(rows.get("bun ${CLAUDE_PLUGIN_ROOT}/hooks/silent-stop.ts")?.gated_stops)).toBe(1);
+    expect(Number(rows.get("make test-unit")?.gated_stops)).toBe(1);
+  });
+
+  it("excludes a queued prompt the harness re-injected at Stop", async () => {
+    expect((await detect()).has("monitor CI until it goes green")).toBe(false);
   });
 });
 
@@ -2368,8 +2445,8 @@ describe("index-health query", () => {
     );
     const deny = rows.find((r) => r.check_name === "hook-deny-invisible");
     expect(deny?.status).toBe("alert");
-    expect(deny?.subject).toBe("5 denies recovered");
-    expect(deny?.detail).toContain("git:block-default-branch-commit (4)");
+    expect(deny?.subject).toBe("6 denies recovered");
+    expect(deny?.detail).toContain("git:block-default-branch-commit (5)");
     expect(deny?.detail).toContain("user:worktree (1)");
     // Subagent denies stay in the count (hook_events misses them too) but are broken
     // out, so a reader knows the total is not all main-thread friction.
@@ -2404,7 +2481,9 @@ describe("index-health query", () => {
     const rows = await runQuery(db, "index-health", Health, healthParams());
     const nullTs = rows.find((r) => r.check_name === "null-timestamp-kinds");
     expect(nullTs?.status).toBe("info");
-    expect(nullTs?.detail).toContain("health-marker (2)");
+    // The detail names only the largest kinds, so assert its shape rather than a
+    // ranking any new timestamp-less fixture would reshuffle.
+    expect(nullTs?.detail).toMatch(/^\d+ rows carry no timestamp .* largest: [\w-]+ \(\d+\)/);
   });
 
   it("reports the corpus window per host and no disk gap when the glob matches", async () => {

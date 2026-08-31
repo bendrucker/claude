@@ -30,7 +30,7 @@ SELECT
   END                                             AS replan_tier,
   strftime(f.first_plan_ts, '%Y-%m-%d %H:%M')    AS first_plan,
   strftime(f.last_plan_ts,  '%Y-%m-%d %H:%M')    AS last_plan,
-  s.summary
+  s.label
 FROM filtered f
 JOIN sessions s USING (host, session_id)
 ORDER BY f.plan_count DESC, f.first_plan_ts DESC;

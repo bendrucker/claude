@@ -1,0 +1,13 @@
+{"type":"agent-name","agentName":"pool-tuner","sessionId":"labeled-session"}
+{"type":"ai-title","aiTitle":"Database connection pooling timeouts","sessionId":"labeled-session"}
+{"type":"user","message":{"role":"user","content":"The database is timing out when there are many concurrent requests"},"sessionId":"labeled-session","cwd":"/Users/test/backend","gitBranch":"fix/db-pool","timestamp":"2024-01-18T11:00:00.000Z","uuid":"labels-uuid-1"}
+{"type":"custom-title","customTitle":"db-pool-sizing","sessionId":"labeled-session"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"This sounds like a connection pooling issue. Let me check the database configuration."}]},"sessionId":"labeled-session","timestamp":"2024-01-18T11:01:00.000Z","uuid":"labels-uuid-2"}
+{"type":"custom-title","customTitle":"db-pool-sizing-final","sessionId":"labeled-session"}
+{"type":"user","message":{"role":"user","content":"Yes, we need to increase the pool size"},"sessionId":"labeled-session","timestamp":"2024-01-18T11:10:00.000Z","uuid":"labels-uuid-3"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I've increased the pool size from 10 to 50 and added connection timeout handling."}]},"sessionId":"labeled-session","timestamp":"2024-01-18T11:15:00.000Z","uuid":"labels-uuid-4"}
+{"type":"ai-title","aiTitle":"Retry budget for the ingest worker","sessionId":"ai-titled-session"}
+{"type":"user","message":{"role":"user","content":"How many retries does the ingest worker get?"},"sessionId":"ai-titled-session","cwd":"/Users/test/backend","gitBranch":"main","timestamp":"2024-01-18T12:00:00.000Z","uuid":"labels-uuid-5"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Three, then it dead-letters."}]},"sessionId":"ai-titled-session","timestamp":"2024-01-18T12:01:00.000Z","uuid":"labels-uuid-6"}
+{"type":"user","message":{"role":"user","content":"Where does the dead-letter queue drain to?"},"sessionId":"unlabeled-session","cwd":"/Users/test/backend","gitBranch":"main","timestamp":"2024-01-18T13:00:00.000Z","uuid":"labels-uuid-7"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"An S3 bucket, swept nightly."}]},"sessionId":"unlabeled-session","timestamp":"2024-01-18T13:01:00.000Z","uuid":"labels-uuid-8"}

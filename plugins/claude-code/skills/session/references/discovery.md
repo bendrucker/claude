@@ -61,7 +61,7 @@ The index spans every machine. `local` is this machine; imported hosts carry the
 - Default to `host = 'local'` for any config-change candidate. The config you are changing is this machine's. Use other hosts only as corroborating aggregate ("this also shows up on `work`"), never as the sole evidence for a local change.
 - Never paste raw `content`, `command`, `stdout`, or `text` from an egress-blocked host verbatim into a digest, a todo, a PR, or anything else that leaves the machine. Quote `local` rows when you need a literal; cite imported hosts as counts only.
 
-## Full Catalog
+## Tier-2 Catalog
 
 Additional queries available in `resources/queries/`:
 
@@ -70,5 +70,5 @@ Additional queries available in `resources/queries/`:
 - `sandbox-path-deny-recurrence`: `Operation not permitted` Bash failures bucketed into concrete config gaps (worktree writes, tmux sockets, process substitution, mktemp, TLS, SSH agent), with recurrence and date span.
 - `catalog-reinjection-thrash-sessions`: sessions re-injecting the full skill catalog and deferred-tools delta, split into `main_injections`/`main_ktokens` and `sidechain_injections`/`sidechain_ktokens`. The catalog is injected once into the main thread and once per subagent context, so a high `sidechain_injections` is fan-out volume and only `main_injections` above 1 (outside compaction) is thrash. Tune via `min_injections`.
 - `top-sessions-by-output`: sessions ranked by total output tokens, the runaway or unattended-session detector. Tune via `limit`.
-- `stop-hook-noop-detector`: Stop hooks that never produce stdout, a decision, a block, or a non-zero exit. Pure-overhead removal candidates. Blocking errors carry no command and group under the bare hook event name; check the `blocks` column before calling anything overhead.
+- `stop-hook-noop-detector`: Stop hooks that cost wall-clock and produce nothing, ranked as removal candidates. Starts from `stop_hook_runs`, the harness's own roster of every Stop hook that fired, so a hook that runs silently appears with `events = 0` rather than being absent. `fires` and `total_ms` come from the roster; `events`, `with_stdout`, `with_decision`, `nonzero_exit` and `blocks` come from the attachment channel, which records only a hook that said something. Real `total_ms` against zeros everywhere else is pure overhead. Roster entries carrying `prompt_text` are excluded, since injecting context is the whole point of those. Blocking errors carry no command and group under the bare hook event name, so `gated_stops` counts a hook's fires at Stops some hook gated: a candidate with gated stops may be the gate.
 - `hook-self-timing`: hook latency measured by the hooks themselves, off `~/.claude/hook-metrics/*.jsonl` rather than the index. `hook_events` only records a fire that produced visible output, single-digit percent of real PreToolUse fires, so every count and quantile in `hooks` is conditioned on the hook having said something. Read `fires` and `index_visible_pct` here before treating a `hooks` row as a hook's cost. Covers only hooks wired to `user/scripts/hook-metrics`, which is the user-level hooks today and no plugin hook yet.

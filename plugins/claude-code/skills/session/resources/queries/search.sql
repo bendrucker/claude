@@ -1,11 +1,11 @@
 SELECT s.*
 FROM sessions s
 WHERE (
-  EXISTS (
+  s.label ILIKE '%' || getvariable('query') || '%'
+  OR EXISTS (
     SELECT 1 FROM messages m
     WHERE m.host = s.host AND m.session_id = s.session_id
-      AND (m.content_text ILIKE '%' || getvariable('query') || '%'
-        OR m.summary ILIKE '%' || getvariable('query') || '%')
+      AND m.content_text ILIKE '%' || getvariable('query') || '%'
   )
   OR EXISTS (
     SELECT 1 FROM content_items ci

@@ -137,11 +137,11 @@ export function hasRunOnProse(body: string): boolean {
 export const WRAP_MIN_LINE = 50;
 export const WRAP_MAX_LINE = 100;
 
-// `fromMarkdown` runs without the GFM extension, matching `heading-case.ts`, so
-// a table parses as one multi-line paragraph. Skipping one costs two shapes,
-// where the extension costs a dependency tree on a hook that runs on every
-// `gh pr create`. Leading pipes are optional in GFM, so a row check alone misses
-// a pipe-less table whose delimiter row is padded out to the column width.
+// `fromMarkdown` runs without the GFM extension, so a table parses as one
+// multi-line paragraph. Skipping one costs two shapes, where the extension
+// costs a dependency tree on a hook that runs on every `gh pr create`. Leading
+// pipes are optional in GFM, so a row check alone misses a pipe-less table
+// whose delimiter row is padded out to the column width.
 const TABLE_ROW = /^\s*\|/;
 const TABLE_DELIMITER = /^[\s:|-]+$/;
 

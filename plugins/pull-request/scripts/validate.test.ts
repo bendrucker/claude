@@ -823,8 +823,8 @@ describe("processInput", () => {
   });
 });
 
-// Greedy fill at a column: the thing the detector exists to catch. `indent`
-// prefixes continuation lines so a wrapped list item keeps its hanging indent.
+// Greedy fill at a column: the thing the detector exists to catch. The indent
+// keeps a wrapped list item's hanging indent.
 function wrapAt(text: string, column: number, indent = ""): string {
   const lines: string[] = [];
   let current = "";

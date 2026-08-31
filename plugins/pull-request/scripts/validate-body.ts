@@ -240,7 +240,7 @@ export function wrapReason(wrapped: WrappedParagraph[]): string {
     remaining > 0
       ? `\n\n${remaining} more wrapped paragraph${remaining === 1 ? "" : "s"} to fix the same way.`
       : "";
-  return `Prose in the body is hard-wrapped at a fixed column. A PR body renders in a web UI that soft-wraps, so a hard wrap gains nothing and displays as a narrow column. Write one line per paragraph and one line per list item. This applies to the body only, and markdown files in the repo keep their own wrapping convention.\n\n${examples}${more}`;
+  return `Prose in the body is hard-wrapped at a fixed column. A PR body renders in a web UI that soft-wraps, so a hard wrap gains nothing and displays as a narrow column. Write one line per paragraph and one line per list item. This applies to the body only. A markdown file in the repo keeps its own wrapping convention, so a body sourced from one gets copied to a scratch file and unwrapped there.\n\n${examples}${more}`;
 }
 
 // Vocabulary that leaks the instructions into the output: the body claims a

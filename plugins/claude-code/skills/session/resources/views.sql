@@ -1,6 +1,12 @@
+-- `prompt_source` labels how a user turn arrived (typed, system, queued, sdk,
+-- suggestion_accepted) and is the harness's own answer to human-vs-automated; it starts
+-- 2026-06-03, so it is NULL on every earlier row. `interrupted_message_id` names the
+-- assistant message an interruption cut off, but the harness sets it on well under half
+-- the turns that carry the `[Request interrupted` marker text, so it identifies the
+-- interrupted message rather than counting interruptions.
 CREATE OR REPLACE VIEW messages AS
 SELECT
-  r.* EXCLUDE (data, summary),
+  r.* EXCLUDE (data),
   r.data,
   CASE
     WHEN json_type(r.data->'$.message.content') = 'VARCHAR'
@@ -9,20 +15,46 @@ SELECT
   (r.data->>'$.message.model') AS model,
   TRY_CAST(r.data->>'$.message.usage.cache_read_input_tokens'     AS BIGINT) AS cache_read_tokens,
   TRY_CAST(r.data->>'$.message.usage.cache_creation_input_tokens' AS BIGINT) AS cache_creation_tokens,
+  (r.data->>'$.promptSource')         AS prompt_source,
+  (r.data->>'$.interruptedMessageId') AS interrupted_message_id,
   (r.data->>'$.attributionSkill')     AS attribution_skill,
   (r.data->>'$.attributionPlugin')    AS attribution_plugin,
   (r.data->>'$.attributionAgent')     AS attribution_agent,
   (r.data->>'$.attributionMcpServer') AS attribution_mcp_server,
-  (r.data->>'$.attributionMcpTool')   AS attribution_mcp_tool,
-  s.summary
+  (r.data->>'$.attributionMcpTool')   AS attribution_mcp_tool
 FROM raw r
-LEFT JOIN (
-  SELECT host, session_id, ANY_VALUE(summary) AS summary
-  FROM raw
-  WHERE type = 'summary' AND summary IS NOT NULL
-  GROUP BY host, session_id
-) s USING (host, session_id)
 WHERE r.type IN ('user', 'assistant');
+
+-- One label per session, from the sidecar title records the harness writes beside the
+-- transcript. A session can accumulate several as the title is regenerated or renamed, so
+-- a user-set `custom-title` wins over a generated `ai-title`, which wins over the
+-- `agent-name` a named agent session carries; within a kind the last one written wins.
+-- These records carry `sessionId` but no timestamp, so recency is source order.
+CREATE OR REPLACE VIEW session_labels AS
+SELECT
+  host,
+  session_id,
+  COALESCE(
+    data->>'$.customTitle',
+    data->>'$.aiTitle',
+    data->>'$.agentName'
+  ) AS label,
+  type AS label_source
+FROM raw
+WHERE type IN ('custom-title', 'ai-title', 'agent-name')
+  AND length(trim(COALESCE(
+    data->>'$.customTitle',
+    data->>'$.aiTitle',
+    data->>'$.agentName',
+    ''
+  ))) > 0
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY host, session_id
+  ORDER BY
+    CASE type WHEN 'custom-title' THEN 1 WHEN 'ai-title' THEN 2 ELSE 3 END,
+    source_line DESC,
+    source_file DESC
+) = 1;
 
 -- Per-message usage, deduped. Claude Code writes one JSONL row per content block, and
 -- every row repeats the parent message's cumulative usage, so summing token columns
@@ -77,6 +109,7 @@ WITH src AS (
     r.source_line,
     r.data->'$.message.content' AS message_content,
     r.data->'$.toolUseResult'   AS tool_use_result,
+    r.data->>'$.toolDenialKind' AS tool_denial_kind,
     r.data->>'$.attributionSkill'  AS attribution_skill,
     r.data->>'$.attributionPlugin' AS attribution_plugin,
     r.data->>'$.attributionAgent'  AS attribution_agent
@@ -104,6 +137,7 @@ SELECT
   TRY_CAST(item->>'$.is_error' AS BOOLEAN) AS is_error,
   item AS data,
   s.tool_use_result,
+  s.tool_denial_kind,
   s.attribution_skill,
   s.attribution_plugin,
   s.attribution_agent
@@ -139,6 +173,11 @@ WHERE type = 'tool_use' AND name IS NOT NULL;
 
 -- `agent_id` comes from the tool_result row, so it names the context that hit the error
 -- even when the originating call did not resolve.
+--
+-- `error_type` splits the surface a person can act on from the one a setting can: only a
+-- denial the user made by hand is a 'rejection'. A `permission-rule` denial is the
+-- configuration working, and it stays 'failure' so `hook_denies` still sees the hook
+-- denies it recovers from error text. `denial_kind` carries the full four-value answer.
 CREATE OR REPLACE VIEW tool_errors AS
 SELECT
   er.tool_use_id   AS tool_id,
@@ -148,8 +187,9 @@ SELECT
   er.session_id,
   tc.project_path,
   er.timestamp,
-  CASE WHEN er.tool_use_result::VARCHAR = '"User rejected tool use"'
+  CASE WHEN denial_kind(er.tool_denial_kind, er.tool_use_result) = 'user-rejected'
        THEN 'rejection' ELSE 'failure' END AS error_type,
+  denial_kind(er.tool_denial_kind, er.tool_use_result) AS denial_kind,
   subagent_id(er.source_file) AS agent_id
 FROM content_items er
 LEFT JOIN tool_calls tc ON er.tool_use_id = tc.tool_id AND er.host = tc.host
@@ -169,6 +209,12 @@ WHERE type = 'tool_use'
   AND name = 'Skill'
   AND (data->>'$.input.skill') IS NOT NULL;
 
+-- Every denied tool call, with the reason it was denied. `denial_kind` separates the four
+-- surfaces that used to be indistinguishable: a hand rejection (`user-rejected`), a
+-- permission rule or PreToolUse hook (`permission-rule`), and the two auto-mode refusals.
+-- `kind_source` says whether the kind came from the record or was inferred from the
+-- result string on a row predating the field, so a window spanning 2026-07-02 reads as
+-- coverage rather than as a change in what a denial is.
 CREATE OR REPLACE VIEW permission_requests AS
 SELECT
   tc.name AS tool_name,
@@ -176,14 +222,17 @@ SELECT
   (tc.data->>'$.input.command')     AS command,
   (tc.data->>'$.input.file_path')   AS file_path,
   (tc.data->>'$.input.description') AS description,
+  denial_kind(er.tool_denial_kind, er.tool_use_result)        AS denial_kind,
+  denial_kind_source(er.tool_denial_kind, er.tool_use_result) AS kind_source,
   tc.host,
   tc.session_id,
   tc.project_path,
-  tc.timestamp
+  tc.timestamp,
+  subagent_id(er.source_file) AS agent_id
 FROM content_items er
 JOIN content_items tc ON er.tool_use_id = tc.id AND er.host = tc.host
 WHERE er.type = 'tool_result'
-  AND er.tool_use_result::VARCHAR = '"User rejected tool use"';
+  AND denial_kind(er.tool_denial_kind, er.tool_use_result) IS NOT NULL;
 
 CREATE OR REPLACE VIEW sandbox_bypasses AS
 WITH bypass AS (
@@ -302,22 +351,31 @@ SELECT
   is_system
 FROM unified;
 
+-- `label` is the session's human-readable name, from session_labels. It replaces the
+-- `summary` this view used to carry: `summary` records are no longer written, so that
+-- column had gone NULL corpus-wide.
 CREATE OR REPLACE VIEW sessions AS
 SELECT
-  host,
-  session_id,
-  project_id(host, ANY_VALUE(project_path)) AS project_id,
-  ANY_VALUE(summary) AS summary,
-  MIN(timestamp) AS start_time,
-  MAX(timestamp) AS end_time,
-  MAX(timestamp) - MIN(timestamp) AS duration,
-  ANY_VALUE(project_path) AS project_path,
-  ANY_VALUE(git_branch)   AS git_branch,
-  COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) AS user_messages,
-  COUNT(*) FILTER (WHERE type = 'assistant')            AS assistant_messages
-FROM messages
-GROUP BY host, session_id
-HAVING COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) > 0;
+  m.*,
+  l.label,
+  l.label_source
+FROM (
+  SELECT
+    host,
+    session_id,
+    project_id(host, ANY_VALUE(project_path)) AS project_id,
+    MIN(timestamp) AS start_time,
+    MAX(timestamp) AS end_time,
+    MAX(timestamp) - MIN(timestamp) AS duration,
+    ANY_VALUE(project_path) AS project_path,
+    ANY_VALUE(git_branch)   AS git_branch,
+    COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) AS user_messages,
+    COUNT(*) FILTER (WHERE type = 'assistant')            AS assistant_messages
+  FROM messages
+  GROUP BY host, session_id
+  HAVING COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) > 0
+) m
+LEFT JOIN session_labels l USING (host, session_id);
 
 -- Universal record union. One row per JSONL line of every type, with a normalized
 -- `kind` label (type, plus subtype/attachment kind when present) and the cross-cutting
@@ -389,6 +447,7 @@ SELECT
   timestamp,
   source_file,
   source_line,
+  (data->>'$.uuid')    AS uuid,
   (data->>'$.subtype') AS subtype,
   (data->>'$.level')   AS level,
   (data->>'$.content') AS content,
@@ -402,9 +461,48 @@ SELECT
   TRY_CAST(data->>'$.compactMetadata.durationMs' AS BIGINT) AS compact_duration_ms,
   (data->>'$.cause.code')                  AS error_code,
   TRY_CAST(data->>'$.retryAttempt' AS INTEGER) AS retry_attempt,
+  (data->'$.hookInfos') AS hook_infos,
   data
 FROM raw
 WHERE type = 'system';
+
+-- One row per Stop hook execution, from the `hookInfos` roster the harness writes into
+-- every `stop_hook_summary`. This is the complete ledger: `hook_events` is built from
+-- attachment records, which a hook producing no output never writes, so a silent hook is
+-- invisible there and present here. `hookInfos` appears under no other subtype, so this
+-- covers Stop hooks only and does not generalize to the other hook events.
+--
+-- `prompt_text` is set when the entry is a queued prompt the harness re-injected at Stop
+-- rather than a configured hook; those rows duplicate the prompt into `command` and are
+-- not automations anyone can remove.
+CREATE OR REPLACE VIEW stop_hook_runs AS
+WITH summaries AS (
+  SELECT host, session_id, project_path, timestamp, source_file, source_line, hook_infos,
+         -- The Stop's own id, shared with every hook attachment it produced. It is the
+         -- only key tying a roster to a blocking error, which names no command.
+         (data->>'$.toolUseID') AS tool_use_id
+  FROM system_events
+  WHERE subtype = 'stop_hook_summary'
+    AND json_type(hook_infos) = 'ARRAY'
+  QUALIFY uuid IS NULL
+    OR ROW_NUMBER() OVER (
+         PARTITION BY host, session_id, uuid
+         ORDER BY source_line DESC, source_file DESC
+       ) = 1
+)
+SELECT
+  s.host,
+  s.session_id,
+  s.project_path,
+  s.timestamp,
+  s.source_file,
+  s.source_line,
+  s.tool_use_id,
+  (info->>'$.command')                      AS command,
+  TRY_CAST(info->>'$.durationMs' AS BIGINT) AS duration_ms,
+  (info->>'$.promptText')                   AS prompt_text
+FROM summaries s,
+LATERAL (SELECT unnest(json_extract(s.hook_infos, '$[*]')) AS info) h;
 
 -- Hook executions, flattened from `hook_*` attachment records. Covers every event
 -- (PreToolUse, PostToolUse, Stop, SessionStart, UserPromptSubmit, PermissionRequest).

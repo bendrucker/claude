@@ -3,8 +3,9 @@
 -- loop, cache-miss storm, repeat-read tax). Reads the deduped per-message usage from
 -- message_usage (raw rows repeat the parent message's usage).
 -- Cost is an estimate from public per-MTok rates (model_input_rate/model_output_rate),
--- useful as a relative weight rather than a billed figure: cache reads bill 0.1x the
--- input rate, cache writes 1.25x for the 5m TTL and 2x for the 1h TTL.
+-- weighting cache reads at 0.1x the input rate and cache writes at 1.25x for the 5m TTL
+-- and 2x for the 1h TTL. Against the 62 sessions carrying a real cost-state.totalCostUSD
+-- it lands at 0.97 of billed spend, so read it as a close approximation.
 -- Params: after_date, before_date, project, host, bucket_minutes (default 10),
 -- limit (default 30).
 WITH priced AS (

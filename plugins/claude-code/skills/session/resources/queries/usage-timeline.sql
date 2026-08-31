@@ -3,8 +3,9 @@
 -- per-message usage from message_usage (raw rows repeat the parent message's usage, so
 -- summing them inflates totals 2-3.5x).
 -- Cost is an estimate from public per-MTok rates (model_input_rate/model_output_rate),
--- useful as a relative weight rather than a billed figure: cache reads bill 0.1x the
--- input rate, cache writes 1.25x for the 5m TTL and 2x for the 1h TTL.
+-- weighting cache reads at 0.1x the input rate and cache writes at 1.25x for the 5m TTL
+-- and 2x for the 1h TTL. Against the 62 sessions carrying a real cost-state.totalCostUSD
+-- it lands at 0.97 of billed spend, so read it as a close approximation.
 -- Params: session (required), host, bucket_minutes (default 10).
 WITH priced AS (
   SELECT

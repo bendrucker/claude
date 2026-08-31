@@ -8,7 +8,7 @@ Claude Code persists thinking blocks as signature-only stubs. `content_items` ro
 
 ## Retention Floor
 
-`cleanupPeriodDays` deletes old session files, and the index rebuilds from surviving JSONL on migration, so the corpus floor ratchets forward (see `corpus-window`). `~/.claude/history.jsonl` holds prompt-level history much further back but is not ingested.
+`cleanupPeriodDays` deletes old session files and the index reaps their rows on the next refresh, so the corpus floor ratchets forward (see `corpus-window`). `~/.claude/history.jsonl` holds prompt-level history much further back but is not ingested.
 
 ## Cloud and Mobile Sessions
 
@@ -16,7 +16,7 @@ claude.ai web/mobile chats and cloud routines write no local JSONL. A `bridge-se
 
 ## Approved Permission Prompts
 
-Only rejections leave a trace (`"User rejected tool use"` results). A prompt the user approved is indistinguishable from a call that never prompted, so prompting friction is undercountable.
+Only denials leave a trace. `$.toolDenialKind` names which mechanism stopped a call (see `permission_requests`), so the denial side is fully classified, but a prompt the user approved is indistinguishable from a call that never prompted. Prompting friction stays undercountable.
 
 ## Offloaded Tool Results
 

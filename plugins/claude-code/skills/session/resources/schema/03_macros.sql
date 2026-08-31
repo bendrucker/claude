@@ -30,6 +30,25 @@ CREATE OR REPLACE MACRO subagent_id(source_file) AS
     THEN NULLIF(regexp_extract(source_file, '([^/]+)\.jsonl$', 1), '')
   END;
 
+-- Why a tool call was denied, or NULL when the result is an ordinary failure.
+-- `$.toolDenialKind` (user-rejected, permission-rule, automode-blocked,
+-- automode-unavailable) states it outright but starts 2026-07-02. Before that the only
+-- trace of a denial is the harness's fixed `toolUseResult` string, which covers user
+-- rejections alone, so an older row resolves to `user-rejected` or to nothing at all.
+-- `denial_kind_source` says which of the two answered, so a count spanning the boundary
+-- is readable as coverage rather than as a change in behavior.
+CREATE OR REPLACE MACRO denial_kind(kind, tool_use_result) AS
+  COALESCE(
+    kind,
+    CASE WHEN tool_use_result::VARCHAR = '"User rejected tool use"' THEN 'user-rejected' END
+  );
+
+CREATE OR REPLACE MACRO denial_kind_source(kind, tool_use_result) AS
+  CASE
+    WHEN kind IS NOT NULL THEN 'field'
+    WHEN tool_use_result::VARCHAR = '"User rejected tool use"' THEN 'result-string'
+  END;
+
 -- Cost-rate table for token spend estimates, per-MTok USD from published API rates as of
 -- 2026-07-24. Rates are keyed by family, so a family arm can drift from a specific model's
 -- current rate. Kept here so every cost query shares one source. The per-tier weighting
@@ -54,7 +73,7 @@ CREATE OR REPLACE MACRO model_output_rate(model) AS
   END;
 
 -- Collapses a concrete model id or a Task-tool `model` override (both full ids like
--- `claude-opus-4-8[1m]` and short names like `opus`) to a family label. Shares the
+-- `claude-opus-5[1m]` and short names like `opus`) to a family label. Shares the
 -- same ILIKE patterns as the rate macros above so family and cost stay consistent.
 CREATE OR REPLACE MACRO model_family(model) AS
   CASE

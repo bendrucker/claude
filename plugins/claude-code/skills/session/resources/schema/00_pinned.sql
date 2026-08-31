@@ -20,7 +20,6 @@ CREATE OR REPLACE MACRO pinned_columns(line) AS {
   'is_sidechain':  COALESCE(TRY_CAST(line->>'$.isSidechain' AS BOOLEAN), false),
   'duration_ms':   TRY_CAST(line->>'$.durationMs' AS BIGINT),
   'timestamp':     TRY_CAST(line->>'$.timestamp'  AS TIMESTAMP),
-  'summary':       line->>'$.summary',
   'input_tokens':  TRY_CAST(line->>'$.message.usage.input_tokens'  AS BIGINT),
   'output_tokens': TRY_CAST(line->>'$.message.usage.output_tokens' AS BIGINT)
 };

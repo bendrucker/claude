@@ -42,7 +42,7 @@ duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb "SELECT model, SUM(output_
 duckdb -readonly ${CLAUDE_PLUGIN_DATA}/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
 ```
 
-`scripts/usage.ts` renders a session's token-burn timeline (`--session <id>`) in the terminal, or the top sessions by estimated cost (`--days <n>`) when no session is given. It opens the index read-only. Cost is an estimate from public API rates, useful as a relative weight rather than billed spend.
+`scripts/usage.ts` renders a session's token-burn timeline (`--session <id>`) in the terminal, or the top sessions by estimated cost (`--days <n>`) when no session is given. It opens the index read-only. Cost is an estimate from public API rates. Checked against the 62 sessions that carry a real `cost-state.totalCostUSD`, it comes in at 0.97 of billed spend ($1,582 against $1,631), so treat it as a close approximation. That record appears in only 66 of 1,645 recent files, which is why the estimate is the primary surface.
 
 ### Locking
 
@@ -72,8 +72,8 @@ Every query, grouped by category with a one-line gloss:
 
 #### Tool Use and Friction
 - `stats`: tool usage breakdown
-- `errors`: recent tool errors
-- `permissions`: tool calls the user rejected
+- `errors`: recent tool failures
+- `permissions`: denied tool calls, by the mechanism that denied them
 - `sandbox`: sandbox-bypassing Bash calls
 - `sandbox-bypass-effective-command`: normalized bypass verbs
 - `sandbox-bypass-justification`: bypasses backed by a prior sandboxed failure

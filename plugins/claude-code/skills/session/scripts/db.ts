@@ -11,9 +11,13 @@ const QUERIES_DIR = path.join(RESOURCES_DIR, "queries");
 
 export const LOCAL_HOST = "local";
 
-// Bump when the ingestion logic changes in a way that requires re-reading every
-// JSONL line (not just newly-modified files). migrateIfNeeded drops the cache when
-// the stored version is older. v2: raw ingests all record types, not just chat.
+// Bump only when the scan or a row's file identity changes (source_file, source_line):
+// those come from the scan rather than from the line, so they are the one thing a
+// re-read restores. Everything else about a row is a projection of raw.data and is
+// re-derived in place by reconcilePinned, and content_items rebuilds from raw whenever
+// views.sql changes, so neither needs a bump. migrateIfNeeded clears indexed_files when
+// the stored version is older, re-importing every file still on disk while leaving rows
+// whose file is gone in place. v2: raw ingests all record types, not just chat.
 // v3: per-file change catalog (indexed_files), incremental content_items.
 export const INDEX_VERSION = 3;
 
@@ -231,15 +235,23 @@ async function applySchema(db: Database): Promise<void> {
   }
 }
 
-async function dropCache(db: Database): Promise<void> {
+// content_items is a table built by views.sql out of raw, so it is discarded and rebuilt
+// rather than migrated. Every view is CREATE OR REPLACE and needs nothing.
+async function dropDerived(db: Database): Promise<void> {
   await db.run("DROP TABLE IF EXISTS content_items");
+}
+
+async function dropEverything(db: Database): Promise<void> {
+  await dropDerived(db);
   await db.run("DROP TABLE IF EXISTS raw");
   await db.run("DROP TABLE IF EXISTS indexed_files");
   await db.run("DROP TABLE IF EXISTS meta");
   await db.run("DROP TABLE IF EXISTS index_meta");
 }
 
-async function migrateIfNeeded(db: Database): Promise<void> {
+// Returns whether every file has to be read again. Runs before applySchema, so it can
+// only drop tables, never write to one that may not exist yet.
+async function migrateIfNeeded(db: Database): Promise<boolean> {
   const [row] = await db.query(
     `
     SELECT
@@ -258,8 +270,16 @@ async function migrateIfNeeded(db: Database): Promise<void> {
   `,
     z.object({ has_data: z.boolean(), has_host: z.boolean(), has_version: z.boolean() }),
   );
+
+  // A raw table without data/host predates the verbatim-line column, so its rows carry
+  // nothing the projection could be re-applied to and there is nothing to preserve.
+  if (!row?.has_data || !row.has_host) {
+    await dropEverything(db);
+    return false;
+  }
+
   // Querying index_meta is only safe once the table exists.
-  const version = row?.has_version
+  const version = row.has_version
     ? ((
         await db.query(
           "SELECT COALESCE(MAX(version), 0) AS version FROM index_meta",
@@ -267,32 +287,106 @@ async function migrateIfNeeded(db: Database): Promise<void> {
         )
       )[0]?.version ?? 0)
     : 0;
-  // A pre-host schema (missing data/host) or an older ingestion version both mean
-  // the cache predates the current import logic; drop it so the next run rebuilds.
-  if (row?.has_data && row.has_host && version >= INDEX_VERSION) return;
-  await dropCache(db);
+  if (version >= INDEX_VERSION) return false;
+
+  await dropDerived(db);
+  return true;
+}
+
+async function fileFingerprint(dir: string, name: string): Promise<string> {
+  const sql = await readSql(dir, name);
+  return new Bun.CryptoHasher("sha256").update(sql).digest("hex");
+}
+
+// content_items is built from raw, so every mutation of raw makes it stale. Clearing the
+// fingerprint before the mutation rather than after it is what makes the rebuild survive
+// an interrupted run: a process that dies between the write and rebuildViews leaves a
+// stale table behind, and only a marker already on disk tells the next run to rebuild it.
+// Nothing distinguishes such a table from a current one by inspection.
+export async function invalidateDerived(db: Database): Promise<void> {
+  await db.run("UPDATE index_meta SET views_hash = NULL");
+}
+
+// raw.data holds the verbatim JSONL line and every other raw column is a projection of
+// it (00_pinned.sql), so a change to that projection is applied to the rows already in
+// the database instead of by re-reading files, which for a deleted session no longer
+// exist. Reads raw and replaces it in one statement, which also drops columns the
+// projection stopped producing and picks up new ones without an ALTER.
+//
+// The rewrite materializes a second copy of the table and DuckDB never returns freed
+// space to the OS, so it checkpoints and leaves refresh.ts's compaction guard to shrink
+// the file. Returns whether raw changed, since content_items is derived from it.
+async function reconcilePinned(db: Database): Promise<boolean> {
+  const fingerprint = await fileFingerprint(SCHEMA_DIR, "00_pinned");
+  const [row] = await db.query(
+    "SELECT import_hash FROM index_meta",
+    z.object({ import_hash: z.string().nullable() }),
+  );
+  if (row?.import_hash === fingerprint) return false;
+
+  // A null hash is an index built before this check existed, whose rows came from the
+  // projection 00_pinned.sql was extracted from unchanged, so rewriting the table would
+  // only reproduce what is already in it.
+  const seeding = row?.import_hash == null;
+
+  // Derived state is invalidated either way. An adopted index was built by code that
+  // could leave content_items behind a committed import, and its provenance is not
+  // recoverable, so the run that adopts it rebuilds once rather than inheriting the
+  // question.
+  await invalidateDerived(db);
+  if (!seeding) {
+    await db.run(`
+      CREATE OR REPLACE TABLE raw AS
+      SELECT host, UNNEST(pinned_columns(data)), source_file, source_line, data FROM raw
+    `);
+    await db.run("CHECKPOINT");
+  }
+  await db.run("UPDATE index_meta SET import_hash = $hash", { hash: fingerprint });
+  return !seeding;
 }
 
 export async function getDb(dataDir: string): Promise<Database> {
   return createDatabase(sessionDbPath(dataDir));
 }
 
-export async function ensureSchema(db: Database): Promise<void> {
-  await migrateIfNeeded(db);
+// Returns whether raw's projected columns were re-derived, which invalidates the tables
+// views.sql builds from it.
+export async function ensureSchema(db: Database): Promise<boolean> {
+  const needsReimport = await migrateIfNeeded(db);
   await applySchema(db);
+
+  // Invalidating the catalog's stats makes ensureIndex treat every file as changed, so
+  // each is re-read inside import.sql's own transaction. Emptying raw up front would
+  // leave nothing behind if the reimport failed partway. The catalog's rows stay, so the
+  // ordinary removed-file reap still drops rows for files deleted since the last run and
+  // the index remains a mirror of what is on disk.
+  if (needsReimport) {
+    await db.run("UPDATE indexed_files SET mtime = -1, size = -1");
+  }
+
   const [row] = await db.query("SELECT COUNT(*) AS n FROM index_meta", z.object({ n: z.bigint() }));
   if (!row || row.n === 0n) {
-    await db.run(`INSERT INTO index_meta VALUES (${INDEX_VERSION}, NULL)`);
+    await db.run(`INSERT INTO index_meta VALUES (${INDEX_VERSION}, NULL, NULL)`);
+  } else {
+    await db.run(`UPDATE index_meta SET version = ${INDEX_VERSION}`);
   }
+  return reconcilePinned(db);
+}
+
+async function tableExists(db: Database, name: string): Promise<boolean> {
+  const [row] = await db.query(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'main' AND table_name = $name
+     ) AS present`,
+    z.object({ present: z.boolean() }),
+    { name },
+  );
+  return row?.present ?? false;
 }
 
 export async function rebuildViews(db: Database): Promise<void> {
   await db.run(await readSql(RESOURCES_DIR, "views"));
-}
-
-async function viewsFingerprint(): Promise<string> {
-  const sql = await readSql(RESOURCES_DIR, "views");
-  return new Bun.CryptoHasher("sha256").update(sql).digest("hex");
 }
 
 async function removeFile(db: Database, host: string, file: string): Promise<void> {
@@ -318,12 +412,14 @@ export async function ensureIndex(
   db: Database,
   options: { projectsDir?: string; importsDir?: string } = {},
 ): Promise<IndexResult> {
-  await ensureSchema(db);
+  const pinnedRederived = await ensureSchema(db);
 
   const importSql = await readSql(RESOURCES_DIR, "import");
   let corpusBytes = 0;
   let changedFiles = 0;
   let removedFiles = 0;
+  // reconcilePinned already cleared the fingerprint when it rewrote raw.
+  let derivedInvalidated = pinnedRederived;
 
   for (const entry of await enumerateHosts(options)) {
     // A missing root is a transient or misconfigured mount (or a typo'd
@@ -347,6 +443,12 @@ export async function ensureIndex(
       return !prev || Number(prev.mtime) !== f.mtime || Number(prev.size) !== f.size;
     });
     const removed = indexed.filter((r) => !scannedPaths.has(r.path));
+
+    if (!derivedInvalidated && (changed.length > 0 || removed.length > 0)) {
+      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
+      await invalidateDerived(db);
+      derivedInvalidated = true;
+    }
 
     // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the per-file import below reads back.
     await db.run("SET VARIABLE host = $host", { host: entry.host });
@@ -375,17 +477,21 @@ export async function ensureIndex(
     removedFiles += removed.length;
   }
 
-  // Rebuild when raw changed (views.sql rebuilds the content_items table, whose
-  // cross-file dedup cannot be maintained per-file) or when views.sql itself was
-  // edited, so a definition change applies even on a no-change refresh.
-  const wrote = changedFiles > 0 || removedFiles > 0;
-  const fingerprint = await viewsFingerprint();
+  // views_hash answers both "was views.sql edited" and "did raw change", because every
+  // mutation clears it before writing. So it also covers a run that died partway: the
+  // fingerprint it finds is null and the rebuild happens now.
+  const wrote = changedFiles > 0 || removedFiles > 0 || pinnedRederived;
+  const fingerprint = await fileFingerprint(RESOURCES_DIR, "views");
   const [metaRow] = await db.query(
     "SELECT views_hash FROM index_meta",
     z.object({ views_hash: z.string().nullable() }),
   );
   const viewsChanged = metaRow?.views_hash !== fingerprint;
-  if (wrote || viewsChanged) {
+  // The one path that clears no fingerprint is an INDEX_VERSION bump against an empty
+  // corpus, which drops content_items and then imports no file. Asking whether the table
+  // is there covers it.
+  const derivedMissing = !(await tableExists(db, "content_items"));
+  if (wrote || viewsChanged || derivedMissing) {
     await rebuildViews(db);
     await db.run("UPDATE index_meta SET views_hash = $hash", { hash: fingerprint });
   }
@@ -396,7 +502,7 @@ export async function ensureIndex(
 
   // Without an explicit CHECKPOINT the blocks freed by DELETE+INSERT and the
   // content_items rebuild are never reused and the file grows on every import.
-  if (wrote || viewsChanged) {
+  if (wrote || viewsChanged || derivedMissing) {
     await db.run("CHECKPOINT");
   }
 

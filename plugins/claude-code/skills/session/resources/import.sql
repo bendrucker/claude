@@ -13,20 +13,14 @@ WHERE host = getvariable('host')
 -- A single-file scan holds that in practice, but it is formally undefined; and
 -- ignore_errors skips unparseable lines, so source_line can trail the physical
 -- line number in files with malformed lines.
+--
+-- The projected columns come from pinned_columns (00_pinned.sql), which db.ts also
+-- applies to rows already in the table, so an edit there reaches the whole corpus
+-- without re-reading a file.
 INSERT INTO raw
 SELECT
   getvariable('host')                                 AS host,
-  json->>'$.sessionId'                                AS session_id,
-  json->>'$.type'                                     AS type,
-  json->>'$.cwd'                                      AS project_path,
-  json->>'$.gitBranch'                                AS git_branch,
-  COALESCE(TRY_CAST(json->>'$.isMeta'      AS BOOLEAN), false) AS is_meta,
-  COALESCE(TRY_CAST(json->>'$.isSidechain' AS BOOLEAN), false) AS is_sidechain,
-  TRY_CAST(json->>'$.durationMs' AS BIGINT)           AS duration_ms,
-  TRY_CAST(json->>'$.timestamp'  AS TIMESTAMP)        AS timestamp,
-  json->>'$.summary'                                  AS summary,
-  TRY_CAST(json->>'$.message.usage.input_tokens'  AS BIGINT) AS input_tokens,
-  TRY_CAST(json->>'$.message.usage.output_tokens' AS BIGINT) AS output_tokens,
+  UNNEST(pinned_columns(json)),
   filename                                            AS source_file,
   ROW_NUMBER() OVER ()                                AS source_line,
   json                                                AS data

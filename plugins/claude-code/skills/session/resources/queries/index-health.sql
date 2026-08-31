@@ -49,8 +49,8 @@
 --     only; imported hosts' files live under session-imports/ and are covered by
 --     their own refresh watermark.
 --   indexed-not-on-disk (info): indexed files deleted from disk, expected once
---     cleanupPeriodDays reaps old sessions. The index is their only surviving copy,
---     so a forced rebuild (migration) permanently loses them.
+--     cleanupPeriodDays reaps old sessions. The index mirrors the disk rather than
+--     archiving it, so these rows are dropped by the next refresh, not retained.
 --   corpus-window (info): per host, the span the index actually covers. Any
 --     "all-time" claim is bounded below by this floor.
 --
@@ -298,8 +298,9 @@ disk_vanished AS (
     'indexed-not-on-disk' AS check_name,
     'info' AS status,
     COUNT(*) || ' files' AS subject,
-    'indexed but deleted from disk (expected under cleanupPeriodDays); the index is '
-      || 'their only surviving copy, and a forced rebuild loses them' AS detail
+    'indexed but deleted from disk (expected under cleanupPeriodDays); the next '
+      || 'refresh drops these rows, since the index mirrors disk rather than archiving it'
+      AS detail
   FROM indexed i
   LEFT JOIN disk d ON d.file = i.source_file
   WHERE d.file IS NULL

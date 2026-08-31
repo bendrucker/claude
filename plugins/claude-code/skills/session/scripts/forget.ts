@@ -11,6 +11,7 @@ import {
   getDataDir,
   getDb,
   importRoot,
+  invalidateDerived,
   LOCAL_HOST,
   rebuildViews,
 } from "./db";
@@ -54,6 +55,12 @@ try {
   // later re-import of the same label skip every unchanged file while raw stays
   // empty. The views rebuild drops the host from content_items. CHECKPOINT cannot
   // run inside a transaction.
+  //
+  // Marking the derived tables stale first is what keeps a forget durable. A crash
+  // between the commit and the rebuild would otherwise leave the host's rows in
+  // content_items with nothing left to ask for their removal: its files are gone, so no
+  // later refresh sees a change.
+  await invalidateDerived(db);
   await db.run("BEGIN");
   await db.run("DELETE FROM raw WHERE host = $host", { host: label });
   await db.run("DELETE FROM indexed_files WHERE host = $host", { host: label });

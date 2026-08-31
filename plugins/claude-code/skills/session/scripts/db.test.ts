@@ -10,7 +10,9 @@ import {
   type Database,
   dirExists,
   ensureIndex,
+  ensureSchema,
   getDb,
+  invalidateDerived,
   rebuildViews,
   runQuery,
 } from "./db";
@@ -759,6 +761,28 @@ describe("cross-machine history", () => {
     );
     expect(sessions.map((r) => r.host)).toEqual(["local"]);
     expect(dirExists(path.join(importsDir, "gone"))).toBe(false);
+  });
+
+  // forget marks the derived tables stale before it deletes, which is what makes the
+  // removal durable: its own rebuild may not run, and the host's files are already gone,
+  // so no later refresh sees a change that would ask for one.
+  it("drops a forgotten host from the derived tables after an interrupted forget", async () => {
+    await importFixtureHost("gone");
+    await reindex();
+
+    await invalidateDerived(db);
+    await db.run("DELETE FROM raw WHERE host = $host", { host: "gone" });
+    await db.run("DELETE FROM indexed_files WHERE host = $host", { host: "gone" });
+    await db.run("DELETE FROM meta WHERE host = $host", { host: "gone" });
+    await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
+
+    await reindex();
+
+    const [row] = await db.query(
+      "SELECT COUNT(*) AS n FROM content_items WHERE host = 'gone'",
+      z.object({ n: z.bigint() }),
+    );
+    expect(Number(row?.n)).toBe(0);
   });
 
   it("keeps the same session distinct across hosts without merging or dropping", async () => {
@@ -1571,6 +1595,182 @@ describe("view versioning", () => {
     await reindex();
 
     expect(db.query("SELECT * FROM tool_calls LIMIT 1", z.unknown())).rejects.toThrow();
+  });
+});
+
+describe("pinned column derivation", () => {
+  // A root that does not exist is skipped rather than read, so ensureIndex touches no
+  // file and anything that changes in raw came from raw itself.
+  async function reindexWithoutDisk() {
+    const gone = path.join(tmpDir, "gone");
+    await ensureIndex(db, { projectsDir: gone, importsDir: gone });
+  }
+
+  it("re-derives the projected columns from raw.data without re-reading the files", async () => {
+    await db.run("UPDATE raw SET session_id = 'clobbered', input_tokens = -1");
+    await db.run("UPDATE index_meta SET import_hash = 'stale'");
+
+    await reindexWithoutDisk();
+
+    const [row] = await db.query(
+      `
+      SELECT
+        COUNT(*) AS n,
+        COUNT(*) FILTER (WHERE session_id = 'clobbered') AS clobbered,
+        COUNT(*) FILTER (WHERE input_tokens = -1) AS negative
+      FROM raw
+    `,
+      z.object({ n: z.bigint(), clobbered: z.bigint(), negative: z.bigint() }),
+    );
+    expect(Number(row?.n)).toBeGreaterThan(0);
+    expect(Number(row?.clobbered)).toBe(0);
+    expect(Number(row?.negative)).toBe(0);
+  });
+
+  it("rebuilds the tables derived from raw after a re-derivation", async () => {
+    await db.run("DROP VIEW tool_calls");
+    await db.run("UPDATE index_meta SET import_hash = 'stale'");
+
+    await reindexWithoutDisk();
+
+    const rows = await db.query(
+      "SELECT tool_name FROM tool_calls LIMIT 1",
+      z.object({ tool_name: z.string() }),
+    );
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  // A rewritten raw leaves content_items holding rows from the projection that was just
+  // replaced. Nothing about that table says so, so the marker has to be written before
+  // the rewrite for an interrupted run to be recoverable.
+  it("marks the derived tables stale before rewriting raw", async () => {
+    await db.run("UPDATE index_meta SET import_hash = 'stale'");
+
+    // ensureSchema is everything a refresh does before it can reach rebuildViews, so
+    // stopping here is the widest crash window the rewrite opens.
+    await ensureSchema(db);
+    const [marker] = await db.query(
+      "SELECT views_hash FROM index_meta",
+      z.object({ views_hash: z.string().nullable() }),
+    );
+    expect(marker?.views_hash).toBeNull();
+
+    // The fingerprint is current again now, and no file changed, so the marker is the
+    // only thing left asking for the rebuild.
+    await db.run("DELETE FROM content_items");
+    await reindexWithoutDisk();
+
+    const [row] = await db.query(
+      "SELECT COUNT(*) AS n FROM content_items",
+      z.object({ n: z.bigint() }),
+    );
+    expect(Number(row?.n)).toBeGreaterThan(0);
+  });
+
+  it("records the fingerprint without rewriting an index that predates the check", async () => {
+    await db.run("UPDATE raw SET session_id = 'untouched'");
+    await db.run("UPDATE index_meta SET import_hash = NULL");
+
+    await reindexWithoutDisk();
+
+    const [row] = await db.query(
+      `
+      SELECT
+        (SELECT COUNT(*) FROM raw WHERE session_id = 'untouched') AS untouched,
+        (SELECT import_hash FROM index_meta) AS hash
+    `,
+      z.object({ untouched: z.bigint(), hash: z.string().nullable() }),
+    );
+    expect(Number(row?.untouched)).toBeGreaterThan(0);
+    expect(row?.hash).not.toBeNull();
+  });
+
+  // An adopted index may already carry a content_items left behind a committed import by
+  // the code that built it, and its hashes and catalog all read as current.
+  it("rebuilds the derived tables when adopting an index that predates the check", async () => {
+    await db.run("UPDATE index_meta SET import_hash = NULL");
+    await db.run("DELETE FROM content_items");
+
+    await reindexWithoutDisk();
+
+    const [row] = await db.query(
+      "SELECT COUNT(*) AS n FROM content_items",
+      z.object({ n: z.bigint() }),
+    );
+    expect(Number(row?.n)).toBeGreaterThan(0);
+  });
+});
+
+describe("index version migration", () => {
+  // A run that drops content_items and dies before rebuilding it leaves the catalog
+  // current and views_hash unchanged, so nothing else would ask for the rebuild.
+  it("rebuilds a derived table an interrupted run left behind", async () => {
+    await db.run("DROP TABLE content_items");
+    await reindex();
+
+    const [row] = await db.query(
+      "SELECT COUNT(*) AS n FROM content_items",
+      z.object({ n: z.bigint() }),
+    );
+    expect(Number(row?.n)).toBeGreaterThan(0);
+  });
+
+  it("re-imports every file instead of emptying the index", async () => {
+    const [before] = await db.query("SELECT COUNT(*) AS n FROM raw", z.object({ n: z.bigint() }));
+
+    await db.run("UPDATE raw SET type = 'clobbered'");
+    await db.run("UPDATE index_meta SET version = 0");
+    await reindex();
+
+    const [after] = await db.query(
+      `
+      SELECT COUNT(*) AS n, COUNT(*) FILTER (WHERE type = 'clobbered') AS clobbered FROM raw
+    `,
+      z.object({ n: z.bigint(), clobbered: z.bigint() }),
+    );
+    expect(after?.n).toBe(before?.n);
+    expect(Number(after?.clobbered)).toBe(0);
+  });
+
+  // The old migration dropped raw outright, so a host that happened to be unreachable
+  // during the bump lost its whole corpus: ensureIndex skips a missing root, so nothing
+  // ever re-imported it.
+  it("keeps rows for a host whose root is unreachable", async () => {
+    await importFixtureHost("detached");
+    await reindex();
+    const [before] = await db.query(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'detached'",
+      z.object({ n: z.bigint() }),
+    );
+    expect(Number(before?.n)).toBeGreaterThan(0);
+
+    await rm(path.join(importsDir, "detached", "projects"), { recursive: true, force: true });
+    await db.run("UPDATE index_meta SET version = 0");
+    await reindex();
+
+    const [after] = await db.query(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'detached'",
+      z.object({ n: z.bigint() }),
+    );
+    expect(after?.n).toBe(before?.n);
+  });
+
+  it("still drops rows for files deleted from disk", async () => {
+    await importFixtureHost("archived");
+    await reindex();
+
+    const projects = path.join(importsDir, "archived", "projects");
+    await rm(projects, { recursive: true, force: true });
+    mkdirSync(projects, { recursive: true });
+
+    await db.run("UPDATE index_meta SET version = 0");
+    await reindex();
+
+    const [row] = await db.query(
+      "SELECT COUNT(*) AS n FROM raw WHERE host = 'archived'",
+      z.object({ n: z.bigint() }),
+    );
+    expect(Number(row?.n)).toBe(0);
   });
 });
 

@@ -2737,6 +2737,54 @@ describe("message_usage cost columns and usage queries", () => {
   });
 });
 
+describe("field-drift query", () => {
+  const DriftRow = z.object({
+    field: z.string(),
+    recent_rows: z.bigint(),
+    first_seen: z.string(),
+    last_seen: z.string(),
+  });
+
+  // The fixture corpus stands in for the real one: `toolDenialKind` appears only on and
+  // after 2024-01-20, `promptSource` straddles that date. `cutoff_date` pins the boundary
+  // so the case does not decay as wall-clock time moves past `new_days`.
+  function driftParams(overrides: Record<string, string | null> = {}) {
+    return {
+      new_days: null,
+      cutoff_date: "2024-01-20",
+      min_rows: "1",
+      sample_pct: "100",
+      host: null,
+      ...overrides,
+    };
+  }
+
+  it("reports a field that arrived on an existing record kind", async () => {
+    const rows = await runQuery(db, "field-drift", DriftRow, driftParams());
+    const denial = rows.find((r) => r.field === "user:$.toolDenialKind");
+    expect(denial).toBeDefined();
+    expect(Number(denial?.recent_rows)).toBe(4);
+    expect(denial?.first_seen).toBe("2024-01-20");
+  });
+
+  it("stays silent on a field that predates the cutoff", async () => {
+    const rows = await runQuery(db, "field-drift", DriftRow, driftParams());
+    expect(rows.map((r) => r.field)).not.toContain("user:$.promptSource");
+  });
+
+  it("honors min_rows", async () => {
+    const rows = await runQuery(db, "field-drift", DriftRow, driftParams({ min_rows: "500" }));
+    expect(rows).toEqual([]);
+  });
+
+  it("samples deterministically, so a rerun walks the same rows", async () => {
+    const params = driftParams({ sample_pct: "50" });
+    const first = await runQuery(db, "field-drift", DriftRow, params);
+    const second = await runQuery(db, "field-drift", DriftRow, params);
+    expect(first).toEqual(second);
+  });
+});
+
 describe("schema map", () => {
   it("stays in step with views.sql, so the injected fallback is never stale", async () => {
     const rows = await db.query(

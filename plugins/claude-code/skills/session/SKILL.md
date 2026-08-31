@@ -84,7 +84,7 @@ The rest, by name, described in [`references/catalog.md`](references/catalog.md)
 - Skills: `skills`, `skill-activity`
 - Files, tokens, activity: `files`, `diagnostics`, `usage-spikes`, `top-sessions`
 - Planning and review: `plans`, `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`
-- Schema and index: `schema`, `keys`, `fields`, `frontmatter`
+- Schema and index: `schema`, `keys`, `fields`, `field-drift`, `frontmatter`
 
 Load [`references/catalog.md`](references/catalog.md) before running a query you have not used. A further tier, aimed at the self-improvement loop, is listed in [`references/discovery.md`](references/discovery.md).
 

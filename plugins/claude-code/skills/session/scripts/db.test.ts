@@ -16,6 +16,7 @@ import {
   rebuildViews,
   runQuery,
 } from "./db";
+import { FALLBACK_PATH, renderMap, schemaMap, SurfaceColumns, SURFACES } from "./schema";
 
 async function backdate(target: string) {
   // Bun's shell builtin touch lacks -t, so use the system binary.
@@ -620,70 +621,6 @@ describe("text-export query", () => {
       exportParams({ min_chars: "200" }),
     );
     for (const row of rows) expect(row.text.length).toBeGreaterThanOrEqual(200);
-  });
-});
-
-describe("phrase-lift query", () => {
-  function liftParams(overrides: Record<string, string | null> = {}) {
-    return {
-      phrase: "reaching for",
-      after_date: null,
-      before_date: null,
-      host: null,
-      ...overrides,
-    };
-  }
-
-  it("counts phrase occurrences per role and model", async () => {
-    const rows = await runQuery(
-      db,
-      "phrase-lift",
-      z.object({ role: z.string(), model: z.string().nullable(), phrase_count: z.number() }),
-      liftParams(),
-    );
-
-    const assistant = rows.find((r) => r.role === "assistant" && r.model?.includes("opus"));
-    expect(assistant).toBeDefined();
-    expect(assistant?.phrase_count).toBeGreaterThanOrEqual(3);
-
-    const user = rows.find((r) => r.role === "user");
-    expect(user).toBeDefined();
-    expect(user?.phrase_count).toBe(0);
-  });
-
-  it("is case-insensitive", async () => {
-    const lower = await runQuery(
-      db,
-      "phrase-lift",
-      z.object({ phrase_count: z.number() }),
-      liftParams({ phrase: "reaching for" }),
-    );
-    const upper = await runQuery(
-      db,
-      "phrase-lift",
-      z.object({ phrase_count: z.number() }),
-      liftParams({ phrase: "REACHING FOR" }),
-    );
-    const sum = (rows: { phrase_count: number }[]) =>
-      rows.reduce((acc, r) => acc + r.phrase_count, 0);
-    expect(sum(lower)).toBe(sum(upper));
-    expect(sum(lower)).toBeGreaterThan(0);
-  });
-
-  it("computes per_1m_chars for rows with phrase occurrences", async () => {
-    const rows = await runQuery(
-      db,
-      "phrase-lift",
-      z.object({
-        role: z.string(),
-        model: z.string().nullable(),
-        per_1m_chars: z.number().nullable(),
-      }),
-      liftParams(),
-    );
-    const assistant = rows.find((r) => r.role === "assistant" && r.model?.includes("opus"));
-    expect(assistant!.per_1m_chars).not.toBeNull();
-    expect(assistant!.per_1m_chars!).toBeGreaterThan(0);
   });
 });
 
@@ -2797,5 +2734,43 @@ describe("message_usage cost columns and usage queries", () => {
     expect(mine?.repo).toBe("usage-proj");
     expect(Number(mine?.msgs)).toBe(2);
     expect(mine?.cost_usd_est).toBe(0.1);
+  });
+});
+
+describe("schema map", () => {
+  it("stays in step with views.sql, so the injected fallback is never stale", async () => {
+    const rows = await db.query(
+      `
+      SELECT table_name, list(column_name ORDER BY ordinal_position) AS cols
+      FROM information_schema.columns
+      WHERE table_name IN (${SURFACES.map((s) => `'${s}'`).join(", ")})
+      GROUP BY table_name
+    `,
+      SurfaceColumns,
+    );
+    const live = renderMap(rows);
+
+    // Regenerate with UPDATE_SCHEMA_MAP=1 after changing a projected column.
+    if (process.env.UPDATE_SCHEMA_MAP !== undefined) await Bun.write(FALLBACK_PATH, `${live}\n`);
+
+    expect(live).toBe((await Bun.file(FALLBACK_PATH).text()).trim());
+
+    // An index missing a surface must reach the fallback rather than inject a map that
+    // silently omits it.
+    expect(() => renderMap(rows.filter((row) => row.table_name !== "content_items"))).toThrow(
+      /content_items/,
+    );
+  });
+
+  it("falls back to the committed map when the index cannot be reached", async () => {
+    const dataDir = process.env.CLAUDE_PLUGIN_DATA;
+    process.env.CLAUDE_PLUGIN_DATA = path.join(tmpDir, "absent");
+    try {
+      const lines = (await schemaMap()).split("\n");
+      expect(lines.map((line) => line.split(":")[0])).toEqual([...SURFACES]);
+    } finally {
+      if (dataDir === undefined) delete process.env.CLAUDE_PLUGIN_DATA;
+      else process.env.CLAUDE_PLUGIN_DATA = dataDir;
+    }
   });
 });

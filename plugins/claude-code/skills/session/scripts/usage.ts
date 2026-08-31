@@ -84,7 +84,7 @@ function daysAgo(days: number): string {
 
 async function renderTopSessions(dbPath: string, host: string | undefined, days: number) {
   const querySql = await Bun.file(path.join(QUERIES_DIR, "top-sessions.sql")).text();
-  const sql = setVariables({ after_date: daysAgo(days), host }) + querySql;
+  const sql = setVariables({ after_date: daysAgo(days), host, limit: 10 }) + querySql;
   const rows = await query(dbPath, sql, SessionCost);
   if (rows.length === 0) {
     console.log(`No sessions with usage in the last ${days} days.`);

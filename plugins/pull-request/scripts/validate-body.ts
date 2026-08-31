@@ -220,7 +220,7 @@ export function hardWrappedParagraphs(body: string): WrappedParagraph[] {
  */
 export function unwrapBody(body: string): string {
   let out = body;
-  for (const { unwrapped, start, end } of hardWrappedParagraphs(body).reverse()) {
+  for (const { unwrapped, start, end } of hardWrappedParagraphs(body).toReversed()) {
     out = out.slice(0, start) + unwrapped + out.slice(end);
   }
   return out;

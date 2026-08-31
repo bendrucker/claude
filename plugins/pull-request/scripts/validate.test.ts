@@ -4,7 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import fc from "fast-check";
+import * as fc from "fast-check";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import {
   type BodyContext,
@@ -852,10 +852,11 @@ const LIST_INDENT = 2;
 const MIN_COLUMN = WRAP_MIN_LINE + MAX_WORD + 1 + LIST_INDENT;
 const MAX_COLUMN = WRAP_MAX_LINE;
 
+const LOWERCASE = "abcdefghijklmnopqrstuvwxyz".split("");
 const word = fc.string({
   minLength: 3,
   maxLength: MAX_WORD,
-  unit: fc.constantFrom(..."abcdefghijklmnopqrstuvwxyz"),
+  unit: fc.constantFrom(...LOWERCASE),
 });
 
 /** A block long enough to wrap at any column in range: at least 25 words. */
@@ -883,7 +884,7 @@ function wrapDocument(doc: string, column: number): string {
  * away. What survives is the structure a reader sees.
  */
 function renderedShape(body: string): string {
-  return JSON.stringify(fromMarkdown(body), (key, value) => {
+  return JSON.stringify(fromMarkdown(body), (key: string, value: unknown) => {
     if (key === "position") return undefined;
     if (key === "value" && typeof value === "string") return value.replace(/\s+/g, " ");
     return value;

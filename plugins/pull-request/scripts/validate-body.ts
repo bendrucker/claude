@@ -138,10 +138,26 @@ export const WRAP_MIN_LINE = 50;
 export const WRAP_MAX_LINE = 100;
 
 // `fromMarkdown` runs without the GFM extension, matching `heading-case.ts`, so
-// a table parses as one multi-line paragraph. Skipping a paragraph whose every
-// line opens a table row costs a line, where the extension costs a dependency
-// tree on a hook that runs on every `gh pr create`.
+// a table parses as one multi-line paragraph. Skipping one costs two shapes,
+// where the extension costs a dependency tree on a hook that runs on every
+// `gh pr create`. Leading pipes are optional in GFM, so a row check alone misses
+// a pipe-less table whose delimiter row is padded out to the column width.
 const TABLE_ROW = /^\s*\|/;
+const TABLE_DELIMITER = /^[\s:|-]+$/;
+
+function isTableParagraph(lines: string[]): boolean {
+  if (lines.every((line) => TABLE_ROW.test(line))) return true;
+  // A delimiter row separates columns with a pipe and pads with dashes. Prose
+  // never produces a line built from nothing else.
+  return lines.some(
+    (line) => TABLE_DELIMITER.test(line) && line.includes("|") && line.includes("-"),
+  );
+}
+
+// A paragraph's position starts after the `> ` that opens the blockquote but
+// spans the markers on every later line, so `raw` carries them. Quoted text also
+// reproduces someone else's line breaks, and reflowing it edits the quotation.
+const BLOCKQUOTE_LINE = /^\s*>/;
 
 export interface WrappedParagraph {
   /** The paragraph exactly as it appears in the body. */
@@ -155,9 +171,9 @@ export interface WrappedParagraph {
 
 /**
  * Paragraphs hard-wrapped at a fill column. mdast supplies the block structure,
- * so fenced code, list continuations, nested lists, indented code, blockquotes,
- * and HTML need no handling here. A `break` child is a two-space markdown hard
- * break, which is an explicit line break rather than a wrap.
+ * so fenced code, list continuations, nested lists, indented code, and HTML need
+ * no handling here. A `break` child is a two-space markdown hard break, which is
+ * an explicit line break rather than a wrap.
  */
 export function hardWrappedParagraphs(body: string): WrappedParagraph[] {
   const found: WrappedParagraph[] = [];
@@ -168,7 +184,8 @@ export function hardWrappedParagraphs(body: string): WrappedParagraph[] {
     if (node.children.some((child) => child.type === "break")) return;
     const raw = body.slice(start.offset, end.offset);
     const lines = raw.split("\n");
-    if (lines.every((line) => TABLE_ROW.test(line))) return;
+    if (isTableParagraph(lines)) return;
+    if (lines.some((line) => BLOCKQUOTE_LINE.test(line))) return;
     const heads = lines.slice(0, -1).map((line) => line.trim().length);
     if (!heads.every((length) => length >= WRAP_MIN_LINE && length <= WRAP_MAX_LINE)) return;
     found.push({

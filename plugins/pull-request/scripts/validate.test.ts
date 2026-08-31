@@ -959,8 +959,26 @@ describe("hardWrappedParagraphs", () => {
       false,
     ],
     ["nested list", `- ${LONG} once.\n  - ${LONG} twice.`, false],
+    [
+      "pipe-less table with a padded delimiter row",
+      "Column heading one here padded out | Column heading two here padded\n---------------------------------- | ---------------------------------\na value in the first column here   | a value in the second column here",
+      false,
+    ],
+    ["wrapped blockquote", `> ${LONG} that\n> ${LONG} runs every thirty seconds here.`, false],
   ])("%s", (_name, body, expected) => {
     expect(hardWrappedParagraphs(body).length > 0).toBe(expected);
+  });
+
+  // Both shapes carry markers or column padding that a naive unwrap would splice
+  // into the prose, so silence is what keeps the suggested fix trustworthy.
+  test.each<[string, string]>([
+    [
+      "pipe-less table",
+      "Column heading one here padded out | Column heading two here padded\n---------------------------------- | ---------------------------------\na value in the first column here   | a value in the second column here",
+    ],
+    ["blockquote", `> ${LONG} that\n> ${LONG} runs every thirty seconds here.`],
+  ])("leaves a %s byte-identical", (_name, body) => {
+    expect(unwrapBody(body)).toBe(body);
   });
 });
 

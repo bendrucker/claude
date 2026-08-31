@@ -1,0 +1,219 @@
+[
+  {
+    "repo": "/Users/ben/src/agavra/tuicr",
+    "sha": "3fe4c88ae089ea8293dba7539ff94641431085a9",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/bendrucker/myra",
+    "sha": "cc56079a05fb270bfa9980d3c1156d3e5577789f",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/homebrew/brew",
+    "sha": "a6ac45c8a5508d2a7ebbbb2844cc825fad9084d1",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/jdx/mise",
+    "sha": "f6c19dbe3d0686dd53e77b6e8342fdd86145cb59",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/schpet/linear-cli",
+    "sha": "47011e77d12fa21ead4cf302c26b169e04186642",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/slopus/happy",
+    "sha": "e34c118f1bf77b6d9e740b69f46fdcbf88697e2c",
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "medium"
+  },
+  {
+    "repo": "/Users/ben/src/agavra/tuicr",
+    "sha": "70dc946b6bc7264b6b963644ba0da7dbcbf810d1",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "medium"
+  },
+  {
+    "repo": "/Users/ben/src/bendrucker/myra",
+    "sha": "c5721e7a0ab8119bff2ae253e4fb5b14a6d09149",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/jdx/mise",
+    "sha": "a63f7d288c5c276fadfca4a76e92c48a4843a957",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/slopus/happy",
+    "sha": "285bfc28faf04a10892ccc5b1c0efaaa4f5fa90c",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/slopus/happy",
+    "sha": "ff8a90aeb30ac29d60415a4905ffd58d32718866",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/teaguesterling/sitting_duck",
+    "sha": "4211737e7303dbc6bea49e5093e7b1e2189b0353",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/agavra/tuicr",
+    "sha": "551dcc27befdb576afa901b37b0d92fa7ff32bab",
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/jacobpascalcoblentz/ggb-bot",
+    "sha": "b6695a2270536c636625b39f7080d6e178779441",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/jdx/mise",
+    "sha": "c9388430b7eb5e5de77d8b00e1aef64a54780adb",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/oapi-codegen/oapi-codegen",
+    "sha": "c6bc7c587515948af319ed804c216aa9fc940f5c",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/slopus/happy",
+    "sha": "87fc12cbcb7d73988cc444c035954e8c84405748",
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/teaguesterling/sitting_duck",
+    "sha": "1819c56cc0aa8770ad4206b71b89c33b653dcab0",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/agavra/tuicr",
+    "sha": "86099cf85303db67b510e1b08bc936141de78c74",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/jdx/mise",
+    "sha": "afd318fd7645d90028748cc68a67d920775a1366",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/max-sixty/worktrunk",
+    "sha": "4cbc8ca5fd738726f773ac34728b130dda983254",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/max-sixty/worktrunk",
+    "sha": "bb3efee9c14dd71e144070db3809c5aa3b3bc92c",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/oapi-codegen/oapi-codegen",
+    "sha": "7787164d95fb2a983d21623c01ea19e273193274",
+    "grade": 0,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/teaguesterling/duckdb_webbed",
+    "sha": "7cf1adb03f216353a4030efcfa157b91e9fe9ed6",
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/jdx/mise",
+    "sha": "00d16df765430afcdd30c72b585f0b624e3cb7c3",
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "medium"
+  },
+  {
+    "repo": "/Users/ben/src/max-sixty/worktrunk",
+    "sha": "03f20457d41f90a6f27dfc204bcb55da47980668",
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/max-sixty/worktrunk",
+    "sha": "51a5eca71bacda59ce307b9fa0593e94ad0a5e10",
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "medium"
+  },
+  {
+    "repo": "/Users/ben/src/raycast/extensions",
+    "sha": "4a9ac1bc0d6153e6678e68107f3a6cd6ba021d67",
+    "grade": 3,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/teaguesterling/sitting_duck",
+    "sha": "a181c4051cce6bc4160835f34a8e81dd75983a96",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "high"
+  },
+  {
+    "repo": "/Users/ben/src/max-sixty/worktrunk",
+    "sha": "014765252fc858970a8e534402ab3c39a17ef855",
+    "grade": 1,
+    "docsIntent": false,
+    "confidence": "medium"
+  },
+  {
+    "repo": "/Users/ben/src/max-sixty/worktrunk",
+    "sha": "821314a672f3d9760a41af2c0c3b00ef99c0f08e",
+    "grade": 2,
+    "docsIntent": false,
+    "confidence": "high"
+  }
+]

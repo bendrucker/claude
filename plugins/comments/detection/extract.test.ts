@@ -160,6 +160,24 @@ describe("extractComments: cpp has no vendored grammar", () => {
   });
 });
 
+describe("extractComments: config languages", () => {
+  test("TOML line comments", async () => {
+    const source = ["# top comment", 'name = "x" # trailing'].join("\n");
+    expect(await summarize(source, "toml")).toEqual([
+      { kind: "line", text: "# top comment" },
+      { kind: "line", text: "# trailing" },
+    ]);
+  });
+
+  test("YAML line comments", async () => {
+    const source = ["# top comment", "key: value # trailing"].join("\n");
+    expect(await summarize(source, "yaml")).toEqual([
+      { kind: "line", text: "# top comment" },
+      { kind: "line", text: "# trailing" },
+    ]);
+  });
+});
+
 describe("languageForPath", () => {
   test.each([
     ["a.py", "python"],
@@ -168,6 +186,25 @@ describe("languageForPath", () => {
     ["a.sql", "sql"],
     ["a.cpp", "cpp"],
     ["a.rb", "ruby"],
+    ["a.toml", "toml"],
+    ["a.yaml", "yaml"],
+    ["a.yml", "yaml"],
+    ["a.vue", "vue"],
+    ["a.svelte", "svelte"],
+    ["a.tf", "terraform"],
+    ["a.hcl", "hcl"],
+    ["a.lua", "lua"],
+    ["a.swift", "swift"],
+    ["a.php", "php"],
+    ["a.cs", "csharp"],
+    ["a.dart", "dart"],
+    ["a.zig", "zig"],
+    ["a.ex", "elixir"],
+    ["a.exs", "elixir"],
+    ["a.fish", "fish"],
+    ["a.ps1", "powershell"],
+    ["a.scala", "scala"],
+    ["a.zsh", "shellscript"],
     ["Makefile", null],
     ["a.unknownext", null],
   ])("%s -> %s", (path, expected) => {

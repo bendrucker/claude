@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import * as fc from "fast-check";
-import { rankComments, type SortKey, scoreComment } from "./rank";
+import { rankComments, rankCommentsWeighted, type SortKey, scoreComment } from "./rank";
 import type { Comment } from "./types";
 
 function comment(over: Partial<Comment> = {}): Comment {
@@ -109,5 +109,49 @@ describe("rankComments", () => {
         },
       ),
     );
+  });
+});
+
+describe("rankCommentsWeighted", () => {
+  const pathed = (text: string, path: string) => ({ ...comment({ text }), path });
+
+  const pathedArb = fc
+    .tuple(commentArb, fc.constantFrom("a.ts", "b.ts", "c.ts"))
+    .map(([c, path]) => Object.assign({}, c, { path }));
+
+  test("matches rankComments when no path has a weight", () => {
+    fc.assert(
+      fc.property(
+        fc.array(pathedArb),
+        fc.constantFrom<SortKey>("score", "lines", "chars"),
+        (comments, sort) => {
+          expect(rankCommentsWeighted(comments, new Map(), sort)).toEqual(
+            rankComments(comments, sort),
+          );
+        },
+      ),
+    );
+  });
+
+  test("a heavy file's comment outranks a longer comment in an unweighted file", () => {
+    const short = pathed("// short one", "heavy.ts");
+    const long = pathed("// a noticeably longer comment", "light.ts");
+    expect(rankCommentsWeighted([long, short], new Map([["heavy.ts", 5]]))).toEqual([short, long]);
+  });
+
+  test("is stable for ties and does not mutate the input", () => {
+    const a = pathed("// tie", "a.ts");
+    const b = pathed("// tie", "b.ts");
+    const input = [a, b];
+    expect(
+      rankCommentsWeighted(
+        input,
+        new Map([
+          ["a.ts", 1],
+          ["b.ts", 1],
+        ]),
+      ),
+    ).toEqual([a, b]);
+    expect(input).toEqual([a, b]);
   });
 });

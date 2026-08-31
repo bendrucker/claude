@@ -6,7 +6,7 @@
 - Minimize unnecessary explanations unless requested.
 - Don't join independent clauses with semicolons or em dashes. End the clause with a period. Swapping one connector for another is not a fix. Semicolons only at rare, normal-English cadence.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
-- Don't hard-wrap prose you author: one line per paragraph, one line per list item. In an existing file, follow the wrapping it already uses. Git commit bodies keep the conventional ~72 columns.
+- Don't hard-wrap markdown prose you author: one line per paragraph, one line per list item. In an existing file, follow the wrapping it already uses.
 - Include a trailing newline in all new files.
 - Prefer meaningful anchor text over raw URLs.
 - Use bullet points for lists, checklists if I ask for tasks.
@@ -68,6 +68,7 @@ claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 - Never `git push` to the default branch (usually `main` or `master`) unless I explicitly instruct you.
 - Always work on a topic branch with a short hyphenated name.
 - For commit messages, use multiple `-m` flags for a simple subject and body. Each `-m` is a separate paragraph. For complex messages, pass the message through a heredoc.
+- Wrap commit message bodies at the conventional ~72 columns.
 
 ## Worktrees
 

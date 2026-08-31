@@ -6,7 +6,7 @@
 - Minimize unnecessary explanations unless requested.
 - Don't join independent clauses with semicolons or em dashes. End the clause with a period. Swapping one connector for another is not a fix. Semicolons only at rare, normal-English cadence.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
-- Never hard-wrap markdown prose. One line per paragraph, one line per list item. In a file, match the wrapping the surrounding file already uses. Git commit bodies keep the conventional ~72 columns.
+- Don't hard-wrap prose you author: one line per paragraph, one line per list item. In an existing file, follow the wrapping it already uses. Git commit bodies keep the conventional ~72 columns.
 - Include a trailing newline in all new files.
 - Prefer meaningful anchor text over raw URLs.
 - Use bullet points for lists, checklists if I ask for tasks.

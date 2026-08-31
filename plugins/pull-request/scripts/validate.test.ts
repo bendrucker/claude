@@ -852,13 +852,11 @@ const LIST_INDENT = 2;
 const MIN_COLUMN = WRAP_MIN_LINE + MAX_WORD + 1 + LIST_INDENT;
 const MAX_COLUMN = WRAP_MAX_LINE;
 
-const word = fc
-  .string({
-    minLength: 3,
-    maxLength: MAX_WORD,
-    unit: fc.constantFrom(..."abcdefghijklmnopqrstuvwxyz"),
-  })
-  .filter((w) => w.length >= 3);
+const word = fc.string({
+  minLength: 3,
+  maxLength: MAX_WORD,
+  unit: fc.constantFrom(..."abcdefghijklmnopqrstuvwxyz"),
+});
 
 /** A block long enough to wrap at any column in range: at least 25 words. */
 const block = fc.array(word, { minLength: 25, maxLength: 60 }).map((words) => words.join(" "));
@@ -912,15 +910,10 @@ describe("hardWrappedParagraphs", () => {
   it("recovers the original document when unwrapping a wrapped one", () => {
     fc.assert(
       fc.property(proseDocument, wrapColumn, (doc, column) => {
-        expect(unwrapBody(wrapDocument(doc, column))).toBe(doc);
-      }),
-    );
-  });
-
-  it("converges in one pass, so a single retry always clears the deny", () => {
-    fc.assert(
-      fc.property(proseDocument, wrapColumn, (doc, column) => {
-        expect(hardWrappedParagraphs(unwrapBody(wrapDocument(doc, column)))).toEqual([]);
+        const unwrapped = unwrapBody(wrapDocument(doc, column));
+        expect(unwrapped).toBe(doc);
+        // Converging in one pass is what makes a single retry clear the deny.
+        expect(hardWrappedParagraphs(unwrapped)).toEqual([]);
       }),
     );
   });
@@ -935,6 +928,14 @@ describe("hardWrappedParagraphs", () => {
   });
 
   const LONG = "The resolver caches every lookup it performs and evicts on a timer";
+
+  // Leading pipes are optional in GFM, so the delimiter row is what marks this
+  // as a table. Lazy continuation drops the marker from every quoted line but
+  // the first, which puts the answer in the tree rather than in the text.
+  const PIPELESS_TABLE =
+    "Column heading one here padded out | Column heading two here padded\n---------------------------------- | ---------------------------------\na value in the first column here   | a value in the second column here";
+  const QUOTED = `> ${LONG} that\n> ${LONG} runs every thirty seconds here.`;
+  const LAZY_QUOTED = `> ${LONG} that\n${LONG} runs every thirty seconds here.`;
 
   test.each<[string, string, boolean]>([
     ["wrapped paragraph", `${LONG} that\n${LONG} runs every thirty seconds here.`, true],
@@ -959,26 +960,34 @@ describe("hardWrappedParagraphs", () => {
       false,
     ],
     ["nested list", `- ${LONG} once.\n  - ${LONG} twice.`, false],
-    [
-      "pipe-less table with a padded delimiter row",
-      "Column heading one here padded out | Column heading two here padded\n---------------------------------- | ---------------------------------\na value in the first column here   | a value in the second column here",
-      false,
-    ],
-    ["wrapped blockquote", `> ${LONG} that\n> ${LONG} runs every thirty seconds here.`, false],
+    ["pipe-less table with a padded delimiter row", PIPELESS_TABLE, false],
+    ["wrapped blockquote", QUOTED, false],
+    ["lazily continued blockquote", LAZY_QUOTED, false],
+    ["blockquote nested in a list", `- Context:\n  > ${LONG} that\n  > ${LONG} here.`, false],
   ])("%s", (_name, body, expected) => {
     expect(hardWrappedParagraphs(body).length > 0).toBe(expected);
   });
 
-  // Both shapes carry markers or column padding that a naive unwrap would splice
-  // into the prose, so silence is what keeps the suggested fix trustworthy.
+  // Each shape carries markers or column padding that a naive unwrap would
+  // splice into the prose, so silence is what keeps the suggested fix
+  // trustworthy.
   test.each<[string, string]>([
-    [
-      "pipe-less table",
-      "Column heading one here padded out | Column heading two here padded\n---------------------------------- | ---------------------------------\na value in the first column here   | a value in the second column here",
-    ],
-    ["blockquote", `> ${LONG} that\n> ${LONG} runs every thirty seconds here.`],
+    ["pipe-less table", PIPELESS_TABLE],
+    ["blockquote", QUOTED],
+    ["lazily continued blockquote", LAZY_QUOTED],
   ])("leaves a %s byte-identical", (_name, body) => {
     expect(unwrapBody(body)).toBe(body);
+  });
+
+  // The join has to absorb the whitespace on both sides of the break, or the
+  // correction the hook quotes carries a stray character into the body.
+  test.each<[string, string]>([
+    ["a CRLF body", `${LONG} that\r\n${LONG} runs every thirty seconds here.`],
+    ["a line ending in one space", `${LONG} that \n${LONG} runs every thirty seconds here.`],
+  ])("joins %s on a single space", (_name, body) => {
+    expect(hardWrappedParagraphs(body)[0]?.unwrapped).toBe(
+      `${LONG} that ${LONG} runs every thirty seconds here.`,
+    );
   });
 });
 

@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { Nodes } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { z } from "zod";
@@ -154,10 +155,19 @@ function isTableParagraph(lines: string[]): boolean {
   );
 }
 
-// A paragraph's position starts after the `> ` that opens the blockquote but
-// spans the markers on every later line, so `raw` carries them. Quoted text also
-// reproduces someone else's line breaks, and reflowing it edits the quotation.
-const BLOCKQUOTE_LINE = /^\s*>/;
+/**
+ * Every paragraph under a blockquote, at any depth. Quoted text reproduces
+ * someone else's line breaks, so reflowing it edits the quotation. Under lazy
+ * continuation only the opening line carries a `>`, which puts the answer in the
+ * tree rather than in the text a line test could read.
+ */
+function quotedParagraphs(tree: Nodes): Set<Nodes> {
+  const quoted = new Set<Nodes>();
+  visit(tree, "blockquote", (blockquote) => {
+    visit(blockquote, "paragraph", (paragraph) => quoted.add(paragraph));
+  });
+  return quoted;
+}
 
 export interface WrappedParagraph {
   /** The paragraph exactly as it appears in the body. */
@@ -177,7 +187,10 @@ export interface WrappedParagraph {
  */
 export function hardWrappedParagraphs(body: string): WrappedParagraph[] {
   const found: WrappedParagraph[] = [];
-  visit(fromMarkdown(body), "paragraph", (node) => {
+  const tree = fromMarkdown(body);
+  const quoted = quotedParagraphs(tree);
+  visit(tree, "paragraph", (node) => {
+    if (quoted.has(node)) return;
     const { start, end } = node.position ?? {};
     if (start?.offset === undefined || end?.offset === undefined) return;
     if (start.line === end.line) return;
@@ -185,12 +198,13 @@ export function hardWrappedParagraphs(body: string): WrappedParagraph[] {
     const raw = body.slice(start.offset, end.offset);
     const lines = raw.split("\n");
     if (isTableParagraph(lines)) return;
-    if (lines.some((line) => BLOCKQUOTE_LINE.test(line))) return;
     const heads = lines.slice(0, -1).map((line) => line.trim().length);
     if (!heads.every((length) => length >= WRAP_MIN_LINE && length <= WRAP_MAX_LINE)) return;
     found.push({
       raw,
-      unwrapped: raw.replace(/\n[ \t]*/g, " "),
+      // Consuming the whitespace on both sides of the break keeps a line that
+      // ended in a space from joining as two, and drops the CR of a CRLF body.
+      unwrapped: raw.replace(/[ \t]*\r?\n[ \t]*/g, " "),
       start: start.offset,
       end: end.offset,
     });
@@ -637,8 +651,11 @@ export function extractTitle(command: string): string | null {
   return unescapeDoubleQuoted(unquote(value));
 }
 
+// A reason carrying a correction spans several lines. Indenting its
+// continuations under the marker keeps each reason one visually bounded item, so
+// the next `- ` still reads as the next thing to fix.
 function bullets(reasons: string[]): string {
-  return reasons.map((reason) => `- ${reason}`).join("\n");
+  return reasons.map((reason) => `- ${reason.replaceAll("\n", "\n  ")}`).join("\n");
 }
 
 // A deny reason carries an exact fix, so the whole set is worth reporting at

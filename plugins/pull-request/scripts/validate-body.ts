@@ -1,6 +1,9 @@
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { Nodes } from "mdast";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { visit } from "unist-util-visit";
 import { z } from "zod";
 import { headingCaseViolations } from "./heading-case";
 import { LINKING_VERBS } from "./linguistics/heading";
@@ -126,6 +129,118 @@ export function hasRunOnProse(body: string): boolean {
     }
   }
   return false;
+}
+
+// A PR body renders in a web UI that soft-wraps, so hard-wrapping prose at a
+// column only narrows it. The floor excludes deliberate one-entry-per-line
+// blocks (a list of SHAs, a signature), which sit well under any fill column.
+// The ceiling keeps a genuinely long line from reading as a wrap.
+export const WRAP_MIN_LINE = 50;
+export const WRAP_MAX_LINE = 100;
+
+// `fromMarkdown` runs without the GFM extension, so a table parses as one
+// multi-line paragraph. Skipping one costs two shapes, where the extension
+// costs a dependency tree on a hook that runs on every `gh pr create`. Leading
+// pipes are optional in GFM, so a row check alone misses a pipe-less table
+// whose delimiter row is padded out to the column width.
+const TABLE_ROW = /^\s*\|/;
+const TABLE_DELIMITER = /^[\s:|-]+$/;
+
+function isTableParagraph(lines: string[]): boolean {
+  if (lines.every((line) => TABLE_ROW.test(line))) return true;
+  // A delimiter row separates columns with a pipe and pads with dashes. Prose
+  // never produces a line built from nothing else.
+  return lines.some(
+    (line) => TABLE_DELIMITER.test(line) && line.includes("|") && line.includes("-"),
+  );
+}
+
+/**
+ * Every paragraph under a blockquote, at any depth. Quoted text reproduces
+ * someone else's line breaks, so reflowing it edits the quotation. Under lazy
+ * continuation only the opening line carries a `>`, which puts the answer in the
+ * tree rather than in the text a line test could read.
+ */
+function quotedParagraphs(tree: Nodes): Set<Nodes> {
+  const quoted = new Set<Nodes>();
+  visit(tree, "blockquote", (blockquote) => {
+    visit(blockquote, "paragraph", (paragraph) => {
+      quoted.add(paragraph);
+    });
+  });
+  return quoted;
+}
+
+export interface WrappedParagraph {
+  /** The paragraph exactly as it appears in the body. */
+  raw: string;
+  /** The same paragraph on one line. */
+  unwrapped: string;
+  /** Byte offsets of `raw` within the body. */
+  start: number;
+  end: number;
+}
+
+/**
+ * Paragraphs hard-wrapped at a fill column. mdast supplies the block structure,
+ * so fenced code, list continuations, nested lists, indented code, and HTML need
+ * no handling here. A `break` child is a two-space markdown hard break, which is
+ * an explicit line break rather than a wrap.
+ */
+export function hardWrappedParagraphs(body: string): WrappedParagraph[] {
+  const found: WrappedParagraph[] = [];
+  const tree = fromMarkdown(body);
+  const quoted = quotedParagraphs(tree);
+  visit(tree, "paragraph", (node) => {
+    if (quoted.has(node)) return;
+    const { start, end } = node.position ?? {};
+    if (start?.offset === undefined || end?.offset === undefined) return;
+    if (start.line === end.line) return;
+    if (node.children.some((child) => child.type === "break")) return;
+    const raw = body.slice(start.offset, end.offset);
+    const lines = raw.split("\n");
+    if (isTableParagraph(lines)) return;
+    const heads = lines.slice(0, -1).map((line) => line.trim().length);
+    if (!heads.every((length) => length >= WRAP_MIN_LINE && length <= WRAP_MAX_LINE)) return;
+    found.push({
+      raw,
+      // Consuming the whitespace on both sides of the break keeps a line that
+      // ended in a space from joining as two, and drops the CR of a CRLF body.
+      unwrapped: raw.replace(/[ \t]*\r?\n[ \t]*/g, " "),
+      start: start.offset,
+      end: end.offset,
+    });
+  });
+  return found;
+}
+
+/**
+ * Rewrite every hard-wrapped paragraph onto one line, leaving the rest of the
+ * body byte-identical. Splicing runs back to front so each offset stays valid.
+ */
+export function unwrapBody(body: string): string {
+  let out = body;
+  for (const { unwrapped, start, end } of hardWrappedParagraphs(body).toReversed()) {
+    out = out.slice(0, start) + unwrapped + out.slice(end);
+  }
+  return out;
+}
+
+// Two paragraphs is enough for the model to see the shape of the fix. Quoting
+// every one of them would make the deny reason longer than the body.
+const WRAP_EXAMPLE_LIMIT = 2;
+
+export function wrapReason(wrapped: WrappedParagraph[]): string {
+  const shown = wrapped.slice(0, WRAP_EXAMPLE_LIMIT);
+  const remaining = wrapped.length - shown.length;
+  const examples = shown
+    .map(({ raw, unwrapped }) => `Replace:\n${raw}\nwith:\n${unwrapped}`)
+    .join("\n\n");
+  const more =
+    remaining > 0
+      ? `\n\n${remaining} more wrapped paragraph${remaining === 1 ? "" : "s"} to fix the same way.`
+      : "";
+  return `Prose in the body is hard-wrapped at a fixed column. A PR body renders in a web UI that soft-wraps, so a hard wrap gains nothing and displays as a narrow column. Write one line per paragraph and one line per list item. This applies to the body only. A markdown file in the repo keeps its own wrapping convention, so a body sourced from one gets copied to a scratch file and unwrapped there.\n\n${examples}${more}`;
 }
 
 // Vocabulary that leaks the instructions into the output: the body claims a
@@ -538,8 +653,11 @@ export function extractTitle(command: string): string | null {
   return unescapeDoubleQuoted(unquote(value));
 }
 
+// A reason carrying a correction spans several lines. Indenting its
+// continuations under the marker keeps each reason one visually bounded item, so
+// the next `- ` still reads as the next thing to fix.
 function bullets(reasons: string[]): string {
-  return reasons.map((reason) => `- ${reason}`).join("\n");
+  return reasons.map((reason) => `- ${reason.replaceAll("\n", "\n  ")}`).join("\n");
 }
 
 // A deny reason carries an exact fix, so the whole set is worth reporting at
@@ -591,6 +709,10 @@ function denyReasons(body: string): string[] {
   }
   if (hasBacktickedRef(body)) {
     reasons.push(AUTOLINK_REASON);
+  }
+  const wrapped = hardWrappedParagraphs(body);
+  if (wrapped.length > 0) {
+    reasons.push(wrapReason(wrapped));
   }
   return reasons;
 }

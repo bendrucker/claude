@@ -164,7 +164,9 @@ function isTableParagraph(lines: string[]): boolean {
 function quotedParagraphs(tree: Nodes): Set<Nodes> {
   const quoted = new Set<Nodes>();
   visit(tree, "blockquote", (blockquote) => {
-    visit(blockquote, "paragraph", (paragraph) => quoted.add(paragraph));
+    visit(blockquote, "paragraph", (paragraph) => {
+      quoted.add(paragraph);
+    });
   });
   return quoted;
 }

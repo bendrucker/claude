@@ -1,0 +1,10 @@
+content_items: host session_id timestamp project_path source_file source_line type name id tool_use_id text content is_error data tool_use_result tool_denial_kind attribution_skill attribution_plugin attribution_agent
+tool_calls: tool_name tool_id host session_id project_path timestamp file_path command attribution_skill attribution_plugin attribution_agent agent_id
+skill_calls: skill_name args tool_id host session_id project_path timestamp
+hook_events: host session_id project_path timestamp source_file source_line kind hook_event hook_name command tool_use_id exit_code duration_ms decision reason additional_context blocked stdout stderr content blocking_error attachment
+messages: host session_id type project_path git_branch is_meta is_sidechain duration_ms timestamp input_tokens output_tokens source_file source_line data content_text model cache_read_tokens cache_creation_tokens prompt_source interrupted_message_id attribution_skill attribution_plugin attribution_agent attribution_mcp_server attribution_mcp_tool
+message_usage: host session_id message_id project_path timestamp model attribution_skill attribution_plugin attribution_agent is_sidechain source_file input_tokens output_tokens cache_read_tokens cache_creation_tokens cache_1h_tokens cache_5m_tokens content_rows
+text_content: host session_id timestamp project_path role model text raw_text source_file source_line is_subagent is_system
+attachments: host session_id project_path timestamp is_sidechain source_file source_line kind hook_name hook_event tool_use_id attachment data
+raw: host session_id type project_path git_branch is_meta is_sidechain duration_ms timestamp input_tokens output_tokens source_file source_line data
+tool_errors: tool_id error_content tool_name host session_id project_path timestamp error_type denial_kind agent_id

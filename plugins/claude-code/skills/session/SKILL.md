@@ -62,56 +62,31 @@ The `project` param matches against the directory name (last path component) usi
 
 Every query also takes an optional `host` param (omit to span every machine, `host=work` to scope to one imported machine). See [Cross-Machine History](#cross-machine-history).
 
-Every query, grouped by category with a one-line gloss:
+The eleven that carry most of the measured usage:
 
-#### Sessions and Prose
-- `search`: find sessions by keyword
-- `text-export`: dump cleaned prose
-- `phrase-lift`: phrase rate, assistant-vs-user lift
-- `model-summary`: assistant text per model
+- `index-health`: the index auditing itself. Run it first in any analysis pass, since its alerts cap what the rest can claim.
+- `activity`: session interaction profile, one row per prompt source, plus interruptions, compactions, API retries, hook friction, permission modes.
+- `hooks`: per-hook runs, friction rate, and latency corrected for host-wide slowdowns (`excess_p95_ms`, not `p95_ms`).
+- `hook-blocks`: hook overfiring, grouped by normalized reason signature, including the PreToolUse denies `hook_events` never records.
+- `skill-auto-vs-explicit`: per skill, model-routed vs chained vs typed. The `disable-model-invocation` lever.
+- `skill-config-vs-observed`: installed skills that never fire, the curation instrument (reads disk, needs `-init`).
+- `sandbox-bypass-effective-command`: bypassed commands normalized to their real verb, the `excludedCommands` candidates.
+- `repeat-read-waste`: repeat Reads split by cause, isolating the true context tax from pagination and fan-out.
+- `delegation`: whether expensive parents push subagent spawns down to cheaper models.
+- `usage-timeline`: one session's token burn per time bucket, with estimated cost and a context-size proxy.
+- `outcomes`: session terminal states (shipped, abandoned-with-edits, handed off, no artifact), the outcome side the activity queries never measure.
 
-#### Tool Use and Friction
-- `stats`: tool usage breakdown
-- `errors`: recent tool failures
-- `permissions`: denied tool calls, by the mechanism that denied them
-- `sandbox`: sandbox-bypassing Bash calls
-- `sandbox-bypass-effective-command`: normalized bypass verbs
-- `sandbox-bypass-justification`: bypasses backed by a prior sandboxed failure
+The rest, by name, described in [`references/catalog.md`](references/catalog.md):
 
-#### Hooks
-- `hooks`: hook activity and performance
-- `hook-blocks`: hook overfiring analysis
-- `hook-block-then-retry-success`: blocks retried away
-- `hook-config-vs-observed`: configured vs observed hooks
+- Sessions and prose: `search`, `text-export`, `model-summary`
+- Tool use and friction: `stats`, `errors`, `permissions`, `sandbox`, `sandbox-bypass-justification`
+- Hooks: `hook-block-then-retry-success`, `hook-config-vs-observed`
+- Skills: `skills`, `skill-activity`
+- Files, tokens, activity: `files`, `diagnostics`, `usage-spikes`, `top-sessions`
+- Planning and review: `plans`, `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`
+- Schema and index: `schema`, `keys`, `fields`, `frontmatter`
 
-#### Skills
-- `skills`: skill invocation counts
-- `skill-activity`: work attributed per skill
-- `skill-auto-vs-explicit`: auto vs explicit invocations
-
-#### Files, Tokens, Activity
-- `files`: most-read and edited file hotspots
-- `repeat-read-waste`: repeat-Read context tax
-- `activity`: session interaction profile
-- `diagnostics`: recurring type/lint diagnostics
-- `usage-timeline`: one session's token burn per time bucket (estimated cost, cache-miss ratio)
-- `usage-spikes`: ranked (session, bucket) burn windows across the corpus
-
-#### Planning and Outcomes
-- `plans`: sessions using plan mode
-- `plan-iterations`: per-plan growth and carry-over
-- `plan-sizes`: weekly first/final plan size trend against the gate threshold
-- `outcomes`: session terminal states
-- `delegation`: subagent spawn model mix against the parent's main model, generic vs pinned-agent split
-- `review-precision`: per-angle verdict and fix-outcome mix for code-review findings
-
-#### Schema and Index
-- `schema`: list every column
-- `keys`: sample raw JSON keys
-- `fields`: infer JSON keys at a path
-- `index-health`: the index auditing itself
-
-Full params and descriptions in [`references/catalog.md`](references/catalog.md). Load it before running a query you have not used.
+Load [`references/catalog.md`](references/catalog.md) before running a query you have not used. A further tier, aimed at the self-improvement loop, is listed in [`references/discovery.md`](references/discovery.md).
 
 ### Markdown and YAML on Disk
 
@@ -136,7 +111,11 @@ Imported corpora are a hot place for secrets in tool output and pasted text. Pat
 
 ## Tables, Views, and Macros
 
-Every table and view carries a `host` column (`local` for this machine, the label for imported ones). The `sessions` view adds `project_id` (`host || ':' || project_path`) for cross-host project identity. [`references/catalog.md`](references/catalog.md) documents every table, view, and filter macro. Load it before writing SQL against a surface you have not used, or ask DuckDB directly (see [Discovery](#discovery)).
+Every table and view carries a `host` column (`local` for this machine, the label for imported ones). The `sessions` view adds `project_id` (`host || ':' || project_path`) for cross-host project identity. [`references/catalog.md`](references/catalog.md) documents every table, view, and filter macro, and says what each one holds. Load it before writing SQL against a surface you have not used.
+
+Columns of the ten surfaces ad-hoc SQL reads most. `DESCRIBE <name>` for anything else.
+
+!`bun ${CLAUDE_SKILL_DIR}/scripts/schema.ts`
 
 ## Known Blind Spots
 
@@ -151,7 +130,7 @@ The `index-health` query detects drift the corpus can show. These absences are s
 
 ## Discovery
 
-Don't memorize column lists. Ask DuckDB (`DESCRIBE <table>`, `information_schema.columns`) or reach into `data` directly with JSON path operators. Wrap `data->>'$.path'` in parens before any comparison: DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` and fails. Worked examples in [`references/schema-discovery.md`](references/schema-discovery.md).
+For a surface outside the map above, `DESCRIBE <table>` or `information_schema.columns`. For anything not pinned to a column, reach into `data` with JSON path operators. Wrap `data->>'$.path'` in parens before any comparison: DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` and fails. Worked examples in [`references/schema-discovery.md`](references/schema-discovery.md).
 
 ## Source Lookup
 

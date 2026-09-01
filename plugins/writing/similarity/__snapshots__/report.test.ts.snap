@@ -1,0 +1,180 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`voice-like draft report 1`] = `
+"draft.md  |  81 words, 13 sentences  |  p26.1 of the voice baseline — toward the low end of the voice baseline
+
+Under 144 words: the score is noisy at this length.
+
+╔═════════════╤════════╤════════════╗
+║ Family      │ Margin │ Percentile ║
+╟─────────────┼────────┼────────────╢
+║ fused       │ 0.834  │ 26.1       ║
+╟─────────────┼────────┼────────────╢
+║ rhythm      │ 1.013  │ 30.9       ║
+╟─────────────┼────────┼────────────╢
+║ char 3-gram │ 0.655  │ 36.4       ║
+╚═════════════╧════════╧════════════╝
+
+Leading features
+╔═════════════════════════════╤═══════════╤════════════╤═══════════╗
+║ Feature                     │ This text │ Voice mean │ Deviation ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ sentence length variation   │ 0.39      │ 0.44       │ -0.63 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ short sentences (<10 words) │ 0.92      │ 0.89       │ +0.39 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ commas per sentence         │ 0.08      │ 0.18       │ -0.99 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ contractions per 100 words  │ 7.41      │ 9.91       │ -0.70 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ 'the' per 100 words         │ 8.64      │ 11.76      │ -1.05 sd  ║
+╚═════════════════════════════╧═══════════╧════════════╧═══════════╝
+
+2 of 10 windows below p10:
+
+  p2.3  sentences 2-5
+    I've pushed a follow-up. It reads better as one function. No rush on this. It reads better as one f…
+    → long, latinate word choice; few definite articles; uniform sentence lengths
+
+  p7.7  sentences 3-6
+    It reads better as one function. No rush on this. It reads better as one function. We don't need th…
+    → long, latinate word choice; uniform sentence lengths; few definite articles"
+`;
+
+exports[`contrast-like draft report 1`] = `
+"draft.md  |  176 words, 8 sentences  |  p0.0 of the voice baseline — outside the voice baseline
+
+╔═════════════╤════════╤════════════╗
+║ Family      │ Margin │ Percentile ║
+╟─────────────┼────────┼────────────╢
+║ fused       │ -1.341 │ 0.0        ║
+╟─────────────┼────────┼────────────╢
+║ rhythm      │ -0.861 │ 0.0        ║
+╟─────────────┼────────┼────────────╢
+║ char 3-gram │ -1.821 │ 0.0        ║
+╚═════════════╧════════╧════════════╝
+
+Leading features
+╔═════════════════════════════╤═══════════╤════════════╤═══════════╗
+║ Feature                     │ This text │ Voice mean │ Deviation ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ sentence length variation   │ 0.06      │ 0.44       │ -4.67 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ short sentences (<10 words) │ 0.00      │ 0.89       │ -11.43 sd ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ commas per sentence         │ 2.00      │ 0.18       │ +17.55 sd ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ contractions per 100 words  │ 0.00      │ 9.91       │ -2.78 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ 'the' per 100 words         │ 11.36     │ 11.76      │ -0.13 sd  ║
+╚═════════════════════════════╧═══════════╧════════════╧═══════════╝
+
+5 of 5 windows below p25:
+
+  p0.0  sentences 1-4
+    The implementation provides a comprehensive solution that addresses the underlying requirements, en…
+    → long, latinate word choice; sentences run long; run-on sentences with many commas
+
+  p0.0  sentences 2-5
+    It is important to note that the described approach, while effective in the general case, introduce…
+    → long, latinate word choice; sentences run long; run-on sentences with many commas
+
+  p0.0  sentences 3-6
+    By leveraging the existing abstraction layer, the proposed modification maintains compatibility wit…
+    → long, latinate word choice; sentences run long; run-on sentences with many commas
+
+  p0.0  sentences 4-7
+    The resulting architecture is designed to accommodate future extensions, allowing additional handle…
+    → sentences run long; long, latinate word choice; run-on sentences with many commas
+
+  p0.0  sentences 5-8
+    This approach ensures that the validation logic, which previously resided in multiple locations, is…
+    → sentences run long; run-on sentences with many commas; long, latinate word choice"
+`;
+
+exports[`mixed draft report at a narrow excerpt width 1`] = `
+"draft.md  |  257 words, 21 sentences  |  p0.0 of the voice baseline — outside the voice baseline
+
+╔═════════════╤════════╤════════════╗
+║ Family      │ Margin │ Percentile ║
+╟─────────────┼────────┼────────────╢
+║ fused       │ -0.474 │ 0.0        ║
+╟─────────────┼────────┼────────────╢
+║ rhythm      │ 0.226  │ 0.0        ║
+╟─────────────┼────────┼────────────╢
+║ char 3-gram │ -1.175 │ 0.0        ║
+╚═════════════╧════════╧════════════╝
+
+Leading features
+╔═════════════════════════════╤═══════════╤════════════╤═══════════╗
+║ Feature                     │ This text │ Voice mean │ Deviation ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ sentence length variation   │ 0.66      │ 0.44       │ +2.79 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ short sentences (<10 words) │ 0.57      │ 0.89       │ -4.11 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ commas per sentence         │ 0.81      │ 0.18       │ +6.07 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ contractions per 100 words  │ 2.33      │ 9.91       │ -2.13 sd  ║
+╟─────────────────────────────┼───────────┼────────────┼───────────╢
+║ 'the' per 100 words         │ 10.51     │ 11.76      │ -0.42 sd  ║
+╚═════════════════════════════╧═══════════╧════════════╧═══════════╝
+
+14 of 18 windows below p25:
+
+  p0.0  sentences 11-14
+    This one bit me twice already. It reads better as one funct…
+    → long, latinate word choice; sentences run long; low contraction density
+
+  p0.0  sentences 12-15
+    It reads better as one function. There's no test for the em…
+    → long, latinate word choice; sentences run long; run-on sentences with many commas
+
+  p0.0  sentences 13-16
+    There's no test for the empty case yet. The implementation …
+    → long, latinate word choice; sentences run long; run-on sentences with many commas
+
+  p0.0  sentences 14-17
+    The implementation provides a comprehensive solution that a…
+    → long, latinate word choice; sentences run long; run-on sentences with many commas
+
+  p0.0  sentences 15-18
+    It is important to note that the described approach, while …
+    → long, latinate word choice; sentences run long; run-on sentences with many commas
+
+  p0.0  sentences 16-19
+    By leveraging the existing abstraction layer, the proposed …
+    → long, latinate word choice; sentences run long; run-on sentences with many commas
+
+  p0.0  sentences 17-20
+    The resulting architecture is designed to accommodate futur…
+    → sentences run long; long, latinate word choice; run-on sentences with many commas
+
+  p0.0  sentences 18-21
+    This approach ensures that the validation logic, which prev…
+    → sentences run long; run-on sentences with many commas; long, latinate word choice
+
+  p2.3  sentences 2-5
+    I've pushed a follow-up. It reads better as one function. N…
+    → long, latinate word choice; few definite articles; uniform sentence lengths
+
+  p7.7  sentences 3-6
+    It reads better as one function. No rush on this. It reads …
+    → long, latinate word choice; uniform sentence lengths; few definite articles
+
+  p18.7  sentences 1-4
+    That's the whole fix. I've pushed a follow-up. It reads bet…
+    → uniform sentence lengths; few definite articles; long, latinate word choice
+
+  p19.8  sentences 4-7
+    No rush on this. It reads better as one function. We don't …
+    → uniform sentence lengths; few definite articles; long, latinate word choice
+
+  p20.0  sentences 9-12
+    There's no test for the empty case yet. Let's ship it and s…
+    → uniform sentence lengths; few definite articles
+
+  p22.1  sentences 10-13
+    Let's ship it and see. This one bit me twice already. It re…
+    → uniform sentence lengths; few definite articles"
+`;

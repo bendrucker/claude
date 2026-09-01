@@ -7,6 +7,7 @@ Writing style enforcement and slop detection for prose output (PR descriptions, 
 - **Hooks**: Step, phase, and part numbering detection, heading style enforcement, AI writing trope detection (em dashes, vocabulary, copula avoidance, promotional language, parallelism, connector density)
 - **Skills**: `writing:writing` system reminder for prose writing guidelines, `writing:analyze` session-history-based trope ruleset curation, `writing:rewrite` user-invoked text rewriter, `writing:scan` user-invoked trope detector (`audit` gates a directory, `score` measures one input's density), `writing:review` multi-agent document review
 - **Agents**: `content`, `style`, `artifacts` (conditional review lenses)
+- **Scripts**: [`scripts/similarity.ts`](scripts/similarity.ts), the CLI over the [`similarity/`](similarity/) style-similarity engine
 
 ## Wordlists
 
@@ -25,6 +26,26 @@ Used for openers and let-me-verbs where the match depends on position (line star
 `<word> <weight>` per line. Uses the same Porter stemmer as vocabulary. The hook accumulates the weighted total of hits and reminds when the total clears a threshold.
 
 The loader lives in [`detection/wordlists.ts`](detection/wordlists.ts). Compiled patterns are exposed via the `WORDLISTS` constant and consumed by `tropes.ts`.
+
+## Similarity Scorer
+
+The wordlists and tropes catch known patterns. [`similarity/`](similarity/) instead measures how close a draft sits to the author's own writing, scoring it against a voice centroid and a contrast centroid of Claude-authored prose. It scores four-sentence sliding windows too, ranking the passages that pulled the document score down. [`similarity/score.ts`](similarity/score.ts) documents the two-pole margin and [`similarity/build.ts`](similarity/build.ts) the profile it reads.
+
+Both corpora are local-only and never committed. They live in the plugin data dir (`CLAUDE_PLUGIN_DATA`, else `~/.claude/plugins/data/writing-bendrucker`), outside the default sandbox allowlist. All three commands need `dangerouslyDisableSandbox: true`.
+
+```sh
+# Build the contrast pole from Claude-authored prose in the session index
+bun plugins/writing/scripts/similarity.ts mine-contrast --session-db "$DB_PATH" --since 2026-05-01
+
+# Cache centroids, the standardizer, the gram vocabulary, and the calibration ladders
+bun plugins/writing/scripts/similarity.ts build
+
+# Score a file, an inline string, or stdin
+bun plugins/writing/scripts/similarity.ts score draft.md
+bun plugins/writing/scripts/similarity.ts score --json --below-percentile 5 draft.md
+```
+
+Rebuild after ingesting new registers or changing the rhythm feature table. Scoring reads only the cached profile and rejects one built from a different feature list.
 
 ## Hook Dispatcher
 

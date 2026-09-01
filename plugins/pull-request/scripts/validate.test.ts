@@ -103,6 +103,7 @@ describe("parseCommand", () => {
             quoted: true,
             segment: "cat > body.md <<'EOF'",
             target: "body.md",
+            offset: 14,
           },
         ],
       },
@@ -118,6 +119,7 @@ describe("parseCommand", () => {
             quoted: true,
             segment: "cat <<'EOF' > body.md",
             target: "body.md",
+            offset: 4,
           },
         ],
       },
@@ -133,6 +135,7 @@ describe("parseCommand", () => {
             quoted: true,
             segment: " tee tmp/body.md <<'EOF'",
             target: "tmp/body.md",
+            offset: 32,
           },
         ],
       },
@@ -143,7 +146,13 @@ describe("parseCommand", () => {
       {
         text: "cat >> log.md <<EOF",
         heredocs: [
-          { content: "$VERSION\n", quoted: false, segment: "cat >> log.md <<EOF", target: null },
+          {
+            content: "$VERSION\n",
+            quoted: false,
+            segment: "cat >> log.md <<EOF",
+            target: null,
+            offset: 14,
+          },
         ],
       },
     ],
@@ -158,9 +167,15 @@ describe("parseCommand", () => {
             quoted: true,
             segment: "cat > body.md <<-'EOF'",
             target: "body.md",
+            offset: 14,
           },
         ],
       },
+    ],
+    [
+      "ignores a << inside a quoted argument",
+      'echo "<<EOF"\ngh pr create --body-file body.md',
+      { text: 'echo "<<EOF"\ngh pr create --body-file body.md', heredocs: [] },
     ],
     [
       "gives an unterminated heredoc the rest of the command",
@@ -173,6 +188,7 @@ describe("parseCommand", () => {
             quoted: true,
             segment: "cat > body.md <<'EOF'",
             target: "body.md",
+            offset: 14,
           },
         ],
       },
@@ -238,6 +254,11 @@ describe("extractBodySpec", () => {
     // A heredoc attached to the create command itself feeds its stdin.
     ["gh pr create --title T --body-file - <<'EOF'\nProse.\nEOF", parts(literal("Prose.\n"))],
     ["gh pr create --body-file /dev/stdin <<'EOF'\nProse.\nEOF", parts(literal("Prose.\n"))],
+    // A write sequenced after the create command is not what the CLI reads.
+    [
+      "gh pr create --body-file body.md\ncat > body.md <<'EOF'\nProse.\nEOF",
+      parts(file("body.md")),
+    ],
   ])("extractBodySpec(%p) -> %p", (command, expected) => {
     expect(extractBodySpec(command)).toEqual(expected);
   });
@@ -698,6 +719,8 @@ describe("effectiveCwd", () => {
     ["gh pr create --body-file body.md && cd sub", "/repo"],
     ['cd "$DIR" && gh pr create --body-file body.md', "/repo"],
     ["cd - && gh pr create --body-file body.md", "/repo"],
+    // The || fallback only runs when the first cd failed.
+    ["cd a || cd b && gh pr create --body-file body.md", path.join("/repo", "a")],
   ])("effectiveCwd(%p) -> %p", (command, expected) => {
     expect(effectiveCwd(command, "/repo")).toBe(expected);
   });

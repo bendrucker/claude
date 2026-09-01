@@ -372,6 +372,8 @@ export interface Heredoc {
   segment: string;
   /** Normalized path the segment redirects or tees the body into, or null when it feeds stdin/stdout. */
   target: string | null;
+  /** Offset of the operator in the stripped text, for ordering against the PR command. */
+  offset: number;
 }
 
 export interface ParsedCommand {
@@ -386,7 +388,35 @@ interface PendingHeredoc {
   stripTabs: boolean;
   segment: string;
   target: string | null;
+  offset: number;
   lines: string[];
+}
+
+// Spans of a line covered by a quoted string, so a `<<` inside an argument
+// (`grep "<<EOF" f`) is not read as an operator. Backslash escapes a quote
+// outside single quotes, where the shell treats it literally.
+function quotedSpans(line: string): Array<[number, number]> {
+  const spans: Array<[number, number]> = [];
+  let open: string | null = null;
+  let start = 0;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === "\\" && open !== "'") {
+      i++;
+      continue;
+    }
+    if (open === null) {
+      if (ch === "'" || ch === '"') {
+        open = ch;
+        start = i;
+      }
+    } else if (ch === open) {
+      spans.push([start, i]);
+      open = null;
+    }
+  }
+  if (open !== null) spans.push([start, line.length]);
+  return spans;
 }
 
 function segmentAt(line: string, index: number): string {
@@ -423,9 +453,11 @@ export function parseCommand(command: string): ParsedCommand {
       quoted: pending.quoted,
       segment: pending.segment,
       target: pending.target,
+      offset: pending.offset,
     });
   };
 
+  let textOffset = 0;
   for (const line of command.split("\n")) {
     const open = queue[0];
     if (open !== undefined) {
@@ -439,7 +471,9 @@ export function parseCommand(command: string): ParsedCommand {
       continue;
     }
     kept.push(line);
+    const spans = quotedSpans(line);
     for (const match of line.matchAll(HEREDOC_OPERATOR)) {
+      if (spans.some(([start, end]) => match.index > start && match.index <= end)) continue;
       const segment = segmentAt(line, match.index);
       queue.push({
         delimiter: match[2] ?? match[3] ?? match[5] ?? "",
@@ -447,9 +481,11 @@ export function parseCommand(command: string): ParsedCommand {
         stripTabs: match[1] === "-",
         segment,
         target: segmentTarget(segment),
+        offset: textOffset + match.index,
         lines: [],
       });
     }
+    textOffset += line.length + 1;
   }
   for (const pending of queue) close(pending);
   return { text: kept.join("\n"), heredocs };
@@ -606,8 +642,9 @@ function heredocSpec(heredoc: Heredoc): BodySpec {
 
 // Swap each file part for the heredoc that writes that path in the same
 // command, so a body created and passed in one call validates without touching
-// a file the command has not written yet. The last write wins, as it would in
-// the shell.
+// a file the command has not written yet. Only writes ahead of the PR command
+// count (a later write is not what the CLI reads), and the last of those wins,
+// as it would in the shell.
 function resolveHeredocParts(parts: BodyPart[], heredocs: Heredoc[]): BodySpec {
   const resolved: BodyPart[] = [];
   for (const part of parts) {
@@ -645,13 +682,19 @@ export function extractBodySpec(command: string): BodySpec {
     }
     const part = filePart(fileValue);
     if (part === null) return unreadableExpansion(path);
-    return resolveHeredocParts([part], heredocs);
+    return resolveHeredocParts([part], precedingHeredocs(text, heredocs));
   }
   const inlineValue = text.match(flagValuePattern(flags.inline))?.[1];
   if (inlineValue == null || inlineValue === "") return { kind: "none" };
   const inline = parseInlineValue(inlineValue);
   if (inline.kind !== "parts") return inline;
-  return resolveHeredocParts(inline.parts, heredocs);
+  return resolveHeredocParts(inline.parts, precedingHeredocs(text, heredocs));
+}
+
+function precedingHeredocs(text: string, heredocs: Heredoc[]): Heredoc[] {
+  const prIndex = text.search(PR_BODY_COMMAND_PATTERN);
+  if (prIndex === -1) return [];
+  return heredocs.filter((doc) => doc.offset < prIndex);
 }
 
 /** The body text a command will send, or why the hook cannot see it. */
@@ -670,7 +713,9 @@ async function readBodyFile(path: string, cwd: string): Promise<string | null> {
 
 // A `cd` ahead of the PR command moves where the CLI resolves a relative body
 // path, so the hook follows each one it can evaluate before reading files.
-const CD_PATTERN = /(?:^|&&|\|\||;|\n)\s*cd\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&]+)/g;
+// `||` is excluded from the lead-ins: a `cd a || cd b` fallback only runs when
+// the first cd failed, so the hook follows the success path.
+const CD_PATTERN = /(?:^|&&|;|\n)\s*cd\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&]+)/g;
 
 export function effectiveCwd(command: string, cwd: string): string {
   const text = parseCommand(command).text;

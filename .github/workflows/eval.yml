@@ -92,6 +92,19 @@ jobs:
         if: steps.check.outputs.has_key == 'false'
         run: echo "::notice::CLAUDE_CODE_OAUTH_TOKEN is not set, so the ${{ matrix.suite }} eval is skipped. Add the secret (from 'claude setup-token') to enable live runs."
 
+      # A suite whose providers point at a fixture tree declares a `fixtures`
+      # script. The tree is git-ignored, so the run materializes it here,
+      # ahead of the credential steps: the script runs with no token in the
+      # environment and no credentials file on disk.
+      - name: Materialize fixtures
+        if: steps.check.outputs.has_key == 'true'
+        working-directory: evals/${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          if jq -e '.scripts.fixtures' package.json > /dev/null 2>&1; then
+            bun run fixtures
+          fi
+
       # The spawned CLI reads the token from the environment. promptfoo's grader
       # providers only read it from ~/.claude/.credentials.json on Linux.
       - name: Write grader credentials
@@ -104,8 +117,6 @@ jobs:
           jq -n --arg token "$CLAUDE_CODE_OAUTH_TOKEN" '{claudeAiOauth: {accessToken: $token}}' > "$HOME/.claude/.credentials.json"
           chmod 600 "$HOME/.claude/.credentials.json"
 
-      # A suite whose providers point at a fixture tree declares a `fixtures`
-      # script. The tree is git-ignored, so the run materializes it first.
       # `continue-on-error` lets a failing eval still upload, summarize, and
       # comment before the last step turns the job red.
       - name: Run promptfoo eval
@@ -115,12 +126,7 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         working-directory: evals/${{ matrix.suite }}
-        run: |
-          set -euo pipefail
-          if jq -e '.scripts.fixtures' package.json > /dev/null 2>&1; then
-            bun run fixtures
-          fi
-          bunx promptfoo eval --no-progress-bar -o output.json
+        run: bunx promptfoo eval --no-progress-bar -o output.json
 
       - name: Upload results
         if: steps.eval.outcome != 'skipped' && hashFiles(format('evals/{0}/output.json', matrix.suite)) != ''

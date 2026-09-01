@@ -2,7 +2,6 @@ import { z } from "zod";
 import { decodeJson } from "../../packages/decode/index";
 import { expectSuccess, type RunCommand, runCommand } from "./command";
 
-/** A single-quoted SQL string literal. */
 export function literal(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
@@ -13,8 +12,8 @@ export function timestampLiteral(value: Date): string {
 
 /**
  * Runs SQL through the `duckdb` CLI and validates the rows of its final statement.
- * The corpus is a directory of JSON files rather than a persistent database, so an
- * in-memory session per query needs no lock coordination.
+ * The corpus is a directory of JSON files, so an in-memory session per query needs
+ * no lock coordination.
  */
 export async function query<S extends z.ZodType>(
   sql: string,

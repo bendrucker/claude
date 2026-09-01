@@ -12,7 +12,7 @@ const BRANCH_MAX = 40;
 
 /**
  * The branch a reviewer would see on the PR. Scenario titles carry a `subject: `
- * prefix naming the area rather than the change, so the slug starts after it.
+ * prefix naming the area, so the slug starts after it.
  */
 export function branchName(title: string): string {
   const [prefix = "", ...rest] = title.split(": ");

@@ -112,7 +112,6 @@ export interface CollectOptions extends GhOptions {
   bin?: string | undefined;
 }
 
-/** Downloads one CI run's artifacts, imports each export locally, and files a copy. */
 export async function collectRun(runId: number, options: CollectOptions): Promise<string[]> {
   const run = options.run ?? runCommand;
   const staging = await mkdtemp(path.join(tmpdir(), `eval-ci-${runId}-`));

@@ -53,11 +53,9 @@ The projection scales the last 30 days of spend over the window actually observe
 
 #### Billing Source
 
-Only the `30d API` column counts against the budget. A local run authenticates through the Claude Code login and spends subscription credits, so charging its list price to a $20 API budget produces alarms for money nobody was billed.
+Only the `30d API` column counts against the budget. Local runs authenticate through the Claude Code login and CI through the `CLAUDE_CODE_OAUTH_TOKEN` secret, so both spend subscription credits, and charging their list price to a $20 API budget produces alarms for money nobody was billed.
 
-A promptfoo export cannot be asked which one it was. It prices the arms under `results.prompts[].metrics.cost` and reports grader usage as bare token counts with no cost attached, and it records nothing about how the run authenticated. What does separate them is where the run happened: CI keys every call with the workflow's `ANTHROPIC_API_KEY`, and a local run keys none of them. `metadata.platform` is the only record of that. The view reads a `darwin` payload as subscription-notional and everything else, including a payload carrying no platform at all, as API-billed.
-
-That is a heuristic and it is wrong on a Linux workstation, which it would count against the budget. It errs toward over-reporting the API side, which is the safe direction for a budget. Replace it the moment promptfoo records the auth mode, or stamp the runs `collect-ci-runs.ts` files, since that script is the only path a CI export takes into the corpus.
+A promptfoo export prices the arms under `results.prompts[].metrics.cost` and records nothing about how the run authenticated, so the view bills every run to the subscription unless its payload carries `metadata.billing: "api"`. Stamp that into the export of any run deliberately keyed with an API key so the report counts it.
 
 ## Tests
 

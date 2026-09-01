@@ -52,12 +52,11 @@ export interface Summary {
 /**
  * The view every report query and every `--sql` query reads.
  *
- * A promptfoo export prices the arms and reports grader usage as bare token
- * counts, so nothing in a payload names the budget a run spent. What separates
- * the two is where the run happened: CI keys every call with the workflow's
- * `ANTHROPIC_API_KEY`, and a local run authenticates the arms and the graders
- * alike through the Claude Code login, which bills the subscription. `platform`
- * is the only record of that, and it fails toward over-reporting the API side.
+ * Local runs and CI alike authenticate through Claude Code subscription
+ * credentials, so a run bills the API only when someone keys it deliberately,
+ * and promptfoo records nothing about auth. Billing therefore defaults to
+ * subscription, and a keyed run counts against the budget by carrying
+ * `metadata.billing: "api"` in its export.
  */
 export function runsView(dir: string): string {
   const glob = literal(path.join(dir, "**", "*.json"));
@@ -69,7 +68,7 @@ SELECT
   COALESCE(NULLIF(regexp_extract(replace(filename, ${prefix}, ''), '^([^/]+)/', 1), ''), 'unsorted') AS suite,
   json->>'$.evalId' AS eval_id,
   TRY_CAST(json->>'$.results.timestamp' AS TIMESTAMP) AS created_at,
-  CASE WHEN json->>'$.metadata.platform' = 'darwin' THEN 'subscription' ELSE 'api' END AS billing,
+  CASE WHEN json->>'$.metadata.billing' = 'api' THEN 'api' ELSE 'subscription' END AS billing,
   COALESCE(list_sum(TRY_CAST(json_extract(json, '$.results.prompts[*].metrics.cost') AS DOUBLE[])), 0)::DOUBLE AS cost_usd,
   CASE WHEN billing = 'api' THEN cost_usd ELSE 0 END::DOUBLE AS api_usd,
   CASE WHEN billing = 'api' THEN 0 ELSE cost_usd END::DOUBLE AS subscription_usd,

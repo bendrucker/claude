@@ -59,7 +59,7 @@ jobs:
       matrix:
         suite: ${{ fromJson(needs.changes.outputs.suites) }}
     env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       PROMPTFOO_CONFIG_DIR: ${{ github.workspace }}/.promptfoo
     steps:
       - name: Checkout code
@@ -77,7 +77,7 @@ jobs:
       - name: Check for eval credentials
         id: check
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
             echo "has_key=false" >> "$GITHUB_OUTPUT"
           else
             echo "has_key=true" >> "$GITHUB_OUTPUT"
@@ -85,7 +85,17 @@ jobs:
 
       - name: Skip notice
         if: steps.check.outputs.has_key == 'false'
-        run: echo "::notice::ANTHROPIC_API_KEY is not set, so the ${{ matrix.suite }} eval is skipped. Add the secret to enable live runs."
+        run: echo "::notice::CLAUDE_CODE_OAUTH_TOKEN is not set, so the ${{ matrix.suite }} eval is skipped. Add the secret (from 'claude setup-token') to enable live runs."
+
+      # The spawned CLI reads the token from the environment. promptfoo's grader
+      # providers only read it from ~/.claude/.credentials.json on Linux.
+      - name: Write grader credentials
+        if: steps.check.outputs.has_key == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.claude"
+          jq -n --arg token "$CLAUDE_CODE_OAUTH_TOKEN" '{claudeAiOauth: {accessToken: $token}}' > "$HOME/.claude/.credentials.json"
+          chmod 600 "$HOME/.claude/.credentials.json"
 
       # A suite whose providers point at a fixture tree declares a `fixtures`
       # script. The tree is git-ignored, so the run materializes it first.

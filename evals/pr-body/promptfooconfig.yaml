@@ -72,13 +72,12 @@ tests: file://cases.json
 defaultTest:
   options:
     # Never promptfoo's default OpenAI grader. `apiKeyRequired: false` rides the same
-    # Claude Code login the arms use, so a local run needs no key at all. Set
+    # Claude Code credential the arms use, so a run needs no key at all. Set
     # ANTHROPIC_GRADER_API_KEY to grade against the API instead. Leave ANTHROPIC_API_KEY
-    # unset locally: the arms hand their whole environment to the Claude Code
-    # subprocess, which takes an API key over the claude.ai login. CI sets only
-    # ANTHROPIC_API_KEY, where the override renders empty and the provider falls
-    # through to it. Sonnet 5 rejects `temperature`, so the grader carries no
-    # sampling parameters and promptfoo's response cache is what pins a regrade.
+    # unset: the arms hand their whole environment to the Claude Code subprocess,
+    # which takes an API key over the subscription credential. Sonnet 5 rejects
+    # `temperature`, so the grader carries no sampling parameters and promptfoo's
+    # response cache is what pins a regrade.
     provider: &grader
       id: anthropic:messages:claude-sonnet-5
       config:
@@ -174,10 +173,10 @@ defaultTest:
     # provider is repeated here. It repeats the model rather than reusing the &grader
     # anchor: on this assert's provider path, promptfoo sends any `apiKey` value as a
     # literal x-api-key header (the env template included, and even an empty string),
-    # so the key override stays off this block and CI's ANTHROPIC_API_KEY reaches it
-    # through the environment instead. promptfoo's built-in prompt for this assert is
-    # a lone system message, which the Anthropic Messages API rejects, so it is
-    # restated as a user turn.
+    # so the key override stays off this block and it authenticates through the CLI
+    # credential instead. promptfoo's built-in prompt for this assert is a lone
+    # system message, which the Anthropic Messages API rejects, so it is restated as
+    # a user turn.
     - type: select-best
       metric: preference
       provider:

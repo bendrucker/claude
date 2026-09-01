@@ -47,9 +47,8 @@ test.each<{ name: string; cost: number; start: string | null; expected: number }
   expect(projectMonthly(cost, start === null ? null : epoch(start), NOW)).toBeCloseTo(expected, 5);
 });
 
-// The corpus fixtures carry a `metadata.platform`: the darwin run bills the
-// subscription, the linux runs bill the API, and the pre-window run carries none
-// at all, which the view treats as API-billed.
+// Two corpus fixtures carry a `metadata.billing: "api"` stamp marking keyed runs.
+// The rest, the pre-window run included, default to the subscription.
 test("loadSuites splits each suite's window by billing source", async () => {
   const rows = await loadSuites(CORPUS, NOW);
 
@@ -118,12 +117,12 @@ test("the runs view types every numeric column as a number", async () => {
         "subscription_usd": 0,
       },
       {
-        "api_usd": 5,
-        "billing": "api",
+        "api_usd": 0,
+        "billing": "subscription",
         "cost_usd": 5,
         "failures": 5,
         "passes": 11,
-        "subscription_usd": 0,
+        "subscription_usd": 5,
       },
     ]
   `);

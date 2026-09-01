@@ -59,7 +59,7 @@ Per-skill harnesses live in [`evals/`](evals/), one directory each for `pr-body`
 
 `pull-request:create`, `pull-request:follow-up`, and `review:follow-up` each carry a `promptfooconfig.yaml` under their `evals/` dir: an in-repo promptfoo suite that loads the plugin and grades cases with `llm-rubric` asserts. [`evals/scripts/`](evals/README.md) files promptfoo runs into the durable corpus and reports what they cost.
 
-Every promptfoo suite runs unkeyed against the logged-in Claude Code CLI, so leave `ANTHROPIC_API_KEY` unset for a local run. The provider hands its whole environment to the spawned CLI, where an API key overrides the subscription login and bills the run. `ANTHROPIC_GRADER_API_KEY` is the optional override that grades through the API instead.
+Every promptfoo suite runs unkeyed against the logged-in Claude Code CLI, so leave `ANTHROPIC_API_KEY` unset for a local run. The provider hands its whole environment to the spawned CLI, where an API key overrides the subscription login and bills the run. `ANTHROPIC_GRADER_API_KEY` is the optional override that grades through the API instead. CI spends subscription credits too, via a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`.
 
 The older runners still read `ANTHROPIC_API_KEY` from the environment: `evals/pr-body/scripts/run-eval.ts` and `scripts/judge.ts`, `plugins/comments/evals/eval.ts --gate`, and `plugins/writing/skills/analyze` with `--judge`. Source it from 1Password per command:
 

@@ -67,12 +67,16 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
-      # cases.json is generated from scenarios/ and drifts silently. The check costs
-      # nothing and runs ahead of the credential gate, so drift fails the job before
-      # a single model call is billed.
+      # A suite with generated cases declares a `cases` script. Generated cases
+      # drift silently, and the check costs nothing and runs ahead of the
+      # credential gate, so drift fails the job before a single model call is billed.
       - name: Check eval cases
-        if: matrix.suite == 'pr-body'
-        run: bun run --cwd evals/pr-body cases --check
+        working-directory: evals/${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          if jq -e '.scripts.cases' package.json > /dev/null 2>&1; then
+            bun run cases --check
+          fi
 
       - name: Check for eval credentials
         id: check
@@ -126,12 +130,12 @@ jobs:
         working-directory: evals/${{ matrix.suite }}
         run: |
           set -euo pipefail
-          successes=$(jq '.results.stats.successes' output.json)
-          failures=$(jq '.results.stats.failures' output.json)
-          errors=$(jq '.results.stats.errors' output.json)
+          successes=$(jq '.results.stats.successes // 0' output.json)
+          failures=$(jq '.results.stats.failures // 0' output.json)
+          errors=$(jq '.results.stats.errors // 0' output.json)
           total=$((successes + failures + errors))
           pass_rate=$(awk -v s="$successes" -v t="$total" 'BEGIN { printf (t > 0) ? "%.1f" : "0.0", (t > 0 ? s / t * 100 : 0) }')
-          total_cost=$(jq '([.results.results[].cost // 0] | add // 0) * 100 | round / 100' output.json)
+          total_cost=$(jq '([.results.results[]?.cost // 0] | add // 0) * 100 | round / 100' output.json)
           {
             echo "pass_rate=$pass_rate"
             echo "total_cost=$total_cost"

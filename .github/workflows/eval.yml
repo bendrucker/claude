@@ -99,8 +99,12 @@ jobs:
 
       # A suite whose providers point at a fixture tree declares a `fixtures`
       # script. The tree is git-ignored, so the run materializes it first.
+      # `continue-on-error` lets a failing eval still upload, summarize, and
+      # comment before the last step turns the job red.
       - name: Run promptfoo eval
         if: steps.check.outputs.has_key == 'true'
+        id: eval
+        continue-on-error: true
         working-directory: evals/${{ matrix.suite }}
         run: |
           set -euo pipefail
@@ -110,14 +114,14 @@ jobs:
           bunx promptfoo eval --no-progress-bar -o output.json
 
       - name: Upload results
-        if: steps.check.outputs.has_key == 'true'
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('evals/{0}/output.json', matrix.suite)) != ''
         uses: actions/upload-artifact@v4
         with:
           name: promptfoo-${{ matrix.suite }}-${{ github.run_id }}
           path: evals/${{ matrix.suite }}/output.json
 
       - name: Summarize results
-        if: steps.check.outputs.has_key == 'true'
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('evals/{0}/output.json', matrix.suite)) != ''
         id: summary
         working-directory: evals/${{ matrix.suite }}
         run: |
@@ -139,7 +143,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post or update PR comment
-        if: steps.check.outputs.has_key == 'true' && github.event_name == 'pull_request'
+        if: steps.summary.outcome == 'success' && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           SUITE: ${{ matrix.suite }}
@@ -170,3 +174,7 @@ jobs:
           else
             gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -X POST -f body="$body"
           fi
+
+      - name: Surface eval failure
+        if: steps.eval.outcome == 'failure'
+        run: exit 1

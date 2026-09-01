@@ -2,7 +2,6 @@
   "evalId": "eval-old-2026-06-01T08:00:00",
   "results": {
     "version": 3,
-    "timestamp": "2026-06-01T08:00:00.000Z",
     "prompts": [
       {
         "label": "current",
@@ -12,7 +11,9 @@
           "testPassCount": 5,
           "testFailCount": 3,
           "testErrorCount": 0,
-          "tokenUsage": { "total": 402000 }
+          "tokenUsage": {
+            "total": 402000
+          }
         }
       },
       {
@@ -23,14 +24,25 @@
           "testPassCount": 6,
           "testFailCount": 2,
           "testErrorCount": 0,
-          "tokenUsage": { "total": 398000 }
+          "tokenUsage": {
+            "total": 398000
+          }
         }
       }
     ],
     "results": [],
-    "stats": { "successes": 11, "failures": 5, "errors": 0 }
+    "stats": {
+      "successes": 11,
+      "failures": 5,
+      "errors": 0
+    }
   },
-  "config": { "description": "pr-body" },
+  "config": {
+    "description": "pr-body"
+  },
   "shareableUrl": null,
-  "metadata": { "promptfooVersion": "0.122.2", "evaluationCreatedAt": "2026-06-01T08:00:00.000Z" }
+  "metadata": {
+    "promptfooVersion": "0.122.2",
+    "evaluationCreatedAt": "2026-06-01T08:00:00.000Z"
+  }
 }

@@ -67,7 +67,10 @@ SELECT
   filename AS path,
   COALESCE(NULLIF(regexp_extract(replace(filename, ${prefix}, ''), '^([^/]+)/', 1), ''), 'unsorted') AS suite,
   json->>'$.evalId' AS eval_id,
-  TRY_CAST(json->>'$.results.timestamp' AS TIMESTAMP) AS created_at,
+  COALESCE(
+    TRY_CAST(json->>'$.results.timestamp' AS TIMESTAMP),
+    TRY_CAST(json->>'$.metadata.evaluationCreatedAt' AS TIMESTAMP)
+  ) AS created_at,
   CASE WHEN json->>'$.metadata.billing' = 'api' THEN 'api' ELSE 'subscription' END AS billing,
   COALESCE(list_sum(TRY_CAST(json_extract(json, '$.results.prompts[*].metrics.cost') AS DOUBLE[])), 0)::DOUBLE AS cost_usd,
   CASE WHEN billing = 'api' THEN cost_usd ELSE 0 END::DOUBLE AS api_usd,

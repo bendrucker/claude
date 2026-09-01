@@ -10,6 +10,7 @@ import {
   type BodyContext,
   type BodyPart,
   type BodySpec,
+  effectiveCwd,
   extractBacktickedHexCandidates,
   extractBodySpec,
   extractTitle,
@@ -25,6 +26,8 @@ import {
   isPersonalRepo,
   isPrBodyCommand,
   type NarrationTell,
+  parseCommand,
+  type ParsedCommand,
   parseGhLogin,
   parseRemote,
   processInput,
@@ -87,8 +90,117 @@ describe("isPrBodyCommand", () => {
     ["{ echo one; echo two; }", false],
     ["for f in *.ts; do wc -l $f; done", false],
     ["cat <<'EOF' > notes.md\nnothing here\nEOF", false],
+    ["cat > notes.md <<'EOF'\nrun gh pr create --body-file x.md later\nEOF", false],
   ])("isPrBodyCommand(%p) -> %p", (command, expected) => {
     expect(isPrBodyCommand(command)).toBe(expected);
+  });
+});
+
+describe("parseCommand", () => {
+  test.each<[string, string, ParsedCommand]>([
+    [
+      "strips the body and captures a > redirect target",
+      "cat > body.md <<'EOF'\nProse.\nEOF\ngh pr create --body-file body.md",
+      {
+        text: "cat > body.md <<'EOF'\ngh pr create --body-file body.md",
+        heredocs: [
+          {
+            content: "Prose.\n",
+            quoted: true,
+            segment: "cat > body.md <<'EOF'",
+            target: "body.md",
+            offset: 14,
+          },
+        ],
+      },
+    ],
+    [
+      "finds a redirect written after the operator",
+      "cat <<'EOF' > body.md\nProse.\nEOF",
+      {
+        text: "cat <<'EOF' > body.md",
+        heredocs: [
+          {
+            content: "Prose.\n",
+            quoted: true,
+            segment: "cat <<'EOF' > body.md",
+            target: "body.md",
+            offset: 4,
+          },
+        ],
+      },
+    ],
+    [
+      "finds a tee sink and scopes the segment to its command",
+      "mkdir -p tmp && tee tmp/body.md <<'EOF'\nProse.\nEOF",
+      {
+        text: "mkdir -p tmp && tee tmp/body.md <<'EOF'",
+        heredocs: [
+          {
+            content: "Prose.\n",
+            quoted: true,
+            segment: " tee tmp/body.md <<'EOF'",
+            target: "tmp/body.md",
+            offset: 32,
+          },
+        ],
+      },
+    ],
+    [
+      "marks an unquoted delimiter and skips an append target",
+      "cat >> log.md <<EOF\n$VERSION\nEOF",
+      {
+        text: "cat >> log.md <<EOF",
+        heredocs: [
+          {
+            content: "$VERSION\n",
+            quoted: false,
+            segment: "cat >> log.md <<EOF",
+            target: null,
+            offset: 14,
+          },
+        ],
+      },
+    ],
+    [
+      "strips tabs under <<- and matches a tab-indented terminator",
+      "cat > body.md <<-'EOF'\n\tProse.\n\tEOF",
+      {
+        text: "cat > body.md <<-'EOF'",
+        heredocs: [
+          {
+            content: "Prose.\n",
+            quoted: true,
+            segment: "cat > body.md <<-'EOF'",
+            target: "body.md",
+            offset: 14,
+          },
+        ],
+      },
+    ],
+    [
+      "ignores a << inside a quoted argument",
+      'echo "<<EOF"\ngh pr create --body-file body.md',
+      { text: 'echo "<<EOF"\ngh pr create --body-file body.md', heredocs: [] },
+    ],
+    [
+      "gives an unterminated heredoc the rest of the command",
+      "cat > body.md <<'EOF'\nProse.\nMore prose.",
+      {
+        text: "cat > body.md <<'EOF'",
+        heredocs: [
+          {
+            content: "Prose.\nMore prose.\n",
+            quoted: true,
+            segment: "cat > body.md <<'EOF'",
+            target: "body.md",
+            offset: 14,
+          },
+        ],
+      },
+    ],
+  ])("%s", (_name, command, expected) => {
+    expect(parseCommand(command)).toEqual(expected);
   });
 });
 
@@ -123,6 +235,53 @@ describe("extractBodySpec", () => {
     // description on glab and the draft switch on gh.
     ["glab mr create -b main --description-file body.md", parts(file("body.md"))],
     ["gh pr create -d --body-file body.md", parts(file("body.md"))],
+    // A heredoc that writes the body file in the same command is the body,
+    // read before the file exists.
+    [
+      "mkdir -p tmp && cat > tmp/body.md <<'EOF'\n## Summary\n\nProse.\nEOF\ngh pr create --title T --body-file tmp/body.md",
+      parts(literal("## Summary\n\nProse.\n")),
+    ],
+    [
+      "cat <<'EOF' > body.md\nProse.\nEOF\ngh pr create --body-file ./body.md",
+      parts(literal("Prose.\n")),
+    ],
+    [
+      "tee body.md <<'EOF'\nProse.\nEOF\nglab mr create --description-file body.md",
+      parts(literal("Prose.\n")),
+    ],
+    [
+      "cat > body.md <<EOF\nPlain prose.\nEOF\ngh pr create --body-file body.md",
+      parts(literal("Plain prose.\n")),
+    ],
+    [
+      "cat > b.md <<'EOF'\nProse.\nEOF\nglab mr create --description \"$(cat b.md)\"",
+      parts(literal("Prose.\n")),
+    ],
+    // A heredoc attached to the create command itself feeds its stdin.
+    ["gh pr create --title T --body-file - <<'EOF'\nProse.\nEOF", parts(literal("Prose.\n"))],
+    ["gh pr create --body-file /dev/stdin <<'EOF'\nProse.\nEOF", parts(literal("Prose.\n"))],
+    // A write sequenced after the create command is not what the CLI reads.
+    [
+      "gh pr create --body-file body.md\ncat > body.md <<'EOF'\nProse.\nEOF",
+      parts(file("body.md")),
+    ],
+    // A flag word inside another flag's quoted value is body text, not a flag.
+    [
+      'gh pr create --body "documents --body-file usage"',
+      parts(literal("documents --body-file usage")),
+    ],
+    // Quoted `;` and `>` in the create command's own arguments do not detach
+    // the stdin heredoc.
+    [
+      "gh pr create --title \"a; b\" --body-file - <<'EOF'\nProse.\nEOF",
+      parts(literal("Prose.\n")),
+    ],
+    [
+      "gh pr create --title \"a > b\" --body-file - <<'EOF'\nProse.\nEOF",
+      parts(literal("Prose.\n")),
+    ],
+    // The shell feeds the last stdin redirection to the CLI.
+    ["gh pr create --body-file - <<'A' <<'B'\nfirst\nA\nsecond\nB", parts(literal("second\n"))],
   ])("extractBodySpec(%p) -> %p", (command, expected) => {
     expect(extractBodySpec(command)).toEqual(expected);
   });
@@ -134,7 +293,13 @@ describe("extractBodySpec", () => {
     ['glab mr create --description "$(cat $BODY_FILE)"', "$BODY_FILE"],
     ["glab mr create --description-file -", "standard input"],
     ["gh pr create --body-file -", "standard input"],
+    ["gh pr create --body-file /dev/stdin", "standard input"],
     ["glab mr create --description -", "editor"],
+    [
+      "cat > body.md <<EOF\nRelease $VERSION\nEOF\ngh pr create --body-file body.md",
+      "unquoted heredoc",
+    ],
+    ["gh pr create --body-file - <<EOF\nRelease $VERSION\nEOF", "$VERSION"],
   ])("extractBodySpec(%p) reports it cannot read %p", (command, fragment) => {
     const spec = extractBodySpec(command);
     expect(spec.kind).toBe("unreadable");
@@ -559,8 +724,30 @@ describe("extractTitle", () => {
     ['BODY=$(mktemp -t pr) && gh pr create --title "Real Title" --body-file "$BODY"', "Real Title"],
     ['gh pr create --body "use tar -t archive.tar to list" --title "Real Title"', "Real Title"],
     ['gh pr edit 12 --body "documents the --title flag for the scaffolder"', null],
+    [
+      'cat > b.md <<\'EOF\'\ngh pr create --title "Fake Title"\nEOF\ngh pr create --title "Real Title" --body-file b.md',
+      "Real Title",
+    ],
   ])("extractTitle(%p) -> %p", (command, expected) => {
     expect(extractTitle(command)).toBe(expected);
+  });
+});
+
+describe("effectiveCwd", () => {
+  test.each<[string, string]>([
+    ["gh pr create --body-file body.md", "/repo"],
+    ["cd sub && gh pr create --body-file body.md", path.join("/repo", "sub")],
+    ["cd /abs && gh pr create --body-file body.md", "/abs"],
+    ["cd a && cd b && gh pr create --body-file body.md", path.join("/repo", "a", "b")],
+    ["gh pr create --body-file body.md && cd sub", "/repo"],
+    ['cd "$DIR" && gh pr create --body-file body.md', "/repo"],
+    ["cd - && gh pr create --body-file body.md", "/repo"],
+    // The || fallback only runs when the first cd failed.
+    ["cd a || cd b && gh pr create --body-file body.md", path.join("/repo", "a")],
+    // `~user` needs a passwd lookup the hook does not do.
+    ["cd ~nobody && gh pr create --body-file body.md", "/repo"],
+  ])("effectiveCwd(%p) -> %p", (command, expected) => {
+    expect(effectiveCwd(command, "/repo")).toBe(expected);
   });
 });
 
@@ -717,6 +904,35 @@ describe("processInput", () => {
     const bodyFile = path.join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Two fixes found while testing\n\nReshapes the resolver.");
     const result = await processInput(createInput(build(bodyFile), repoRoot));
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+  });
+
+  // The body file does not exist when the hook runs: the same command writes
+  // it. The heredoc is the body.
+  it("validates a body written by a heredoc in the same command", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    const command = `mkdir -p tmp && cat > ${bodyFile} <<'EOF'\n## Two fixes found while testing\n\nReshapes the resolver.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
+    const result = await processInput(createInput(command, repoRoot));
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+  });
+
+  it("passes a clean body written by a heredoc in the same command", async () => {
+    const bodyFile = path.join(tempDir, "body.md");
+    const command = `cat > ${bodyFile} <<'EOF'\n## Summary\n\nFixes a bug.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
+    expect(await processInput(createInput(command, repoRoot))).toBeNull();
+  });
+
+  it("resolves a relative body file behind a cd", async () => {
+    const sub = path.join(tempDir, "sub");
+    await Bun.write(
+      path.join(sub, "body.md"),
+      "## Two fixes found while testing\n\nReshapes the resolver.",
+    );
+    const result = await processInput(
+      createInput("cd sub && gh pr create --title T --body-file body.md", tempDir),
+    );
     expect(getPermissionDecision(result)).toBe("deny");
     expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
   });

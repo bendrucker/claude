@@ -1,10 +1,10 @@
 # Evals
 
-Per-skill harnesses live one directory down, each with its own README: [`pr-body/`](pr-body/), [`issue-refine/`](issue-refine/), [`review-voice/`](review-voice/), [`writing/`](writing/).
+Per-skill harnesses live one directory down, each with its own README: [`pr-body/`](pr-body/), [`issue-refine/`](issue-refine/), [`review-voice/`](review-voice/), [`writing/`](writing/), [`comment-density/`](comment-density/).
 
 [`scripts/`](scripts/) is shared across them. It moves promptfoo runs out of promptfoo's SQLite database into a durable corpus and reports what the runs cost.
 
-## Results corpus
+## Results Corpus
 
 promptfoo keeps its own database under `~/.cache/promptfoo`, set through `PROMPTFOO_CONFIG_DIR` because the default `~/.promptfoo` is not writable under the repo sandbox. That database is the browse layer. It is machine-local, so the canonical durable record is one `promptfoo export` JSON per run under `evals/results/<suite>/<date>-<id>.json`, mirrored to `s3://ben-drucker-agents-eval-corpus/eval-results/`.
 
@@ -12,7 +12,7 @@ promptfoo keeps its own database under `~/.cache/promptfoo`, set through `PROMPT
 
 ## Scripts
 
-#### `export-run.ts`
+### `export-run.ts`
 
 Exports one eval and files it in the corpus.
 
@@ -26,7 +26,7 @@ Without `--suite` the suite comes from a slug of the config description. The dat
 
 `--sync` uses the standard AWS credential chain. It prints a notice and leaves the export on disk when no credentials resolve, and again when the credentials that do resolve cannot reach the bucket, so neither an unauthenticated shell nor one signed into the wrong role loses the export.
 
-#### `collect-ci-runs.ts`
+### `collect-ci-runs.ts`
 
 Pulls the exports that the eval workflow uploaded as artifacts, imports each into the local promptfoo database, and files a copy in the corpus.
 
@@ -37,7 +37,7 @@ bun evals/scripts/collect-ci-runs.ts 12345678 --suite pr-body   # one run
 
 Defaults to the last five successful `eval.yml` runs. `--conclusion any` collects failures too, `--repo OWNER/REPO` reads another checkout's workflow.
 
-#### `report.ts`
+### `report.ts`
 
 Rolls the corpus up per suite: run count, last run and its cost, the last 30 days split by who pays for it, and a monthly projection against the $20 budget.
 
@@ -51,11 +51,11 @@ The projection scales the last 30 days of spend over the window actually observe
 
 `--sql` runs any query against the `runs` view, one row per export, with `suite`, `eval_id`, `created_at`, `billing`, `cost_usd`, `api_usd`, `subscription_usd`, `passes`, `failures`, and `path`. It needs the `duckdb` CLI on `PATH` (`brew install duckdb`), as does the default rollup.
 
-#### Billing Source
+### Billing Source
 
 Only the `30d API` column counts against the budget. Local runs authenticate through the Claude Code login and CI through the `CLAUDE_CODE_OAUTH_TOKEN` secret, so both spend subscription credits, and charging their list price to a $20 API budget produces alarms for money nobody was billed.
 
-A promptfoo export prices the arms under `results.prompts[].metrics.cost` and records nothing about how the run authenticated, so the view bills every run to the subscription unless its payload carries `metadata.billing: "api"`. Stamp that into the export of any run deliberately keyed with an API key so the report counts it.
+A promptfoo export prices the arms under `results.prompts[].metrics.cost` and records nothing about how the run authenticated, so the view bills every run to the subscription unless its payload carries `metadata.billing: "api"`. Nothing writes that stamp automatically: hand-edit it into the exported JSON of any run deliberately keyed with an API key so the report counts it.
 
 ## Tests
 

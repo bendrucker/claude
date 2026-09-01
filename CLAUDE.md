@@ -50,14 +50,14 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 
 ## Evals
 
-Per-skill harnesses live in [`evals/`](evals/), one directory each for `pr-body`, `issue-refine`, `review-voice`, and `writing`, with a README per harness covering its loop. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, as is the shared `evals/results/` corpus, and some hold work-repo content that must not land here.
+Per-skill harnesses live in [`evals/`](evals/), one directory each for `pr-body`, `issue-refine`, `review-voice`, `writing`, and `comment-density`, with a README per harness covering its loop. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, as is the shared `evals/results/` corpus, and some hold work-repo content that must not land here.
 
-- `bun run --cwd evals/pr-body eval:smoke` for two cases and `eval` for all eight, both promptfoo A/B runs. `scripts/judge.ts <run-dir>` is retained as the blinded judge audited against `labels.json`. Also `scripts/mine.ts`, `label/server.ts`, and `calibrate.ts` for the heading screen
+- `bun run --cwd evals/pr-body eval:smoke` for two cases and `eval` for all eight, both promptfoo A/B runs. `scripts/judge.ts <run-dir>` is retained as the blinded audit reference for the rubric graders. Also `scripts/mine.ts`, `label/server.ts`, and `calibrate.ts` for the heading screen, whose classifier `labels.json` calibrates
 - `bun evals/issue-refine/scripts/build-dataset.ts`, then `label/server.ts`, then `scripts/ab-report.ts` and `scripts/judge.ts`
 - `bun evals/review-voice/scripts/mine.ts`, then `label/server.ts`, then `scripts/report.ts`
 - `bun evals/writing/scripts/mine.ts`, then `label/server.ts` (scorer and judge are not built yet)
 
-`pull-request:create`, `pull-request:follow-up`, and `review:follow-up` each carry a `promptfooconfig.yaml` under their `evals/` dir: an in-repo promptfoo suite that loads the plugin and grades cases with `llm-rubric` asserts. [`evals/scripts/`](evals/README.md) files promptfoo runs into the durable corpus and reports what they cost.
+`pull-request:create`, `pull-request:follow-up`, and `review:follow-up` each carry a `promptfooconfig.yaml` under their `evals/` dir: an in-repo promptfoo suite that loads the plugin and grades cases with `llm-rubric` asserts. Those three run manually; `eval.yml` wires only the pr-body suite into CI. [`evals/scripts/`](evals/scripts/) files promptfoo runs into the durable corpus and reports what they cost.
 
 Every promptfoo suite runs unkeyed against the logged-in Claude Code CLI, so leave `ANTHROPIC_API_KEY` unset for a local run. The provider hands its whole environment to the spawned CLI, where an API key overrides the subscription login and bills the run. `ANTHROPIC_GRADER_API_KEY` is the optional override that grades through the API instead. CI spends subscription credits too, via a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`.
 

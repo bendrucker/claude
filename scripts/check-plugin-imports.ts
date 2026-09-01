@@ -32,6 +32,9 @@ async function checkPlugin(pluginDir: string): Promise<string[]> {
 
   for await (const path of glob.scan({ cwd: pluginDir })) {
     if (path.includes("node_modules") || path.includes(".bun-cache")) continue;
+    // Eval harnesses only ever run from the repo checkout, so they may
+    // import packages/ like any other repo script.
+    if (path.split("/").includes("evals")) continue;
 
     const filePath = join(pluginDir, path);
     let content = await Bun.file(filePath).text();

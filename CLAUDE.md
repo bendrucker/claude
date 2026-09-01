@@ -50,21 +50,21 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 
 ## Evals
 
-Per-skill harnesses live in [`evals/`](evals/), one directory each for `pr-body`, `issue-refine`, `review-voice`, `writing`, and `comment-density`, with a README per harness covering its loop. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, as is the shared `evals/results/` corpus, and some hold work-repo content that must not land here.
+Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, with a README per harness covering its loop: `pull-request/evals/pr-body`, `issue/evals/issue-refine`, `review/evals/review-voice`, `writing/evals/writing`, and `comments/evals/comment-density`. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, as is the shared `evals/results/` corpus, and some hold work-repo content that must not land here. The generic layer stays in [`evals/`](evals/): the corpus, the export and cost scripts, and their tests.
 
-- `bun run --cwd evals/pr-body eval:smoke` for two cases and `eval` for all eight, both promptfoo A/B runs. `scripts/judge.ts <run-dir>` is retained as the blinded audit reference for the rubric graders. Also `scripts/mine.ts`, `label/server.ts`, and `calibrate.ts` for the heading screen, whose classifier `labels.json` calibrates
-- `bun evals/issue-refine/scripts/build-dataset.ts`, then `label/server.ts`, then `scripts/ab-report.ts` and `scripts/judge.ts`
-- `bun evals/review-voice/scripts/mine.ts`, then `label/server.ts`, then `scripts/report.ts`
-- `bun evals/writing/scripts/mine.ts`, then `label/server.ts` (scorer and judge are not built yet)
+- `bun run --cwd plugins/pull-request/evals/pr-body eval:smoke` for two cases and `eval` for all eight, both promptfoo A/B runs. `scripts/judge.ts <run-dir>` is retained as the blinded audit reference for the rubric graders. Also `scripts/mine.ts`, `label/server.ts`, and `calibrate.ts` for the heading screen, whose classifier `labels.json` calibrates
+- `bun plugins/issue/evals/issue-refine/scripts/build-dataset.ts`, then `label/server.ts`, then `scripts/ab-report.ts` and `scripts/judge.ts`
+- `bun plugins/review/evals/review-voice/scripts/mine.ts`, then `label/server.ts`, then `scripts/report.ts`
+- `bun plugins/writing/evals/writing/scripts/mine.ts`, then `label/server.ts` (scorer and judge are not built yet)
 
 `pull-request:create`, `pull-request:follow-up`, and `review:follow-up` each carry a `promptfooconfig.yaml` under their `evals/` dir: an in-repo promptfoo suite that loads the plugin and grades cases with `llm-rubric` asserts. Those three run manually; `eval.yml` wires only the pr-body suite into CI. [`evals/scripts/`](evals/scripts/) files promptfoo runs into the durable corpus and reports what they cost.
 
 Every promptfoo suite runs unkeyed against the logged-in Claude Code CLI, so leave `ANTHROPIC_API_KEY` unset for a local run. The provider hands its whole environment to the spawned CLI, where an API key overrides the subscription login and bills the run. `ANTHROPIC_GRADER_API_KEY` is the optional override that grades through the API instead. CI spends subscription credits too, via a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`.
 
-The older runners still read `ANTHROPIC_API_KEY` from the environment: `evals/pr-body/scripts/run-eval.ts` and `scripts/judge.ts`, `plugins/comments/evals/eval.ts --gate`, and `plugins/writing/skills/analyze` with `--judge`. Source it from 1Password per command:
+The older runners still read `ANTHROPIC_API_KEY` from the environment: the pr-body harness's `scripts/run-eval.ts` and `scripts/judge.ts`, `plugins/comments/evals/eval.ts --gate`, and `plugins/writing/skills/analyze` with `--judge`. Source it from 1Password per command:
 
 ```bash
-ANTHROPIC_API_KEY=$(op item get jx63slqb27yjg6lo7db6s42bde --fields credential --reveal) bun evals/pr-body/scripts/judge.ts <run-dir>
+ANTHROPIC_API_KEY=$(op item get jx63slqb27yjg6lo7db6s42bde --fields credential --reveal) bun plugins/pull-request/evals/pr-body/scripts/judge.ts <run-dir>
 ```
 
 `.github/workflows/eval.yml` runs a suite only when a pull request touches that suite's paths and carries the `eval` label.

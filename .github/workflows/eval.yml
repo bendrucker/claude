@@ -1,8 +1,8 @@
 name: eval
 
-# CI runs use tracked fixtures only (evals/<suite>/fixtures materialized from
-# in-repo skill sources plus evals/<suite>/scenarios/). S3 corpora never reach
-# this workflow.
+# CI runs use tracked fixtures only (each harness's fixtures/ materialized from
+# in-repo skill sources plus its scenarios/). S3 corpora never reach this
+# workflow. Harnesses live at plugins/<plugin>/evals/<suite>.
 
 on:
   pull_request:
@@ -29,9 +29,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Suite -> path mapping. A suite name must match its evals/<suite>
-      # directory, and the workflow_dispatch fallback list below must stay
-      # in sync with the filter keys here.
+      # Filter keys are suite names. Each needs an entry in the eval job's
+      # SUITE_DIR map, and the workflow_dispatch fallback list below must
+      # stay in sync with the filter keys here.
       - name: Detect touched suites
         if: github.event_name == 'pull_request'
         id: filter
@@ -40,7 +40,6 @@ jobs:
           filters: |
             pr-body:
               - 'plugins/pull-request/**'
-              - 'evals/pr-body/**'
 
       - name: Run all suites
         if: github.event_name == 'workflow_dispatch'
@@ -60,17 +59,25 @@ jobs:
         suite: ${{ fromJson(needs.changes.outputs.suites) }}
     env:
       PROMPTFOO_CONFIG_DIR: ${{ github.workspace }}/.promptfoo
+      SUITE_DIR: ${{ fromJson('{"pr-body":"plugins/pull-request/evals/pr-body"}')[matrix.suite] }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
       - uses: ./.github/actions/bun-install
 
+      - name: Resolve suite directory
+        run: |
+          if [ -z "$SUITE_DIR" ]; then
+            echo "::error::No SUITE_DIR mapping for suite '${{ matrix.suite }}'. Add it to the eval job's env map."
+            exit 1
+          fi
+
       # A suite with generated cases declares a `cases` script. Generated cases
       # drift silently, and the check costs nothing and runs ahead of the
       # credential gate, so drift fails the job before a single model call is billed.
       - name: Check eval cases
-        working-directory: evals/${{ matrix.suite }}
+        working-directory: ${{ env.SUITE_DIR }}
         run: |
           set -euo pipefail
           if jq -e '.scripts.cases' package.json > /dev/null 2>&1; then
@@ -98,7 +105,7 @@ jobs:
       # environment and no credentials file on disk.
       - name: Materialize fixtures
         if: steps.check.outputs.has_key == 'true'
-        working-directory: evals/${{ matrix.suite }}
+        working-directory: ${{ env.SUITE_DIR }}
         run: |
           set -euo pipefail
           if jq -e '.scripts.fixtures' package.json > /dev/null 2>&1; then
@@ -125,20 +132,20 @@ jobs:
         continue-on-error: true
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        working-directory: evals/${{ matrix.suite }}
+        working-directory: ${{ env.SUITE_DIR }}
         run: bunx promptfoo eval --no-progress-bar -o output.json
 
       - name: Upload results
-        if: steps.eval.outcome != 'skipped' && hashFiles(format('evals/{0}/output.json', matrix.suite)) != ''
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/output.json', env.SUITE_DIR)) != ''
         uses: actions/upload-artifact@v4
         with:
           name: promptfoo-${{ matrix.suite }}-${{ github.run_id }}
-          path: evals/${{ matrix.suite }}/output.json
+          path: ${{ env.SUITE_DIR }}/output.json
 
       - name: Summarize results
-        if: steps.eval.outcome != 'skipped' && hashFiles(format('evals/{0}/output.json', matrix.suite)) != ''
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/output.json', env.SUITE_DIR)) != ''
         id: summary
-        working-directory: evals/${{ matrix.suite }}
+        working-directory: ${{ env.SUITE_DIR }}
         run: |
           set -euo pipefail
           successes=$(jq '.results.stats.successes // 0' output.json)

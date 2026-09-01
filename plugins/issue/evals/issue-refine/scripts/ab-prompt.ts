@@ -1,0 +1,76 @@
+#!/usr/bin/env bun
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { cli } from "cleye";
+import { z } from "zod";
+import { decodeFile } from "../../../../../packages/decode/index";
+
+const Brief = z.looseObject({
+  brief: z.string(),
+  context: z
+    .looseObject({
+      files: z.array(z.string()).default([]),
+      related_issues: z.array(z.string()).default([]),
+    })
+    .default({ files: [], related_issues: [] }),
+});
+
+// Assembles the agent prompt for one A/B cell: a skill version (a directory of
+// SKILL.md + guide files) run against one synthetic brief. The agent identifies
+// the type itself and emits only the finished issue, so a version that lacks a
+// guide (e.g. before spike.md existed) simply cannot pick that type.
+
+const argv = cli({
+  name: "ab-prompt",
+  flags: {
+    version: { type: String, description: "Directory of skill files (SKILL.md + guides)" },
+    brief: { type: String, description: "Path to a brief JSON file" },
+  },
+});
+
+if (
+  argv.flags.version == null ||
+  argv.flags.version === "" ||
+  argv.flags.brief == null ||
+  argv.flags.brief === ""
+) {
+  console.error("usage: ab-prompt --version <dir> --brief <file.json>");
+  process.exit(1);
+}
+
+const versionDir = argv.flags.version;
+const brief = await decodeFile(Brief, argv.flags.brief);
+const files = (await readdir(versionDir)).filter((f) => f.endsWith(".md")).toSorted();
+
+const skillBlocks = await Promise.all(
+  files.map(async (f) => {
+    const body = await Bun.file(join(versionDir, f)).text();
+    return `================ ${f} ================\n${body.trim()}`;
+  }),
+);
+
+const files_ctx = brief.context.files.map((x) => `- ${x}`).join("\n");
+const issues_ctx = brief.context.related_issues.map((x) => `- ${x}`).join("\n");
+
+const prompt = `You are the issue:refine skill. Refine the brief below into a structured issue by following the skill instructions verbatim.
+
+Rules for this run:
+- Use ONLY the brief and synthetic context below. Do not call tools or gather external context. Treat the listed files and related issues as what you found when investigating.
+- Identify the issue type yourself from the skill's Issue Types, then follow the matching guide.
+- The tracker is a Linear-style tracker: a reference written as a markdown link expands into an inline chip. Relation links under \`relations:\` are those links.
+- Output ONLY the finished issue as a Markdown artifact: YAML frontmatter between \`---\` fences (\`title\`, \`type\`, and any of \`labels\`, \`priority\`, \`relations\` you can fill), then the body below the closing \`---\`. The body opens with the summary prose directly. Do not put a \`# H1\` heading in the body. No preamble, no "for approval" question, no commentary.
+
+${skillBlocks.join("\n\n")}
+
+================ BRIEF ================
+${brief.brief}
+
+================ SYNTHETIC CONTEXT ================
+Files:
+${files_ctx !== "" ? files_ctx : "(none)"}
+
+Related issues:
+${issues_ctx !== "" ? issues_ctx : "(none)"}
+`;
+
+console.log(prompt);

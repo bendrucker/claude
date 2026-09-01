@@ -259,6 +259,23 @@ describe("extractBodySpec", () => {
       "gh pr create --body-file body.md\ncat > body.md <<'EOF'\nProse.\nEOF",
       parts(file("body.md")),
     ],
+    // A flag word inside another flag's quoted value is body text, not a flag.
+    [
+      'gh pr create --body "documents --body-file usage"',
+      parts(literal("documents --body-file usage")),
+    ],
+    // Quoted `;` and `>` in the create command's own arguments do not detach
+    // the stdin heredoc.
+    [
+      "gh pr create --title \"a; b\" --body-file - <<'EOF'\nProse.\nEOF",
+      parts(literal("Prose.\n")),
+    ],
+    [
+      "gh pr create --title \"a > b\" --body-file - <<'EOF'\nProse.\nEOF",
+      parts(literal("Prose.\n")),
+    ],
+    // The shell feeds the last stdin redirection to the CLI.
+    ["gh pr create --body-file - <<'A' <<'B'\nfirst\nA\nsecond\nB", parts(literal("second\n"))],
   ])("extractBodySpec(%p) -> %p", (command, expected) => {
     expect(extractBodySpec(command)).toEqual(expected);
   });
@@ -721,6 +738,8 @@ describe("effectiveCwd", () => {
     ["cd - && gh pr create --body-file body.md", "/repo"],
     // The || fallback only runs when the first cd failed.
     ["cd a || cd b && gh pr create --body-file body.md", path.join("/repo", "a")],
+    // `~user` needs a passwd lookup the hook does not do.
+    ["cd ~nobody && gh pr create --body-file body.md", "/repo"],
   ])("effectiveCwd(%p) -> %p", (command, expected) => {
     expect(effectiveCwd(command, "/repo")).toBe(expected);
   });

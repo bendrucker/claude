@@ -360,8 +360,8 @@ const SEGMENT_SEPARATOR = /&&|\|\||;/g;
 // The redirect lookbehind skips `>>` (an append mixes the heredoc with the
 // file's prior content), fd forms (`2>`), and `&>`. The tee pattern's leading
 // character class skips flags, so `tee -a` also resolves to no target.
-const REDIRECT_TARGET = /(?<![>\d&])>[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&<>]+)/;
-const TEE_TARGET = /\btee\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&<>-][^\s;|&<>]*)/;
+const REDIRECT_TARGET = /(?<![>\d&])>[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&<>]+)/g;
+const TEE_TARGET = /\btee\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&<>-][^\s;|&<>]*)/g;
 
 export interface Heredoc {
   /** Body text as the shell delivers it, with `<<-` tab stripping applied. */
@@ -419,10 +419,38 @@ function quotedSpans(line: string): Array<[number, number]> {
   return spans;
 }
 
-function segmentAt(line: string, index: number): string {
+// Quoted spans across the whole (stripped) text, line by line, so flag
+// matching can skip a flag word sitting inside another flag's quoted value.
+function quotedSpansAll(text: string): Array<[number, number]> {
+  const spans: Array<[number, number]> = [];
+  let offset = 0;
+  for (const line of text.split("\n")) {
+    for (const [start, end] of quotedSpans(line)) spans.push([offset + start, offset + end]);
+    offset += line.length + 1;
+  }
+  return spans;
+}
+
+// First match whose own start sits outside every quoted span. The value a
+// match captures may still be quoted. Only the operator or flag itself must
+// not be.
+function firstUnquotedMatch(
+  text: string,
+  pattern: RegExp,
+  spans: Array<[number, number]>,
+): RegExpExecArray | null {
+  for (const match of text.matchAll(pattern)) {
+    if (!spans.some(([start, end]) => match.index > start && match.index <= end)) return match;
+  }
+  return null;
+}
+
+function segmentAt(line: string, index: number, spans: Array<[number, number]>): string {
   let start = 0;
   let end = line.length;
   for (const sep of line.matchAll(SEGMENT_SEPARATOR)) {
+    if (spans.some(([spanStart, spanEnd]) => sep.index > spanStart && sep.index <= spanEnd))
+      continue;
     if (sep.index < index) {
       start = sep.index + sep[0].length;
     } else {
@@ -434,7 +462,10 @@ function segmentAt(line: string, index: number): string {
 }
 
 function segmentTarget(segment: string): string | null {
-  const value = segment.match(REDIRECT_TARGET)?.[1] ?? segment.match(TEE_TARGET)?.[1];
+  const spans = quotedSpans(segment);
+  const value =
+    firstUnquotedMatch(segment, REDIRECT_TARGET, spans)?.[1] ??
+    firstUnquotedMatch(segment, TEE_TARGET, spans)?.[1];
   return value === undefined ? null : normalizeBodyPath(value);
 }
 
@@ -474,7 +505,7 @@ export function parseCommand(command: string): ParsedCommand {
     const spans = quotedSpans(line);
     for (const match of line.matchAll(HEREDOC_OPERATOR)) {
       if (spans.some(([start, end]) => match.index > start && match.index <= end)) continue;
-      const segment = segmentAt(line, match.index);
+      const segment = segmentAt(line, match.index, spans);
       queue.push({
         delimiter: match[2] ?? match[3] ?? match[5] ?? "",
         quoted: match[2] !== undefined || match[3] !== undefined || match[4] !== undefined,
@@ -670,11 +701,13 @@ const STDIN_PATHS = new Set(["-", "/dev/stdin"]);
 export function extractBodySpec(command: string): BodySpec {
   const { text, heredocs } = parseCommand(command);
   const flags = bodyFlags(text);
-  const fileValue = text.match(flagValuePattern(flags.file))?.[1];
+  const spans = quotedSpansAll(text);
+  const fileValue = firstUnquotedMatch(text, flagValuePattern(flags.file, true), spans)?.[1];
   if (fileValue != null && fileValue !== "") {
     const path = unquote(fileValue);
     if (STDIN_PATHS.has(path)) {
-      const fed = heredocs.find(
+      // The last stdin redirection wins, as it does in the shell.
+      const fed = heredocs.findLast(
         (doc) => doc.target === null && PR_BODY_COMMAND_PATTERN.test(doc.segment),
       );
       if (fed !== undefined) return heredocSpec(fed);
@@ -684,7 +717,7 @@ export function extractBodySpec(command: string): BodySpec {
     if (part === null) return unreadableExpansion(path);
     return resolveHeredocParts([part], precedingHeredocs(text, heredocs));
   }
-  const inlineValue = text.match(flagValuePattern(flags.inline))?.[1];
+  const inlineValue = firstUnquotedMatch(text, flagValuePattern(flags.inline, true), spans)?.[1];
   if (inlineValue == null || inlineValue === "") return { kind: "none" };
   const inline = parseInlineValue(inlineValue);
   if (inline.kind !== "parts") return inline;
@@ -725,11 +758,13 @@ export function effectiveCwd(command: string, cwd: string): string {
   for (const match of scope.matchAll(CD_PATTERN)) {
     const target = expandTmpdir(unquote(match[1] ?? ""));
     if (target === "" || target === "-" || SHELL_EXPANSION_PATTERN.test(target)) continue;
-    if (target === "~" || target.startsWith("~/")) {
+    if (target.startsWith("~")) {
+      // `~user` needs a passwd lookup the hook does not do, so leave dir as-is.
+      if (target !== "~" && !target.startsWith("~/")) continue;
       dir = join(homedir(), target.slice(1));
-    } else {
-      dir = isAbsolute(target) ? target : join(dir, target);
+      continue;
     }
+    dir = isAbsolute(target) ? target : join(dir, target);
   }
   return dir;
 }

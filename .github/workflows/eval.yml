@@ -59,7 +59,6 @@ jobs:
       matrix:
         suite: ${{ fromJson(needs.changes.outputs.suites) }}
     env:
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       PROMPTFOO_CONFIG_DIR: ${{ github.workspace }}/.promptfoo
     steps:
       - name: Checkout code
@@ -80,6 +79,8 @@ jobs:
 
       - name: Check for eval credentials
         id: check
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
             echo "has_key=false" >> "$GITHUB_OUTPUT"
@@ -95,6 +96,8 @@ jobs:
       # providers only read it from ~/.claude/.credentials.json on Linux.
       - name: Write grader credentials
         if: steps.check.outputs.has_key == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.claude"
@@ -109,6 +112,8 @@ jobs:
         if: steps.check.outputs.has_key == 'true'
         id: eval
         continue-on-error: true
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         working-directory: evals/${{ matrix.suite }}
         run: |
           set -euo pipefail

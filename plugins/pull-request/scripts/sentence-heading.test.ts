@@ -4,21 +4,23 @@ import { classifyPrHeading } from "./sentence-heading";
 
 const root = join(import.meta.dirname, "..", "..", "..");
 
-// The files under `linguistics/` are byte-for-byte copies of the writing
-// plugin's. The duplication is deliberate: plugins are distributed and installed
-// one at a time, so runtime code can only import published npm packages, which
-// rules out both a cross-plugin import and a `workspace:*` package. Read as text
-// rather than imported, so the plugin-boundary checker still passes.
-test.each(["heading.ts", "preprocess.ts", "tags.ts"])(
-  "linguistics/%s stays identical to the writing plugin's copy",
-  async (file) => {
-    const [writing, pullRequest] = await Promise.all([
-      Bun.file(join(root, "plugins", "writing", "linguistics", file)).text(),
-      Bun.file(join(root, "plugins", "pull-request", "scripts", "linguistics", file)).text(),
-    ]);
-    expect(pullRequest).toBe(writing);
-  },
-);
+// These files are byte-for-byte copies of the writing plugin's. The duplication
+// is deliberate: plugins are distributed and installed one at a time, so runtime
+// code can only import published npm packages, which rules out both a
+// cross-plugin import and a `workspace:*` package. Read as text rather than
+// imported, so the plugin-boundary checker still passes.
+test.each([
+  ["linguistics/heading.ts", "scripts/linguistics/heading.ts"],
+  ["linguistics/preprocess.ts", "scripts/linguistics/preprocess.ts"],
+  ["linguistics/tags.ts", "scripts/linguistics/tags.ts"],
+  ["hooks/heading-case.ts", "scripts/heading-case.ts"],
+])("writing/%s and pull-request/%s stay identical", async (source, destination) => {
+  const [writing, pullRequest] = await Promise.all([
+    Bun.file(join(root, "plugins", "writing", source)).text(),
+    Bun.file(join(root, "plugins", "pull-request", destination)).text(),
+  ]);
+  expect(pullRequest).toBe(writing);
+});
 
 test.each<[string, string, boolean]>([
   ["flags an interrogative opener", "Why This Happens", true],

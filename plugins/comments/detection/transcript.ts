@@ -12,8 +12,7 @@ const TranscriptLine = z.object({
 
 /**
  * The absolute paths a session's `Edit`, `Write`, and `MultiEdit` calls named,
- * in first-touch order. Paths only: what those edits produced is read from the
- * files themselves, so a path repeated across edits appears once.
+ * in first-touch order. A path repeated across edits appears once.
  */
 export function editedPaths(transcript: string): string[] {
   const paths = new Set<string>();

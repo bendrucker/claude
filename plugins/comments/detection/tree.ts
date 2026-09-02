@@ -3,14 +3,19 @@ import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import {
   addedLines,
+  isGeneratedPath,
   measureAddedLines,
   type ScoredFile,
   sessionScore,
   type SessionScore,
 } from "./density";
+import { isGeneratedFile } from "./collect";
 import { languageForPath } from "./extract";
 
-const MAX_FILE_CHARS = 500_000;
+const MAX_FILE_CHARS = 2_000_000;
+
+/** Directories holding throwaway output, scored in no repo. */
+const SCRATCH = /(^|\/)(tmp|scratchpad|tasks)\//;
 
 /** Refs to take a merge base against when the repo has no `origin/HEAD`, in preference order. */
 const DEFAULT_REFS = [
@@ -49,7 +54,9 @@ async function defaultRef(root: string): Promise<string | null> {
 /**
  * The commit the current work sits on top of: the merge base with the default
  * branch, so committed and uncommitted work both count as introduced. Null on
- * an unborn branch, where every file is new.
+ * an unborn branch, where every file is new. With no default branch to compare
+ * against, HEAD stands in and only uncommitted work counts: a score that misses
+ * committed comments beats one that charges a whole repo for them.
  */
 async function diffBase(root: string): Promise<string | null> {
   const head = await $`git rev-parse --verify HEAD`.cwd(root).quiet().nothrow();
@@ -82,14 +89,19 @@ async function changedFiles(root: string, base: string | null): Promise<ChangedF
       for (const line of lines(diff.text())) {
         const [status = "", first, second] = line.split("\t");
         if (first == null) continue;
-        const moved = status.startsWith("R") || status.startsWith("C");
+        const moved = status.startsWith("R");
         const path = moved ? second : first;
         if (path == null) continue;
         files.set(path, { path, source: first });
       }
     }
   }
-  const others = await $`git ls-files --others --exclude-standard`.cwd(root).quiet().nothrow();
+  // An unborn branch has no base to diff against, so its staged files are new too.
+  const listed =
+    base == null
+      ? $`git ls-files --cached --others --exclude-standard`
+      : $`git ls-files --others --exclude-standard`;
+  const others = await listed.cwd(root).quiet().nothrow();
   if (others.exitCode === 0) {
     for (const path of lines(others.text())) files.set(path, { path, source: path });
   }
@@ -113,7 +125,7 @@ function realPath(path: string): string {
 /**
  * Measure one file's current content against the version at `base`. Lines the
  * base already carried do not count, so a file scores what its introduced
- * comments weigh now, not what the edits that produced them said.
+ * comments weigh now.
  */
 async function scoreFile(
   root: string,
@@ -122,10 +134,12 @@ async function scoreFile(
 ): Promise<ScoredFile | null> {
   const language = languageForPath(path);
   if (language == null || language === "") return null;
+  if (SCRATCH.test(path) || isGeneratedPath(path)) return null;
   const blob = Bun.file(join(root, path));
   if (!(await blob.exists())) return null;
+  if (blob.size === 0 || blob.size > MAX_FILE_CHARS) return null;
   const current = await blob.text();
-  if (current.length === 0 || current.length > MAX_FILE_CHARS) return null;
+  if (isGeneratedFile(path, current)) return null;
   const previous = base == null ? "" : await contentAt(root, base, source);
   const { fragment, added } = addedLines(previous, current);
   if (added.size === 0) return null;
@@ -140,9 +154,9 @@ export interface TreeOptions {
 }
 
 /**
- * Score the comments a branch introduced, read from the working tree rather
- * than from the edits that wrote them. Trimming a comment lowers the score and
- * a tree matching its base scores zero. Outside a git repo nothing is scored.
+ * Score the comments a branch introduced, measured from the working tree.
+ * Trimming a comment lowers the score and a tree matching its base scores zero.
+ * Outside a git repo nothing is scored.
  */
 export async function scoreTree(
   options: TreeOptions,

@@ -27,7 +27,7 @@ Both run extraction, intrinsic-complexity ranking, an agent fan-out for judging,
 
 `hooks/density.ts` runs on `Stop`. It takes the files the session's `Edit`, `Write`, and `MultiEdit` calls named, measures the comment share of the lines those files add over the branch's merge base with the default branch, and charges each file's comment weight against its language baseline. At 2800 characters of total excess it blocks the stop, names the three heaviest files, and asks for a `comments:audit` run over the diff and the trims it flags. Below that it stays silent.
 
-The number describes the tree, not the edits that wrote it. Trimming a comment lowers it, rewriting one costs what the surviving text weighs, and a branch back at its base scores zero, so the audit the hook asks for can satisfy it.
+The number describes the tree as it stands. Trimming a comment lowers it, rewriting one costs what the surviving text weighs, and a branch back at its base scores zero, so the audit the hook asks for can satisfy it.
 
 The score is volume, so slop written at an ordinary density passes. Files the session touched through a shell heredoc or `sed` never reach it, and neither does work outside the repo it stopped in. It also skips extensions missing from the language map, generated files, and files git ignores. Added lines that are 95% comment read as a documentation pass and never escalate on their own.
 

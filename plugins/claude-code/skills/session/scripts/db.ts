@@ -4,10 +4,10 @@ import * as path from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
+import { nodeAdapter, runQuery as runOnAdapter } from "./query";
 
 const RESOURCES_DIR = path.join(import.meta.dirname, "..", "resources");
 const SCHEMA_DIR = path.join(RESOURCES_DIR, "schema");
-const QUERIES_DIR = path.join(RESOURCES_DIR, "queries");
 
 export const LOCAL_HOST = "local";
 
@@ -538,15 +538,5 @@ export async function runQuery<T>(
   schema: z.ZodType<T>,
   params: Record<string, string | null> = {},
 ): Promise<T[]> {
-  for (const [key, value] of Object.entries(params)) {
-    if (value === null) {
-      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
-      await db.run(`SET VARIABLE "${key}" = NULL`);
-    } else {
-      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
-      await db.run(`SET VARIABLE "${key}" = $value`, { value });
-    }
-  }
-  const sql = await readSql(QUERIES_DIR, queryName);
-  return db.query(sql, schema);
+  return runOnAdapter(nodeAdapter(db), { name: queryName }, schema, params);
 }

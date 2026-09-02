@@ -65,6 +65,7 @@ The four writers carry the `claude:dangerouslyDisableSandbox` marker after their
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.
 - `refresh.ts`: CLI entry point. Stamp fast-path, `ensureIndex`, compaction guard, prints DB path to stdout.
+- `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock.
 
 ### Development
 

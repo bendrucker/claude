@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "bun:test";
-import type { Discussion, DiscussionSummary, FilterOptions } from "./discussions";
+import type { DiscussionSummary, FilterOptions } from "./discussions";
 import {
   deduplicateDiscussions,
   Discussion,

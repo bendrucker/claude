@@ -1,0 +1,3 @@
+Run with `PROMPTFOO_CONFIG_DIR=$HOME/.cache/promptfoo bunx promptfoo eval -c plugins/writing/skills/no-diary/evals/promptfooconfig.yaml` from the repo root. Both the skill under test and the grader authenticate through the logged-in Claude Code CLI, so a local run needs no API key. Leave `ANTHROPIC_API_KEY` unset, since the provider hands its environment to the Claude Code subprocess and an API key there takes precedence over the claude.ai login. Set `ANTHROPIC_GRADER_API_KEY` to grade against the API instead.
+
+Each case pastes its artifact as text, so the rewrite lands in the reply and the write tools are denied. That pins the skill's rule that pasted text leaves nothing on disk.

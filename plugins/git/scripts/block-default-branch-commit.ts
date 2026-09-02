@@ -24,9 +24,9 @@ const QUOTED_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
 // herestrings out.
 const HEREDOC_OPERATOR = /(?<!<)<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/g;
 
-// Quoted spans carry commit messages and grep patterns, where the literal text
-// `git commit` is data rather than an invocation. Masking with spaces keeps
-// offsets aligned with the unmasked text.
+// Quoted spans can hold the literal text `git commit` as inert data, in commit
+// messages or grep patterns. Masking with spaces keeps offsets aligned with
+// the unmasked text.
 function maskQuoted(command: string): string {
   return command.replace(QUOTED_SPAN, (span) => " ".repeat(span.length));
 }

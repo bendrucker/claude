@@ -1,4 +1,5 @@
 import { describe, expect, it, test } from "bun:test";
+import { join } from "node:path";
 import type { PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
 import { formatOutput, type HookInput, isGitLabUrl, parseGitLabUrl, processInput } from "./fetch";
 
@@ -198,5 +199,23 @@ describe("processInput", () => {
     const output = getOutput(mockInput("https://gitlab.com/gitlab-org/gitlab/-/settings"));
     expect(output?.permissionDecision).toBe("ask");
     expect(output?.permissionDecisionReason).toContain("Unknown GitLab URL pattern");
+  });
+});
+
+describe("undecodable payload", () => {
+  it("logs and exits 0", async () => {
+    const hook = Bun.spawn(["bun", join(import.meta.dir, "fetch.ts")], {
+      stdin: new TextEncoder().encode("not json"),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(hook.stdout).text(),
+      new Response(hook.stderr).text(),
+      hook.exited,
+    ]);
+    expect(stderr).toContain("[gitlab/fetch] Failed to parse hook input:");
+    expect(stdout).toBe("");
+    expect(exitCode).toBe(0);
   });
 });

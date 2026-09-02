@@ -3,6 +3,7 @@
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import UrlPattern from "url-pattern";
 import { z } from "zod";
+import { readHookInput } from "../hooks/hook-input";
 
 const WebFetchInput = z.looseObject({ url: z.string() });
 
@@ -138,15 +139,8 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
 }
 
 async function main(): Promise<void> {
-  let input: HookInput;
-  try {
-    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
-  } catch (error) {
-    console.error(
-      `[gitlab/fetch] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
-  }
+  const input = await readHookInput(HookInput, "fetch");
+  if (input == null) return;
 
   const output = processInput(input);
   if (output) {

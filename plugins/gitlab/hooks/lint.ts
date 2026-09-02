@@ -3,12 +3,12 @@
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { BashHookInput, readHookInput } from "./hook-input";
 
-export const HookInput = z.looseObject({
+export const HookInput = BashHookInput.extend({
   hook_event_name: z.literal("PreToolUse"),
   session_id: z.string(),
   cwd: z.string(),
-  tool_input: z.looseObject({ command: z.string().optional().catch(undefined) }).catch({}),
 });
 export type HookInput = z.infer<typeof HookInput>;
 
@@ -229,16 +229,10 @@ export async function processInput(
 }
 
 async function main(): Promise<void> {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(await Bun.stdin.text());
-  } catch {
-    return;
-  }
-  const input = HookInput.safeParse(raw);
-  if (!input.success) return;
+  const input = await readHookInput(HookInput, "lint");
+  if (input == null) return;
 
-  const output = await processInput(input.data);
+  const output = await processInput(input);
   if (output) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }

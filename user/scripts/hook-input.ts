@@ -8,6 +8,7 @@ import { decodeStdin } from "../../packages/decode/index";
 export const HookInput = z.looseObject({
   session_id: z.string().catch(""),
   hook_event_name: z.string().catch(""),
+  transcript_path: z.string().optional().catch(undefined),
   tool_name: z.string().optional().catch(undefined),
   tool_input: z.unknown().optional(),
 });

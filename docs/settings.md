@@ -1,6 +1,6 @@
 # settings.json Entries
 
-Why each sandbox entry in `settings.json` exists and what would retire it. Nothing here auto-injects. [`.claude/rules/settings.md`](../.claude/rules/settings.md) carries the rules that govern an edit and links here.
+Why each sandbox grant and hook in `settings.json` exists and what would retire it. Nothing here auto-injects. [`.claude/rules/settings.md`](../.claude/rules/settings.md) carries the rules that govern an edit and links here.
 
 ## Hosts
 
@@ -67,6 +67,14 @@ The rest are tool caches and state directories holding no credential material:
 A new host needs its secret kept outside the sandbox, and never add an upload-capable one casually. A new escaped command must fit a group above. If it reaches the network without its own auth, keep it sandboxed.
 
 Go CLIs need no entry. `sandbox.network.allowMachLookup` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification profile-wide.
+
+## Hooks
+
+Why each hook entry in `user/settings.json` earns its place, and what would retire it. The hook scripts themselves live in [`user/hooks/`](../user/hooks).
+
+[`agent-model`](../user/hooks/agent-model) warns, on a `PreToolUse` matching `Agent`, when a spawn names neither a `model` nor a `subagent_type` that pins one and the parent is running opus or fable. It enforces the delegation rule already written in `user/CLAUDE.md`, which spawns were ignoring: over the 30 days to 2026-09-01, 34 `general-purpose` and 30 bare spawns under opus-family parents carried no `model` and resolved to opus, and their task descriptions were lookup and fan-out shaped. It emits `additionalContext` and no `permissionDecision`, so the spawn still proceeds. `PreToolUse` carries no model field, so the parent's family comes from the last assistant record in the tail of `transcript_path`, and an unresolvable model stays silent.
+
+**Delete it** if the gap it targets has not closed. Around 2026-10-15, run the `claude-code:session` skill's [`delegation`](../plugins/claude-code/skills/session/resources/queries/delegation.sql) query with `host` set to `local` and `after_date` to the day this shipped, and read the `generic` path under an opus or fable `parent_family`. If `cheaper_override_rate_pct` has not risen and the count of spawns carrying no override has not fallen, the warning is not changing behavior and the hook goes.
 
 ## Sandbox Findings
 

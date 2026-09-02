@@ -6,5 +6,12 @@
     "./lint/typescript.json",
     "./packages/oxlint-rules/config.json"
   ],
-  "ignorePatterns": ["**/fixtures/**", "**/*.d.ts", "**/jxa/**/*.js", ".claude/workflows/**"]
+  "ignorePatterns": [
+    "**/fixtures/**",
+    "**/*.d.ts",
+    "**/jxa/**/*.js",
+    ".claude/workflows/**",
+    ".worktrees/**",
+    "tmp/**"
+  ]
 }

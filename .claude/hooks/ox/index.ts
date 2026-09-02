@@ -425,11 +425,14 @@ type TypeCheckResult = { output: string | null; needsInstall: boolean };
 // already reports them for the files actually edited. --no-error-on-unmatched-pattern
 // covers a tree whose config ignores everything in it, which otherwise exits
 // non-zero with "No files found to lint" and reads as a type failure.
-const TYPE_CHECK_ARGS = [
+// --disable-nested-config avoids a nested checkout under .worktrees/
+// re-registering the root's `local` JS plugin.
+export const TYPE_CHECK_ARGS = [
   "--type-aware",
   "--type-check",
   "--quiet",
   "--no-error-on-unmatched-pattern",
+  "--disable-nested-config",
   "-f",
   "agent",
 ];

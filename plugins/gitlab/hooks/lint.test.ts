@@ -234,3 +234,32 @@ describe("pass-through", () => {
     expect(await processInput(input, fakeEnv())).toBeNull();
   });
 });
+
+async function runHook(payload: string) {
+  const hook = Bun.spawn(["bun", join(import.meta.dir, "lint.ts")], {
+    stdin: new TextEncoder().encode(payload),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(hook.stdout).text(),
+    new Response(hook.stderr).text(),
+    hook.exited,
+  ]);
+  return { stdout, stderr, exitCode };
+}
+
+describe("undecodable payload", () => {
+  test.each<{ name: string; payload: string }>([
+    { name: "not JSON", payload: "not json" },
+    {
+      name: "missing cwd",
+      payload: JSON.stringify({ hook_event_name: "PreToolUse", session_id: "s" }),
+    },
+  ])("$name logs and exits 0", async ({ payload }) => {
+    const { stdout, stderr, exitCode } = await runHook(payload);
+    expect(stderr).toContain("[gitlab/lint] Failed to parse hook input:");
+    expect(stdout).toBe("");
+    expect(exitCode).toBe(0);
+  });
+});

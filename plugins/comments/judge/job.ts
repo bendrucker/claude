@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 import type { CollectedComment } from "../detection/collect";
 import type { CommentKind, Language } from "../detection/types";
 import { BATCH_SIZE, loadPrompt, sha256 } from "./judge";
@@ -18,6 +19,25 @@ export interface ShardComment {
 export interface JobShard {
   id: number;
   comments: ShardComment[];
+}
+
+const ShardFile = z.object({
+  id: z.number(),
+  comments: z.array(
+    z.object({
+      id: z.string(),
+      path: z.string(),
+      language: z.string(),
+      kind: z.enum(["line", "block", "docstring"]),
+      text: z.string(),
+      context: z.string(),
+    }),
+  ),
+}) satisfies z.ZodType<JobShard>;
+
+/** A shard read back from the file `writeJob` wrote. */
+export async function readShard(path: string): Promise<JobShard> {
+  return ShardFile.parse(JSON.parse(await Bun.file(path).text()));
 }
 
 export interface JobDescriptor {

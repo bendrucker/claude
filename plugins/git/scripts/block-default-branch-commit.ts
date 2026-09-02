@@ -44,8 +44,8 @@ function* unquotedMatches(
 
 // A heredoc operator, then its delimiter word, which the shell takes as any
 // word up to the next operator or space and reads with its quotes removed.
-// The lookarounds keep `<<<` herestrings out.
-const HEREDOC_LEAD = /(?<!<)<<(?!<)/g;
+// The lookarounds keep `<<<` herestrings and an escaped `\<<` out.
+const HEREDOC_LEAD = /(?<![<\\])<<(?!<)/g;
 const HEREDOC_DELIMITER = /^(-?)[ \t]*((?:'[^']*'|"[^"]*"|\\.|[^\s'"\\<>|&;()])+)/;
 
 function unquoteWord(word: string): string {
@@ -54,9 +54,9 @@ function unquoteWord(word: string): string {
   );
 }
 
-// A `#` that starts a word opens a comment the shell never parses, so nothing
-// after it is syntax.
-const COMMENT_START = /(?:^|\s)#/;
+// A `#` that starts a word, after space or an operator, opens a comment the
+// shell never parses, so nothing after it is syntax.
+const COMMENT_START = /(?:^|[\s;&|(])#/;
 
 function withoutComment(line: string): string {
   const start = maskQuoted(line).search(COMMENT_START);

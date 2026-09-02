@@ -413,6 +413,36 @@ export async function rebuildViews(db: Database): Promise<void> {
   await db.run(await readSql(RESOURCES_DIR, "views"));
 }
 
+// One transaction: a partial forget that kept indexed_files rows would make a later
+// re-import of the same label skip every unchanged file while raw stays empty. The views
+// rebuild drops the host from content_items. CHECKPOINT cannot run inside a transaction.
+//
+// Marking the derived tables stale first is what keeps a forget durable. A crash between
+// the commit and the rebuild would otherwise leave the host's rows in content_items with
+// nothing left to ask for their removal: its files are gone, so no later refresh sees a
+// change. Returns the number of raw rows removed.
+export async function forgetHost(db: Database, host: string): Promise<number> {
+  const [row] = await db.query(
+    "SELECT COUNT(*) AS n FROM raw WHERE host = $host",
+    z.object({ n: z.bigint() }),
+    { host },
+  );
+  await invalidateDerived(db);
+  await deleteHostRows(db, host);
+  await rebuildViews(db);
+  await db.run("CHECKPOINT");
+  return Number(row?.n ?? 0n);
+}
+
+// The committed half of a forget, exported so an interrupted one can be reproduced.
+export async function deleteHostRows(db: Database, host: string): Promise<void> {
+  await db.run("BEGIN");
+  await db.run("DELETE FROM raw WHERE host = $host", { host });
+  await db.run("DELETE FROM indexed_files WHERE host = $host", { host });
+  await db.run("DELETE FROM meta WHERE host = $host", { host });
+  await db.run("COMMIT");
+}
+
 async function removeFile(db: Database, host: string, file: string): Promise<void> {
   await db.run("BEGIN");
   await db.run("DELETE FROM raw WHERE host = $host AND source_file = $path", {

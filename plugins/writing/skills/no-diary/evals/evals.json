@@ -1,0 +1,124 @@
+{
+  "skill_name": "writing:no-diary",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Fix this PR body.\n\n---\nThis PR fixes the retry bug. Initially we thought the exit code was being swallowed by the wrapper, so the first approach added a status check in `run()`. That turned out to be wrong. After adding logging we found the real cause: `spawn` was being awaited before the stream drained, so the exit event fired against a closed handle. We then reverted the status check and moved the await below the drain. Along the way we also discovered the timeout path had the same shape, so that got fixed too. All tests pass (47 passing).\n---",
+      "expected_output": "A body that opens on the real cause and the fix, keeps the second site as a stated fact rather than a discovery narrative, and drops the disproven theory and the test tally.",
+      "files": [],
+      "expectations": [
+        "Opens on the actual cause (awaiting spawn before the stream drained) or on what the change does, never on the first theory",
+        "The abandoned exit-code theory and its reverted status check do not appear as narrative",
+        "The timeout path fix is stated as part of the change, without discovery framing",
+        "No 'initially', 'then', 'turned out', 'along the way' sequencing",
+        "No test count and no 'all tests pass'"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "no-diary this comment.\n\n```ts\n// This used to be a giant switch statement that duplicated the parser logic in\n// three places, which was a nightmare to keep in sync. Ben asked me to pull it\n// out during review of #412, so now it delegates to parseToken. See ENG-1183\n// and the Acme Corp incident for background.\nfunction read(input: string) {\n```",
+      "expected_output": "Either no comment, or a short comment stating a durable constraint. Everything about the prior implementation, the review, the ticket, and the customer is gone.",
+      "files": [],
+      "expectations": [
+        "No description of the previous switch-statement implementation or how bad it was",
+        "No reference to the reviewer, the review, or the session",
+        "No issue or ticket identifiers (#412, ENG-1183)",
+        "No customer name",
+        "Either deletes the comment entirely or leaves only something the code itself cannot say",
+        "Does not replace the narrative with an equally long restatement of what parseToken does"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "trim this pr body, too much diary\n\n---\n## Things That Wouldn't Be Obvious To A Reviewer\n\nThis section covers the non-obvious parts of the change. First, I noticed while working on this that the cast on line 40 was unrequested, but I added it anyway. Second, it's worth noting that the schema asymmetry here is deliberate.\n\n## Changes\n\n- `src/query/build.ts`: added cast\n- `src/query/build.test.ts`: added test\n- `src/types.ts`: widened type\n---",
+      "expected_output": "Prose that states what the cast prevents and why the asymmetry is intentional, with the meta heading, the self-narration, and the file inventory removed.",
+      "files": [],
+      "expectations": [
+        "The heading echoing the instruction ('Things That Wouldn't Be Obvious To A Reviewer') is gone",
+        "No 'I noticed', no 'unrequested', no 'worth noting', no 'deliberate' as self-description",
+        "States what the cast prevents rather than that it was added",
+        "The file-by-file changes list is replaced by naming the behavior or function",
+        "No section that introduces what the following section will say"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/writing:no-diary docs/access-spec.md\n\n---\n# Access Engine\n\nA Postgres-native access engine, decided in the 2026-08-24 authorization evaluation after we benchmarked spikes at 1000x production scale and read through the OpenFGA and SpiceDB docs. External engines were rejected: dual-write atomicity, tuple sync on high-cardinality tables, and list filtering are all free in SQL and pathological in a sidecar. Note that this is not an attempt to reinvent authorization from scratch.\n\nGrants live in the app database and share transactions with the rows they protect.\n---",
+      "expected_output": "A spec that describes the engine and its transactional property, with the evaluation history, the reading list, and the defensive disclaimer removed.",
+      "files": [],
+      "expectations": [
+        "The dated evaluation, the benchmark story, and the documents consulted are gone",
+        "The defensive sentence disclaiming reinvention is gone",
+        "The transactional property of grants survives",
+        "The rejected-alternatives reasoning is either cut or reduced to a compact statement of the constraint, rather than left as a narrative of the decision",
+        "Does not read as a shortened version of the same story"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "cut the diary out of this skill file\n\n---\n## Retry Policy\n\nThis section explains how retries work. We originally used exponential backoff with jitter, but that was chosen over a fixed interval because fixed intervals synchronize across workers, which is a well-known problem in distributed systems. The reason this rule is correct is that thundering herds are expensive.\n\nRetry three times with exponential backoff. Give up after the third failure and report the error.\n---",
+      "expected_output": "The two instruction sentences, with the framing sentence, the alternative considered, and the justification removed.",
+      "files": [],
+      "expectations": [
+        "The framing sentence announcing what the section explains is gone",
+        "The rejected fixed-interval alternative is gone",
+        "The sentence arguing the rule is correct is gone",
+        "The imperative instruction to retry three times with exponential backoff and then report survives",
+        "The result is shorter than the input, rather than a reworded version of the same length"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "no-diary the plan\n\n---\n# Migration Plan\n\n## Changed Since Last Plan\n\nYou asked me to drop the shadow-write phase, so that section is removed. I also corrected the row-count estimate after you pointed out the stale figure.\n\n## Approach\n\nBackfill the new column, switch reads, drop the old column.\n---",
+      "expected_output": "A standalone execution document containing the approach, with the revision log and the dialogue removed.",
+      "files": [],
+      "expectations": [
+        "The 'Changed Since Last Plan' section is removed entirely",
+        "No second-person address to the reviewer and no reference to their feedback",
+        "The approach survives intact",
+        "Ruled-out approaches, if kept at all, appear as an alternatives section rather than as revision history",
+        "The plan reads as usable without the chat that produced it"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "rewrite my review comment, sounds robotic\n\n---\nI reviewed this and found four minor issues. In src/handlers/auth.ts:142 the null check is redundant. In src/handlers/auth.ts:187 the error is swallowed. Regarding your first comment about the token refresh, I have addressed it. Regarding your second comment about the retry, I have also addressed it.\n---",
+      "expected_output": "Plain technical prose that says what was investigated and what came of it, without the tally, the recited paths, or the point-by-point mirroring.",
+      "files": [],
+      "expectations": [
+        "No count of issues ('four minor issues')",
+        "No recited file:line paths in the prose",
+        "Does not mirror the reviewer's comments back as a numbered or 'regarding your Nth comment' sequence",
+        "Reads as someone who understood and investigated the concerns rather than someone answering a checklist",
+        "The substantive findings (redundant null check, swallowed error) survive"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "/writing:no-diary the body on #204\n\n---\nThis change reworks the loader. During the work I found that the LEFT JOIN assumed `external_id` was unique, which the old comment could only assert. I ran it against a real org: 1,852 rows in and 1,852 rows out, zero fan-out, so the assumption holds. I also learned that DuckDB's httpfs cache is off by default, which surprised me.\n\nThe loader now streams instead of buffering.\n---",
+      "expected_output": "A body keeping the streaming change and the row-count verification as a finding, with the discovery framing removed and the incidental httpfs observation either dropped or stated as a brief explicit aside.",
+      "files": [],
+      "expectations": [
+        "The 1,852-in/1,852-out verification survives, because it is evidence rather than a routine test report",
+        "The uniqueness assumption is stated as a fact about the join, rather than as something found during the work",
+        "No 'during the work I found', 'I also learned', 'which surprised me' framing",
+        "The streaming change is stated",
+        "The httpfs observation is cut, or kept as a short aside that is explicitly labeled rather than folded into the change description",
+        "The pass does not delete the verification along with the narration"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "no-diary this issue\n\n---\n## Loader drops rows\n\nWhile pairing with Claude on the DuckDB migration I noticed something odd. At first I thought the loader was fine, but then I checked the row counts and they didn't line up. I went back and forth on whether this was a join problem or a streaming problem. After digging through the transcript I realized the LEFT JOIN fans out whenever `external_id` repeats.\n\nAnyway, the loader should probably dedupe on `external_id` before the join.\n---",
+      "expected_output": "An issue stating the fan-out and what would fix it, with the investigation narrative, the session reference, and the hedging removed.",
+      "files": [],
+      "expectations": [
+        "States the defect as a fact about the loader: the LEFT JOIN fans out when `external_id` repeats",
+        "No first-person investigation narrative ('I noticed', 'at first I thought', 'I went back and forth', 'after digging')",
+        "No reference to the session, the transcript, or pairing",
+        "The resolution (dedupe on `external_id` before the join) survives without hedging such as 'should probably'",
+        "Materially shorter than the input rather than a reworded version of the same length"
+      ]
+    }
+  ]
+}

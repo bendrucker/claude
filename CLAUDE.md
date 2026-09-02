@@ -61,10 +61,10 @@ Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/ev
 
 Every promptfoo suite runs unkeyed against the logged-in Claude Code CLI, so leave `ANTHROPIC_API_KEY` unset for a local run. The provider hands its whole environment to the spawned CLI, where an API key overrides the subscription login and bills the run. `ANTHROPIC_GRADER_API_KEY` is the optional override that grades through the API instead. CI spends subscription credits too, via a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`.
 
-The older runners still read `ANTHROPIC_API_KEY` from the environment: the pr-body harness's `scripts/run-eval.ts` and `scripts/judge.ts`, `plugins/comments/evals/eval.ts --gate`, and `plugins/writing/skills/analyze` with `--judge`. Source it from 1Password per command:
+The older runners still read `ANTHROPIC_API_KEY` from the environment: the pr-body harness's `scripts/run-eval.ts` and `scripts/judge.ts`, `plugins/comments/evals/eval.ts --gate`, and `plugins/writing/skills/analyze` with `--judge`. [`evals/op.env`](evals/op.env) holds the 1Password secret reference, which `op run` resolves at run time, so no secret rests on disk. Reserve it for those runners, since injecting a key into a promptfoo run bills it:
 
 ```bash
-ANTHROPIC_API_KEY=$(op item get jx63slqb27yjg6lo7db6s42bde --fields credential --reveal) bun plugins/pull-request/evals/pr-body/scripts/judge.ts <run-dir>
+op run --env-file=evals/op.env -- bun plugins/pull-request/evals/pr-body/scripts/judge.ts <run-dir>
 ```
 
 `.github/workflows/eval.yml` runs a suite only when a pull request touches that suite's paths and carries the `eval` label.

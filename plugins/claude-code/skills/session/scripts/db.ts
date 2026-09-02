@@ -324,17 +324,18 @@ async function reconcilePinned(db: Database): Promise<boolean> {
   );
   if (row?.import_hash === fingerprint) return false;
 
-  // A null hash is an index built before this check existed, whose rows came from the
-  // projection 00_pinned.sql was extracted from unchanged, so rewriting the table would
-  // only reproduce what is already in it.
+  // A null hash is an index built before this check existed. The projection may have
+  // changed between that build and the first run to stamp it, so the rewrite is skipped
+  // only when raw's columns already match what the projection produces.
   const seeding = row?.import_hash == null;
+  const rewrite = !seeding || !(await rawMatchesProjection(db));
 
   // Derived state is invalidated either way. An adopted index was built by code that
   // could leave content_items behind a committed import, and its provenance is not
   // recoverable, so the run that adopts it rebuilds once rather than inheriting the
   // question.
   await invalidateDerived(db);
-  if (!seeding) {
+  if (rewrite) {
     await db.run(`
       CREATE OR REPLACE TABLE raw AS
       SELECT host, UNNEST(pinned_columns(data)), source_file, source_line, data FROM raw
@@ -342,7 +343,30 @@ async function reconcilePinned(db: Database): Promise<boolean> {
     await db.run("CHECKPOINT");
   }
   await db.run("UPDATE index_meta SET import_hash = $hash", { hash: fingerprint });
-  return !seeding;
+  return rewrite;
+}
+
+const ColumnName = z.object({ column_name: z.string() });
+
+async function columnNames(db: Database, sql: string): Promise<string> {
+  const rows = await db.query(sql, ColumnName);
+  return rows.map((r) => r.column_name).join(",");
+}
+
+async function rawMatchesProjection(db: Database): Promise<boolean> {
+  const live = await columnNames(
+    db,
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'raw' ORDER BY ordinal_position`,
+  );
+  const projected = await columnNames(
+    db,
+    `SELECT column_name FROM (
+       DESCRIBE SELECT host, UNNEST(pinned_columns(NULL::JSON)), source_file, source_line, data
+       FROM raw
+     )`,
+  );
+  return live === projected;
 }
 
 export async function getDb(dataDir: string): Promise<Database> {

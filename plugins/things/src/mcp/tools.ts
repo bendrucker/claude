@@ -181,7 +181,8 @@ interface Attribute {
  * spelled at a single call site can be wrong for a long time without anything
  * saying so.
  */
-const ATTRIBUTES: Record<keyof WriteArgs, Attribute> & Record<string, Attribute | undefined> = {
+export const ATTRIBUTES: Record<keyof WriteArgs, Attribute> &
+  Record<string, Attribute | undefined> = {
   title: { param: "title" },
   titles: { param: "titles" },
   notes: { param: "notes" },
@@ -301,12 +302,7 @@ function limitArgs(limit: number | undefined): string[] {
   return limit === undefined ? [] : ["--limit", String(limit)];
 }
 
-/**
- * What a write tool needs from Things. Production wires it to the real
- * dispatcher and tag requirer, which hold their own `DispatchActions` and
- * `TagActions` seams. A test wires it to fakes and drives a tool call without
- * launching Things or writing to real task data.
- */
+/** What a write tool needs from Things, injectable for tests. */
 export interface ThingsClient {
   ensureRunning(): Promise<void>;
   dispatch(command: string, params: Map<string, string>): Promise<DispatchResult>;

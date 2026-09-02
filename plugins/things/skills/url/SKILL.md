@@ -63,7 +63,7 @@ Matching folds case, so `Bug` resolves to a stored `bug`. An empty `tags=` still
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3> ...
 ```
 
-Items appear at the top of the list in the order specified. Default list is `today`. Use the `--list` value matching the items' current scheduling state. Reordering reschedules each item out of the list and back, so an item carrying a specific date loses it, and order within a project is untouched.
+Items appear at the top of the list in the order specified. Default list is `today`. Use the `--list` value matching the items' current scheduling state. See [Reordering Replaces a Specific Date](#reordering-replaces-a-specific-date).
 
 ## Inbox Capture
 
@@ -103,6 +103,12 @@ Things notes support [Markdown](https://culturedcode.com/things/support/articles
 Judge failure by a non-zero exit and read stderr for the cause. To confirm a write that printed nothing, query the todo with the `things:jxa` skill. Never retry blind: a repeated `add` creates duplicate todos.
 
 `inbox.ts` and `reorder.ts` do print on success regardless of xcall, so silence from those is a genuine failure.
+
+#### Reordering Replaces a Specific Date
+
+`reorder.ts` reschedules each item out of the target list and back, because the URL scheme offers no other way to move an item to the top. An item carrying a specific date has that date replaced by the target list, and there is no workaround.
+
+Order within a project is untouched, being separate from scheduling.
 
 #### Sandbox-blocked URL handoff
 

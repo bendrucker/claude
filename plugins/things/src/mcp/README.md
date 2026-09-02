@@ -35,7 +35,7 @@ Reads run the plugin's JXA scripts through the `mac` plugin's runner: `list_todo
 
 Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `update_todos`, `update_project`, `capture_inbox`, `reorder_todos`. Cultured Code exposes no write API beyond it.
 
-Every write maps its arguments through the one `ATTRIBUTES` table in `tools.ts`, which holds each argument's dashed param name and how a list value joins. Things ignores a param it does not recognize and reports success anyway, so a dashed name spelled per call site can be wrong for a long time without anything saying so.
+Every write but `reorder_todos` maps its arguments through the one `ATTRIBUTES` table in `tools.ts`, which holds each argument's URL-scheme param name and how a list value joins. Things ignores a param it does not recognize and reports success anyway, so a param name spelled per call site can be wrong for a long time without anything saying so. `reorder_todos` sits outside the table, building its own `when` update in `scripts/reorder.ts`.
 
 `registerTools` takes a `ThingsClient` carrying the launch check, the dispatcher, the tag requirer, and the batch pacing. `tools.test.ts` passes a fake and drives each write through a real in-memory MCP round trip, which covers what a handler builds without touching Things.
 

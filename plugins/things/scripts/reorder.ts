@@ -38,10 +38,7 @@ export interface ReorderResult {
   reordered: number;
 }
 
-/**
- * What reordering does to the todos it moves. Callers state this rather than
- * describing the mechanism again, since a second telling drifts from this one.
- */
+/** What reordering does to the todos it moves, for callers to quote verbatim. */
 export const REORDER_MECHANISM =
   "This works by rescheduling each todo out of the list and back, so a todo carrying a specific date has that date replaced by the target list. Order within a project is untouched, being separate from scheduling.";
 

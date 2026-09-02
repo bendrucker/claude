@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { buildAttribution } from "../../scripts/inbox";
 import {
+  ATTRIBUTES,
   chunk,
   limitItems,
   registerTools,
@@ -211,6 +212,26 @@ const ToolResult = z.looseObject({
   isError: z.boolean().optional(),
   content: z.array(z.looseObject({ text: z.string() })).optional(),
 });
+
+const ToolList = z.looseObject({
+  tools: z.array(
+    z.looseObject({
+      name: z.string(),
+      inputSchema: z.looseObject({ properties: z.record(z.string(), z.unknown()).optional() }),
+    }),
+  ),
+});
+
+const WRITE_TOOLS = new Set([
+  "add_todo",
+  "add_project",
+  "update_project",
+  "update_todos",
+  "capture_inbox",
+]);
+
+/** Arguments a write tool reads itself rather than passing to `writeParams`. */
+const STEERING_ARGUMENTS = new Set(["id", "ids", "create_tags", "session_id", "directory"]);
 
 /** Connects a client to a server carrying only the fake, over an in-memory pair. */
 async function connect(client: ThingsClient): Promise<Client> {
@@ -435,6 +456,23 @@ describe("write tools", () => {
     expect(result.isError).toBe(true);
     expect(result.content?.[0]?.text).toContain("At least one attribute to update is required");
     expect(calls.launches).toBe(0);
+    await mcp.close();
+  });
+
+  test("every advertised write argument names an attribute", async () => {
+    const { client } = fakeClient();
+    const mcp = await connect(client);
+
+    const { tools } = ToolList.parse(await mcp.listTools());
+    const unmapped = tools
+      .filter((tool) => WRITE_TOOLS.has(tool.name))
+      .flatMap((tool) =>
+        Object.keys(tool.inputSchema.properties ?? {})
+          .filter((name) => !(name in ATTRIBUTES) && !STEERING_ARGUMENTS.has(name))
+          .map((name) => `${tool.name}.${name}`),
+      );
+
+    expect(unmapped).toEqual([]);
     await mcp.close();
   });
 });

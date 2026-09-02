@@ -1,5 +1,4 @@
-import { z } from "zod";
-import { extractComments, languageForPath } from "./extract";
+import { extractComments } from "./extract";
 import { isExemptComment } from "./exempt";
 import type { Comment } from "./types";
 
@@ -320,79 +319,4 @@ export function densityWeights(files: ScoredFile[]): Map<string, number> {
       return [file.path, chars === 0 ? 1 : 1 + excessChars / chars];
     }),
   );
-}
-
-const EditInput = z.object({
-  file_path: z.string().optional(),
-  old_string: z.string().optional(),
-  new_string: z.string().optional(),
-  content: z.string().optional(),
-  edits: z
-    .array(z.object({ old_string: z.string().optional(), new_string: z.string().optional() }))
-    .optional(),
-});
-
-const EditToolUse = z.object({
-  type: z.literal("tool_use"),
-  name: z.enum(["Edit", "Write", "MultiEdit"]),
-  input: EditInput,
-});
-
-const TranscriptLine = z.object({
-  message: z.object({ content: z.array(z.unknown()) }).optional(),
-});
-
-/** Path segments marking scratch output the score ignores. */
-const SKIP_PATHS = ["/scratchpad/", "/tmp/", "/tasks/"];
-
-const MAX_FRAGMENT_CHARS = 500_000;
-
-/**
- * Score every Edit/Write/MultiEdit in a session JSONL transcript, accumulating
- * added-line stats per file across edits. A Write counts its full content as
- * new. Files without a known language and scratch paths are skipped.
- */
-export async function scoreTranscript(
-  transcriptPath: string,
-): Promise<{ files: ScoredFile[]; session: SessionScore }> {
-  const content = await Bun.file(transcriptPath).text();
-  const perFile = new Map<string, ScoredFile>();
-  for (const line of content.split("\n")) {
-    if (!line.includes('"tool_use"')) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const record = TranscriptLine.safeParse(parsed);
-    if (!record.success || record.data.message == null) continue;
-    for (const raw of record.data.message.content) {
-      const block = EditToolUse.safeParse(raw);
-      if (!block.success) continue;
-      const { name, input } = block.data;
-      const path = input.file_path;
-      if (path == null || path === "") continue;
-      if (SKIP_PATHS.some((part) => path.includes(part))) continue;
-      const language = languageForPath(path);
-      if (language == null) continue;
-      const pairs: Array<{ old: string; new: string }> =
-        name === "Write"
-          ? [{ old: "", new: input.content ?? "" }]
-          : name === "MultiEdit"
-            ? (input.edits ?? []).map((e) => ({ old: e.old_string ?? "", new: e.new_string ?? "" }))
-            : [{ old: input.old_string ?? "", new: input.new_string ?? "" }];
-      for (const pair of pairs) {
-        if (pair.new.length === 0 || pair.new.length > MAX_FRAGMENT_CHARS) continue;
-        const { fragment, added } = addedLines(pair.old, pair.new);
-        if (added.size === 0) continue;
-        const entry = perFile.get(path) ?? { path, language, stats: emptyStats() };
-        perFile.set(path, entry);
-        // oxlint-disable-next-line no-await-in-loop -- Shiki extraction is CPU-bound and the accumulator is shared, so parallelizing buys nothing.
-        addInto(entry.stats, await measureAddedLines(fragment, added, language));
-      }
-    }
-  }
-  const files = [...perFile.values()];
-  return { files, session: sessionScore(files) };
 }

@@ -1,7 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import {
   type AddedLineStats,
   addedLines,
@@ -10,7 +7,6 @@ import {
   emptyStats,
   measureAddedLines,
   type ScoredFile,
-  scoreTranscript,
   sessionScore,
   type Tier,
 } from "./density";
@@ -256,67 +252,5 @@ describe("sessionScore tiers", () => {
       session.worstFiles.reduce((sum, f) => sum + f.excessChars, 0),
       5,
     );
-  });
-});
-
-describe("scoreTranscript", () => {
-  const toolUse = (name: string, input: Record<string, unknown>) =>
-    JSON.stringify({ message: { content: [{ type: "tool_use", name, input }] } });
-
-  test("accumulates Edit/Write/MultiEdit per file, skipping scratch and unknown paths", async () => {
-    const lines = [
-      toolUse("Write", {
-        file_path: "/repo/a.ts",
-        content: ["// adds two numbers", "const x = 1; // trailing", "const y = 2;"].join("\n"),
-      }),
-      toolUse("Edit", {
-        file_path: "/repo/a.ts",
-        old_string: "const y = 2;",
-        new_string: "const y = 2;\nconst z = 3;",
-      }),
-      toolUse("MultiEdit", {
-        file_path: "/repo/b.py",
-        edits: [{ old_string: "", new_string: ["# top comment", "x = 1"].join("\n") }],
-      }),
-      toolUse("Write", { file_path: "/tmp/skip.ts", content: "// nope\nconst a = 1;" }),
-      toolUse("Write", { file_path: "/work/scratchpad/s.ts", content: "const a = 1;" }),
-      toolUse("Write", { file_path: "/repo/readme.txt", content: "plain text" }),
-      toolUse("Read", { file_path: "/repo/a.ts" }),
-      JSON.stringify({ type: "user", message: { content: "not an edit" } }),
-      'not json but mentions "tool_use"',
-    ];
-    const dir = mkdtempSync(join(tmpdir(), "density-"));
-    const path = join(dir, "session.jsonl");
-    await Bun.write(path, `${lines.join("\n")}\n`);
-
-    const { files, session } = await scoreTranscript(path);
-    expect(files.map((f) => ({ path: f.path, language: f.language }))).toEqual([
-      { path: "/repo/a.ts", language: "typescript" },
-      { path: "/repo/b.py", language: "python" },
-    ]);
-    expect(files[0]?.stats).toEqual({
-      addedLines: 4,
-      commentChars: 26,
-      codeChars: 27,
-      commentLines: 1,
-      codeLines: 2,
-      mixedLines: 1,
-      commentWords: 4,
-      commentCount: 2,
-      maxCommentChars: 19,
-    });
-    expect(files[1]?.stats).toEqual({
-      addedLines: 2,
-      commentChars: 11,
-      codeChars: 3,
-      commentLines: 1,
-      codeLines: 1,
-      mixedLines: 0,
-      commentWords: 2,
-      commentCount: 1,
-      maxCommentChars: 13,
-    });
-    expect(session.stats.addedLines).toBe(6);
-    expect(session.tier).toBe("none");
   });
 });

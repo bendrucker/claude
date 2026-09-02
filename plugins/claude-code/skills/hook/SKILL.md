@@ -104,9 +104,9 @@ try {
 }
 ```
 
-`looseObject` keeps fields the harness adds later, and `.catch` supplies a per-field default so one unexpected value costs that field rather than the whole payload.
+`looseObject` keeps fields the harness adds later. A per-field `.catch` means one unexpected value costs that field rather than the whole payload.
 
-On an undecodable payload, log one line to stderr and exit 0 so the tool call proceeds. A gate exits 1 instead, letting the call through while the harness surfaces the stderr line, so a gate that has stopped deciding says so rather than reading as a call that passed every rule ([plugins/plan/hooks/gate.ts](../../../plan/hooks/gate.ts)). Reserve exit 2 for the block itself.
+On an undecodable payload, log the failure to stderr and exit 0 so the tool call proceeds. A gate can exit 1 instead. The call still goes through, and the harness surfaces the stderr line, so a gate that has stopped deciding does not read as a call that passed every rule ([plugins/plan/hooks/gate.ts](../../../plan/hooks/gate.ts)).
 
 ## Hook Output
 
@@ -119,7 +119,7 @@ On an undecodable payload, log one line to stderr and exit 0 so the tool call pr
 {"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {"state": "Todo"}}}
 ```
 
-On `ExitPlanMode`, `ask` is inert: the tool runs its own plan-approval prompt, and the harness drops the hook's `permissionDecisionReason` and `systemMessage` both. Use `deny` there to carry a reason back.
+On `ExitPlanMode`, `ask` is inert: the tool runs its own plan-approval prompt, and the harness drops both `permissionDecisionReason` and `systemMessage`. Use `deny` there to carry a reason back.
 
 **PostToolUse** - Provide feedback:
 ```json

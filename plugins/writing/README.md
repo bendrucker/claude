@@ -7,6 +7,7 @@ Writing style enforcement and slop detection for prose output (PR descriptions, 
 - **Hooks**: Step, phase, and part numbering detection, heading style enforcement, AI writing trope detection (em dashes, vocabulary, copula avoidance, promotional language, parallelism, connector density)
 - **Skills**: `writing:writing` system reminder for prose writing guidelines, `writing:analyze` session-history-based trope ruleset curation, `writing:rewrite` user-invoked text rewriter, `writing:scan` user-invoked trope detector (`audit` gates a directory, `score` measures one input's density), `writing:review` multi-agent document review, `writing:no-diary` cuts process narration out of a deliverable
 - **Agents**: `content`, `style`, `artifacts` (conditional review lenses)
+- **Scripts**: [`scripts/similarity.ts`](scripts/similarity.ts), the CLI over the [`similarity/`](similarity/) style-similarity engine
 
 ## Wordlists
 

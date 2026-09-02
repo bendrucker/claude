@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -23,4 +24,33 @@ export function corpusPath(dataDir: string): string {
 
 export function profilePath(dataDir: string): string {
   return join(voiceBaselineDir(dataDir), "profile.json");
+}
+
+// The voice baseline grew past its seed file into one delimited corpus per
+// register (sent mail, dictation, blog, and so on). Everything ending in .txt
+// there is a register, so adding one needs no code change.
+export async function registerPaths(dataDir: string): Promise<string[]> {
+  const dir = voiceBaselineDir(dataDir);
+  const entries = await readdir(dir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  });
+  return entries
+    .filter((entry) => entry.endsWith(".txt"))
+    .toSorted()
+    .map((entry) => join(dir, entry));
+}
+
+// The contrast pole for similarity scoring: Claude-written prose in the same
+// delimited format. Local-only for the same reason the voice baseline is.
+export function contrastBaselineDir(dataDir: string): string {
+  return join(dataDir, "contrast-baseline");
+}
+
+export function contrastCorpusPath(dataDir: string): string {
+  return join(contrastBaselineDir(dataDir), "claude-deliverables.txt");
+}
+
+export function similarityProfilePath(dataDir: string): string {
+  return join(voiceBaselineDir(dataDir), "similarity.json");
 }

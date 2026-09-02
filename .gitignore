@@ -34,3 +34,10 @@ node_modules/
 # which is this repo's user/skills. They belong to that install, not here, and
 # `install.sh` replaces them on every upgrade.
 /user/skills/plannotator*
+
+# The similarity scorer's corpora and cached profile live in the plugin data
+# dir outside the repo. A --data-dir or --out pointed inside it would otherwise
+# stage real corpus text, which must never be committed.
+voice-baseline/
+contrast-baseline/
+similarity.json

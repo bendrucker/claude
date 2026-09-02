@@ -19,8 +19,8 @@ import { AuditError, type AuditIo } from "./io";
  * Fixed token cost of one judging agent beyond its comment payload: the Claude
  * Code system prompt and tool schemas (~15k), the rubric read (~2.5k), and the
  * multi-turn read/write/output cycle. The preflight estimate is the number the
- * user consents to, so it must include this, not just payload; overhead
- * dominates payload at the default shard size.
+ * user consents to, so it must include this cost; overhead dominates payload
+ * at the default shard size.
  */
 const AGENT_OVERHEAD_TOKENS = 25_000;
 

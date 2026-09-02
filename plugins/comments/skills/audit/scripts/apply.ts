@@ -14,7 +14,7 @@ import { AuditError, type AuditIo } from "./io";
 export interface ApplyOptions {
   /** The job dir preflight printed. */
   job: string;
-  /** Print findings instead of applying. */
+  /** Prints findings only. */
   report: boolean;
   /** Include suggestions in the report. */
   fix: boolean;

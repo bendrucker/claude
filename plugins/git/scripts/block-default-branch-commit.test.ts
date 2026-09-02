@@ -75,6 +75,8 @@ describe("invokesGitCommit", () => {
     ["cat > f <<E'OF'\nnotes\nEOF\ngit commit", true],
     ['cat > f <<"EOF"\ngit commit here\nEOF', false],
     ["cat > f <<E\\OF\ngit commit here\nEOF", false],
+    ["echo $((1<<2))\ngit commit -m x", true],
+    ["echo $(( (1<<2) ))\ngit commit -m x", true],
   ])("%p → %p", (command, expected) => {
     expect(invokesGitCommit(command)).toBe(expected);
   });
@@ -117,6 +119,8 @@ describe("commitDirectories", () => {
     ["echo $(cd /wt && git commit)", ["/wt"]],
     ["echo `cd /wt && git commit`", ["/wt"]],
     ["echo `cd /x && pwd` && git commit", ["/repo"]],
+    ["echo `cd /wt && echo \\`x\\` && git commit`", ["/wt"]],
+    ["echo `cd /wt && echo $(x) && git commit`", ["/wt"]],
     ["cd /wt && echo `pwd` && git commit", ["/wt"]],
   ])("%p → %p", (command, expected) => {
     expect(commitDirectories(command, "/repo", (path) => [path])).toEqual(expected);
@@ -314,6 +318,17 @@ describe("processInput", () => {
       const { command, cwd } = build(testRepo, worktree);
       const output = await getOutput(mockInput(command, cwd));
       expect(output?.permissionDecision ?? "allow").toBe(expected);
+    });
+
+    it("stays put when a glob names the worktree and a file", async () => {
+      const sibling = `${worktree}.txt`;
+      await Bun.write(sibling, "");
+      try {
+        const output = await getOutput(mockInput(`cd ${worktree}* && git commit -m x`, testRepo));
+        expect(output?.permissionDecision).toBe("deny");
+      } finally {
+        await rm(sibling, { force: true });
+      }
     });
   });
 

@@ -18,13 +18,12 @@ const GIT_COMMIT_PATTERN = new RegExp(
   String.raw`\bgit\s+(?:(?:${VALUE_FLAG}|${BOOLEAN_FLAG})\s+)*commit(?![\w-])`,
 );
 
-const QUOTED_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
+// Quoted strings and `$((...))` arithmetic, where `<<` and `git commit` are
+// data. Masking with spaces keeps offsets aligned with the unmasked text.
+const INERT_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"|\$\(\((?:[^)]|\)(?!\)))*\)\)/g;
 
-// Quoted spans can hold the literal text `git commit` as inert data, in commit
-// messages or grep patterns. Masking with spaces keeps offsets aligned with
-// the unmasked text.
 function maskQuoted(command: string): string {
-  return command.replace(QUOTED_SPAN, (span) => " ".repeat(span.length));
+  return command.replace(INERT_SPAN, (span) => " ".repeat(span.length));
 }
 
 // Runs `lead` over the quote-masked text, so a match cannot start inside a
@@ -96,6 +95,7 @@ const CD_LEAD = /(?:^|&&|;|\n|\(|`)\s*cd(?=\s)/g;
 const CD_TARGET = /^\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&)]+)\s*(?=&&|\|\||;|\n|$)/;
 const SHELL_EXPANSION_PATTERN = /(?<!\\)[$`]/;
 const GLOB_PATTERN = /(?<!\\)[*?[]/;
+const BACKTICK = /(?<!\\)`/g;
 const EVERY_GIT_COMMIT = new RegExp(GIT_COMMIT_PATTERN, "g");
 
 function unquote(value: string): string {
@@ -106,8 +106,8 @@ function unquote(value: string): string {
 // follow it, and one inside backticks once the closing backtick does.
 function subshellClosed(masked: string, from: number): boolean {
   const rest = masked.slice(from);
-  const inBackticks = (masked.slice(0, from).split("`").length - 1) % 2 === 1;
-  if (inBackticks && rest.includes("`")) return true;
+  const inBackticks = (masked.slice(0, from).match(BACKTICK)?.length ?? 0) % 2 === 1;
+  if (inBackticks && rest.search(BACKTICK) !== -1) return true;
   let depth = 0;
   for (const char of rest) {
     if (char === "(") depth++;
@@ -125,11 +125,12 @@ function isDirectory(path: string): boolean {
   }
 }
 
-// The directories a bare cd word names on disk: the path itself, or what an
-// unquoted glob in it expands to.
+// The directory a cd word names on disk, if it names exactly one path and
+// that path is a directory. A glob that also matches a file gives cd too many
+// operands.
 function directoriesNamed(path: string, quoted: boolean): string[] {
   const candidates = !quoted && GLOB_PATTERN.test(path) ? globSync(path) : [path];
-  return candidates.filter(isDirectory);
+  return candidates.length === 1 ? candidates.filter(isDirectory) : [];
 }
 
 type Expand = (path: string, quoted: boolean) => string[];

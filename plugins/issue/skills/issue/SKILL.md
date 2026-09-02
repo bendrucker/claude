@@ -3,6 +3,7 @@ name: issue
 description: |
   Implement a feature or fix based on an issue. Use when given an issue URL to work on, or when implementing changes described in a tracked issue. Supports GitHub, Linear, and GitLab.
 argument-hint: <issue-url>
+disable-model-invocation: true
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)

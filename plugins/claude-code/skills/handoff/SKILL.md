@@ -2,6 +2,7 @@
 name: claude-code:handoff
 description: Hand the current conversation off to a fresh background agent that picks up the work immediately, so you can step away and track it independently. Use when the user wants to background the current work, keep going without them, continue in a separate session, or says "hand this off", "run this in the background", "keep working on this while I'm gone", or "spin up an agent to finish this".
 argument-hint: "[what the next session should focus on]"
+disable-model-invocation: true
 allowed-tools:
   - Bash(claude --bg:*)
   - Bash(claude agents:*)

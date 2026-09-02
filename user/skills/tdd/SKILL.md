@@ -1,6 +1,7 @@
 ---
 name: tdd
 description: Test-driven development. Use when building a feature or fixing a bug test-first, when the user asks for red-green-refactor, or when a change needs its tests written before its implementation.
+disable-model-invocation: true
 ---
 
 # Test-Driven Development

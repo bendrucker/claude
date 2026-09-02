@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: Diagnose a reported bug, a failing CI or lint job, or a performance regression, and find its cause. Use when something is broken, failing, throwing, hanging, or slower than it was, when CI or a pipeline fails, or when the user asks why something is happening.
+description: Find the cause of a reported failure by first building a command that reproduces it. Use when the user reports something broken, failing, throwing, hanging, or slower than it was, or points at a red CI, pipeline, or lint job.
 argument-hint: "[<what is broken>]"
 ---
 

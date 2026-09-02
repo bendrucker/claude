@@ -2,6 +2,7 @@
 name: claude-code:agent-team
 description: Orchestrating Claude Code agent teams. Use when creating teams, spawning teammates, assigning tasks, configuring teammate modes, or setting up team quality gate hooks.
 argument-hint: "[--plan-approval] [--delegate] [--shutdown]"
+disable-model-invocation: true
 allowed-tools:
   - Read
   - Write

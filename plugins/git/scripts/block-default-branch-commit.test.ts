@@ -59,6 +59,10 @@ describe("invokesGitCommit", () => {
     ["cat > a <<'ONE' > b <<'TWO'\nfirst\nONE\ngit commit\nTWO", false],
     ["grep '<<EOF' f && git commit", true],
     ["git commit -F - <<'EOF'\nmessage\nEOF", true],
+    ["cat > f <<'MY-DELIM'\nnotes\nMY-DELIM\ngit commit", true],
+    ["cat > f <<MY-DELIM\nnotes\nMY-DELIM\ngit commit", true],
+    ["cat > f <<123\ngit commit here\n123", false],
+    ["cat <<EOF>f\ngit commit here\nEOF", false],
   ])("%p → %p", (command, expected) => {
     expect(invokesGitCommit(command)).toBe(expected);
   });
@@ -92,6 +96,7 @@ describe("effectiveCwd", () => {
     ["cd /wt & git commit", "/repo"],
     ['echo "done; cd /x" && git commit', "/repo"],
     ["cd /wt &&git commit", "/wt"],
+    ["(cd /wt); git commit", "/repo"],
   ])("%p → %p", (command, expected) => {
     expect(effectiveCwd(command, "/repo")).toBe(expected);
   });
@@ -201,9 +206,9 @@ describe("processInput", () => {
         "allow",
       ],
       [
-        "cd to a file returns a decision instead of throwing",
+        "cd to a file falls back to the input directory",
         (repo) => ({ command: `cd ${repo}/README.md && git commit -m x`, cwd: repo }),
-        "allow",
+        "deny",
       ],
       [
         "cd to a missing path falls back to the input directory",

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { realpathSync } from "node:fs";
+import { readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
@@ -37,10 +37,11 @@ function* unquotedMatches(text: string, lead: RegExp, tail: RegExp): Generator<R
   }
 }
 
-// A heredoc operator, then its delimiter word. The lookarounds keep `<<<`
+// A heredoc operator, then its delimiter word, which the shell takes as any
+// word up to the next operator or space. The lookarounds keep `<<<`
 // herestrings out.
 const HEREDOC_LEAD = /(?<!<)<<(?!<)/g;
-const HEREDOC_DELIMITER = /^(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/;
+const HEREDOC_DELIMITER = /^(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([^\s'"\\<>|&;()]+))/;
 
 // Line-oriented heredoc scan: a body runs from the line after its operator to
 // the delimiter line, and several operators on one line consume bodies in
@@ -72,18 +73,23 @@ export function invokesGitCommit(command: string): boolean {
 // A `cd` ahead of the commit moves where git resolves the branch. The lead-in
 // excludes `||`, whose cd only runs when the one before it failed, and `$(`,
 // whose cd stays inside the substitution. The terminator excludes a cd that
-// runs in its own process behind `|` or `&`.
+// runs in its own process behind `|` or `&`, or whose subshell closes with
+// `)` before the commit.
 const CD_LEAD = /(?:^|&&|;|\n|(?<!\$)\()\s*cd(?=\s)/g;
-const CD_TARGET = /^\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&)]+)\s*(?=&&|\|\||;|\n|\)|$)/;
+const CD_TARGET = /^\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&)]+)\s*(?=&&|\|\||;|\n|$)/;
 const SHELL_EXPANSION_PATTERN = /(?<!\\)[$`]/;
 
 function unquote(value: string): string {
   return value.match(/^(['"])(.*)\1$/s)?.[2] ?? value;
 }
 
+// A cd into a missing path or a file fails and leaves the shell where it was,
+// so the branch check belongs in the fallback.
 function existingDirectory(target: string, fallback: string): string {
   try {
-    return realpathSync(target);
+    const resolved = realpathSync(target);
+    readdirSync(resolved);
+    return resolved;
   } catch {
     return fallback;
   }

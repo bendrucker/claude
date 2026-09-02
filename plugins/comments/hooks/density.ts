@@ -103,7 +103,7 @@ async function main(): Promise<void> {
     .slice(0, 3)
     .map((file) => `${basename(file.path)} +${Math.round(file.excessChars)} chars`)
     .join(", ");
-  const reason = `${MARKER} the comments this session added to the branch run ${Math.round(session.excessChars)} chars over the language baseline (${worst}). Run the comments:audit skill on the diff and trim what it flags before stopping.`;
+  const reason = `${MARKER} the comments this branch adds in the files this session edited run ${Math.round(session.excessChars)} chars over the language baseline (${worst}). Run the comments:audit skill on the diff and trim what it flags before stopping.`;
   process.stdout.write(`${JSON.stringify({ decision: "block", reason })}\n`);
 }
 

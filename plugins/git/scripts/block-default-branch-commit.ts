@@ -19,7 +19,8 @@ const GIT_COMMIT_PATTERN = new RegExp(
 );
 
 // Quoted strings and `((...))` or `$((...))` arithmetic, where `<<` and
-// `git commit` are data. Masking with spaces keeps offsets aligned with the unmasked text.
+// `git commit` are data. Masking with spaces keeps offsets aligned with the
+// unmasked text.
 const INERT_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"|\$?\(\((?:[^)]|\)(?!\)))*\)\)/g;
 
 function maskQuoted(command: string): string {

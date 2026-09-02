@@ -14,26 +14,31 @@ const heavy = (count: number, commented = count) =>
   ).join("\n")}\n`;
 
 let dir: string;
-let git: typeof $;
+
+/** Scoped per command: `$.cwd()` and `$.env()` mutate the shared shell. */
+const git = (...args: string[]) =>
+  $`git ${args}`
+    .cwd(dir)
+    .env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" })
+    .quiet();
 
 async function write(path: string, content: string): Promise<void> {
   await Bun.write(join(dir, path), content);
 }
 
 async function commit(message: string): Promise<void> {
-  await git`git add -A`.quiet();
-  await git`git commit -m ${message}`.quiet();
+  await git("add", "-A");
+  await git("commit", "-m", message);
 }
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "comments-tree-"));
-  git = $.cwd(dir).env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" });
-  await git`git init -b main`.quiet();
-  await git`git config user.email test@example.com`.quiet();
-  await git`git config user.name Test`.quiet();
+  await git("init", "-b", "main");
+  await git("config", "user.email", "test@example.com");
+  await git("config", "user.name", "Test");
   await write("base.ts", heavy(20, 20));
   await commit("init");
-  await git`git checkout -b work`.quiet();
+  await git("checkout", "-b", "work");
 });
 
 afterEach(async () => {
@@ -78,7 +83,7 @@ describe("scoreTree", () => {
   });
 
   test("charges a renamed file only for what the move changed", async () => {
-    await git`git mv base.ts moved.ts`.quiet();
+    await git("mv", "base.ts", "moved.ts");
     const moved = await excess();
 
     await write("moved.ts", `${heavy(20)}${await Bun.file(join(dir, "moved.ts")).text()}`);
@@ -99,7 +104,7 @@ describe("scoreTree", () => {
 
   test("skips paths with no known language and deleted files", async () => {
     await write("notes.txt", "prose, not code\n");
-    await git`git rm -q base.ts`.quiet();
+    await git("rm", "-q", "base.ts");
 
     expect((await scoreTree({ cwd: dir })).files).toEqual([]);
   });

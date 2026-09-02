@@ -20,18 +20,24 @@ const heavy = (count: number, commented = count) =>
 let repo: string;
 let transcripts: string;
 
+/** Scoped per command: `$.cwd()` and `$.env()` mutate the shared shell. */
+const git = (...args: string[]) =>
+  $`git ${args}`
+    .cwd(repo)
+    .env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" })
+    .quiet();
+
 /** A branch off `main` whose working tree carries a comment-heavy new file. */
 beforeEach(async () => {
   repo = await mkdtemp(join(tmpdir(), "density-hook-repo-"));
   transcripts = await mkdtemp(join(tmpdir(), "density-hook-"));
-  const git = $.cwd(repo).env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" });
-  await git`git init -b main`.quiet();
-  await git`git config user.email test@example.com`.quiet();
-  await git`git config user.name Test`.quiet();
+  await git("init", "-b", "main");
+  await git("config", "user.email", "test@example.com");
+  await git("config", "user.name", "Test");
   await Bun.write(join(repo, "base.ts"), "const base = 1;\n");
-  await git`git add -A`.quiet();
-  await git`git commit -m init`.quiet();
-  await git`git checkout -b work`.quiet();
+  await git("add", "-A");
+  await git("commit", "-m", "init");
+  await git("checkout", "-b", "work");
   await Bun.write(join(repo, "heavy.ts"), heavy(40));
 });
 

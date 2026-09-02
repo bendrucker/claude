@@ -1664,6 +1664,30 @@ describe("pinned column derivation", () => {
     expect(row?.hash).not.toBeNull();
   });
 
+  // The projection can change between an index's build and the first run that stamps
+  // it. Stamping over a raw that still carries a dropped column left every later
+  // import failing on a column-count mismatch.
+  it("rewrites an unstamped index whose columns no longer match the projection", async () => {
+    await db.run("ALTER TABLE raw ADD COLUMN summary VARCHAR");
+    await db.run("UPDATE index_meta SET import_hash = NULL");
+
+    const rewritten = await ensureSchema(db);
+    expect(rewritten).toBe(true);
+
+    const columns = await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = 'raw'",
+      z.object({ column_name: z.string() }),
+    );
+    expect(columns.map((c) => c.column_name)).not.toContain("summary");
+
+    // Invalidating the catalog's stats sends every fixture back through import.sql,
+    // which is where the column-count mismatch used to surface.
+    await db.run("UPDATE indexed_files SET mtime = -1, size = -1");
+    await reindex();
+    const [row] = await db.query("SELECT COUNT(*) AS n FROM raw", z.object({ n: z.bigint() }));
+    expect(Number(row?.n)).toBeGreaterThan(0);
+  });
+
   // An adopted index may already carry a content_items left behind a committed import by
   // the code that built it, and its hashes and catalog all read as current.
   it("rebuilds the derived tables when adopting an index that predates the check", async () => {

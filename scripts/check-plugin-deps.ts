@@ -24,6 +24,7 @@ async function getPluginDeps(pluginDir: string): Promise<Set<string>> {
 
   for await (const path of glob.scan({ cwd: pluginDir })) {
     if (path.includes("node_modules") || path.includes(".bun-cache")) continue;
+    if (path.split("/").includes("evals")) continue;
     try {
       const pkg = await decodeFile(PackageJson, join(pluginDir, path));
       for (const field of ["dependencies", "devDependencies"] as const) {
@@ -56,6 +57,9 @@ async function getImportedPackages(pluginDir: string): Promise<Set<string>> {
   for await (const path of glob.scan({ cwd: pluginDir })) {
     if (path.includes("node_modules") || path.includes(".bun-cache")) continue;
     if (path.endsWith(".test.ts") || path.endsWith(".integration.ts")) continue;
+    // Eval harnesses resolve their deps as repo workspaces, not through the
+    // plugin's own package.json.
+    if (path.split("/").includes("evals")) continue;
 
     const content = await Bun.file(join(pluginDir, path)).text();
     for (const match of content.matchAll(/^import\s+.*?from\s+["']([^"']+)["']/gm)) {

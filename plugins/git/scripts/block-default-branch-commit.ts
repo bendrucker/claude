@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { readdirSync, realpathSync } from "node:fs";
+import { globSync, readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
@@ -96,6 +96,7 @@ export function invokesGitCommit(command: string): boolean {
 const CD_LEAD = /(?:^|&&|;|\n|(?<!\$)\()\s*cd(?=\s)/g;
 const CD_TARGET = /^\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&)]+)\s*(?=&&|\|\||;|\n|$)/;
 const SHELL_EXPANSION_PATTERN = /(?<!\\)[$`]/;
+const GLOB_PATTERN = /(?<!\\)[*?[]/;
 const EVERY_GIT_COMMIT = new RegExp(GIT_COMMIT_PATTERN, "g");
 
 function unquote(value: string): string {
@@ -121,13 +122,23 @@ function isDirectory(path: string): boolean {
   }
 }
 
-function directoryBefore(scope: string, cwd: string, exists: (path: string) => boolean): string {
+// The directories a bare cd word names on disk: the path itself, or what an
+// unquoted glob in it expands to.
+function directoriesNamed(path: string, quoted: boolean): string[] {
+  const candidates = !quoted && GLOB_PATTERN.test(path) ? globSync(path) : [path];
+  return candidates.filter(isDirectory);
+}
+
+type Expand = (path: string, quoted: boolean) => string[];
+
+function directoryBefore(scope: string, cwd: string, expand: Expand): string {
   const masked = maskQuoted(scope);
   let dir = cwd;
   for (const { at, match } of unquotedMatches(scope, CD_LEAD, CD_TARGET)) {
     if (subshellClosed(masked, at)) continue;
     const word = match[1] ?? "";
     const target = unquote(word);
+    const quoted = word !== target;
     if (target === "" || target === "-" || SHELL_EXPANSION_PATTERN.test(target)) return cwd;
     let next = isAbsolute(target) ? target : join(dir, target);
     // A quoted tilde is literal. `~user` needs a passwd lookup the hook does not do.
@@ -135,17 +146,23 @@ function directoryBefore(scope: string, cwd: string, exists: (path: string) => b
       if (target !== "~" && !target.startsWith("~/")) return cwd;
       next = join(homedir(), target.slice(1));
     }
-    // A cd into a missing path or a file fails and leaves the shell where it was.
-    if (exists(next)) dir = next;
+    // A cd into a missing path, a file, or a glob naming several directories
+    // fails and leaves the shell where it was.
+    const [found, ...others] = expand(next, quoted);
+    if (found !== undefined && others.length === 0) dir = found;
   }
   return dir;
 }
 
 /** Directory each commit in the command runs in after the `cd`s the hook can evaluate, or `cwd` where one cannot be. */
-export function commitDirectories(command: string, cwd: string, exists = isDirectory): string[] {
+export function commitDirectories(
+  command: string,
+  cwd: string,
+  expand: Expand = directoriesNamed,
+): string[] {
   const text = stripHeredocs(command);
   return [...maskQuoted(text).matchAll(EVERY_GIT_COMMIT)].map((commit) =>
-    directoryBefore(text.slice(0, commit.index), cwd, exists),
+    directoryBefore(text.slice(0, commit.index), cwd, expand),
   );
 }
 

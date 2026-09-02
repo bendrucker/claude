@@ -115,12 +115,22 @@ describe("commitDirectories", () => {
     ["cd /wt && (git commit) && git commit", ["/wt", "/wt"]],
     ['cd "~/wt" && git commit', ["/repo/~/wt"]],
   ])("%p → %p", (command, expected) => {
-    expect(commitDirectories(command, "/repo", () => true)).toEqual(expected);
+    expect(commitDirectories(command, "/repo", (path) => [path])).toEqual(expected);
   });
 
   test("a cd that fails keeps the directory reached so far", () => {
-    const exists = (path: string) => path === "/wt";
-    expect(commitDirectories("cd /wt && cd /gone; git commit", "/repo", exists)).toEqual(["/wt"]);
+    const expand = (path: string) => (path === "/wt" ? [path] : []);
+    expect(commitDirectories("cd /wt && cd /gone; git commit", "/repo", expand)).toEqual(["/wt"]);
+  });
+
+  test.each<[string, Record<string, string[]>, string]>([
+    ["cd /w* && git commit", { "/w*": ["/wt"] }, "/wt"],
+    ["cd /w* && git commit", { "/w*": ["/wt", "/www"] }, "/repo"],
+    ["cd /w* && git commit", { "/w*": [] }, "/repo"],
+    ["cd '/w*' && git commit", { "/w*": ["/wt"] }, "/repo"],
+  ])("%p with %j → %p", (command, matches, expected) => {
+    const expand = (path: string, quoted: boolean) => (quoted ? [] : (matches[path] ?? []));
+    expect(commitDirectories(command, "/repo", expand)).toEqual([expected]);
   });
 });
 
@@ -241,6 +251,16 @@ describe("processInput", () => {
         "failed cd after a cd into the main checkout",
         (repo, wt) => ({ command: `cd ${repo} && cd ${repo}/gone; git commit -m x`, cwd: wt }),
         "deny",
+      ],
+      [
+        "glob naming the main checkout",
+        (repo, wt) => ({ command: `cd ${repo}* && git commit -m x`, cwd: wt }),
+        "deny",
+      ],
+      [
+        "glob naming the worktree",
+        (repo, wt) => ({ command: `cd ${wt}* && git commit -m x`, cwd: repo }),
+        "allow",
       ],
       [
         "quoted tilde is a literal path",

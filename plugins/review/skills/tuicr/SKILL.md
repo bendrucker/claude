@@ -2,13 +2,10 @@
 name: review:tuicr
 argument-hint: "[-w | -r <range> | pr <N> | mr <N>]"
 description: >
-  Drive tuicr, the terminal code-review TUI, as a live local review surface in tmux: launch a
-  session, seed agent comments, collect inline comments to act on, or watch comments arrive live.
-  The shared core that review:self (inbound) and review:peer (outbound) delegate to, and the
-  model-invocable path to pick up comments already left in a running session and apply them. Use
-  when reviewing through tuicr, or when the user says their review is done and comments need
-  applying: "review in tuicr", "tuicr session", "open the diff in tuicr", "watch my comments", "I
-  left review comments", "I finished my review, apply them", "pick up my tuicr comments".
+  Drive tuicr, the terminal code-review TUI, in tmux: launch a session, seed comments, or collect
+  and apply comments left in a running session. Shared core that review:self and review:peer
+  delegate to. Use when reviewing through tuicr, or when a review is done and its comments need
+  applying: "review in tuicr", "I left review comments", "pick up my tuicr comments".
 allowed-tools:
   - Bash(tuicr:*)
   - Bash(tmux:*)

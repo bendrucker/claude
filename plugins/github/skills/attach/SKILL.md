@@ -1,6 +1,6 @@
 ---
 name: github:attach
-description: Upload a local image or video to GitHub and reference it so it renders inline in an issue, pull request, comment, or review. Use when attaching a screenshot, screen recording, or generated diagram to GitHub content, or when a body would otherwise link a local path the reader cannot open. Load before posting to uploads.github.com.
+description: Upload a local image or video to GitHub and reference it so it renders inline in an issue, pull request, comment, or review. Use when attaching a screenshot, recording, or diagram to GitHub content.
 allowed-tools:
   - Bash(gh api:*)
   - Bash(gh issue:*)

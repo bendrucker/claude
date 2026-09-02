@@ -46,6 +46,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply:
    - **GitHub**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr update --description-file tmp/pr-body-<branch>.md`
+   - A screenshot or recording the new body references by local path uploads with it: `--attach ./shot.png` per file on `gh pr edit` (load `github:attach`), or project uploads per `gitlab:api` pasted in before the update. Assets already in the body keep their uploaded URLs.
 
 ## GitLab Notes
 

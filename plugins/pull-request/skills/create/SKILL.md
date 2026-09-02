@@ -11,6 +11,8 @@ allowed-tools:
   - Skill(pull-request:follow-up)
   - Skill(github:stack)
   - Skill(gitlab:merge-request)
+  - Skill(gitlab:api)
+  - Skill(github:attach)
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
   - "Bash(git push:*)"
@@ -81,6 +83,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description-file tmp/pr-body-<branch>.md`
+   - A screenshot or recording the body references by local path goes up with the command. GitHub: `--attach ./shot.png` per file on `gh pr create`, which rewrites the reference to the uploaded asset. Load `github:attach` first. GitLab: upload each file per the uploads section of `gitlab:api` and paste the returned markdown into the body before creating.
    - Put the branch name in the body filename so concurrent agents don't collide. Writing the file with a quoted heredoc (`cat > tmp/pr-body-<branch>.md <<'EOF'`) in the same call as the create command works: the validation hook reads the heredoc directly.
 1. Chain a GitHub stack layer into its stack once the PR exists. Load `github:stack` for the `gh stack link` forms, the detection query that picks between them, and what an exit code 9 means.
 1. Enable auto-merge after the PR/MR exists, unless `--no-auto` or `--draft` is set. On a repo you own (the Remote URL above names the owner), run `gh pr merge --auto`. On a third-party repo, leave the merge to the maintainer. GitLab, stacked PRs, and a repo that rejects `--auto` take the paths in [`references/merge.md`](references/merge.md).

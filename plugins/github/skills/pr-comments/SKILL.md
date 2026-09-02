@@ -31,7 +31,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts reply <thread-id> --resolve 
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.ts resolve <thread-id>
 ```
 
-Pass the reply text with `--body`, `--bodyFile <path>`, or stdin. Don't resolve without a reply: a silent resolve hides why the thread closed. Prefer `reply --resolve` so the resolve carries context.
+Pass the reply text with `--body`, `--bodyFile <path>`, or stdin. Don't resolve without a reply: a silent resolve hides why the thread closed. Prefer `reply --resolve` so the resolve carries context. A reply that shows a screenshot uploads it first through the endpoint in `github:attach`. Review threads sit outside the reach of `gh`'s `--attach` flag.
 
 ## Reactions
 

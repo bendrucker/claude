@@ -10,11 +10,11 @@ allowed-tools:
 
 # Attachments
 
-Images and video in issues and pull requests are served from a user-attachments store. `gh` 2.99.0 added a repeatable `--attach` flag that uploads to it from `gh issue create`, `gh issue edit`, `gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`. Everything else uploads through the endpoint the flag wraps: review comments and pending reviews, discussions, releases, gists, GitHub Enterprise Server, and any `gh` older than 2.99.0.
+Images and video in issues and pull requests are served from a user-attachments store. `gh` 2.99.0 added a repeatable `--attach` flag that uploads to it from `gh issue create`, `gh issue edit`, `gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`. Everything else uploads through the endpoint the flag wraps: review comments and pending reviews, discussions, releases, gists, and any `gh` older than 2.99.0. Both paths exist on GitHub.com and Enterprise Cloud only. Enterprise Server has no attachment store.
 
 `--attach` on this build: !`gh issue comment --help 2>/dev/null | grep -q -- '--attach' && echo present || echo absent`
 
-Absent means this `gh` predates 2.99.0. Upgrade it (`brew upgrade gh`) or use the endpoint.
+Absent means this `gh` predates 2.99.0. Upgrade it or use the endpoint.
 
 ## The Flag
 
@@ -28,12 +28,12 @@ gh pr create --title "..." --body-file tmp/pr-body.md --attach ./picker.png --at
 - A file the body never references is appended to the end, in flag order, with the filename as alt text. Alt text follows the path after `#`: `--attach './picker.png#The wide layout'`.
 - `gh pr edit` and `gh issue edit` without a body flag keep the existing body and append.
 - Up to 50 files per command.
-- When some uploads fail, the issue, pull request, or comment still lands with the ones that succeeded, its URL prints, and the exit status is non-zero. Read the output before retrying, or the retry duplicates the assets that did upload.
+- When some uploads fail, the issue, pull request, or comment still lands with the ones that succeeded. Its URL prints, and the exit status is non-zero. Read the output before retrying. A blind retry duplicates the assets that already uploaded.
 - The token needs write access to the repository.
 
 ## The Endpoint
 
-`POST https://uploads.github.com/user-attachments/assets` has no REST route and no documentation, so `gh api` reaches it by full URL. `repository_id` takes the numeric REST id. `gh repo view --json id` returns the GraphQL node id, which fails here.
+`POST https://uploads.github.com/user-attachments/assets` has no REST route and no documentation. `gh api` reaches it by full URL instead. A data-residency Enterprise Cloud tenant has its own upload host in place of `uploads.github.com`. `repository_id` takes the numeric REST id. `gh repo view --json id` returns the GraphQL node id, which fails here.
 
 ```bash
 repo_id=$(gh api repos/{owner}/{repo} --jq .id)
@@ -43,7 +43,7 @@ gh api --method POST \
   --input ./picker.png --jq .url
 ```
 
-The response is `{"url": "https://github.com/user-attachments/assets/<uuid>"}`. The token needs write access to that repository. Read-only access answers 404, which makes a permission problem look like a missing repository.
+The response is `{"url": "https://github.com/user-attachments/assets/<uuid>"}`. The token needs write access to that repository. Read-only access also answers 404. That makes a permission problem look like a missing repository.
 
 An image is ordinary markdown, with `\`, `[`, and `]` escaped in the alt text.
 
@@ -55,7 +55,7 @@ Video has no markdown syntax and no alt text. GitHub renders a player when a bar
 
 ## File Types
 
-Both paths accept the same list, and nothing outside it uploads. Logs, archives, and PDFs have no path here. On the endpoint, the extension in `name` must agree with `content_type`.
+Both paths accept the same list, and nothing outside it uploads. Logs, archives, and PDFs are not supported. On the endpoint, the extension in `name` must agree with `content_type`.
 
 | Extension | `content_type` |
 | --- | --- |
@@ -70,6 +70,6 @@ Both paths accept the same list, and nothing outside it uploads. Logs, archives,
 
 Images cap at 10 MB. Video caps at 100 MB on a paid plan and 10 MB on a free one.
 
-## Ordering
+## Irreversibility
 
-An upload cannot be undone and an asset cannot be deleted. Upload once the body is final and nothing is left that could cancel. An asset nothing references is stranded and permanent, and it answers 404 until something references it, so opening the URL proves nothing about the upload.
+An upload cannot be undone and an asset cannot be deleted. Upload only after the body is final. An unreferenced asset stays stranded permanently. It answers 404 until something references it, unlike the write-access 404 on upload above. A 404 right after uploading does not mean the upload failed.

@@ -50,7 +50,7 @@ glab api projects/:id/merge_requests/:iid/discussions -X POST -H "Content-Type: 
 
 ## Uploads
 
-An image or video for an MR or issue body goes through project uploads, which take multipart form data. `--form` sends the file. `-F` sends the path as a JSON field and the API answers HTTP 400.
+An image or video for an MR or issue body goes through project uploads, which take multipart form data. `--form` sends the file. `-F` reads the file and embeds its bytes in a JSON body field, which the endpoint rejects with HTTP 400.
 
 ```bash
 glab api projects/:id/uploads --form "file=@./shot.png" | jq -r .markdown

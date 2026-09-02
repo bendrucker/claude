@@ -70,7 +70,7 @@ Go CLIs need no entry. `sandbox.network.allowMachLookup` lets Go's `crypto/x509`
 
 ## Hooks
 
-Why each hook entry in `user/settings.json` earns its place, and what would retire it. The hook scripts themselves live in [`user/hooks/`](../user/hooks).
+Why a hook entry in `user/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).
 
 [`agent-model`](../user/hooks/agent-model) warns, on a `PreToolUse` matching `Agent`, when a spawn names neither a `model` nor a `subagent_type` that pins one and the parent is running opus or fable. It enforces the delegation rule already written in `user/CLAUDE.md`, which spawns were ignoring: over the 30 days to 2026-09-01, 34 `general-purpose` and 30 bare spawns under opus-family parents carried no `model` and resolved to opus, and their task descriptions were lookup and fan-out shaped. It emits `additionalContext` and no `permissionDecision`, so the spawn still proceeds. `PreToolUse` carries no model field, so the parent's family comes from the last assistant record in the tail of `transcript_path`, and an unresolvable model stays silent.
 

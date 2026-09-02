@@ -77,6 +77,8 @@ describe("invokesGitCommit", () => {
     ["cat > f <<E\\OF\ngit commit here\nEOF", false],
     ["echo $((1<<2))\ngit commit -m x", true],
     ["echo $(( (1<<2) ))\ngit commit -m x", true],
+    ["(( 1 << 2 ))\ngit commit -m x", true],
+    ["(( x <<= 2 )); git commit -m x", true],
   ])("%p → %p", (command, expected) => {
     expect(invokesGitCommit(command)).toBe(expected);
   });

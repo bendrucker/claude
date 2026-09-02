@@ -18,9 +18,9 @@ const GIT_COMMIT_PATTERN = new RegExp(
   String.raw`\bgit\s+(?:(?:${VALUE_FLAG}|${BOOLEAN_FLAG})\s+)*commit(?![\w-])`,
 );
 
-// Quoted strings and `$((...))` arithmetic, where `<<` and `git commit` are
-// data. Masking with spaces keeps offsets aligned with the unmasked text.
-const INERT_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"|\$\(\((?:[^)]|\)(?!\)))*\)\)/g;
+// Quoted strings and `((...))` or `$((...))` arithmetic, where `<<` and
+// `git commit` are data. Masking with spaces keeps offsets aligned with the unmasked text.
+const INERT_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"|\$?\(\((?:[^)]|\)(?!\)))*\)\)/g;
 
 function maskQuoted(command: string): string {
   return command.replace(INERT_SPAN, (span) => " ".repeat(span.length));

@@ -115,10 +115,14 @@ export interface WrittenJob {
 
 export const DEFAULT_JOB_BASE = join(tmpdir(), "comments-audit");
 
-/** Content-hash the descriptor so re-running identical input reuses the same job dir. */
+/**
+ * Content-hash the descriptor so re-running identical input reuses the same job
+ * dir. The full prompt text is hashed, not the rubric's sha alone, so a `--fix`
+ * run lands in its own dir instead of reading the plain run's verdicts.
+ */
 function jobHash(descriptor: JobDescriptor): string {
   return sha256(
-    JSON.stringify({ shards: descriptor.shards, promptSha: descriptor.promptSha }),
+    JSON.stringify({ shards: descriptor.shards, promptText: descriptor.promptText }),
   ).slice(0, 16);
 }
 

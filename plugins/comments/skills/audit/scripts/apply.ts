@@ -1,4 +1,3 @@
-import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { z } from "zod";
 import { applyToBranch, isCleanTree } from "../../../apply/branch";
@@ -8,6 +7,7 @@ import { collectVerdicts, matchVerdicts } from "../../../apply/join";
 import { color, type ReportItem, renderReport, summarize } from "../../../apply/report";
 import { extractComments, languageForPath } from "../../../detection/extract";
 import type { Comment } from "../../../detection/types";
+import type { ShardRef } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
 import { AuditError, type AuditIo } from "./io";
 
@@ -47,48 +47,54 @@ function toEditItem(comment: Comment, verdict: Verdict): EditItem {
   };
 }
 
-async function readJsonFiles<T = unknown>(
-  dir: string,
-  prefix: string,
-  schema: z.ZodType<T>,
-): Promise<T[]> {
-  let names: string[];
-  try {
-    names = await readdir(dir);
-  } catch {
-    return [];
-  }
-  const matching = names.filter((name) => name.startsWith(prefix) && name.endsWith(".json"));
-  return Promise.all(
-    matching.map(async (name) => schema.parse(JSON.parse(await Bun.file(join(dir, name)).text()))),
-  );
+async function readJson<T = unknown>(path: string, schema: z.ZodType<T>): Promise<T> {
+  return schema.parse(JSON.parse(await Bun.file(path).text()));
 }
+
+const JobArgsFile = z.looseObject({
+  shards: z.array(z.looseObject({ id: z.number(), path: z.string() })),
+});
 
 const Scope = z.looseObject({ mr: z.string().nullish() });
 
 const ShardPaths = z.looseObject({ comments: z.array(z.looseObject({ path: z.string() })) });
 
+/** The shards preflight wrote, from the args it handed the workflow. */
+async function readShardRefs(jobDir: string): Promise<ShardRef[]> {
+  const argsPath = join(jobDir, "job-args.json");
+  if (!(await Bun.file(argsPath).exists())) {
+    throw new AuditError(`No job at ${jobDir}. Pass the job dir printed by preflight.`);
+  }
+  return (await readJson(argsPath, JobArgsFile)).shards;
+}
+
 /** The files a job judged, recovered from its shards. */
-async function judgedPaths(jobDir: string): Promise<string[]> {
-  const shards = await readJsonFiles(jobDir, "shard-", ShardPaths);
+async function judgedPaths(shards: ShardRef[]): Promise<string[]> {
   const paths = new Set<string>();
-  for (const shard of shards) for (const comment of shard.comments) paths.add(comment.path);
+  for (const shard of await Promise.all(shards.map((ref) => readJson(ref.path, ShardPaths)))) {
+    for (const comment of shard.comments) paths.add(comment.path);
+  }
   return [...paths];
 }
 
-async function readVerdicts(jobDir: string): Promise<Map<string, Verdict>> {
+/** Every shard's verdict file. A shard whose agent never wrote one fails the run rather than reading as drift. */
+async function readVerdicts(jobDir: string, shards: ShardRef[]): Promise<Map<string, Verdict>> {
   const verdictsDir = join(jobDir, "verdicts");
-  const shards = await readJsonFiles(verdictsDir, "verdict-", z.unknown());
-  if (shards.length === 0) {
-    throw new AuditError(`No verdicts in ${verdictsDir}. Run the judge workflow first.`);
+  const files = shards.map((ref) => ({
+    id: ref.id,
+    path: join(verdictsDir, `verdict-${ref.id}.json`),
+  }));
+  const present = await Promise.all(files.map((file) => Bun.file(file.path).exists()));
+  const missing = files.filter((_, i) => !present[i]).map((file) => file.id);
+  if (missing.length > 0) {
+    throw new AuditError(
+      `No verdicts for shard(s) ${missing.join(", ")} in ${verdictsDir}. Run the judge workflow first.`,
+    );
   }
-  return collectVerdicts(shards);
+  return collectVerdicts(await Promise.all(files.map((file) => readJson(file.path, z.unknown()))));
 }
 
 async function guardScope(options: ApplyOptions): Promise<void> {
-  if (!(await Bun.file(join(options.job, "job-args.json")).exists())) {
-    throw new AuditError(`No job at ${options.job}. Pass the job dir printed by preflight.`);
-  }
   const scopeFile = Bun.file(join(options.job, "scope.json"));
   const scope = (await scopeFile.exists())
     ? Scope.parse(JSON.parse(await scopeFile.text()))
@@ -106,8 +112,9 @@ async function guardScope(options: ApplyOptions): Promise<void> {
  * branch off HEAD. Runs from the repo root.
  */
 export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyResult> {
+  const shards = await readShardRefs(options.job);
   await guardScope(options);
-  const verdicts = await readVerdicts(options.job);
+  const verdicts = await readVerdicts(options.job, shards);
 
   const items: ReportItem[] = [];
   const edits = new Map<string, string>();
@@ -116,7 +123,7 @@ export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyRe
   const skippedComments = new Set<string>();
 
   // A verdict whose id no longer re-extracts has drifted.
-  for (const path of await judgedPaths(options.job)) {
+  for (const path of await judgedPaths(shards)) {
     const language = languageForPath(path);
     const file = Bun.file(path);
     // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.

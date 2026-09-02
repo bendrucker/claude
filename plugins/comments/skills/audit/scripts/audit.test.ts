@@ -386,7 +386,21 @@ describe("apply", () => {
       { io: capture().io, judge: () => Promise.resolve() },
     );
     if (!unjudged) throw new Error("preflight found no comments");
-    expect(await rejection(runApply(unjudged))).toMatch(/No verdicts in/);
+    expect(await rejection(runApply(unjudged))).toMatch(/No verdicts for shard\(s\) 0 in/);
+  });
+
+  test("refuses a job whose shards were only partly judged", async () => {
+    const job = await judgedJob({ shardSize: 2 });
+    await rm(join(job.verdictsDir, "verdict-1.json"));
+    expect(await rejection(runApply(job, { report: true }))).toMatch(
+      /No verdicts for shard\(s\) 1 in/,
+    );
+  });
+
+  test("gives a --fix run its own job dir", async () => {
+    const plain = await judgedJob();
+    const fix = await judgedJob({ fix: true });
+    expect(fix.jobDir).not.toBe(plain.jobDir);
   });
 });
 

@@ -2,10 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ensureThingsRunning } from "../../scripts/ensure-running";
 import { buildAttribution } from "../../scripts/inbox";
-import { reorder } from "../../scripts/reorder";
+import { REORDER_MECHANISM, reorder } from "../../scripts/reorder";
 import { buildJsonPayload, type DispatchResult, dispatch, warnFallback } from "../../scripts/url";
 import { runScript } from "./jxa";
-import { requireTags } from "./tags";
+import { requireTags, type TagRequirer } from "./tags";
 
 const LIST_IDS = {
   inbox: "TMInboxListSource",
@@ -145,8 +145,9 @@ function writeResult(result: DispatchResult, action: string) {
 // Explicit `| undefined` on every property: under exactOptionalPropertyTypes an
 // optional property rejects an explicit undefined, and the tool handler spreads
 // its unset zod-optional arguments in as exactly that.
-interface UpdateAttributeArgs {
+export type WriteArgs = {
   title?: string | undefined;
+  titles?: string[] | undefined;
   notes?: string | undefined;
   prepend_notes?: string | undefined;
   append_notes?: string | undefined;
@@ -161,36 +162,60 @@ interface UpdateAttributeArgs {
   list_id?: string | undefined;
   area?: string | undefined;
   area_id?: string | undefined;
+  heading?: string | undefined;
+  todos?: string[] | undefined;
   completed?: boolean | undefined;
   canceled?: boolean | undefined;
+};
+
+interface Attribute {
+  /** The URL scheme's name for this argument. */
+  param: string;
+  /** Joins a list value. Things reads tags comma-separated and items one per line. */
+  separator?: string;
 }
 
-export function updateAttributes(args: UpdateAttributeArgs): Record<string, string> {
-  const attributes: Record<string, string> = {};
-  if (args.title !== undefined) attributes.title = args.title;
-  if (args.notes !== undefined) attributes.notes = args.notes;
-  if (args.prepend_notes !== undefined) attributes["prepend-notes"] = args.prepend_notes;
-  if (args.append_notes !== undefined) attributes["append-notes"] = args.append_notes;
-  if (args.when !== undefined) attributes.when = args.when;
-  if (args.deadline !== undefined) attributes.deadline = args.deadline;
-  if (args.tags !== undefined) attributes.tags = args.tags.join(",");
-  if (args.add_tags !== undefined) attributes["add-tags"] = args.add_tags.join(",");
-  if (args.checklist_items !== undefined) {
-    attributes["checklist-items"] = args.checklist_items.join("\n");
+/**
+ * The URL-scheme param behind every argument the write tools accept. Things
+ * ignores a param it does not recognize and reports success anyway, so a name
+ * spelled at a single call site can be wrong for a long time without anything
+ * saying so.
+ */
+export const ATTRIBUTES: Record<keyof WriteArgs, Attribute> &
+  Record<string, Attribute | undefined> = {
+  title: { param: "title" },
+  titles: { param: "titles" },
+  notes: { param: "notes" },
+  prepend_notes: { param: "prepend-notes" },
+  append_notes: { param: "append-notes" },
+  when: { param: "when" },
+  deadline: { param: "deadline" },
+  tags: { param: "tags", separator: "," },
+  add_tags: { param: "add-tags", separator: "," },
+  checklist_items: { param: "checklist-items" },
+  prepend_checklist_items: { param: "prepend-checklist-items" },
+  append_checklist_items: { param: "append-checklist-items" },
+  list: { param: "list" },
+  list_id: { param: "list-id" },
+  area: { param: "area" },
+  area_id: { param: "area-id" },
+  heading: { param: "heading" },
+  todos: { param: "to-dos" },
+  completed: { param: "completed" },
+  canceled: { param: "canceled" },
+};
+
+export function writeParams(args: WriteArgs): Map<string, string> {
+  const params = new Map<string, string>();
+  for (const [name, value] of Object.entries<WriteArgs[keyof WriteArgs]>(args)) {
+    const attribute = ATTRIBUTES[name];
+    if (attribute === undefined || value === undefined) continue;
+    params.set(
+      attribute.param,
+      Array.isArray(value) ? value.join(attribute.separator ?? "\n") : String(value),
+    );
   }
-  if (args.prepend_checklist_items !== undefined) {
-    attributes["prepend-checklist-items"] = args.prepend_checklist_items.join("\n");
-  }
-  if (args.append_checklist_items !== undefined) {
-    attributes["append-checklist-items"] = args.append_checklist_items.join("\n");
-  }
-  if (args.list !== undefined) attributes.list = args.list;
-  if (args.list_id !== undefined) attributes["list-id"] = args.list_id;
-  if (args.area !== undefined) attributes.area = args.area;
-  if (args.area_id !== undefined) attributes["area-id"] = args.area_id;
-  if (args.completed !== undefined) attributes.completed = String(args.completed);
-  if (args.canceled !== undefined) attributes.canceled = String(args.canceled);
-  return attributes;
+  return params;
 }
 
 /**
@@ -277,7 +302,23 @@ function limitArgs(limit: number | undefined): string[] {
   return limit === undefined ? [] : ["--limit", String(limit)];
 }
 
-export function registerTools(server: McpServer): void {
+/** What a write tool needs from Things, injectable for tests. */
+export interface ThingsClient {
+  ensureRunning(): Promise<void>;
+  dispatch(command: string, params: Map<string, string>): Promise<DispatchResult>;
+  requireTags: TagRequirer;
+  /** Waits out the URL scheme's rate limit between batches. */
+  pace(ms: number): Promise<void>;
+}
+
+const defaultClient: ThingsClient = {
+  ensureRunning: ensureThingsRunning,
+  dispatch,
+  requireTags,
+  pace: Bun.sleep,
+};
+
+export function registerTools(server: McpServer, client: ThingsClient = defaultClient): void {
   server.registerTool(
     "list_todos",
     {
@@ -439,22 +480,12 @@ export function registerTools(server: McpServer): void {
       },
     },
     async (args) => {
-      await ensureThingsRunning();
-      const params = new Map<string, string>();
-      params.set("title", args.title);
-      if (args.notes !== undefined) params.set("notes", args.notes);
-      if (args.when !== undefined) params.set("when", args.when);
-      if (args.deadline !== undefined) params.set("deadline", args.deadline);
-      if (args.tags !== undefined) {
-        params.set("tags", (await requireTags(args.tags, args.create_tags ?? false)).join(","));
-      }
-      if (args.checklist_items !== undefined) {
-        params.set("checklist-items", args.checklist_items.join("\n"));
-      }
-      if (args.list !== undefined) params.set("list", args.list);
-      if (args.list_id !== undefined) params.set("list-id", args.list_id);
-      if (args.heading !== undefined) params.set("heading", args.heading);
-      return writeResult(await dispatch("add", params), `Created "${args.title}"`);
+      await client.ensureRunning();
+      const params = writeParams({
+        ...args,
+        tags: args.tags && (await client.requireTags(args.tags, args.create_tags ?? false)),
+      });
+      return writeResult(await client.dispatch("add", params), `Created "${args.title}"`);
     },
   );
 
@@ -477,19 +508,15 @@ export function registerTools(server: McpServer): void {
     },
     async (args) => {
       if (args.todos) validateNonBlank(args.todos, "todos");
-      await ensureThingsRunning();
-      const params = new Map<string, string>();
-      params.set("title", args.title);
-      if (args.notes !== undefined) params.set("notes", args.notes);
-      if (args.when !== undefined) params.set("when", args.when);
-      if (args.deadline !== undefined) params.set("deadline", args.deadline);
-      if (args.area !== undefined) params.set("area", args.area);
-      if (args.area_id !== undefined) params.set("area-id", args.area_id);
-      if (args.tags !== undefined) {
-        params.set("tags", (await requireTags(args.tags, args.create_tags ?? false)).join(","));
-      }
-      if (args.todos !== undefined) params.set("to-dos", args.todos.join("\n"));
-      return writeResult(await dispatch("add-project", params), `Created project "${args.title}"`);
+      await client.ensureRunning();
+      const params = writeParams({
+        ...args,
+        tags: args.tags && (await client.requireTags(args.tags, args.create_tags ?? false)),
+      });
+      return writeResult(
+        await client.dispatch("add-project", params),
+        `Created project "${args.title}"`,
+      );
     },
   );
 
@@ -525,21 +552,20 @@ export function registerTools(server: McpServer): void {
       },
     },
     async ({ id, create_tags, ...rest }) => {
-      if (Object.keys(updateAttributes(rest)).length === 0) {
+      if (writeParams(rest).size === 0) {
         throw new Error("At least one attribute to update is required");
       }
-      await ensureThingsRunning();
+      await client.ensureRunning();
 
       const createMissing = create_tags ?? false;
-      const attributes = updateAttributes({
+      const params = writeParams({
         ...rest,
-        tags: rest.tags && (await requireTags(rest.tags, createMissing)),
-        add_tags: rest.add_tags && (await requireTags(rest.add_tags, createMissing)),
+        tags: rest.tags && (await client.requireTags(rest.tags, createMissing)),
+        add_tags: rest.add_tags && (await client.requireTags(rest.add_tags, createMissing)),
       });
 
-      const params = new Map<string, string>(Object.entries(attributes));
       params.set("id", id);
-      return writeResult(await dispatch("update-project", params), `Updated project ${id}`);
+      return writeResult(await client.dispatch("update-project", params), `Updated project ${id}`);
     },
   );
 
@@ -573,35 +599,36 @@ export function registerTools(server: McpServer): void {
       },
     },
     async ({ ids, create_tags, ...rest }) => {
-      if (Object.keys(updateAttributes(rest)).length === 0) {
+      if (writeParams(rest).size === 0) {
         throw new Error("At least one attribute to update is required");
       }
-      await ensureThingsRunning();
+      await client.ensureRunning();
 
       // Both tag fields resolve up front. A rejection landing partway through
       // the batch loop would leave the earlier chunks already written.
       const createMissing = create_tags ?? false;
-      const attributes = updateAttributes({
+      const attributes = writeParams({
         ...rest,
-        tags: rest.tags && (await requireTags(rest.tags, createMissing)),
-        add_tags: rest.add_tags && (await requireTags(rest.add_tags, createMissing)),
+        tags: rest.tags && (await client.requireTags(rest.tags, createMissing)),
+        add_tags: rest.add_tags && (await client.requireTags(rest.add_tags, createMissing)),
       });
 
       if (ids.length === 1 && ids[0] != null && ids[0] !== "") {
-        const params = new Map<string, string>(Object.entries(attributes));
+        const params = new Map(attributes);
         params.set("id", ids[0]);
-        return writeResult(await dispatch("update", params), `Updated ${ids[0]}`);
+        return writeResult(await client.dispatch("update", params), `Updated ${ids[0]}`);
       }
 
+      const payloadAttributes = Object.fromEntries(attributes);
       const applied: string[] = [];
       for (const [index, batch] of chunk(ids, BATCH_SIZE).entries()) {
         // oxlint-disable-next-line no-await-in-loop -- deliberate pacing: the Things URL scheme drops batches sent back to back.
-        if (index > 0) await Bun.sleep(BATCH_DELAY_MS);
+        if (index > 0) await client.pace(BATCH_DELAY_MS);
         const params = new Map<string, string>();
-        params.set("data", buildJsonPayload(batch, attributes));
+        params.set("data", buildJsonPayload(batch, payloadAttributes));
         try {
           // oxlint-disable-next-line no-await-in-loop -- a failed batch names the batches already applied, which requires knowing their order.
-          writeResult(await dispatch("json", params), `Updated ${batch.length} todos`);
+          writeResult(await client.dispatch("json", params), `Updated ${batch.length} todos`);
         } catch (error) {
           // A batch that fails leaves the earlier ones applied. Naming them
           // keeps a retry from updating those todos a second time.
@@ -656,30 +683,26 @@ export function registerTools(server: McpServer): void {
     },
     async (args) => {
       validateCaptureTitles(args.title, args.titles);
-      await ensureThingsRunning();
+      await client.ensureRunning();
 
-      const params = new Map<string, string>();
-      if (args.title !== undefined) params.set("title", args.title);
-      if (args.titles !== undefined) params.set("titles", args.titles.join("\n"));
-      if (args.checklist_items !== undefined) {
-        params.set("checklist-items", args.checklist_items.join("\n"));
-      }
       // Lowercase to match the tag Things stores. resolveTags folds case, so a
       // caller naming it too gets one tag rather than two spellings of it.
-      const tags = await requireTags(["claude", ...(args.tags ?? [])], args.create_tags ?? false);
-      params.set("tags", tags.join(","));
+      const tags = await client.requireTags(
+        ["claude", ...(args.tags ?? [])],
+        args.create_tags ?? false,
+      );
 
       let notes = args.notes;
       if (args.session_id != null && args.session_id !== "") {
         const attribution = buildAttribution(args.session_id, args.directory);
         notes = notes != null && notes !== "" ? `${notes}\n\n${attribution}` : attribution;
       }
-      if (notes !== undefined) params.set("notes", notes);
 
+      const params = writeParams({ ...args, tags, notes });
       const first = args.title ?? args.titles?.[0] ?? "(untitled)";
       const extra =
         args.titles && args.titles.length > 1 ? ` (+${args.titles.length - 1} more)` : "";
-      return writeResult(await dispatch("add", params), `Captured "${first}"${extra}`);
+      return writeResult(await client.dispatch("add", params), `Captured "${first}"${extra}`);
     },
   );
 
@@ -687,16 +710,17 @@ export function registerTools(server: McpServer): void {
     "reorder_todos",
     {
       title: "Reorder todos to the top of a list",
-      description:
-        "Move todos to the top of Today, Anytime, or Someday in the given order. Use the list matching the todos' current scheduling state. This works by rescheduling each todo out of the list and back, so a todo carrying a specific date has that date replaced by the target list.",
+      description: `Move todos to the top of Today, Anytime, or Someday in the given order. Use the list matching the todos' current scheduling state. ${REORDER_MECHANISM}`,
       inputSchema: {
         ids: todoIds.describe("Todo IDs in desired top-to-bottom order"),
         list: z.enum(["today", "anytime", "someday"]).default("today"),
       },
     },
     async ({ ids, list }) => {
-      await ensureThingsRunning();
-      return jsonResult(await reorder(list, ids));
+      await client.ensureRunning();
+      return jsonResult(
+        await reorder(list, ids, (command, params) => client.dispatch(command, params)),
+      );
     },
   );
 }

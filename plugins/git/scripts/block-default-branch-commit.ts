@@ -89,11 +89,10 @@ export function invokesGitCommit(command: string): boolean {
 }
 
 // A `cd` ahead of the commit moves where git resolves the branch. The lead-in
-// excludes `||`, whose cd only runs when the one before it failed, and `$(`,
-// whose cd stays inside the substitution. The terminator excludes a cd that
-// runs in its own process behind `|` or `&`, or whose subshell closes with
-// `)` right after it.
-const CD_LEAD = /(?:^|&&|;|\n|(?<!\$)\()\s*cd(?=\s)/g;
+// excludes `||`, whose cd only runs when the one before it failed. The
+// terminator excludes a cd that runs in its own process behind `|` or `&`, or
+// whose subshell closes with `)` right after it.
+const CD_LEAD = /(?:^|&&|;|\n|\(|`)\s*cd(?=\s)/g;
 const CD_TARGET = /^\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&)]+)\s*(?=&&|\|\||;|\n|$)/;
 const SHELL_EXPANSION_PATTERN = /(?<!\\)[$`]/;
 const GLOB_PATTERN = /(?<!\\)[*?[]/;
@@ -103,10 +102,14 @@ function unquote(value: string): string {
   return value.match(/^(['"])(.*)\1$/s)?.[2] ?? value;
 }
 
-// A cd inside a subshell stops applying once more `)` than `(` follow it.
+// A cd inside a subshell or `$(...)` stops applying once more `)` than `(`
+// follow it, and one inside backticks once the closing backtick does.
 function subshellClosed(masked: string, from: number): boolean {
+  const rest = masked.slice(from);
+  const inBackticks = (masked.slice(0, from).split("`").length - 1) % 2 === 1;
+  if (inBackticks && rest.includes("`")) return true;
   let depth = 0;
-  for (const char of masked.slice(from)) {
+  for (const char of rest) {
     if (char === "(") depth++;
     if (char === ")" && --depth < 0) return true;
   }

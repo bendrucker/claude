@@ -114,6 +114,10 @@ describe("commitDirectories", () => {
     ["cd /a && (cd /b && git commit); git commit", ["/b", "/a"]],
     ["cd /wt && (git commit) && git commit", ["/wt", "/wt"]],
     ['cd "~/wt" && git commit', ["/repo/~/wt"]],
+    ["echo $(cd /wt && git commit)", ["/wt"]],
+    ["echo `cd /wt && git commit`", ["/wt"]],
+    ["echo `cd /x && pwd` && git commit", ["/repo"]],
+    ["cd /wt && echo `pwd` && git commit", ["/wt"]],
   ])("%p → %p", (command, expected) => {
     expect(commitDirectories(command, "/repo", (path) => [path])).toEqual(expected);
   });
@@ -250,6 +254,11 @@ describe("processInput", () => {
       [
         "failed cd after a cd into the main checkout",
         (repo, wt) => ({ command: `cd ${repo} && cd ${repo}/gone; git commit -m x`, cwd: wt }),
+        "deny",
+      ],
+      [
+        "commit inside a substitution that cd'd into the main checkout",
+        (repo, wt) => ({ command: `echo $(cd ${repo} && git commit -m x)`, cwd: wt }),
         "deny",
       ],
       [

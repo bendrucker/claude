@@ -1,0 +1,60 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`validateBody bundles every deny and folds the warns in 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": 
+"Fix the PR body before retrying:
+- Testing section should not mention test counts. Describe what is covered instead.
+- Section headings should use AP title case. Apply: "Two fixes found while testing" → "Two Fixes Found While Testing". A heading that is intentionally cased (proper noun, code identifier) can be reworded so it satisfies AP case.
+- Commit SHAs and issue/MR refs (\`#123\`, \`!45\`) auto-link on GitHub/GitLab. Backticks render them as code and suppress the link. Write them bare.
+Also worth addressing in the same edit:
+- Bullets shaped like \`- **path/to/file**: ...\` narrate a file tour. Describe the conceptual change instead of walking the diff file by file."
+,
+  },
+}
+`;
+
+exports[`validateBody carries a title warn into an unreadable-body deny 1`] = `
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": 
+"Fix the PR body before retrying:
+- The hook cannot read standard input, so none of the body checks ran. Write the body to a file with a quoted heredoc (\`cat > <path> <<'EOF'\`), in the same call or its own, then pass that path: \`--body-file <path>\` on \`gh\`, \`--description-file <path>\` on \`glab\`.
+Also worth addressing in the same edit:
+- The title runs 52 characters. Under 50 keeps it readable in a PR list and in \`git log --oneline\`."
+,
+  },
+}
+`;
+
+exports[`validateBody lists several warns 1`] = `
+{
+  "hookSpecificOutput": {
+    "additionalContext": 
+"This PR has structural-slop patterns:
+- Small PRs don't need a \`## Changes\` + \`## Testing\` scaffold. Length tracks substance. Use prose for a short change.
+- Bullets shaped like \`- **path/to/file**: ...\` narrate a file tour. Describe the conceptual change instead of walking the diff file by file."
+,
+    "hookEventName": "PreToolUse",
+  },
+}
+`;
+
+exports[`validateBody notes a single warn 1`] = `
+{
+  "hookSpecificOutput": {
+    "additionalContext": 
+"This PR has a structural-slop pattern:
+- The body states that lint, types, tests, or a build passed. The PR's status checks already show that. Drop it, unless the result is one CI won't post: a manual check CI doesn't run, an intentional exclusion, or a pre-existing warning you're leaving in place."
+,
+    "hookEventName": "PreToolUse",
+  },
+}
+`;
+
+exports[`validateBody stays silent on a clean body 1`] = `null`;

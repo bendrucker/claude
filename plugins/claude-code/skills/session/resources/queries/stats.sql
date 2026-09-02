@@ -1,3 +1,16 @@
+-- ---
+-- name: stats
+-- tier: 1
+-- summary: Tool usage breakdown with error rates and aggregate totals.
+-- description: >-
+--   One row per tool with uses, errors, and error rate, and the window's total calls and
+--   sessions repeated on every row so a share is readable without a second query.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH filtered_calls AS (
   SELECT tc.*
   FROM tool_calls tc

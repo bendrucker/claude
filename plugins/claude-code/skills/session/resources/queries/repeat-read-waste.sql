@@ -1,25 +1,35 @@
--- Repeat Reads (a file already read earlier in the same session), decomposed by cause
--- so by-design re-reads don't masquerade as waste:
---   paginated:      the read passed `offset`/`limit` (chunked reading of a large file)
---   sidechain:      the read happened in a subagent (parallel fan-out loads shared files
---                   by design); may also be paginated, the two columns overlap
---   after_own_edit: main-thread, unpaginated, but the session edited the file since
---                   the previous main-thread read (refreshing post-edit state)
---   true_repeats:   main-thread, unpaginated, no intervening edit: the actual context tax
--- The actionable buckets require a prior main-thread read: a subagent's read shares the
--- parent session id, so without that gate the main thread's first read of a file a
--- subagent touched would count as a repeat even though nothing was re-injected.
--- Only `true_repeats` (and arguably `after_own_edit`) is actionable waste; a headline
--- repeat percentage without this split mostly measures pagination and fan-out
--- architecture.
--- Token estimate: text results use the chars/4 proxy, but an image Read returns the file
--- as a base64 image content block, whose real cost is the model's fixed image tokenization
--- (~1,600 tokens/image), not a quarter of the base64 length. Left uncapped the proxy
--- overstates image reads by orders of magnitude: one session's 31 image reads scored ~2.2M
--- tokens on base64 length vs ~50K real. So image results are capped at a flat per-image
--- budget: a re-read image still costs those ~1,600 tokens, so it stays in the estimate at
--- that bounded rate.
--- Params: after_date, before_date, project, host.
+-- ---
+-- name: repeat-read-waste
+-- tier: 1
+-- dimensions: [tokens]
+-- summary: >-
+--   Repeat Reads split by cause, isolating the true context tax from pagination and
+--   fan-out.
+-- description: >-
+--   A repeat Read is a file already read earlier in the same session, decomposed so that
+--   by-design re-reads do not masquerade as waste. `paginated` passed `offset`/`limit`,
+--   chunked reading of a large file. `sidechain` happened in a subagent, where parallel
+--   fan-out loads shared files by design, and may also be paginated, so the two columns
+--   overlap. `after_own_edit` is main-thread and unpaginated, but the session edited the
+--   file since the previous main-thread read. `true_repeats` is main-thread, unpaginated,
+--   with no intervening edit: the actual context tax. Only `true_repeats`, and arguably
+--   `after_own_edit`, is actionable waste. A headline repeat percentage without this split
+--   mostly measures pagination and fan-out architecture.
+--
+--   The actionable buckets require a prior main-thread read, because a subagent's read
+--   shares the parent session id and without that gate the main thread's first read of a
+--   file a subagent touched would count as a repeat. The token estimate uses the chars/4
+--   proxy for text, but an image Read returns the file as a base64 image content block
+--   whose real cost is the model's fixed image tokenization, around 1,600 tokens. Left
+--   uncapped the proxy overstated one session's 31 image reads at ~2.2M tokens against
+--   ~50K real, so image results are capped at a flat per-image budget and a re-read image
+--   stays in the estimate at that bounded rate.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH reads AS (
   SELECT
     tc.host,

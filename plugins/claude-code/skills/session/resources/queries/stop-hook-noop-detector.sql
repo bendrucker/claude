@@ -1,25 +1,35 @@
--- Stop hooks that never produce stdout, a decision, a block, or a non-zero exit:
--- pure-overhead automations that fire on every Stop and do nothing observable
--- (removal candidates). `total_ms` is the latency deleting one would buy back.
+-- ---
+-- name: stop-hook-noop-detector
+-- tier: 2
+-- dimensions: [turns-compaction]
+-- summary: >-
+--   Stop hooks that cost wall-clock and produce nothing, ranked as removal candidates.
+-- description: >-
+--   Pure-overhead automations that fire on every Stop and do nothing observable, no stdout,
+--   no decision, no block, no non-zero exit. `total_ms` is the latency deleting one would
+--   buy back. `fires` comes from the `hookInfos` roster in each `stop_hook_summary`, the
+--   harness's own list of every hook it ran, so a hook that runs silently appears with
+--   `events = 0` rather than being absent. `events`, `with_stdout`, `with_decision`,
+--   `nonzero_exit`, and `blocks` come from the attachment channel, which records only a
+--   hook that said something. Real `total_ms` against zeros everywhere else is pure
+--   overhead. The join is full outer because the roster starts 2026-04-27, so an older
+--   attachment row has no fire to match.
 --
--- `fires` comes from the `hookInfos` roster in each stop_hook_summary, which lists every
--- hook the harness ran. `events` counts the attachment records the same hook wrote. A
--- hook that produces no output writes no attachment, so a row with many fires and zero
--- events is the strongest removal candidate and is exactly what the attachment channel
--- alone cannot see. The join is full outer because the roster starts 2026-04-27, so an
--- older attachment row has no fire to match.
---
--- Blocking errors (exit-2 gates) arrive as kind=hook_blocking_error with no command,
--- stdout, decision, or exit code, and nothing in the record identifies which hook exited
--- 2, so they group under the bare hook event name ('Stop') in the `blocks` column.
--- `gated_stops` covers the gap from the roster side: the Stop's `toolUseID` is shared by
--- its summary and its blocking error, so a hook's fires at a gated Stop are countable
--- even though the gate itself is not attributable. Zero events and zero gated stops is a
--- hook that never ran at a blocked Stop; gated stops mean it may be the gate.
---
--- Roster entries carrying `prompt_text` are queued prompts the harness re-injected at
--- Stop, not configured hooks, and are excluded.
--- Params: after_date, before_date, project, host.
+--   Blocking errors (exit-2 gates) arrive as `hook_blocking_error` with no command, stdout,
+--   decision, or exit code, and nothing in the record identifies which hook exited 2, so
+--   they group under the bare hook event name. `gated_stops` covers that gap from the
+--   roster side: a Stop's `toolUseID` is shared by its summary and its blocking error, so a
+--   hook's fires at a gated Stop are countable even though the gate itself is not
+--   attributable. Zero events and zero gated stops is a hook that never ran at a blocked
+--   Stop, while gated stops mean it may be the gate. Roster entries carrying `prompt_text`
+--   are queued prompts the harness re-injected at Stop rather than configured hooks, and
+--   are excluded.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH gated AS (
   SELECT DISTINCT host, tool_use_id
   FROM hook_events

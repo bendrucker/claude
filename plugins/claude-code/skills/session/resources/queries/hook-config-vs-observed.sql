@@ -1,44 +1,50 @@
--- Hooks that are CONFIGURED on disk but never OBSERVED firing in the session index.
--- hooks.sql / hook-blocks.sql / stop-hook-noop-detector.sql all start from hook_events,
--- which only gets a row when a hook produces stdout, a decision, or a non-zero exit. A
--- hook that silently exits 0 on every invocation (an env-var guard gone stale, a broken
--- path) leaves NO row at all, so those queries are blind to it: they mine what fired,
--- never what should have fired. This query starts from disk config instead.
+-- ---
+-- name: hook-config-vs-observed
+-- tier: 1
+-- dimensions: [hook-coverage]
+-- summary: >-
+--   Hooks configured on disk but never observed firing in the index, left-joined so the
+--   `observed_fires = 0` rows surface.
+-- description: >-
+--   `hooks`, `hook-blocks`, and `stop-hook-noop-detector` all start from `hook_events`,
+--   which only gets a row when a hook produces stdout, a decision, or a non-zero exit. A
+--   hook that silently exits 0 on every invocation (an env-var guard gone stale, a broken
+--   path) leaves no row at all, so those queries are blind to it: they mine what fired,
+--   never what should have fired. This one starts from disk config instead.
 --
--- Configured side, read from local disk (not the index):
---   1. Plugin hooks.json under the plugin cache. Content is duplicated across
---      version-hash directories for the same plugin (same duplication frontmatter.sql
---      documents for SKILL.md); pinned to one hash per plugin via QUALIFY row_number(),
---      picking arbitrarily since the copies are byte-identical for the installed
---      version.
---   2. ~/.claude/settings.json (this machine's user-level hook config).
---   3. .claude/settings.json relative to the invoking cwd (project-level hook config).
--- Both settings paths are fixed, not globbed: point duckdb's cwd at the project you want
--- scoped before running this query. Like plan-sections.sql and frontmatter.sql, a
--- missing file at a fixed path errors rather than returning zero rows (a DuckDB
--- read_json_objects limitation, not something this query works around); override
--- hook_config_glob for the plugin-cache source if needed.
+--   The configured side reads local disk, not the index: plugin `hooks.json` under the
+--   plugin cache (content is duplicated across version-hash directories, so it is pinned to
+--   one hash per plugin, picking arbitrarily since the copies are byte-identical for the
+--   installed version), `~/.claude/settings.json`, and `.claude/settings.json` relative to
+--   the invoking cwd. Both settings paths are fixed rather than globbed, so point duckdb's
+--   cwd at the project you want scoped, and a missing file at a fixed path errors rather
+--   than returning zero rows.
 --
--- Matching a configured command to hook_events.command is heuristic: both sides may or
--- may not have ${CLAUDE_PLUGIN_ROOT}/$CLAUDE_PROJECT_DIR expanded, and observed strings
--- can carry a wrapping interpreter (`bun "..."`) or trailing args. match_key resolves,
--- in order: the basename of the last path segment ending in a known script extension
--- (sandbox.ts, context.sh, ...), else the last slash-delimited path segment when the
--- command's final token is a bare path (`bun ~/.claude/hooks/worktree`), else the
--- trimmed command text verbatim (inline one-liners like `make test-unit`). False-match
--- risk: two different plugins' scripts sharing a basename collapse into one row.
--- False-negative risk: a configured command with no extension, no bare trailing path,
--- and a verbatim mismatch against its observed form (e.g. an alias or wrapper) reports
--- as unobserved when it actually ran.
+--   Matching a configured command to `hook_events.command` is heuristic: either side may
+--   have `${CLAUDE_PLUGIN_ROOT}` or `$CLAUDE_PROJECT_DIR` expanded, and observed strings can
+--   carry a wrapping interpreter or trailing args. `match_key` resolves, in order: the
+--   basename of the last path segment ending in a known script extension, else the last
+--   slash-delimited segment when the command's final token is a bare path, else the trimmed
+--   command text verbatim. Two plugins' scripts sharing a basename collapse into one row,
+--   and a configured command with no extension, no bare trailing path, and a verbatim
+--   mismatch against its observed form reports as unobserved when it actually ran.
 --
--- A 0 in observed_fires is a lead, not proof of breakage: a conditional injector that
--- legitimately produces no output on most events looks identical here to a hook that
--- never runs at all. Read the script before treating a 0 as a bug.
---
--- Params: after_date, before_date, project, host (scopes the OBSERVED side only; the
--- configured side always reflects this machine's current disk state, so pass
--- host='local' when grounding a finding rather than trusting another host's fire count),
--- hook (GLOB on configured command), hook_config_glob (override the plugin-cache glob).
+--   A 0 in `observed_fires` is a lead, not proof of breakage: a conditional injector that
+--   legitimately produces no output on most events looks identical here to a hook that
+--   never runs at all. Read the script before treating a 0 as a bug.
+-- params:
+--   - name: hook
+--     meaning: GLOB on configured command
+--   - name: hook_config_glob
+--     meaning: override the plugin-cache glob
+--   - after_date
+--   - before_date
+--   - project
+--   - name: host
+--     meaning: >-
+--       scopes the observed side only, since the configured side always reflects this
+--       machine's disk, so pass `local` when grounding a finding
+-- ---
 WITH raw_configs AS (
   SELECT
     'plugin:' || regexp_extract(filename, 'cache/([^/]+)/([^/]+)/([^/]+)/hooks/hooks\.json$', 1)

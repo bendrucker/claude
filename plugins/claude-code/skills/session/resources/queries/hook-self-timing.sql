@@ -1,23 +1,33 @@
--- Hook latency from the hooks' own clocks, read off ~/.claude/hook-metrics/*.jsonl
--- rather than the index. `hook_events` records a hook only when it produced visible
--- output, a few percent of actual fires, so every latency figure derived from it is
--- conditioned on the hook having said something. A self-timing hook appends one line
--- per invocation, which makes `fires` here the unbiased denominator: quantiles run
--- over every invocation, silent ones included.
+-- ---
+-- name: hook-self-timing
+-- tier: 2
+-- reads: disk
+-- summary: >-
+--   Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl`
+--   rather than the index.
+-- description: >-
+--   `hook_events` records a hook only when it produced visible output, a few percent of
+--   actual fires, so every latency figure derived from it is conditioned on the hook having
+--   said something. A self-timing hook appends one line per invocation, which makes `fires`
+--   here the unbiased denominator behind `p50_ms`, `p95_ms`, and `p99_ms`.
+--   `index_visible_pct` is the share of fires `hook_events` could have seen at all, the
+--   bias factor on the `hooks` query for that hook.
 --
--- `index_visible_pct` is the share of fires that `hook_events` could have seen at all.
--- Read it as the bias factor on the `hooks` query for the same hook.
---
--- The in-process duration excludes process spawn and interpreter start, which the
--- harness figure includes, so it is lower than `hooks.p50_ms` by that fixed overhead.
--- These files are written on this machine only and carry no host column; an imported
--- host's metrics are not part of the index.
---
--- Only hooks that call the `user/scripts/hook-metrics` helper appear. With no file
--- written yet, DuckDB raises an IO Error naming the glob rather than returning no rows.
---
--- Params: metrics_glob (default ~/.claude/hook-metrics/*.jsonl*, which includes rotated
--- .1 files), hook (GLOB on hook name), after_date, before_date. Pass null to skip a filter.
+--   The in-process duration excludes process spawn and interpreter start, which the harness
+--   figure includes, so it runs below `hooks.p50_ms` by that fixed overhead. These files
+--   are written on this machine only and carry no host column, so an imported host's
+--   metrics are not part of the index. Only hooks that call the `user/scripts/hook-metrics`
+--   helper appear, and with no file written yet DuckDB raises an IO Error naming the glob
+--   rather than returning no rows.
+-- params:
+--   - name: metrics_glob
+--     default: '~/.claude/hook-metrics/*.jsonl*'
+--     meaning: rotated .1 files included
+--   - name: hook
+--     meaning: GLOB on hook name
+--   - after_date
+--   - before_date
+-- ---
 WITH runs AS (
   SELECT
     regexp_extract(filename, '([^/]+?)\.jsonl', 1) AS hook,

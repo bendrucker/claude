@@ -1,7 +1,18 @@
--- Recurring diagnostics (type-checker, linter, LSP errors surfaced in-session), grouped
--- by source/severity/code. The self-improvement signal for systematic mistakes: a code
--- that recurs across many files and sessions is a pattern worth a rule, snippet, or habit.
--- Params: after_date, before_date, project, host.
+-- ---
+-- name: diagnostics
+-- tier: 1
+-- summary: >-
+--   Recurring type-checker, linter, and LSP diagnostics grouped by source, severity, and
+--   code, with file and session spread.
+-- description: >-
+--   The self-improvement signal for systematic mistakes: a code that recurs across many
+--   files and sessions is a pattern worth a rule, a snippet, or a habit.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH d AS (
   SELECT dg.*
   FROM diagnostics dg

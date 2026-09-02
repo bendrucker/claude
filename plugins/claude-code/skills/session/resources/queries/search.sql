@@ -1,3 +1,20 @@
+-- ---
+-- name: search
+-- tier: 1
+-- summary: >-
+--   Find sessions by keyword, matching the session label and the prose of both messages and
+--   content items.
+-- description: >-
+--   ILIKE on the session `label`, `messages.content_text`, and `content_items.text`,
+--   returning full `sessions` rows newest first.
+-- params:
+--   - query
+--   - limit
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 SELECT s.*
 FROM sessions s
 WHERE (

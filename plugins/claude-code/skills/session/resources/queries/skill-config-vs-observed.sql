@@ -1,43 +1,52 @@
--- Skills that are CONFIGURED on disk but rarely or never OBSERVED in skill_calls.
--- skills.sql counts what fired; it never sees a skill that is installed but silent,
--- even though every model-invocable skill pays its description into context on every
--- session (the curation doctrine's always-on cost). This query starts from SKILL.md
--- frontmatter on disk instead, the same configured-vs-observed shape as
--- hook-config-vs-observed.sql. Requires the yaml community extension: run with
--- `-init resources/extensions.sql`.
+-- ---
+-- name: skill-config-vs-observed
+-- tier: 1
+-- reads: disk
+-- extensions: [yaml]
+-- summary: >-
+--   Installed skills that never fire, the curation instrument: SKILL.md frontmatter on disk
+--   left-joined against observed `skill_calls`, zero-fire first.
+-- description: >-
+--   `skills` counts what fired and never sees a skill that is installed but silent, even
+--   though every model-invocable skill pays its description into context on every session.
+--   Rows carry `description_chars`, which approximates that always-on cost, and
+--   `disable_model_invocation`, where a zero in calls is normal: those skills load no
+--   description into context and fire only via explicit slash use.
 --
--- Configured side, read from local disk (not the index):
---   1. Plugin skills under the plugin cache. Content is duplicated across
---      version-hash directories for the same plugin (the duplication frontmatter.sql
---      documents); pinned to one hash per (marketplace, plugin, skill) via QUALIFY,
---      picking arbitrarily since the copies are byte-identical for the installed
---      version.
---   2. ~/.claude/skills (personal skills, invoked by bare name).
---   3. .claude/skills relative to the invoking cwd (project skills, bare name):
---      point duckdb's cwd at the project you want scoped before running.
--- A glob with no matching files errors rather than returning zero rows (the same
--- DuckDB reader limitation hook-config-vs-observed.sql documents); override the
--- glob for an absent source.
+--   The configured side reads local disk, not the index: plugin skills under the plugin
+--   cache (content is duplicated across version-hash directories, so it is pinned to one
+--   hash per marketplace, plugin, and skill, picking arbitrarily since the copies are
+--   byte-identical for the installed version), `~/.claude/skills` for personal skills
+--   invoked by bare name, and `.claude/skills` relative to the invoking cwd for project
+--   skills, so point duckdb's cwd at the project you want scoped. A glob with no matching
+--   files errors rather than returning zero rows, so override the glob for an absent source.
 --
--- Matching a configured skill to skill_calls.skill_name: a plugin skill's
--- invocation name is <plugin>:<skill-dir> derived from the cache path (frontmatter
--- `name` is often unnamespaced), and an entry skill (<p>:<p>) also matches bare
--- `<p>` calls, which appear in real data. Personal/project skills match their bare
--- dir name. False-match risk: a personal skill sharing a plugin's name absorbs its
--- bare calls. Built-in CLI skills (code-review, verify, ...) have no SKILL.md under
--- these globs, so they never appear here.
+--   Matching a configured skill to `skill_calls.skill_name`: a plugin skill's invocation
+--   name is `<plugin>:<skill-dir>` derived from the cache path, since frontmatter `name` is
+--   often unnamespaced, and an entry skill (`<p>:<p>`) also matches bare `<p>` calls, which
+--   appear in real data. Personal and project skills match their bare dir name. A personal
+--   skill sharing a plugin's name absorbs its bare calls. Built-in CLI skills have no
+--   SKILL.md under these globs, so they never appear here.
 --
--- disable_model_invocation matters for reading a 0: those skills load no
--- description into context and only fire via explicit /slash use, so a zero for
--- them is normal. description_chars approximates the always-on cost of every
--- other row. Treat a 0 in calls as a lead to investigate: the observed side only
--- spans the index, and a newly added skill has no history.
---
--- Params: after_date, before_date, project, host (all scope the OBSERVED side
--- only; the configured side always reflects this machine's current disk state, so
--- pass host='local' when grounding a finding rather than trusting another host's
--- call count), skill (GLOB on configured name), plugin_skill_glob /
--- user_skill_glob / project_skill_glob (override the three configured sources).
+--   Treat a 0 in calls as a lead to investigate rather than proof. The observed side only
+--   spans the index, and a newly added skill has no history.
+-- params:
+--   - name: skill
+--     meaning: GLOB on configured name
+--   - name: plugin_skill_glob
+--     meaning: override the plugin-cache source
+--   - name: user_skill_glob
+--     meaning: override the personal-skills source
+--   - name: project_skill_glob
+--     meaning: override the project-skills source
+--   - after_date
+--   - before_date
+--   - project
+--   - name: host
+--     meaning: >-
+--       scopes the observed side only, since the configured side always reflects this
+--       machine's disk, so pass `local` when grounding a finding
+-- ---
 WITH plugin_files AS (
   SELECT
     regexp_extract(filename, 'cache/([^/]+)/([^/]+)/([^/]+)/skills/([^/]+)/SKILL\.md$', 1) AS marketplace,

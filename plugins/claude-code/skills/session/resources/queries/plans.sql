@@ -1,10 +1,25 @@
--- Plan-mode usage: sessions that used ExitPlanMode, with replan counts and outcome
--- distribution. `replan_tier` is keyed on mid-session redirects (the user rejected a
--- plan and the session kept going): 1 redirect is a replan candidate, 2+ is off-rails.
--- A terminal rejection with no file edits afterward is a deliberate handoff (plan
--- here, implement from the plan file in a fresh session), reported in handoff_count
--- and never counted as churn.
--- Params: after_date, before_date, project, host, min_plans (minimum plan_count, default 1).
+-- ---
+-- name: plans
+-- tier: 1
+-- dimensions: [planning]
+-- summary: >-
+--   Sessions that used plan mode (ExitPlanMode), with per-session plan count, an
+--   approved/redirect/handoff breakdown, and a `replan_tier` label.
+-- description: >-
+--   `replan_tier` is keyed on mid-session redirects, where the user rejected a plan and the
+--   session kept going: `single` for none, `replan` for one, `off-rails` for two or more. A
+--   terminal rejection with no file edits afterward is a deliberate handoff, planning here
+--   and implementing from the plan file in a fresh session. It lands in `handoff_count` and
+--   never counts as churn. Sorted by `plan_count` descending.
+-- params:
+--   - name: min_plans
+--     default: 1
+--     meaning: minimum plan_count per session
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH filtered AS (
   SELECT ps.*
   FROM plan_sessions ps

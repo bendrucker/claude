@@ -1,15 +1,24 @@
--- Split hook wall-clock between portable shared config (CLAUDE_PLUGIN_ROOT/CLAUDE_SKILL_DIR
--- and the symlinked ~/.claude hooks) and arbitrary per-repo project hooks. The central
--- discovery lesson: measure your own config, not a project's `make test-unit`. Per-repo
--- hooks dominating total_s means the latency isn't yours to fix. Hooks run in parallel,
--- so read total_s as aggregate process work, not the wall-clock the user waits on.
---
--- shared_config is what travels with you: plugin/skill hooks (CLAUDE_PLUGIN_ROOT,
--- CLAUDE_SKILL_DIR) and the user-level hook dir under $HOME/~. A `.claude/hooks/` path
--- rooted at CLAUDE_PROJECT_DIR (or relative to the repo) is a per-repo hook that happens
--- to share the directory name, so it belongs to project_local: a repo's own hooks are not
--- portable config, and counting them as such buries your own latency under someone else's.
--- Params: after_date, before_date, project, host.
+-- ---
+-- name: hook-origin-split
+-- tier: 2
+-- dimensions: [hook-latency]
+-- summary: >-
+--   Hook wall-clock split between portable shared config and arbitrary per-repo project
+--   hooks.
+-- description: >-
+--   The central discovery lesson: measure your own config, not a project's `make
+--   test-unit`. Per-repo hooks dominating `total_s` means the latency is not yours to fix.
+--   `shared_config` is what travels with you, plugin and skill hooks (`CLAUDE_PLUGIN_ROOT`,
+--   `CLAUDE_SKILL_DIR`) plus the user-level hook dir under `$HOME`. A `.claude/hooks/` path
+--   rooted at `CLAUDE_PROJECT_DIR` is a per-repo hook that happens to share the directory
+--   name, so it belongs to `project_local`. Hooks run in parallel, so read `total_s` as
+--   aggregate process work rather than the wall-clock the user waits on.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH ev AS (
   SELECT he.command, he.duration_ms
   FROM hook_events he

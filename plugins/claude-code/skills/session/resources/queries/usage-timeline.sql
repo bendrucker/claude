@@ -1,12 +1,22 @@
--- Temporal view of one session's token burn: per-bucket message counts, token classes,
--- estimated cost, a context-size proxy, and cache-miss ratio. Reads the deduped
--- per-message usage from message_usage (raw rows repeat the parent message's usage, so
--- summing them inflates totals 2-3.5x).
--- Cost is an estimate from public per-MTok rates (model_input_rate/model_output_rate),
--- weighting cache reads at 0.1x the input rate and cache writes at 1.25x for the 5m TTL
--- and 2x for the 1h TTL. Against the 62 sessions carrying a real cost-state.totalCostUSD
--- it lands at 0.97 of billed spend, so read it as a close approximation.
--- Params: session (required), host, bucket_minutes (default 10).
+-- ---
+-- name: usage-timeline
+-- tier: 1
+-- summary: >-
+--   One session's token burn per time bucket, with estimated cost and a context-size proxy.
+-- description: >-
+--   One row per bucket with message count, estimated cost, input, output, cache-write and
+--   cache-read tokens, cache-miss ratio, `max_context_tokens` (the maximum per-message
+--   input plus cache_read plus cache_creation, a context-size proxy), sidechain share, and
+--   the modal model, agent, and skill. Reads the deduped per-message usage from
+--   `message_usage`, since raw rows repeat the parent message's usage and summing them
+--   inflates totals 2-3.5x. Cost uses the same estimate as `usage-spikes`.
+-- params:
+--   - name: session
+--     required: true
+--   - name: bucket_minutes
+--     default: 10
+--   - host
+-- ---
 WITH priced AS (
   SELECT
     mu.*,

@@ -1,12 +1,26 @@
--- Denied tool calls: the permission-friction surface. `denial_kind` says which mechanism
--- refused the call, so hand rejections (`user-rejected`) are separable from the ones a
--- setting produced (`permission-rule`, `automode-blocked`, `automode-unavailable`).
--- `kind_source` is `field` when the harness recorded the kind and `result-string` on rows
--- predating 2026-07-02, where only user rejections leave a trace.
--- Excludes built-in tools that block on user input by design (plan approval, question
--- prompts): a rejection there is the interaction working, not friction a setting can remove.
--- Params: denial_kind (one kind, or all when unset), limit, after_date, before_date,
--- project, host.
+-- ---
+-- name: permissions
+-- tier: 1
+-- summary: >-
+--   Denied tool calls, one row per denial, with the mechanism that stopped it and the
+--   signal that answered.
+-- description: >-
+--   `denial_kind` says which mechanism refused the call (`user-rejected`,
+--   `permission-rule`, `automode-blocked`, `automode-unavailable`), so hand rejections are
+--   separable from the ones a setting produced. `kind_source` is `field` when the harness
+--   recorded the kind and `result-string` on rows predating 2026-07-02, where only user
+--   rejections leave a trace. Built-in tools that block on user input by design (plan
+--   approval, question prompts) are excluded: a rejection there is the interaction working,
+--   not friction a setting can remove.
+-- params:
+--   - name: denial_kind
+--     meaning: one kind, or all when unset
+--   - limit
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 SELECT
   pr.tool_name,
   pr.denial_kind,

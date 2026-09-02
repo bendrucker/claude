@@ -1,10 +1,22 @@
--- Commands that prompted for permission even though an allow rule should cover them.
--- Pass a permissions.allow pattern as `allow_glob`; this lists the Bash prompts whose
--- command matches it. A non-empty result means the allow pattern isn't matching at the
--- prompt (usually a compound command defeating prefix matching). The grounding step
--- compares each row against the live permissions.allow list.
--- Params: after_date, before_date, project, host, allow_glob (GLOB on command; required
--- to be useful, e.g. 'gh pr *' or 'bun *').
+-- ---
+-- name: already-allowed-still-prompting
+-- tier: 2
+-- dimensions: [permissions-sandbox]
+-- summary: >-
+--   Bash permission prompts whose command matches a `permissions.allow` pattern you pass
+--   as `allow_glob`.
+-- description: >-
+--   A non-empty result is an allow pattern that is not matching at the prompt, usually a
+--   compound command defeating prefix matching. The grounding step compares each row
+--   against the live `permissions.allow` list.
+-- params:
+--   - name: allow_glob
+--     meaning: "GLOB on command, required to be useful, e.g. `gh pr *` or `bun *`"
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH pr AS (
   SELECT p.host, p.command, p.session_id, p.timestamp
   FROM permission_requests p

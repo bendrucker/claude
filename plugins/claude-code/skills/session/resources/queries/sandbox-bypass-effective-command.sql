@@ -1,11 +1,26 @@
--- Top commands that get dangerouslyDisableSandbox, normalized to their real verb by
--- stripping leading preamble: `cd <path>` wrappers, `echo` lines, and `VAR=value`
--- env assignments (optionally `export`ed, each followed by `&&`, `;`, a newline, or
--- whitespace for assignments) so the tool that needs the bypass surfaces. The
--- normalization is the reusable part: it recurs across every permission and sandbox
--- question, because compound commands otherwise hide the verb that needs an
--- exemption. Ranked by frequency; reveals `excludedCommands` candidates.
--- Params: after_date, before_date, project, host, min_count (floor, default 5).
+-- ---
+-- name: sandbox-bypass-effective-command
+-- tier: 1
+-- dimensions: [permissions-sandbox]
+-- summary: >-
+--   Bypassed commands normalized to their real verb, ranked by frequency: the
+--   `excludedCommands` candidates.
+-- description: >-
+--   Normalization strips leading preamble from a `dangerouslyDisableSandbox` command,
+--   `cd <path>` wrappers, `echo` lines, and `VAR=value` env assignments (optionally
+--   exported, each followed by `&&`, a semicolon, a newline, or whitespace for
+--   assignments), so the tool that actually needs the bypass surfaces. The normalization is
+--   the reusable part, because it recurs across every permission and sandbox question:
+--   compound commands otherwise hide the verb that needs an exemption.
+-- params:
+--   - name: min_count
+--     default: 5
+--     meaning: floor on a command's total
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH stripped AS (
   SELECT
     sb.host,

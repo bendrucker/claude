@@ -1,7 +1,18 @@
--- Recent tool failures: calls that ran and went wrong. Denials are a different surface
--- with a different fix, and `permissions` reports them with the mechanism that refused
--- each one, so they are excluded here rather than reported twice under two definitions.
--- Params: limit, after_date, before_date, project, host.
+-- ---
+-- name: errors
+-- tier: 1
+-- summary: "Recent tool failures: calls that ran and went wrong."
+-- description: >-
+--   Denials are a different surface with a different fix, and `permissions` reports them
+--   with the mechanism that refused each one, so they are excluded here rather than
+--   reported twice under two definitions.
+-- params:
+--   - limit
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 SELECT te.*
 FROM tool_errors te
 JOIN sessions s USING (host, session_id)

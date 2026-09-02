@@ -1,3 +1,21 @@
+-- ---
+-- name: sandbox
+-- tier: 1
+-- summary: >-
+--   Bash calls that bypassed the sandbox with `dangerouslyDisableSandbox`, with back-links
+--   to prior failed sandboxed calls of the same command.
+-- description: >-
+--   One row per bypass, most recent first, carrying the command, its description, whether
+--   it followed a failure, and the prior error text. The back-link requires the same
+--   `agent_id`, so sibling subagents sharing a session id cannot be paired into a retry
+--   that never happened.
+-- params:
+--   - limit
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 SELECT
   LEFT(sb.command, 80) as command,
   sb.description,

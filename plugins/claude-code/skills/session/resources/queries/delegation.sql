@@ -1,50 +1,46 @@
--- Delegation observability: how well expensive orchestrator sessions push work down to
--- cheaper models on Agent/Task spawns. One row per (parent main-model family, path,
--- actual spawn-model family), where `path` splits `pinned` (purpose-built agents that
--- set a `model:` in their own definition, so the parent's choice never applies) from
--- `generic` (`general-purpose`, `Plan`, bare `claude`, no `subagent_type`, and any
--- subagent type not on the known-pinned list). Re-derive the pinned list from the
--- `model` column of `bun run inventory agents` in the config repo, plus the built-in
--- `claude-code-guide`. An agent that gains or loses a frontmatter `model:` moves
--- between the two paths, and a purpose-built agent without one (`review:angle`,
--- `review:verifier`) belongs in `generic` because its spawn site still has to supply
--- the model.
+-- ---
+-- name: delegation
+-- tier: 1
+-- dimensions: [tokens]
+-- summary: >-
+--   Whether expensive orchestrator sessions push work down to cheaper models on Agent/Task
+--   spawns.
+-- description: >-
+--   One row per (parent main-model family, `path`, actual spawn-model family). `path`
+--   splits `pinned` (purpose-built agents that set a `model:` in their own definition,
+--   re-derivable from the `model` column of `bun run inventory agents` plus the built-in
+--   `claude-code-guide`) from `generic` (`general-purpose`, `Plan`, bare `claude`,
+--   `Explore`, any subagent type off that list). A purpose-built agent with no frontmatter
+--   `model:` (`review:angle`, `review:verifier`) counts as generic, because its spawn site
+--   still has to supply the model. `Explore` counts as generic, not pinned: since CLI
+--   v2.1.198 it inherits the parent model (capped at Opus) rather than pinning Haiku, so an
+--   Explore spawn under an expensive parent is a real delegation miss. Unrecognized types
+--   default to generic, so the split undercounts `pinned` rather than overstating the
+--   generic-path miss. The generic path is where delegation actually happens or fails,
+--   because a pinned agent's model is fixed by its own definition.
 --
--- `Explore` is generic, not pinned: since
--- CLI v2.1.198 it inherits the main conversation model (capped at Opus) instead of
--- pinning Haiku, so an Explore spawn under an expensive parent is a real delegation miss,
--- not a free downgrade. Unrecognized types default to generic, so the split undercounts
--- `pinned` rather than overstating the generic-path miss. The generic path is where
--- delegation actually happens or fails: a purpose-built agent's model is fixed by its
--- definition, not by the parent's choice.
+--   `override_rate_pct` and `cheaper_override_rate_pct` divide by every spawn in the group,
+--   so they read as how much of that group's delegation was steered. A cheaper override is
+--   an explicit `model` input naming a family cheaper than the parent's dominant model,
+--   compared via `model_output_rate`.
 --
--- `override_rate_pct` / `cheaper_override_rate_pct` are both fractions of every spawn
--- in the (parent_family, path) group, not just the overridden ones, so they read
--- directly as "how much of this group's delegation was steered". A spawn counts as a
--- cheaper override when the explicit `model` input names a cheaper family than the
--- parent's dominant model (compared via `model_output_rate`).
---
--- Blind spots:
--- - `fork` subagents are excluded entirely. A fork inherits the parent model by
---   design (it continues the same conversation), so counting it as a delegation miss
---   would be wrong. It never carries an explicit `model` override either.
--- - The actual spawn model is the tool result's `resolvedModel` when present (recent
---   CLI versions only, a minority of spawns), else the modal model of the subagent's
---   own transcript (`.../subagents/agent-<id>.jsonl` or a workflow-nested variant,
---   joined via the tool result's `agentId`). Spawns with neither signal, and spawns
---   whose result never returned (still running, cancelled), land in `actual_family =
---   unknown`, undercounting whichever family they actually ran on. Exclude `unknown`
---   from the denominator when reading a family's expensive-share off `pct_of_path`.
--- - `expensive_output_tokens` / `expensive_cache_creation_tokens` sum `message_usage`
---   tokens for spawns whose actual family is opus/fable, scoped to spawns with a
---   resolvable `agentId` (the same coverage gap as `actual_family`). This is an upper
---   bound on wasted spend, not a verdict: some opus subagent work is warranted.
--- - The parent's main model is the modal (most frequent) model across the session's
---   non-sidechain assistant messages. A mid-session `/model` switch flattens into
---   whichever model produced more turns, so the family a spawn was delegated relative
---   to can differ from the model actually active at spawn time.
---
--- Params: after_date, before_date, project, host.
+--   Blind spots. `fork` subagents are excluded, since a fork inherits the parent model by
+--   design and never carries an explicit override. The actual spawn model comes from the
+--   tool result's `resolvedModel` when present and otherwise from the modal model of the
+--   subagent's own transcript, so spawns with neither signal (still running, cancelled)
+--   land in `actual_family = unknown` and belong out of the denominator when reading a
+--   family's expensive share off `pct_of_path`. `expensive_output_tokens` and
+--   `expensive_cache_creation_tokens` sum `message_usage` tokens for spawns whose actual
+--   family resolved to opus or fable, an upper bound on wasted spend rather than a verdict,
+--   since some opus subagent work is warranted. The parent's main model is the modal model
+--   across the session's non-sidechain assistant messages, so a mid-session `/model` switch
+--   flattens into whichever model produced more turns.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH session_main AS (
   SELECT
     mu.host,

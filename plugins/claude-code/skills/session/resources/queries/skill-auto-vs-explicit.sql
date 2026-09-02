@@ -1,30 +1,43 @@
--- Per skill, how invocations split between the model choosing it, another skill chaining
--- into it, and the user typing its slash command. A skill the user always types can go
--- `disable-model-invocation` and stop paying for its always-on description; one the model
--- reaches for on its own is earning that description. The core skill-economy lever.
+-- ---
+-- name: skill-auto-vs-explicit
+-- tier: 1
+-- dimensions: [skill-economy]
+-- summary: >-
+--   Per skill, how invocations split between the model choosing it (`model_auto`), another
+--   skill chaining into it (`chained`), and the user typing its slash command (`explicit`).
+-- description: >-
+--   The core skill-economy lever. A skill the user always types can go
+--   `disable-model-invocation` and stop paying for its always-on description. One the model
+--   invokes on its own is earning that description.
 --
--- The three columns come from two different places, because a typed slash command is not
--- a Skill tool call. The harness expands `/name` into a user message carrying
--- `<command-name>/name</command-name>`, and no Skill tool_use follows: across the corpus
--- fewer than 1% of Skill calls have a matching slash command anywhere earlier in the
--- session. So `explicit` is counted from those markers in `raw`, and `model_auto` +
--- `chained` from `skill_calls`. Reading explicitness off the Skill call alone cannot work,
--- which is what the previous definition (`args IS NULL` means model-auto) got wrong:
--- passing args is ordinary model routing, so every parameterized skill read as 100%
--- explicit and its description looked unearned.
+--   The three columns come from two different places, because a typed slash command is not
+--   a Skill tool call. The harness expands `/name` into a user message carrying a
+--   `<command-name>` marker, and no Skill tool_use follows: across the corpus fewer than 1%
+--   of Skill calls have a matching slash command anywhere earlier in the session. So
+--   `explicit` is counted from those markers in `raw`, and `model_auto` plus `chained` from
+--   `skill_calls`. Reading explicitness off the Skill call alone cannot work, which is what
+--   the previous definition (args being NULL means model-auto) got wrong: passing args is
+--   ordinary model routing, so every parameterized skill read as 100% explicit and its
+--   description looked unearned.
 --
--- `chained` is a Skill call made while another skill held attribution, i.e. skill-to-skill
--- delegation rather than a fresh routing decision. It counts toward the description
--- earning its keep only if the calling skill names it by description rather than by name.
+--   `chained` is a Skill call made while another skill held attribution, skill-to-skill
+--   delegation rather than a fresh routing decision. It counts toward the description
+--   earning its keep only if the calling skill names it by description rather than by name.
 --
--- Blind spot: the skill universe here is whatever appears in `skill_calls`, so a skill the
--- user only ever types and the model never loads has no row at all. `skill-config-vs-
--- observed` reads the installed skills off disk and is the surface for that question.
--- Marker names are matched to a skill by full name (`plugin:skill`) or, for an unnamespaced
--- command, by the segment after the colon; two plugins exposing the same trailing name
--- would collapse into one row.
---
--- Params: after_date, before_date, project, host, min_calls (floor on total, default 1).
+--   Blind spot: the skill universe here is whatever appears in `skill_calls`, so a skill
+--   the user only ever types and the model never loads has no row at all. Use
+--   `skill-config-vs-observed` for the disk-side universe. Marker names are matched to a
+--   skill by full name (`plugin:skill`) or, for an unnamespaced command, by the segment
+--   after the colon, so two plugins exposing the same trailing name collapse into one row.
+-- params:
+--   - name: min_calls
+--     default: 1
+--     meaning: floor on a skill's total
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH scoped_sessions AS (
   SELECT host, session_id
   FROM sessions

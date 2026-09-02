@@ -1,13 +1,29 @@
--- One row per ExitPlanMode present, measuring the append-only re-present signature:
--- per-present growth/removal/carry-over against the previous present in the same
--- session, plus session-level context (time to first present, human prompt count).
--- Line comparison is set-based (trim, drop empty lines, DISTINCT), not multiset: a
--- line repeated within a plan counts once. High carry_over_ratio paired with positive
--- lines_added and near-zero lines_removed is the append-only pattern the plan
--- iteration guidance (#942) and re-present gate (#943) exist to prevent.
--- Params: after_date, before_date, project, host, min_plans (minimum plan_count per
--- session, default 2: the query is about re-presents, and a session with a single
--- present carries no iteration signal).
+-- ---
+-- name: plan-iterations
+-- tier: 1
+-- summary: >-
+--   One row per ExitPlanMode present, ordered within a session, measuring the append-only
+--   re-present signature.
+-- description: >-
+--   Measures growth (`chars_delta`, `lines_added`), removal (`lines_removed`), and
+--   carry-over (`lines_carried`, `carry_over_ratio`) against the previous present via set
+--   comparison of normalized plan text, plus time to the first present
+--   (`secs_to_first_plan`) and the session's human-authored prompt count (`human_msgs`).
+--   Line comparison is set-based (trim, drop empty lines, DISTINCT) rather than multiset,
+--   so a line repeated within a plan counts once. High `carry_over_ratio` paired with
+--   positive `lines_added` and near-zero `lines_removed` is the append-only pattern the
+--   plan iteration guidance (#942) and re-present gate (#943) exist to prevent.
+-- params:
+--   - name: min_plans
+--     default: 2
+--     meaning: >-
+--       minimum plan_count per session, defaulting to 2 because the query is about
+--       re-presents and a session with a single present carries no iteration signal
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH filtered AS (
   SELECT ps.host, ps.session_id
   FROM plan_sessions ps

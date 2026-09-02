@@ -1,3 +1,16 @@
+-- ---
+-- name: model-summary
+-- tier: 1
+-- summary: Assistant text item, message, session, and character counts per model.
+-- description: >-
+--   Reads `text_content`, so it measures prose volume rather than tokens. Use
+--   `usage-timeline` or `top-sessions` for spend.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH scoped AS (
   SELECT tc.*
   FROM text_content tc

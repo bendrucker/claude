@@ -1,17 +1,30 @@
--- Session terminal states: what each session actually produced, the outcome side the
--- activity-centric queries never measure. Classifies every session:
---   shipped: a pr-link record or a ship-signal Bash command (git push, gh pr
---     create/merge, glab mr create/merge) ran. Shipped means opened or pushed, not
---     merged; PR fate after the session ends lives outside the index.
---   ongoing: ended within ongoing_hours of the corpus horizon, too fresh to call.
---   handed-off: the session's last plan was rejected with no edits after it, the
---     deliberate plan-here-implement-elsewhere pattern (see plan_calls).
---   abandoned-with-edits: file edits happened but nothing shipped. Real loss signal.
---   no-artifact: no edits and no ship signal, e.g. Q&A, analysis, or discovery.
--- Also counts distinct PRs opened and PRs that took more than one session, a rework
--- proxy. Reads DISTINCT (host, session_id) pairs from pr_links so duplicate link
--- emissions never inflate the counts.
--- Params: after_date, before_date, project, host, ongoing_hours (default 48).
+-- ---
+-- name: outcomes
+-- tier: 1
+-- dimensions: [outcomes]
+-- summary: >-
+--   Session terminal states (shipped, abandoned-with-edits, handed off, no artifact), the
+--   outcome side the activity queries never measure.
+-- description: >-
+--   `shipped` is a pr-link record or a ship-signal Bash command (`git push`, `gh pr
+--   create/merge`, `glab mr create/merge`). `ongoing` ended within `ongoing_hours` of the
+--   corpus horizon, too fresh to call. `handed-off` is a session whose last plan was
+--   rejected with no edits after it, the deliberate plan-here-implement-elsewhere pattern.
+--   `abandoned-with-edits` is file edits with nothing shipped, the real loss signal.
+--   `no-artifact` is neither, e.g. Q&A, analysis, or discovery. Shipped means opened or
+--   pushed, not merged. PR fate after the session ends lives outside the index.
+--
+--   Also counts distinct PRs opened and PRs that took more than one session, a rework
+--   proxy. Reads DISTINCT `(host, session_id)` pairs from `pr_links`, so duplicate link
+--   emissions never inflate the counts.
+-- params:
+--   - name: ongoing_hours
+--     default: 48
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH base AS (
   SELECT *
   FROM sessions

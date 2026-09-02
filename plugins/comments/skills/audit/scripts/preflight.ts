@@ -3,6 +3,7 @@ import { isCleanTree } from "../../../apply/branch";
 import { color } from "../../../apply/report";
 import {
   type CollectedComment,
+  type CollectOptions,
   collectDiff,
   collectRepo,
   type MrSource,
@@ -54,14 +55,15 @@ async function collect(
   options: PreflightOptions,
   onFileDensity: (file: ScoredFile) => void,
 ): Promise<CollectedComment[]> {
-  const { pathGlobs } = options;
+  const scope: CollectOptions = { onFileDensity };
+  if (options.pathGlobs) scope.pathGlobs = options.pathGlobs;
   if (options.all) {
     if (!(await isCleanTree())) {
       throw new AuditError(
         "Working tree is not clean. --all reads the working tree but applies from HEAD. Commit or stash first.",
       );
     }
-    return collectRepo({ pathGlobs, onFileDensity });
+    return collectRepo(scope);
   }
   const diff: DiffOptions = {};
   if (options.base != null && options.base !== "") diff.base = options.base;
@@ -73,7 +75,7 @@ async function collect(
       throw new AuditError("Could not resolve the merge request's source ref via glab.");
     }
   }
-  return collectDiff(diff, mrSource, { pathGlobs, onFileDensity });
+  return collectDiff(diff, mrSource, scope);
 }
 
 /**

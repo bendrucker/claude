@@ -35,6 +35,10 @@ Reads run the plugin's JXA scripts through the `mac` plugin's runner: `list_todo
 
 Writes go through the `things:///` URL scheme: `add_todo`, `add_project`, `update_todos`, `update_project`, `capture_inbox`, `reorder_todos`. Cultured Code exposes no write API beyond it.
 
+Every write maps its arguments through the one `ATTRIBUTES` table in `tools.ts`, which holds each argument's dashed param name and how a list value joins. Things ignores a param it does not recognize and reports success anyway, so a dashed name spelled per call site can be wrong for a long time without anything saying so.
+
+`registerTools` takes a `ThingsClient` carrying the launch check, the dispatcher, the tag requirer, and the batch pacing. `tools.test.ts` passes a fake and drives each write through a real in-memory MCP round trip, which covers what a handler builds without touching Things.
+
 `capture_inbox` accepts an optional `session_id` and `directory`. Given a `session_id` it appends a resume command to the todo's notes. `directory` is a parameter because this process runs as tailgate's child, whose working directory has nothing to do with the session being attributed.
 
 ## Tags

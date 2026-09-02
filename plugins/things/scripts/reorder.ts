@@ -36,6 +36,16 @@ export interface ReorderResult {
 }
 
 /**
+ * What reordering does to the todos it moves. Callers state this rather than
+ * describing the mechanism again, since a second telling drifts from this one.
+ */
+export const REORDER_MECHANISM =
+  "This works by rescheduling each todo out of the list and back, so a todo carrying a specific date has that date replaced by the target list. Order within a project is untouched, being separate from scheduling.";
+
+/**
+ * Moves todos to the top of a built-in list in the order given.
+ * {@link REORDER_MECHANISM} states what that costs the todos.
+ *
  * Throws on bad input and returns its outcome, leaving both for the caller to
  * present. The MCP server calls this on a live stdio connection, where an exit
  * ends the session and a print to stdout corrupts the JSON-RPC framing.

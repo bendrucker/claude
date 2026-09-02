@@ -63,7 +63,7 @@ Matching folds case, so `Bug` resolves to a stored `bug`. An empty `tags=` still
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts [--list today|anytime|someday] <id1> <id2> <id3> ...
 ```
 
-Items appear at the top of the list in the order specified. Default list is `today`. Also works for items within a project. Use the `--list` value matching the items' current scheduling state.
+Items appear at the top of the list in the order specified. Default list is `today`. Use the `--list` value matching the items' current scheduling state. Reordering reschedules each item out of the list and back, so an item carrying a specific date loses it, and order within a project is untouched.
 
 ## Inbox Capture
 

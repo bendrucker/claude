@@ -11,13 +11,15 @@ const ansi = (code: number, s: string): string => {
 };
 const dim = (s: string): string => `\x1b[2m${s}\x1b[0m`;
 
-const localTime = (ts: string): string =>
-  new Date(`${ts.replace(" ", "T")}Z`).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+// Date and time format separately because the connector between them is an ICU
+// pattern that varies by version ("Aug 30 at 11:00" against "Aug 30, 11:00").
+const dateFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
+
+const localTime = (ts: string): string => {
+  const at = new Date(`${ts.replace(" ", "T")}Z`);
+  return `${dateFormat.format(at)} ${timeFormat.format(at)}`;
+};
 
 const num = (n: number): string => Math.round(n).toLocaleString();
 

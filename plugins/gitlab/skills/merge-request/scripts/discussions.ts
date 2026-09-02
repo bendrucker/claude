@@ -22,17 +22,17 @@ exitOnRejection();
 
 const LineEnd = z.looseObject({
   type: z.enum(["new", "old"]),
-  new_line: z.number().optional(),
-  old_line: z.number().optional(),
+  new_line: z.number().nullish(),
+  old_line: z.number().nullish(),
 });
 
 const LineRange = z.looseObject({ start: LineEnd, end: LineEnd });
 
 const Position = z.looseObject({
-  new_path: z.string().optional(),
-  old_path: z.string().optional(),
-  new_line: z.number().optional(),
-  old_line: z.number().optional(),
+  new_path: z.string().nullish(),
+  old_path: z.string().nullish(),
+  new_line: z.number().nullish(),
+  old_line: z.number().nullish(),
   position_type: z.string().optional(),
   line_range: LineRange.nullish(),
 });

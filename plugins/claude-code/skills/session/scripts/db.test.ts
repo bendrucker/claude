@@ -8,9 +8,11 @@ import { z } from "zod";
 import {
   compactDatabase,
   type Database,
+  deleteHostRows,
   dirExists,
   ensureIndex,
   ensureSchema,
+  forgetHost,
   getDb,
   invalidateDerived,
   rebuildViews,
@@ -719,10 +721,8 @@ describe("cross-machine history", () => {
     );
     expect(Number(before?.n)).toBeGreaterThan(0);
 
-    await db.run("DELETE FROM raw WHERE host = $host", { host: "gone" });
-    await db.run("DELETE FROM content_items WHERE host = $host", { host: "gone" });
-    await db.run("DELETE FROM indexed_files WHERE host = $host", { host: "gone" });
-    await db.run("DELETE FROM meta WHERE host = $host", { host: "gone" });
+    const removed = await forgetHost(db, "gone");
+    expect(removed).toBe(Number(before?.n));
     await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
 
     const [after] = await db.query(
@@ -746,9 +746,7 @@ describe("cross-machine history", () => {
     await reindex();
 
     await invalidateDerived(db);
-    await db.run("DELETE FROM raw WHERE host = $host", { host: "gone" });
-    await db.run("DELETE FROM indexed_files WHERE host = $host", { host: "gone" });
-    await db.run("DELETE FROM meta WHERE host = $host", { host: "gone" });
+    await deleteHostRows(db, "gone");
     await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
 
     await reindex();

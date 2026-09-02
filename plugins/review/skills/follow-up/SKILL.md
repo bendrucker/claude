@@ -7,6 +7,7 @@ description: >
   comments and want to verify the author acted on them before re-approving. Triggers: "did they
   fix my review comments", "re-review this PR", "check whether the author addressed my feedback".
 argument-hint: "[pr-url]"
+disable-model-invocation: true
 allowed-tools:
   - Bash(gh:*)
   - Bash(glab:*)

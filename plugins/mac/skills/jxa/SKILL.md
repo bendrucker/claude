@@ -1,6 +1,6 @@
 ---
 name: mac:jxa
-description: Writing JXA (JavaScript for Automation) code for macOS automation. Use when authoring JXA scripts, learning JXA syntax, or understanding how to automate macOS apps via Application() calls.
+description: Reference for writing JXA (JavaScript for Automation) scripts run through `osascript -l JavaScript`. Covers the JavaScriptCore ES5 constraints, `run(argv)`, and the `Application()` bridge.
 ---
 
 # JXA

@@ -16,7 +16,7 @@ Both run extraction, intrinsic-complexity ranking, an agent fan-out for judging,
 ## Contents
 
 - **`comments:audit`** skill: the three-step pipeline. `preflight` extracts, ranks, and builds the judging job. The committed Workflow fans out one agent per shard to judge. `apply` lands the trims and rewrites on a `comments/audit-*` branch or reports the findings. `--report`, `--fix`, `--path`, `--sort`, and `--limit` tune scope and output.
-- **`detection/`**: comment extraction over Shiki's TextMate grammars, the diff and repo collectors, intrinsic-complexity ranking, stable comment ids, and the exemption gate that keeps tool directives, shebangs, and license headers away from the judge. `density.ts` measures comment share against calibrated per-language baselines, weighting the ranking and scoring the Stop hook. Per-comment deterministic features land in the job dir beside the verdicts, accumulating labeled pairs for a future routing layer.
+- **`detection/`**: comment extraction over Shiki's TextMate grammars, the diff and repo collectors, intrinsic-complexity ranking, stable comment ids, and the exemption gate that keeps tool directives, shebangs, and license headers away from the judge. `density.ts` measures comment share against calibrated per-language baselines, weighting the ranking. `tree.ts` reads the working tree against the branch's merge base for the Stop hook, and `transcript.ts` names the files a session edited. Per-comment deterministic features land in the job dir beside the verdicts, accumulating labeled pairs for a future routing layer.
 - **`judge/`**: the versioned `prompt.md`, the verdict schema, per-verdict validation, and the job builder that shards comments for the Workflow.
 - **`workflow/`**: the committed Workflow script the skill hands the job to.
 - **`apply/`**: the deterministic edit engine, the verdict id-match against re-extracted comments, the branch writer, and the report renderer.
@@ -25,11 +25,13 @@ Both run extraction, intrinsic-complexity ranking, an agent fan-out for judging,
 
 ## Density Hook
 
-`hooks/density.ts` runs on `Stop`. It replays the session's `Edit`, `Write`, and `MultiEdit` calls, measures the comment share of the non-whitespace characters they added, and charges each file's comment weight against its language baseline. At 2800 characters of total excess it blocks the stop, names the three heaviest files, and asks for a `comments:audit` run over the diff. Below that it stays silent.
+`hooks/density.ts` runs on `Stop`. It takes the files the session's `Edit`, `Write`, and `MultiEdit` calls named, measures the comment share of the lines those files add over the branch's merge base with the default branch, and charges each file's comment weight against its language baseline. At 2800 characters of total excess it blocks the stop, names the three heaviest files, and asks for a `comments:audit` run over the diff and the trims it flags. Below that it stays silent.
 
-The score is volume, so slop written at an ordinary density passes. Edits made outside those three tools never reach it, including files written by a shell heredoc or `sed`. It also skips extensions missing from the language map, generated files, and scratch paths. Added lines that are 95% comment read as a documentation pass and never escalate on their own.
+The number describes the tree as it stands. Trimming a comment lowers it, rewriting one costs what the surviving text weighs, and a branch back at its base scores zero, so the audit the hook asks for can satisfy it.
 
-It blocks once. The reason opens with a `comment-density:` marker, and the hook scans the transcript tail for it before blocking again. Turning it off means disabling the plugin.
+The score is volume, so slop written at an ordinary density passes. Files the session touched through a shell heredoc or `sed` never reach it, and neither does work outside the repo it stopped in. It also skips extensions missing from the language map, generated files, and files git ignores. Added lines that are 95% comment read as a documentation pass and never escalate on their own.
+
+It blocks once. The reason opens with a `comment-density:` marker, and the hook scans the whole transcript for it before blocking again. Turning it off means disabling the plugin.
 
 ## Testing
 

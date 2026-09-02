@@ -127,7 +127,7 @@ export function formatTimeline(rows: Bucket[], session: string, bucket: number):
     ansi(3, `~$${total("cost_usd_est").toFixed(2)} est`),
   ].join(dim(" | "));
 
-  return `${table(grid)}${summary}`;
+  return `${table(grid)}\n${summary}`;
 }
 
 if (import.meta.main) {

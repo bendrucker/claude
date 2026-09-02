@@ -119,6 +119,7 @@ describe("formatTimeline", () => {
       ╟────────────────────┼──────┼──────────────────────────┼────────┼──────╢
       ║ Aug 30 at 11:10 AM │ 3    │ \x1B[36m████\x1B[39m                     │ \x1B[33m0.25\x1B[39m   │ \x1B[31m0.75\x1B[39m ║
       ╚════════════════════╧══════╧══════════════════════════╧════════╧══════╝
+
       session abcdef12\x1B[2m | \x1B[0m2 buckets of 10m\x1B[2m | \x1B[0m15 msgs\x1B[2m | \x1B[0mout 4,800 tok\x1B[2m | \x1B[0mcache read 160,000 / write 30,000 tok\x1B[2m | \x1B[0mpeak context 91,000 tok\x1B[2m | \x1B[0m\x1B[33m~$1.75 est\x1B[0m"
     `);
   });

@@ -28,19 +28,22 @@ export function sqlLiteral(value: string | number | null): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-// Both adapters quote the key as a SQL identifier, which no parameter binding covers.
-function variableName(key: string): string {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-    throw new Error(`Invalid query parameter name: ${key}`);
+// Which params become variables, and under what name, for both adapters. The key is
+// quoted as a SQL identifier, which no parameter binding covers.
+function* bindings(params: QueryParams): Generator<[string, string | number | null]> {
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+      throw new Error(`Invalid query parameter name: ${key}`);
+    }
+    yield [key, value];
   }
-  return key;
 }
 
 export function renderSetVariables(params: QueryParams): string {
   const lines: string[] = [];
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined) continue;
-    lines.push(`SET VARIABLE "${variableName(key)}" = ${sqlLiteral(value)};`);
+  for (const [name, value] of bindings(params)) {
+    lines.push(`SET VARIABLE "${name}" = ${sqlLiteral(value)};`);
   }
   return lines.length > 0 ? `${lines.join("\n")}\n` : "";
 }
@@ -48,9 +51,7 @@ export function renderSetVariables(params: QueryParams): string {
 export function nodeAdapter(db: Database): QueryAdapter {
   return {
     async bind(params) {
-      for (const [key, value] of Object.entries(params)) {
-        if (value === undefined) continue;
-        const name = variableName(key);
+      for (const [name, value] of bindings(params)) {
         if (typeof value === "string") {
           // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query reads back.
           await db.run(`SET VARIABLE "${name}" = $value`, { value });
@@ -82,7 +83,9 @@ export type SpawnDuckdb = (
 const spawnDuckdb: SpawnDuckdb = (command, options) =>
   Bun.spawn(command, { ...options, stdout: "pipe", stderr: "pipe" });
 
-export const CLI_TIMEOUT_MS = 30_000;
+// A hang guard, not a latency budget: a large corpus can legitimately take a while.
+// schema.ts overrides it with the tighter budget its load path needs.
+export const CLI_TIMEOUT_MS = 120_000;
 
 export interface CliOptions {
   timeoutMs?: number;

@@ -397,6 +397,17 @@ describe("apply", () => {
     );
   });
 
+  test("refuses a verdict file that skips one of its shard's comments", async () => {
+    const job = await judgedJob();
+    const path = join(job.verdictsDir, "verdict-0.json");
+    const file = await readJson(path, VerdictFile);
+    const dropped = file.verdicts.pop();
+    await Bun.write(path, JSON.stringify(file));
+    expect(await rejection(runApply(job, { report: true }))).toMatch(
+      new RegExp(`omit 1 judged comment\\(s\\): ${dropped?.id}`),
+    );
+  });
+
   test("gives a --fix run its own job dir", async () => {
     const plain = await judgedJob();
     const fix = await judgedJob({ fix: true });

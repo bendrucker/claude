@@ -8,7 +8,7 @@ import { color, type ReportItem, renderReport, summarize } from "../../../apply/
 import { extractComments, languageForPath } from "../../../detection/extract";
 import type { Comment } from "../../../detection/types";
 import { verdictPath } from "../../../judge/adapter";
-import { readShard, type ShardRef } from "../../../judge/job";
+import { type JobShard, readShard, type ShardRef } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
 import { AuditError, type AuditIo } from "./io";
 
@@ -67,22 +67,29 @@ async function readShardRefs(jobDir: string): Promise<ShardRef[]> {
   return (await readJson(argsPath, JobArgsFile)).shards;
 }
 
+/** The shard contents preflight wrote, read back through the refs it handed the workflow. */
+async function readShards(jobDir: string): Promise<JobShard[]> {
+  const refs = await readShardRefs(jobDir);
+  return Promise.all(refs.map((ref) => readShard(ref.path)));
+}
+
 /** The files a job judged, recovered from its shards. */
-async function judgedPaths(shards: ShardRef[]): Promise<string[]> {
+function judgedPaths(shards: JobShard[]): string[] {
   const paths = new Set<string>();
-  for (const shard of await Promise.all(shards.map((ref) => readShard(ref.path)))) {
+  for (const shard of shards) {
     for (const comment of shard.comments) paths.add(comment.path);
   }
   return [...paths];
 }
 
 /**
- * Every shard's verdict file. A shard whose agent never wrote one fails the run
- * rather than reading as drift.
+ * Every shard's verdict file, covering every comment the shard carried. A shard
+ * whose agent never wrote one, or skipped a comment, fails the run rather than
+ * reading as drift or as keep.
  */
-async function readVerdicts(jobDir: string, shards: ShardRef[]): Promise<Map<string, Verdict>> {
+async function readVerdicts(jobDir: string, shards: JobShard[]): Promise<Map<string, Verdict>> {
   const verdictsDir = join(jobDir, "verdicts");
-  const files = shards.map((ref) => ({ id: ref.id, path: verdictPath(verdictsDir, ref.id) }));
+  const files = shards.map((shard) => ({ id: shard.id, path: verdictPath(verdictsDir, shard.id) }));
   const present = await Promise.all(files.map((file) => Bun.file(file.path).exists()));
   const missing = files.filter((_, i) => !present[i]).map((file) => file.id);
   if (missing.length > 0) {
@@ -90,7 +97,18 @@ async function readVerdicts(jobDir: string, shards: ShardRef[]): Promise<Map<str
       `No verdicts for shard(s) ${missing.join(", ")} in ${verdictsDir}. Run the judge workflow first.`,
     );
   }
-  return collectVerdicts(await Promise.all(files.map((file) => readJson(file.path, z.unknown()))));
+  const verdicts = collectVerdicts(
+    await Promise.all(files.map((file) => readJson(file.path, z.unknown()))),
+  );
+  const unjudged = shards.flatMap((shard) =>
+    shard.comments.filter((comment) => !verdicts.has(comment.id)).map((comment) => comment.id),
+  );
+  if (unjudged.length > 0) {
+    throw new AuditError(
+      `Verdicts in ${verdictsDir} omit ${unjudged.length} judged comment(s): ${unjudged.join(", ")}. Rerun the judge workflow.`,
+    );
+  }
+  return verdicts;
 }
 
 async function guardScope(options: ApplyOptions): Promise<void> {
@@ -111,7 +129,7 @@ async function guardScope(options: ApplyOptions): Promise<void> {
  * branch off HEAD. Runs from the repo root.
  */
 export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyResult> {
-  const shards = await readShardRefs(options.job);
+  const shards = await readShards(options.job);
   await guardScope(options);
   const verdicts = await readVerdicts(options.job, shards);
 
@@ -122,7 +140,7 @@ export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyRe
   const skippedComments = new Set<string>();
 
   // A verdict whose id no longer re-extracts has drifted.
-  for (const path of await judgedPaths(shards)) {
+  for (const path of judgedPaths(shards)) {
     const language = languageForPath(path);
     const file = Bun.file(path);
     // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.

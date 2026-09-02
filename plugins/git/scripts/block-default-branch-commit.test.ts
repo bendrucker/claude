@@ -86,6 +86,12 @@ describe("effectiveCwd", () => {
     ["cat > f <<'EOF'\ncd /inside\nEOF\ngit commit", "/repo"],
     ["echo 'cd /quoted' && git commit", "/repo"],
     ["cd /wt && git commit -m 'cd /msg'", "/wt"],
+    ["(cd /wt && git commit)", "/wt"],
+    ["echo $(cd /x && pwd) && git commit", "/repo"],
+    ["cd /wt | git commit", "/repo"],
+    ["cd /wt & git commit", "/repo"],
+    ['echo "done; cd /x" && git commit', "/repo"],
+    ["cd /wt &&git commit", "/wt"],
   ])("%p → %p", (command, expected) => {
     expect(effectiveCwd(command, "/repo")).toBe(expected);
   });
@@ -192,6 +198,11 @@ describe("processInput", () => {
       [
         "cd into a quoted path",
         (repo, wt) => ({ command: `cd "${wt}" && git commit -m x`, cwd: repo }),
+        "allow",
+      ],
+      [
+        "cd to a file returns a decision instead of throwing",
+        (repo) => ({ command: `cd ${repo}/README.md && git commit -m x`, cwd: repo }),
         "allow",
       ],
       [

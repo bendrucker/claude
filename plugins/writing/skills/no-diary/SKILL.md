@@ -1,11 +1,10 @@
 ---
 name: writing:no-diary
 description: >-
-  Refocus a written deliverable on its result by cutting process narration,
-  past states, session leakage, and provenance. Use when a PR or MR body, code
-  comment, doc, skill, review comment, issue, or plan tells the story of how
-  the work happened instead of stating what it is.
-argument-hint: "[<file> | <pr-url> | <mr-url> | <section> | <line-range> | <description>]"
+  Cut process narration, past states, session leakage, and provenance from a
+  deliverable (PR or MR body, code comment, doc, skill, review comment, issue,
+  plan) so it states the result rather than how the work happened.
+argument-hint: "[<file> | <pr> | <section> | <text>]"
 user-invocable: true
 allowed-tools:
   - Read
@@ -19,14 +18,12 @@ allowed-tools:
 
 # No Diary
 
-Rewrite a deliverable so it states what is true now instead of how it got that way.
-
 ## Arguments
 
 `$ARGUMENTS` is freeform. Resolve it to concrete text:
 
 - A path, optionally with a line range, reads that file.
-- A PR or MR number or URL reads the body with `gh pr view <n> --json body -q .body` or `glab mr view <n> --output json | jq -r .description`.
+- A PR or MR number or URL reads the body through `gh` or `glab`, with the commands in `references/surfaces.md`.
 - A section name or heading locates it in the artifact under discussion.
 - A description with no target names the problem in the deliverable in play.
 
@@ -37,7 +34,7 @@ With no arguments, resolve the target in this order: text the user pasted this t
 Where the rewrite goes depends on how the target resolved:
 
 - **A file.** Edit it in place.
-- **A PR or MR body.** Write the new body under `tmp/`, then apply it with `gh pr edit <n> --body-file` or `glab mr update <n> --description-file`. Confirm first when the user did not name the PR.
+- **A PR or MR body.** Write the new body under `tmp/`, then apply it with the command in `references/surfaces.md`. Confirm first when the user did not name the PR.
 - **Pasted text.** Return the rewrite in your reply. Nothing on disk changed, so do not go looking for a file to put it in.
 
 Then report what you cut, grouped by the `Removals` headings, in a few lines.
@@ -46,7 +43,7 @@ Then report what you cut, grouped by the `Removals` headings, in a few lines.
 
 Every sentence must change what the reader does. A sentence explaining why a decision was right, what it replaced, or where it came from fails.
 
-Prefer deleting whole sentences, since trimming words out of a diary sentence leaves a shorter diary. Cut within a sentence for the two cases in `Gotchas`: a finding fused to its discovery framing, and a rule fused to the rationale that makes it usable.
+Prefer deleting whole sentences, since trimming words out of a diary sentence leaves a shorter diary. Cut within a sentence only for the cases in `Gotchas`.
 
 Judge the text as a reader who was not in the session. For a whole artifact rather than a passage, dispatch a `general-purpose` agent that loads `writing:no-diary` and `writing:writing` and works from the artifact alone, plus its diff where one exists, with no session transcript.
 

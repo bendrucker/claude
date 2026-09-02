@@ -6,6 +6,8 @@ The test in `SKILL.md` decides every case these rules do not name.
 
 Open on why the change exists. Give the decisions a reviewer cannot reconstruct from the diff, then stop.
 
+Read the body with `gh pr view <n> --json body -q .body` or `glab mr view <n> --output json | jq -r .description`. Apply the rewrite with `gh pr edit <n> --body-file` or `glab mr update <n> --description-file`.
+
 - No numbered phases or steps.
 - No test-pass reports or passing counts. Describe what the tests cover.
 - No file inventories in a changes section. Name the function or the behavior.
@@ -41,8 +43,7 @@ A line earns its place by changing what the model does when it reads the file.
 
 - No sentence announcing what the section will say.
 - Nothing `CLAUDE.md` or a single lookup already covers.
-- Imperative for actions, declarative for definitions.
-- Cut anything the model would perform identically without. Human readability is not the target.
+- Cut anything the model would perform identically without.
 
 ## Review Comments
 

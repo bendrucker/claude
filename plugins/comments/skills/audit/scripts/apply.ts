@@ -83,9 +83,9 @@ function judgedPaths(shards: JobShard[]): string[] {
 }
 
 /**
- * Every shard's verdict file, covering every comment the shard carried. A shard
- * whose agent never wrote one, or skipped a comment, fails the run rather than
- * reading as drift or as keep.
+ * Every shard's verdict file, each covering every comment its own shard carried.
+ * A shard whose agent never wrote one, or skipped a comment, fails the run rather
+ * than reading as drift or as keep.
  */
 async function readVerdicts(jobDir: string, shards: JobShard[]): Promise<Map<string, Verdict>> {
   const verdictsDir = join(jobDir, "verdicts");
@@ -97,18 +97,17 @@ async function readVerdicts(jobDir: string, shards: JobShard[]): Promise<Map<str
       `No verdicts for shard(s) ${missing.join(", ")} in ${verdictsDir}. Run the judge workflow first.`,
     );
   }
-  const verdicts = collectVerdicts(
-    await Promise.all(files.map((file) => readJson(file.path, z.unknown()))),
-  );
-  const unjudged = shards.flatMap((shard) =>
-    shard.comments.filter((comment) => !verdicts.has(comment.id)).map((comment) => comment.id),
-  );
+  const contents = await Promise.all(files.map((file) => readJson(file.path, z.unknown())));
+  const unjudged = shards.flatMap((shard, i) => {
+    const own = collectVerdicts([contents[i]]);
+    return shard.comments.filter((comment) => !own.has(comment.id)).map((comment) => comment.id);
+  });
   if (unjudged.length > 0) {
     throw new AuditError(
       `Verdicts in ${verdictsDir} omit ${unjudged.length} judged comment(s): ${unjudged.join(", ")}. Rerun the judge workflow.`,
     );
   }
-  return verdicts;
+  return collectVerdicts(contents);
 }
 
 async function guardScope(options: ApplyOptions): Promise<void> {

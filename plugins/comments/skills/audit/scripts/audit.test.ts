@@ -408,6 +408,22 @@ describe("apply", () => {
     );
   });
 
+  test("refuses a verdict filed under another shard", async () => {
+    const job = await judgedJob({ shardSize: 2 });
+    const firstPath = join(job.verdictsDir, "verdict-0.json");
+    const secondPath = join(job.verdictsDir, "verdict-1.json");
+    const first = await readJson(firstPath, VerdictFile);
+    const second = await readJson(secondPath, VerdictFile);
+    const moved = second.verdicts.pop();
+    if (!moved) throw new Error("second shard has no verdicts");
+    first.verdicts.push(moved);
+    await Bun.write(firstPath, JSON.stringify(first));
+    await Bun.write(secondPath, JSON.stringify(second));
+    expect(await rejection(runApply(job, { report: true }))).toMatch(
+      new RegExp(`omit 1 judged comment\\(s\\): ${moved.id}`),
+    );
+  });
+
   test("gives a --fix run its own job dir", async () => {
     const plain = await judgedJob();
     const fix = await judgedJob({ fix: true });

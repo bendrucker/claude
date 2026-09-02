@@ -8,7 +8,7 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
 import {
-  effectiveCwd,
+  commitDirectories,
   formatDenyOutput,
   invokesGitCommit,
   processInput,
@@ -68,42 +68,50 @@ describe("invokesGitCommit", () => {
     ["# git commit", false],
     ["echo a#b && git commit", true],
     ['echo "# <<EOF" && git commit', true],
+    ["cat > f <<E'OF'\ngit commit here\nEOF", false],
+    ["cat > f <<E'OF'\nnotes\nEOF\ngit commit", true],
+    ['cat > f <<"EOF"\ngit commit here\nEOF', false],
+    ["cat > f <<E\\OF\ngit commit here\nEOF", false],
   ])("%p → %p", (command, expected) => {
     expect(invokesGitCommit(command)).toBe(expected);
   });
 });
 
-describe("effectiveCwd", () => {
-  test.each<[string, string]>([
-    ["git commit -m x", "/repo"],
-    ["cd /wt && git commit -m x", "/wt"],
-    ["cd /wt; git commit -m x", "/wt"],
-    ["cd /wt\ngit commit -m x", "/wt"],
-    ["cd sub && git commit -m x", "/repo/sub"],
-    ["cd /a && cd b && cd ../c && git commit", "/a/c"],
-    ['cd "/with space" && git commit', "/with space"],
-    ["cd '/wt' && git commit", "/wt"],
-    ["cd ~/wt && git commit", join(homedir(), "wt")],
-    ["cd ~ && git commit", homedir()],
-    ["git commit -m x && cd /elsewhere", "/repo"],
-    ["cd /a || cd /b && git commit", "/a"],
-    ["cd $WT && git commit", "/repo"],
-    ["cd $(pwd)/wt && git commit", "/repo"],
-    ["cd - && git commit", "/repo"],
-    ["cd ~user/wt && git commit", "/repo"],
-    ["cd /a && cd $WT && git commit", "/repo"],
-    ["cat > f <<'EOF'\ncd /inside\nEOF\ngit commit", "/repo"],
-    ["echo 'cd /quoted' && git commit", "/repo"],
-    ["cd /wt && git commit -m 'cd /msg'", "/wt"],
-    ["(cd /wt && git commit)", "/wt"],
-    ["echo $(cd /x && pwd) && git commit", "/repo"],
-    ["cd /wt | git commit", "/repo"],
-    ["cd /wt & git commit", "/repo"],
-    ['echo "done; cd /x" && git commit', "/repo"],
-    ["cd /wt &&git commit", "/wt"],
-    ["(cd /wt); git commit", "/repo"],
+describe("commitDirectories", () => {
+  test.each<[string, string[]]>([
+    ["git commit -m x", ["/repo"]],
+    ["cd /wt && git commit -m x", ["/wt"]],
+    ["cd /wt; git commit -m x", ["/wt"]],
+    ["cd /wt\ngit commit -m x", ["/wt"]],
+    ["cd sub && git commit -m x", ["/repo/sub"]],
+    ["cd /a && cd b && cd ../c && git commit", ["/a/c"]],
+    ['cd "/with space" && git commit', ["/with space"]],
+    ["cd '/wt' && git commit", ["/wt"]],
+    ["cd ~/wt && git commit", [join(homedir(), "wt")]],
+    ["cd ~ && git commit", [homedir()]],
+    ["git commit -m x && cd /elsewhere", ["/repo"]],
+    ["cd /a || cd /b && git commit", ["/a"]],
+    ["cd $WT && git commit", ["/repo"]],
+    ["cd $(pwd)/wt && git commit", ["/repo"]],
+    ["cd - && git commit", ["/repo"]],
+    ["cd ~user/wt && git commit", ["/repo"]],
+    ["cd /a && cd $WT && git commit", ["/repo"]],
+    ["cat > f <<'EOF'\ncd /inside\nEOF\ngit commit", ["/repo"]],
+    ["echo 'cd /quoted' && git commit", ["/repo"]],
+    ["cd /wt && git commit -m 'cd /msg'", ["/wt"]],
+    ["(cd /wt && git commit)", ["/wt"]],
+    ["echo $(cd /x && pwd) && git commit", ["/repo"]],
+    ["cd /wt | git commit", ["/repo"]],
+    ["cd /wt & git commit", ["/repo"]],
+    ['echo "done; cd /x" && git commit', ["/repo"]],
+    ["cd /wt &&git commit", ["/wt"]],
+    ["(cd /wt); git commit", ["/repo"]],
+    ["(cd /wt && git commit); git commit", ["/wt", "/repo"]],
+    ["(true && cd /wt && git commit); git commit", ["/wt", "/repo"]],
+    ["cd /a && (cd /b && git commit); git commit", ["/b", "/a"]],
+    ["cd /wt && (git commit) && git commit", ["/wt", "/wt"]],
   ])("%p → %p", (command, expected) => {
-    expect(effectiveCwd(command, "/repo")).toBe(expected);
+    expect(commitDirectories(command, "/repo")).toEqual(expected);
   });
 });
 
@@ -218,6 +226,11 @@ describe("processInput", () => {
       [
         "cd to a missing path falls back to the input directory",
         (repo, wt) => ({ command: `cd ${wt}/missing && git commit -m x`, cwd: repo }),
+        "deny",
+      ],
+      [
+        "second commit after the subshell closes",
+        (repo, wt) => ({ command: `(cd ${wt} && git commit -m x); git commit -m y`, cwd: repo }),
         "deny",
       ],
       [

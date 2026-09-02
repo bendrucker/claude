@@ -30,18 +30,29 @@ function maskQuoted(command: string): string {
 // Runs `lead` over the quote-masked text, so a match cannot start inside a
 // string, then reads `tail` from the unmasked text where each lead ends, so a
 // quoted operand still comes through.
-function* unquotedMatches(text: string, lead: RegExp, tail: RegExp): Generator<RegExpMatchArray> {
+function* unquotedMatches(
+  text: string,
+  lead: RegExp,
+  tail: RegExp,
+): Generator<{ at: number; match: RegExpMatchArray }> {
   for (const match of maskQuoted(text).matchAll(lead)) {
-    const rest = text.slice(match.index + match[0].length).match(tail);
-    if (rest !== null) yield rest;
+    const at = match.index + match[0].length;
+    const rest = text.slice(at).match(tail);
+    if (rest !== null) yield { at, match: rest };
   }
 }
 
 // A heredoc operator, then its delimiter word, which the shell takes as any
-// word up to the next operator or space. The lookarounds keep `<<<`
-// herestrings out.
+// word up to the next operator or space and reads with its quotes removed.
+// The lookarounds keep `<<<` herestrings out.
 const HEREDOC_LEAD = /(?<!<)<<(?!<)/g;
-const HEREDOC_DELIMITER = /^(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([^\s'"\\<>|&;()]+))/;
+const HEREDOC_DELIMITER = /^(-?)[ \t]*((?:'[^']*'|"[^"]*"|\\.|[^\s'"\\<>|&;()])+)/;
+
+function unquoteWord(word: string): string {
+  return word.replace(/'([^']*)'|"([^"]*)"|\\(.)/g, (_, single, double, escaped) =>
+    String(single ?? double ?? escaped),
+  );
+}
 
 // A `#` that starts a word opens a comment the shell never parses, so nothing
 // after it is syntax.
@@ -66,11 +77,8 @@ function stripHeredocs(command: string): string {
     }
     const line = withoutComment(raw);
     kept.push(line);
-    for (const match of unquotedMatches(line, HEREDOC_LEAD, HEREDOC_DELIMITER)) {
-      pending.push({
-        delimiter: match[2] ?? match[3] ?? match[4] ?? "",
-        stripTabs: match[1] === "-",
-      });
+    for (const { match } of unquotedMatches(line, HEREDOC_LEAD, HEREDOC_DELIMITER)) {
+      pending.push({ delimiter: unquoteWord(match[2] ?? ""), stripTabs: match[1] === "-" });
     }
   }
   return kept.join("\n");
@@ -84,13 +92,42 @@ export function invokesGitCommit(command: string): boolean {
 // excludes `||`, whose cd only runs when the one before it failed, and `$(`,
 // whose cd stays inside the substitution. The terminator excludes a cd that
 // runs in its own process behind `|` or `&`, or whose subshell closes with
-// `)` before the commit.
+// `)` right after it.
 const CD_LEAD = /(?:^|&&|;|\n|(?<!\$)\()\s*cd(?=\s)/g;
 const CD_TARGET = /^\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&)]+)\s*(?=&&|\|\||;|\n|$)/;
 const SHELL_EXPANSION_PATTERN = /(?<!\\)[$`]/;
+const EVERY_GIT_COMMIT = new RegExp(GIT_COMMIT_PATTERN, "g");
 
 function unquote(value: string): string {
   return value.match(/^(['"])(.*)\1$/s)?.[2] ?? value;
+}
+
+// A cd inside a subshell stops applying once more `)` than `(` follow it.
+function subshellClosed(masked: string, from: number): boolean {
+  let depth = 0;
+  for (const char of masked.slice(from)) {
+    if (char === "(") depth++;
+    if (char === ")" && --depth < 0) return true;
+  }
+  return false;
+}
+
+function directoryBefore(scope: string, cwd: string): string {
+  const masked = maskQuoted(scope);
+  let dir = cwd;
+  for (const { at, match } of unquotedMatches(scope, CD_LEAD, CD_TARGET)) {
+    if (subshellClosed(masked, at)) continue;
+    const target = unquote(match[1] ?? "");
+    if (target === "" || target === "-" || SHELL_EXPANSION_PATTERN.test(target)) return cwd;
+    if (target.startsWith("~")) {
+      // `~user` needs a passwd lookup the hook does not do.
+      if (target !== "~" && !target.startsWith("~/")) return cwd;
+      dir = join(homedir(), target.slice(1));
+      continue;
+    }
+    dir = isAbsolute(target) ? target : join(dir, target);
+  }
+  return dir;
 }
 
 // A cd into a missing path or a file fails and leaves the shell where it was,
@@ -105,24 +142,12 @@ function existingDirectory(target: string, fallback: string): string {
   }
 }
 
-/** Directory the commit runs in after every `cd` the hook can evaluate, or `cwd` when one cannot be. */
-export function effectiveCwd(command: string, cwd: string): string {
+/** Directory each commit in the command runs in after the `cd`s the hook can evaluate, or `cwd` where one cannot be. */
+export function commitDirectories(command: string, cwd: string): string[] {
   const text = stripHeredocs(command);
-  const start = maskQuoted(text).search(GIT_COMMIT_PATTERN);
-  const scope = start === -1 ? text : text.slice(0, start);
-  let dir = cwd;
-  for (const match of unquotedMatches(scope, CD_LEAD, CD_TARGET)) {
-    const target = unquote(match[1] ?? "");
-    if (target === "" || target === "-" || SHELL_EXPANSION_PATTERN.test(target)) return cwd;
-    if (target.startsWith("~")) {
-      // `~user` needs a passwd lookup the hook does not do.
-      if (target !== "~" && !target.startsWith("~/")) return cwd;
-      dir = join(homedir(), target.slice(1));
-      continue;
-    }
-    dir = isAbsolute(target) ? target : join(dir, target);
-  }
-  return dir;
+  return [...maskQuoted(text).matchAll(EVERY_GIT_COMMIT)].map((commit) =>
+    directoryBefore(text.slice(0, commit.index), cwd),
+  );
 }
 
 // One rev-parse yields both the repo root (cache key) and current branch. A
@@ -160,13 +185,19 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   // the Bash command runs: a subagent working in a worktree reports that
   // worktree as `input.cwd`, and a leading `cd` moves the command again before
   // git runs. Resolving the branch anywhere else reads the wrong repo.
-  const dir = existingDirectory(effectiveCwd(command, input.cwd), input.cwd);
+  const dirs = commitDirectories(command, input.cwd).map((dir) =>
+    existingDirectory(dir, input.cwd),
+  );
+  const branches = await Promise.all([...new Set(dirs)].map(defaultBranchCheckedOut));
+  const branch = branches.find((name) => name !== null);
+  return branch == null ? null : formatDenyOutput(branch);
+}
 
+// The default branch when `dir` sits on it, else null: outside a repo,
+// detached ("HEAD"), or on another branch.
+async function defaultBranchCheckedOut(dir: string): Promise<string | null> {
   const rev = await revParse(dir);
-  if (rev === null) {
-    return null;
-  }
-  // "HEAD" means detached.
+  if (rev === null) return null;
   const [repoRoot, currentBranch] = rev.trim().split("\n");
   if (
     repoRoot == null ||
@@ -177,17 +208,8 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   ) {
     return null;
   }
-
   const defaultBranch = await getDefaultBranch(dir, repoRoot);
-  if (defaultBranch == null || defaultBranch === "") {
-    return null;
-  }
-
-  if (currentBranch === defaultBranch) {
-    return formatDenyOutput(defaultBranch);
-  }
-
-  return null;
+  return defaultBranch != null && defaultBranch === currentBranch ? defaultBranch : null;
 }
 
 async function main(): Promise<void> {

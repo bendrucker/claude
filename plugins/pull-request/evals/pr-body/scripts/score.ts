@@ -17,10 +17,9 @@ import {
   narrationTellSource,
   proseParagraphs,
   RUN_ON_CHARS,
-  type SentenceHeading,
   splitSentences,
   TITLE_LENGTH_LIMIT,
-} from "../../../scripts/validate-body";
+} from "../../../scripts/prose";
 import { classifyPrHeading } from "../classifier";
 
 // Deterministic metrics for one generated PR body. Everything here is
@@ -28,7 +27,12 @@ import { classifyPrHeading } from "../classifier";
 // wordlists come from the hook that enforces them, so the scorer and the hook
 // measure the same thing.
 
-export type { NarrationTell, SentenceHeading };
+export type { NarrationTell };
+
+export interface SentenceHeading {
+  text: string;
+  signals: string[];
+}
 
 export interface HeadingCaseViolation {
   text: string;

@@ -9,7 +9,7 @@ paths:
 
 Read [`hooks.md`](hooks.md) before adding or changing a hook entry in either file.
 
-Why each sandbox entry exists, and what would retire it, is in [`docs/settings.md`](../../docs/settings.md). Read it before adding, removing, or narrowing a host, write path, socket, or escaped command.
+Why each sandbox grant and hook exists, and what would retire it, is in [`docs/settings.md`](../../docs/settings.md). Read it before adding, removing, or narrowing a host, write path, socket, escaped command, or hook entry.
 
 ## Permission Paths
 

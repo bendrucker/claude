@@ -1,0 +1,9 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`warning text 1`] = `
+"This Agent spawn sets no \`model\` and no \`subagent_type\` that pins one, so it inherits the parent's opus and bills the whole subagent at orchestrator rates.
+
+CLAUDE.md: pick a spawn's \`subagent_type\` before its \`model\`, and pass an explicit cheap \`model\` when the type names none.
+
+Either set \`subagent_type\` to \`analyst\` (read-only research, search, judging) or another type whose \`bun run inventory agents\` row names a model, or pass \`model: "haiku"\` or \`model: "sonnet"\`."
+`;

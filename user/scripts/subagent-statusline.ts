@@ -6,6 +6,7 @@ import { effortGlyph } from "./effort";
 import { genericGlyph, purposeGlyphs, remoteGlyph } from "./glyphs";
 import { modelMarker } from "./model";
 import { styleText } from "./style";
+import { readTranscriptTail } from "./transcript";
 
 const str = z.string().optional().catch(undefined);
 const num = z.number().optional().catch(undefined);
@@ -303,30 +304,15 @@ async function readMeta(base: string): Promise<AgentMeta | null> {
   }
 }
 
-// Transcripts grow to megabytes. Only the tail holds the latest events, so read
-// a bounded suffix and drop the first line, which a mid-file slice splits.
+// The status line reads the latest events, which sit in the last few records.
 const TAIL_BYTES = 65_536;
 async function readEntries(path: string): Promise<TranscriptEntry[]> {
-  try {
-    const file = Bun.file(path);
-    const size = file.size;
-    if (size === 0) return [];
-    const start = Math.max(0, size - TAIL_BYTES);
-    const lines = (await file.slice(start).text()).split("\n");
-    if (start > 0) lines.shift();
-    const entries: TranscriptEntry[] = [];
-    for (const line of lines) {
-      if (line.trim() === "") continue;
-      try {
-        entries.push(TranscriptEntry.parse(JSON.parse(line)));
-      } catch {
-        // Skip malformed lines.
-      }
-    }
-    return entries;
-  } catch {
-    return [];
+  const entries: TranscriptEntry[] = [];
+  for (const raw of await readTranscriptTail(path, TAIL_BYTES)) {
+    const entry = TranscriptEntry.safeParse(raw).data;
+    if (entry !== undefined) entries.push(entry);
   }
+  return entries;
 }
 
 if (import.meta.main) {

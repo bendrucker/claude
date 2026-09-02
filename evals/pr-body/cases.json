@@ -1,0 +1,122 @@
+[
+  {
+    "description": "001-claude-1127",
+    "vars": {
+      "repo": "bendrucker/claude",
+      "tier": "personal",
+      "base": "main",
+      "branch": "drop-the-hardcoded-rate-limits-path",
+      "diffSummary": "Removes a machine-specific default path (~/.vibe-island/cache/rl.json) from the session-limit hook so it matches the statusline writer's contract, requiring CLAUDE_STATUSLINE_RATE_LIMITS_PATH to be set explicitly. Adds a test for the unset case and fixes a README heading. 3 files changed, +37/-8.",
+      "substance": "- The hardcoded machine-specific path exposed a private setup in both the README and the source.\n- The fix matches the statusline writer's contract: the hook reads only from the env var, so unset means nothing is being written and the hook stays silent.\n- Behavior is unchanged in practice because user/settings.json already sets CLAUDE_STATUSLINE_RATE_LIMITS_PATH.\n- End-to-end verification confirmed the shell writer's output drives the hook to inject a band message, and a render carrying no rate_limits leaves the file intact.\n- Added test coverage for the unset-variable case to ensure graceful degradation."
+    },
+    "metadata": {
+      "scenarioId": "001-claude-1127",
+      "url": "https://github.com/bendrucker/claude/pull/1127"
+    }
+  },
+  {
+    "description": "002-claude-1131",
+    "vars": {
+      "repo": "bendrucker/claude",
+      "tier": "personal",
+      "base": "main",
+      "branch": "stop-reporting-false-greens",
+      "diffSummary": "Fixes pipeline selection in gitlab:ci-monitor to eliminate false-green reports caused by external pipelines, parent pipelines, and unrelated MRs on the same branch. MR mode now queries the MR-specific endpoint; branch mode keeps the branch-ref query. Adds fail-closed job verification before emitting success, plus property-based and e2e tests against a stub glab. 3 files changed, +790/-67.",
+      "substance": "- The pipeline list endpoint returns external pipelines (posted by other tools, carrying no CI jobs) and parent-pipeline children, and either can hold the highest id and trigger a false success.\n- MR mode's ref= query matched the pipeline's stored ref rather than the caller's intent, so it also returned pipelines belonging to other MRs on the same branch.\n- MR mode now queries the MR-specific endpoint, branch mode keeps the branch-ref query, and both funnel through a selectPipeline filter that drops external and parent_pipeline sources.\n- selectPipeline prefers the caller's own pipeline kind and falls back to the other kind only when the preferred one is absent, so a project running a single pipeline kind still works.\n- A claimed success is confirmed against the pipeline's jobs before being emitted; a failed job with allow_failure=false downgrades the state to failing.\n- Rejected head_pipeline as a replacement because GitLab derives it from pipelines ordered by id, so an external pipeline can become head_pipeline and reproduce the bug; rejected pipeline sha as a staleness check because merged-results pipelines report an ephemeral merge commit.\n- Testing surfaced a pre-existing, unrelated bug left unfixed: the fetchInterval duration filter on finished_at always yields an empty array because the endpoint never returns that field, so the poll interval always defaults to the 30s floor.\n- Verified in all three modes against a stub glab exercising the real shell and jq pipeline; a live watch against a real GitLab project was unavailable due to missing glab auth."
+    },
+    "metadata": {
+      "scenarioId": "002-claude-1131",
+      "url": "https://github.com/bendrucker/claude/pull/1131"
+    }
+  },
+  {
+    "description": "003-claude-1136",
+    "vars": {
+      "repo": "bendrucker/claude",
+      "tier": "personal",
+      "base": "main",
+      "branch": "add-a-discovery-first-workspace-skill",
+      "diffSummary": "Adds a user-level herdr skill with a discovery-first design that avoids documenting commands, which would go stale within herdr's release cadence. Includes an orient.sh script for dynamic orientation. Verifies non-derivable behaviors against a running v0.7.5. 3 files changed, +198/-0.",
+      "substance": "- Gap measurement: the work machine spent 25% of its weekly herdr calls re-probing --help because no skill documented the CLI.\n- herdr ships five stable releases in five weeks plus near-weekly previews, so any copied command table would go stale within a release cycle; the skill instead teaches a discovery protocol and states that the CLI wins wherever the two disagree.\n- orient.sh bang-executes a jq projection over herdr api snapshot, replacing four separate list calls and surfacing the live version and protocol first.\n- Verified against a running v0.7.5: structured queries return single-line JSON but pane read, agent read, and agent explain return plain text; --source visible works on a fresh pane while recent returns empty; pane run executes through an interactive shell that inherits per-directory mise activation; agent_status is scraped from the screen rather than reported by a hook; agent_session.value carries the Claude session UUID for an exact pane-to-session join; worktree creation stays with worktrunk.\n- orient.sh is guarded on HERDR_PANE_ID so a missing socket doesn't print a raw stack-trace fragment.\n- Deliberately left the tmux plugin in place: a stale view made it look dead everywhere, but re-syncing that host showed both multiplexers still operational, with list-panes and capture-pane used in the last two days.\n- Removal criterion: the --help re-probe count, tracked via the session index; the skill goes if that count holds steady or the skill goes unloaded for two consecutive weeks."
+    },
+    "metadata": {
+      "scenarioId": "003-claude-1136",
+      "url": "https://github.com/bendrucker/claude/pull/1136"
+    }
+  },
+  {
+    "description": "004-claude-1142",
+    "vars": {
+      "repo": "bendrucker/claude",
+      "tier": "personal",
+      "base": "main",
+      "branch": "spend-bot-reviews-deliberately",
+      "diffSummary": "Implements an importance gate for bot code reviews plus an availability cooldown cache, after exhausting Greptile's free OSS review credits. A single gate keyed on diff size/surface decides both the local CLI and the hosted bot; hosted review becomes opt-in via a review label. Also fixes a sandboxed Node DNS issue (NODE_USE_ENV_PROXY=1) and grants ~/.greptile write access. 11 files changed, +296/-24.",
+      "substance": "- Greptile's 100 free OSS review credits were exhausted; free_reviews_limit_reached appeared in 15 sessions, each spending a turn to rediscover it because detect-bot only reported CLI presence, not availability.\n- Over 30 days, 352 PRs opened across 3 repos, with triggerOnUpdates=true charging again on every push, so real spend ran several times higher than the reported PR count implied.\n- A single importance gate, keyed on the diff rather than per-repo, now decides both whether to run the local CLI and whether to request the hosted bot.\n- Hosted review became opt-in through a review label; Greptile's Labels/Include filter skips any PR without it.\n- An availability cache at ~/.cache/claude/bot-review.json merges cooldown records so detect-bot can inject a fast path showing pause status instead of re-discovering the limit.\n- Rejected fileChangeLimit as the gating mechanism because it abuses a skip mechanism as an opt-in and still lets single-file PRs review themselves.\n- The gate's thresholds (risk surface, runtime surface, roughly 200 lines or 8 files) are guesses with an explicit removal trigger: free_reviews_limit_reached should drop to zero, and a too-tight gate would show up as manual --local requests.\n- NODE_USE_ENV_PROXY=1 makes Node 24 honor the sandbox's HTTPS_PROXY, fixing DNS failures and superseding an earlier mDNSResponder theory; ~/.greptile was added to allowWrite because greptile review writes auth.json and reviews.json there."
+    },
+    "metadata": {
+      "scenarioId": "004-claude-1142",
+      "url": "https://github.com/bendrucker/claude/pull/1142"
+    }
+  },
+  {
+    "description": "005-claude-1147",
+    "vars": {
+      "repo": "bendrucker/claude",
+      "tier": "personal",
+      "base": "main",
+      "branch": "add-a-copilot-cross-model-review-skill",
+      "diffSummary": "Adds /github:copilot, a cross-model review skill that runs the Copilot CLI against the diff to catch blind spots a same-model re-review shares. Uses disable-model-invocation for a fixed-budget design: one call by default, capped at three, diff-scoped with 120KB soft / 400KB hard size caps. Testing against the skill's own diff surfaced and fixed four input-validation defects. 4 files changed, +559/-0.",
+      "substance": "- Motivating case: reviewing a change in another repo, Copilot caught a compose function that streamed two files to stdout without checking either read succeeded, a defect two Claude reviewers had missed.\n- The Copilot Pro plan is a fixed allowance, so every design choice follows from budget: disable-model-invocation keeps natural-language routing and skill-to-skill delegation from reaching it, and --angles is capped at three with one call by default.\n- Discovered the target model gpt-5.6-codex doesn't exist by probing copilot help config to enumerate accepted names; the GPT-5.6 family turned out to be sol/terra/luna, with sol not entitled on this account, terra the default at 3.89 AI credits, and luna the cheapest at 0.39.\n- Multiple angles are disjoint rather than repeated passes: angle one covers unchecked failure and correctness, angle two covers data loss and security, angle three adds contracts, concurrency, and resources.\n- Testing against the skill's own diff found four defects: café.ts came back quoted and escaped under default core.quotePath and failed a stat check; changed files were read through symlinks with no containment check, so linking to ~/.ssh would have inlined a private key; --max-bytes wasn't validated so a non-numeric value produced NaN and disabled the size cap; and --base reached git unverified, so --base=--output=/tmp/x turned a diff into a file write.\n- Also fixed: --force bypassed the only size guard, trading a clear refusal for an opaque E2BIG, and file contents accumulated with no running total, so many small files could each pass the per-file cap and still blow out the prompt together.\n- Accepted rather than fixed: diff and file contents go to GitHub unredacted; this is the mechanism, not a bug, and is now documented as a pre-review checklist item.\n- The sandbox blocks Copilot from writing to ~/.copilot, so the script throws an empty HOME instead, which leaves the sandbox intact and keeps hooks, instructions, and history out of the review."
+    },
+    "metadata": {
+      "scenarioId": "005-claude-1147",
+      "url": "https://github.com/bendrucker/claude/pull/1147"
+    }
+  },
+  {
+    "description": "006-claude-1153",
+    "vars": {
+      "repo": "bendrucker/claude",
+      "tier": "personal",
+      "base": "main",
+      "branch": "focus-a-live-session-s-herdr-pane",
+      "diffSummary": "Replaces the job skill's copy-paste claude --resume command with herdr agent focus when running under herdr, using an exact session-UUID join from herdr agent list. All new behavior is guarded on HERDR_PANE_ID so the tmux path is untouched. Prose-only changes to SKILL.md. 3 files changed, +8/-4.",
+      "substance": "- The job skill previously handed over a claude --resume <sessionId> command for every item with a live session, requiring a manual copy, paste, and run.\n- herdr agent list returns agent_session.value, which carries the Claude session UUID, giving an exact join to a claude agents record with no title guessing.\n- Gather makes one extra inline call when HERDR_PANE_ID is set; a matched pane turns the brief's action line into herdr agent focus <pane_id>.\n- Act can run the focus command directly after confirming, since focus moves the foreground off the job session; herdr agent attach stays out of allowed-tools and is instead named in the brief for a manual run because it takes over the terminal.\n- Every branch is guarded on HERDR_PANE_ID, so the tmux work machine, where both multiplexers remain operational, keeps its existing resume path unchanged."
+    },
+    "metadata": {
+      "scenarioId": "006-claude-1153",
+      "url": "https://github.com/bendrucker/claude/pull/1153"
+    }
+  },
+  {
+    "description": "007-claude-1137",
+    "vars": {
+      "repo": "bendrucker/claude",
+      "tier": "personal",
+      "base": "main",
+      "branch": "support-github-stacked-pull-requests",
+      "diffSummary": "Adds a new github:stack skill documenting gh stack (the github/gh-stack extension) and wires stacked-PR awareness into babysit's merge mode, pull-request:create, ship, and user/CLAUDE.md, since gh pr merge does not work on a stacked PR and is the primary merge path in both. Covers detection via a GraphQL stack query, two tracking layouts chosen per stack, and merge/re-arm semantics under gh stack merge. 7 files changed, +167/-3.",
+      "substance": "- gh pr merge does not work on a stacked PR, and it is the primary merge path in both babysit's merge mode and pull-request:create, so either would have failed the first time a stack existed on GitHub.\n- Stack membership has to be detected through a GraphQL query on pullRequest.stack, since gh pr view has no stack field and gh stack view only reads local tracking state, which a worktree-per-branch layout never has.\n- The first shipped version encoded one-worktree-per-branch as a constraint of the tool itself, which was circular: it was read off the user's own instructions rather than from gh stack's actual behavior.\n- Verifying gh stack --help after shipping surfaced three corrections: gh stack sync already does fetch, cascade-rebase, force-with-lease push, and links open PRs into a stack, which in a single-worktree layout replaces both wt sync and gh stack link; gh stack submit opens an editor to draft each PR's title and body, so the create-PR-first workaround is a link-path constraint rather than a general one; and both submit --auto and link create PRs as drafts unless --open is passed, which collides with the ready-for-review default and wasn't mentioned in the first draft.\n- Rewrote the skill to document two layouts chosen per stack rather than assuming one: native tracking (gh stack owns branches, rebases, and publish in one working tree) fits a stack under active reshaping, and external tracking (gh stack link only, another tool rebases) fits layers worked on in parallel or over a long stretch.\n- A code-review pass raised a blocking finding that gh stack merge <n> could silently merge an unrelated stack if a PR number collided with a stack number; rejected after confirming via gh stack link --help that stack and PR numbers share one sequence per repository and never overlap, so the collision cannot occur.\n- gh stack merge is all-or-nothing across every PR at or below the target, so a blocked lower layer sinks the whole call; babysit watches one PR and can't fix a sibling's CI, so that case is reported and the task stops rather than treated as recoverable.\n- Checked glab stack and left the GitLab skill untouched: every subcommand is still marked EXPERIMENTAL, with no link, no merge, and no server-side stack object, so the two-layout distinction has nothing to attach to there and the existing custom stack-merge.ts cascade stays the GitLab path."
+    },
+    "metadata": {
+      "scenarioId": "007-claude-1137",
+      "url": "https://github.com/bendrucker/claude/pull/1137"
+    }
+  },
+  {
+    "description": "008-claude-1149",
+    "vars": {
+      "repo": "bendrucker/claude",
+      "tier": "personal",
+      "base": "main",
+      "branch": "treat-a-skill-s-fan-out-as-requested",
+      "diffSummary": "Adds one Workflow bullet to user/CLAUDE.md stating that invoking a skill which instructs a subagent fan-out or background dispatch already carries the user's authorization for Agent, and narrows plugins/review/skills/code/SKILL.md's degrade cell so it only falls back to a single inline pass when Agent is genuinely absent from the tool set, placing the reinforcement sentence under the Fan-out cells heading instead. 2 files changed, +3/-2.",
+      "substance": "- The user reported that /ship's reviewer pass ran inline instead of fanning out to subagents, even though the ship skill's own instruction said to fan out.\n- Traced the cause with grep -a against the installed 2.1.220 CLI binary: two lines, \"Do not call the AgentTool unless the user requested it\" and \"Do not use workflows or deep-research unless the user requested it,\" are compiled directly into the binary and absent from settings.json, .claude.json, user/, and every hook in the repo, so nothing in this repo can disable them.\n- Resolution works with the native gate rather than against it: a skill instructing a fan-out is itself the user's request for Agent, stated once globally in user/CLAUDE.md so ship, writing:review, pull-request:create, and review:follow-up all pick it up without a per-skill edit.\n- plugins/review/skills/code/SKILL.md held the actual trapdoor: its \"No Agent tool\" cell described every fan-out cell as degrading to a single inline pass, language broad enough to double as an excuse for a model already inclined to skip the fan-out; narrowed so it degrades only when Agent is genuinely missing from the tool set.\n- A two-lens writing review (content and style) on the first draft flagged the CLAUDE.md bullet's \"on my behalf\" phrasing as ambiguous: the file's established convention is that first person always means the user, so a model could misread \"my\" as itself, inverting the intended meaning; reworded to \"already carries the user's authorization for Agent.\"\n- The same review found the SKILL.md reinforcement sentence was misplaced under the \"No Agent tool\" heading, which a model on a real fan-out cell never reads because it resolves at \"Fan-out cells\" first; moved the sentence to sit under \"Fan-out cells\" instead.\n- Removal criteria: a release that stops shipping the compiled-in gate, or review:code summaries that stop declaring single-pass runs while Agent was actually available, since the skill already requires stating when a review went inline.\n- A prose-quality hook flagged the first PR body draft for low sentence-length variation (CV=0.41 over 13 sentences); the refreshed body was rewritten to vary rhythm, mixing short fragments with longer explanatory sentences."
+    },
+    "metadata": {
+      "scenarioId": "008-claude-1149",
+      "url": "https://github.com/bendrucker/claude/pull/1149"
+    }
+  }
+]

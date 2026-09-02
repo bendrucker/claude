@@ -1,0 +1,38 @@
+{
+  "evalId": "eval-ghi-2026-08-25T17:45:00",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-08-25T17:45:00.000Z",
+    "prompts": [
+      {
+        "label": "refine",
+        "provider": "anthropic:claude-agent-sdk",
+        "metrics": {
+          "cost": 0.25,
+          "testPassCount": 4,
+          "testFailCount": 0,
+          "testErrorCount": 0,
+          "tokenUsage": {
+            "total": 60000
+          }
+        }
+      }
+    ],
+    "results": [],
+    "stats": {
+      "successes": 4,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  "config": {
+    "description": "issue-refine"
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.122.2",
+    "platform": "linux",
+    "evaluationCreatedAt": "2026-08-25T17:45:00.000Z",
+    "billing": "api"
+  }
+}

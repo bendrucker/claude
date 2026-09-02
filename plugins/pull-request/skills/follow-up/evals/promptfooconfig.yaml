@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: pull-request:follow-up skill quality suite
+
+providers:
+  - id: anthropic:claude-agent-sdk
+    config:
+      model: claude-sonnet-5
+      apiKeyRequired: false
+      permission_mode: bypassPermissions
+      allow_dangerously_skip_permissions: true
+      setting_sources: []
+      max_budget_usd: 0.75
+      max_turns: 20
+      # The provider only hands the session read-only file tools when working_dir is
+      # set, and the skill grades against replies.md, reviewers.md, and auto.md, so
+      # the session needs Read, Grep, Glob, and LS. Bash is the tool name, not a
+      # permission specifier: an entry like "Bash(gh:*)" here would register a tool by
+      # that literal name, and the skill's context block runs a script, so the Skill
+      # tool itself errors out when no shell is allowed.
+      working_dir: ./workdir
+      append_allowed_tools:
+        - Bash
+      # The default workflow is gated read-only, and the cases name repositories that
+      # do not exist. These denials keep an `--auto` reading of a case from posting or
+      # pushing anywhere real. They bind under bypassPermissions.
+      disallowed_tools:
+        - "Bash(git commit:*)"
+        - "Bash(git push:*)"
+        - "Bash(gh pr comment:*)"
+        - "Bash(gh pr review:*)"
+        - "Bash(gh pr merge:*)"
+      plugins:
+        - type: local
+          path: ../../..
+      skills:
+        - pull-request:follow-up
+
+defaultTest:
+  options:
+    provider:
+      id: anthropic:messages:claude-sonnet-5
+      config:
+        apiKeyRequired: false
+        apiKey: "{{ env.ANTHROPIC_GRADER_API_KEY | default('') }}"
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  - description: GitHub thread triage with silent-resolve detection
+    vars:
+      prompt: Check what review comments still need replies on https://github.com/acme/api-server/pull/247
+    assert:
+      - type: llm-rubric
+        value: The skill fetches all resolvable threads (resolved and unresolved)
+      - type: llm-rubric
+        value: Threads are classified into the four buckets (unresolved/no reply, unresolved/replied, resolved/with reply, resolved/silent)
+      - type: llm-rubric
+        value: A summary table with counts per category is presented
+      - type: llm-rubric
+        value: Unresolved threads are listed with file, line, and feedback summary
+      - type: llm-rubric
+        value: "The output matches this intent: a summary table of thread states with unresolved threads listed by file and line, plus identification of any silently resolved threads."
+
+  - description: GitLab draft-reply delegation with tone and confirmation
+    vars:
+      prompt: Help me draft replies for the outstanding feedback on https://gitlab.example.com/team/service/-/merge_requests/89
+    assert:
+      - type: llm-rubric
+        value: "The skill detects GitLab from the URL and delegates to the gitlab:merge-request skill"
+      - type: llm-rubric
+        value: Unresolved threads are fetched and summarized before drafting
+      - type: llm-rubric
+        value: Draft replies follow the tone guidelines in replies.md
+      - type: llm-rubric
+        value: The skill asks for confirmation before posting any comments
+      - type: llm-rubric
+        value: "The output matches this intent: draft replies for each unresolved thread that match the author's writing style and follow the reply tone guidelines."

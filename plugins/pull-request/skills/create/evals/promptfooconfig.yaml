@@ -1,0 +1,152 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: pull-request:create skill quality suite
+
+providers:
+  - id: anthropic:claude-agent-sdk
+    config:
+      model: claude-sonnet-5
+      apiKeyRequired: false
+      permission_mode: bypassPermissions
+      allow_dangerously_skip_permissions: true
+      setting_sources: []
+      max_budget_usd: 0.75
+      max_turns: 15
+      # The provider only hands the session read-only file tools when working_dir is
+      # set, and the skill grades against references/sections.md and its siblings, so
+      # the session needs Read, Grep, Glob, and LS. Bash is the tool name, not a
+      # permission specifier: an entry like "Bash(gh pr:*)" here would register a tool
+      # by that literal name and leave the session with no shell at all.
+      working_dir: ./workdir
+      append_allowed_tools:
+        - Bash
+      # The scratch cwd sits inside this checkout, so the skill's `git remote get-url`
+      # resolves to the real repository and a prompt reading "open a PR" could reach
+      # `gh pr create`. Denials still bind under bypassPermissions and are applied to
+      # each part of a compound command, so the mutating verbs are cut here while the
+      # skill keeps the shell its context block needs.
+      disallowed_tools:
+        - "Bash(git add:*)"
+        - "Bash(git commit:*)"
+        - "Bash(git push:*)"
+        - "Bash(gh:*)"
+        - "Bash(glab:*)"
+      plugins:
+        - type: local
+          path: ../../..
+      skills:
+        - pull-request:create
+
+defaultTest:
+  options:
+    provider:
+      id: anthropic:messages:claude-sonnet-5
+      config:
+        apiKeyRequired: false
+        apiKey: "{{ env.ANTHROPIC_GRADER_API_KEY | default('') }}"
+
+# The scratch cwd sits inside this checkout, so an unqualified "open a PR" sends the
+# session hunting through the real working tree for a diff to describe. It found one,
+# spent the whole budget cap reading it, and answered with a clarifying question
+# instead of a body. Every rubric below grades prose, and the material that prose
+# needs is in the case, so the request is scoped to a draft.
+prompts:
+  - label: create-pr
+    raw: |
+      {{prompt}}
+
+      Draft only. This sandbox has no reviewable diff on disk, no usable remote, and
+      no network, so skip the staging, commit, push, and create steps. Everything the
+      body needs is in the request above. Return the title and body you would ship.
+
+tests:
+  - description: overturned theory and dropped test, no reflexive scaffold
+    vars:
+      prompt: "Open a PR for this fix. The session above traced the bug to a wrong theory first (we thought the exit code was lost) before finding the real cause, and we dropped a unit test because the test runner couldn't make it fail."
+    assert:
+      - type: llm-rubric
+        value: The body leads with intent or the real root cause, not a file-by-file summary
+      - type: llm-rubric
+        value: It states the overturned theory in about a sentence, without a paragraph-length narrative of the wrong turn
+      - type: llm-rubric
+        value: It notes the dropped test and the concrete reason it was dropped
+      - type: llm-rubric
+        value: A small fix is a tight paragraph with no reflexive ## Changes plus ## Testing scaffold
+      - type: llm-rubric
+        value: No test counts and no 'all tests pass' phrasing
+      - type: llm-rubric
+        value: "The output matches this intent: a prose-led body that leads with the real cause, names the disproven theory, and notes the dropped test with its reason. No reflexive section scaffold on a small fix."
+
+  - description: plan deviations surfaced as self-contained decisions
+    vars:
+      prompt: "Create a PR for this skill change. We deviated from the plan: an extra allowed-tools entry was added beyond what the plan listed, and you renamed the two modes mid-session at my request."
+    assert:
+      - type: llm-rubric
+        value: The body states the added scope (the extra allowed-tools entry) as a decision with its reason, rather than smoothing it over
+      - type: llm-rubric
+        value: It does not reference 'the plan', 'as planned', or any unseen spec or conversation; the scope change reads as a self-contained decision
+      - type: llm-rubric
+        value: It does not make a false claim that contradicts the diff (e.g. naming the wrong set of additions)
+      - type: llm-rubric
+        value: The user-driven naming decision is surfaced as a decision, not presented as obvious
+      - type: llm-rubric
+        value: "Changes are organized by concept, never as **path**: description bullets"
+      - type: llm-rubric
+        value: "The output matches this intent: a body that surfaces the added scope and the user-driven rename as the self-contained decisions they were, organized by concept, without framing them as a delta against a plan the reader can't see."
+
+  - description: manual verification and benchmark notes over coverage inventory
+    vars:
+      prompt: "Write the PR body. I verified this manually against the live tool since it couldn't be unit tested, and I benchmarked the slow path."
+    assert:
+      - type: llm-rubric
+        value: Testing notes state what manual verification showed or what breaks without the fix, not that tests exist
+      - type: llm-rubric
+        value: What could not be tested is named with a concrete reason
+      - type: llm-rubric
+        value: Benchmark or observed numbers from the session appear in the body
+      - type: llm-rubric
+        value: No test counts, no 'all tests pass', no listing of test file names without coverage detail
+      - type: llm-rubric
+        value: "The output matches this intent: a body whose testing notes state what was observed and what could not be automated, with the concrete reason, not a coverage inventory."
+
+  - description: multi-part change with Title-Cased topic headings
+    vars:
+      prompt: "Open a PR for this multi-part change. It refactors the auth callback handler, narrows the 401/403 error matching, and persists the DCR client ID. I deferred the token-refresh rework and left the existing retry behavior unchanged."
+    assert:
+      - type: llm-rubric
+        value: Section headings are Title-Cased noun phrases, not sentences, fragments, or questions
+      - type: llm-rubric
+        value: No heading carries a qualifying tail, a trailing clause, or a parenthetical that belongs in the body
+      - type: llm-rubric
+        value: Deferred and unchanged work is named by topic (e.g. Deferred Work, Unchanged Behavior), not as a What Changed or What I Didn't Do meta-heading
+      - type: llm-rubric
+        value: No Why/What/How question headings and no sentence-case headings
+      - type: llm-rubric
+        value: "The output matches this intent: a sectioned body whose headings are Title-Cased noun phrases naming each topic, with deferred and unchanged work named as topics rather than as meta-headings."
+
+  - description: decisions stated as plain facts, no instruction-leak vocabulary
+    vars:
+      prompt: "Open a PR for this config change on my personal repo. In the session we decided against a shared package on purpose, cut a flag that seemed non-obvious, and left the legacy path alone."
+    assert:
+      - type: llm-rubric
+        value: "The body never uses instruction-leak vocabulary: 'deliberately', 'on purpose', 'non-obvious', 'worth noting', 'left alone'"
+      - type: llm-rubric
+        value: Decisions are stated as facts about the change ('a shared package would have required X, so each plugin carries its own copy'), free of meta-commentary about what the author chose to mention
+      - type: llm-rubric
+        value: "The body does not name its own restraint (no 'I left out', 'omitted for brevity', or a list of things it isn't covering)"
+      - type: llm-rubric
+        value: "The output matches this intent: a body that states each decision in plain prose about the change, without echoing instruction vocabulary or describing its own selection process."
+
+  - description: personal-repo tight body with measured numbers and kept Things link
+    vars:
+      prompt: "Create the PR. This is my own repo. The change swaps the retry backoff to jitter and bumps the cap. I measured p99 at 410ms before and 230ms after. Original task: things:///show?id=Fk3aX2mQ"
+    assert:
+      - type: llm-rubric
+        value: The body is one to three paragraphs for this personal-tier change, with no section scaffold
+      - type: llm-rubric
+        value: The measured p99 numbers appear, and the decision to add jitter carries its reason
+      - type: llm-rubric
+        value: Every paragraph adds something beyond the title and diff, with no restatement of what the diff shows
+      - type: llm-rubric
+        value: An Original Task Things link is kept on this personal repo rather than dropped as a dead end
+      - type: llm-rubric
+        value: "The output matches this intent: a one-to-three-paragraph body carrying the decision and the measured numbers, with the Things link kept under References."

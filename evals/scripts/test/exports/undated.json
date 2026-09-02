@@ -1,0 +1,12 @@
+{
+  "evalId": "eval-nod-2026-08-26T11:00:00",
+  "results": {
+    "version": 3,
+    "prompts": [],
+    "results": [],
+    "stats": { "successes": 0, "failures": 0, "errors": 0 }
+  },
+  "config": {},
+  "shareableUrl": null,
+  "metadata": { "promptfooVersion": "0.122.2" }
+}

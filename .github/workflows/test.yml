@@ -44,6 +44,24 @@ jobs:
       - name: Run tests
         run: bun test ./.claude ./user scripts/
 
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/bun-install
+
+      # evals/scripts/duckdb.ts shells out to the duckdb CLI, so the report tests
+      # need it on PATH. Same installer the plugin job uses.
+      - name: Install DuckDB
+        run: |
+          curl -fsSL https://install.duckdb.org | bash
+          echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
+
+      - name: Run tests
+        run: bun test evals/
+
   validate:
     runs-on: ubuntu-latest
     steps:

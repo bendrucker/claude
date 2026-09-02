@@ -32,7 +32,6 @@ export interface RepoContext {
 }
 
 export interface BodyContext extends RepoContext {
-  /** Title the command sets, or null when it sets none. */
   title: string | null;
   /** Why the hook could not read the body, in which case the body rules see an empty one. */
   unreadable: string | null;
@@ -118,8 +117,7 @@ function hasReflexiveScaffold(body: string): boolean {
   return CHANGES_HEADING_PATTERN.test(body) && TESTING_HEADING_PATTERN.test(body);
 }
 
-// File-tour bullet: a `- **label:**` or `* **label:**` item whose bold label
-// names a file rather than a concept.
+// File-tour bullet: a `- **label:**` or `* **label:**` item whose bold label names a file.
 const BOLD_LABEL_BULLET_PATTERN = /^\s*[-*]\s+\*\*([^*]+?)\*\*:/gm;
 const FILE_EXTENSION_PATTERN =
   /\.(ts|tsx|js|jsx|mjs|cjs|json|md|txt|py|rb|go|rs|java|c|h|cpp|sh|yml|yaml|toml|css|html|sql)$/i;

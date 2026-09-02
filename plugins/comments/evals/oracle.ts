@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import Builder from "fast-xml-builder";
 import { z } from "zod";
 import type { CommentKind, Language } from "../detection/types";
+import { type JudgeAdapter, shardJudge } from "../judge/adapter";
 import { BATCH_SIZE, parseVerdict } from "../judge/judge";
 import { batchVerdictSchema, type Verdict } from "../judge/schema";
 
@@ -146,4 +147,12 @@ export function anthropicCommentJudge(options: AnthropicJudgeOptions): CommentJu
     }
     return parseBatchVerdicts(block.text, inputs.length);
   };
+}
+
+/**
+ * The oracle behind the audit's judge seam: scores each written shard in one
+ * Messages call and writes its verdict file where the agent fan-out would.
+ */
+export function anthropicJudgeAdapter(options: AnthropicJudgeOptions): JudgeAdapter {
+  return shardJudge(anthropicCommentJudge(options));
 }

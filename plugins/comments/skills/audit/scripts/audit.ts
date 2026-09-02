@@ -1,40 +1,13 @@
 #!/usr/bin/env bun
 
-import { readdir } from "node:fs/promises";
-import { basename, join } from "node:path";
 import { $ } from "bun";
 import { cli, command } from "cleye";
 import { z } from "zod";
-import { applyToBranch, isCleanTree } from "../../../apply/branch";
-import { computeFileEdits, type EditItem } from "../../../apply/edits";
-import { formatContent } from "../../../apply/format";
-import { collectVerdicts, matchVerdicts } from "../../../apply/join";
-import { color, type ReportItem, renderReport, summarize } from "../../../apply/report";
-import {
-  type CollectedComment,
-  collectDiff,
-  collectRepo,
-  type MrSource,
-  resolveMrSource,
-} from "../../../detection/collect";
-import { densityWeights, type ScoredFile } from "../../../detection/density";
-import type { DiffOptions } from "../../../detection/diff";
-import { extractComments, languageForPath } from "../../../detection/extract";
-import { rankCommentsWeighted, type SortKey } from "../../../detection/rank";
-import type { Comment } from "../../../detection/types";
-import { buildJob, type BuildJobOptions, writeJob } from "../../../judge/job";
-import type { Verdict } from "../../../judge/schema";
-
-const WORKFLOW_PATH = join(import.meta.dirname, "..", "..", "..", "workflow", "judge.workflow.js");
-
-/**
- * Fixed token cost of one judging agent beyond its comment payload: the Claude
- * Code system prompt and tool schemas (~15k), the rubric read (~2.5k), and the
- * multi-turn read/write/output cycle. The preflight estimate is the number the
- * user consents to, so it must include this, not just payload; overhead
- * dominates payload at the default shard size.
- */
-const AGENT_OVERHEAD_TOKENS = 25_000;
+import type { SortKey } from "../../../detection/rank";
+import { workflowJudge } from "../../../judge/adapter";
+import { apply } from "./apply";
+import { AuditError, consoleIo } from "./io";
+import { preflight } from "./preflight";
 
 const SORT_KEYS = ["lines", "chars", "score"] as const satisfies readonly SortKey[];
 
@@ -62,9 +35,15 @@ async function chdirToRepoRoot(): Promise<void> {
   process.chdir(root);
 }
 
-function preview(text: string): string {
-  const firstLine = text.split("\n")[0] ?? "";
-  return firstLine.length > 64 ? `${firstLine.slice(0, 61)}...` : firstLine;
+async function run(task: () => Promise<void>): Promise<void> {
+  await chdirToRepoRoot();
+  try {
+    await task();
+  } catch (error) {
+    if (!(error instanceof AuditError)) throw error;
+    console.error(error.message);
+    process.exit(1);
+  }
 }
 
 const preflightCmd = command(
@@ -95,132 +74,15 @@ const preflightCmd = command(
       },
     },
   },
-  async (parsed) => {
-    await chdirToRepoRoot();
-    const { base, mr, all, path, sort, limit, shardSize, fix } = parsed.flags;
-    const pathGlobs = path;
-    const sortKey = parseSort(sort);
-
-    // Per-file added-line density, gathered while collect has each file's
-    // content in hand, weights the ranking so the shard budget lands on the
-    // heaviest files first.
-    const densities: ScoredFile[] = [];
-    const onFileDensity = (file: ScoredFile) => densities.push(file);
-
-    let comments: CollectedComment[];
-    if (all) {
-      if (!(await isCleanTree())) {
-        console.error(
-          "Working tree is not clean. --all reads the working tree but applies from HEAD. Commit or stash first.",
-        );
-        process.exit(1);
-      }
-      comments = await collectRepo({ pathGlobs, onFileDensity });
-    } else {
-      const options: DiffOptions = {};
-      if (base != null && base !== "") options.base = base;
-      if (mr != null && mr !== "") options.mr = mr;
-      let mrSource: MrSource | null = null;
-      if (mr != null && mr !== "") {
-        mrSource = await resolveMrSource(mr);
-        if (!mrSource) {
-          console.error("Could not resolve the merge request's source ref via glab.");
-          process.exit(1);
-        }
-      }
-      comments = await collectDiff(options, mrSource, { pathGlobs, onFileDensity });
-    }
-
-    const ranked = rankCommentsWeighted(comments, densityWeights(densities), sortKey);
-    const limited = typeof limit === "number" ? ranked.slice(0, limit) : ranked;
-    if (limited.length === 0) {
-      console.log(color.dim("No comments to judge."));
-      return;
-    }
-
-    const options: BuildJobOptions = { fix };
-    if (shardSize != null && shardSize !== 0) options.shardSize = shardSize;
-    const descriptor = await buildJob(limited, options);
-    const written = await writeJob(descriptor);
-    // An --mr job records comment text from the remote MR ref, but apply trims
-    // the local tree from HEAD. Persist the scope so apply can refuse to branch
-    // off a local checkout that would read every comment as drift.
-    await Bun.write(join(written.jobDir, "scope.json"), JSON.stringify({ mr: mr ?? null }));
-
-    // Deterministic features per judged comment, keyed by the same id the
-    // verdicts use. Each run leaves a (features, verdict) pair in its job dir,
-    // the training data for routing obvious comments away from the judge later.
-    const features = Object.fromEntries(
-      limited.map((c) => [c.id, { path: c.path, startLine: c.startLine, ...c.features }]),
-    );
-    await Bun.write(join(written.jobDir, "features.json"), JSON.stringify(features, null, 2));
-
-    const fileCount = new Set(limited.map((c) => c.path)).size;
-    const payloadTokens = Math.ceil(
-      limited.reduce((sum, c) => sum + c.text.length + c.context.length, 0) / 4,
-    );
-    const tokens = payloadTokens + written.shardCount * AGENT_OVERHEAD_TOKENS;
-
-    console.log(
-      color.bold(
-        `${limited.length} comments / ${fileCount} files / ~${written.shardCount} agents / ~${tokens} tokens (rough)`,
-      ),
-    );
-    for (const c of limited.slice(0, 10)) {
-      console.log(
-        `  ${color.dim(String(c.score.score).padStart(5))}  ${c.path}:${c.startLine}  ${preview(c.text)}`,
+  (parsed) =>
+    run(async () => {
+      const { base, mr, all, path, sort, limit, shardSize, fix } = parsed.flags;
+      await preflight(
+        { base, mr, all, pathGlobs: path, sort: parseSort(sort), limit, shardSize, fix },
+        { io: consoleIo, judge: workflowJudge((line) => consoleIo.log(line)) },
       );
-    }
-    console.log("");
-    console.log("<preflight>");
-    console.log(
-      JSON.stringify({
-        scriptPath: WORKFLOW_PATH,
-        argsPath: written.argsPath,
-        jobDir: written.jobDir,
-        count: written.count,
-        shardCount: written.shardCount,
-      }),
-    );
-    console.log("</preflight>");
-  },
+    }),
 );
-
-function toEditItem(comment: Comment, verdict: Verdict): EditItem {
-  return {
-    startLine: comment.startLine,
-    endLine: comment.endLine,
-    startColumn: comment.startColumn,
-    endColumn: comment.endColumn,
-    kind: comment.kind,
-    verdict,
-  };
-}
-
-async function readJsonFiles<T>(dir: string, prefix: string, schema: z.ZodType<T>): Promise<T[]> {
-  let names: string[];
-  try {
-    names = await readdir(dir);
-  } catch {
-    return [];
-  }
-  const matching = names.filter((name) => name.startsWith(prefix) && name.endsWith(".json"));
-  return Promise.all(
-    matching.map(async (name) => schema.parse(JSON.parse(await Bun.file(join(dir, name)).text()))),
-  );
-}
-
-const Scope = z.looseObject({ mr: z.string().nullish() });
-
-const JobShardFile = z.looseObject({ comments: z.array(z.looseObject({ path: z.string() })) });
-
-/** The files a job judged, recovered from the shards. */
-async function judgedPaths(jobDir: string): Promise<string[]> {
-  const shards = await readJsonFiles(jobDir, "shard-", JobShardFile);
-  const paths = new Set<string>();
-  for (const shard of shards) for (const comment of shard.comments) paths.add(comment.path);
-  return [...paths];
-}
 
 const applyCmd = command(
   {
@@ -240,128 +102,12 @@ const applyCmd = command(
       },
     },
   },
-  async (parsed) => {
-    await chdirToRepoRoot();
-    const { job, report, fix, format, maxWidth } = parsed.flags;
-    if (job == null || job === "") {
-      console.error("--job <dir> is required.");
-      process.exit(1);
-    }
-
-    if (!(await Bun.file(join(job, "job-args.json")).exists())) {
-      console.error(`No job at ${job}. Pass the job dir printed by preflight.`);
-      process.exit(1);
-    }
-
-    const scopeFile = Bun.file(join(job, "scope.json"));
-    const scope = (await scopeFile.exists())
-      ? Scope.parse(JSON.parse(await scopeFile.text()))
-      : { mr: null };
-    if (scope.mr != null && scope.mr !== "" && !report) {
-      console.error(
-        `This job audited merge request !${scope.mr} from its remote source. Apply writes trims to the local tree from HEAD, so every comment would read as drift. Re-run with --report, or check out the MR branch and re-run preflight with --base.`,
-      );
-      process.exit(1);
-    }
-
-    const verdictShards = await readJsonFiles(join(job, "verdicts"), "verdict-", z.unknown());
-    if (verdictShards.length === 0) {
-      console.error(`No verdicts in ${join(job, "verdicts")}. Run the judge workflow first.`);
-      process.exit(1);
-    }
-    const verdicts = collectVerdicts(verdictShards);
-
-    const reportItems: ReportItem[] = [];
-    const editsByPath = new Map<string, string>();
-    const matched = new Set<string>();
-    const manualSkips: string[] = [];
-    const skippedComments = new Set<string>();
-
-    // Re-extract each judged file and match verdicts by id at the comment's
-    // current range. A verdict whose id no longer re-extracts has drifted.
-    for (const path of await judgedPaths(job)) {
-      const language = languageForPath(path);
-      const file = Bun.file(path);
-      // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.
-      if (language == null || language === "" || !(await file.exists())) continue;
-      // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.
-      const source = await file.text();
-      const editItems: EditItem[] = [];
-      // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.
-      for (const match of matchVerdicts(path, await extractComments(source, language), verdicts)) {
-        matched.add(match.id);
-        reportItems.push({
-          path,
-          startLine: match.comment.startLine,
-          verdict: match.verdict,
-          text: match.comment.text,
-        });
-        if (match.verdict.action !== "keep")
-          editItems.push(toEditItem(match.comment, match.verdict));
-      }
-      if (editItems.length > 0) {
-        const result = computeFileEdits(source, editItems, { maxWidth });
-        for (const skip of result.skips) {
-          manualSkips.push(`${path}:${skip.startLine}  ${skip.detail}`);
-          skippedComments.add(`${path}:${skip.startLine}`);
-        }
-        if (result.content !== source) editsByPath.set(path, result.content);
-      }
-    }
-
-    if (format != null && format !== "" && !report) {
-      for (const [path, content] of editsByPath) {
-        // oxlint-disable-next-line no-await-in-loop -- bounds formatter subprocess fan-out to one `sh -c` per edited file at a time.
-        const formatted = await formatContent(format, path, content);
-        if (formatted.formatted) {
-          editsByPath.set(path, formatted.content);
-        } else {
-          console.error(
-            color.yellow(
-              `Formatter failed for ${path} (${formatted.error}); keeping unformatted content.`,
-            ),
-          );
-        }
-      }
-    }
-
-    for (const item of reportItems) {
-      if (skippedComments.has(`${item.path}:${item.startLine}`)) item.skipped = true;
-    }
-
-    const driftSkips = [...verdicts.keys()].filter((id) => !matched.has(id));
-
-    if (report) {
-      console.log(renderReport(reportItems, { fix }));
-    } else {
-      const branch = `comments/audit-${basename(job)}`;
-      if (editsByPath.size === 0) {
-        console.log(color.dim("Nothing to apply."));
-      } else if (!(await isCleanTree())) {
-        console.error(
-          "Working tree is not clean. Commit or stash before applying, or use --report.",
-        );
-        process.exit(1);
-      } else {
-        await applyToBranch(editsByPath, { branch });
-        console.log(
-          `Applied ${summarize(reportItems)} on branch ${color.bold(branch)}. Review with git diff HEAD..${branch}.`,
-        );
-      }
-    }
-
-    if (driftSkips.length > 0) {
-      console.error(
-        color.yellow(
-          `Skipped ${driftSkips.length} judged comment(s) no longer found at preflight position (file changed since preflight).`,
-        ),
-      );
-    }
-    if (manualSkips.length > 0) {
-      console.error(color.yellow(`Left ${manualSkips.length} comment(s) for manual handling:`));
-      for (const skip of manualSkips) console.error(`  ${skip}`);
-    }
-  },
+  (parsed) =>
+    run(async () => {
+      const { job, report, fix, format, maxWidth } = parsed.flags;
+      if (job == null || job === "") throw new AuditError("--job <dir> is required.");
+      await apply({ job, report, fix, format, maxWidth }, consoleIo);
+    }),
 );
 
 await cli(

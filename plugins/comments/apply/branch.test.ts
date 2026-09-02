@@ -8,15 +8,19 @@ import { applyToBranch } from "./branch";
 /** A fresh git repo with a normal file and an executable shell script committed. */
 async function makeRepo(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "comments-branch-"));
-  const git = $.cwd(dir).env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" });
-  await git`git init -b main`.quiet();
-  await git`git config user.email test@example.com`.quiet();
-  await git`git config user.name Test`.quiet();
+  const git = (...args: string[]) =>
+    $`git ${args}`
+      .cwd(dir)
+      .env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" })
+      .quiet();
+  await git("init", "-b", "main");
+  await git("config", "user.email", "test@example.com");
+  await git("config", "user.name", "Test");
   await Bun.write(join(dir, "note.ts"), "// keep\n// slop\nconst x = 1;\n");
   await Bun.write(join(dir, "run.sh"), "#!/bin/sh\necho hi\n");
-  await $.cwd(dir)`chmod 755 run.sh`.quiet();
-  await git`git add note.ts run.sh`.quiet();
-  await git`git commit -m init`.quiet();
+  await $`chmod 755 run.sh`.cwd(dir).quiet();
+  await git("add", "note.ts", "run.sh");
+  await git("commit", "-m", "init");
   return dir;
 }
 

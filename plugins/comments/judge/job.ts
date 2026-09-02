@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 import type { CollectedComment } from "../detection/collect";
 import type { CommentKind, Language } from "../detection/types";
 import { BATCH_SIZE, loadPrompt, sha256 } from "./judge";
@@ -18,6 +19,25 @@ export interface ShardComment {
 export interface JobShard {
   id: number;
   comments: ShardComment[];
+}
+
+const ShardFile = z.object({
+  id: z.number(),
+  comments: z.array(
+    z.object({
+      id: z.string(),
+      path: z.string(),
+      language: z.string(),
+      kind: z.enum(["line", "block", "docstring"]),
+      text: z.string(),
+      context: z.string(),
+    }),
+  ),
+}) satisfies z.ZodType<JobShard>;
+
+/** A shard read back from the file `writeJob` wrote. */
+export async function readShard(path: string): Promise<JobShard> {
+  return ShardFile.parse(JSON.parse(await Bun.file(path).text()));
 }
 
 export interface JobDescriptor {
@@ -95,10 +115,14 @@ export interface WrittenJob {
 
 export const DEFAULT_JOB_BASE = join(tmpdir(), "comments-audit");
 
-/** Content-hash the descriptor so re-running identical input reuses the same job dir. */
+/**
+ * Content-hash the descriptor so re-running identical input reuses the same job
+ * dir. The full prompt text is hashed, not the rubric's sha alone, so a `--fix`
+ * run lands in its own dir instead of reading the plain run's verdicts.
+ */
 function jobHash(descriptor: JobDescriptor): string {
   return sha256(
-    JSON.stringify({ shards: descriptor.shards, promptSha: descriptor.promptSha }),
+    JSON.stringify({ shards: descriptor.shards, promptText: descriptor.promptText }),
   ).slice(0, 16);
 }
 

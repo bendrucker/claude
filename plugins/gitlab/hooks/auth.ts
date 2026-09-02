@@ -2,7 +2,7 @@
 
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { BashHookInput, parseHookInput } from "./hook-input";
+import { BashHookInput, readHookInput } from "./hook-input";
 
 export const HookInput = BashHookInput.extend({
   hook_event_name: z.literal("PostToolUse"),
@@ -27,7 +27,7 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
 }
 
 async function main(): Promise<void> {
-  const input = parseHookInput(HookInput, "auth", await Bun.stdin.text());
+  const input = await readHookInput(HookInput, "auth");
   if (input == null) return;
 
   const output = processInput(input);

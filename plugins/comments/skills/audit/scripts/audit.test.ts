@@ -7,7 +7,7 @@ import { z } from "zod";
 import { shardJudge, type ShardJudge } from "../../../judge/adapter";
 import type { ShardComment, WrittenJob } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
-import { apply, type ApplyOptions } from "./apply";
+import { apply, type ApplyOptions, type ApplyResult } from "./apply";
 import type { AuditIo } from "./io";
 import { preflight, type PreflightOptions } from "./preflight";
 
@@ -166,7 +166,7 @@ async function judgedJob(options: Partial<PreflightOptions> = {}): Promise<Writt
 async function runApply(
   job: WrittenJob,
   options: Partial<ApplyOptions> = {},
-): Promise<Capture & { result: Awaited<ReturnType<typeof apply>> }> {
+): Promise<Capture & { result: ApplyResult }> {
   const captured = capture();
   const result = await apply(
     { job: job.jobDir, report: false, fix: false, ...options },
@@ -441,6 +441,7 @@ describe("audit.ts", () => {
     const block = /<preflight>\n(.*)\n<\/preflight>/.exec(pre.stdout);
     const handoff = Preflight.parse(JSON.parse(block?.[1] ?? ""));
     expect(handoff.scriptPath).toEndWith("workflow/judge.workflow.js");
+    expect(await Bun.file(handoff.scriptPath).exists()).toBe(true);
     expect(handoff.jobDir.startsWith(jobs)).toBe(true);
     expect(handoff).toMatchObject({ count: 4, shardCount: 2 });
 

@@ -7,7 +7,8 @@ import { collectVerdicts, matchVerdicts } from "../../../apply/join";
 import { color, type ReportItem, renderReport, summarize } from "../../../apply/report";
 import { extractComments, languageForPath } from "../../../detection/extract";
 import type { Comment } from "../../../detection/types";
-import type { ShardRef } from "../../../judge/job";
+import { verdictPath } from "../../../judge/adapter";
+import { readShard, type ShardRef } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
 import { AuditError, type AuditIo } from "./io";
 
@@ -57,8 +58,6 @@ const JobArgsFile = z.looseObject({
 
 const Scope = z.looseObject({ mr: z.string().nullish() });
 
-const ShardPaths = z.looseObject({ comments: z.array(z.looseObject({ path: z.string() })) });
-
 /** The shards preflight wrote, from the args it handed the workflow. */
 async function readShardRefs(jobDir: string): Promise<ShardRef[]> {
   const argsPath = join(jobDir, "job-args.json");
@@ -71,19 +70,19 @@ async function readShardRefs(jobDir: string): Promise<ShardRef[]> {
 /** The files a job judged, recovered from its shards. */
 async function judgedPaths(shards: ShardRef[]): Promise<string[]> {
   const paths = new Set<string>();
-  for (const shard of await Promise.all(shards.map((ref) => readJson(ref.path, ShardPaths)))) {
+  for (const shard of await Promise.all(shards.map((ref) => readShard(ref.path)))) {
     for (const comment of shard.comments) paths.add(comment.path);
   }
   return [...paths];
 }
 
-/** Every shard's verdict file. A shard whose agent never wrote one fails the run rather than reading as drift. */
+/**
+ * Every shard's verdict file. A shard whose agent never wrote one fails the run
+ * rather than reading as drift.
+ */
 async function readVerdicts(jobDir: string, shards: ShardRef[]): Promise<Map<string, Verdict>> {
   const verdictsDir = join(jobDir, "verdicts");
-  const files = shards.map((ref) => ({
-    id: ref.id,
-    path: join(verdictsDir, `verdict-${ref.id}.json`),
-  }));
+  const files = shards.map((ref) => ({ id: ref.id, path: verdictPath(verdictsDir, ref.id) }));
   const present = await Promise.all(files.map((file) => Bun.file(file.path).exists()));
   const missing = files.filter((_, i) => !present[i]).map((file) => file.id);
   if (missing.length > 0) {
@@ -95,9 +94,9 @@ async function readVerdicts(jobDir: string, shards: ShardRef[]): Promise<Map<str
 }
 
 async function guardScope(options: ApplyOptions): Promise<void> {
-  const scopeFile = Bun.file(join(options.job, "scope.json"));
-  const scope = (await scopeFile.exists())
-    ? Scope.parse(JSON.parse(await scopeFile.text()))
+  const scopePath = join(options.job, "scope.json");
+  const scope = (await Bun.file(scopePath).exists())
+    ? await readJson(scopePath, Scope)
     : { mr: null };
   if (scope.mr != null && scope.mr !== "" && !options.report) {
     throw new AuditError(

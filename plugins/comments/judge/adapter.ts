@@ -35,6 +35,11 @@ export function workflowJudge(log: (line: string) => void): JudgeAdapter {
   };
 }
 
+/** Where a shard's verdict file lands, the name the workflow prompt spells out to each agent. */
+export function verdictPath(verdictsDir: string, shardId: number): string {
+  return join(verdictsDir, `verdict-${shardId}.json`);
+}
+
 /** Scores one shard's comments, returning verdicts in the same order. */
 export type ShardJudge = (comments: ShardComment[]) => Promise<Verdict[]>;
 
@@ -59,7 +64,7 @@ export function shardJudge(judge: ShardJudge): JudgeAdapter {
           verdict: verdicts[i],
         }));
         await Bun.write(
-          join(job.verdictsDir, `verdict-${ref.id}.json`),
+          verdictPath(job.verdictsDir, ref.id),
           JSON.stringify({ verdicts: entries }, null, 2),
         );
       }),

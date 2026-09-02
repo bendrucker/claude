@@ -33,6 +33,7 @@ import {
   processStop,
   runOxlintAgent,
   STOP_BLOCK_LIMIT,
+  TYPE_CHECK_ARGS,
 } from ".";
 
 // Every check here spawns oxlint and oxfmt over a real fixture, and the
@@ -400,6 +401,10 @@ describe("ox hook", () => {
       expect(context).toContain(reports);
       expect(context).not.toContain("tsgolint");
     });
+  });
+
+  it("disables nested config discovery for the type-check pass", () => {
+    expect(TYPE_CHECK_ARGS).toContain("--disable-nested-config");
   });
 
   describe("processStop", () => {

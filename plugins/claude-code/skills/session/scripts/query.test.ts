@@ -36,6 +36,13 @@ describe("renderSetVariables", () => {
   test.each([Number.NaN, Number.POSITIVE_INFINITY])("rejects %p", (value) => {
     expect(() => renderSetVariables({ bucket_minutes: value })).toThrow("non-finite");
   });
+
+  test.each([`x" = NULL; DROP TABLE raw; --`, "has space", "1leading_digit", ""])(
+    "rejects %p as a variable name",
+    (key) => {
+      expect(() => renderSetVariables({ [key]: "value" })).toThrow("Invalid query parameter name");
+    },
+  );
 });
 
 describe("node adapter", () => {

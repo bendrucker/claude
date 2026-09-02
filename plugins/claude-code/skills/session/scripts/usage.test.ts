@@ -81,6 +81,10 @@ describe("Bucket", () => {
     const row = { ...buckets[0], output_tokens: "4200", cache_read_tokens: "120000" };
     expect(Bucket.parse(row)).toEqual(buckets[0]!);
   });
+
+  it("rejects a null aggregate rather than reading it as zero", () => {
+    expect(() => Bucket.parse({ ...buckets[0], output_tokens: null })).toThrow();
+  });
 });
 
 describe("formatTopSessions", () => {

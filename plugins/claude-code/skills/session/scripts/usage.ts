@@ -22,7 +22,14 @@ const localTime = (ts: string): string =>
 const num = (n: number): string => Math.round(n).toLocaleString();
 
 // SUM over a BIGINT column yields a HUGEINT, which duckdb -json serializes as a string.
-const Tokens = z.coerce.number();
+// Narrower than z.coerce.number(), which would read a null aggregate as a measured zero.
+const Tokens = z.union([
+  z.number(),
+  z
+    .string()
+    .regex(/^-?\d+$/)
+    .transform(Number),
+]);
 
 export const Bucket = z.object({
   bucket: z.string(),

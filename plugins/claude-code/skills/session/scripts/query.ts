@@ -28,11 +28,19 @@ export function sqlLiteral(value: string | number | null): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+// Both adapters quote the key as a SQL identifier, which no parameter binding covers.
+function variableName(key: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+    throw new Error(`Invalid query parameter name: ${key}`);
+  }
+  return key;
+}
+
 export function renderSetVariables(params: QueryParams): string {
   const lines: string[] = [];
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined) continue;
-    lines.push(`SET VARIABLE "${key}" = ${sqlLiteral(value)};`);
+    lines.push(`SET VARIABLE "${variableName(key)}" = ${sqlLiteral(value)};`);
   }
   return lines.length > 0 ? `${lines.join("\n")}\n` : "";
 }
@@ -42,12 +50,13 @@ export function nodeAdapter(db: Database): QueryAdapter {
     async bind(params) {
       for (const [key, value] of Object.entries(params)) {
         if (value === undefined) continue;
+        const name = variableName(key);
         if (typeof value === "string") {
           // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query reads back.
-          await db.run(`SET VARIABLE "${key}" = $value`, { value });
+          await db.run(`SET VARIABLE "${name}" = $value`, { value });
         } else {
           // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query reads back.
-          await db.run(`SET VARIABLE "${key}" = ${sqlLiteral(value)}`);
+          await db.run(`SET VARIABLE "${name}" = ${sqlLiteral(value)}`);
         }
       }
       return "";

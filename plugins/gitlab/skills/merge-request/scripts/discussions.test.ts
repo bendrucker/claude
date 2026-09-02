@@ -2,6 +2,7 @@ import { describe, expect, it, test } from "bun:test";
 import type { Discussion, DiscussionSummary, FilterOptions } from "./discussions";
 import {
   deduplicateDiscussions,
+  Discussion,
   filterDiscussions,
   formatDigest,
   formatLocation,
@@ -217,5 +218,45 @@ describe("null notes tolerance", () => {
 
   it("deduplicateDiscussions skips discussions without notes", () => {
     expect(deduplicateDiscussions(degenerate).map((d) => d.id)).toEqual(["real"]);
+  });
+});
+
+describe("null position fields", () => {
+  // GitLab nulls the side of a position that does not exist: old_line and
+  // old_path on a purely added line, new_line and new_path on a deleted one.
+  // Requiring numbers there rejected every thread on an added line.
+  test.each<{ name: string; position: Record<string, unknown> }>([
+    {
+      name: "added line",
+      position: { old_line: null, new_line: 42, old_path: null, new_path: "src/a.ts" },
+    },
+    {
+      name: "deleted line",
+      position: { old_line: 42, new_line: null, old_path: "src/a.ts", new_path: null },
+    },
+  ])("parses a position on an $name", ({ position }) => {
+    const parsed = Discussion.parse({ id: "1", notes: [makeNote({ position })] });
+    expect(parsed.notes?.[0]?.position).toMatchObject(position);
+  });
+
+  it("parses a line_range whose ends null the absent side", () => {
+    const parsed = Discussion.parse({
+      id: "1",
+      notes: [
+        makeNote({
+          position: {
+            new_path: "src/a.ts",
+            old_path: null,
+            new_line: 10,
+            old_line: null,
+            line_range: {
+              start: { type: "new", new_line: 10, old_line: null },
+              end: { type: "new", new_line: 12, old_line: null },
+            },
+          },
+        }),
+      ],
+    });
+    expect(parsed.notes?.[0]?.position?.line_range?.start.new_line).toBe(10);
   });
 });

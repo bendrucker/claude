@@ -12,6 +12,8 @@ groups=$(
     printf '%s\n' plugin server
   } | sort -u
 )
+# A command earns a line by measured demand: how often sessions that had
+# already loaded this skill still ran `<command> --help`.
 hot=(
   "agent prompt"
   "agent wait"
@@ -21,7 +23,13 @@ hot=(
   "pane wait-output"
   "pane split"
   "pane run"
+  "pane move"
+  "workspace create"
+  "workspace close"
+  "tab create"
+  "worktree create"
   "worktree open"
+  "worktree remove"
 )
 
 for g in $groups; do

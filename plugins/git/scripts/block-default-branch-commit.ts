@@ -43,18 +43,28 @@ function* unquotedMatches(text: string, lead: RegExp, tail: RegExp): Generator<R
 const HEREDOC_LEAD = /(?<!<)<<(?!<)/g;
 const HEREDOC_DELIMITER = /^(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([^\s'"\\<>|&;()]+))/;
 
+// A `#` that starts a word opens a comment the shell never parses, so nothing
+// after it is syntax.
+const COMMENT_START = /(?:^|\s)#/;
+
+function withoutComment(line: string): string {
+  const start = maskQuoted(line).search(COMMENT_START);
+  return start === -1 ? line : line.slice(0, start);
+}
+
 // Line-oriented heredoc scan: a body runs from the line after its operator to
 // the delimiter line, and several operators on one line consume bodies in
 // order. An unterminated heredoc owns the rest of the command.
 function stripHeredocs(command: string): string {
   const kept: string[] = [];
   const pending: Array<{ delimiter: string; stripTabs: boolean }> = [];
-  for (const line of command.split("\n")) {
+  for (const raw of command.split("\n")) {
     const open = pending[0];
     if (open !== undefined) {
-      if ((open.stripTabs ? line.replace(/^\t+/, "") : line) === open.delimiter) pending.shift();
+      if ((open.stripTabs ? raw.replace(/^\t+/, "") : raw) === open.delimiter) pending.shift();
       continue;
     }
+    const line = withoutComment(raw);
     kept.push(line);
     for (const match of unquotedMatches(line, HEREDOC_LEAD, HEREDOC_DELIMITER)) {
       pending.push({

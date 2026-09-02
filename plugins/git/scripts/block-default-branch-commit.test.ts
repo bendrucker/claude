@@ -63,6 +63,11 @@ describe("invokesGitCommit", () => {
     ["cat > f <<MY-DELIM\nnotes\nMY-DELIM\ngit commit", true],
     ["cat > f <<123\ngit commit here\n123", false],
     ["cat <<EOF>f\ngit commit here\nEOF", false],
+    ["# <<EOF\ngit commit -m x", true],
+    ["cat > f <<'EOF' # notes\ngit commit here\nEOF", false],
+    ["# git commit", false],
+    ["echo a#b && git commit", true],
+    ['echo "# <<EOF" && git commit', true],
   ])("%p → %p", (command, expected) => {
     expect(invokesGitCommit(command)).toBe(expected);
   });

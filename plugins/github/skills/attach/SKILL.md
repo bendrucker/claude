@@ -1,6 +1,6 @@
 ---
 name: github:attach
-description: Upload a local image or video to GitHub and reference it so it renders inline in an issue, pull request, comment, or review. Use when attaching a screenshot, recording, or diagram to GitHub content.
+description: Attach a local image or video to GitHub content so it renders inline in an issue, pull request, comment, or review. Use when attaching a screenshot, recording, or diagram to GitHub content.
 allowed-tools:
   - Bash(gh api:*)
   - Bash(gh issue:*)
@@ -10,11 +10,30 @@ allowed-tools:
 
 # Attachments
 
-Images and video in issues and pull requests are served from a user-attachments store. `POST https://uploads.github.com/user-attachments/assets` puts a file there and answers with the URL to reference. It has no REST route and no documentation, so `gh api` reaches it by full URL.
+Images and video in issues and pull requests are served from a user-attachments store. `gh` 2.99.0 added a repeatable `--attach` flag that uploads to it from `gh issue create`, `gh issue edit`, `gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`. Everything else uploads through the endpoint the flag wraps: review comments and pending reviews, discussions, releases, gists, and any `gh` older than 2.99.0. Both paths exist on GitHub.com and Enterprise Cloud only. Enterprise Server has no attachment store.
 
-## Upload
+`--attach` on this build: !`gh issue comment --help 2>/dev/null | grep -q -- '--attach' && echo present || echo absent`
 
-`repository_id` takes the numeric REST id. `gh repo view --json id` returns the GraphQL node id, which fails here.
+Absent means this `gh` predates 2.99.0. Upgrade it or use the endpoint.
+
+## The Flag
+
+Write the body with the local path in the markdown, then name each file on the command. `gh` uploads it and rewrites the reference in place. The image lands where the prose put it. The alt text written in the body wins.
+
+```bash
+gh pr create --title "..." --body-file tmp/pr-body.md --attach ./picker.png --attach ./walkthrough.mp4
+```
+
+- A path is absolute or relative to the directory `gh` runs in.
+- A file the body never references is appended to the end, in flag order, with the filename as alt text. Alt text follows the path after `#`: `--attach './picker.png#The wide layout'`.
+- `gh pr edit` and `gh issue edit` without a body flag keep the existing body and append.
+- Up to 50 files per command.
+- When some uploads fail, the issue, pull request, or comment still lands with the ones that succeeded. Its URL prints, and the exit status is non-zero. Read the output before retrying. A blind retry duplicates the assets that already uploaded.
+- The token needs write access to the repository.
+
+## The Endpoint
+
+`POST https://uploads.github.com/user-attachments/assets` has no REST route and no documentation. `gh api` reaches it by full URL instead. A data-residency Enterprise Cloud tenant has its own upload host in place of `uploads.github.com`. `repository_id` takes the numeric REST id. `gh repo view --json id` returns the GraphQL node id, which fails here.
 
 ```bash
 repo_id=$(gh api repos/{owner}/{repo} --jq .id)
@@ -24,13 +43,19 @@ gh api --method POST \
   --input ./picker.png --jq .url
 ```
 
-The response is `{"url": "https://github.com/user-attachments/assets/<uuid>"}`.
+The response is `{"url": "https://github.com/user-attachments/assets/<uuid>"}`. The token needs write access to that repository. Read-only access also answers 404. That makes a permission problem look like a missing repository.
 
-The token needs write access to that repository. Read-only access answers 404, which makes a permission problem look like a missing repository.
+An image is ordinary markdown, with `\`, `[`, and `]` escaped in the alt text.
+
+```markdown
+![Wide window](https://github.com/user-attachments/assets/<uuid>)
+```
+
+Video has no markdown syntax and no alt text. GitHub renders a player when a bare asset URL is the whole of a paragraph.
 
 ## File Types
 
-The extension in `name` must agree with `content_type`, and nothing outside this list uploads. Logs, archives, and PDFs have no path here.
+Both paths accept the same list, and nothing outside it uploads. Logs, archives, and PDFs are not supported. On the endpoint, the extension in `name` must agree with `content_type`.
 
 | Extension | `content_type` |
 | --- | --- |
@@ -43,30 +68,8 @@ The extension in `name` must agree with `content_type`, and nothing outside this
 | `.mov` | `video/quicktime` |
 | `.webm` | `video/webm` |
 
-Images cap at 10 MB. Video caps at 100 MB or lower, depending on the account plan.
+Images cap at 10 MB. Video caps at 100 MB on a paid plan and 10 MB on a free one.
 
-## Reference
+## Irreversibility
 
-An image is ordinary markdown, with `\`, `[`, and `]` escaped in the alt text.
-
-```markdown
-![Wide window](https://github.com/user-attachments/assets/<uuid>)
-```
-
-Video has no markdown syntax. GitHub renders a player when a bare asset URL is the whole of a paragraph.
-
-## Ordering
-
-An upload cannot be undone and an asset cannot be deleted. Upload once the body is final and nothing is left that could cancel. An asset nothing references is stranded and permanent, and it answers 404 until something references it, so opening the URL proves nothing about the upload.
-
-## The --attach Flag
-
-`--attach` on this build: !`gh issue comment --help 2>/dev/null | grep -q -- '--attach' && echo present || echo absent`
-
-Absent means the upload above is the only way. Present means `--attach` replaces it for `gh issue create`, `gh issue edit`, `gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`. It repeats, takes a path, and takes alt text after a `#`.
-
-```bash
-gh issue comment 87 --body-file report.md --attach './picker.png#The wide layout'
-```
-
-A body that already links the local path gets that reference rewritten. A body that does not gets the asset appended. Review comments, discussions, releases, and gists are out of the flag's reach and upload through the endpoint either way.
+An upload cannot be undone and an asset cannot be deleted. Upload only after the body is final. An unreferenced asset stays stranded permanently. It answers 404 until something references it, unlike the write-access 404 on upload above. A 404 right after uploading does not mean the upload failed.

@@ -24,7 +24,7 @@ Parse `$ARGUMENTS`:
 
 ## Workflow
 
-Read the type guide, gather context from code and related issues, and draft the refinement following the type's structure. Write it to `tmp/issue-<slug>.md` and output it for approval. After approval, hand the file to the platform skill (for Linear, `linear:linear`), which maps the frontmatter to tracker fields and saves the body. Defer all save mechanics to that skill.
+Read the type guide, gather context from code and related issues, and draft the refinement following the type's structure. Write it to `tmp/issue-<slug>.md` and output it for approval. After approval, hand the file to the platform skill (for Linear, `linear:linear`), which maps the frontmatter to tracker fields and saves the body. Defer all save mechanics to that skill. On GitHub, a screenshot the body references by local path goes on `gh issue create --attach`, per `github:attach`.
 
 ## Output Structure
 

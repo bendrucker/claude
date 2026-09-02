@@ -48,6 +48,16 @@ echo '{"position":{"base_sha":"abc","head_sha":"def","old_path":"file.ts","new_p
 glab api projects/:id/merge_requests/:iid/discussions -X POST -H "Content-Type: application/json" --input /tmp/payload.json
 ```
 
+## Uploads
+
+An image or video for an MR or issue body goes through project uploads, which take multipart form data. `--form` sends the file. `-F` reads the file and embeds its bytes in a JSON body field, which the endpoint rejects with HTTP 400.
+
+```bash
+glab api projects/:id/uploads --form "file=@./shot.png" | jq -r .markdown
+```
+
+The response carries `url` (a project-relative `/uploads/<hash>/shot.png`) and `markdown` (`![shot](/uploads/<hash>/shot.png)`). Paste the markdown into the description or note. The relative URL renders anywhere inside that project. `glab mr` and `glab issue` have no attach flag. The upload runs before the create or update.
+
 ## GraphQL
 
 ```bash

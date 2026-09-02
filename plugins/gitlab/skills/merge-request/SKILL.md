@@ -74,6 +74,8 @@ git push -u origin feature-branch && glab mr create --fill
 
 **Body from file:** The flag is `--description-file file.md`, not gh's `--body-file`. Prefer it over `--description "$(cat file.md)"`, which passes the body through the shell and keeps it out of some hooks.
 
+**Screenshots:** `glab mr` has no attach flag. Upload each file through project uploads per `gitlab:api` and paste the returned markdown into the description before creating.
+
 **Username resolution:** Flags like `--reviewer` and `--assignee` require exact usernames; invalid names are silently ignored. Look up users first:
 
 ```bash

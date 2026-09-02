@@ -60,7 +60,7 @@ A disproved theory, a rejected workaround, or a name the user settled by hand ge
 
 ### By Change Type
 
-- Visual or GUI work: screenshots or a recording. Rejected layouts. Bugs found only by rendering it live.
+- Visual or GUI work: screenshots or a recording, uploaded so they render (`--attach` per `github:attach`, project uploads per `gitlab:api`) rather than linked by a local path. Rejected layouts. Bugs found only by rendering it live.
 - Backend or API work: an example request and response. What breaks without the fix. Performance numbers.
 - Config, tooling, or prose: scope added or dropped, what you chose not to build, the evidence behind the design.
 

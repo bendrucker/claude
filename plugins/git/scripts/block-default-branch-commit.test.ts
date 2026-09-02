@@ -113,8 +113,14 @@ describe("commitDirectories", () => {
     ["(true && cd /wt && git commit); git commit", ["/wt", "/repo"]],
     ["cd /a && (cd /b && git commit); git commit", ["/b", "/a"]],
     ["cd /wt && (git commit) && git commit", ["/wt", "/wt"]],
+    ['cd "~/wt" && git commit', ["/repo/~/wt"]],
   ])("%p → %p", (command, expected) => {
-    expect(commitDirectories(command, "/repo")).toEqual(expected);
+    expect(commitDirectories(command, "/repo", () => true)).toEqual(expected);
+  });
+
+  test("a cd that fails keeps the directory reached so far", () => {
+    const exists = (path: string) => path === "/wt";
+    expect(commitDirectories("cd /wt && cd /gone; git commit", "/repo", exists)).toEqual(["/wt"]);
   });
 });
 
@@ -229,6 +235,16 @@ describe("processInput", () => {
       [
         "cd to a missing path falls back to the input directory",
         (repo, wt) => ({ command: `cd ${wt}/missing && git commit -m x`, cwd: repo }),
+        "deny",
+      ],
+      [
+        "failed cd after a cd into the main checkout",
+        (repo, wt) => ({ command: `cd ${repo} && cd ${repo}/gone; git commit -m x`, cwd: wt }),
+        "deny",
+      ],
+      [
+        "quoted tilde is a literal path",
+        (repo) => ({ command: 'cd "~/gone" && git commit -m x', cwd: repo }),
         "deny",
       ],
       [

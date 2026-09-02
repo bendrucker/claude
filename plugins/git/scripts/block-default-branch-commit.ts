@@ -112,41 +112,40 @@ function subshellClosed(masked: string, from: number): boolean {
   return false;
 }
 
-function directoryBefore(scope: string, cwd: string): string {
+function isDirectory(path: string): boolean {
+  try {
+    readdirSync(realpathSync(path));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function directoryBefore(scope: string, cwd: string, exists: (path: string) => boolean): string {
   const masked = maskQuoted(scope);
   let dir = cwd;
   for (const { at, match } of unquotedMatches(scope, CD_LEAD, CD_TARGET)) {
     if (subshellClosed(masked, at)) continue;
-    const target = unquote(match[1] ?? "");
+    const word = match[1] ?? "";
+    const target = unquote(word);
     if (target === "" || target === "-" || SHELL_EXPANSION_PATTERN.test(target)) return cwd;
-    if (target.startsWith("~")) {
-      // `~user` needs a passwd lookup the hook does not do.
+    let next = isAbsolute(target) ? target : join(dir, target);
+    // A quoted tilde is literal. `~user` needs a passwd lookup the hook does not do.
+    if (word.startsWith("~")) {
       if (target !== "~" && !target.startsWith("~/")) return cwd;
-      dir = join(homedir(), target.slice(1));
-      continue;
+      next = join(homedir(), target.slice(1));
     }
-    dir = isAbsolute(target) ? target : join(dir, target);
+    // A cd into a missing path or a file fails and leaves the shell where it was.
+    if (exists(next)) dir = next;
   }
   return dir;
 }
 
-// A cd into a missing path or a file fails and leaves the shell where it was,
-// so the branch check belongs in the fallback.
-function existingDirectory(target: string, fallback: string): string {
-  try {
-    const resolved = realpathSync(target);
-    readdirSync(resolved);
-    return resolved;
-  } catch {
-    return fallback;
-  }
-}
-
 /** Directory each commit in the command runs in after the `cd`s the hook can evaluate, or `cwd` where one cannot be. */
-export function commitDirectories(command: string, cwd: string): string[] {
+export function commitDirectories(command: string, cwd: string, exists = isDirectory): string[] {
   const text = stripHeredocs(command);
   return [...maskQuoted(text).matchAll(EVERY_GIT_COMMIT)].map((commit) =>
-    directoryBefore(text.slice(0, commit.index), cwd),
+    directoryBefore(text.slice(0, commit.index), cwd, exists),
   );
 }
 
@@ -185,9 +184,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<SyncHook
   // the Bash command runs: a subagent working in a worktree reports that
   // worktree as `input.cwd`, and a leading `cd` moves the command again before
   // git runs. Resolving the branch anywhere else reads the wrong repo.
-  const dirs = commitDirectories(command, input.cwd).map((dir) =>
-    existingDirectory(dir, input.cwd),
-  );
+  const dirs = commitDirectories(command, input.cwd);
   const branches = await Promise.all([...new Set(dirs)].map(defaultBranchCheckedOut));
   const branch = branches.find((name) => name !== null);
   return branch == null ? null : formatDenyOutput(branch);

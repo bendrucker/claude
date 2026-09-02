@@ -204,10 +204,6 @@ const ATTRIBUTES: Record<keyof WriteArgs, Attribute> & Record<string, Attribute 
   canceled: { param: "canceled" },
 };
 
-/**
- * Maps a write tool's arguments to URL-scheme params, skipping the ones it left
- * unset and the ones that are not attributes.
- */
 export function writeParams(args: WriteArgs): Map<string, string> {
   const params = new Map<string, string>();
   for (const [name, value] of Object.entries<WriteArgs[keyof WriteArgs]>(args)) {

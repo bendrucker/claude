@@ -69,8 +69,7 @@ describe("writeParams", () => {
     expect(writeParams({ title: undefined })).toEqual(new Map());
   });
 
-  // A tool hands its whole argument object over, including the fields that
-  // steer the handler rather than the URL.
+  // A tool hands its whole argument object over, including fields that steer the handler.
   test("ignores arguments that are not attributes", () => {
     const args = { title: "Buy milk", create_tags: true, session_id: "abc" };
     expect(writeParams({ ...args })).toEqual(new Map([["title", "Buy milk"]]));

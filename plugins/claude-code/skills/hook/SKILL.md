@@ -85,11 +85,28 @@ Commands receive JSON on stdin:
 }
 ```
 
-Parse in TypeScript:
+Stdin is external data, so decode it with a zod schema covering the fields the hook reads. A plugin hook keeps that schema local, since it cannot import a workspace package:
+
 ```typescript
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-const input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
+import { z } from "zod";
+
+const HookInput = z.looseObject({
+  cwd: z.string().catch(""),
+  tool_input: z.looseObject({ file_path: z.string().optional().catch(undefined) }).catch({}),
+});
+
+let input: z.infer<typeof HookInput>;
+try {
+  input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
+} catch (error) {
+  console.error(`[my-hook] undecodable stdin: ${error}`);
+  process.exit(0);
+}
 ```
+
+`looseObject` keeps fields the harness adds later. A per-field `.catch` means one unexpected value costs that field rather than the whole payload.
+
+On an undecodable payload, log the failure to stderr and exit 0 so the tool call proceeds. A gate can exit 1 instead. The call still goes through, and the harness surfaces the stderr line, so a gate that has stopped deciding does not read as a call that passed every rule ([plugins/plan/hooks/gate.ts](../../../plan/hooks/gate.ts)).
 
 ## Hook Output
 
@@ -101,6 +118,8 @@ const input = JSON.parse(await Bun.stdin.text()) as PreToolUseHookInput;
 ```json
 {"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {"state": "Todo"}}}
 ```
+
+On `ExitPlanMode`, `ask` is inert: the tool runs its own plan-approval prompt, and the harness drops both `permissionDecisionReason` and `systemMessage`. Use `deny` there to carry a reason back.
 
 **PostToolUse** - Provide feedback:
 ```json

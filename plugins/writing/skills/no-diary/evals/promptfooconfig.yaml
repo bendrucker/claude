@@ -1,0 +1,281 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: writing:no-diary skill quality suite
+
+providers:
+  - id: anthropic:claude-agent-sdk
+    config:
+      model: claude-sonnet-5
+      apiKeyRequired: false
+      permission_mode: bypassPermissions
+      allow_dangerously_skip_permissions: true
+      setting_sources: []
+      max_budget_usd: 0.75
+      max_turns: 15
+      # The provider only hands the session read-only file tools when working_dir is
+      # set, and the skill reads its own references/surfaces.md to pick up the rules
+      # for the surface under edit.
+      working_dir: ./workdir
+      # Every case pastes its artifact as text, so the rewrite belongs in the reply.
+      # Denying the write paths pins the skill's rule that pasted text leaves nothing
+      # on disk, and stops a run from mutating a real PR.
+      disallowed_tools:
+        - Write
+        - Edit
+        - "Bash(gh pr edit:*)"
+        - "Bash(gh pr create:*)"
+        - "Bash(glab mr update:*)"
+      plugins:
+        - type: local
+          path: ../../..
+      skills:
+        - writing:no-diary
+
+defaultTest:
+  options:
+    provider:
+      id: anthropic:messages:claude-sonnet-5
+      config:
+        apiKeyRequired: false
+        apiKey: "{{ env.ANTHROPIC_GRADER_API_KEY | default('') }}"
+
+prompts:
+  - "{{prompt}}"
+
+tests:
+  - description: PR body carrying an abandoned theory and a test tally
+    vars:
+      prompt: |
+        Fix this PR body.
+
+        ---
+        This PR fixes the retry bug. Initially we thought the exit code was being swallowed by the wrapper, so the first approach added a status check in `run()`. That turned out to be wrong. After adding logging we found the real cause: `spawn` was being awaited before the stream drained, so the exit event fired against a closed handle. We then reverted the status check and moved the await below the drain. Along the way we also discovered the timeout path had the same shape, so that got fixed too. All tests pass (47 passing).
+        ---
+    assert:
+      - type: llm-rubric
+        value: Opens on the actual cause (awaiting spawn before the stream drained) or on what the change does, never on the first theory
+      - type: llm-rubric
+        value: The abandoned exit-code theory and its reverted status check do not appear as narrative
+      - type: llm-rubric
+        value: The timeout path fix is stated as part of the change, without discovery framing
+      - type: llm-rubric
+        value: "No sequencing narration: no 'initially', 'then', 'turned out', or 'along the way'"
+      - type: llm-rubric
+        value: No test count and no claim that all tests pass
+      - type: llm-rubric
+        value: "The output matches this intent: a body opening on the real cause and the fix, with the disproven theory and the test tally gone."
+
+  - description: code comment holding prior implementation, a reviewer, tickets, and a customer
+    vars:
+      prompt: |
+        no-diary this comment.
+
+        ```ts
+        // This used to be a giant switch statement that duplicated the parser logic in
+        // three places, which was a nightmare to keep in sync. Ben asked me to pull it
+        // out during review of #412, so now it delegates to parseToken. See ENG-1183
+        // and the Acme Corp incident for background.
+        function read(input: string) {
+        ```
+    assert:
+      - type: llm-rubric
+        value: No description of the previous switch-statement implementation or how bad it was
+      - type: llm-rubric
+        value: No reference to the reviewer, the review, or the session
+      - type: llm-rubric
+        value: "No issue or ticket identifiers (#412, ENG-1183)"
+      - type: llm-rubric
+        value: No customer name
+      - type: llm-rubric
+        value: Either deletes the comment entirely or leaves only something the code itself cannot say
+      - type: llm-rubric
+        value: Does not replace the narrative with an equally long restatement of what parseToken does
+      - type: llm-rubric
+        value: "The output matches this intent: no comment at all, or a short one stating a durable constraint."
+
+  - description: literal instruction echoed as a heading, plus a file inventory
+    vars:
+      prompt: |
+        trim this pr body, too much diary
+
+        ---
+        ## Things That Wouldn't Be Obvious To A Reviewer
+
+        This section covers the non-obvious parts of the change. First, I noticed while working on this that the cast on line 40 was unrequested, but I added it anyway. Second, it's worth noting that the schema asymmetry here is deliberate.
+
+        ## Changes
+
+        - `src/query/build.ts`: added cast
+        - `src/query/build.test.ts`: added test
+        - `src/types.ts`: widened type
+        ---
+    assert:
+      - type: llm-rubric
+        value: "The heading echoing the instruction ('Things That Wouldn't Be Obvious To A Reviewer') is gone"
+      - type: llm-rubric
+        value: "No self-narration: no 'I noticed', 'unrequested', 'worth noting', or 'deliberate' as self-description"
+      - type: llm-rubric
+        value: States what the cast prevents rather than that it was added
+      - type: llm-rubric
+        value: The file-by-file changes list is replaced by naming the behavior or function
+      - type: llm-rubric
+        value: No section that introduces what the following section will say
+      - type: llm-rubric
+        value: "The output matches this intent: prose stating what the cast prevents and why the asymmetry is intentional, with the meta heading and file inventory gone."
+
+  - description: spec carrying research provenance and a defensive disclaimer
+    vars:
+      prompt: |
+        /writing:no-diary the access spec below
+
+        ---
+        # Access Engine
+
+        A Postgres-native access engine, decided in the 2026-08-24 authorization evaluation after we benchmarked spikes at 1000x production scale and read through the OpenFGA and SpiceDB docs. External engines were rejected: dual-write atomicity, tuple sync on high-cardinality tables, and list filtering are all free in SQL and pathological in a sidecar. Note that this is not an attempt to reinvent authorization from scratch.
+
+        Grants live in the app database and share transactions with the rows they protect.
+        ---
+    assert:
+      - type: llm-rubric
+        value: The dated evaluation, the benchmark story, and the documents consulted are gone
+      - type: llm-rubric
+        value: The defensive sentence disclaiming reinvention is gone
+      - type: llm-rubric
+        value: The transactional property of grants survives
+      - type: llm-rubric
+        value: The rejected-alternatives reasoning is either cut or reduced to a compact statement of the constraint, rather than left as a narrative of the decision
+      - type: llm-rubric
+        value: Does not read as a shortened version of the same story
+      - type: llm-rubric
+        value: "The output matches this intent: a spec describing the engine and its transactional property, with evaluation history and disclaimer removed."
+
+  - description: skill prose framing its own section and arguing its rule
+    vars:
+      prompt: |
+        cut the diary out of this skill file
+
+        ---
+        ## Retry Policy
+
+        This section explains how retries work. We originally used exponential backoff with jitter, but that was chosen over a fixed interval because fixed intervals synchronize across workers, which is a well-known problem in distributed systems. The reason this rule is correct is that thundering herds are expensive.
+
+        Retry three times with exponential backoff. Give up after the third failure and report the error.
+        ---
+    assert:
+      - type: llm-rubric
+        value: The framing sentence announcing what the section explains is gone
+      - type: llm-rubric
+        value: The rejected fixed-interval alternative is gone
+      - type: llm-rubric
+        value: The sentence arguing the rule is correct is gone
+      - type: llm-rubric
+        value: The imperative instruction to retry three times with exponential backoff and then report survives
+      - type: llm-rubric
+        value: The result is shorter than the input, rather than a reworded version of the same length
+      - type: llm-rubric
+        value: "The output matches this intent: the two instruction sentences alone."
+
+  - description: plan carrying a revision log and reviewer dialogue
+    vars:
+      prompt: |
+        no-diary the plan
+
+        ---
+        # Migration Plan
+
+        ## Changed Since Last Plan
+
+        You asked me to drop the shadow-write phase, so that section is removed. I also corrected the row-count estimate after you pointed out the stale figure.
+
+        ## Approach
+
+        Backfill the new column, switch reads, drop the old column.
+        ---
+    assert:
+      - type: llm-rubric
+        value: "The 'Changed Since Last Plan' section is removed entirely"
+      - type: llm-rubric
+        value: No second-person address to the reviewer and no reference to their feedback
+      - type: llm-rubric
+        value: The approach survives intact
+      - type: llm-rubric
+        value: Ruled-out approaches, if kept at all, appear as an alternatives section rather than as revision history
+      - type: llm-rubric
+        value: The plan reads as usable without the chat that produced it
+      - type: llm-rubric
+        value: "The output matches this intent: a standalone execution document holding the approach."
+
+  - description: review comment counting issues and reciting paths
+    vars:
+      prompt: |
+        rewrite my review comment, sounds robotic
+
+        ---
+        I reviewed this and found four minor issues. In src/handlers/auth.ts:142 the null check is redundant. In src/handlers/auth.ts:187 the error is swallowed. Regarding your first comment about the token refresh, I have addressed it. Regarding your second comment about the retry, I have also addressed it.
+        ---
+    assert:
+      - type: llm-rubric
+        value: "No count of issues ('four minor issues')"
+      - type: llm-rubric
+        value: "No recited file:line paths in the prose"
+      - type: llm-rubric
+        value: "Does not mirror the reviewer's comments back as a numbered or 'regarding your Nth comment' sequence"
+      - type: llm-rubric
+        value: Reads as someone who understood and investigated the concerns rather than someone answering a checklist
+      - type: llm-rubric
+        value: The substantive findings (redundant null check, swallowed error) survive
+      - type: llm-rubric
+        value: Preserves the user's own voice rather than rewriting it into a different register
+      - type: llm-rubric
+        value: "The output matches this intent: plain technical prose saying what was investigated and what came of it."
+
+  - description: over-deletion guard, where evidence must outlive its narration
+    vars:
+      prompt: |
+        /writing:no-diary the body below
+
+        ---
+        This change reworks the loader. During the work I found that the LEFT JOIN assumed `external_id` was unique, which the old comment could only assert. I ran it against a real org: 1,852 rows in and 1,852 rows out, zero fan-out, so the assumption holds. I also learned that DuckDB's httpfs cache is off by default, which surprised me.
+
+        The loader now streams instead of buffering.
+        ---
+    assert:
+      - type: llm-rubric
+        value: The 1,852-in/1,852-out verification survives, because it is evidence rather than a routine test report
+      - type: llm-rubric
+        value: The uniqueness assumption is stated as a fact about the join, rather than as something found during the work
+      - type: llm-rubric
+        value: "No discovery framing: no 'during the work I found', 'I also learned', or 'which surprised me'"
+      - type: llm-rubric
+        value: The streaming change is stated
+      - type: llm-rubric
+        value: The httpfs observation is cut, or kept as a short aside that is explicitly labeled rather than folded into the change description
+      - type: llm-rubric
+        value: The pass does not delete the verification along with the narration
+      - type: llm-rubric
+        value: "The output matches this intent: the streaming change and the row-count evidence kept, the discovery framing gone."
+
+  - description: issue carrying an investigation monologue and a session reference
+    vars:
+      prompt: |
+        no-diary this issue
+
+        ---
+        ## Loader drops rows
+
+        While pairing with Claude on the DuckDB migration I noticed something odd. At first I thought the loader was fine, but then I checked the row counts and they didn't line up. I went back and forth on whether this was a join problem or a streaming problem. After digging through the transcript I realized the LEFT JOIN fans out whenever `external_id` repeats.
+
+        Anyway, the loader should probably dedupe on `external_id` before the join.
+        ---
+    assert:
+      - type: llm-rubric
+        value: "States the defect as a fact about the loader: the LEFT JOIN fans out when external_id repeats"
+      - type: llm-rubric
+        value: "No first-person investigation narrative: no 'I noticed', 'at first I thought', 'I went back and forth', or 'after digging'"
+      - type: llm-rubric
+        value: No reference to the session, the transcript, or pairing
+      - type: llm-rubric
+        value: "The resolution (dedupe on external_id before the join) survives without hedging such as 'should probably'"
+      - type: llm-rubric
+        value: Materially shorter than the input rather than a reworded version of the same length
+      - type: llm-rubric
+        value: "The output matches this intent: the fan-out stated as a defect plus what would fix it."

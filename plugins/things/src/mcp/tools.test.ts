@@ -415,6 +415,16 @@ describe("write tools", () => {
     await mcp.close();
   });
 
+  test("routes reorder_todos through the client", async () => {
+    const { calls, client } = fakeClient();
+    const mcp = await connect(client);
+
+    await mcp.callTool({ name: "reorder_todos", arguments: { ids: ["T1", "T2"], list: "today" } });
+
+    expect(calls.dispatch.map((call) => call.command)).toEqual(["json", "json"]);
+    await mcp.close();
+  });
+
   test("rejects an update naming no attribute", async () => {
     const { calls, client } = fakeClient();
     const mcp = await connect(client);

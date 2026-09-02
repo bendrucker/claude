@@ -726,7 +726,9 @@ export function registerTools(server: McpServer, client: ThingsClient = defaultC
     },
     async ({ ids, list }) => {
       await client.ensureRunning();
-      return jsonResult(await reorder(list, ids));
+      return jsonResult(
+        await reorder(list, ids, (command, params) => client.dispatch(command, params)),
+      );
     },
   );
 }

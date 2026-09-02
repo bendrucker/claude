@@ -3,7 +3,7 @@
 
 import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
-import { dispatch, warnFallback } from "./url";
+import { type DispatchResult, dispatch, warnFallback } from "./url";
 
 const INTERMEDIATE_LIST: Record<string, string | undefined> = {
   today: "anytime",
@@ -11,7 +11,10 @@ const INTERMEDIATE_LIST: Record<string, string | undefined> = {
   someday: "anytime",
 };
 
-async function updateWhen(ids: string[], when: string): Promise<void> {
+/** How {@link reorder} reaches Things, injectable so a test can drive it without one. */
+export type Dispatcher = (command: string, params: Map<string, string>) => Promise<DispatchResult>;
+
+async function updateWhen(send: Dispatcher, ids: string[], when: string): Promise<void> {
   const params = new Map<string, string>();
   params.set(
     "data",
@@ -26,7 +29,7 @@ async function updateWhen(ids: string[], when: string): Promise<void> {
   );
   // Reordering moves the todos out of the list and back, so the second update
   // must land after the first. A fire-and-forget open guarantees no such order.
-  warnFallback(await dispatch("json", params));
+  warnFallback(await send("json", params));
 }
 
 export interface ReorderResult {
@@ -50,7 +53,11 @@ export const REORDER_MECHANISM =
  * present. The MCP server calls this on a live stdio connection, where an exit
  * ends the session and a print to stdout corrupts the JSON-RPC framing.
  */
-export async function reorder(targetList: string, ids: string[]): Promise<ReorderResult> {
+export async function reorder(
+  targetList: string,
+  ids: string[],
+  send: Dispatcher = dispatch,
+): Promise<ReorderResult> {
   if (ids.length === 0) {
     throw new Error("No IDs provided");
   }
@@ -60,8 +67,8 @@ export async function reorder(targetList: string, ids: string[]): Promise<Reorde
     throw new Error(`Invalid list: ${targetList}`);
   }
 
-  await updateWhen(ids, intermediate);
-  await updateWhen(ids, targetList);
+  await updateWhen(send, ids, intermediate);
+  await updateWhen(send, ids, targetList);
 
   return { success: true, list: targetList, reordered: ids.length };
 }

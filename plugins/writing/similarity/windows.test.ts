@@ -59,21 +59,6 @@ test("a flagged window names the features that put it there", () => {
   expect(messages).toContain("sentences run long");
 });
 
-describe("antithesis probes", () => {
-  test.each([
-    [
-      "It's not just a rename, but a rewrite of the dispatch layer.",
-      "'not just X but Y' antithesis",
-    ],
-    ["The fix belongs in the parser, not the formatter.", "'X, not Y' antithesis"],
-    ["It isn't a caching problem, it's a lifetime problem.", "'it isn't X, it's Y' antithesis"],
-  ])("%p", (passage, expected) => {
-    const windows = localize(segment(`${passage} One. Two here. Three of them.`), profile);
-    const messages = windows.flatMap((window) => window.issues.map((issue) => issue.message));
-    expect(messages).toContain(expected);
-  });
-});
-
 test("localize reports window position against the input's sentences", () => {
   const windows = localize(
     segment("One. Two here. Three of them. Four is next. Five ends it."),

@@ -6,7 +6,7 @@
 // `leading` marks the features that separated the poles with |Cohen's d| >= 0.8.
 
 import { mean, median, quantileOfSorted, standardDeviation } from "./vector";
-import { type Segmented, sentenceWordCount } from "./segment";
+import type { Segmented } from "./segment";
 
 export interface FeatureDiagnostic {
   high: string;
@@ -21,11 +21,6 @@ export interface RhythmFeature {
   compute: (doc: Segmented) => number;
 }
 
-// Unambiguous contraction suffixes plus the pronoun and adverb hosts where a
-// trailing 's is a contraction rather than a possessive.
-const CONTRACTION =
-  /\b(?:[a-z]+n['’]t|[a-z]+['’](?:re|ve|ll|d|m)|(?:it|that|there|here|what|who|he|she|let|how|where|why|this)['’]s)\b/g;
-
 function rate(count: number, total: number, per: number): number {
   if (total === 0) return 0;
   return (count / total) * per;
@@ -36,11 +31,15 @@ function occurrences(text: string, pattern: RegExp): number {
 }
 
 function sentenceLengths(doc: Segmented): number[] {
-  return doc.sentences.map(sentenceWordCount).filter((length) => length > 0);
+  return doc.sentences.map((sentence) => sentence.words).filter((length) => length > 0);
 }
 
 function commaCounts(doc: Segmented): number[] {
-  return doc.sentences.map((sentence) => occurrences(sentence, /,/g));
+  return doc.sentences.map((sentence) => occurrences(sentence.text, /,/g));
+}
+
+function contractions(doc: Segmented): number {
+  return doc.sentences.reduce((sum, sentence) => sum + sentence.contractions, 0);
 }
 
 function fraction(values: number[], predicate: (value: number) => boolean): number {
@@ -73,7 +72,7 @@ function typeTokenRatio(words: string[]): number {
 function midSentenceCapitals(doc: Segmented): number {
   let capitals = 0;
   for (const sentence of doc.sentences) {
-    const words = sentence.split(/\s+/).slice(1);
+    const words = sentence.text.split(/\s+/).slice(1);
     capitals += words.filter((word) => /^[A-Z][a-z]/.test(word)).length;
   }
   return capitals;
@@ -177,8 +176,7 @@ export const RHYTHM_FEATURES: RhythmFeature[] = [
       high: "unusually contraction-heavy",
       low: "low contraction density",
     },
-    compute: (doc) =>
-      rate(occurrences(doc.prose.toLowerCase(), CONTRACTION), doc.words.length, 100),
+    compute: (doc) => rate(contractions(doc), doc.words.length, 100),
   },
   {
     id: "theDensity",

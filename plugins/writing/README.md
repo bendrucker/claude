@@ -27,26 +27,6 @@ Used for openers and let-me-verbs where the match depends on position (line star
 
 The loader lives in [`detection/wordlists.ts`](detection/wordlists.ts). Compiled patterns are exposed via the `WORDLISTS` constant and consumed by `tropes.ts`.
 
-## Similarity Scorer
-
-The wordlists and tropes catch known patterns. [`similarity/`](similarity/) instead measures how close a draft sits to the author's own writing, scoring it against a voice centroid and a contrast centroid of Claude-authored prose. It scores four-sentence sliding windows too, ranking the passages that pulled the document score down. [`similarity/score.ts`](similarity/score.ts) documents the two-pole margin and [`similarity/build.ts`](similarity/build.ts) the profile it reads.
-
-Both corpora are local-only and never committed. They live in the plugin data dir (`CLAUDE_PLUGIN_DATA`, else `~/.claude/plugins/data/writing-bendrucker`), outside the default sandbox allowlist. All three commands need `dangerouslyDisableSandbox: true`.
-
-```sh
-# Build the contrast pole from Claude-authored prose in the session index
-bun plugins/writing/scripts/similarity.ts mine-contrast --session-db "$DB_PATH" --since 2026-05-01
-
-# Cache centroids, the standardizer, the gram vocabulary, and the calibration ladders
-bun plugins/writing/scripts/similarity.ts build
-
-# Score a file, an inline string, or stdin
-bun plugins/writing/scripts/similarity.ts score draft.md
-bun plugins/writing/scripts/similarity.ts score --json --below-percentile 5 draft.md
-```
-
-Rebuild after ingesting new registers or changing the rhythm feature table. Scoring reads only the cached profile and rejects one built from a different feature list.
-
 ## Hook Dispatcher
 
 A single PreToolUse entry script, [`hooks/pretooluse.ts`](hooks/pretooluse.ts), reads stdin once and runs the numbering, headings, and tropes checkers in-process. It emits at most one output per tool call with fixed priority (deny > ask > context, earliest checker wins within a tier). Shared skips apply once up front: plan mode, plan and memory paths, and scratch paths (`tmp/` directories, `$TMPDIR`, background job dirs), where prose is internal handoff text that gets scanned later at the Bash egress surface (`--body-file`, `--body`, `gh api -F body=@file`) instead of at write time.

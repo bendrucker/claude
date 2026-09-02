@@ -59,6 +59,20 @@ test("an empty pole is a build error", () => {
   ).toThrow(/voice/);
 });
 
+test.each([
+  ["vocabularySize", 0],
+  ["minWords", -5],
+  ["windowSentences", 2.5],
+  ["maxWindowsPerDocument", 0],
+])("%s of %p is rejected before the profile is built", (name, value) => {
+  expect(() =>
+    buildStyleProfile(voiceCorpus(5), contrastCorpus(5), {
+      generatedAt: "2026-01-01",
+      [name]: value,
+    }),
+  ).toThrow(new RegExp(`${name} must be a positive integer`));
+});
+
 test("the build is deterministic over the same corpora", () => {
   const options = { generatedAt: "2026-01-01", vocabularySize: 120, minWords: 40 };
   const first = buildStyleProfile(voiceCorpus(), contrastCorpus(), options).profile;

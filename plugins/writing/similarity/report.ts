@@ -98,7 +98,7 @@ export function renderReport(
   const header = [
     report.input ?? "(stdin)",
     `${score.words} words, ${score.sentences} sentences`,
-    `p${score.percentile.fused.toFixed(1)} of the voice baseline — ${verdict(score.percentile.fused)}`,
+    `p${score.percentile.fused.toFixed(1)}: ${verdict(score.percentile.fused)}`,
   ].join("  |  ");
 
   const short =

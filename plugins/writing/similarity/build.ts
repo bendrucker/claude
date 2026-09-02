@@ -46,6 +46,15 @@ export interface BuildResult {
 const DEFAULT_MIN_WORDS = 60;
 const DEFAULT_MAX_WINDOWS_PER_DOCUMENT = 12;
 
+// Zero or a negative would build a profile that validates but scores on an
+// empty vocabulary or an unfloored corpus.
+function positiveInteger(name: string, value: number): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${name} must be a positive integer, got ${value}`);
+  }
+  return value;
+}
+
 interface PreparedDocument {
   source: string;
   segmented: Segmented;
@@ -104,12 +113,19 @@ export function buildStyleProfile(
   contrast: CorpusDocument[],
   options: BuildOptions,
 ): BuildResult {
-  const minWords = options.minWords ?? DEFAULT_MIN_WORDS;
-  const windowSentences = options.windowSentences ?? DEFAULT_WINDOW_SENTENCES;
-  const maxWindows = options.maxWindowsPerDocument ?? DEFAULT_MAX_WINDOWS_PER_DOCUMENT;
-  if (!Number.isInteger(windowSentences) || windowSentences < 1) {
-    throw new Error(`windowSentences must be a positive integer, got ${windowSentences}`);
-  }
+  const minWords = positiveInteger("minWords", options.minWords ?? DEFAULT_MIN_WORDS);
+  const windowSentences = positiveInteger(
+    "windowSentences",
+    options.windowSentences ?? DEFAULT_WINDOW_SENTENCES,
+  );
+  const maxWindows = positiveInteger(
+    "maxWindowsPerDocument",
+    options.maxWindowsPerDocument ?? DEFAULT_MAX_WINDOWS_PER_DOCUMENT,
+  );
+  const vocabularySize = positiveInteger(
+    "vocabularySize",
+    options.vocabularySize ?? DEFAULT_VOCABULARY_SIZE,
+  );
 
   const voiceDocuments = prepare(voice, minWords, windowSentences);
   const contrastDocuments = prepare(contrast, minWords, windowSentences);
@@ -121,7 +137,7 @@ export function buildStyleProfile(
   const scaler = fitScaler([...voiceDocuments, ...contrastDocuments].map((d) => d.rhythm));
   const vocabulary = selectVocabulary(
     mergeGrams([...voiceDocuments, ...contrastDocuments]),
-    options.vocabularySize ?? DEFAULT_VOCABULARY_SIZE,
+    vocabularySize,
   );
 
   const poles: Poles = {

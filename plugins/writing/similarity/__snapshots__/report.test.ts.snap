@@ -1,7 +1,7 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`voice-like draft report 1`] = `
-"draft.md  |  81 words, 13 sentences  |  p26.1 of the voice baseline — toward the low end of the voice baseline
+"draft.md  |  81 words, 13 sentences  |  p26.1: toward the low end of the voice baseline
 
 Under 144 words: the score is noisy at this length.
 
@@ -42,7 +42,7 @@ Leading features
 `;
 
 exports[`contrast-like draft report 1`] = `
-"draft.md  |  176 words, 8 sentences  |  p0.0 of the voice baseline — outside the voice baseline
+"draft.md  |  176 words, 8 sentences  |  p0.0: outside the voice baseline
 
 ╔═════════════╤════════╤════════════╗
 ║ Family      │ Margin │ Percentile ║
@@ -93,7 +93,7 @@ Leading features
 `;
 
 exports[`mixed draft report at a narrow excerpt width 1`] = `
-"draft.md  |  257 words, 21 sentences  |  p0.0 of the voice baseline — outside the voice baseline
+"draft.md  |  257 words, 21 sentences  |  p0.0: outside the voice baseline
 
 ╔═════════════╤════════╤════════════╗
 ║ Family      │ Margin │ Percentile ║

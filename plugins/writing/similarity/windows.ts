@@ -50,9 +50,9 @@ export function stride<T>(items: T[], limit: number): T[] {
 
 // A document with fewer sentences than the window yields none, so every sample
 // in the calibration ladder covers the same span.
-export function slidingWindows(sentences: string[], size: number): string[][] {
+export function slidingWindows<T>(sentences: T[], size: number): T[][] {
   if (size < 1 || sentences.length < size) return [];
-  const windows: string[][] = [];
+  const windows: T[][] = [];
   for (let start = 0; start + size <= sentences.length; start++) {
     windows.push(sentences.slice(start, start + size));
   }
@@ -75,38 +75,17 @@ export function scoreWindows(
     const window = fromSentences(sentences);
     return {
       startSentence,
-      sentences,
+      sentences: sentences.map((sentence) => sentence.text),
       words: window.words.length,
       raw: scoreSegmented(window, poles),
     };
   });
 }
 
-// Matched on the passage: a four-sentence window is too short for a rate to
-// mean anything.
-const ANTITHESIS: [RegExp, string][] = [
-  [
-    /\bnot\s+(?:just|only|merely|simply)\s+[^,.;:]{1,60},?\s+but\b/i,
-    "'not just X but Y' antithesis",
-  ],
-  [/,\s*not\s+[^,.;:]{1,50}[.;]/i, "'X, not Y' antithesis"],
-  [
-    /\b(?:isn['’]t|aren['’]t|wasn['’]t|weren['’]t|doesn['’]t|don['’]t)\s+[^,.;:]{1,50},\s*(?:it['’]s|they['’]re|but|rather)\b/i,
-    "'it isn't X, it's Y' antithesis",
-  ],
-];
-
-function antithesisIssues(passage: string): WindowIssue[] {
-  const issues: WindowIssue[] = [];
-  for (const [pattern, message] of ANTITHESIS) {
-    if (pattern.test(passage)) issues.push({ id: "antithesis", message });
-  }
-  return issues;
-}
-
 const DIAGNOSTICS = new Map(RHYTHM_FEATURES.map((feature) => [feature.id, feature.diagnostic]));
 
-function featureIssues(raw: RawScore, poles: Poles): WindowIssue[] {
+// Sorted so the feature furthest toward the contrast pole is named first.
+export function windowIssues(raw: RawScore, poles: Poles): WindowIssue[] {
   return featureDeltas(raw, poles)
     .filter((delta) => Math.abs(delta.deviation) >= DIAGNOSTIC_DEVIATION)
     .filter((delta) => Math.sign(delta.deviation) === delta.contrastDirection)
@@ -116,24 +95,15 @@ function featureIssues(raw: RawScore, poles: Poles): WindowIssue[] {
       if (diagnostic === undefined) return [];
       const message = delta.deviation > 0 ? diagnostic.high : diagnostic.low;
       return message === "" ? [] : [{ id: delta.id, message }];
-    });
-}
-
-// Antithesis first: a match names something concrete in the passage, where a
-// feature deviation only says the window sits outside a range.
-export function windowIssues(window: WindowScore, poles: Poles): WindowIssue[] {
-  const passage = window.sentences.join(" ");
-  return [...antithesisIssues(passage), ...featureIssues(window.raw, poles)].slice(
-    0,
-    MAX_ISSUES_PER_WINDOW,
-  );
+    })
+    .slice(0, MAX_ISSUES_PER_WINDOW);
 }
 
 export function localize(doc: Segmented, profile: StyleProfile): LocalizedWindow[] {
   return scoreWindows(doc, profile, profile.windowSentences).map((window) =>
     Object.assign(window, {
       percentile: percentileOf(profile.windowCalibration.fused, window.raw.fused),
-      issues: windowIssues(window, profile),
+      issues: windowIssues(window.raw, profile),
       excerpt: window.sentences.join(" "),
     }),
   );

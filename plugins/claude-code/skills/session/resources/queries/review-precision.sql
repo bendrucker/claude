@@ -1,47 +1,54 @@
--- Per-angle precision for the code-review pipeline: which finder angles produce findings
--- that survive verification and get applied, and which burn a finder spawn, a verifier
--- spawn, and a slot under the output cap to produce something nobody acts on.
+-- ---
+-- name: review-precision
+-- tier: 1
+-- summary: >-
+--   Per-angle precision for the code-review pipeline, one row per angle plus one per
+--   (angle, effort level), with the `level = 'all'` rollup first.
+-- description: >-
+--   Which finder angles produce findings that survive verification and get applied, and
+--   which burn a finder spawn, a verifier spawn, and a slot under the output cap to produce
+--   something nobody acts on.
 --
--- One row per angle, plus one per (angle, effort level). The `level = 'all'` row is the
--- rollup and sorts first. An angle is identified by the `category` slug on the finding,
--- which `review:code` defines as "a short kebab-case slug for the angle that produced it".
--- That is a self-report by the orchestrator, not a spawn-side join: the `review:angle`
--- Agent calls carry free-form descriptions ("Cleanup: reuse+simplify+efficiency") that do
--- not map onto slugs, and one spawn can feed several categories. The canonical slugs
--- (correctness, simplification, efficiency, reuse, altitude, conventions) are the angle
--- names verbatim and are trustworthy; the skill also permits "something more specific when
--- it fits better", so slugs like `test-coverage` or `documentation` are the model inventing
--- a finer label and land in their own rows rather than under the angle that produced them.
+--   An angle is identified by the finding's `category` slug, which `review:code` defines as
+--   a short kebab-case slug for the angle that produced it. That is the orchestrator's
+--   self-report rather than a spawn-side join: the `review:angle` spawns carry free-form
+--   descriptions that do not map onto slugs, and one spawn can feed several categories. The
+--   canonical slugs (correctness, simplification, efficiency, reuse, altitude, conventions)
+--   are the angle names verbatim and are trustworthy, while ad-hoc ones like
+--   `test-coverage` or `documentation` are a finer label the model invented and land in
+--   their own rows rather than under the angle that produced them.
 --
--- REFUTED is near-zero here by construction, not because verifiers never refute. The
--- pipeline drops REFUTED candidates before calling ReportFindings, so a refuted candidate
--- leaves no structured trace; the verdict exists only as free-form prose in the verifier
--- subagent's transcript, which has no parseable form. The precision signals that do survive:
+--   `confirmed_pct` is the share of verdicted findings the verifier could pin to a trigger,
+--   so a low share with a high `plausible` count is an angle generating mechanisms nobody
+--   can construct a failure for. `no_change` is the author finding it wrong or already
+--   handled while applying, a post-hoc refutation and the strongest false-positive evidence
+--   available here. `skipped` is real but not applied, the earn-its-spawn number for a
+--   cleanup angle. `acted_pct` is fixed as a share of everything resolved, NULL when no
+--   `--fix` pass ran rather than a fabricated zero. `refuted` is near-zero by construction,
+--   because the pipeline drops REFUTED candidates before reporting and the verifier's
+--   verdict survives only as free-form prose in its subagent transcript.
 --
---   confirmed_pct  share of verdicted findings the verifier could pin to a trigger.
---                  A low share with a high `plausible` count is an angle that generates
---                  mechanisms nobody can construct a failure for.
---   no_change      the author found the finding wrong or already handled while applying it.
---                  A post-hoc refutation, and the strongest false-positive evidence here.
---   skipped        real but not applied. For a cleanup angle this is the earn-its-spawn
---                  number: a finding declined every time is noise with a correct verdict.
---   acted_pct      fixed as a share of everything resolved. NULL when no --fix pass ran,
---                  so an angle only ever reviewed (never fixed) shows verdicts and no
---                  outcomes rather than a fabricated zero.
---
--- Findings are deduped per session and identity because a --fix run calls ReportFindings
--- a second (and after later fixes, a third) time with the same findings plus outcomes.
--- Counting the calls inflates every column and weights re-reported findings highest.
---
+--   Findings are deduped per session and identity, because a `--fix` run re-reports the
+--   same findings with outcomes attached and counting the calls would inflate every column
+--   and weight re-reported findings highest.
+-- params:
+--   - name: skill
+--     meaning: >-
+--       glob on the calling skill, where unset spans every caller including user-typed
+--       /code-review, which carries no skill attribution
+--   - name: min_findings
+--     default: 1
+--     meaning: floor on an angle's rollup total
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 -- The query exists to change `plugins/review/skills/code/angles.md`: narrow an angle whose
 -- findings nobody acts on, or widen one that only ever confirms. Delete it and its catalog
--- paragraph once two readings a month apart both leave that file untouched, whether because
+-- header once two readings a month apart both leave that file untouched, whether because
 -- the spreads sit inside noise or because the answer is already known. `git log` on
 -- `angles.md` is where that evidence surfaces.
---
--- Params: after_date, before_date, project, host, skill (glob on the calling skill;
--- unset spans every caller, including user-typed /code-review, which carries no skill
--- attribution), min_findings (floor on an angle's rollup total, default 1).
 WITH reports AS (
   SELECT
     ci.host,

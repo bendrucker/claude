@@ -1,13 +1,28 @@
--- Sessions that re-inject the full skill catalog and deferred-tools delta many times,
--- cumulatively re-billing the same context. Counts skill_listing and
--- deferred_tools_delta injections per session with an estimated token total; tune the
--- floor via min_injections.
--- The catalog is injected once into the main thread and once per subagent context, so
--- the two halves mean different things: main_injections above 1 (outside compaction)
--- is re-injection thrash, while sidechain_injections is the per-subagent cost of
--- fan-out and scales with subagent count, not with any harness defect. Rank on
--- main_injections for defects and on sidechain_ktokens for fan-out spend.
--- Params: after_date, before_date, project, host, min_injections (default 6).
+-- ---
+-- name: catalog-reinjection-thrash-sessions
+-- tier: 2
+-- dimensions: [context-tax]
+-- summary: >-
+--   Sessions re-injecting the full skill catalog and deferred-tools delta, cumulatively
+--   re-billing the same context.
+-- description: >-
+--   Counts `skill_listing` and `deferred_tools_delta` injections per session with an
+--   estimated token total, split into `main_injections`/`main_ktokens` and
+--   `sidechain_injections`/`sidechain_ktokens`. The catalog is injected once into the main
+--   thread and once per subagent context, so the two halves mean different things:
+--   `main_injections` above 1 (outside compaction) is re-injection thrash, while
+--   `sidechain_injections` is the per-subagent cost of fan-out and scales with subagent
+--   count rather than with any harness defect. Rank on `main_injections` for defects and
+--   on `sidechain_ktokens` for fan-out spend.
+-- params:
+--   - name: min_injections
+--     default: 6
+--     meaning: floor on a session's injection count
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH att AS (
   SELECT
     a.host,

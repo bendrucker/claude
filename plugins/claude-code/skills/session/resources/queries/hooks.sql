@@ -1,20 +1,33 @@
--- Hook activity and performance overview, one row per hook (keyed by command, or
--- hook_name when no command is recorded). Surfaces how often each hook runs, how
--- often it blocks/asks/errors, how much context it injects, and its latency.
--- p95_ms is raw wall-clock and absorbs host-wide slowdowns, so the attributable
--- figure is excess_p95_ms: the tail left after subtracting the ambient latency of
--- every other hook that ran on the same host in the same hour. A hook with a high
--- p95_ms, a high ambient_p50_ms, and a near-zero excess_p95_ms was slow because
--- the machine was slow. Both columns are NULL when no hour had enough peers.
+-- ---
+-- name: hooks
+-- tier: 1
+-- summary: >-
+--   Per-hook runs, friction rate, and latency corrected for host-wide slowdowns, one row
+--   per hook keyed by command (or `hook_name` when no command is recorded).
+-- description: >-
+--   Runs, blocks, asks, errors, cancelled, context injections, friction rate, and p50/p95
+--   duration, plus `ambient_p50_ms` (the median duration of every other hook on the same
+--   host in the same hour) and `excess_p95_ms` (the tail left after subtracting it).
+--   `excess_p95_ms` is the attributable figure: `p95_ms` absorbs host-wide slowdowns, so a
+--   hook with a high `p95_ms`, a high `ambient_p50_ms`, and a near-zero `excess_p95_ms` was
+--   slow because the machine was slow. Both are NULL when no hour had enough peers.
 --
--- `blocks` and `friction_pct` count only what hook_events recorded, which excludes
--- every PreToolUse permissionDecision "deny": that path writes no hook record, so a
--- hook that mostly denies reads as frictionless here. The recovered volume lives in
--- the `hook_denies` view (hook-blocks.sql reports it, index-health.sql sizes the gap).
--- It is not folded in here because a recovered deny carries no command and no duration,
--- so it cannot key to a row or contribute to the latency columns.
--- Params: after_date, before_date, project, host, event (hook_event filter), hook
--- (GLOB on command/name). Pass null to skip any filter.
+--   `blocks` and `friction_pct` count only what `hook_events` recorded, which excludes
+--   every PreToolUse `permissionDecision: deny`: that path writes no hook record, so a hook
+--   that mostly denies reads as frictionless here. The recovered volume lives in the
+--   `hook_denies` view, which `hook-blocks` reports and `index-health` sizes. It is not
+--   folded in here because a recovered deny carries no command and no duration, so it
+--   cannot key to a row or contribute to the latency columns.
+-- params:
+--   - name: event
+--     meaning: hook_event filter
+--   - name: hook
+--     meaning: GLOB on command/name
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH scoped AS (
   SELECT he.*
   FROM hook_events he

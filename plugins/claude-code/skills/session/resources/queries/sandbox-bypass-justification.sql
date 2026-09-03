@@ -1,25 +1,33 @@
--- Per normalized command verb, how many `dangerouslyDisableSandbox` calls followed a
--- failed sandboxed run of the same command and how many carried no such failure. The
--- operating rule is to run sandboxed and bypass only after a sandboxed run of that
--- command actually failed, so `justified_pct` measures adherence per verb and, in the
--- `(all)` rollup row, across the whole corpus.
+-- ---
+-- name: sandbox-bypass-justification
+-- tier: 1
+-- summary: >-
+--   Per normalized command verb, the split between bypasses that followed a failed
+--   sandboxed run of the same command (`justified`) and bypasses with no such failure on
+--   record (`reflexive`).
+-- description: >-
+--   The operating rule is to run sandboxed and bypass only after a sandboxed run of that
+--   command actually failed, so `justified_pct` measures adherence per verb and, in the
+--   `(all)` rollup row, across the whole corpus. The verb comes from the same normalization
+--   `sandbox-bypass-effective-command` applies, so the two queries agree on what counts as
+--   one command. Rows are per (host, verb) plus one `(all)` rollup per host, which sorts
+--   first and covers every verb including those under `min_count`.
 --
--- The verb comes from the same normalization `sandbox-bypass-effective-command` applies
--- (strip leading `cd <path>` wrappers, `echo` lines, and `VAR=value` env assignments,
--- optionally `export`ed) so the two queries agree on what counts as one command.
---
--- `justified` counts bypasses the view could back-link to a prior sandboxed failure of
--- the byte-identical command by the same agent in the same session. The absence of a
--- back-link is not evidence the sandbox would have worked: the model may have learned
--- the failure in an earlier session, in another repo, or from a command that differed
--- by a path. A low `justified_pct` on a verb is a prompt to check whether that verb
--- belongs in `excludedCommands` (so no bypass is needed) or whether the bypass is
--- reflex, not a prompt to conclude the bypass was unnecessary.
---
--- Rows are per (host, verb) plus one `(all)` rollup per host, which sorts first and
--- covers every verb including those under `min_count`.
--- Params: after_date, before_date, project, host, min_count (floor on a verb's total,
--- default 5).
+--   A low percentage does not establish that the sandbox would have worked. The back-link
+--   requires a prior failure of the byte-identical command by the same agent in the same
+--   session, so a failure learned in an earlier session, in another repo, or from a command
+--   differing by a path leaves no trace. Read a low-percentage verb as a candidate for
+--   `excludedCommands`, which removes the need to bypass at all, or as a prompt to check
+--   whether the flag is reflex.
+-- params:
+--   - name: min_count
+--     default: 5
+--     meaning: floor on a verb's total
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH stripped AS (
   SELECT
     sb.host,

@@ -1,10 +1,23 @@
--- Schema discovery by inference. Enumerates the JSON keys present at a given path
--- across records of a given kind, with the value's JSON type and an occurrence count.
--- A key appearing with more than one type (type divergence) shows up as multiple rows.
--- This is the antidote to blindness: rather than relying on pre-extracted columns, ask
--- the corpus what fields exist for any record kind, then drill with `data->>'$.path'`.
--- Params: kind (GLOB on the records.kind label, or null for all), path (JSON path to
--- enumerate, e.g. '$' or '$.attachment'), after_date, before_date, project, host.
+-- ---
+-- name: fields
+-- tier: 1
+-- summary: >-
+--   Schema discovery by inference: the JSON keys present at a path across records of a
+--   kind, with each value's JSON type and an occurrence count.
+-- description: >-
+--   A key appearing with more than one type (type divergence) shows up as multiple rows.
+--   This is the antidote to blindness: rather than relying on pre-extracted columns, ask
+--   the corpus what fields exist for any record kind, then drill with `data->>'$.path'`.
+-- params:
+--   - name: kind
+--     meaning: GLOB on the `records.kind` label, or null for all
+--   - name: path
+--     meaning: JSON path to enumerate, e.g. `$` or `$.attachment`
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH r AS (
   SELECT data
   FROM records

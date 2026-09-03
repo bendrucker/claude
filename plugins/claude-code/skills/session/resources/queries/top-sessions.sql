@@ -1,16 +1,34 @@
--- Sessions ranked by spend, one row per session. `sort` picks the axis: `cost` (default)
--- for the biggest estimated bills, `output` for the runaway or unattended-session
--- detector, where a huge output total spread over many messages is the signature of a
--- loop left running. Both axes are reported on every row either way, so a scan for one
--- shows the other beside it.
--- Reads the deduped per-message usage from message_usage. Summing raw rows inflates
--- totals 2-3.5x, because every content-block row repeats the parent message's usage.
--- Cost is an estimate from public per-MTok rates (model_input_rate/model_output_rate),
--- weighted per token class: cache reads 0.1x the input rate, cache writes 1.25x for the
--- 5m TTL and 2x for the 1h TTL. Against the 62 sessions carrying a real
--- cost-state.totalCostUSD it lands at 0.97 of billed spend ($1,582 vs $1,631).
--- Params: after_date, before_date, project, host, sort (cost|output), limit (default 15,
--- quoted as SET VARIABLE "limit" = 15 because limit is reserved).
+-- ---
+-- name: top-sessions
+-- tier: 1
+-- dimensions: [tokens]
+-- summary: >-
+--   Sessions ranked by spend, one row per session, carrying `msgs`, `out_tokens`,
+--   `avg_out`, `cost_usd_est`, and `last_activity`.
+-- description: >-
+--   `sort` picks the ranking axis. `cost` finds the biggest estimated bills. `output` is
+--   the runaway or unattended-session detector, where a large output total spread over many
+--   messages is a loop left running. Both axes appear on every row regardless, so a scan
+--   for one shows the other beside it.
+--
+--   Reads the deduped per-message usage from `message_usage`. Summing raw rows inflates
+--   totals 2-3.5x, because every content-block row repeats the parent message's usage. Cost
+--   is an estimate from public per-MTok rates (`model_input_rate` and `model_output_rate`),
+--   weighted per token class: cache reads at 0.1x the input rate, cache writes at 1.25x for
+--   the 5m TTL and 2x for the 1h TTL. Against the 62 sessions carrying a real
+--   `cost-state.totalCostUSD` it lands at 0.97 of billed spend, $1,582 against $1,631.
+-- params:
+--   - name: sort
+--     default: cost
+--     meaning: cost or output
+--   - name: limit
+--     default: 15
+--     meaning: reserved word, so quote the name as SET VARIABLE with double quotes
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH priced AS (
   SELECT
     mu.*,

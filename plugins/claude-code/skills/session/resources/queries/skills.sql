@@ -1,3 +1,20 @@
+-- ---
+-- name: skills
+-- tier: 1
+-- summary: Skill invocation counts by name, with per-skill sessions and window totals.
+-- description: >-
+--   One row per skill from `skill_calls`, carrying `uses` and `sessions` with the window's
+--   `total_uses` and `total_sessions` alongside. It counts Skill tool calls only, so a
+--   typed slash command is invisible here: `skill-auto-vs-explicit` splits those two
+--   populations.
+-- params:
+--   - name: skill
+--     meaning: exact skill name, or all when unset
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH filtered AS (
   SELECT sc.*
   FROM skill_calls sc

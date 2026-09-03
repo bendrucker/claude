@@ -1,5 +1,15 @@
--- File hotspots: the files you read and edit most, across sessions. Reveals where work
--- concentrates and which files churn. Params: after_date, before_date, project, host, limit.
+-- ---
+-- name: files
+-- tier: 1
+-- summary: "File hotspots: the files you read and edit most, across sessions."
+-- description: Reveals where work concentrates and which files churn.
+-- params:
+--   - limit
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH f AS (
   SELECT fo.*
   FROM file_operations fo

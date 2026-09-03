@@ -1,13 +1,33 @@
--- Plan structure: one row per markdown section across plan files on disk, joined to
--- the session that produced each plan. Reads plans with the `markdown` community
--- extension (load it via `-init resources/extensions.sql`). The glob self-defaults to
--- the local plans dir and accepts an optional `plans_glob` override.
+-- ---
+-- name: plan-sections
+-- tier: 1
+-- reads: disk
+-- extensions: [markdown]
+-- summary: >-
+--   One row per markdown section across plan files on disk, joined to the session that
+--   produced each plan.
+-- description: >-
+--   Reads plan structure rather than re-parsing headings by hand, so a question like which
+--   plans have no Verification section is a `bool_or` over section titles. The glob
+--   self-defaults to the local plans dir and takes an optional `plans_glob` override.
 --
--- Disk plans are local-host current state: a `plan_calls.plan_file` from another
--- machine (or a deleted plan) has no file on disk, so the LEFT JOIN leaves it out of
--- the section rows without affecting session-side data. Use embedded `$.input.plan`
--- (via plan_calls.plan_chars / content_items) for cross-host or point-in-time needs.
---
+--   Disk plans are local-host current state. A `plan_calls.plan_file` from another machine,
+--   or a deleted plan, has no file to read, so the LEFT JOIN leaves it out of the section
+--   rows without affecting session-side data. Embedded `$.input.plan` (via
+--   `plan_calls.plan_chars` and `content_items`) stays the source for cross-host and
+--   point-in-time needs.
+-- example: |-
+--   WITH s AS (
+--     SELECT file_path, bool_or(title = 'Verification') AS has_verification
+--     FROM read_markdown_sections('~/.claude/plans/*.md', filename=true)
+--     GROUP BY file_path
+--   )
+--   SELECT file_path FROM s WHERE NOT has_verification;
+-- params:
+--   - name: plans_glob
+--     default: '~/.claude/plans/*.md'
+--     meaning: the local plans dir
+-- ---
 -- TODO(https://github.com/teaguesterling/duckdb_markdown/pull/20): we read sections
 -- from disk because `md_extract_sections` is binder-ambiguous on VARCHAR input, so the
 -- embedded `$.input.plan` text can't be sectioned in-memory. Once that fix is released,
@@ -15,7 +35,6 @@
 -- works cross-host and point-in-time with no missing-file caveat. Revisit whether this
 -- on-disk query is still worth keeping at that point.
 --
--- Params: plans_glob (override the default plans dir).
 -- Example: plans whose section titles never include "Verification".
 WITH sections AS (
   SELECT

@@ -1,18 +1,26 @@
--- Frontmatter: one row per markdown file with YAML frontmatter, parsed with the
--- `yaml` community extension (load it via `-init resources/extensions.sql`). Returns
--- the typed `name`/`description` fields plus the body in one shot, replacing a
--- regex `^---...---$` split. The glob self-defaults to the memory corpus (the clean,
--- frontmatter-native set under ~/.claude) and accepts an optional `frontmatter_glob`
--- override. On memory files the nested `metadata` frontmatter auto-expands into a
--- typed struct; select `metadata` directly when querying that corpus.
---
--- Override the glob for skills, which live under ~/.claude/plugins (not the personal
--- ~/.claude/skills dir) and are duplicated across cache version-hashes, so a path that
--- pins one copy reads cleaner:
+-- ---
+-- name: frontmatter
+-- tier: 1
+-- reads: disk
+-- extensions: [yaml]
+-- summary: >-
+--   One row per markdown file with YAML frontmatter, returning the typed `name` and
+--   `description` fields plus the body in one shot.
+-- description: >-
+--   Parsing frontmatter with the extension replaces a regex `^---...---$` split. The glob
+--   self-defaults to the memory corpus (`~/.claude/projects/*/memory/*.md`), the clean
+--   frontmatter-native set, where the nested `metadata` frontmatter auto-expands into a
+--   typed struct: select `metadata` directly when querying it. Override the glob for
+--   skills, which live under `~/.claude/plugins` (not the personal `~/.claude/skills`) and
+--   are duplicated across cache version-hashes, so a path that pins one copy reads cleaner.
+-- params:
+--   - name: frontmatter_glob
+--     default: '~/.claude/projects/*/memory/*.md'
+--     meaning: the memory corpus, overridden to read another corpus such as skills
+-- ---
+-- Globs that pin one copy of a duplicated skill:
 --   SET VARIABLE frontmatter_glob = 'plugins/*/skills/*/SKILL.md';                  -- repo skills
 --   SET VARIABLE frontmatter_glob = '~/.claude/plugins/marketplaces/*/*/skills/*/SKILL.md';
---
--- Params: frontmatter_glob (override the default memory dir).
 SELECT
   filename AS file_path,
   name,

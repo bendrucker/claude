@@ -1,13 +1,33 @@
--- Ranked burn windows: cost-weighted token spend per (session, time bucket), with the
--- shape signals that separate an expected burst (workflow fan-out) from a defect (hook
--- loop, cache-miss storm, repeat-read tax). Reads the deduped per-message usage from
--- message_usage (raw rows repeat the parent message's usage).
--- Cost is an estimate from public per-MTok rates (model_input_rate/model_output_rate),
--- weighting cache reads at 0.1x the input rate and cache writes at 1.25x for the 5m TTL
--- and 2x for the 1h TTL. Against the 62 sessions carrying a real cost-state.totalCostUSD
--- it lands at 0.97 of billed spend, so read it as a close approximation.
--- Params: after_date, before_date, project, host, bucket_minutes (default 10),
--- limit (default 30).
+-- ---
+-- name: usage-spikes
+-- tier: 1
+-- summary: >-
+--   Ranked (session, time bucket) burn windows across the corpus, the same shape columns as
+--   `usage-timeline` plus `host`, `session_id`, and `repo` (the last path component).
+-- description: >-
+--   Cost-weighted spend is what separates an expected burst such as a workflow fan-out from
+--   a defect such as a hook loop, a cache-miss storm, or the repeat-read tax. Reads the
+--   deduped per-message usage from `message_usage`, since raw rows repeat the parent
+--   message's usage.
+--
+--   Cost is an estimate from public per-MTok API rates (`model_input_rate` and
+--   `model_output_rate`), weighted per token class: cache reads at 0.1x the input rate,
+--   cache writes at 1.25x for the 5m TTL and 2x for the 1h TTL. Against the 62 sessions
+--   carrying a real `cost-state.totalCostUSD` it lands at 0.97 of billed spend, so read it
+--   as a close approximation rather than an exact bill. Ranking bursts is this query's own
+--   job. `scripts/usage.ts` renders the per-session and per-bucket views in the terminal
+--   from `top-sessions` and `usage-timeline`.
+-- params:
+--   - name: bucket_minutes
+--     default: 10
+--   - name: limit
+--     default: 30
+--     meaning: reserved word, so quote the name as SET VARIABLE with double quotes
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH priced AS (
   SELECT
     mu.*,

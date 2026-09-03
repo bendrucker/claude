@@ -1,10 +1,25 @@
--- Weekly trend of plan sizes, the steering metric for the plan plugin's
--- ExitPlanMode size gate. One row per week, each plan session assigned to the
--- week of its first present. First-present chars measure how big plans arrive;
--- final-present chars (max plan_seq per session) measure what the gate lets
--- through. finals_near_threshold counts finals in [threshold - 2000, threshold],
--- the bunching-under-the-cap signal.
--- Params: after_date, before_date, project, host, threshold (default 12000).
+-- ---
+-- name: plan-sizes
+-- tier: 1
+-- summary: >-
+--   Weekly trend of plan sizes, the steering metric for the plan plugin's ExitPlanMode size
+--   gate.
+-- description: >-
+--   One row per week, each plan session assigned to the week of its first present, with the
+--   session count, median and p90 of first-present chars, median and p90 of final-present
+--   chars (final being the max `plan_seq` per session), finals over the threshold, and
+--   `finals_near_threshold`, the count in `[threshold - 2000, threshold]` that is the
+--   bunching-under-the-cap signal. Firsts measure how big plans arrive, finals measure what
+--   the gate lets through. The gate's post-2026-08-15 denials do not appear in
+--   `hook_events`, so this query measures outcomes rather than gate fires.
+-- params:
+--   - name: threshold
+--     default: 12000
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH filtered AS (
   SELECT pc.host, pc.session_id, pc.timestamp, pc.plan_seq, pc.plan_chars
   FROM plan_calls pc

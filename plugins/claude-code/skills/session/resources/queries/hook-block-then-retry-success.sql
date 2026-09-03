@@ -1,17 +1,30 @@
--- Hook blocks that were followed by a same-hook *success* in the same session within N
--- seconds: a block the model simply retried away, which is noise rather than a genuine
--- redirect. Groups by hook and reports total blocks against how many were retried away,
--- with the retry rate. A high rate means the gate mostly annoys; a low rate means it
--- actually stops work. The windowed self-correlation is the hard part to rewrite from
--- memory.
---
+-- ---
+-- name: hook-block-then-retry-success
+-- tier: 1
+-- dimensions: [hook-blocks]
+-- summary: >-
+--   Per hook, blocks that were retried away by a same-hook success in the same session
+--   within N seconds: noise rather than a genuine redirect.
+-- description: >-
+--   Groups by hook and reports total blocks against how many were retried away, with the
+--   retry rate. A high rate means the gate mostly annoys. A low rate means it actually
+--   stops work.
+-- params:
+--   - name: hook
+--     meaning: GLOB on the hook key
+--   - name: within_seconds
+--     default: 300
+--     meaning: the retry window
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 -- NULL-safety matters here: `blocked` is NULL for most success rows (the view's boolean
 -- is NULL when `decision` is NULL), so `NOT blocked` would exclude essentially every
 -- success; use `blocked IS NOT TRUE` plus the `hook_success` kind check. Stop rows are
 -- keyed by `hook_event` because blocked Stop events carry NULL `command` while Stop
 -- successes carry it, so a command-based key never aligns the two sides.
--- Params: after_date, before_date, project, host, hook (GLOB on the hook key),
--- within_seconds (window, default 300).
 WITH ev AS (
   SELECT
     he.host,

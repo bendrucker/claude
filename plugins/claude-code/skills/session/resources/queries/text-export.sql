@@ -1,3 +1,23 @@
+-- ---
+-- name: text-export
+-- tier: 1
+-- summary: Dump cleaned prose from `text_content`, one row per text item, TSV-friendly.
+-- description: >-
+--   Fenced and inline-backtick code is stripped from `text`, with `raw_text` alongside for
+--   the original. Ordered by timestamp then source position, so an export reads in
+--   transcript order.
+-- params:
+--   - name: role
+--     meaning: user or assistant, or both when unset
+--   - name: model
+--     meaning: GLOB on the model id
+--   - name: min_chars
+--     meaning: floor on the cleaned text length
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 SELECT
   tc.session_id,
   tc.timestamp,

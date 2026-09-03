@@ -1,27 +1,47 @@
--- Fields the harness started writing recently, on record kinds that already existed.
--- `index-health`'s stream-new check keys on record kind, so it fires only when a whole
--- new kind appears. Every field that mattered most recently (`$.effort`, `thinking_tokens`,
--- `promptSource`, `toolDenialKind`, `cache_miss_reason`) arrived on a kind the corpus had
--- carried for months, which is exactly the case that check cannot see. This walks the JSON
--- itself and reports any (kind, path) with zero occurrences before the cutoff.
+-- ---
+-- name: field-drift
+-- tier: 1
+-- summary: >-
+--   Fields the harness started writing recently, on record kinds the corpus already
+--   carried.
+-- description: >-
+--   `index-health`'s `stream-new` check keys on record kind, so it fires only when a whole
+--   kind appears and has never fired on a new field. Every field that mattered most
+--   recently (`$.effort`, `thinking_tokens`, `promptSource`, `toolDenialKind`,
+--   `cache_miss_reason`) arrived on a kind the corpus had carried for months, exactly the
+--   case that check cannot see. This walks `raw.data` itself, objects and arrays alike, and
+--   reports every `kind:$.path` with zero occurrences before the cutoff, ordered by recent
+--   volume.
 --
--- Run it periodically, not per analysis pass: the walk takes tens of seconds over a full
--- corpus, against 6s for `index-health`.
+--   Array elements share their parent's path, so `content[0].type` and `content[7].type`
+--   are one field. Sampling is deterministic on the row's identity rather than random, so a
+--   rerun walks the same rows and a field appearing or disappearing between runs is a real
+--   change. Map-shaped kinds whose keys are file paths and UUIDs (`file-history-snapshot`,
+--   `file-history-delta`, `artifact-autoreact-ledger`) are excluded, since every row invents
+--   fresh paths. Rows are dated by their file's earliest timestamp, because 20 kinds carry
+--   no `timestamp` of their own and would otherwise fall out of both sides of the cutoff.
 --
--- Rows are dated by their file's earliest timestamp, because 20 record kinds carry no
--- `timestamp` of their own (see `index-health`'s null-timestamp-kinds) and would otherwise
--- fall out of both sides of the cutoff.
---
+--   Run it periodically rather than per analysis pass: tens of seconds against
+--   `index-health`'s six.
+-- params:
+--   - name: new_days
+--     default: 45
+--   - name: cutoff_date
+--     meaning: an explicit boundary overriding `new_days`, for auditing a past window
+--   - name: min_rows
+--     default: 50
+--     meaning: floor on recent occurrences
+--   - name: sample_pct
+--     default: 40
+--     meaning: the share of rows walked
+--   - host
+-- ---
 -- The walk descends through objects and arrays alike, so it never builds a JSON path
 -- string out of a key. Keys in this corpus contain quotes, which an interpolated
 -- `'$."' || key || '"'` would break on. `list_zip(json_keys(v), json_extract(v, '$.*'))`
 -- pairs each key with its value without one. Objects and arrays share a single recursive
 -- term, because two UNION ALL terms over the same CTE raise a circular-reference binder
 -- error.
---
--- Params: new_days (default 45), cutoff_date (an explicit boundary, overriding new_days,
--- for auditing a past window), min_rows (default 50, floor on recent occurrences),
--- sample_pct (default 40, the share of rows walked), host.
 WITH RECURSIVE file_start AS (
   SELECT source_file, MIN(timestamp) AS first_ts
   FROM raw

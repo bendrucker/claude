@@ -1,65 +1,66 @@
--- Index self-audit: checks the instrument before trusting its readings. Every other
--- named query assumes the index reflects reality; this one checks the index against
--- its own history and against the disk, surfacing the ways a query can return a
--- confidently wrong answer with no error. Run it FIRST in any discovery or analysis
--- pass (references/discovery.md wires it in as the opening step).
+-- ---
+-- name: index-health
+-- tier: 1
+-- summary: >-
+--   The index auditing itself. Run it first in any analysis pass, since its alerts cap what
+--   the rest can claim.
+-- description: >-
+--   Every other named query assumes the index reflects reality. This one checks the index
+--   against its own history and against the disk, surfacing the ways a query can return a
+--   confidently wrong answer with no error. One row per issue (`check_name`, `status`,
+--   `subject`, `detail`), alerts before info. It deliberately takes no date, project, or
+--   host scoping, because health is corpus-level. An empty alert set means these checks
+--   found nothing, not that the index is complete: thinking text, cloud sessions, and
+--   pre-retention history are structurally absent (see SKILL.md "Known Blind Spots").
 --
--- One row per issue: check_name, status ('alert' or 'info'), subject, detail.
--- Alerts sort first. An empty alert set means the checks below found nothing; it does
--- not mean the index is complete. Thinking text, cloud sessions, and pre-retention
--- history are structurally absent; see SKILL.md "Known Blind Spots".
+--   Alerts. `stream-silent` is a record kind that posted regularly and then went quiet
+--   longer than its own worst historical gap, the signature of an upstream rename or
+--   removal that leaves every query reading that kind returning stale or empty results with
+--   no staleness signal. `host-staleness` is an imported host whose newest record lags the
+--   corpus, so cross-host queries read a dead snapshot as an idle machine. `disk-not-indexed`
+--   is JSONL files on disk missing from the index, which also catches files created since
+--   the last refresh, so rerun `refresh.ts --refresh` before reading one as a refresh
+--   failure or glob drift.
 --
--- Checks:
---   stream-silent (alert): a record kind that posted regularly and then went silent
---     longer than its own worst historical gap. The signature of an upstream rename
---     or removal: every query reading that kind now returns stale or empty results
---     with no staleness signal (e.g. attachment:diagnostics after CLI 2.1.198).
---     Silence is judged against the kind's own gap distribution so
---     bursty-by-nature kinds don't false-positive.
---   stream-migrated (info): a kind that went silent while a registered successor
---     field keeps arriving on another record type (e.g. system:api_error stopped
---     after CLI 2.1.179 and the signal moved to isApiErrorMessage on the synthetic
---     assistant message). The event did not stop, only its representation changed:
---     queries reading the kind alone under-report to zero. The detail names the
---     successor field so a depth query can read both.
---   stream-new (info): a kind first seen recently. New surfaces ship unconsumed;
---     each is a triage prompt (add a view/query, or document it as noise).
---   host-staleness (alert): an imported host whose newest record lags the corpus.
---     Cross-host queries silently read a dead snapshot and conclude that machine
---     went idle; re-sync per SKILL.md "Re-syncing".
---   hook-deny-invisible: PreToolUse denies recovered from tool_results (the
---     `hook_denies` view) measured against the PreToolUse blocks hook_events actually
---     recorded over the same window. A hook denying a call writes no hook record, so
---     every hook_events-only reading (hooks.sql's blocks/friction_pct, any custom SQL
---     over hook_blocks) under-reports blocking by the recovered count. Alert when
---     recovery exceeds the denies hook_events did record, meaning the deny channel is
---     mostly dark, info otherwise. The detail breaks out how many were a subagent being
---     denied. hook_events misses those too, so they count here, but they carry the parent
---     session's id and a per-session reading has to key on `agent_id`.
---     Zero recovered is itself ambiguous: either nothing was
---     denied, or the hand-maintained pattern map in views.sql has fallen behind a
---     reworded hook, which is why this row is emitted even when the count is zero.
---   null-timestamp-kinds (info): kinds whose rows carry no timestamp. date_filter
---     excludes them from EVERY date-scoped query (NULL >= x is NULL), so a date
---     window hides these rows entirely.
---   disk-not-indexed (alert): JSONL files on disk missing from the index. Files
---     created since the last refresh land here too (refresh.ts marks a session
---     refreshed once and skips subsequent runs), so run refresh.ts --refresh and
---     re-check; entries that persist mean refresh failure or glob drift. Local host
---     only; imported hosts' files live under session-imports/ and are covered by
---     their own refresh watermark.
---   indexed-not-on-disk (info): indexed files deleted from disk, expected once
---     cleanupPeriodDays reaps old sessions. The index mirrors the disk rather than
---     archiving it, so these rows are dropped by the next refresh, not retained.
---   corpus-window (info): per host, the span the index actually covers. Any
---     "all-time" claim is bounded below by this floor.
+--   Info. `stream-migrated` is the same silence with a registered successor field still
+--   arriving on another record type, named in `detail`, so the kind's zero is a rename
+--   rather than an absence. `stream-new` is kinds first seen recently, shipping unconsumed,
+--   each a triage prompt. `hook-deny-invisible` measures denies recovered from tool_results
+--   against the PreToolUse blocks `hook_events` actually recorded over the same window,
+--   sizing how much blocking a `hook_events`-only reading misses, and alerts when recovery
+--   exceeds what was recorded. Its detail breaks out how many were a subagent being denied.
+--   `null-timestamp-kinds` is kinds whose rows carry no timestamp, which `date_filter`
+--   excludes from every date-scoped query. `indexed-not-on-disk` is indexed files deleted
+--   from disk, dropped by the next refresh rather than retained. `corpus-window` is the span
+--   each host actually covers, the floor under any all-time claim.
+-- params:
+--   - name: min_active_days
+--     default: 5
+--     meaning: stream-silent eligibility
+--   - name: new_days
+--     default: 14
+--     meaning: stream-new window
+--   - name: stale_days
+--     default: 2
+--     meaning: host-staleness threshold
+--   - name: deny_window_days
+--     default: 30
+--     meaning: hook-deny-invisible window
+--   - name: projects_glob
+--     default: '~/.claude/projects/**/*.jsonl'
+--     meaning: >-
+--       the disk check's glob, which needs the same override given to refresh.ts when
+--       CLAUDE_PROJECTS_DIR is customized
+-- ---
+-- stream-silent judges silence against the kind's own gap distribution, so kinds that are
+-- bursty by nature do not false-positive.
 --
--- Params (all optional): min_active_days (stream-silent eligibility, default 5),
--- new_days (stream-new window, default 14), stale_days (host-staleness
--- threshold, default 2), deny_window_days (hook-deny-invisible window, default 30),
--- projects_glob (disk check, default
--- '~/.claude/projects/**/*.jsonl'; pass the same override given to refresh.ts if
--- CLAUDE_PROJECTS_DIR is customized).
+-- hook-deny-invisible emits a row even when the recovered count is zero, because zero is
+-- itself ambiguous: either nothing was denied, or the hand-maintained pattern map in
+-- views.sql has fallen behind a reworded hook.
+--
+-- The disk checks cover the local host only. Imported hosts' files live under
+-- session-imports/ and are covered by their own refresh watermark.
 WITH corpus AS (
   SELECT MIN(timestamp) AS min_ts, MAX(timestamp) AS max_ts
   FROM records

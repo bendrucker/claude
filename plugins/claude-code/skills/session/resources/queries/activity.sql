@@ -1,16 +1,26 @@
--- Session interaction profile: how work enters and flows through sessions, drawn from
--- the structured records that the chat-only views miss. Reports where each prompt came
--- from, interruptions, compactions, API retries, hook friction, and the distribution of
--- permission modes. One labeled row per signal.
---
--- `prompt: <source>` is the harness's own `promptSource` (typed, system, queued, sdk,
--- suggestion_accepted), which replaced this query's inference of automated-vs-human from
--- attachment kinds. `queued command: <origin>` keeps the finer split `promptSource`
--- collapses, since a `queued` prompt may be an auto-continuation, a peer's message, or
--- one the user typed ahead. It starts 2026-06-03, so a window before that reports no prompts at
--- all rather than a partial count. The `last-prompt` record is not a substitute: it is a
--- per-session snapshot the harness rewrites every turn, so counting its rows counts
--- rewrites (55,592 rows across 2,131 sessions when this was checked).
+-- ---
+-- name: activity
+-- tier: 1
+-- summary: >-
+--   Session interaction profile: one row per prompt source, plus interruptions, queued
+--   goals, scheduled fires, compactions, API retries, hook friction, and the distribution
+--   of permission modes.
+-- description: >-
+--   A `prompt: <source>` row carries the harness's own `$.promptSource` (`typed`, `system`,
+--   `queued`, `sdk`, `suggestion_accepted`), which is where human-versus-automated entry
+--   now comes from. A `queued command: <origin>` row keeps the finer split `promptSource`
+--   collapses, since a `queued` prompt may be an auto-continuation, a peer's message, or
+--   one the user typed ahead. `promptSource` starts 2026-06-03, so an earlier window
+--   reports no prompts at all rather than a partial count.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
+-- The `last-prompt` record is not a substitute for `promptSource`: it is a per-session
+-- snapshot the harness rewrites every turn, so counting its rows counts rewrites (55,592
+-- rows across 2,131 sessions when this was checked).
 --
 -- Interruptions stay on the `[Request interrupted` marker text. `$.interruptedMessageId`
 -- names the message that was cut off but is set on well under half the marked turns, so
@@ -20,7 +30,6 @@
 -- own, which date_filter would silently exclude (NULL >= x is NULL); those rows borrow
 -- their session's last timestamp so a date window scopes them by when the session ran
 -- instead of dropping them.
--- Params: after_date, before_date, project, host.
 WITH session_ts AS (
   SELECT host, session_id, MAX(timestamp) AS last_ts
   FROM records

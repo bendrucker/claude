@@ -1,10 +1,21 @@
--- Work attributed to each skill: how much of your activity (and token spend) each skill
--- drives. Attribution is on the assistant messages produced while a skill is active, so
--- this captures the skill's real footprint, not just explicit Skill-tool invocations.
--- Tokens are deduped per message via message_usage (raw rows repeat the parent
--- message's usage). Swap `attribution_skill` for `attribution_plugin` or
--- `attribution_agent` to re-cut.
--- Params: after_date, before_date, project, host.
+-- ---
+-- name: skill-activity
+-- tier: 1
+-- summary: >-
+--   Work attributed to each skill: assistant turns, sessions, and input, output, and cache
+--   tokens.
+-- description: >-
+--   Attribution is on the assistant messages produced while a skill is active, so this
+--   captures the skill's real footprint rather than just explicit Skill-tool invocations.
+--   Tokens are deduped per message via `message_usage`, because raw rows repeat the parent
+--   message's usage. Swap `attribution_skill` for `attribution_plugin` or
+--   `attribution_agent` in the SQL to re-cut.
+-- params:
+--   - after_date
+--   - before_date
+--   - project
+--   - host
+-- ---
 WITH m AS (
   SELECT mu.*
   FROM message_usage mu

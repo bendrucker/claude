@@ -1,6 +1,6 @@
 # History-Discovery Recipe
 
-Fan out read-only analysts over the session index to mine config-change candidates, ground every candidate against the live config, then emit a ranked digest. This is the engine `improve-claude-code`'s Discover mode drives; the recipe lives here so the per-run prompt stays small.
+Fan out read-only analysts over the session index to mine config-change candidates, ground every candidate against the live config, then emit a ranked digest. This is the engine `improve-claude-code`'s Discover mode drives. The recipe lives here so the per-run prompt stays small.
 
 ## Fan-Out
 
@@ -15,20 +15,24 @@ Mirror the "Parallel Queries (Workflows)" pattern in [`SKILL.md`](../SKILL.md): 
 
 ## Dimension Cheat Sheet
 
-Each dimension maps to the named queries that answer it (Tier-1 listed in [`catalog.md`](catalog.md), Tier-2 documented in [Tier-2 Catalog](#tier-2-catalog) below) plus the survey surfaces to start from. Simple `GROUP BY ... COUNT/SUM` rollups (tokens by host, turns by project, hook time by event) stay inline; an agent writes them in seconds.
+Each dimension maps to the named queries that answer it, all documented in [`catalog.md`](catalog.md), plus the survey surfaces to start from. Simple `GROUP BY ... COUNT/SUM` rollups (tokens by host, turns by project, hook time by event) stay inline. An agent writes them in seconds.
 
+This table and the Tier-2 list below are generated from the `-- ---` headers on `resources/queries/*.sql`. Edit the header, then regenerate with `UPDATE_QUERY_CATALOG=1 bun test plugins/claude-code/skills/session`.
+
+<!-- generated:dimensions -->
 | Dimension | Named queries | Survey surfaces |
 |-----------|---------------|-----------------|
 | Hook latency | `hook-origin-split` | `hooks` |
 | Hook blocks | `hook-block-then-retry-success` | `hook-blocks`, `hooks` |
 | Hook coverage | `hook-config-vs-observed` | `hooks` |
-| Permissions and sandbox | `sandbox-bypass-effective-command`, `already-allowed-still-prompting`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox` |
+| Permissions and sandbox | `already-allowed-still-prompting`, `sandbox-bypass-effective-command`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox` |
 | Context tax | `catalog-reinjection-thrash-sessions` | `activity`, `hooks` (additionalContext) |
-| Tokens | `repeat-read-waste`, `top-sessions`, `delegation` | `stats`, `model-summary`, `skill-activity` |
+| Tokens | `delegation`, `repeat-read-waste`, `top-sessions` | `stats`, `model-summary`, `skill-activity` |
 | Turns and compaction | `stop-hook-noop-detector` | `activity` (compactions, API errors) |
 | Skill economy | `skill-auto-vs-explicit` | `skills`, `skill-activity` |
 | Planning | `plans` | `plan_sessions`, `plan_calls` |
 | Outcomes | `outcomes` | `pr_links`, `plan_calls`, `file_operations` |
+<!-- /generated:dimensions -->
 
 Use `records`, `fields`, `schema`, and `keys` whenever a dimension needs a path that isn't pinned: `SELECT kind, COUNT(*) FROM records GROUP BY kind` is the full taxonomy, and `fields` infers the JSON keys under any path.
 
@@ -64,11 +68,13 @@ The index spans every machine. `local` is this machine; imported hosts carry the
 
 ## Tier-2 Catalog
 
-Additional queries available in `resources/queries/`:
+Additional queries in `resources/queries/`, aimed at the self-improvement loop rather than everyday analysis. Parameters and caveats for each are in [`catalog.md`](catalog.md).
 
-- `hook-origin-split`: split hook wall-clock between portable shared config and per-repo project hooks. Measure your config, not someone's `make test-unit`. Shared config is plugin/skill hooks plus the user-level hook dir. A `.claude/hooks/` path rooted at `CLAUDE_PROJECT_DIR` is per-repo and lands in `project_local`.
-- `already-allowed-still-prompting`: Bash prompts matching a `permissions.allow` pattern you pass as `allow_glob`. A non-empty result is an allowlist pattern mismatch, usually a compound command.
-- `sandbox-path-deny-recurrence`: `Operation not permitted` Bash failures bucketed into concrete config gaps (worktree writes, tmux sockets, process substitution, mktemp, TLS, SSH agent), with recurrence and date span.
-- `catalog-reinjection-thrash-sessions`: sessions re-injecting the full skill catalog and deferred-tools delta, split into `main_injections`/`main_ktokens` and `sidechain_injections`/`sidechain_ktokens`. The catalog is injected once into the main thread and once per subagent context, so a high `sidechain_injections` is fan-out volume and only `main_injections` above 1 (outside compaction) is thrash. Tune via `min_injections`.
-- `stop-hook-noop-detector`: Stop hooks that cost wall-clock and produce nothing, ranked as removal candidates. Starts from `stop_hook_runs`, the harness's own roster of every Stop hook that fired, so a hook that runs silently appears with `events = 0` rather than being absent. `fires` and `total_ms` come from the roster; `events`, `with_stdout`, `with_decision`, `nonzero_exit` and `blocks` come from the attachment channel, which records only a hook that said something. Real `total_ms` against zeros everywhere else is pure overhead. Roster entries carrying `prompt_text` are excluded, since injecting context is the whole point of those. Blocking errors carry no command and group under the bare hook event name, so `gated_stops` counts a hook's fires at Stops some hook gated: a candidate with gated stops may be the gate.
-- `hook-self-timing`: hook latency measured by the hooks themselves, off `~/.claude/hook-metrics/*.jsonl` rather than the index. `hook_events` only records a fire that produced visible output, single-digit percent of real PreToolUse fires, so every count and quantile in `hooks` is conditioned on the hook having said something. Read `fires` and `index_visible_pct` here before treating a `hooks` row as a hook's cost. Covers only hooks wired to `user/scripts/hook-metrics`, which is the user-level hooks today and no plugin hook yet.
+<!-- generated:tier-2 -->
+- `already-allowed-still-prompting`: Bash permission prompts whose command matches a `permissions.allow` pattern you pass as `allow_glob`.
+- `catalog-reinjection-thrash-sessions`: Sessions re-injecting the full skill catalog and deferred-tools delta, cumulatively re-billing the same context.
+- `hook-origin-split`: Hook wall-clock split between portable shared config and arbitrary per-repo project hooks.
+- `hook-self-timing`: Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl` rather than the index.
+- `sandbox-path-deny-recurrence`: `Operation not permitted` and adjacent Bash failures bucketed into concrete sandbox config gaps, with recurrence and date span.
+- `stop-hook-noop-detector`: Stop hooks that cost wall-clock and produce nothing, ranked as removal candidates.
+<!-- /generated:tier-2 -->

@@ -34,11 +34,14 @@
 --   - name: skill
 --     meaning: GLOB on configured name
 --   - name: plugin_skill_glob
---     meaning: override the plugin-cache source
+--     default: '~/.claude/plugins/cache/*/*/*/skills/*/SKILL.md'
+--     meaning: the plugin-cache source
 --   - name: user_skill_glob
---     meaning: override the personal-skills source
+--     default: '~/.claude/skills/*/SKILL.md'
+--     meaning: the personal-skills source
 --   - name: project_skill_glob
---     meaning: override the project-skills source
+--     default: '.claude/skills/*/SKILL.md'
+--     meaning: the project-skills source
 --   - after_date
 --   - before_date
 --   - project

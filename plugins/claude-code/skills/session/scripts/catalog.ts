@@ -7,40 +7,39 @@ export const CATALOG_PATH = path.join(REFERENCES_DIR, "catalog.md");
 export const DISCOVERY_PATH = path.join(REFERENCES_DIR, "discovery.md");
 export const SKILL_PATH = path.join(import.meta.dirname, "..", "SKILL.md");
 
-// Survey surfaces are per-dimension starting points rather than per-query metadata, so the
-// dimension registry lives here and each query declares its membership in its own header.
+// Survey surfaces are per-dimension starting points, so the dimension registry lives here
+// and each query declares its membership in its own header.
 export const DIMENSIONS = [
-  { slug: "hook-latency", label: "Hook latency", surfaces: ["`hooks`"] },
-  { slug: "hook-blocks", label: "Hook blocks", surfaces: ["`hook-blocks`", "`hooks`"] },
-  { slug: "hook-coverage", label: "Hook coverage", surfaces: ["`hooks`"] },
+  { slug: "hook-latency", label: "Hook latency", surfaces: ["hooks"] },
+  { slug: "hook-blocks", label: "Hook blocks", surfaces: ["hook-blocks", "hooks"] },
+  { slug: "hook-coverage", label: "Hook coverage", surfaces: ["hooks"] },
   {
     slug: "permissions-sandbox",
     label: "Permissions and sandbox",
-    surfaces: ["`permissions`", "`sandbox`"],
+    surfaces: ["permissions", "sandbox"],
   },
   {
     slug: "context-tax",
     label: "Context tax",
-    surfaces: ["`activity`", "`hooks` (additionalContext)"],
+    surfaces: ["activity", "hooks (additionalContext)"],
   },
-  {
-    slug: "tokens",
-    label: "Tokens",
-    surfaces: ["`stats`", "`model-summary`", "`skill-activity`"],
-  },
+  { slug: "tokens", label: "Tokens", surfaces: ["stats", "model-summary", "skill-activity"] },
   {
     slug: "turns-compaction",
     label: "Turns and compaction",
-    surfaces: ["`activity` (compactions, API errors)"],
+    surfaces: ["activity (compactions, API errors)"],
   },
-  { slug: "skill-economy", label: "Skill economy", surfaces: ["`skills`", "`skill-activity`"] },
-  { slug: "planning", label: "Planning", surfaces: ["`plan_sessions`", "`plan_calls`"] },
-  {
-    slug: "outcomes",
-    label: "Outcomes",
-    surfaces: ["`pr_links`", "`plan_calls`", "`file_operations`"],
-  },
+  { slug: "skill-economy", label: "Skill economy", surfaces: ["skills", "skill-activity"] },
+  { slug: "planning", label: "Planning", surfaces: ["plan_sessions", "plan_calls"] },
+  { slug: "outcomes", label: "Outcomes", surfaces: ["pr_links", "plan_calls", "file_operations"] },
 ] as const;
+
+// A surface is a query or view name, optionally followed by a parenthetical narrowing it.
+export const SURFACE_NAME = /^[a-z_-]+/;
+
+function renderSurface(surface: string): string {
+  return surface.replace(SURFACE_NAME, (name) => `\`${name}\``);
+}
 
 function renderExtensions(names: readonly string[]): string | null {
   if (names.length === 0) return null;
@@ -58,6 +57,9 @@ function renderParam(param: QueryHeader["params"][number]): string {
   return notes.length === 0 ? `\`${param.name}\`` : `\`${param.name}\` (${notes.join(", ")})`;
 }
 
+// Every line of a continuation block indents, so a fenced example stays inside the bullet.
+const indent = (block: string) => block.replace(/^(?=.)/gm, "  ");
+
 function renderEntry(header: QueryHeader): string {
   const tail = [
     renderExtensions(header.extensions),
@@ -74,14 +76,16 @@ function renderEntry(header: QueryHeader): string {
     .filter((part) => part !== "");
   const blocks = [
     [header.summary, paragraphs[0]].filter((part) => part !== undefined).join(" "),
-  ].concat(paragraphs.slice(1));
+    ...paragraphs.slice(1),
+  ];
+  if (header.example !== undefined) blocks.push(`\`\`\`sql\n${header.example}\n\`\`\``);
   if (tail !== "") {
     if (blocks.length > 1) blocks.push(tail);
     else blocks[0] = `${blocks[0]} ${tail}`;
   }
 
   const [lead, ...rest] = blocks;
-  return `- \`${header.name}\`: ${lead}${rest.map((block) => `\n\n  ${block}`).join("")}`;
+  return `- \`${header.name}\`: ${lead}${rest.map((block) => `\n\n${indent(block)}`).join("")}`;
 }
 
 function replaceRegion(text: string, id: string, body: string): string {
@@ -106,7 +110,7 @@ export function renderCatalog(headers: QueryHeader[], current: string): string {
 }
 
 function renderDimensionTable(headers: QueryHeader[]): string {
-  const known = new Set(DIMENSIONS.map((dimension) => dimension.slug));
+  const known = new Set<string>(DIMENSIONS.map((dimension) => dimension.slug));
   for (const header of headers) {
     const unknown = header.dimensions.filter((slug) => !known.has(slug));
     if (unknown.length > 0) throw new Error(`${header.name}: unknown dimension ${unknown[0]}`);
@@ -117,7 +121,8 @@ function renderDimensionTable(headers: QueryHeader[]): string {
       .filter((header) => header.dimensions.some((slug) => slug === dimension.slug))
       .map((header) => `\`${header.name}\``);
     if (queries.length === 0) throw new Error(`no query claims dimension ${dimension.slug}`);
-    return `| ${dimension.label} | ${queries.join(", ")} | ${dimension.surfaces.join(", ")} |`;
+    const surfaces = dimension.surfaces.map(renderSurface);
+    return `| ${dimension.label} | ${queries.join(", ")} | ${surfaces.join(", ")} |`;
   });
 
   return [

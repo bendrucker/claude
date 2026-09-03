@@ -21,8 +21,7 @@ const QueryParamEntry = z.union([
   z
     .string()
     .min(1)
-    .transform((name) => ({ name }))
-    .pipe(QueryParam),
+    .transform((name): QueryParam => ({ name })),
   QueryParam,
 ]);
 
@@ -31,6 +30,8 @@ export const QueryHeader = z.strictObject({
   tier: z.union([z.literal(1), z.literal(2)]),
   summary: z.string().min(1),
   description: z.string().optional(),
+  // A literal YAML block (`|-`), so the SQL keeps its own line breaks and indentation.
+  example: z.string().optional(),
   params: z.array(QueryParamEntry).default([]),
   dimensions: z.array(z.string()).default([]),
   reads: z.enum(["index", "disk"]).default("index"),

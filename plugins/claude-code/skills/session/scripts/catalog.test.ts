@@ -6,13 +6,15 @@ import * as path from "node:path";
 import { z } from "zod";
 import {
   CATALOG_PATH,
+  DIMENSIONS,
   DISCOVERY_PATH,
   renderCatalog,
   renderDiscovery,
   SKILL_PATH,
+  SURFACE_NAME,
 } from "./catalog";
 import { type Database, ensureIndex, getDb, runQuery } from "./db";
-import { loadQueryHeaders, parseQueryHeader, QUERIES_DIR } from "./query-header";
+import { loadQueryHeaders, parseQueryHeader, QUERIES_DIR, type QueryHeader } from "./query-header";
 
 const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -29,6 +31,9 @@ const VALID = `-- ---
 --   First paragraph.
 --
 --   Second paragraph.
+-- example: |-
+--   SELECT 1
+--     FROM t;
 -- params:
 --   - after_date
 --   - name: limit
@@ -54,6 +59,32 @@ const MALFORMED: [string, string][] = [
   ["a non-comment line inside the fence", "-- ---\nname: demo\n-- ---\n"],
 ];
 
+// A default the query applies itself, in either shape its SQL uses:
+// `COALESCE(getvariable('x'), 15)` and `COALESCE(TRY_CAST(getvariable('x') AS INTEGER), 15)`.
+const DEFAULT_FALLBACK =
+  /COALESCE\( ?(?:TRY_CAST\( ?)?getvariable\('(\w+)'\)(?: AS \w+ ?\))? ?, ?('[^']*'|-?\d+) ?\)/g;
+
+const EXTENSION_FUNCTIONS = {
+  markdown: ["read_markdown_sections", "md_to_text"],
+  yaml: ["read_yaml_frontmatter"],
+} as const;
+
+const alphabetical = (values: (string | undefined)[]) =>
+  values.toSorted((a, b) => (a ?? "").localeCompare(b ?? ""));
+
+async function loadQueries(): Promise<[QueryHeader, string][]> {
+  const headers = await loadQueryHeaders();
+  return Promise.all(
+    headers.map(
+      async (header) =>
+        [header, await Bun.file(path.join(QUERIES_DIR, `${header.name}.sql`)).text()] as [
+          QueryHeader,
+          string,
+        ],
+    ),
+  );
+}
+
 describe("query header", () => {
   it("parses the fenced YAML and leaves the free prose alone", () => {
     expect(parseQueryHeader(VALID)).toEqual({
@@ -64,6 +95,7 @@ describe("query header", () => {
       extensions: ["yaml"],
       summary: "A one-line purpose that wraps.",
       description: "First paragraph.\nSecond paragraph.",
+      example: "SELECT 1\n  FROM t;",
       params: [
         { name: "after_date" },
         { name: "limit", default: 15, meaning: "reserved word" },
@@ -77,20 +109,46 @@ describe("query header", () => {
   });
 
   it("declares exactly the params its SQL reads", async () => {
-    const headers = await loadQueryHeaders();
-    const alphabetical = (names: (string | undefined)[]) =>
-      names.toSorted((a, b) => (a ?? "").localeCompare(b ?? ""));
+    const queries = await loadQueries();
+    const used = queries.map(([header, sql]) => {
+      const names = [...sql.matchAll(/getvariable\('([a-z_]+)'\)/g)].map((match) => match[1]);
+      return [header.name, alphabetical([...new Set(names)])] as const;
+    });
+    const declared = queries.map(
+      ([header]) => [header.name, alphabetical(header.params.map((param) => param.name))] as const,
+    );
+    expect(declared).toEqual(used);
+  });
 
-    const used = await Promise.all(
-      headers.map(async (header) => {
-        const sql = await Bun.file(path.join(QUERIES_DIR, `${header.name}.sql`)).text();
-        const names = [...sql.matchAll(/getvariable\('([a-z_]+)'\)/g)].map((match) => match[1]);
-        return [header.name, alphabetical([...new Set(names)])] as const;
-      }),
-    );
-    const declared = headers.map(
-      (header) => [header.name, alphabetical(header.params.map((param) => param.name))] as const,
-    );
+  it("declares the community extensions its SQL calls into", async () => {
+    const queries = await loadQueries();
+    const used = queries.map(([header, sql]) => {
+      const names = Object.entries(EXTENSION_FUNCTIONS)
+        .filter(([, functions]) => functions.some((fn) => sql.includes(`${fn}(`)))
+        .map(([extension]) => extension);
+      return [header.name, names] as const;
+    });
+    const declared = queries.map(([header]) => {
+      const names: string[] = [...header.extensions];
+      return [header.name, names] as const;
+    });
+    expect(declared).toEqual(used);
+  });
+
+  it("documents every default its SQL falls back to", async () => {
+    const queries = await loadQueries();
+    const used = queries.map(([header, sql]) => {
+      const pairs = [...sql.replace(/\s+/g, " ").matchAll(DEFAULT_FALLBACK)].map(
+        ([, name, value]) => `${name}=${(value ?? "").replace(/^'|'$/g, "")}`,
+      );
+      return [header.name, alphabetical([...new Set(pairs)])] as const;
+    });
+    const declared = queries.map(([header]) => {
+      const pairs = header.params
+        .filter((param) => param.default !== undefined)
+        .map((param) => `${param.name}=${param.default}`);
+      return [header.name, alphabetical(pairs)] as const;
+    });
     expect(declared).toEqual(used);
   });
 });
@@ -107,6 +165,23 @@ describe("generated reference docs", () => {
     if (process.env.UPDATE_QUERY_CATALOG !== undefined) await Bun.write(file, rendered);
 
     expect(rendered).toBe(await Bun.file(file).text());
+  });
+
+  it("cites survey surfaces that exist as a query or a view", async () => {
+    const views = await Bun.file(
+      path.join(import.meta.dirname, "..", "resources", "views.sql"),
+    ).text();
+    const known = new Set([
+      ...(await loadQueryHeaders()).map((header) => header.name),
+      ...[...views.matchAll(/CREATE OR REPLACE (?:VIEW|TABLE) ([a-z_]+)/g)].map(
+        (match) => match[1],
+      ),
+    ]);
+
+    const cited = DIMENSIONS.flatMap((dimension) =>
+      dimension.surfaces.map((surface) => SURFACE_NAME.exec(surface)?.[0]),
+    );
+    expect(cited.filter((name) => name === undefined || !known.has(name))).toEqual([]);
   });
 
   it("refuses to render a dimension no query claims", async () => {
@@ -133,10 +208,10 @@ describe("SKILL.md name index", () => {
     // query, and "- Category: `a`, `b`", where every token is.
     const listed = new Set(
       section.split("\n").flatMap((line) => {
-        const named = /^- `([a-z-]+)`:/.exec(line);
-        if (named?.[1] !== undefined) return [named[1]];
-        const grouped = /^- [^`]+: (.+)$/.exec(line);
-        return [...(grouped?.[1] ?? "").matchAll(/`([a-z-]+)`/g)].map((match) => match[1]);
+        const named = /^- `([a-z-]+)`:/.exec(line)?.[1];
+        if (named !== undefined) return [named];
+        const grouped = /^- [^`]+: (.+)$/.exec(line)?.[1] ?? "";
+        return [...grouped.matchAll(/`([a-z-]+)`/g)].flatMap((match) => match[1] ?? []);
       }),
     );
 

@@ -16,9 +16,18 @@
 --   rows without affecting session-side data. Embedded `$.input.plan` (via
 --   `plan_calls.plan_chars` and `content_items`) stays the source for cross-host and
 --   point-in-time needs.
+-- example: |-
+--   -- prepend SET VARIABLE plans_glob = '...'; to scope
+--   WITH s AS (
+--     SELECT file_path, bool_or(title = 'Verification') AS has_verification
+--     FROM read_markdown_sections('~/.claude/plans/*.md', filename=true)
+--     GROUP BY file_path
+--   )
+--   SELECT file_path FROM s WHERE NOT has_verification;
 -- params:
 --   - name: plans_glob
---     meaning: override the default plans dir
+--     default: '~/.claude/plans/*.md'
+--     meaning: the local plans dir
 -- ---
 -- TODO(https://github.com/teaguesterling/duckdb_markdown/pull/20): we read sections
 -- from disk because `md_extract_sections` is binder-ambiguous on VARCHAR input, so the

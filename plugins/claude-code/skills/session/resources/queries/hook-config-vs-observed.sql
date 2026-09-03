@@ -36,7 +36,8 @@
 --   - name: hook
 --     meaning: GLOB on configured command
 --   - name: hook_config_glob
---     meaning: override the plugin-cache glob
+--     default: '~/.claude/plugins/cache/*/*/*/hooks/hooks.json'
+--     meaning: the plugin-cache glob
 --   - after_date
 --   - before_date
 --   - project

@@ -12,9 +12,9 @@
 --
 --   Cost is an estimate from public per-MTok API rates (`model_input_rate` and
 --   `model_output_rate`), weighted per token class: cache reads at 0.1x the input rate,
---   cache writes at 1.25x for the 5m TTL and 2x for the 1h TTL. It is a relative weight for
---   comparing sessions and windows, not billed spend, since the account is on a
---   subscription and the rate table is a snapshot. `scripts/usage.ts` renders the same
+--   cache writes at 1.25x for the 5m TTL and 2x for the 1h TTL. Against the 62 sessions
+--   carrying a real `cost-state.totalCostUSD` it lands at 0.97 of billed spend, so read it
+--   as a close approximation rather than an exact bill. `scripts/usage.ts` renders the same
 --   numbers in the terminal.
 -- params:
 --   - name: bucket_minutes

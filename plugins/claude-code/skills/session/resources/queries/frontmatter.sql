@@ -15,7 +15,8 @@
 --   are duplicated across cache version-hashes, so a path that pins one copy reads cleaner.
 -- params:
 --   - name: frontmatter_glob
---     meaning: override the default memory-corpus glob
+--     default: '~/.claude/projects/*/memory/*.md'
+--     meaning: the memory corpus, overridden to read another corpus such as skills
 -- ---
 -- Globs that pin one copy of a duplicated skill:
 --   SET VARIABLE frontmatter_glob = 'plugins/*/skills/*/SKILL.md';                  -- repo skills

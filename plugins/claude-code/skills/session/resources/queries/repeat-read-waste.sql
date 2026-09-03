@@ -20,10 +20,10 @@
 --   shares the parent session id and without that gate the main thread's first read of a
 --   file a subagent touched would count as a repeat. The token estimate uses the chars/4
 --   proxy for text, but an image Read returns the file as a base64 image content block
---   whose real cost is the model's fixed image tokenization, around 1,600 tokens. Left
---   uncapped the proxy overstated one session's 31 image reads at ~2.2M tokens against
---   ~50K real, so image results are capped at a flat per-image budget and a re-read image
---   stays in the estimate at that bounded rate.
+--   whose real cost is the model's fixed image tokenization, around 1,600 tokens whatever
+--   the file size. Uncapped, the proxy overstates a session of image reads by more than an
+--   order of magnitude, so image results are capped at a flat per-image budget and a
+--   re-read image stays in the estimate at that bounded rate.
 -- params:
 --   - after_date
 --   - before_date

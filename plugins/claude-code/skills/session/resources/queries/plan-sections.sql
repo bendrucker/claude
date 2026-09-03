@@ -17,7 +17,6 @@
 --   `plan_calls.plan_chars` and `content_items`) stays the source for cross-host and
 --   point-in-time needs.
 -- example: |-
---   -- prepend SET VARIABLE plans_glob = '...'; to scope
 --   WITH s AS (
 --     SELECT file_path, bool_or(title = 'Verification') AS has_verification
 --     FROM read_markdown_sections('~/.claude/plans/*.md', filename=true)

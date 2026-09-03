@@ -1,6 +1,6 @@
 # History-Discovery Recipe
 
-Fan out read-only analysts over the session index to mine config-change candidates, ground every candidate against the live config, then emit a ranked digest. This is the engine `improve-claude-code`'s Discover mode drives; the recipe lives here so the per-run prompt stays small.
+Fan out read-only analysts over the session index to mine config-change candidates, ground every candidate against the live config, then emit a ranked digest. This is the engine `improve-claude-code`'s Discover mode drives. The recipe lives here so the per-run prompt stays small.
 
 ## Fan-Out
 

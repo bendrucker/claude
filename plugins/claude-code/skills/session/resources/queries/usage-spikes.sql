@@ -14,8 +14,9 @@
 --   `model_output_rate`), weighted per token class: cache reads at 0.1x the input rate,
 --   cache writes at 1.25x for the 5m TTL and 2x for the 1h TTL. Against the 62 sessions
 --   carrying a real `cost-state.totalCostUSD` it lands at 0.97 of billed spend, so read it
---   as a close approximation rather than an exact bill. `scripts/usage.ts` renders the same
---   numbers in the terminal.
+--   as a close approximation rather than an exact bill. Ranking bursts is this query's own
+--   job. `scripts/usage.ts` renders the per-session and per-bucket views in the terminal
+--   from `top-sessions` and `usage-timeline`.
 -- params:
 --   - name: bucket_minutes
 --     default: 10

@@ -15,10 +15,10 @@
 --   `<command-name>` marker, and no Skill tool_use follows: across the corpus fewer than 1%
 --   of Skill calls have a matching slash command anywhere earlier in the session. So
 --   `explicit` is counted from those markers in `raw`, and `model_auto` plus `chained` from
---   `skill_calls`. Reading explicitness off the Skill call alone cannot work, which is what
---   the previous definition (args being NULL means model-auto) got wrong: passing args is
---   ordinary model routing, so every parameterized skill read as 100% explicit and its
---   description looked unearned.
+--   `skill_calls`. Reading explicitness off the Skill call alone cannot work. Whether args
+--   were passed says nothing, since passing args is ordinary model routing, so keying on it
+--   reads every parameterized skill as 100% explicit and makes its description look
+--   unearned.
 --
 --   `chained` is a Skill call made while another skill held attribution, skill-to-skill
 --   delegation rather than a fresh routing decision. It counts toward the description

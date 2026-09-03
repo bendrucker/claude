@@ -88,9 +88,9 @@ The rest, by name, described in [`references/catalog.md`](references/catalog.md)
 
 Load [`references/catalog.md`](references/catalog.md) before running a query you have not used. A further tier, aimed at the self-improvement loop, is listed in [`references/discovery.md`](references/discovery.md).
 
-### Markdown and YAML on Disk
+### Queries That Read Disk
 
-Three queries (`plan-sections`, `frontmatter`, `skill-config-vs-observed`) read files on disk through the `markdown`/`yaml` community extensions instead of the index. Run them with `-init resources/extensions.sql`, which loads both in the same process before the piped query and runs under `-readonly`. The common-path queries above omit `-init` and pay nothing. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
+Four queries read files on disk instead of the index. Three of them (`plan-sections`, `frontmatter`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-init resources/extensions.sql`, which loads both in the same process before the piped query and runs under `-readonly`. `hook-self-timing` reads JSONL and needs no extension. The common-path queries above omit `-init` and pay nothing. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
 
 ```bash
 duckdb -readonly -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql ${CLAUDE_PLUGIN_DATA}/session.duckdb \

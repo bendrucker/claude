@@ -77,11 +77,11 @@ while IFS= read -r dir; do
   case "$slug" in */*) printf '%s\t%s\n' "$root" "$slug" ;; esac
 done < "$tmp/seeds" | sort -u > "$tmp/repos"
 
-# One subshell per repository, so the slowest repo sets the wall clock rather
-# than the sum of them. gh overlaps with that repo's own git work.
+# One subshell per repository, so the slowest repo sets the wall clock. gh
+# overlaps with that repo's own git work.
 #
 # Only PRs on branches checked out here matter, and headRefName is the exact
-# join from a worktree branch to its PR. So: one list call per discovered repo.
+# join from a worktree branch to its PR: one list call per discovered repo.
 
 scan_repo() {
   local root=$1 slug=$2 out=$3

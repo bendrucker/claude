@@ -37,6 +37,10 @@ Never silently drop an item.
 
 ## Unpushed Work Sweep
 
+When `HERDR_PANE_ID` is set, load `flock` and let it run this phase. It reconciles panes, worktrees, and pull requests in one pass and cleans up what it finds, which is strictly more than the sweep below. Fold its report into the brief and skip the rest of this section.
+
+Without a herdr server, `flock` has nothing to coordinate and refuses, so run the sweep below instead.
+
 The configured roots may span many repositories, so keep this phase cheap: one sub-agent, local git commands only, no platform API calls. This is the lowest-priority phase. Skip it when the focus hint points elsewhere or the rest of the brief needs the time.
 
 Enumerate worktrees via the configured worktree tool. Fall back to `git worktree list` run across the configured roots. For each worktree, report:

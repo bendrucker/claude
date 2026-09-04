@@ -155,6 +155,11 @@
       "source": "./plugins/raycast"
     },
     {
+      "name": "herdr",
+      "description": "Drive the herdr terminal workspace manager: panes, tabs, workspaces, and sibling coding agents",
+      "source": "./plugins/herdr"
+    },
+    {
       "name": "tmux",
       "description": "Tmux session awareness and pane interaction",
       "source": "./plugins/tmux"

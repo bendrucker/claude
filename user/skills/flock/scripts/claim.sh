@@ -198,10 +198,11 @@ awk -F'\t' '
 ' "$tmp/board"
 
 if [ -s "$DEFERRED" ]; then
-  echo
-  jq -r --arg cut "$(date -v-14d +%Y-%m-%d 2>/dev/null || date -d '14 days ago' +%Y-%m-%d)" '
-    "deferred: \(length) (" + ([.[] | .key] | join(", ")) + ")",
-    ( to_entries[] | select((.value.since // "9999-99-99") < $cut)
-      | "  stale >14d, re-raise: \(.key) - \(.value.reason // "no reason recorded")" )
-  ' "$DEFERRED" 2>/dev/null || echo "deferred: file unreadable ($DEFERRED)"
+  deferrals=$(jq -r --arg cut "$(date -v-14d +%Y-%m-%d 2>/dev/null || date -d '14 days ago' +%Y-%m-%d)" '
+    select(length > 0)
+    | "deferred: \(length) (\(keys_unsorted | join(", ")))",
+      ( to_entries[] | select((.value.since // "9999-99-99") < $cut)
+        | "  stale >14d, re-raise: \(.key) - \(.value.reason // "no reason recorded")" )
+  ' "$DEFERRED" 2>/dev/null) || deferrals="deferred: file unreadable ($DEFERRED)"
+  [ -n "$deferrals" ] && printf '\n%s\n' "$deferrals"
 fi

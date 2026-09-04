@@ -206,3 +206,7 @@ if [ -s "$DEFERRED" ]; then
   ' "$DEFERRED" 2>/dev/null) || deferrals="deferred: file unreadable ($DEFERRED)"
   [ -n "$deferrals" ] && printf '\n%s\n' "$deferrals"
 fi
+
+# The block above ends on a test, and a report-only script must not hand the
+# skill loader a failure because there was nothing to defer.
+exit 0

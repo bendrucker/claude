@@ -37,11 +37,9 @@ Never silently drop an item.
 
 ## Unpushed Work Sweep
 
-When `HERDR_PANE_ID` is set, `flock` covers this phase and more: it reconciles panes, worktrees, and pull requests in one pass, then merges, closes, and prunes what it finds. It answers only to the user typing `/flock`, so recommend that in the brief rather than trying to load it. Where the user has already run it tonight, fold its report in and skip the rest of this section.
+When `HERDR_PANE_ID` is set, `flock` reconciles panes, worktrees, and pull requests in one pass, then merges, closes, and prunes what it finds. It answers only to the user typing `/flock`, so recommend that in the brief rather than trying to load it. Where this session's own transcript shows it already ran tonight, fold its report into the brief as extra findings.
 
-`flock` reports a dirty or unpushed worktree and never writes to one, so the WIP offer below stays here either way.
-
-Without a herdr server, `flock` has nothing to coordinate and refuses, so run the sweep below.
+That is an addition, never a replacement. `flock` reports a dirty or unpushed worktree and never writes to one, so the sweep below and its WIP offer run either way.
 
 The configured roots may span many repositories, so keep this phase cheap: one sub-agent, local git commands only, no platform API calls. This is the lowest-priority phase. Skip it when the focus hint points elsewhere or the rest of the brief needs the time.
 

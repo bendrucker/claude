@@ -72,7 +72,10 @@ repo_seed() {
   local repo_dir wt
   for repo_dir in "$@"; do
     for wt in "$repo_dir"*/; do
-      [ -d "$wt" ] && { printf '%s\n' "${wt%/}"; break; }
+      # Any one checkout resolves the whole repository, but it has to be a real
+      # one: stopping at the first bare directory lets a leftover hide every
+      # worktree under it.
+      [ -e "$wt.git" ] && { printf '%s\n' "${wt%/}"; break; }
     done
   done
 }

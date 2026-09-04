@@ -7,6 +7,7 @@ import {
   allowedToolsFormat,
   descriptionLength,
   descriptionRequired,
+  effortRequiresFork,
   nameConsecutiveHyphens,
   nameEdgeHyphens,
   nameFormat,
@@ -14,6 +15,7 @@ import {
 } from "../rules/frontmatter";
 import { preferHeaders } from "../rules/headers";
 import { namespaceMismatch, namespaceStutter } from "../rules/namespace";
+import { findReferences } from "../rules/references";
 import type { RuleResult, Severity } from "../types";
 
 const fixturesDir = path.join(import.meta.dirname, "fixtures");
@@ -194,6 +196,40 @@ describe("frontmatter rules", () => {
     const content = parseSkill(frontmatter);
     const result = single(allowedToolsFormat.check(content, ""));
     expect(result.passed).toBe(passed);
+  });
+
+  test.each<{ name: string; frontmatter: string; passed: boolean }>([
+    {
+      name: "passes when effort is not set",
+      frontmatter: "---\nname: test\n---\n",
+      passed: true,
+    },
+    {
+      name: "passes when effort is paired with context: fork",
+      frontmatter: "---\neffort: low\ncontext: fork\n---\n",
+      passed: true,
+    },
+    {
+      name: "fails when effort is set on an inline skill",
+      frontmatter: "---\neffort: low\n---\n",
+      passed: false,
+    },
+    {
+      name: "fails when effort is set with a non-fork context",
+      frontmatter: "---\neffort: low\ncontext: inline\n---\n",
+      passed: false,
+    },
+  ])("effortRequiresFork: $name", ({ frontmatter, passed }) => {
+    const content = parseSkill(frontmatter);
+    const result = single(effortRequiresFork.check(content, ""));
+    expect(result.passed).toBe(passed);
+  });
+});
+
+describe("findReferences", () => {
+  it("strips anchor fragments so link variants resolve to one file", () => {
+    const body = "[a](references/patterns.md) and [b](references/patterns.md#reasoning-effort)";
+    expect(findReferences(body)).toEqual(["references/patterns.md"]);
   });
 });
 

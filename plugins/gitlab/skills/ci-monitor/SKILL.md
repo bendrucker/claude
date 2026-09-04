@@ -2,7 +2,6 @@
 name: gitlab:ci-monitor
 description: Watch GitLab CI and investigate pipeline failures. Use when a pipeline or job is failing or red, when watching MR CI, branch builds, or a specific pipeline, when waiting for CI to go green, or when authoring or validating .gitlab-ci.yml.
 argument-hint: "[mr-url | branch | pipeline-id] [--max-minutes N] [--project group/project]"
-effort: low
 allowed-tools:
   - Monitor
   - TaskStop

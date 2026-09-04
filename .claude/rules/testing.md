@@ -20,6 +20,7 @@ After changing a plugin script, run it directly with real arguments as well as i
 - **Assertion chains are allowed in tests only.** `local/no-chained-type-assertions` is off under `**/*.test.ts` so a test can build a deliberately-invalid input for a rejection path. Everywhere else the chain has to go.
 - **Prefer skills over agents** for anything that should be directly invocable. Skills are invocable via the `Skill` tool.
 - **Hook E2E tests drive the real dispatcher.** A unit test proves the script's logic, not that Claude Code dispatches to it. Run headless `claude -p` with `--plugin-dir` against a throwaway repo with the external CLI (`gh`, `glab`) stubbed onto `PATH`, then assert on what the stub recorded. These live at `plugins/<name>/scripts/e2e-*.ts` and run in CI only, from a path-filtered workflow holding the `CLAUDE_CODE_OAUTH_TOKEN` secret, because each run spends API tokens.
+- **Capture check and test output once.** `bun run check` and `bun test` re-execute the whole gate every time. Redirect on the first run (`bun run check 2>&1 | tee tmp/check.log | tail -n 50`) and read further into `tmp/check.log` with `sed`.
 
 ## CI Structure
 

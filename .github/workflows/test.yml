@@ -214,7 +214,7 @@ jobs:
 
       - name: Lint skills
         if: steps.inspect.outputs.has_skills == 'true'
-        run: bun run skill-lint "plugins/${{ matrix.plugin.name }}/skills/*"
+        run: bun run skill-lint --strict "plugins/${{ matrix.plugin.name }}/skills/*"
 
       - name: Validate Swift syntax
         if: steps.inspect.outputs.has_swift == 'true'
@@ -295,7 +295,7 @@ jobs:
       - uses: ./.github/actions/bun-install
 
       - name: Lint skills
-        run: bun run skill-lint "user/skills/*"
+        run: bun run skill-lint --strict "user/skills/*"
 
   coverage:
     runs-on: ubuntu-latest

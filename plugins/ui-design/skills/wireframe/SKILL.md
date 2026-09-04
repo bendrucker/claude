@@ -34,7 +34,7 @@ Wireframes are skeletal, black-and-white representations of UI layout, focused o
 | **SVG** | Precise positioning, overlapping elements, custom shapes, artistic layouts | `render.ts` |
 | **HTML/Tailwind** | Standard UI patterns (forms, grids, navigation, modals), flexbox layouts | `render-html.ts` |
 
-**Before creating any wireframe**: Read the reference file for your chosen approach. The references contain required patterns, component examples, and the rendering workflow.
+Before creating a wireframe, read the reference file for your chosen approach. The references contain required patterns, component examples, and the rendering workflow.
 
 ## References
 

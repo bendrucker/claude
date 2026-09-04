@@ -6,6 +6,7 @@ argument-hint: "[focus hint]"
 disable-model-invocation: true
 allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/claim.sh)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/defer.sh:*)
   - AskUserQuestion
   - Bash(herdr api snapshot:*)
   - Bash(herdr agent list:*)
@@ -18,6 +19,9 @@ allowed-tools:
   - Bash(herdr pane read:*)
   - Bash(herdr pane list:*)
   - Bash(herdr workspace list:*)
+  - Bash(herdr workspace focus:*)
+  - Bash(herdr workspace rename:*)
+  - Bash(herdr workspace create:*)
   - Bash(herdr worktree list:*)
   - Bash(gh pr view:*)
   - Bash(gh pr list:*)
@@ -46,6 +50,8 @@ The `FLOCK` line is the singleton check, and only one flock runs per server:
 - `UNCLAIMED`: no workspace is labelled `flock`. Rename this workspace to `flock` if it holds nothing else, otherwise create one and move there. Then sweep.
 
 The board below it is a skeleton. It carries panes, worktrees, branches, PR numbers, and local flags. It carries no CI state and no review scores, so fetch those for the rows that have a PR and for nothing else.
+
+An `incomplete:` line above the board, or a `?` in a PR column, means a lookup failed for that repo. Its rows are unknown rather than empty, so re-run `gh` yourself there before disposing of anything.
 
 Weight the sweep toward whatever `$ARGUMENTS` names: a repo, a workspace, a branch.
 
@@ -81,6 +87,8 @@ Resolve every row to one of four dispositions.
 
 **Merge.** Bar met, your repo. `gh pr merge --squash --delete-branch`, then clean up its worktree and workspace.
 
+Merging, removing a worktree, closing a workspace, and pruning a branch are each deliberately outside the pre-approved set. They stop at the permission gate every time, which is the point: the sweep proposes disposals and the user lets them through.
+
 **Push back.** Bar not met and a pane owns it. Prompt that pane with the evidence. Use `herdr agent wait` rather than polling when you intend to collect the result this run.
 
 **Clean up.** Branch merged, tree clean, no live agent. Remove the worktree, close its workspace and panes, prune the branch. A pane cannot close its own workspace without killing itself mid-command, which is why this is yours.
@@ -89,7 +97,7 @@ Resolve every row to one of four dispositions.
 
 An orphan row with no pane is the point of the sweep. A branch merged weeks ago whose checkout is still on disk, or a worktree carrying commits that were never pushed, is work you lost track of, and it is why the board reads worktrees rather than panes alone.
 
-A pane parked on an approval dialog is the user's to answer. Read it, hand it over, do not answer it.
+A pane parked on an approval dialog is the user's to answer. Read it, `herdr agent focus` it so the dialog is in front of them, and say what it is asking. Do not answer it.
 
 ## Report
 
@@ -105,10 +113,11 @@ Between prompts, do nothing. `/loop 20m /flock` is how the user makes this proac
 
 ## Deferrals
 
-A row the user says to leave alone goes in `~/.cache/claude/flock/deferred.json`, keyed by worktree or branch:
+A row the user says to leave alone is recorded by key, either a worktree or a branch:
 
-```json
-{ "redesign": { "reason": "still working it", "since": "2026-09-03" } }
+```bash
+bash ${CLAUDE_SKILL_DIR}/scripts/defer.sh redesign "still working it"
+bash ${CLAUDE_SKILL_DIR}/scripts/defer.sh --drop redesign
 ```
 
 The state block collapses these to one line and re-raises anything older than 14 days. Record the reason in the user's own words. Drop the entry once the work lands.

@@ -23,13 +23,15 @@ for tool in herdr jq git gh; do
   }
 done
 
-if ! snapshot=$(herdr api snapshot 2>&1) || [ "${snapshot:0:1}" != "{" ]; then
-  echo "NO HERDR (snapshot failed: ${snapshot%%$'\n'*}). Stop and say so."
-  exit 0
-fi
-
 tmp=$(mktemp -d) || exit 0
 trap 'rm -rf "$tmp"' EXIT
+
+# stderr stays out of the captured value. Folded in, one warning line ahead of
+# the body would make a healthy server read as an outage.
+if ! snapshot=$(herdr api snapshot 2>"$tmp/snapshot.err") || [ "${snapshot:0:1}" != "{" ]; then
+  echo "NO HERDR (snapshot failed: $(head -1 "$tmp/snapshot.err")). Stop and say so."
+  exit 0
+fi
 
 flock_ws=$(printf '%s' "$snapshot" | jq -r --arg l "$LABEL" '
   [.result.snapshot.workspaces[]? | select((.label // "") == $l) | .workspace_id][0] // ""' 2>/dev/null)
@@ -52,20 +54,34 @@ printf '%s' "$snapshot" | jq -r '
   | ($s.workspaces // []) as $ws
   | ($s.panes // [])[]
   | . as $p
-  | ($ws[] | select(.workspace_id == $p.workspace_id) | .label // "") as $label
+  | (($ws | map(select(.workspace_id == $p.workspace_id)) | .[0].label) // "") as $label
   | [ $p.pane_id,
       $label,
       ((if ($p.agent // "") == "" then "shell" else $p.agent end) + "/" + ($p.agent_status // "?")),
       ($p.foreground_cwd // $p.cwd // "")
     ] | @tsv' 2>/dev/null | sort > "$tmp/panes" || : > "$tmp/panes"
 
-# Three seeds, so a worktree with no pane is still discovered. That is where
-# work merged remotely but still open locally actually hides.
+# Seeded from more than the live panes, because a worktree with no pane is
+# where work merged remotely but still open locally actually hides. The
+# snapshot names every repository herdr knows, whatever path layout it uses;
+# the globs then cover checkouts herdr has never opened. git resolves one
+# seed per repository rather than one per worktree, so a repo with twenty
+# worktrees still costs one lookup.
+
+repo_seed() {
+  local repo_dir wt
+  for repo_dir in "$@"; do
+    for wt in "$repo_dir"*/; do
+      [ -d "$wt" ] && { printf '%s\n' "${wt%/}"; break; }
+    done
+  done
+}
 
 {
+  printf '%s' "$snapshot" | jq -r '
+    [.result.snapshot.workspaces[]?.worktree?.repo_root // empty] | unique[]' 2>/dev/null
   cut -f4 "$tmp/panes"
-  ls -d "$HOME"/src/.worktrees/*/*/* 2>/dev/null
-  ls -d "$HOME"/.herdr/worktrees/*/* 2>/dev/null
+  repo_seed "$HOME"/src/.worktrees/*/*/ "$HOME"/.herdr/worktrees/*/
 } | sed '/^$/d' | sort -u > "$tmp/seeds"
 
 while IFS= read -r dir; do
@@ -85,7 +101,7 @@ done < "$tmp/seeds" | sort -u > "$tmp/repos"
 
 scan_repo() {
   local root=$1 slug=$2 out=$3
-  local default merged prs wt branch flags ahead pr
+  local default candidate merged prs wt branch flags ahead pr none="-"
 
   gh pr list --repo "$slug" --author @me --state open --limit 60 \
     --json number,headRefName,isDraft > "$out.gh" 2>/dev/null &
@@ -93,30 +109,48 @@ scan_repo() {
 
   default=$(git -C "$root" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)
   default=${default#origin/}
-  [ -n "$default" ] || default=main
-  merged=$(git -C "$root" branch --format='%(refname:short)' --merged "origin/$default" 2>/dev/null)
+  # origin/HEAD goes unset on any checkout that never ran `git remote set-head`,
+  # and guessing main against a master repo empties the merged list in silence.
+  if [ -z "$default" ]; then
+    for candidate in main master; do
+      git -C "$root" rev-parse --verify --quiet "origin/$candidate" >/dev/null 2>&1 &&
+        { default=$candidate; break; }
+    done
+  fi
+  if [ -z "$default" ]; then
+    echo "$slug: no default branch on origin, so merged branches go unflagged" >> "$tmp/warnings"
+  else
+    merged=$(git -C "$root" branch --format='%(refname:short)' --merged "origin/$default" 2>/dev/null)
+  fi
 
-  wait "$gh_pid" 2>/dev/null
-  prs=$(jq -r '.[]? | [.headRefName, (if .isDraft then "draft#" else "#" end) + (.number|tostring)] | @tsv' \
-    "$out.gh" 2>/dev/null)
+  # An unreachable forge and a repo with no open PRs both leave jq nothing to
+  # read, and the board must not present the first as the second.
+  if wait "$gh_pid" 2>/dev/null; then
+    prs=$(jq -r '.[]? | [.headRefName, (if .isDraft then "draft#" else "#" end) + (.number|tostring)] | @tsv' \
+      "$out.gh" 2>/dev/null)
+  else
+    prs=""
+    none="?"
+    echo "$slug: open pull requests could not be listed, so its PR column reads ?" >> "$tmp/warnings"
+  fi
+  rm -f "$out.gh"
 
-  git -C "$root" worktree list --porcelain 2>/dev/null |
-    awk '/^worktree /{p=$2} /^branch /{sub(/^refs\/heads\//,"",$2); print p "\t" $2}' |
+  git -C "$root" worktree list --porcelain > "$out.wt" 2>/dev/null ||
+    echo "$slug: worktrees could not be listed, so none of its rows appear below" >> "$tmp/warnings"
+
+  awk '/^worktree /{p=$2} /^branch /{sub(/^refs\/heads\//,"",$2); print p "\t" $2}' "$out.wt" 2>/dev/null |
     while IFS=$'\t' read -r wt branch; do
       [ "$wt" = "$root" ] && continue
       flags=""
       [ -n "$(git -C "$wt" status --porcelain 2>/dev/null | head -1)" ] && flags="dirty"
-      if git -C "$wt" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
-        ahead=$(git -C "$wt" log '@{u}..HEAD' --oneline 2>/dev/null | wc -l | tr -d ' ')
-      else
-        ahead=$(git -C "$wt" log "origin/$default..HEAD" --oneline 2>/dev/null | wc -l | tr -d ' ')
-      fi
+      ahead=$(git -C "$wt" rev-list --count '@{u}..HEAD' 2>/dev/null ||
+        git -C "$wt" rev-list --count "origin/$default..HEAD" 2>/dev/null)
       [ "${ahead:-0}" -gt 0 ] 2>/dev/null && flags="${flags:+$flags,}unpushed:$ahead"
       printf '%s\n' "$merged" | grep -qx -- "$branch" && flags="${flags:+$flags,}merged"
       pr=$(printf '%s\n' "$prs" | awk -F'\t' -v b="$branch" '$1==b {print $2; exit}')
-      printf 'wt\t%s\t%s\t%s\t%s\t%s\n' "${slug##*/}" "$branch" "${pr:--}" "${flags:-clean}" "$wt"
+      printf 'wt\t%s\t%s\t%s\t%s\t%s\n' "${slug##*/}" "$branch" "${pr:-$none}" "${flags:-clean}" "$wt"
     done > "$out"
-  rm -f "$out.gh"
+  rm -f "$out.wt"
 }
 
 i=0
@@ -126,16 +160,21 @@ while IFS=$'\t' read -r root slug; do
 done < "$tmp/repos"
 wait
 
-cat "$tmp"/repo.* 2>/dev/null | sort -t$'\t' -k2,2 -k3,3 > "$tmp/rows" || : > "$tmp/rows"
+cat "$tmp"/repo.[0-9]* 2>/dev/null | sort -t$'\t' -k2,2 -k3,3 > "$tmp/rows" || : > "$tmp/rows"
 
-: > "$tmp/claimed"
+if [ -s "$tmp/warnings" ]; then
+  sed 's/^/incomplete: /' "$tmp/warnings"
+  echo
+fi
+
+claimed=" "
 : > "$tmp/board"
 while IFS=$'\t' read -r _kind repo branch pr flags wt; do
   pane="-" agent="-"
   while IFS=$'\t' read -r pid _label ast cwd; do
     case "$cwd" in "$wt" | "$wt"/*)
       pane="$pid" agent="$ast"
-      echo "$pid" >> "$tmp/claimed"
+      claimed="$claimed$pid "
       break
       ;;
     esac
@@ -147,7 +186,7 @@ done < "$tmp/rows"
 while IFS=$'\t' read -r pid label ast cwd; do
   case "$ast" in shell/*) continue ;; esac
   [ "$pid" = "$HERDR_PANE_ID" ] && continue
-  grep -qx -- "$pid" "$tmp/claimed" 2>/dev/null && continue
+  case "$claimed" in *" $pid "*) continue ;; esac
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$pid" "$ast" "${label:--}" "-" "-" "no worktree" >> "$tmp/board"
 done < "$tmp/panes"
 

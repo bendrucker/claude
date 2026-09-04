@@ -28,6 +28,7 @@ Plugins cannot use it. A distributed plugin resolves its runtime deps through np
 - **Output width**: use a fixed default with a flag override (`--truncate <n>`). Do not read `process.stdout.columns` or gate on `process.stdout.isTTY`, both undefined when piped. The `local/no-terminal-width` lint rule enforces this.
 - **Ancestor paths**: use `join(import.meta.dirname, "..")` rather than chained `dirname()` calls.
 - **Terminal colors**: use ANSI colors 0-15, which the terminal theme remaps for light and dark mode. Avoid 256-color and truecolor escapes for foreground text.
+- **Gate output**: redirect on the first run. `bun run check` and `bun test` re-execute everything each time they are called, so run `bun run check 2>&1 | tee tmp/check.log | tail -n 50` and read further into `tmp/check.log` with `sed`.
 
 # Sandbox and Nested Commands
 

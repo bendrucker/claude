@@ -189,7 +189,7 @@ Load detailed guides as needed:
 
 - **[references/information-hierarchy.md](references/information-hierarchy.md)** - What body, reference, and pointer cost, pointer wording, splitting
 - **[references/levers.md](references/levers.md)** - Completion criteria, leading words, positive form, pruning
-- **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, skill-scoped hooks, anti-patterns
+- **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, reasoning effort, skill-scoped hooks, anti-patterns
 - **[references/plain-language.md](references/plain-language.md)** - Plain-language rules for skill prose and the conversion procedure
 - **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache
 

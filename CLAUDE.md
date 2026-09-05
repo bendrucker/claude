@@ -32,7 +32,7 @@ A customization must also stay harmonious with Claude Code's native behavior. Wh
 Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-injects when you touch matching files (via `paths` frontmatter), so it stays out of this always-on file:
 
 - [`plugins.md`](.claude/rules/plugins.md) (`plugins/**`): plugin architecture, naming, MCP tool naming, READMEs, metadata, dependencies
-- [`scripts.md`](.claude/rules/scripts.md) (`**/*.ts`): Bun runtime, script conventions, terminal colors, sandbox/nested-command pattern
+- [`scripts.md`](.claude/rules/scripts.md) (`**/*.ts`): Bun runtime, AST-based parsing, script conventions, terminal colors, sandbox/nested-command pattern
 - [`hooks.md`](.claude/rules/hooks.md) (`**/hooks.json`, `**/hooks/**`): hook guidance, quoting, MCP matcher validation
 - [`settings.md`](.claude/rules/settings.md) (`**/settings*.json`): permission paths, `autoMode` scoping, sandbox and `excludedCommands`. Per-entry rationale and removal criteria live in [`docs/settings.md`](docs/settings.md), which does not auto-inject
 - [`testing.md`](.claude/rules/testing.md) (test and workflow files): testing conventions, CI structure

@@ -54,8 +54,8 @@ export async function arm(
       // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one failed transiently.
       await run();
       return;
-    } catch (err) {
-      const message = errorText(err);
+    } catch (error) {
+      const message = errorText(error);
       if (message.includes(ALREADY_ARMED)) {
         return;
       }
@@ -64,7 +64,7 @@ export async function arm(
         await sleep(RETRY_DELAY_MS);
         continue;
       }
-      throw err;
+      throw error;
     }
   }
 }

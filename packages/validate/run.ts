@@ -65,8 +65,8 @@ export function pluginDirFile(usage: string, file: string): string {
 }
 
 export function runEntry(run: () => Promise<void>): void {
-  run().catch((err) => {
-    console.error(err);
+  run().catch((error) => {
+    console.error(error);
     process.exit(1);
   });
 }

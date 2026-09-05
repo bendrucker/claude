@@ -194,10 +194,8 @@ export function deriveEvents(
       events.push({ type: "queued-timeout", minutes: queuedTimeoutMinutes });
       next = { ...next, queuedTimeoutEmitted: true };
     }
-  } else {
-    if (next.queuedSince !== null || next.queuedTimeoutEmitted) {
-      next = { ...next, queuedSince: null, queuedTimeoutEmitted: false };
-    }
+  } else if (next.queuedSince !== null || next.queuedTimeoutEmitted) {
+    next = { ...next, queuedSince: null, queuedTimeoutEmitted: false };
   }
 
   return { events, state: next };
@@ -304,9 +302,11 @@ function exec(command: string): ExecResult {
   try {
     const stdout = execSync(command, execOptions).toString().trim();
     return { ok: true, stdout };
-  } catch (err) {
+  } catch (error) {
     const stderr =
-      typeof err === "object" && err !== null && "stderr" in err ? streamText(err.stderr) : "";
+      typeof error === "object" && error !== null && "stderr" in error
+        ? streamText(error.stderr)
+        : "";
     const { rateLimited, retryAfter } = detectRateLimit(stderr);
     return { ok: false, stderr, rateLimited, retryAfter };
   }
@@ -496,8 +496,8 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
   let view: z.infer<typeof PrView>;
   try {
     view = PrView.parse(JSON.parse(prResult.stdout));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error(`gh pr view returned unparseable JSON for PR #${prNumber}: ${message}`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
@@ -533,8 +533,8 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
     state = deriveChecksState(
       Checks.parse(JSON.parse(checksResult.stdout !== "" ? checksResult.stdout : "[]")),
     );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error(`gh pr checks returned unusable JSON for PR #${prNumber}: ${message}`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
@@ -559,8 +559,8 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
         JSON.parse(runsResult.stdout !== "" ? runsResult.stdout : "[]"),
       );
       runId = selectRunId(runs, sha);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error(`gh run list returned unusable JSON for ${repo}@${sha}: ${message}`);
       return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
     }
@@ -609,8 +609,8 @@ export function probeBranch(repo: string, branch: string, run: ExecFn = exec): P
   let runs: RunView[];
   try {
     runs = RunList.parse(JSON.parse(result.stdout !== "" ? result.stdout : "[]"));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error(`gh run list returned unusable JSON for ${repo}@${branch}: ${message}`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
@@ -642,9 +642,9 @@ function fetchInterval(branch: string, repo: string | null): number {
   try {
     const parsed = Durations.parse(JSON.parse(result.stdout !== "" ? result.stdout : "[]"));
     return computeInterval(parsed.filter((n): n is number => typeof n === "number"));
-  } catch (err) {
+  } catch (error) {
     console.error(
-      `gh run list returned unparseable JSON while computing poll interval for ${branch}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${err instanceof Error ? err.message : String(err)}`,
+      `gh run list returned unparseable JSON while computing poll interval for ${branch}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
   return DEFAULT_INTERVAL_SECONDS;
@@ -671,8 +671,8 @@ export function probeRunId(runId: string, repo: string, run: ExecFn = exec): Pro
   let view: RunView;
   try {
     view = RunView.parse(JSON.parse(result.stdout !== "" ? result.stdout : "{}"));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error(`gh run view returned unusable JSON for run ${runId}: ${message}`);
     return { kind: "error", rateLimited: false, retryAfter: "", stderr: message };
   }
@@ -872,8 +872,8 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch((err) => {
-    console.error(err instanceof Error ? err.message : String(err));
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
 }

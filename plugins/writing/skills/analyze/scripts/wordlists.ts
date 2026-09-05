@@ -13,9 +13,9 @@ export async function loadWordlists(dir: string): Promise<WordlistEntry[]> {
   let files: string[];
   try {
     files = readdirSync(dir).filter((f) => f.endsWith(".txt"));
-  } catch (err) {
-    if (FileError.safeParse(err).data?.code === "ENOENT") return [];
-    throw err;
+  } catch (error) {
+    if (FileError.safeParse(error).data?.code === "ENOENT") return [];
+    throw error;
   }
   const perFile = await Promise.all(
     files.toSorted().map(async (file) => {

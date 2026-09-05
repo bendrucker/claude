@@ -70,8 +70,8 @@ export async function openSessionDb(dbPath: string): Promise<Database> {
     close() {
       try {
         connection.closeSync();
-      } catch (err) {
-        console.error("Failed to close DuckDB connection:", err);
+      } catch (error) {
+        console.error("Failed to close DuckDB connection:", error);
       }
     },
   };

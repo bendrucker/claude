@@ -188,10 +188,8 @@ export function deriveEvents(
       events.push({ type: "queued-timeout", minutes: queuedTimeoutMinutes });
       next = { ...next, queuedTimeoutEmitted: true };
     }
-  } else {
-    if (next.queuedSince !== null || next.queuedTimeoutEmitted) {
-      next = { ...next, queuedSince: null, queuedTimeoutEmitted: false };
-    }
+  } else if (next.queuedSince !== null || next.queuedTimeoutEmitted) {
+    next = { ...next, queuedSince: null, queuedTimeoutEmitted: false };
   }
 
   return { events, state: next };
@@ -415,9 +413,11 @@ function exec(command: string): ExecResult {
   try {
     const stdout = execSync(command, execOptions).toString().trim();
     return { ok: true, stdout };
-  } catch (err) {
+  } catch (error) {
     const stderr =
-      typeof err === "object" && err !== null && "stderr" in err ? streamText(err.stderr) : "";
+      typeof error === "object" && error !== null && "stderr" in error
+        ? streamText(error.stderr)
+        : "";
     // glab does not surface structured rate-limit metadata. Rather than
     // regexing human text we rely on the api-error counter instead.
     return { ok: false, stderr, rateLimited: false, retryAfter: "" };
@@ -468,9 +468,9 @@ function fetchMrMetadata(
         state: parsed.state,
       },
     };
-  } catch (err) {
+  } catch (error) {
     console.error(
-      `glab api returned unparseable JSON for MR !${iid}: ${err instanceof Error ? err.message : String(err)}`,
+      `glab api returned unparseable JSON for MR !${iid}: ${error instanceof Error ? error.message : String(error)}`,
     );
     return { ok: false, rateLimited: false, retryAfter: "" };
   }
@@ -557,9 +557,9 @@ function fetchPipelineList(
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.stdout !== "" ? result.stdout : "null");
-  } catch (err) {
+  } catch (error) {
     console.error(
-      `glab api returned unparseable JSON for pipelines on ${describeTarget(target)}: ${err instanceof Error ? err.message : String(err)}`,
+      `glab api returned unparseable JSON for pipelines on ${describeTarget(target)}: ${error instanceof Error ? error.message : String(error)}`,
     );
     return { ok: false, rateLimited: false, retryAfter: "" };
   }
@@ -589,9 +589,9 @@ function fetchJobs(projectEncoded: string, pipelineId: string, run: ExecFn = exe
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.stdout !== "" ? result.stdout : "null");
-  } catch (err) {
+  } catch (error) {
     console.error(
-      `glab api returned unparseable JSON for jobs on pipeline ${pipelineId}: ${err instanceof Error ? err.message : String(err)}`,
+      `glab api returned unparseable JSON for jobs on pipeline ${pipelineId}: ${error instanceof Error ? error.message : String(error)}`,
     );
     return { ok: false };
   }
@@ -732,9 +732,9 @@ function fetchPipelineById(
       return { ok: false, rateLimited: false, retryAfter: "", notFound: false };
     }
     return { ok: true, pipeline };
-  } catch (err) {
+  } catch (error) {
     console.error(
-      `glab api returned unparseable JSON for pipeline ${pipelineId}: ${err instanceof Error ? err.message : String(err)}`,
+      `glab api returned unparseable JSON for pipeline ${pipelineId}: ${error instanceof Error ? error.message : String(error)}`,
     );
     return { ok: false, rateLimited: false, retryAfter: "", notFound: false };
   }
@@ -816,9 +816,9 @@ function fetchInterval(projectEncoded: string, target: PipelineTarget): number {
     console.error(
       `glab api returned non-array JSON while computing poll interval for ${label}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s`,
     );
-  } catch (err) {
+  } catch (error) {
     console.error(
-      `glab api returned unparseable JSON while computing poll interval for ${label}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${err instanceof Error ? err.message : String(err)}`,
+      `glab api returned unparseable JSON while computing poll interval for ${label}; defaulting to ${DEFAULT_INTERVAL_SECONDS}s: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
   return DEFAULT_INTERVAL_SECONDS;
@@ -1040,8 +1040,8 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch((err) => {
-    console.error(err instanceof Error ? err.message : String(err));
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
 }

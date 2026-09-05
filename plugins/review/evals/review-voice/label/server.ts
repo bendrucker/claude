@@ -48,7 +48,9 @@ async function readAllLabels(): Promise<Record<string, unknown>> {
       .map(async (name) => {
         try {
           out[name.replace(/\.json$/, "")] = await Bun.file(join(argv.flags.labels, name)).json();
-        } catch {}
+        } catch {
+          // best-effort: skip a label file that fails to parse rather than blocking the rest
+        }
       }),
   );
   return out;

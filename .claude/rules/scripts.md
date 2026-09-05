@@ -21,6 +21,24 @@ Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` cod
 
 Plugins cannot use it. A distributed plugin resolves its runtime deps through npm auto-install, which skips `workspace:*`, so a plugin declares `zod` in its own `package.json` and calls `schema.parse` directly.
 
+# Parsing Structured Text
+
+Parse structured text with a real parser and match against the tree it returns. This holds for any language a script reads: source code, markup, config, or data.
+
+A regex over lines carries no grammar state, so it drifts at every edge: a delimiter inside a string or a comment, an escape, a construct spanning lines, nesting of any depth. Each drift becomes a false positive or a silent gap in whatever the script enforces.
+
+Pick the parser by what is being read:
+
+- **Source code**: [`ast-grep`](https://ast-grep.github.io), which matches structurally with code-shaped patterns across every language its tree-sitter grammars cover. The `ast-grep` skill wraps it, and `ast-grep:outline` summarizes a file's structure.
+- **Markdown**: `mdast-util-from-markdown` to parse and `unist-util-visit` to walk, typed by `@types/mdast`. [`plugins/pull-request/scripts/prose.ts`](../../plugins/pull-request/scripts/prose.ts) is the reference use.
+- **Data formats**: the format's own loader, such as `JSON.parse` or the `yaml` package, which returns a tree directly.
+
+Nodes carry position data, so a finding still reports an exact line and column.
+
+Bun auto-installs registry dependencies at runtime, so a distributed plugin declares its parser in its own `package.json` like any other npm dependency. The cross-plugin restriction in [`plugins.md`](plugins.md) covers `workspace:*` specifiers, not registry packages.
+
+A regex is fine inside a single node's text, where the grammar is already resolved: matching a word within one paragraph, a flag within one command string.
+
 # Script Conventions
 
 - **Argument parsing**: use [cleye](https://github.com/privatenumber/cleye). Load the `cleye` skill for parameters, flags, and subcommands instead of reading existing scripts.

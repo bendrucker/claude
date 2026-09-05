@@ -13,14 +13,19 @@ const StopInput = z.looseObject({
 
 type StopInput = z.infer<typeof StopInput>;
 
-// Mirrors VIOLATION_EXIT in scripts/check-plugin-deps.ts. Deliberately a
-// literal rather than an import: importing the checker would pull its module
-// graph into the hook, so a checker that cannot load would crash the hook
-// instead of reaching the non-blocking "checker could not run" path below.
-// The hook's test imports both to keep the values in sync.
+// Deliberately a literal rather than an import: importing the checker would
+// pull its module graph into the hook, so a checker that cannot load would
+// crash the hook. The hook's test imports both to keep the values in sync.
 const VIOLATION_EXIT = 2;
 
-const CHECKER_PATH = join(import.meta.dirname, "..", "..", "..", "scripts", "check-plugin-deps.ts");
+const CHECKER_PATH = join(
+  import.meta.dirname,
+  "..",
+  "..",
+  "..",
+  "scripts",
+  "check-workspace-deps.ts",
+);
 
 export async function processStop(
   input: StopInput,
@@ -42,19 +47,19 @@ export async function processStop(
   if (exitCode === VIOLATION_EXIT) {
     return {
       decision: "block",
-      reason: `Missing plugin dependencies detected:\n\n${stderr}\n\nDeclare these in the plugin's package.json before stopping. Plugins must declare every npm package they import.`,
+      reason: `Missing workspace dependencies detected:\n\n${stderr}\n\nDeclare these in the workspace's own package.json before stopping. Every workspace resolves independently, so relying on the root to hoist a package is what lets an undeclared import pass locally and fail on install.`,
     };
   }
 
   // Any other non-zero exit means the checker itself failed to run (e.g.
   // module resolution failure). Surface it without blocking the stop.
   return {
-    systemMessage: `plugin-deps: checker could not run (exit ${exitCode}); skipping plugin dependency check.\n\n${stderr.trim()}`,
+    systemMessage: `workspace-deps: checker could not run (exit ${exitCode}); skipping workspace dependency check.\n\n${stderr.trim()}`,
   };
 }
 
 async function main(): Promise<void> {
-  const output = await processStop(await decodeStdin(StopInput, "plugin-deps hook input"));
+  const output = await processStop(await decodeStdin(StopInput, "workspace-deps hook input"));
   if (output) process.stdout.write(`${JSON.stringify(output)}\n`);
 }
 

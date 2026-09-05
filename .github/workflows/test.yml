@@ -94,8 +94,8 @@ jobs:
       - name: Check hook matchers
         run: bun scripts/check-hook-matchers.ts
 
-      - name: Check plugin dependencies
-        run: bun scripts/check-plugin-deps.ts
+      - name: Check workspace dependencies
+        run: bun scripts/check-workspace-deps.ts
 
       - name: Check plugin imports
         run: bun scripts/check-plugin-imports.ts

@@ -5,5 +5,8 @@
   "main": "./index.ts",
   "dependencies": {
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "fast-check": "^4.8.0"
   }
 }

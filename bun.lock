@@ -33,12 +33,16 @@
       "dependencies": {
         "cleye": "^2.0.0",
         "fast-xml-parser": "^5.0.0",
+        "zod": "^4.4.3",
       },
     },
     "packages/decode": {
       "name": "@bendrucker/claude-decode",
       "dependencies": {
         "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "fast-check": "^4.8.0",
       },
     },
     "packages/marketplace": {
@@ -92,6 +96,7 @@
       "name": "skill",
       "version": "1.0.0",
       "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
         "yaml": "^2.7.1",
         "zod": "^4.4.3",
       },
@@ -107,6 +112,7 @@
       },
       "devDependencies": {
         "@anthropic-ai/sdk": "^0.116.0",
+        "fast-check": "^4.8.0",
         "fast-xml-builder": "^1.3.1",
       },
     },
@@ -115,6 +121,7 @@
       "dependencies": {
         "cleye": "^2.2.1",
         "table": "^6.9.0",
+        "zod": "^4.4.3",
       },
     },
     "plugins/git": {
@@ -145,6 +152,9 @@
         "url-pattern": "^1.0.3",
         "zod": "^4.4.3",
       },
+      "devDependencies": {
+        "fast-check": "^4.8.0",
+      },
     },
     "plugins/go": {
       "name": "go",
@@ -158,6 +168,10 @@
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
         "cleye": "^2.0.0",
+      },
+      "devDependencies": {
+        "gray-matter": "^4.0.3",
+        "zod": "^4.4.3",
       },
     },
     "plugins/linear": {
@@ -205,6 +219,9 @@
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
         "zod": "^4.4.3",
       },
+      "devDependencies": {
+        "fast-check": "^4.8.0",
+      },
     },
     "plugins/plan": {
       "name": "@bendrucker/claude-plan",
@@ -224,14 +241,18 @@
       },
       "devDependencies": {
         "@types/mdast": "^4.0.4",
+        "fast-check": "^4.8.0",
       },
     },
     "plugins/pull-request/evals/pr-body": {
       "name": "pr-body-eval",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.116.0",
+        "cleye": "^2.2.1",
+        "zod": "^4.4.3",
       },
       "devDependencies": {
+        "fast-check": "^4.8.0",
         "promptfoo": "0.122.2",
       },
     },
@@ -314,6 +335,7 @@
       },
       "devDependencies": {
         "@types/mdast": "^4.0.4",
+        "fast-check": "^4.8.0",
         "natural": "^8.1.1",
       },
     },

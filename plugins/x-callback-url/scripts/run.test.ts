@@ -71,6 +71,20 @@ const scenarios: Scenario[] = [
     build: 'echo "$SCRIPT_DIR/xcall-stub"',
     binary: 'echo "canceled" >&2; exit 2',
   },
+  {
+    // shlock reclaims a lock whose recorded pid is gone, so the holder has to
+    // outlive the wait. Its output goes to /dev/null because a child holding
+    // the stdout run.sh reads the binary path from would stall the build read.
+    name: "another instance holds the bridge",
+    build: [
+      'lock="$XDG_CACHE_HOME/claude/x-callback-url/xcall.lock"',
+      'mkdir -p "$(dirname "$lock")"',
+      `sleep ${STUCK_SECONDS} >/dev/null 2>&1 &`,
+      'shlock -f "$lock" -p $!',
+      'echo "$SCRIPT_DIR/xcall-stub"',
+    ].join("\n"),
+    binary: 'echo "unreachable"',
+  },
 ];
 
 async function writeExecutable(path: string, contents: string): Promise<string> {
@@ -109,6 +123,7 @@ async function runScenario(scenario: Scenario): Promise<Outcome> {
       XDG_CACHE_HOME: dir,
       XCALL_TIMEOUT_SECONDS: String(BOUND),
       XCALL_BUILD_TIMEOUT_SECONDS: String(BOUND),
+      XCALL_LOCK_WAIT_SECONDS: String(BOUND),
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -178,6 +193,10 @@ test("run.sh bounds every wait and maps each outcome to its own exit code", asyn
     user cancels
       exit:   2
       stdout: (none)
-      stderr: canceled"
+      stderr: canceled
+    another instance holds the bridge
+      exit:   5
+      stdout: (none)
+      stderr: another xcall held the xcall-claude:// bridge for more than 1s"
   `);
 }, 15_000);

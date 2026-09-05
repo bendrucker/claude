@@ -38,12 +38,10 @@ run_bounded() {
   # execs first the parent's call is refused (EPERM on BSD) and bash warns about
   # a group that is already correct. Fd 9 carries the command's own stderr past
   # the /dev/null that keeps that warning off the caller's.
-  exec 9>&2
   set -m
-  { "$@" 2>&9 9>&- & } 2>/dev/null
+  { "$@" 2>&9 9>&- & } 9>&2 2>/dev/null
   local pid=$!
   set +m
-  exec 9>&-
 
   (
     # The timer runs as a child so the trap can end it. A foreground sleep here
@@ -97,7 +95,9 @@ mkdir -p "$(dirname "$LOCK_FILE")"
 # A holder cannot outlive its own watchdog, so the wait covers one full turn
 # plus the grace the watchdog allows before SIGKILL. shlock reclaims a lock
 # whose recorded pid is gone, which covers a holder killed outside that path.
-LOCK_WAIT_SECONDS=$((TIMEOUT_SECONDS + KILL_GRACE_SECONDS + 1))
+# The budget assumes a single holder ahead. XCALL_LOCK_WAIT_SECONDS overrides it
+# for a caller queued behind more than one.
+LOCK_WAIT_SECONDS="${XCALL_LOCK_WAIT_SECONDS:-$((TIMEOUT_SECONDS + KILL_GRACE_SECONDS + 1))}"
 lock_deadline=$((SECONDS + LOCK_WAIT_SECONDS))
 until shlock -f "$LOCK_FILE" -p $$; do
   if ((SECONDS >= lock_deadline)); then

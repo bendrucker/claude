@@ -27,6 +27,7 @@ The marker hook reads the script named at the head of a command, past any `VAR=v
 
 - `XCALL_BUILD_TIMEOUT_SECONDS` (default 20) bounds the build, and exits 3
 - `XCALL_TIMEOUT_SECONDS` (default 20) bounds the callback, and exits 4
+- `XCALL_LOCK_WAIT_SECONDS` (default `XCALL_TIMEOUT_SECONDS` + 3) bounds the wait for the bridge lock, and exits 5. The default covers one holder ahead, so raise it for a caller queued behind several
 
 ## Usage
 

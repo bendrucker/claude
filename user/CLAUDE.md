@@ -82,16 +82,20 @@ I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 
 ## Claude Configuration
 
-My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucker/claude). Two checkouts of it matter, and they are not the same tree:
+My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucker/claude), worked on at `~/src/bendrucker/claude`. The `~/.claude` symlinks point into a deployed clone at `~/.claude-repo` that `claude-upgrade` syncs from `main`. A merged change is not live until that sync runs, and editing through the symlinks writes into that clone instead of a branch. Project-scoped `.claude/` directories stay with their repo.
 
-- `~/.claude-repo` is the deployed one. Each entry under its `user/` directory is symlinked into `~/.claude`, so the instructions, settings, rules, skills, agents, and hooks loaded this session are its files. `claude-upgrade` syncs it from `main`.
-- `~/src/bendrucker/claude` is the dev clone that worktrees are cut from. Work happens there.
+## Dotfiles
 
-A merged change is not live until that sync runs, so never treat an edit as already in effect. Never write to the `~/.claude` symlink targets either, which would edit the deployed checkout behind git's back.
+Machine setup lives in [`bendrucker/dotfiles`](https://github.com/bendrucker/dotfiles) at `~/.dotfiles`, organized into topic directories, including a [`claude/`](https://github.com/bendrucker/dotfiles/tree/main/claude) topic. The Claude repo installs nothing. A change that assumes something the machine or the shell provides needs a merged dotfiles PR first:
 
-Everything that steers Claude across projects belongs in that repo: these instructions, `settings.json` and its permissions and sandbox entries, rules, skills, agents, hooks, plugins under `plugins/`, and the schemas and evals supporting them. A repo's own `.claude/` directory is the exception, since project-scoped config belongs with the project.
+- A binary a skill, hook, or MCP server invokes. Declare it in a topic `Brewfile`, or in `mise.toml` for pinned language tooling.
+- Anything on `$PATH`: a `bin/` executable, or a directory added by `path.zsh`.
+- Shell aliases, functions, wrappers, and completions, which live in a topic's `*.zsh` files.
+- Environment variables the shell must export. Variables only Claude reads belong in `settings.json` instead.
+- Setup beyond dropping a file in place: `install.sh` steps, `symlinks.conf` entries, launchd agents, and macOS permission grants like Screen Recording and Accessibility.
+- Recurring jobs, including work the nightly `claude-upgrade` should carry.
 
-When a request starts in another repo and the real fix turns out to be one of those, hand it to a sibling agent through the `herdr` skill, with its own worktree of `bendrucker/claude`, and report the PR back to me. herdr gives a sibling its checkout without re-rooting this session, which is why it applies here in place of `worktrunk:wt-switch-create`. Where herdr is unavailable, tell me what the change is and let me route it rather than editing in place.
+Work in another repo that turns out to need a change in either repo goes to a sibling agent through the `herdr` skill, which leaves this session on its own task. Report the PR back to me, or tell me what the change is where herdr is unavailable.
 
 ## Stacked PRs
 

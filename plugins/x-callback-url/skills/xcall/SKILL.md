@@ -34,9 +34,11 @@ The marker hook reads the script named at the head of a command, past any `VAR=v
 ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh "<url>"
 ```
 
-**stdout**: `x-success` query string on success
-**stderr**: `x-error` query string or timeout message
-**Exit codes**: 0 = success, 1 = error, 2 = cancel, 3 = build failed, 4 = timed out waiting for the callback
+| Output | Contents |
+| :--- | :--- |
+| stdout | `x-success` query string on success |
+| stderr | `x-error` query string or timeout message |
+| Exit codes | 0 = success, 1 = error, 2 = cancel, 3 = build failed, 4 = timed out waiting for the callback |
 
 ## Examples
 

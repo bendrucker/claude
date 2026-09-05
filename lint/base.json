@@ -29,6 +29,9 @@
     "prefer-template": "error",
     "import/no-named-as-default-member": "error",
     "oxc/no-map-spread": "error",
+    // A `new Promise` executor that only wraps an existing async API duplicates
+    // logic the platform already exposes, and drops its built-in error handling.
+    "promise/avoid-new": "error",
     "unicorn/prefer-array-find": "error",
     "unicorn/prefer-set-has": "error"
   },

@@ -433,10 +433,6 @@ function emit(event: Event): void {
   console.log(JSON.stringify(event));
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 type MrMetadata = {
   sha: string;
   sourceBranch: string;
@@ -495,7 +491,7 @@ export async function resolveMergeStatus(
   projectEncoded: string,
   iid: number,
   run: ExecFn = exec,
-  sleepFn: (ms: number) => Promise<void> = sleep,
+  sleepFn: (ms: number) => Promise<void> = Bun.sleep,
 ): Promise<MergeStatus> {
   let current: MergeStatus = {
     hasConflicts: false,
@@ -944,7 +940,7 @@ async function watch(options: RunOptions): Promise<void> {
       let probe = result.probe;
       if (target.mode === "mr" && iid !== null && probeIsUndetermined(probe)) {
         // oxlint-disable-next-line no-await-in-loop -- poll loop: each cycle reads state the previous cycle left behind.
-        const resolved = await resolveMergeStatus(projectEncoded, iid, exec, sleep);
+        const resolved = await resolveMergeStatus(projectEncoded, iid, exec, Bun.sleep);
         probe = {
           ...probe,
           hasConflicts: resolved.hasConflicts,
@@ -963,7 +959,7 @@ async function watch(options: RunOptions): Promise<void> {
     }
 
     // oxlint-disable-next-line no-await-in-loop -- poll interval between API cycles.
-    await sleep((intervalSeconds ?? DEFAULT_INTERVAL_SECONDS) * 1000);
+    await Bun.sleep((intervalSeconds ?? DEFAULT_INTERVAL_SECONDS) * 1000);
   }
 }
 

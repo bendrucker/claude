@@ -2,8 +2,7 @@ import { execSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import type { Heading, Text } from "mdast";
 import { z } from "zod";
@@ -31,8 +30,6 @@ type MarkdownMatch = {
 const AstGrepMatches = z.array(z.looseObject({ message: z.string() }));
 
 const ExecFailure = z.looseObject({ stdout: z.string().optional() });
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Bare `N. ` headings are usually rankings or enumerations, not process steps,
 // so only explicit step labels count.
@@ -74,7 +71,7 @@ export async function checkCode(content: string, ext: string): Promise<string | 
 
   const tmpDir = mkdtempSync(join(tmpdir(), "hook-check-"));
   const tmpFile = join(tmpDir, `check.${ext}`);
-  const ruleFile = join(__dirname, "numbering.yml");
+  const ruleFile = join(import.meta.dirname, "numbering.yml");
 
   try {
     await Bun.write(tmpFile, content);

@@ -127,8 +127,11 @@ function limiter(max: number): <T>(task: () => Promise<T>) => Promise<T> {
   let active = 0;
   const waiting: (() => void)[] = [];
   return async (task) => {
-    if (active >= max) await new Promise<void>((resolve) => waiting.push(resolve));
-    else active++;
+    if (active >= max) {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      waiting.push(resolve);
+      await promise;
+    } else active++;
     try {
       return await task();
     } finally {

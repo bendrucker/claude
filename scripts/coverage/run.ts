@@ -61,6 +61,7 @@ async function readLcov(coverageDir: string): Promise<FileCoverage[]> {
 
 function runScope(scope: string): Promise<FileCoverage[]> {
   const coverageDir = mkdtempSync(join(tmpdir(), "cov-"));
+  // oxlint-disable-next-line promise/avoid-new -- child_process's close/error pair is callback-based, so this wraps it in a promise.
   return new Promise((resolve, reject) => {
     const child = spawn("bun", ["test", "--coverage", `--coverage-dir=${coverageDir}`, scope], {
       cwd: repoRoot,

@@ -10,6 +10,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/mdast": "^4.0.4"
+    "@types/mdast": "^4.0.4",
+    "fast-check": "^4.8.0"
   }
 }

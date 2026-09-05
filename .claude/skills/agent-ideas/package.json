@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "cleye": "^2.0.0",
-    "fast-xml-parser": "^5.0.0"
+    "fast-xml-parser": "^5.0.0",
+    "zod": "^4.4.3"
   }
 }

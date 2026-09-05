@@ -3,13 +3,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StopHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { VIOLATION_EXIT } from "../../../scripts/check-plugin-deps";
+import { VIOLATION_EXIT } from "../../../scripts/check-workspace-deps";
 import { processStop } from ".";
 
 let tempDir: string;
 
 beforeAll(async () => {
-  tempDir = await mkdtemp(join(tmpdir(), "plugin-deps-hook-"));
+  tempDir = await mkdtemp(join(tmpdir(), "workspace-deps-hook-"));
 });
 
 afterAll(async () => {
@@ -53,7 +53,7 @@ process.exit(${VIOLATION_EXIT});`,
 
     const output = await processStop(stopInput(), checker);
     expect(output?.decision).toBe("block");
-    expect(output?.reason).toContain("Missing plugin dependencies detected");
+    expect(output?.reason).toContain("Missing workspace dependencies detected");
     expect(output?.reason).toContain('missing dependency "cleye"');
   });
 

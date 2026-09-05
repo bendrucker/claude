@@ -1,56 +1,29 @@
 import { expect, test } from "bun:test";
-import { importedPackages, owningWorkspace, packageName } from "./check-workspace-deps";
+import { importedPackages, owningWorkspace, unlistedWorkspaces } from "./check-workspace-deps";
 
 test.each<{ name: string; source: string; expected: string[] }>([
-  { name: "value import", source: `import { z } from "zod";`, expected: ["zod"] },
+  { name: "bare package", source: `import { z } from "zod";`, expected: ["zod"] },
   {
-    name: "type-only import, which the transpiler would otherwise elide",
+    name: "type-only import counts, since it still has to resolve",
     source: `import type { A } from "zod";`,
     expected: ["zod"],
-  },
-  {
-    name: "type-only re-export",
-    source: `export type { A } from "zod";`,
-    expected: ["zod"],
-  },
-  {
-    name: "local type alias is not an import and must still parse",
-    source: `export type Source = "rss" | "blog";\nimport { z } from "zod";`,
-    expected: ["zod"],
-  },
-  { name: "side-effect import", source: `import "zod";`, expected: ["zod"] },
-  { name: "dynamic import", source: `const m = await import("zod");`, expected: ["zod"] },
-  { name: "re-export", source: `export { z } from "zod";`, expected: ["zod"] },
-  {
-    name: "scoped package keeps both segments",
-    source: `import x from "@anthropic-ai/claude-agent-sdk";`,
-    expected: ["@anthropic-ai/claude-agent-sdk"],
   },
   {
     name: "subpath resolves to the package",
     source: `import x from "unist-util-visit/lib/index.js";`,
     expected: ["unist-util-visit"],
   },
-  { name: "relative import", source: `import x from "./local";`, expected: [] },
-  { name: "node builtin", source: `import { join } from "node:path";`, expected: [] },
-  { name: "bun builtin", source: `import { $ } from "bun";`, expected: [] },
-  { name: "bun test builtin", source: `import { test } from "bun:test";`, expected: [] },
   {
-    name: "shebang does not break parsing",
-    source: `#!/usr/bin/env bun\nimport { z } from "zod";`,
-    expected: ["zod"],
+    name: "scoped package keeps both segments",
+    source: `import x from "@anthropic-ai/claude-agent-sdk";`,
+    expected: ["@anthropic-ai/claude-agent-sdk"],
   },
+  { name: "relative import", source: `import x from "./local";`, expected: [] },
+  { name: "absolute path", source: `import x from "/etc/thing";`, expected: [] },
+  { name: "node builtin", source: `import { join } from "node:path";`, expected: [] },
+  { name: "bun test builtin", source: `import { test } from "bun:test";`, expected: [] },
 ])("importedPackages: $name", ({ source, expected }) => {
   expect([...importedPackages(source)].toSorted()).toEqual(expected.toSorted());
-});
-
-test.each([
-  { specifier: "zod", expected: "zod" },
-  { specifier: "zod/v4", expected: "zod" },
-  { specifier: "@types/bun", expected: "@types/bun" },
-  { specifier: "@anthropic-ai/sdk/core", expected: "@anthropic-ai/sdk" },
-])("packageName: $specifier", ({ specifier, expected }) => {
-  expect(packageName(specifier)).toBe(expected);
 });
 
 const DIRS = [".", "plugins/pull-request", "plugins/pull-request/evals/pr-body", "plugins/issue"];
@@ -74,4 +47,20 @@ test.each([
   },
 ])("owningWorkspace: $name", ({ file, expected }) => {
   expect(owningWorkspace(file, DIRS)).toBe(expected);
+});
+
+test.each<{ name: string; manifests: string[]; expected: string[] }>([
+  {
+    name: "manifest in a declared workspace",
+    manifests: ["plugins/issue/package.json"],
+    expected: [],
+  },
+  { name: "root manifest", manifests: ["package.json"], expected: [] },
+  {
+    name: "manifest in a directory the root never lists",
+    manifests: ["plugins/raycast/package.json"],
+    expected: ["plugins/raycast"],
+  },
+])("unlistedWorkspaces: $name", ({ manifests, expected }) => {
+  expect(unlistedWorkspaces(manifests, DIRS)).toEqual(expected);
 });

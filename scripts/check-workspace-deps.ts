@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
 import { dirname, join } from "node:path";
-import { Glob } from "bun";
 import { z } from "zod";
 import { decodeFile } from "../packages/decode/index";
-import { runCheck, tracked } from "./check";
+import { readTracked, runCheck, tracked } from "./check";
+import { isBuiltin, packageName, scanImports } from "./imports";
 
 // Exit codes: 0 clean, VIOLATION_EXIT when undeclared dependencies are found.
 // Anything else (bun exits 1 on uncaught errors) means the checker itself
@@ -19,33 +19,9 @@ const PackageJson = z.looseObject({
   peerDependencies: z.record(z.string(), z.string()).optional(),
 });
 
-const transpiler = new Bun.Transpiler({ loader: "ts" });
+type PackageJson = z.infer<typeof PackageJson>;
 
-/**
- * Workspace directories declared by the root package.json, plus the root.
- *
- * Every entry gets its own resolution root under Bun's installer, so a
- * workspace must declare what its own files import. Root is included because
- * repo scripts outside any workspace resolve against it.
- */
-export async function workspaceDirs(cwd: string): Promise<string[]> {
-  const root = await decodeFile(PackageJson, join(cwd, "package.json"));
-  const patterns = root.workspaces ?? [];
-  const dirs = await Promise.all(
-    patterns.map(async (pattern) => {
-      if (!pattern.includes("*")) return [pattern];
-      const matches: string[] = [];
-      for await (const path of new Glob(`${pattern}/package.json`).scan({ cwd })) {
-        matches.push(dirname(path));
-      }
-      return matches;
-    }),
-  );
-  return [".", ...dirs.flat()];
-}
-
-async function declaredPackages(dir: string, cwd: string): Promise<Set<string>> {
-  const pkg = await decodeFile(PackageJson, join(cwd, dir, "package.json"));
+function declaredPackages(pkg: PackageJson): Set<string> {
   return new Set([
     ...Object.keys(pkg.dependencies ?? {}),
     ...Object.keys(pkg.devDependencies ?? {}),
@@ -53,37 +29,12 @@ async function declaredPackages(dir: string, cwd: string): Promise<Set<string>> 
   ]);
 }
 
-function isBuiltin(specifier: string): boolean {
-  return specifier.startsWith("node:") || specifier === "bun" || specifier.startsWith("bun:");
-}
-
-export function packageName(specifier: string): string {
-  if (specifier.startsWith("@")) {
-    const [scope, name] = specifier.split("/");
-    return `${scope}/${name}`;
-  }
-  return specifier.split("/")[0] ?? specifier;
-}
-
-/**
- * Bare package specifiers imported by a TypeScript source.
- *
- * The `type` keyword is stripped before scanning because `Transpiler.scanImports`
- * elides type-only imports, and a type-only import of an undeclared package
- * still fails to resolve under `oxlint --type-aware`. Only the two forms that
- * carry a module specifier are rewritten: bare `export type Name =` declares a
- * local alias and must survive intact for the source to still parse.
- */
+/** Bare package specifiers a TypeScript source imports, keyed to their package. */
 export function importedPackages(source: string): Set<string> {
-  const body = source.startsWith("#!") ? source.slice(source.indexOf("\n") + 1) : source;
-  const values = body
-    .replaceAll(/\bimport\s+type\s+/g, "import ")
-    .replaceAll(/\bexport\s+type\s+(?=[{*])/g, "export ");
-
   const packages = new Set<string>();
-  for (const { path } of transpiler.scanImports(values)) {
-    if (path.startsWith(".") || path.startsWith("/") || isBuiltin(path)) continue;
-    packages.add(packageName(path));
+  for (const specifier of scanImports(source)) {
+    if (specifier.startsWith(".") || specifier.startsWith("/") || isBuiltin(specifier)) continue;
+    packages.add(packageName(specifier));
   }
   return packages;
 }
@@ -96,37 +47,65 @@ export function owningWorkspace(file: string, dirs: string[]): string {
   return owner ?? ".";
 }
 
+/**
+ * Directories holding a package.json that the root does not list as a workspace.
+ *
+ * Such a directory resolves through the root's hoisted node_modules instead of
+ * its own manifest, so every import under it would be checked against the
+ * root's declarations and an undeclared one would pass.
+ */
+export function unlistedWorkspaces(manifests: string[], dirs: string[]): string[] {
+  return manifests.map((file) => dirname(file)).filter((dir) => !dirs.includes(dir));
+}
+
 async function checkDeps(): Promise<string[]> {
   const cwd = join(import.meta.dirname, "..");
-  const dirs = await workspaceDirs(cwd);
+  const [root, manifests, sources] = await Promise.all([
+    decodeFile(PackageJson, join(cwd, "package.json")),
+    tracked("*package.json", cwd),
+    tracked("*.ts", cwd),
+  ]);
+
+  const dirs = [".", ...(root.workspaces ?? [])];
   const declared = new Map(
-    await Promise.all(dirs.map(async (dir) => [dir, await declaredPackages(dir, cwd)] as const)),
+    await Promise.all(
+      dirs.map(async (dir) => {
+        const pkg =
+          dir === "." ? root : await decodeFile(PackageJson, join(cwd, dir, "package.json"));
+        return [dir, declaredPackages(pkg)] as const;
+      }),
+    ),
   );
 
-  const files = (await tracked("*.ts", cwd)).filter(
+  const files = sources.filter(
     (file) => !file.endsWith(".d.ts") && !file.split("/").includes("fixtures"),
   );
-
   const scanned = await Promise.all(
-    files.map(async (file) => ({
-      file,
-      dir: owningWorkspace(file, dirs),
-      imported: importedPackages(await Bun.file(join(cwd, file)).text()),
-    })),
+    files.map(async (file) => {
+      const source = await readTracked(file, cwd);
+      return source === null
+        ? null
+        : { file, dir: owningWorkspace(file, dirs), imported: importedPackages(source) };
+    }),
   );
 
   // Keyed by workspace and package so a dependency imported by twenty files in
   // one workspace reports once, naming the first file as the place to look.
   const violations = new Map<string, string>();
-  for (const { file, dir, imported } of scanned) {
-    const packages = declared.get(dir);
+  for (const dir of unlistedWorkspaces(manifests, dirs)) {
+    violations.set(`${dir}\0`, `${dir}: has a package.json but is not a root workspace`);
+  }
+
+  for (const scan of scanned) {
+    if (scan === null) continue;
+    const packages = declared.get(scan.dir);
     if (packages === undefined) continue;
 
-    for (const pkg of imported) {
+    for (const pkg of scan.imported) {
       if (packages.has(pkg) || packages.has(`@types/${pkg}`)) continue;
-      const key = `${dir}\0${pkg}`;
+      const key = `${scan.dir}\0${pkg}`;
       if (!violations.has(key)) {
-        violations.set(key, `${dir}: missing dependency "${pkg}" (imported by ${file})`);
+        violations.set(key, `${scan.dir}: missing dependency "${pkg}" (imported by ${scan.file})`);
       }
     }
   }

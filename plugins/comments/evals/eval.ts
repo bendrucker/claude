@@ -140,15 +140,14 @@ function validateFixture(value: unknown, file: string): Fixture {
 }
 
 export function fixtureToInput(fixture: Fixture): CommentJudgeInput {
-  const input: CommentJudgeInput = {
+  return {
     path: fixture.path,
     language: fixture.language,
     kind: fixture.kind,
     text: fixture.comment,
     context: fixture.context,
+    provenance: fixture.provenance,
   };
-  if (fixture.provenance) input.provenance = fixture.provenance;
-  return input;
 }
 
 export interface ActionMismatch {

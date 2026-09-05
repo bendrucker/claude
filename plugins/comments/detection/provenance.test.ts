@@ -206,11 +206,14 @@ describe("ProvenanceIndex", () => {
     expect(pending).toEqual({ uncommitted: true, authors: [], latest: null, signals: [] });
   });
 
-  test("a staged file blames as uncommitted", async () => {
-    await Bun.write(join(dir, "b.ts"), "// staged\n");
-    await git("add", "b.ts");
+  test.each<[string, string, () => Promise<void>]>([
+    ["a staged file", "b.ts", async () => void (await git("add", "b.ts"))],
+    ["an untracked file", "new.ts", async () => {}],
+  ])("%s blames as wholly uncommitted", async (_, path, stage) => {
+    await Bun.write(join(dir, path), "// fresh\n");
+    await stage();
     const index = new ProvenanceIndex();
-    expect(await index.forFile("b.ts", [comment(1)])).toEqual([
+    expect(await index.forFile(path, [comment(1)])).toEqual([
       { uncommitted: true, authors: [], latest: null, signals: [] },
     ]);
   });
@@ -251,13 +254,5 @@ describe("ProvenanceIndex", () => {
     expect(shows).toBe(1);
     expect(first.get(SHA_A)).toEqual(["Claude-Session: abc"]);
     expect(second.get(SHA_A)).toEqual(["Claude-Session: abc"]);
-  });
-
-  test("treats an untracked file as wholly uncommitted", async () => {
-    await Bun.write(join(dir, "new.ts"), "// fresh\n");
-    const index = new ProvenanceIndex();
-    expect(await index.forFile("new.ts", [comment(1)])).toEqual([
-      { uncommitted: true, authors: [], latest: null, signals: [] },
-    ]);
   });
 });

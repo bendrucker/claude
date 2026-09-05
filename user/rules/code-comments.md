@@ -20,7 +20,7 @@ A comment earns its place when it tells the reader something the adjacent code d
 
 Delete a **what-on-simple** comment, where the code is simple and the comment only says what it does.
 
-Default to no comment. Most comments an agent writes fail the test above, and every one that survives review taxes each future reader. A comment that earns its place is one sentence carrying the fact. A docstring states the contract in one line. Typed signatures already document parameters and return values.
+Default to no comment. Most comments an agent writes fail the test above. A comment that earns its place is one sentence carrying the fact. A docstring states the contract in one line. Typed signatures already document parameters and return values.
 
 ## Avoid
 
@@ -36,3 +36,4 @@ Default to no comment. Most comments an agent writes fail the test above, and ev
 - Docstrings that surface canonical upstream API names for discoverability, even when they restate the identifier. `"""Return the Aembit OAuth 2.0 + PKCE authorization URL."""` introduces searchable proper nouns the name abbreviates.
 - What-comments on genuinely dense lines.
 - Verbose rationale in a regression test about the bug it defends against.
+- A guard or TODO anchored to a ticket that resolves a present code condition: `# TODO(ENG-4102): drop once the backfill lands`.

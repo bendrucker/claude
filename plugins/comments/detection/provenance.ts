@@ -28,8 +28,8 @@ const UNCOMMITTED = /^0+$/;
 
 /**
  * `<sha> <source line> <final line> [<group size>]`, the record opener in
- * porcelain output. The id is 40 hex in a SHA-1 repo and 64 in a SHA-256 one,
- * and a boundary commit's id carries a `^` prefix.
+ * porcelain output, whose id is 40 hex in a SHA-1 repo or 64 in a SHA-256
+ * one, with a `^` prefix on a boundary commit.
  */
 const HEADER = /^\^?([0-9a-f]{40}|[0-9a-f]{64}) \d+ (\d+)(?: \d+)?$/;
 
@@ -92,10 +92,6 @@ export function authorSignal(line: BlamedLine): string | null {
   return AGENT_NAME.test(identity) ? `author: ${identity}` : null;
 }
 
-function isoDate(seconds: number): string {
-  return new Date(seconds * 1000).toISOString().slice(0, 10);
-}
-
 /** A line the blame map lacks (an untracked file, a failed blame) counts as uncommitted. */
 export function provenanceOf(
   comment: Comment,
@@ -121,7 +117,7 @@ export function provenanceOf(
   return {
     uncommitted,
     authors: [...authors],
-    latest: latest === 0 ? null : isoDate(latest),
+    latest: latest === 0 ? null : new Date(latest * 1000).toISOString().slice(0, 10),
     signals: [...signals],
   };
 }
@@ -149,7 +145,7 @@ const GIT_CONCURRENCY = 8;
 const NUL = "%x00";
 const NUL_CHAR = "\x00";
 
-export interface GitResult {
+interface GitResult {
   exitCode: number;
   text: string;
 }
@@ -157,7 +153,7 @@ export interface GitResult {
 /** Runs one git command from the current directory. */
 export type GitRunner = (args: string[]) => Promise<GitResult>;
 
-export async function runGit(args: string[]): Promise<GitResult> {
+async function runGit(args: string[]): Promise<GitResult> {
   const result = await $`git ${args}`.quiet().nothrow();
   return { exitCode: result.exitCode, text: result.text() };
 }
@@ -172,19 +168,23 @@ export class ProvenanceIndex {
     this.git = git;
   }
 
+  private run(args: string[]): Promise<GitResult> {
+    return this.limit(() => this.git(args));
+  }
+
   /**
    * The blame of a file, empty for an untracked file, and null when blame
    * fails on a tracked one (a partial clone missing the history, say), so the
    * caller reports nothing rather than a false "uncommitted".
    */
   async blame(path: string): Promise<Map<number, BlamedLine> | null> {
-    const result = await this.limit(() => this.git(["blame", "--line-porcelain", "--", path]));
+    const result = await this.run(["blame", "--line-porcelain", "--", path]);
     if (result.exitCode === 0) return parseLinePorcelain(result.text);
-    const tracked = await this.limit(() => this.git(["ls-files", "--error-unmatch", "--", path]));
+    const tracked = await this.run(["ls-files", "--error-unmatch", "--", path]);
     return tracked.exitCode === 0 ? null : new Map();
   }
 
-  /** The agent signals of each commit, keyed by sha. Concurrent callers share one `git show` per commit. */
+  /** The agent signals of each commit, keyed by sha, shared across concurrent callers behind one `git show` per commit. */
   async signalsFor(shas: Iterable<string>): Promise<Map<string, string[]>> {
     const wanted = [...new Set(shas)].filter((sha) => !UNCOMMITTED.test(sha));
     const unresolved = wanted.filter((sha) => !this.signals.has(sha));
@@ -207,9 +207,7 @@ export class ProvenanceIndex {
 
   private async show(shas: string[]): Promise<Map<string, string[]>> {
     const found = new Map<string, string[]>();
-    const result = await this.limit(() =>
-      this.git(["show", "-s", `--format=%H${NUL}%B${NUL}`, ...shas]),
-    );
+    const result = await this.run(["show", "-s", `--format=%H${NUL}%B${NUL}`, ...shas]);
     if (result.exitCode !== 0) return found;
     const wanted = new Set(shas);
     const fields = result.text.split(NUL_CHAR);
@@ -220,7 +218,7 @@ export class ProvenanceIndex {
     return found;
   }
 
-  /** Provenance for each comment of one file, in the order given. Empty when blame failed. */
+  /** Provenance for each comment of one file, in the order given, empty when blame failed. */
   async forFile(path: string, comments: Comment[]): Promise<Provenance[]> {
     if (comments.length === 0) return [];
     const blame = await this.blame(path);

@@ -47,18 +47,15 @@ const xml = new Builder({
 export function formatBatch(inputs: CommentJudgeInput[]): string {
   return xml.build({
     comments: {
-      comment: inputs.map((input, index) => {
-        const element: Record<string, unknown> = {
-          "@_index": index,
-          path: input.path,
-          language: input.language,
-          kind: input.kind,
-          text: input.text,
-          context: input.context,
-        };
-        if (input.provenance) element.provenance = input.provenance;
-        return element;
-      }),
+      comment: inputs.map((input, index) => ({
+        "@_index": index,
+        path: input.path,
+        language: input.language,
+        kind: input.kind,
+        text: input.text,
+        context: input.context,
+        provenance: input.provenance,
+      })),
     },
   });
 }

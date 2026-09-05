@@ -24,7 +24,7 @@ export interface CollectedComment extends IntroducedComment {
   score: CommentScore;
   features: CommentFeatures;
   /** Who last touched the comment's lines. Absent when the content came from a remote MR ref. */
-  provenance?: Provenance;
+  provenance?: Provenance | undefined;
 }
 
 /** A header marker that announces a file is machine-written. */
@@ -91,7 +91,7 @@ function toCollected(
   lines: string[],
   provenance?: Provenance,
 ): CollectedComment {
-  const collected: CollectedComment = {
+  return {
     ...comment,
     path,
     language,
@@ -99,9 +99,8 @@ function toCollected(
     context: contextWindow(lines, comment),
     score: scoreComment(comment),
     features: commentFeatures(comment, lines),
+    provenance,
   };
-  if (provenance) collected.provenance = provenance;
-  return collected;
 }
 
 /**

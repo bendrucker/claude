@@ -60,16 +60,15 @@ const FIX_INSTRUCTION =
   "For this run, populate suggestedFix for every flagged comment with a concrete rewrite, trim, or delete.";
 
 function toShardComment(comment: CollectedComment): ShardComment {
-  const shard: ShardComment = {
+  return {
     id: comment.id,
     path: comment.path,
     language: comment.language,
     kind: comment.kind,
     text: comment.text,
     context: comment.context,
+    provenance: comment.provenance,
   };
-  if (comment.provenance) shard.provenance = comment.provenance;
-  return shard;
 }
 
 /**

@@ -19,26 +19,20 @@ function hits(def: PatternDef, text: string): number {
 }
 
 describe("pattern examples", () => {
-  for (const def of ALL_PATTERNS) {
-    describe(def.category, () => {
-      it("has at least 2 positives and 2 negatives", () => {
-        expect(def.positives.length).toBeGreaterThanOrEqual(2);
-        expect(def.negatives.length).toBeGreaterThanOrEqual(2);
-      });
-
-      for (const positive of def.positives) {
-        it(`matches: ${JSON.stringify(positive.slice(0, 60))}`, () => {
-          expect(hits(def, positive)).toBeGreaterThan(0);
-        });
-      }
-
-      for (const negative of def.negatives) {
-        it(`does not match: ${JSON.stringify(negative.slice(0, 60))}`, () => {
-          expect(hits(def, negative)).toBe(0);
-        });
-      }
+  describe.each(ALL_PATTERNS)("$category", (def) => {
+    it("has at least 2 positives and 2 negatives", () => {
+      expect(def.positives.length).toBeGreaterThanOrEqual(2);
+      expect(def.negatives.length).toBeGreaterThanOrEqual(2);
     });
-  }
+
+    it.each(def.positives)("matches: %s", (positive) => {
+      expect(hits(def, positive)).toBeGreaterThan(0);
+    });
+
+    it.each(def.negatives)("does not match: %s", (negative) => {
+      expect(hits(def, negative)).toBe(0);
+    });
+  });
 
   it("labels every pattern with a layer", () => {
     for (const def of ALL_PATTERNS) {

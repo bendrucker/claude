@@ -23,11 +23,9 @@ import { classifyHeadingBaseline } from "./heading";
 describe("sentence-heading false-positive ceiling", () => {
   // The gate: the baseline that ships in the hook flags none of the
   // conventional heading shapes documented in linguistics.md.
-  for (const { description, heading } of sentenceHeadingNegatives) {
-    it(`baseline does not flag: ${description}`, () => {
-      expect(classifyHeadingBaseline(heading).flagged).toBe(false);
-    });
-  }
+  it.each(sentenceHeadingNegatives)("baseline does not flag: $description", ({ heading }) => {
+    expect(classifyHeadingBaseline(heading).flagged).toBe(false);
+  });
 
   // Regression visibility for the eval-only candidates: each flags a
   // known number of these negatives today. This is recorded, not gated;
@@ -58,30 +56,24 @@ describe("sentence-heading positives", () => {
   // within reach and flagged; imperatives outside the nine-opener word set
   // are recorded as misses (~20% recall per linguistics.md), so this is
   // current behavior, not a recall gate the baseline would fail.
-  for (const { description, heading, baselineFlagged, kind } of sentenceHeadingPositives) {
-    it(description, () => {
-      const verdict = classifyHeadingBaseline(heading);
-      expect(verdict.flagged).toBe(baselineFlagged);
-      if (kind != null) {
-        expect(verdict.kind).toBe(kind);
-      }
-    });
-  }
+  it.each(sentenceHeadingPositives)("$description", ({ heading, baselineFlagged, kind }) => {
+    const verdict = classifyHeadingBaseline(heading);
+    expect(verdict.flagged).toBe(baselineFlagged);
+    if (kind != null) {
+      expect(verdict.kind).toBe(kind);
+    }
+  });
 });
 
 describe("title-case false-positive ceiling", () => {
   // The gate: AP-correct headings from issue #769 must not be flagged.
-  for (const { description, heading } of titleCaseNegatives) {
-    it(`accepts: ${description}`, () => {
-      expect(checkTitleCase(`## ${heading}`)).toBeNull();
-    });
-  }
+  it.each(titleCaseNegatives)("accepts: $description", ({ heading }) => {
+    expect(checkTitleCase(`## ${heading}`)).toBeNull();
+  });
 
   // The checker's real job stays intact: genuinely mis-cased headings are
   // still flagged after extending the stopword list.
-  for (const { description, heading } of titleCasePositives) {
-    it(`flags: ${description}`, () => {
-      expect(checkTitleCase(`## ${heading}`)).not.toBeNull();
-    });
-  }
+  it.each(titleCasePositives)("flags: $description", ({ heading }) => {
+    expect(checkTitleCase(`## ${heading}`)).not.toBeNull();
+  });
 });

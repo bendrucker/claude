@@ -66,16 +66,14 @@ const titleCaseCases: { description: string; content: string; match: boolean }[]
 ];
 
 describe("checkTitleCase", () => {
-  for (const { description, content, match } of titleCaseCases) {
-    it(description, () => {
-      const result = checkTitleCase(content);
-      if (match) {
-        expect(result).not.toBeNull();
-      } else {
-        expect(result).toBeNull();
-      }
-    });
-  }
+  it.each(titleCaseCases)("$description", ({ content, match }) => {
+    const result = checkTitleCase(content);
+    if (match) {
+      expect(result).not.toBeNull();
+    } else {
+      expect(result).toBeNull();
+    }
+  });
 });
 
 const boldAsHeadingCases: { description: string; content: string; match: boolean }[] = [
@@ -95,16 +93,14 @@ const boldAsHeadingCases: { description: string; content: string; match: boolean
 ];
 
 describe("checkBoldAsHeading", () => {
-  for (const { description, content, match } of boldAsHeadingCases) {
-    it(description, () => {
-      const result = checkBoldAsHeading(content);
-      if (match) {
-        expect(result).not.toBeNull();
-      } else {
-        expect(result).toBeNull();
-      }
-    });
-  }
+  it.each(boldAsHeadingCases)("$description", ({ content, match }) => {
+    const result = checkBoldAsHeading(content);
+    if (match) {
+      expect(result).not.toBeNull();
+    } else {
+      expect(result).toBeNull();
+    }
+  });
 });
 
 const sentenceHeadingCases: { description: string; content: string; match: boolean }[] = [
@@ -214,16 +210,14 @@ const sentenceHeadingCases: { description: string; content: string; match: boole
 ];
 
 describe("checkSentenceHeading", () => {
-  for (const { description, content, match } of sentenceHeadingCases) {
-    it(description, () => {
-      const result = checkSentenceHeading(content);
-      if (match) {
-        expect(result).not.toBeNull();
-      } else {
-        expect(result).toBeNull();
-      }
-    });
-  }
+  it.each(sentenceHeadingCases)("$description", ({ content, match }) => {
+    const result = checkSentenceHeading(content);
+    if (match) {
+      expect(result).not.toBeNull();
+    } else {
+      expect(result).toBeNull();
+    }
+  });
 });
 
 describe("processInput", () => {

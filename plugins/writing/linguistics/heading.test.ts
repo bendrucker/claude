@@ -126,13 +126,11 @@ export const seedCases: Array<{
 ];
 
 describe("classifyHeadingBaseline", () => {
-  for (const { description, heading, flagged, kind } of seedCases) {
-    it(description, () => {
-      const verdict = classifyHeadingBaseline(heading);
-      expect(verdict.flagged).toBe(flagged);
-      if (kind != null) {
-        expect(verdict.kind).toBe(kind);
-      }
-    });
-  }
+  it.each(seedCases)("$description", ({ heading, flagged, kind }) => {
+    const verdict = classifyHeadingBaseline(heading);
+    expect(verdict.flagged).toBe(flagged);
+    if (kind != null) {
+      expect(verdict.kind).toBe(kind);
+    }
+  });
 });

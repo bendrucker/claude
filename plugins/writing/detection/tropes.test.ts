@@ -84,11 +84,9 @@ describe("scan", () => {
       expect(match[0]?.message).toContain("two sentences");
     });
 
-    for (const allowed of ["This is\u2014fine", "2024 \u2013 2025"]) {
-      it(`allows: "${allowed}"`, () => {
-        expect(firstByTier(scan(allowed), "deny")).toBeUndefined();
-      });
-    }
+    it.each(["This is\u2014fine", "2024 \u2013 2025"])('allows: "%s"', (allowed) => {
+      expect(firstByTier(scan(allowed), "deny")).toBeUndefined();
+    });
   });
 
   describe("AI vocabulary", () => {
@@ -104,35 +102,30 @@ describe("scan", () => {
       "nuanced",
     ];
 
-    for (const word of words) {
-      it(`detects "${word}"`, () => {
-        const deny = firstByTier(scan(`The ${word} of the project`), "deny");
-        expect(deny?.category).toBe("AI vocabulary");
-      });
-    }
+    it.each(words)('detects "%s"', (word) => {
+      const deny = firstByTier(scan(`The ${word} of the project`), "deny");
+      expect(deny?.category).toBe("AI vocabulary");
+    });
 
-    for (const safe of ["```\ndelve into code\n```", "The `delve` function"]) {
-      it(`ignores in code: "${safe.slice(0, 30)}..."`, () => {
+    it.each(["```\ndelve into code\n```", "The `delve` function"])(
+      'ignores in code: "%s..."',
+      (safe) => {
         expect(firstByTier(scan(safe), "deny")).toBeUndefined();
-      });
-    }
+      },
+    );
   });
 
   describe("copula avoidance", () => {
     const deny = ["The module serves as the entry point", "This stands as a reminder"];
     const allow = ["The restaurant serves food"];
 
-    for (const text of deny) {
-      it(`flags: "${text}"`, () => {
-        expect(firstByTier(scan(text), "deny")?.category).toBe("copula avoidance");
-      });
-    }
+    it.each(deny)('flags: "%s"', (text) => {
+      expect(firstByTier(scan(text), "deny")?.category).toBe("copula avoidance");
+    });
 
-    for (const text of allow) {
-      it(`allows: "${text}"`, () => {
-        expect(firstByTier(scan(text), "deny")).toBeUndefined();
-      });
-    }
+    it.each(allow)('allows: "%s"', (text) => {
+      expect(firstByTier(scan(text), "deny")).toBeUndefined();
+    });
   });
 
   describe("test result reporting", () => {
@@ -189,27 +182,21 @@ describe("scan", () => {
       "Write a test for this function.",
     ];
 
-    for (const text of shouldFlag) {
-      it(`flags: "${text.slice(0, 60)}..."`, () => {
-        expect(firstByTier(scan(text), "context")?.category).toBe("test result reporting");
-      });
-    }
+    it.each(shouldFlag)('flags: "%s"', (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("test result reporting");
+    });
 
-    for (const text of shouldNotFlag) {
-      it(`allows: "${text.slice(0, 60)}..."`, () => {
-        expect(scan(text).find((m) => m.category === "test result reporting")).toBeUndefined();
-      });
-    }
+    it.each(shouldNotFlag)('allows: "%s"', (text) => {
+      expect(scan(text).find((m) => m.category === "test result reporting")).toBeUndefined();
+    });
   });
 
   describe("promotional language", () => {
     const flag = ["The library boasts excellent performance", "A groundbreaking approach"];
 
-    for (const text of flag) {
-      it(`flags: "${text}"`, () => {
-        expect(firstByTier(scan(text), "context")?.category).toBe("promotional language");
-      });
-    }
+    it.each(flag)('flags: "%s"', (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("promotional language");
+    });
   });
 
   describe("no X needed brag", () => {
@@ -231,17 +218,13 @@ describe("scan", () => {
       "There is no way the runtime needed that much memory.",
     ];
 
-    for (const text of flag) {
-      it(`flags: "${text}"`, () => {
-        expect(firstByTier(scan(text), "context")?.category).toBe("no X needed brag");
-      });
-    }
+    it.each(flag)('flags: "%s"', (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("no X needed brag");
+    });
 
-    for (const text of allow) {
-      it(`allows: ${JSON.stringify(text)}`, () => {
-        expect(scan(text).find((m) => m.category === "no X needed brag")).toBeUndefined();
-      });
-    }
+    it.each(allow)("allows: %j", (text) => {
+      expect(scan(text).find((m) => m.category === "no X needed brag")).toBeUndefined();
+    });
   });
 
   describe("parallelism", () => {
@@ -251,17 +234,13 @@ describe("scan", () => {
     ];
     const allow = ["Not just yet"];
 
-    for (const text of flag) {
-      it(`flags: "${text}"`, () => {
-        expect(firstByTier(scan(text), "context")?.category).toBe("parallelism");
-      });
-    }
+    it.each(flag)('flags: "%s"', (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("parallelism");
+    });
 
-    for (const text of allow) {
-      it(`allows: "${text}"`, () => {
-        expect(firstByTier(scan(text), "context")).toBeUndefined();
-      });
-    }
+    it.each(allow)('allows: "%s"', (text) => {
+      expect(firstByTier(scan(text), "context")).toBeUndefined();
+    });
   });
 
   describe("connector density", () => {
@@ -274,16 +253,14 @@ describe("scan", () => {
     const hyphen =
       "The cache starts cold - the first request fills it. The retry logic backs off - later attempts succeed. The parser rejects malformed input - it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
 
-    for (const [name, text] of [
+    it.each([
       ["semicolons", semicolons],
       ["unspaced em dashes", emDashes],
       ["mixed connectors", mixed],
       ["letter-flanked hyphens", hyphen],
-    ] as const) {
-      it(`flags ${name}`, () => {
-        expect(firstByTier(scan(text), "context")?.category).toBe("connector density");
-      });
-    }
+    ] as const)("flags %s", (_name, text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("connector density");
+    });
 
     it("fires at exactly 30% density (3 of 10)", () => {
       const text =
@@ -402,13 +379,11 @@ describe("scan", () => {
       );
     });
 
-    for (const path of ["script.sh", "index.ts", "style.css"]) {
-      it(`skips in ${path}`, () => {
-        expect(
-          scan(semicolons, path).find((m) => m.category === "connector density"),
-        ).toBeUndefined();
-      });
-    }
+    it.each(["script.sh", "index.ts", "style.css"])("skips in %s", (path) => {
+      expect(
+        scan(semicolons, path).find((m) => m.category === "connector density"),
+      ).toBeUndefined();
+    });
   });
 
   describe("semicolon splice", () => {
@@ -463,13 +438,9 @@ describe("scan", () => {
       ).toBeDefined();
     });
 
-    for (const path of ["script.sh", "index.ts"]) {
-      it(`skips in ${path}`, () => {
-        expect(
-          scan(twoSplices, path).find((m) => m.category === "semicolon splice"),
-        ).toBeUndefined();
-      });
-    }
+    it.each(["script.sh", "index.ts"])("skips in %s", (path) => {
+      expect(scan(twoSplices, path).find((m) => m.category === "semicolon splice")).toBeUndefined();
+    });
   });
 
   it("returns all matches per tier", () => {
@@ -537,11 +508,9 @@ describe("scan", () => {
       "Open a sibling pane rather than reaching for Bash.",
       "Reach for the linter before the formatter.",
     ];
-    for (const text of flag) {
-      it(`flags: "${text}"`, () => {
-        expect(firstByTier(scan(text), "deny")?.category).toBe("reaching for");
-      });
-    }
+    it.each(flag)('flags: "%s"', (text) => {
+      expect(firstByTier(scan(text), "deny")?.category).toBe("reaching for");
+    });
   });
 
   describe("contrast not", () => {
@@ -563,17 +532,13 @@ describe("scan", () => {
       "```\nif err != nil, not ok\n```",
     ];
 
-    for (const text of flag) {
-      it(`flags: "${text}"`, () => {
-        expect(firstByTier(scan(text), "context")?.category).toBe("contrast not");
-      });
-    }
+    it.each(flag)('flags: "%s"', (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("contrast not");
+    });
 
-    for (const text of allow) {
-      it(`allows: ${JSON.stringify(text)}`, () => {
-        expect(scan(text).find((m) => m.category === "contrast not")).toBeUndefined();
-      });
-    }
+    it.each(allow)("allows: %j", (text) => {
+      expect(scan(text).find((m) => m.category === "contrast not")).toBeUndefined();
+    });
   });
 
   describe("passive PR summary", () => {
@@ -739,13 +704,11 @@ describe("scan", () => {
       "Dana,\nThe retry loop swallows the error.",
     ];
 
-    for (const text of addressed) {
-      it(`denies: ${JSON.stringify(text.slice(0, 40))}`, () => {
-        const match = salutation(text);
-        expect(match?.tier).toBe("deny");
-        expect(match?.structural).toBe(true);
-      });
-    }
+    it.each(addressed)("denies: %j", (text) => {
+      const match = salutation(text);
+      expect(match?.tier).toBe("deny");
+      expect(match?.structural).toBe(true);
+    });
 
     const substantive = [
       "Otherwise, this looks right.",
@@ -764,11 +727,9 @@ describe("scan", () => {
       "Tests, then the docs.",
     ];
 
-    for (const text of substantive) {
-      it(`allows: ${JSON.stringify(text.slice(0, 40))}`, () => {
-        expect(salutation(text)).toBeUndefined();
-      });
-    }
+    it.each(substantive)("allows: %j", (text) => {
+      expect(salutation(text)).toBeUndefined();
+    });
 
     it("ignores an address that is not on the opening line", () => {
       expect(salutation("The sweep is too broad.\n\nDana, it fires on every run.")).toBeUndefined();
@@ -791,21 +752,19 @@ describe("scan", () => {
       { text: "I understand the issue.", category: "I understand" },
     ];
 
-    for (const { text, category } of conversational) {
-      it(`fires without context: "${text.slice(0, 40)}"`, () => {
-        expect(scan(text).find((m) => m.category === category)).toBeDefined();
-      });
+    it.each(conversational)('fires without context: "$text"', ({ text, category }) => {
+      expect(scan(text).find((m) => m.category === category)).toBeDefined();
+    });
 
-      it(`fires in sideEffect context: "${text.slice(0, 40)}"`, () => {
-        expect(
-          scan(text, undefined, "sideEffect").find((m) => m.category === category),
-        ).toBeDefined();
-      });
+    it.each(conversational)('fires in sideEffect context: "$text"', ({ text, category }) => {
+      expect(
+        scan(text, undefined, "sideEffect").find((m) => m.category === category),
+      ).toBeDefined();
+    });
 
-      it(`skips in file context: "${text.slice(0, 40)}"`, () => {
-        expect(scan(text, undefined, "file").find((m) => m.category === category)).toBeUndefined();
-      });
-    }
+    it.each(conversational)('skips in file context: "$text"', ({ text, category }) => {
+      expect(scan(text, undefined, "file").find((m) => m.category === category)).toBeUndefined();
+    });
 
     it("non-conversational patterns still fire in file context", () => {
       expect(
@@ -847,16 +806,12 @@ describe("scan", () => {
       "a hatch you can escape through",
       "loudly proclaimed the failure",
     ];
-    for (const text of flag) {
-      it(`flags ${JSON.stringify(text)}`, () => {
-        expect(firstByTier(scan(text), "context")?.category).toBe("flowery phrasing");
-      });
-    }
-    for (const text of allow) {
-      it(`allows ${JSON.stringify(text)}`, () => {
-        expect(scan(text).find((m) => m.category === "flowery phrasing")).toBeUndefined();
-      });
-    }
+    it.each(flag)("flags %j", (text) => {
+      expect(firstByTier(scan(text), "context")?.category).toBe("flowery phrasing");
+    });
+    it.each(allow)("allows %j", (text) => {
+      expect(scan(text).find((m) => m.category === "flowery phrasing")).toBeUndefined();
+    });
     it("does not fire in non-prose file context", () => {
       expect(
         scan("a single source of truth", "module.ts", "file").find(

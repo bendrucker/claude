@@ -147,11 +147,9 @@ describe("compromise candidates", () => {
   const npTest = npTestClassifier(compromiseTagger);
   const hybrid = hybridClassifier(compromiseTagger);
 
-  for (const testCase of compromiseCases) {
-    it(testCase.description, () => {
-      expect(finiteVerb.classify(testCase.heading).flagged).toBe(testCase.finiteVerb);
-      expect(npTest.classify(testCase.heading).flagged).toBe(testCase.npTest);
-      expect(hybrid.classify(testCase.heading).flagged).toBe(testCase.hybrid);
-    });
-  }
+  it.each(compromiseCases)("$description", (testCase) => {
+    expect(finiteVerb.classify(testCase.heading).flagged).toBe(testCase.finiteVerb);
+    expect(npTest.classify(testCase.heading).flagged).toBe(testCase.npTest);
+    expect(hybrid.classify(testCase.heading).flagged).toBe(testCase.hybrid);
+  });
 });

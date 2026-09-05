@@ -4,13 +4,13 @@ Worked pattern for fan-out investigations of the session corpus: breadth search 
 
 ## Scoping Params From the CLI
 
-`getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare read-only run of a query file runs unfiltered. Prepend `SET VARIABLE` lines to scope it:
+`getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare read-only run of a query file runs unfiltered. Prepend `SET VARIABLE` lines to scope it. The DB path and the skill directory are both stable (stated in `SKILL.md`), so substitute them for the placeholders:
 
 ```bash
-duckdb -readonly -json ${CLAUDE_PLUGIN_DATA}/session.duckdb <<'SQL'
+duckdb -readonly -json <db-path> <<'SQL'
 SET VARIABLE after_date = '2026-05-01';
 SET VARIABLE hook = '*tropes*';
-.read ${CLAUDE_SKILL_DIR}/resources/queries/hook-blocks.sql
+.read <skill-dir>/resources/queries/hook-blocks.sql
 SQL
 ```
 

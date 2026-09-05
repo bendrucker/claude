@@ -16,7 +16,12 @@ export interface WorktreeRecord {
  */
 export function parseWorktreeList(porcelain: string): WorktreeRecord[] {
   const records: WorktreeRecord[] = [];
-  let current: { path: string; head: string | null; branch: string | null; detached: boolean } | null = null;
+  let current: {
+    path: string;
+    head: string | null;
+    branch: string | null;
+    detached: boolean;
+  } | null = null;
 
   const flush = (): void => {
     if (current !== null) records.push(current);
@@ -200,7 +205,10 @@ export function ageInDays(commit: number | null, now: number): number | null {
  * new branch created under a recycled name joins to the old merged pull
  * request and inherits its disposition.
  */
-export function isReusedBranch(pull: PullRequest | undefined, branchCommit: number | null): boolean {
+export function isReusedBranch(
+  pull: PullRequest | undefined,
+  branchCommit: number | null,
+): boolean {
   if (pull === undefined || pull.state !== "merged") return false;
   if (pull.mergedAt === null || branchCommit === null) return false;
   return branchCommit > pull.mergedAt;

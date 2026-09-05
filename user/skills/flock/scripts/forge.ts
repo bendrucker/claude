@@ -33,7 +33,10 @@ export function parseRemote(url: string): Remote | null {
     path = scp[2] ?? "";
   }
 
-  const slug = path.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.git$/, "");
+  const slug = path
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "");
   if (host === "" || !slug.includes("/")) return null;
   return { host: host.toLowerCase(), slug };
 }
@@ -167,13 +170,21 @@ function githubForge(run: Run): Forge {
     kind: "github",
     viewer,
     identity: async (slug) => {
-      const result = await run(["gh", "repo", "view", slug, "--json", "isFork,parent,nameWithOwner"]);
+      const result = await run([
+        "gh",
+        "repo",
+        "view",
+        slug,
+        "--json",
+        "isFork,parent,nameWithOwner",
+      ]);
       if (!result.ok) return { slug, forkOf: null, resolved: false };
       try {
         const repo = decodeJson(GitHubRepo, result.stdout, "gh repo view");
-        const parent = repo.parent === null || repo.parent === undefined
-          ? undefined
-          : `${repo.parent.owner.login}/${repo.parent.name}`;
+        const parent =
+          repo.parent === null || repo.parent === undefined
+            ? undefined
+            : `${repo.parent.owner.login}/${repo.parent.name}`;
         if (repo.isFork && parent !== undefined) {
           return { slug: parent, forkOf: repo.nameWithOwner, resolved: true };
         }
@@ -185,24 +196,41 @@ function githubForge(run: Run): Forge {
     pullRequests: async (slug) => {
       const [open, merged] = await Promise.all([
         run([
-          "gh", "pr", "list",
-          "--repo", slug,
-          "--author", "@me",
-          "--state", "open",
-          "--limit", String(OPEN_LIMIT),
-          "--json", "number,headRefName,isDraft",
+          "gh",
+          "pr",
+          "list",
+          "--repo",
+          slug,
+          "--author",
+          "@me",
+          "--state",
+          "open",
+          "--limit",
+          String(OPEN_LIMIT),
+          "--json",
+          "number,headRefName,isDraft",
         ]),
         run([
-          "gh", "pr", "list",
-          "--repo", slug,
-          "--author", "@me",
-          "--state", "merged",
-          "--limit", String(MERGED_LIMIT),
-          "--json", "number,headRefName,mergedAt",
+          "gh",
+          "pr",
+          "list",
+          "--repo",
+          slug,
+          "--author",
+          "@me",
+          "--state",
+          "merged",
+          "--limit",
+          String(MERGED_LIMIT),
+          "--json",
+          "number,headRefName,mergedAt",
         ]),
       ]);
 
-      const read = (result: { ok: boolean; stdout: string }, state: "open" | "merged"): PullRequest[] | null => {
+      const read = (
+        result: { ok: boolean; stdout: string },
+        state: "open" | "merged",
+      ): PullRequest[] | null => {
         if (!result.ok) return null;
         try {
           return decodeJson(GitHubPullRequests, result.stdout, "gh pr list").map((pull) => ({
@@ -272,13 +300,26 @@ function gitlabForge(run: Run): Forge {
       const me = await viewer();
       if (me === null) return { open: null, merged: null };
 
-      const base = ["glab", "mr", "list", "--repo", slug, "--author", me, "--per-page", String(MERGED_LIMIT)];
+      const base = [
+        "glab",
+        "mr",
+        "list",
+        "--repo",
+        slug,
+        "--author",
+        me,
+        "--per-page",
+        String(MERGED_LIMIT),
+      ];
       const [open, merged] = await Promise.all([
         run([...base, "--output", "json"]),
         run([...base, "--merged", "--output", "json"]),
       ]);
 
-      const read = (result: { ok: boolean; stdout: string }, state: "open" | "merged"): PullRequest[] | null => {
+      const read = (
+        result: { ok: boolean; stdout: string },
+        state: "open" | "merged",
+      ): PullRequest[] | null => {
         if (!result.ok) return null;
         try {
           return decodeJson(GitLabMergeRequests, result.stdout, "glab mr list").map((request) => ({

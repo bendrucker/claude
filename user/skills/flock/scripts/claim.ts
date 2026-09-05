@@ -145,7 +145,14 @@ async function seededCheckouts(home: string): Promise<string[]> {
 }
 
 async function resolveRepository(git: Run, dir: string): Promise<Repository | null> {
-  const common = await git(["git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  const common = await git([
+    "git",
+    "-C",
+    dir,
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-common-dir",
+  ]);
   if (!common.ok) return null;
 
   const trimmed = common.stdout.trim();
@@ -159,7 +166,15 @@ async function resolveRepository(git: Run, dir: string): Promise<Repository | nu
 }
 
 async function defaultBranch(git: Run, root: string): Promise<string | null> {
-  const head = await git(["git", "-C", root, "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"]);
+  const head = await git([
+    "git",
+    "-C",
+    root,
+    "symbolic-ref",
+    "-q",
+    "--short",
+    "refs/remotes/origin/HEAD",
+  ]);
   const named = head.stdout.trim().replace(/^origin\//, "");
   if (head.ok && named !== "") return named;
 
@@ -188,7 +203,14 @@ async function aheadCount(git: Run, worktree: string, base: string | null): Prom
   const upstream = await git(["git", "-C", worktree, "rev-list", "--count", "@{u}..HEAD"]);
   if (upstream.ok) return toCount(upstream.stdout);
   if (base === null) return null;
-  const fallback = await git(["git", "-C", worktree, "rev-list", "--count", `origin/${base}..HEAD`]);
+  const fallback = await git([
+    "git",
+    "-C",
+    worktree,
+    "rev-list",
+    "--count",
+    `origin/${base}..HEAD`,
+  ]);
   return fallback.ok ? toCount(fallback.stdout) : null;
 }
 
@@ -218,7 +240,9 @@ async function resolveForge(
       identity: { slug: remote.slug, forkOf: null, resolved: false },
       viewer: null,
       listing: { open: null, merged: null },
-      warnings: [`${remote.slug}: ${remote.host} is neither GitHub nor GitLab, so its PR column reads ?`],
+      warnings: [
+        `${remote.slug}: ${remote.host} is neither GitHub nor GitLab, so its PR column reads ?`,
+      ],
     };
   }
 
@@ -226,17 +250,23 @@ async function resolveForge(
   const [identity, viewer] = await Promise.all([forge.identity(remote.slug), forge.viewer()]);
   const warnings: string[] = [];
   if (!identity.resolved) {
-    warnings.push(`${remote.slug}: the forge did not say whether it is a fork, so its owner is shown in full`);
+    warnings.push(
+      `${remote.slug}: the forge did not say whether it is a fork, so its owner is shown in full`,
+    );
   }
 
   // A pull request opened from a fork lives in the parent repository, so the
   // fork's own slug returns nothing.
   const listing = await forge.pullRequests(identity.slug);
   if (listing.open === null) {
-    warnings.push(`${identity.slug}: open pull requests could not be listed, so its PR column reads ?`);
+    warnings.push(
+      `${identity.slug}: open pull requests could not be listed, so its PR column reads ?`,
+    );
   }
   if (listing.merged === null) {
-    warnings.push(`${identity.slug}: merged pull requests could not be listed, so its PR column reads ?`);
+    warnings.push(
+      `${identity.slug}: merged pull requests could not be listed, so its PR column reads ?`,
+    );
   }
 
   return { identity, viewer, listing, warnings };
@@ -249,7 +279,12 @@ async function scanWorktree(
     readonly base: string | null;
     readonly commitDate: number | null;
   },
-): Promise<{ status: ReturnType<typeof readStatus>; ahead: number | null; carried: number; commit: number | null }> {
+): Promise<{
+  status: ReturnType<typeof readStatus>;
+  ahead: number | null;
+  carried: number;
+  commit: number | null;
+}> {
   const [status, ahead, carried, detachedDate] = await Promise.all([
     ctx.git(["git", "-C", options.path, "status", "--porcelain", "-z", "--ignore-submodules=none"]),
     aheadCount(ctx.git, options.path, options.base),
@@ -260,7 +295,8 @@ async function scanWorktree(
   ]);
 
   const commit =
-    options.commitDate ?? (detachedDate !== null && detachedDate.ok ? toCount(detachedDate.stdout) : null);
+    options.commitDate ??
+    (detachedDate !== null && detachedDate.ok ? toCount(detachedDate.stdout) : null);
 
   return { status: readStatus(status), ahead, carried: carried.length, commit };
 }
@@ -273,7 +309,10 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
     resolveForge(ctx, remote),
     defaultBranch(ctx.git, root),
     ctx.git([
-      "git", "-C", root, "for-each-ref",
+      "git",
+      "-C",
+      root,
+      "for-each-ref",
       "--format=%(refname:short)\t%(committerdate:unix)",
       "refs/heads/",
     ]),
@@ -294,8 +333,18 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
     base === null
       ? new Set<string>()
       : new Set(
-          (await ctx.git(["git", "-C", root, "branch", "--format=%(refname:short)", "--merged", `origin/${base}`]))
-            .stdout.split("\n")
+          (
+            await ctx.git([
+              "git",
+              "-C",
+              root,
+              "branch",
+              "--format=%(refname:short)",
+              "--merged",
+              `origin/${base}`,
+            ])
+          ).stdout
+            .split("\n")
             .map((line) => line.trim())
             .filter((line) => line !== ""),
         );
@@ -308,7 +357,9 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
   const ownedByViewer = ownedBy(target, forge.viewer);
   const repoLabel = ownedByViewer ? repo : target;
 
-  const records = parseWorktreeList(worktrees.stdout).filter((record) => realpath(record.path) !== root);
+  const records = parseWorktreeList(worktrees.stdout).filter(
+    (record) => realpath(record.path) !== root,
+  );
 
   const scanned = await Promise.all(
     records.map(async (record) => {
@@ -338,7 +389,10 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
         branch: record.branch,
         detached: record.branch === null,
         worktree: record.path,
-        pull: pull === undefined ? null : { ref: pullRequestRef(pull), number: pull.number, state: pull.state },
+        pull:
+          pull === undefined
+            ? null
+            : { ref: pullRequestRef(pull), number: pull.number, state: pull.state },
         prColumn: pull === undefined ? (unknownColumn ? "?" : "-") : pullRequestRef(pull),
         age: ageInDays(scan.commit, ctx.now),
         flags,
@@ -348,7 +402,13 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
   );
 
   const merged = forge.listing.merged;
-  if (merged !== null && mergedHorizonReached(merged, scanned.map((entry) => entry.commit))) {
+  if (
+    merged !== null &&
+    mergedHorizonReached(
+      merged,
+      scanned.map((entry) => entry.commit),
+    )
+  ) {
     warnings.push(
       `${target}: merged pull request history stopped at ${MERGED_LIMIT}, so a branch older than that window goes unflagged`,
     );
@@ -357,10 +417,16 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
   return { rows: scanned.map((entry) => entry.row), warnings };
 }
 
-function readPanes(snapshot: z.infer<typeof Snapshot>): { panes: Pane[]; repoRoots: string[]; flockWorkspace: string } {
+function readPanes(snapshot: z.infer<typeof Snapshot>): {
+  panes: Pane[];
+  repoRoots: string[];
+  flockWorkspace: string;
+} {
   const inner = snapshot.result.snapshot;
   const workspaces = inner.workspaces ?? [];
-  const labels = new Map(workspaces.map((workspace) => [workspace.workspace_id, workspace.label ?? ""]));
+  const labels = new Map(
+    workspaces.map((workspace) => [workspace.workspace_id, workspace.label ?? ""]),
+  );
 
   const panes = (inner.panes ?? [])
     .map((pane) => {
@@ -384,12 +450,17 @@ function readPanes(snapshot: z.infer<typeof Snapshot>): { panes: Pane[]; repoRoo
   return { panes, repoRoots, flockWorkspace };
 }
 
-function attachPanes(rows: readonly BoardRow[], panes: readonly Pane[]): { rows: BoardRow[]; claimed: Set<string> } {
+function attachPanes(
+  rows: readonly BoardRow[],
+  panes: readonly Pane[],
+): { rows: BoardRow[]; claimed: Set<string> } {
   const claimed = new Set<string>();
   const attached = rows.map((row) => {
     const worktree = row.worktree;
     if (worktree === null) return row;
-    const pane = panes.find((candidate) => candidate.cwd === worktree || candidate.cwd.startsWith(`${worktree}/`));
+    const pane = panes.find(
+      (candidate) => candidate.cwd === worktree || candidate.cwd.startsWith(`${worktree}/`),
+    );
     if (pane === undefined) return row;
     claimed.add(pane.id);
     return { ...row, pane: pane.id, agent: pane.agent };
@@ -397,7 +468,11 @@ function attachPanes(rows: readonly BoardRow[], panes: readonly Pane[]): { rows:
   return { rows: attached, claimed };
 }
 
-function idlePaneRows(panes: readonly Pane[], claimed: ReadonlySet<string>, self: string): BoardRow[] {
+function idlePaneRows(
+  panes: readonly Pane[],
+  claimed: ReadonlySet<string>,
+  self: string,
+): BoardRow[] {
   return panes
     .filter((pane) => !pane.agent.startsWith("shell/") && pane.id !== self && !claimed.has(pane.id))
     .map((pane) => ({
@@ -450,7 +525,8 @@ async function deferralLines(path: string, today: Date): Promise<string[]> {
   return [
     `deferred: ${keys.length} (${keys.join(", ")})`,
     ...staleKeys(deferrals, daysBefore(today, STALE_DAYS)).map(
-      (key) => `  stale >${STALE_DAYS}d, re-raise: ${key} - ${deferrals[key]?.reason ?? "no reason recorded"}`,
+      (key) =>
+        `  stale >${STALE_DAYS}d, re-raise: ${key} - ${deferrals[key]?.reason ?? "no reason recorded"}`,
     ),
   ];
 }
@@ -472,7 +548,8 @@ async function board(json: boolean): Promise<string> {
 
   const raw = await spawnRun(["herdr", "api", "snapshot"]);
   if (!raw.ok || !raw.stdout.startsWith("{")) {
-    const reason = raw.stderr.split("\n")[0]?.trim() ?? "no output";
+    const first = raw.stderr.split("\n")[0]?.trim() ?? "";
+    const reason = first === "" ? "no output" : first;
     return `NO HERDR (snapshot failed: ${reason}). Stop and say so.`;
   }
 
@@ -511,7 +588,9 @@ async function board(json: boolean): Promise<string> {
     if (repository !== null) repositories.set(repository.root, repository);
   }
 
-  const scans = await Promise.all([...repositories.values()].map((repo) => scanRepository(ctx, repo)));
+  const scans = await Promise.all(
+    [...repositories.values()].map((repo) => scanRepository(ctx, repo)),
+  );
   const warnings = scans.flatMap((scan) => scan.warnings);
   const sorted = sortWorktreeRows(scans.flatMap((scan) => scan.rows));
   const { rows: withPanes, claimed } = attachPanes(sorted, panes);
@@ -523,7 +602,12 @@ async function board(json: boolean): Promise<string> {
   if (json) {
     return JSON.stringify(
       {
-        status: flockWorkspace === "" ? "UNCLAIMED" : flockWorkspace === selfWorkspace ? "OK" : "ELSEWHERE",
+        status:
+          flockWorkspace === ""
+            ? "UNCLAIMED"
+            : flockWorkspace === selfWorkspace
+              ? "OK"
+              : "ELSEWHERE",
         self,
         workspace: flockWorkspace === "" ? null : flockWorkspace,
         incomplete: warnings,
@@ -553,7 +637,9 @@ if (import.meta.main) {
         description: "Emit the board as structured records instead of the table",
       },
     },
-    help: { description: "Report the flock singleton verdict and the board of every worktree and pane." },
+    help: {
+      description: "Report the flock singleton verdict and the board of every worktree and pane.",
+    },
   });
 
   // Bang-executed at skill load, so stdout is prompt text. A thrown error would

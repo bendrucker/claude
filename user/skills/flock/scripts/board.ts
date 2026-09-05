@@ -59,18 +59,20 @@ export function rowCells(row: BoardRow): string[] {
 
 export function renderTable(rows: readonly (readonly string[])[]): string {
   const format = (cells: readonly string[], truncate: boolean): string =>
-    COLUMNS
-      .map((column, index) => {
-        const raw = cells[index] ?? "";
-        if (column.width === null) return raw;
-        const value = truncate ? fit(raw, column.width) : raw;
-        return value.padEnd(column.width);
-      })
+    COLUMNS.map((column, index) => {
+      const raw = cells[index] ?? "";
+      if (column.width === null) return raw;
+      const value = truncate ? fit(raw, column.width) : raw;
+      return value.padEnd(column.width);
+    })
       .join(" ")
       .replace(/\s+$/, "");
 
   return [
-    format(COLUMNS.map((column) => column.header), false),
+    format(
+      COLUMNS.map((column) => column.header),
+      false,
+    ),
     ...rows.map((cells) => format(cells, true)),
   ].join("\n");
 }

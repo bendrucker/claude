@@ -7,6 +7,7 @@ export interface CommandResult {
 export interface RunOptions {
   readonly cwd?: string;
   readonly stdin?: string;
+  readonly env?: Record<string, string | undefined>;
 }
 
 export type Run = (argv: readonly string[], options?: RunOptions) => Promise<CommandResult>;
@@ -17,12 +18,21 @@ function reason(error: unknown): string {
 
 export const spawnRun: Run = async (argv, options) => {
   try {
-    const proc = Bun.spawn([...argv], {
-      cwd: options?.cwd,
+    const spawnOptions: {
+      stdin: "ignore" | Uint8Array<ArrayBuffer>;
+      stdout: "pipe";
+      stderr: "pipe";
+      cwd?: string;
+      env?: Record<string, string | undefined>;
+    } = {
       stdin: options?.stdin === undefined ? "ignore" : new TextEncoder().encode(options.stdin),
       stdout: "pipe",
       stderr: "pipe",
-    });
+    };
+    if (options?.cwd !== undefined) spawnOptions.cwd = options.cwd;
+    if (options?.env !== undefined) spawnOptions.env = options.env;
+
+    const proc = Bun.spawn([...argv], spawnOptions);
     const [stdout, stderr, code] = await Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),

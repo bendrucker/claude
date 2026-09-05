@@ -20,7 +20,9 @@ if (import.meta.main) {
         description: "Remove the deferral instead of recording one",
       },
     },
-    help: { description: "Record or drop a flock deferral, the write half of the board's held rows." },
+    help: {
+      description: "Record or drop a flock deferral, the write half of the board's held rows.",
+    },
   });
 
   const path = deferredPath(process.env);

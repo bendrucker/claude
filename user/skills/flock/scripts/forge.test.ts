@@ -1,0 +1,241 @@
+import { describe, expect, test } from "bun:test";
+import type { CommandResult, Run } from "./exec";
+import {
+  createForge,
+  forgeKind,
+  joinPullRequests,
+  MERGED_LIMIT,
+  mergedHorizonReached,
+  ownedBy,
+  parseRemote,
+  pullRequestRef,
+  slugParts,
+  type PullRequest,
+} from "./forge";
+
+function stub(replies: Record<string, Partial<CommandResult>>): { run: Run; calls: string[] } {
+  const calls: string[] = [];
+  const run: Run = (argv) => {
+    const command = argv.join(" ");
+    calls.push(command);
+    const match = Object.entries(replies).find(([key]) => command.includes(key));
+    return Promise.resolve({ ok: true, stdout: "", stderr: "", ...match?.[1] });
+  };
+  return { run, calls };
+}
+
+function pull(
+  branch: string,
+  number: number,
+  state: PullRequest["state"],
+  mergedAt: number | null = null,
+): PullRequest {
+  return { branch, number, state, mergedAt };
+}
+
+describe("parseRemote", () => {
+  test.each([
+    ["git@github.com:bendrucker/claude.git", "github.com", "bendrucker/claude"],
+    ["https://github.com/vercel/streamdown.git", "github.com", "vercel/streamdown"],
+    ["https://gitlab.com/group/sub/project", "gitlab.com", "group/sub/project"],
+    ["ssh://git@gitlab.example.org:2222/team/app.git", "gitlab.example.org", "team/app"],
+    ["git@GitHub.com:Owner/Repo", "github.com", "Owner/Repo"],
+  ])("%s", (url, host, slug) => {
+    expect(parseRemote(url)).toEqual({ host, slug });
+  });
+
+  test.each(["", "not-a-url", "local-only", "https://github.com/owner"])("rejects %s", (url) => {
+    expect(parseRemote(url)).toBeNull();
+  });
+});
+
+describe("forgeKind", () => {
+  const cases: Array<[string, string | null, "github" | "gitlab" | null]> = [
+    ["github.com", null, "github"],
+    ["gitlab.com", null, "gitlab"],
+    ["gitlab.internal.example", null, "gitlab"],
+    ["git.example.com", "git.example.com", "gitlab"],
+    ["bitbucket.org", null, null],
+    ["git.example.com", null, null],
+  ];
+
+  test.each(cases)("%s with configured %s", (host, configured, expected) => {
+    expect(forgeKind(host, configured)).toBe(expected);
+  });
+});
+
+test("slugParts keeps a nested GitLab namespace with the owner", () => {
+  expect(slugParts("group/sub/project")).toEqual({ owner: "group/sub", repo: "project" });
+  expect(slugParts("bendrucker/claude")).toEqual({ owner: "bendrucker", repo: "claude" });
+});
+
+test("ownedBy compares the root namespace and treats an unknown viewer as unowned", () => {
+  expect(ownedBy("bendrucker/claude", "bendrucker")).toBe(true);
+  expect(ownedBy("vercel/streamdown", "bendrucker")).toBe(false);
+  expect(ownedBy("bendrucker/group/app", "bendrucker")).toBe(true);
+  expect(ownedBy("bendrucker/claude", null)).toBe(false);
+});
+
+test.each([
+  ["open", "#12"],
+  ["draft", "draft#12"],
+  ["merged", "merged#12"],
+] as const)("pullRequestRef renders %s", (state, ref) => {
+  expect(pullRequestRef(pull("b", 12, state))).toBe(ref);
+});
+
+describe("joinPullRequests", () => {
+  test("an open pull request wins over a merged one on the same branch", () => {
+    const joined = joinPullRequests([pull("reuse", 9, "open")], [pull("reuse", 4, "merged")]);
+    expect(pullRequestRef(joined.get("reuse")!)).toBe("#9");
+  });
+
+  test("a branch with only a merged pull request keeps it", () => {
+    const joined = joinPullRequests([], [pull("done", 4, "merged")]);
+    expect(pullRequestRef(joined.get("done")!)).toBe("merged#4");
+  });
+
+  test("the first of several open pull requests on a branch wins", () => {
+    const joined = joinPullRequests([pull("b", 1, "open"), pull("b", 2, "draft")], []);
+    expect(joined.get("b")?.number).toBe(1);
+  });
+});
+
+describe("mergedHorizonReached", () => {
+  const full = Array.from({ length: MERGED_LIMIT }, (_, index) =>
+    pull(`b${index}`, index, "merged", 2000),
+  );
+
+  test("a branch older than the oldest merged pull request in a full window", () => {
+    expect(mergedHorizonReached(full, [1000])).toBe(true);
+  });
+
+  test("a branch inside the window", () => {
+    expect(mergedHorizonReached(full, [3000])).toBe(false);
+  });
+
+  test("a window that did not fill cannot have a horizon", () => {
+    expect(mergedHorizonReached(full.slice(0, 5), [1000])).toBe(false);
+  });
+});
+
+describe("github", () => {
+  test("reads open and merged pull requests and marks drafts", async () => {
+    const { run, calls } = stub({
+      "--state open": { stdout: '[{"number":1,"headRefName":"a","isDraft":true}]' },
+      "--state merged": {
+        stdout: '[{"number":2,"headRefName":"b","mergedAt":"2026-01-01T00:00:00Z"}]',
+      },
+    });
+    const listing = await createForge("github", run).pullRequests("o/r");
+
+    expect(listing.open).toEqual([{ branch: "a", number: 1, state: "draft", mergedAt: null }]);
+    expect(listing.merged).toEqual([
+      { branch: "b", number: 2, state: "merged", mergedAt: 1_767_225_600 },
+    ]);
+    expect(calls.every((call) => call.includes("--author @me"))).toBe(true);
+  });
+
+  test("a failed listing reports null rather than an empty repository", async () => {
+    const { run } = stub({
+      "--state open": { ok: false, stderr: "boom" },
+      "--state merged": { stdout: "[]" },
+    });
+    const listing = await createForge("github", run).pullRequests("o/r");
+    expect(listing.open).toBeNull();
+    expect(listing.merged).toEqual([]);
+  });
+
+  test("a fork resolves to the parent slug", async () => {
+    const { run } = stub({
+      "repo view": {
+        stdout: JSON.stringify({
+          isFork: true,
+          nameWithOwner: "bendrucker/extensions",
+          parent: { name: "extensions", owner: { login: "raycast" } },
+        }),
+      },
+    });
+    expect(await createForge("github", run).identity("bendrucker/extensions")).toEqual({
+      slug: "raycast/extensions",
+      forkOf: "bendrucker/extensions",
+      resolved: true,
+    });
+  });
+
+  test("a repository that is not a fork keeps its own slug", async () => {
+    const { run } = stub({
+      "repo view": {
+        stdout: JSON.stringify({ isFork: false, nameWithOwner: "vercel/streamdown", parent: null }),
+      },
+    });
+    expect(await createForge("github", run).identity("vercel/streamdown")).toEqual({
+      slug: "vercel/streamdown",
+      forkOf: null,
+      resolved: true,
+    });
+  });
+
+  test("a failed fork lookup is reported as unresolved", async () => {
+    const { run } = stub({ "repo view": { ok: false } });
+    expect(await createForge("github", run).identity("o/r")).toEqual({
+      slug: "o/r",
+      forkOf: null,
+      resolved: false,
+    });
+  });
+
+  test("the viewer is fetched once for many repositories", async () => {
+    const { run, calls } = stub({ "api user": { stdout: '{"login":"bendrucker"}' } });
+    const forge = createForge("github", run);
+    expect(await Promise.all([forge.viewer(), forge.viewer()])).toEqual([
+      "bendrucker",
+      "bendrucker",
+    ]);
+    expect(calls.filter((call) => call.includes("api user"))).toHaveLength(1);
+  });
+});
+
+describe("gitlab", () => {
+  test("reads iid and source_branch and separates the merged query", async () => {
+    const { run, calls } = stub({
+      "api user": { stdout: '{"username":"ben"}' },
+      "--merged": {
+        stdout: '[{"iid":7,"source_branch":"done","merged_at":"2026-01-01T00:00:00Z"}]',
+      },
+      "mr list": { stdout: '[{"iid":5,"source_branch":"wip","draft":true}]' },
+    });
+    const listing = await createForge("gitlab", run).pullRequests("group/app");
+
+    expect(listing.open).toEqual([{ branch: "wip", number: 5, state: "draft", mergedAt: null }]);
+    expect(listing.merged).toEqual([
+      { branch: "done", number: 7, state: "merged", mergedAt: 1_767_225_600 },
+    ]);
+    expect(calls.some((call) => call.includes("--author ben"))).toBe(true);
+  });
+
+  test("an unresolved viewer refuses to widen the query", async () => {
+    const { run, calls } = stub({ "api user": { ok: false } });
+    expect(await createForge("gitlab", run).pullRequests("group/app")).toEqual({
+      open: null,
+      merged: null,
+    });
+    expect(calls.some((call) => call.includes("mr list"))).toBe(false);
+  });
+
+  test("forked_from_project names the parent", async () => {
+    const { run } = stub({
+      "repo view": {
+        stdout: JSON.stringify({
+          path_with_namespace: "ben/app",
+          forked_from_project: { path_with_namespace: "team/app" },
+        }),
+      },
+    });
+    expect(await createForge("gitlab", run).identity("ben/app")).toEqual({
+      slug: "team/app",
+      forkOf: "ben/app",
+      resolved: true,
+    });
+  });
+});

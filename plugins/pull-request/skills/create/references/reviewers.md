@@ -5,7 +5,7 @@ Load this after creating the PR/MR on a corporate or internal repo.
 Gate on repository visibility first:
 
 - **GitHub**: `gh repo view --json visibility -q .visibility`
-- **GitLab**: `glab api projects/:fullpath --jq .visibility`
+- **GitLab**: `glab api projects/:fullpath | jq -r .visibility` (`glab api` has no output filter flag)
 
 A public repository is OSS: skip reviewer suggestion and let the maintainer triage. Any other visibility (private, internal) is corporate: continue.
 
@@ -21,4 +21,4 @@ bun <plugin-root>/scripts/suggest-reviewers.ts
 Resolve names to platform usernames only after the user accepts, then assign them to the existing PR/MR:
 
 - **GitHub**: `gh pr edit --add-reviewer <user>` (resolve emails to logins with `mcp__github` if needed).
-- **GitLab**: load `gitlab:merge-request` for username resolution, then `glab mr update --reviewer <user>`.
+- **GitLab**: load `gitlab:merge-request` for username resolution, then `glab mr update --reviewer +<user>`. The `+` prefix appends. A bare username replaces the whole reviewer list, dropping anyone already assigned.

@@ -9,15 +9,18 @@ function statusIcon(result: RuleResult): string {
   return result.passed ? "pass" : result.severity;
 }
 
+function location(result: RuleResult): string {
+  return result.line === undefined ? "" : ` (line ${result.line})`;
+}
+
 function formatResult(result: RuleResult): string {
-  const location = result.line === undefined ? "" : ` (line ${result.line})`;
-  return `  [${statusIcon(result)}] ${result.rule}${location}: ${result.message}`;
+  return `  [${statusIcon(result)}] ${result.rule}${location(result)}: ${result.message}`;
 }
 
 function formatReference(ref: ReferenceResult): string {
   const lines = [`    ${ref.path}:`];
   for (const result of ref.results) {
-    lines.push(`      [${statusIcon(result)}] ${result.message}`);
+    lines.push(`      [${statusIcon(result)}]${location(result)} ${result.message}`);
   }
   return lines.join("\n");
 }
@@ -31,7 +34,8 @@ export function formatText(results: SkillLintResult[]): string {
     output.push(`Errors: ${skill.errors} | Warnings: ${skill.warnings}`);
     output.push("");
 
-    for (const result of skill.results) {
+    // Reference results are rendered under references/ with their file attached.
+    for (const result of skill.results.filter((r) => r.reference === undefined)) {
       output.push(formatResult(result));
     }
 

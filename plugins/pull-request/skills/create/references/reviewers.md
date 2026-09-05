@@ -9,10 +9,10 @@ Gate on repository visibility first:
 
 A public repository is OSS: skip reviewer suggestion and let the maintainer triage. Any other visibility (private, internal) is corporate: continue.
 
-Rank candidates from the git history of the changed files. The script excludes you and needs no arguments:
+Rank candidates from the git history of the changed files. The script excludes you and needs no arguments. Substitute `<plugin-root>` with the plugin root path from `SKILL.md`:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-reviewers.ts
+bun <plugin-root>/scripts/suggest-reviewers.ts
 ```
 
 - **Blame owners**: people who wrote the lines you're changing. Suggest the top one or two.

@@ -15,7 +15,7 @@ import {
 } from "../rules/frontmatter";
 import { preferHeaders } from "../rules/headers";
 import { namespaceMismatch, namespaceStutter } from "../rules/namespace";
-import { findReferences } from "../rules/references";
+import { findReferences, substitutionResults } from "../rules/references";
 import type { RuleResult, Severity } from "../types";
 
 const fixturesDir = path.join(import.meta.dirname, "fixtures");
@@ -317,6 +317,16 @@ describe("preferHeaders", () => {
       body: "```md\n~~~\n**Inner**: value\n~~~\n```",
       flagged: false,
     },
+    {
+      name: "passes a bold label inside an indented code block",
+      body: "intro\n\n    **Config**: value",
+      flagged: false,
+    },
+    {
+      name: "flags a bold label opening the lazily continued second line of a paragraph",
+      body: "some text\n**Config**: value",
+      flagged: true,
+    },
   ])("$name", ({ body, flagged }) => {
     expect(failing(body).length > 0).toBe(flagged);
   });
@@ -325,6 +335,126 @@ describe("preferHeaders", () => {
     const [offender] = failing("intro\n\n**Config**: value");
     expect(offender?.severity).toBe("warn");
     expect(offender?.line).toBe(3);
+  });
+});
+
+describe("substitutionResults", () => {
+  // Built by hand so the fixture file itself never carries a literal the rule flags.
+  const v = (name: string) => ["$", "{", name, "}"].join("");
+  const failing = (content: string, refPath = "references/example.md") =>
+    substitutionResults(content, refPath).filter((r) => !r.passed);
+
+  test.each<{ name: string; content: string; flagged: boolean }>([
+    {
+      name: "flags a skill dir in a bash block",
+      content: `\`\`\`bash\nbun ${v("CLAUDE_SKILL_DIR")}/scripts/hosts.ts\n\`\`\``,
+      flagged: true,
+    },
+    {
+      name: "flags a plugin root in a bash block",
+      content: `\`\`\`bash\nbun ${v("CLAUDE_PLUGIN_ROOT")}/scripts/x.ts\n\`\`\``,
+      flagged: true,
+    },
+    {
+      name: "flags a plugin data dir in a bash block",
+      content: `\`\`\`bash\nduckdb ${v("CLAUDE_PLUGIN_DATA")}/session.duckdb\n\`\`\``,
+      flagged: true,
+    },
+    {
+      name: "flags the unbraced form",
+      content: "```bash\nbun $CLAUDE_SKILL_DIR/scripts/x.ts\n```",
+      flagged: true,
+    },
+    {
+      name: "flags inside a tilde fence",
+      content: `~~~bash\nbun ${v("CLAUDE_SKILL_DIR")}/scripts/x.ts\n~~~`,
+      flagged: true,
+    },
+    {
+      name: "flags inside an indented code block",
+      content: `intro\n\n    bun ${v("CLAUDE_SKILL_DIR")}/scripts/x.ts`,
+      flagged: true,
+    },
+    {
+      name: "flags inside a tilde fence whose content contains backtick fence markers",
+      content: `~~~bash\n\`\`\`\nbun ${v("CLAUDE_SKILL_DIR")}/scripts/x.ts\n\`\`\`\n~~~`,
+      flagged: true,
+    },
+    {
+      name: "passes prose describing the variable in inline backticks",
+      content: `Use \`${v("CLAUDE_PLUGIN_ROOT")}/skills/<name>\` to reference skill-local scripts.`,
+      flagged: false,
+    },
+    {
+      name: "passes a bare name with no substitution sigil",
+      content: "```bash\necho CLAUDE_PLUGIN_DATA\n```",
+      flagged: false,
+    },
+    {
+      name: "passes a placeholder path",
+      content: "```bash\nbun <skill-dir>/scripts/hosts.ts\n```",
+      flagged: false,
+    },
+    {
+      name: "passes a longer name that merely starts with a watched one",
+      content: "```bash\nbun $CLAUDE_SKILL_DIRECTORY/scripts/x.ts\n```",
+      flagged: false,
+    },
+    {
+      name: "passes prose after a fenced block closes",
+      content: `\`\`\`bash\nbun scripts/x.ts\n\`\`\`\n\nSet \`${v("CLAUDE_SKILL_DIR")}\` in SKILL.md.`,
+      flagged: false,
+    },
+  ])("$name", ({ content, flagged }) => {
+    expect(failing(content).length > 0).toBe(flagged);
+  });
+
+  it("reports the whole finding", () => {
+    expect(failing(`intro\n\n\`\`\`bash\nbun ${v("CLAUDE_SKILL_DIR")}/x.ts\n\`\`\``))
+      .toMatchInlineSnapshot(`
+      [
+        {
+          "line": 4,
+          "message": "\${CLAUDE_SKILL_DIR} in a code block. Substitution reaches SKILL.md and allowed-tools only, so this expands to nothing when the command runs. State the path in SKILL.md and write a placeholder here, e.g. <skill-dir>.",
+          "passed": false,
+          "reference": "references/example.md",
+          "rule": "reference-substitution",
+          "severity": "warn",
+        },
+      ]
+    `);
+  });
+
+  it("reports the exact line for an indented code block", () => {
+    const [offender] = failing(`intro\n\n    bun ${v("CLAUDE_SKILL_DIR")}/x.ts`);
+    expect(offender?.line).toBe(3);
+  });
+
+  test.each<{ variable: string; placeholder: string }>([
+    { variable: "CLAUDE_SKILL_DIR", placeholder: "<skill-dir>" },
+    { variable: "CLAUDE_PLUGIN_ROOT", placeholder: "<plugin-root>" },
+    { variable: "CLAUDE_PLUGIN_DATA", placeholder: "<plugin-data>" },
+  ])("suggests $placeholder for $variable", ({ variable, placeholder }) => {
+    const [offender] = failing(`\`\`\`bash\nbun ${v(variable)}/x.ts\n\`\`\``);
+    expect(offender?.message).toContain(placeholder);
+  });
+
+  it("flags every occurrence on a line", () => {
+    const content = `\`\`\`bash\nduckdb ${v("CLAUDE_PLUGIN_DATA")}/s.duckdb < ${v("CLAUDE_SKILL_DIR")}/q.sql\n\`\`\``;
+    expect(failing(content)).toHaveLength(2);
+  });
+
+  // These repo files describe the substitution syntax in prose. The rule must
+  // not fire on any of them.
+  const repoRoot = path.join(import.meta.dirname, "../../../../../../..");
+
+  test.each([
+    "plugins/claude-code/skills/skill/references/patterns.md",
+    "plugins/writing/skills/analyze/references/methodology.md",
+    "plugins/claude-code/skills/hook/references/debugging.md",
+  ])("passes prose in %s", async (relative) => {
+    const content = await Bun.file(path.join(repoRoot, relative)).text();
+    expect(failing(content, relative)).toEqual([]);
   });
 });
 

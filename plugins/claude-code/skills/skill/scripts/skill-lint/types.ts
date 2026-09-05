@@ -8,6 +8,8 @@ export interface RuleResult {
   passed: boolean;
   message: string;
   line?: number;
+  /** Set when the result describes a reference file rather than SKILL.md. */
+  reference?: string;
 }
 
 export interface ReferenceResult {

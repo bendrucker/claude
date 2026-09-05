@@ -60,7 +60,7 @@ When the context above shows a detected PR template, follow its structure instea
 
 ## Reviewers
 
-Corporate and internal repos only. On OSS (a public repo you don't own), skip this step and leave triage to the maintainer. Suggest reviewers for the user to choose from. Never assign them yourself. Load [`references/reviewers.md`](references/reviewers.md) for the visibility gate, the ranking script, and username resolution.
+Corporate and internal repos only. On OSS (a public repo you don't own), skip this step and leave triage to the maintainer. Suggest reviewers for the user to choose from. Never assign them yourself. Load [`references/reviewers.md`](references/reviewers.md) for the visibility gate, the ranking script (`${CLAUDE_PLUGIN_ROOT}/scripts/suggest-reviewers.ts`), and username resolution.
 
 ## Arguments
 

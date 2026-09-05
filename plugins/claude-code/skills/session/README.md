@@ -17,7 +17,7 @@ Search and analyze Claude Code conversation history using a DuckDB index over JS
 
 ## Community Extensions
 
-The `plan-sections` and `frontmatter` queries read markdown and YAML from disk through DuckDB's `markdown` and `yaml` community extensions. Run them with `duckdb -readonly -init resources/extensions.sql`, which loads both before the piped query. The index/refresh path needs no extensions.
+The `plan-sections` and `frontmatter` queries read markdown and YAML from disk through DuckDB's `markdown` and `yaml` community extensions. Run them with `duckdb -readonly -json -init resources/extensions.sql`, which loads both before the piped query. The index/refresh path needs no extensions.
 
 DuckDB fetches these from `community-extensions.duckdb.org` on first `INSTALL ... FROM community`, then caches them per host under `~/.duckdb/extensions/`. The sandbox blocks network by default, so that host is allowlisted in `user/settings.json` (`WebFetch(domain:community-extensions.duckdb.org)`). Without it, the first install fails with a download error until the extension is cached.
 

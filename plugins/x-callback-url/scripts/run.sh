@@ -33,10 +33,17 @@ run_bounded() {
   # ordinary foreground children, and either one keeps holding the stdout this
   # function's caller reads through. The watchdog would fire, the child would
   # die, and the read would go on waiting on a grandchild nobody bounded.
+  #
+  # Parent and child both set that group, so neither has to win. When the child
+  # execs first the parent's call is refused (EPERM on BSD) and bash warns about
+  # a group that is already correct. Fd 9 carries the command's own stderr past
+  # the /dev/null that keeps that warning off the caller's.
+  exec 9>&2
   set -m
-  "$@" &
+  { "$@" 2>&9 9>&- & } 2>/dev/null
   local pid=$!
   set +m
+  exec 9>&-
 
   (
     # The timer runs as a child so the trap can end it. A foreground sleep here

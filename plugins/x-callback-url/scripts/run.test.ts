@@ -103,6 +103,10 @@ async function runScenario(scenario: Scenario): Promise<Outcome> {
   const proc = Bun.spawn([runner, "things:///version"], {
     env: {
       ...process.env,
+      // Scenarios run concurrently and run.sh serializes on a lock under
+      // XDG_CACHE_HOME. Sharing one would queue them behind each other, and the
+      // lock wait budgets for a single holder ahead, so a loser would exit 5.
+      XDG_CACHE_HOME: dir,
       XCALL_TIMEOUT_SECONDS: String(BOUND),
       XCALL_BUILD_TIMEOUT_SECONDS: String(BOUND),
     },

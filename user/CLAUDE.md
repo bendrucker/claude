@@ -80,6 +80,19 @@ I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 - For everything else (pruning, listing, removing, running hooks, editing config, and general `wt` questions), use the generic `worktrunk:worktrunk` skill.
 - Disposable verification worktrees may be created with `git worktree add tmp/<name>`; everything persistent goes through the worktrunk skills.
 
+## Claude Configuration
+
+My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucker/claude). Two checkouts of it matter, and they are not the same tree:
+
+- `~/.claude-repo` is the deployed one. Each entry under its `user/` directory is symlinked into `~/.claude`, so the instructions, settings, rules, skills, agents, and hooks loaded this session are its files. `claude-upgrade` syncs it from `main`.
+- `~/src/bendrucker/claude` is the dev clone that worktrees are cut from. Work happens there.
+
+A merged change is not live until that sync runs, so never treat an edit as already in effect. Never write to the `~/.claude` symlink targets either, which would edit the deployed checkout behind git's back.
+
+Everything that steers Claude across projects belongs in that repo: these instructions, `settings.json` and its permissions and sandbox entries, rules, skills, agents, hooks, plugins under `plugins/`, and the schemas and evals supporting them. A repo's own `.claude/` directory is the exception, since project-scoped config belongs with the project.
+
+When a request starts in another repo and the real fix turns out to be one of those, hand it to a sibling agent through the `herdr` skill, with its own worktree of `bendrucker/claude`, and report the PR back to me. herdr gives a sibling its checkout without re-rooting this session, which is why it applies here in place of `worktrunk:wt-switch-create`. Where herdr is unavailable, tell me what the change is and let me route it rather than editing in place.
+
 ## Stacked PRs
 
 I work in stacks routinely, in one of two layouts, chosen per stack. Load `github:stack` before any `gh stack` command. `gitlab:merge-request` is the GitLab equivalent.

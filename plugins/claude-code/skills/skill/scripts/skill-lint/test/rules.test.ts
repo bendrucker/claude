@@ -317,6 +317,16 @@ describe("preferHeaders", () => {
       body: "```md\n~~~\n**Inner**: value\n~~~\n```",
       flagged: false,
     },
+    {
+      name: "passes a bold label inside an indented code block",
+      body: "intro\n\n    **Config**: value",
+      flagged: false,
+    },
+    {
+      name: "flags a bold label opening the lazily continued second line of a paragraph",
+      body: "some text\n**Config**: value",
+      flagged: true,
+    },
   ])("$name", ({ body, flagged }) => {
     expect(failing(body).length > 0).toBe(flagged);
   });
@@ -361,6 +371,16 @@ describe("substitutionResults", () => {
       flagged: true,
     },
     {
+      name: "flags inside an indented code block",
+      content: `intro\n\n    bun ${v("CLAUDE_SKILL_DIR")}/scripts/x.ts`,
+      flagged: true,
+    },
+    {
+      name: "flags inside a tilde fence whose content contains backtick fence markers",
+      content: `~~~bash\n\`\`\`\nbun ${v("CLAUDE_SKILL_DIR")}/scripts/x.ts\n\`\`\`\n~~~`,
+      flagged: true,
+    },
+    {
       name: "passes prose describing the variable in inline backticks",
       content: `Use \`${v("CLAUDE_PLUGIN_ROOT")}/skills/<name>\` to reference skill-local scripts.`,
       flagged: false,
@@ -395,7 +415,7 @@ describe("substitutionResults", () => {
       [
         {
           "line": 4,
-          "message": "\${CLAUDE_SKILL_DIR} in a fenced block. Substitution reaches SKILL.md and allowed-tools only, so this expands to nothing when the command runs. State the path in SKILL.md and write a placeholder here, e.g. <skill-dir>.",
+          "message": "\${CLAUDE_SKILL_DIR} in a code block. Substitution reaches SKILL.md and allowed-tools only, so this expands to nothing when the command runs. State the path in SKILL.md and write a placeholder here, e.g. <skill-dir>.",
           "passed": false,
           "reference": "references/example.md",
           "rule": "reference-substitution",
@@ -403,6 +423,11 @@ describe("substitutionResults", () => {
         },
       ]
     `);
+  });
+
+  it("reports the exact line for an indented code block", () => {
+    const [offender] = failing(`intro\n\n    bun ${v("CLAUDE_SKILL_DIR")}/x.ts`);
+    expect(offender?.line).toBe(3);
   });
 
   test.each<{ variable: string; placeholder: string }>([

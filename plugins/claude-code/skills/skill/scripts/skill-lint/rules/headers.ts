@@ -1,7 +1,5 @@
 import type { Rule, RuleResult, SkillContent } from "../types";
-import { markdownLines } from "./fences";
-
-const LINE_START_LABEL = /^\*\*[^*]+\*\*:/;
+import { boldLabelLines } from "./markdown";
 
 function frontmatterOffset(content: SkillContent): number {
   const prefixLength = content.raw.length - content.body.length;
@@ -15,15 +13,13 @@ export const preferHeaders: Rule = {
   check(content: SkillContent): RuleResult[] {
     const offset = frontmatterOffset(content);
 
-    const results: RuleResult[] = markdownLines(content.body)
-      .filter((line) => !line.fenced && LINE_START_LABEL.test(line.text))
-      .map((line) => ({
-        rule: "prefer-headers",
-        severity: "warn" as const,
-        passed: false,
-        message: `line-start bold label. Use a #### header for the subsection instead`,
-        line: offset + line.index + 1,
-      }));
+    const results: RuleResult[] = boldLabelLines(content.body).map((line) => ({
+      rule: "prefer-headers",
+      severity: "warn" as const,
+      passed: false,
+      message: `line-start bold label. Use a #### header for the subsection instead`,
+      line: offset + line,
+    }));
 
     if (results.length === 0) {
       return [

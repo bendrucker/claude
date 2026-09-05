@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { countLines } from "../parse";
 import type { ReferenceResult, RuleResult } from "../types";
-import { markdownLines } from "./fences";
+import { codeSpans, lineAt } from "./markdown";
 
 const SPEC_URL = "https://agentskills.io/specification";
 
@@ -39,10 +39,10 @@ export function getDepth(refPath: string): number {
 export function substitutionResults(content: string, refPath: string): RuleResult[] {
   const results: RuleResult[] = [];
 
-  for (const line of markdownLines(content)) {
-    if (!line.fenced) continue;
+  for (const { start, end } of codeSpans(content)) {
+    const block = content.slice(start, end);
 
-    for (const match of line.text.matchAll(SUBSTITUTION_PATTERN)) {
+    for (const match of block.matchAll(SUBSTITUTION_PATTERN)) {
       const placeholder = PLACEHOLDERS.get(match[1] ?? "");
       if (placeholder == null) continue;
 
@@ -50,8 +50,8 @@ export function substitutionResults(content: string, refPath: string): RuleResul
         rule: "reference-substitution",
         severity: "warn",
         passed: false,
-        message: `\${${match[1]}} in a fenced block. Substitution reaches SKILL.md and allowed-tools only, so this expands to nothing when the command runs. State the path in SKILL.md and write a placeholder here, e.g. ${placeholder}.`,
-        line: line.index + 1,
+        message: `\${${match[1]}} in a code block. Substitution reaches SKILL.md and allowed-tools only, so this expands to nothing when the command runs. State the path in SKILL.md and write a placeholder here, e.g. ${placeholder}.`,
+        line: lineAt(content, start + match.index),
         reference: refPath,
       });
     }

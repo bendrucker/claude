@@ -5,7 +5,7 @@ import {
   forgeKind,
   joinPullRequests,
   MERGED_LIMIT,
-  mergedHorizonReached,
+  beyondMergedHorizon,
   ownedBy,
   parseRemote,
   pullRequestRef,
@@ -101,21 +101,44 @@ describe("joinPullRequests", () => {
   });
 });
 
-describe("mergedHorizonReached", () => {
+describe("beyondMergedHorizon", () => {
   const full = Array.from({ length: MERGED_LIMIT }, (_, index) =>
     pull(`b${index}`, index, "merged", 2000),
   );
-
-  test("a branch older than the oldest merged pull request in a full window", () => {
-    expect(mergedHorizonReached(full, [1000])).toBe(true);
+  const candidate = (branch: string, commit: number | null, matched = false) => ({
+    branch,
+    commit,
+    matched,
   });
 
-  test("a branch inside the window", () => {
-    expect(mergedHorizonReached(full, [3000])).toBe(false);
+  test("names an unmatched branch older than the oldest merge in a full window", () => {
+    expect(beyondMergedHorizon(full, [candidate("old", 1000)])).toEqual(["old"]);
+  });
+
+  test("a branch inside the window is not at risk", () => {
+    expect(beyondMergedHorizon(full, [candidate("recent", 3000)])).toEqual([]);
+  });
+
+  test("a branch that already matched a pull request is settled whatever its age", () => {
+    expect(beyondMergedHorizon(full, [candidate("old", 1000, true)])).toEqual([]);
   });
 
   test("a window that did not fill cannot have a horizon", () => {
-    expect(mergedHorizonReached(full.slice(0, 5), [1000])).toBe(false);
+    expect(beyondMergedHorizon(full.slice(0, 5), [candidate("old", 1000)])).toEqual([]);
+  });
+
+  test("an undated branch cannot be placed against the window", () => {
+    expect(beyondMergedHorizon(full, [candidate("undated", null)])).toEqual([]);
+  });
+
+  test("names every at-risk branch, sorted", () => {
+    expect(
+      beyondMergedHorizon(full, [
+        candidate("zeta", 1000),
+        candidate("alpha", 900),
+        candidate("recent", 3000),
+      ]),
+    ).toEqual(["alpha", "zeta"]);
   });
 });
 

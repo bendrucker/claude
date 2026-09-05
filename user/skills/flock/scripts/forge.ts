@@ -87,19 +87,30 @@ export function joinPullRequests(
   return byBranch;
 }
 
+export interface HorizonCandidate {
+  readonly branch: string;
+  readonly commit: number | null;
+  readonly matched: boolean;
+}
+
 /**
- * The merged query reaches only so far back, and a worktree older than the
- * window silently loses its `merged` marker rather than reporting one wrongly.
+ * The merged query reaches only so far back. A branch that already matched a
+ * pull request is settled whatever its age, so only an unmatched branch older
+ * than the window is genuinely unflagged, and naming those is what makes the
+ * warning worth acting on.
  */
-export function mergedHorizonReached(
+export function beyondMergedHorizon(
   merged: readonly PullRequest[],
-  branchCommits: readonly (number | null)[],
-): boolean {
-  if (merged.length < MERGED_LIMIT) return false;
+  candidates: readonly HorizonCandidate[],
+): string[] {
+  if (merged.length < MERGED_LIMIT) return [];
   const mergeTimes = merged.map((pull) => pull.mergedAt).filter((at): at is number => at !== null);
-  const commits = branchCommits.filter((at): at is number => at !== null);
-  if (mergeTimes.length === 0 || commits.length === 0) return false;
-  return Math.min(...commits) < Math.min(...mergeTimes);
+  if (mergeTimes.length === 0) return [];
+  const oldest = Math.min(...mergeTimes);
+  return candidates
+    .filter(({ matched, commit }) => !matched && commit !== null && commit < oldest)
+    .map(({ branch }) => branch)
+    .toSorted();
 }
 
 export interface PullRequestListing {

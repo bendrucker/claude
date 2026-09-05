@@ -36,13 +36,13 @@ One flock runs per server, and the `FLOCK` line settles which:
 - `ELSEWHERE`: `herdr workspace focus` that ID, say where it went, stop.
 - `UNCLAIMED`: rename this workspace to `flock` if it holds nothing else, then sweep. Otherwise create one, tell the user to run `/flock` there, and stop. A pane keeps the workspace it launched in, so moving this one reads `ELSEWHERE` on the next load.
 
-The PR column reads `#N`, `draft#N`, `merged#N`, `-`, or `?`. A `merged#N` row is a checkout whose work has landed. The board carries no CI state and no review scores, so fetch those only for a row you are about to merge.
+The PR column reads `#N`, `draft#N`, `merged#N`, `-`, or `?`. The board carries no CI state and no review scores, so fetch those only for a row you are about to merge.
 
-The REPO column reads a bare name for a repository you own, and `owner/repo` for anything else, including a checkout whose pull requests target an upstream you forked. An owner in that column means the row is not yours to merge.
+The REPO column reads a bare name for a repository you own, and `owner/repo` for anything else, a fork's upstream target included. An owner there means the row is not yours to merge.
 
-FLAGS reads `clean` or a comma-joined list. Only `merged` clears a row for cleanup. Every other flag holds it: `dirty` and `unpushed:N` mark work in the tree, `carries:N` counts gitignored files that a recursive removal would take with it, `unreadable` and `unpushed:?` mark a state git would not report, `detached` marks a worktree on no branch, and `reused` marks a branch whose commits postdate the merge its name matched, so the `merged#N` beside it belongs to different work.
+FLAGS reads `clean` or a comma-joined list. Only `merged` clears a row for cleanup, and every other flag holds it. Three are not self-evident: `carries:N` counts gitignored files a recursive removal would take, `reused` means the `merged#N` beside it belongs to different work under a recycled branch name, and `unreadable` or `unpushed:?` mean git would not report the state at all.
 
-An `incomplete:` line names a repo whose lookup failed. Retry it: `gh pr list` for a `?` PR column, `git worktree list` for absent rows. Dispose of nothing in a repo whose retry also fails.
+An `incomplete:` line names what the board could not resolve. Retry it: `gh pr list --head <branch>` for the branches it names, `gh pr list` for a `?` PR column. Dispose of nothing the retry also leaves unresolved.
 
 Weight the sweep toward whatever `$ARGUMENTS` names.
 
@@ -74,24 +74,24 @@ Resolve the rest to one of three dispositions.
 
 **Clean up.** `merged#N` or the `merged` flag, and no other flag on the row. Remove the worktree, close its workspace and panes, prune the branch. Read `open_workspace_id` out of `herdr worktree list --json` before removing the path, because herdr loses the mapping once the worktree is gone.
 
-**Merge.** Bar met, your repo. `gh pr merge --squash --delete-branch`, then clean up its worktree and workspace.
+**Merge.** Bar met, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it carrying nothing.
 
-**Report.** Everything else, one line per row. A `merged#N` row with a dirty tree carries new work on a landed branch, so it needs a fresh branch rather than a removal. Dirty trees, unpushed commits, repos you do not own, and repos whose lookup failed twice all stay where they are.
+**Report.** Everything else, grouped rather than listed. Rows sharing a shape become one line carrying the count and the shape, and a single row is named only when it needs a decision. A `merged#N` row carrying any other flag holds work the merge did not take, so it needs a fresh branch rather than a removal.
 
-Never remove a worktree carrying uncommitted or unpushed work.
+Skip the row whose pane matches `self=`. You do not sweep the pane you run in.
 
-A healthy row mid-flight gets none of the three. An agent working a fresh branch with no PR and no flags is not stuck. Skip it.
+A row mid-flight gets none of the three. An agent on a fresh branch with no PR and no flags is working rather than stuck. A clean worktree with no PR, no flags, and no agent is quiet under 30 days and aged out above it.
 
 A pane parked on an approval dialog is the user's to answer. Read it, `herdr agent focus` it, and say what it is asking.
 
-Every disposal waits for the user. Auto mode treats `gh pr merge` on your own green pull request as routine, so no permission prompt arrives to catch a wrong call. Propose disposals in the `AskUserQuestion` batch and run only what comes back approved.
+Every disposal waits for the user, and nothing else stops one. Auto mode approves `gh pr merge` on your own green pull request with no prompt, and leaves worktree removal and workspace close to a classifier. Propose every disposal in the `AskUserQuestion` batch and run only what comes back approved.
 
 ## Close
 
-Close with a count of what the sweep found, then the rows that need the user:
+Close with a count, then the rows that need the user:
 
 ```
-9 to clean up · 2 to merge · 6 need you · 43 mid-flight
+12 to clean up · 2 to merge · 6 need you · 43 mid-flight
 ```
 
 Then batch the decisions into `AskUserQuestion`: the cleanups as one grouped question, the merges individually, and anything genuinely yours to raise.

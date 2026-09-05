@@ -13,7 +13,7 @@ import {
   forgeKind,
   joinPullRequests,
   MERGED_LIMIT,
-  mergedHorizonReached,
+  beyondMergedHorizon,
   ownedBy,
   parseRemote,
   pullRequestRef,
@@ -402,16 +402,20 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
   );
 
   const merged = forge.listing.merged;
-  if (
-    merged !== null &&
-    mergedHorizonReached(
+  if (merged !== null) {
+    const beyond = beyondMergedHorizon(
       merged,
-      scanned.map((entry) => entry.commit),
-    )
-  ) {
-    warnings.push(
-      `${target}: merged pull request history stopped at ${MERGED_LIMIT}, so a branch older than that window goes unflagged`,
+      scanned.map(({ row, commit }) => ({
+        branch: row.branch ?? "",
+        commit,
+        matched: row.pull !== null,
+      })),
     );
+    if (beyond.length > 0) {
+      warnings.push(
+        `${target}: ${beyond.join(", ")} ${beyond.length === 1 ? "predates" : "predate"} the last ${MERGED_LIMIT} merged pull requests, so a merged one would go unflagged`,
+      );
+    }
   }
 
   return { rows: scanned.map((entry) => entry.row), warnings };

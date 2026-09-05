@@ -33,6 +33,7 @@ describe("fit", () => {
   });
 
   test("an elided value never exceeds the column", () => {
+    // oxlint-disable-next-line unicorn/prefer-spread -- typescript/no-misused-spread rejects the spread form on a string.
     expect(Array.from(fit("x".repeat(80), 14))).toHaveLength(14);
   });
 });

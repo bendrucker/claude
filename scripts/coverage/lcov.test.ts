@@ -12,6 +12,7 @@ import {
 } from "./lcov";
 
 const pathChar = fc.constantFrom(
+  // oxlint-disable-next-line unicorn/prefer-spread -- spreading this ASCII string directly would trip typescript/no-misused-spread's code-point warning.
   ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-".split(""),
 );
 

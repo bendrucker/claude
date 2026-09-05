@@ -135,9 +135,9 @@ test.each<{ name: string; skillName: string; plugin: string; substrings: string[
   if (substrings.length === 0) {
     expect(warnings).toEqual([]);
   } else {
-    substrings.forEach((substring, i) => {
+    for (const [i, substring] of substrings.entries()) {
       expect(warnings[i]).toContain(substring);
-    });
+    }
   }
 });
 

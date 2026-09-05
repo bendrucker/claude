@@ -15,7 +15,7 @@ const PLACEHOLDERS = new Map([
 
 // \b after the name keeps $CLAUDE_SKILL_DIRECTORY from matching CLAUDE_SKILL_DIR.
 const SUBSTITUTION_PATTERN = new RegExp(
-  `\\$\\{?(${Array.from(PLACEHOLDERS.keys()).join("|")})\\b\\}?`,
+  `\\$\\{?(${[...PLACEHOLDERS.keys()].join("|")})\\b\\}?`,
   "g",
 );
 
@@ -28,7 +28,7 @@ export function findReferences(body: string): string[] {
     if (ref != null && ref !== "") refs.add(ref);
   }
 
-  return Array.from(refs);
+  return [...refs];
 }
 
 export function getDepth(refPath: string): number {

@@ -26,14 +26,35 @@
         "ignoreRestSiblings": true
       }
     ],
+    // Object.assign({}, ...) merges through a function call instead of an
+    // object literal, hiding the resulting shape from tools that read
+    // literals better than call expressions, and needs an empty target
+    // argument purely to avoid mutating an input.
+    "prefer-object-spread": "error",
     "prefer-template": "error",
     "import/no-named-as-default-member": "error",
     "oxc/no-map-spread": "error",
     // A `new Promise` executor that only wraps an existing async API duplicates
     // logic the platform already exposes, and drops its built-in error handling.
     "promise/avoid-new": "error",
+    // An implicit length check reads as a numeric truthiness test rather
+    // than a stated "has items" or "is empty" comparison, and looks the
+    // same whether the intent is >0, !==0, or something else entirely.
+    "unicorn/explicit-length-check": "error",
+    // A forEach callback gives up break and continue, cannot await without
+    // an async-IIFE workaround, and adds a closure frame the loop body
+    // does not need.
+    "unicorn/no-array-for-each": "error",
     "unicorn/prefer-array-find": "error",
+    // A hand-written a > b ? a : b comparison mishandles NaN silently,
+    // does not extend past two values without nesting, and hides a named
+    // operation behind inline conditional logic.
+    "unicorn/prefer-math-min-max": "error",
     "unicorn/prefer-set-has": "error",
+    // Array.prototype.slice.call/.apply()/.concat()/Array.from() carry
+    // parameters and binding semantics (thisArg, mapping functions)
+    // irrelevant to a plain copy, where spread states the intent directly.
+    "unicorn/prefer-spread": "error",
     // `String.raw` keeps a backslash-heavy literal (a path, a regex) readable as written, instead of forcing a manual escape count that's easy to get wrong.
     "unicorn/prefer-string-raw": "error",
     // `replace()` needs a global regex to hit every match, and a dropped `g` flag silently replaces only the first one. `replaceAll()` makes the intent explicit and takes a plain string when there's no pattern to match.

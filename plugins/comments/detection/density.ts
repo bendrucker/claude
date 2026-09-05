@@ -60,7 +60,7 @@ export function addedLines(
   }
   const added = new Set<number>();
   const newLines = newText.split("\n");
-  newLines.forEach((line, i) => {
+  for (const [i, line] of newLines.entries()) {
     const k = lineKey(line);
     const remaining = oldCounts.get(k) ?? 0;
     if (remaining > 0) {
@@ -68,7 +68,7 @@ export function addedLines(
     } else {
       added.add(i + 1);
     }
-  });
+  }
   return { fragment: newText, added };
 }
 

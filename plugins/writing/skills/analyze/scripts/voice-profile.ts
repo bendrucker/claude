@@ -77,7 +77,7 @@ export function buildProfile(docs: VoiceDocument[], generatedAt: string): VoiceP
     stemmedNgrams: serializeNgrams(stemmedNgrams),
     totalStemmedTokens,
     generatedAt,
-    sources: Array.from(sources).toSorted(),
+    sources: [...sources].toSorted(),
     voiceDelta,
   };
 }

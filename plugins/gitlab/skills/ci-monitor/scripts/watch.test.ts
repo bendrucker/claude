@@ -301,9 +301,9 @@ describe("pipelineDurations", () => {
   ])("$name", ({ raw, expected }) => {
     const durations = pipelineDurations(raw);
     expect(durations).toHaveLength(expected.length);
-    expected.forEach((seconds, index) => {
+    for (const [index, seconds] of expected.entries()) {
       expect(durations[index]).toBeCloseTo(seconds, 2);
-    });
+    }
   });
 
   test("never yields a duration the clamped interval cannot consume", () => {
@@ -645,11 +645,11 @@ describe("deriveEvents in branch mode", () => {
     ];
 
     const allEvents: Event[] = [];
-    sequence.forEach((probe, i) => {
+    for (const [i, probe] of sequence.entries()) {
       const outcome = deriveEvents(probe, state, i * minute, 15);
       state = outcome.state;
       allEvents.push(...outcome.events);
-    });
+    }
 
     expect(allEvents.some((e) => e.type === "conflicts")).toBe(false);
     expect(allEvents.some((e) => e.type === "pr-closed")).toBe(false);
@@ -700,11 +700,11 @@ describe("deriveEvents in pipeline-id mode", () => {
     ];
 
     const allEvents: Event[] = [];
-    sequence.forEach((probe, i) => {
+    for (const [i, probe] of sequence.entries()) {
       const outcome = deriveEvents(probe, state, i * minute, 15);
       state = outcome.state;
       allEvents.push(...outcome.events);
-    });
+    }
 
     expect(allEvents.some((e) => e.type === "conflicts")).toBe(false);
     expect(allEvents.some((e) => e.type === "pr-closed")).toBe(false);
@@ -722,11 +722,11 @@ describe("deriveEvents in pipeline-id mode", () => {
     ];
 
     const allEvents: Event[] = [];
-    sequence.forEach((probe, i) => {
+    for (const [i, probe] of sequence.entries()) {
       const outcome = deriveEvents(probe, state, i * minute, 15);
       state = outcome.state;
       allEvents.push(...outcome.events);
-    });
+    }
 
     expect(allEvents.some((e) => e.type === "conflicts")).toBe(false);
     expect(allEvents.some((e) => e.type === "pr-closed")).toBe(false);

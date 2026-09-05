@@ -128,7 +128,7 @@ export function renderTask(
     body += ` ${text}`;
     const trailing = [...metaParts];
     if (withType && agentType != null && agentType !== "") trailing.push(agentType);
-    if (trailing.length !== 0) {
+    if (trailing.length > 0) {
       body += ` ${styleText(["dim"], trailing.map((part) => `· ${part}`).join(" "))}`;
     }
     return body;
@@ -364,5 +364,5 @@ if (import.meta.main) {
       );
     }),
   );
-  if (lines.length !== 0) process.stdout.write(`${lines.join("\n")}\n`);
+  if (lines.length > 0) process.stdout.write(`${lines.join("\n")}\n`);
 }

@@ -19,7 +19,7 @@ export interface ValidationTarget {
 
 export async function runValidation(target: ValidationTarget): Promise<void> {
   let ajv: Ajv | undefined;
-  if (target.extraSchemas != null && target.extraSchemas.length !== 0) {
+  if (target.extraSchemas != null && target.extraSchemas.length > 0) {
     ajv = createValidator();
     const extras = await Promise.all(
       target.extraSchemas.map(async (extra) => ({

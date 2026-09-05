@@ -71,7 +71,7 @@ await persistLcov(reports);
 
 // When specific files were requested, focus the report on them.
 const targets =
-  files.length !== 0 ? new Set(files.map((f) => relative(repoRoot, join(process.cwd(), f)))) : null;
+  files.length > 0 ? new Set(files.map((f) => relative(repoRoot, join(process.cwd(), f)))) : null;
 const scoped = targets ? reports.filter((fc) => targets.has(fc.file)) : reports;
 
 if (argv.flags.report === "github") {

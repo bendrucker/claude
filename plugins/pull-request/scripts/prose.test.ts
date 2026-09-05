@@ -32,6 +32,7 @@ const LIST_INDENT = 2;
 const MIN_COLUMN = WRAP_MIN_LINE + MAX_WORD + 1 + LIST_INDENT;
 const MAX_COLUMN = WRAP_MAX_LINE;
 
+// oxlint-disable-next-line unicorn/prefer-spread -- spreading this ASCII string directly would trip typescript/no-misused-spread's code-point warning.
 const LOWERCASE = "abcdefghijklmnopqrstuvwxyz".split("");
 const word = fc.string({
   minLength: 3,

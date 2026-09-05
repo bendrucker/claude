@@ -34,6 +34,7 @@ export const COLUMNS = [
 ] as const;
 
 export function fit(value: string, width: number): string {
+  // oxlint-disable-next-line unicorn/prefer-spread -- typescript/no-misused-spread rejects the spread form on a string.
   const points = Array.from(value);
   if (points.length <= width) return value;
   return `${points.slice(0, width - 1).join("")}…`;

@@ -112,9 +112,9 @@ function drawCaption(ctx: SKRSContext2D, layout: CaptionLayout, y: number, width
   ctx.font = fontString(font, layout.fontPx);
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  layout.lines.forEach((line, i) => {
+  for (const [i, line] of layout.lines.entries()) {
     ctx.fillText(line, width / 2, y + padPx + i * layout.fontPx * LINE_HEIGHT);
-  });
+  }
 }
 
 interface BoxLayout {
@@ -210,11 +210,11 @@ function drawBox(
   ctx.lineWidth = Math.max(MIN_STROKE_PX, fit.fontPx * preset.strokeWidthRatio);
   ctx.strokeStyle = box.style?.stroke ?? preset.stroke;
   ctx.fillStyle = box.style?.fill ?? preset.fill;
-  fit.lines.forEach((line, i) => {
+  for (const [i, line] of fit.lines.entries()) {
     const y = offsetY + yStart + i * fit.fontPx * LINE_HEIGHT;
     ctx.strokeText(line, x, y);
     ctx.fillText(line, x, y);
-  });
+  }
 }
 
 export async function render(
@@ -258,9 +258,9 @@ export async function render(
 
   const warnings: string[] = [];
   const classic = await classicFontFamily();
-  layoutBoxes(ctx, spec, image.width, image.height, classic).forEach((layout, i) => {
+  for (const [i, layout] of layoutBoxes(ctx, spec, image.width, image.height, classic).entries()) {
     drawBox(ctx, layout, bars.top, warnings, i);
-  });
+  }
 
   const absolute = resolve(outPath);
   await Bun.write(absolute, await canvas.encode("png"));

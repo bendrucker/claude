@@ -238,13 +238,13 @@ export function validateCaptureTitles(title?: string, titles?: string[]): void {
  * silently and a blank title as a nameless todo the user then has to find.
  */
 export function validateNonBlank(values: string[], field: string): void {
-  values.forEach((value, index) => {
+  for (const [index, value] of values.entries()) {
     if (value.trim() === "") {
       throw new Error(
         `${field}[${index}] must be a non-empty string, got ${JSON.stringify(value)}`,
       );
     }
-  });
+  }
 }
 
 /**
@@ -634,7 +634,7 @@ export function registerTools(server: McpServer, client: ThingsClient = defaultC
           // keeps a retry from updating those todos a second time.
           const message = error instanceof Error ? error.message : String(error);
           throw new Error(
-            applied.length !== 0
+            applied.length > 0
               ? `${message}\nAlready updated: ${applied.join(", ")}. Retry only the remaining IDs.`
               : message,
             { cause: error },

@@ -118,7 +118,7 @@ export function evaluateClassifiers(
     }
     verdicts.set(heading, row);
     const base = row.get(baseline.name);
-    if (Array.from(row.values()).some((flagged) => flagged !== base)) {
+    if ([...row.values()].some((flagged) => flagged !== base)) {
       disagreements.push(heading);
     }
   }

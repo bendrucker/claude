@@ -94,7 +94,7 @@ export function dialColor(pct: number, exceeds: boolean): DialColor {
 
 export function dialIndex(pct: number): number {
   const idx = Math.floor((pct * 7) / 100);
-  return idx > 7 ? 7 : idx;
+  return Math.min(7, idx);
 }
 
 // Claude Code's top-level `exceeds_200k_tokens` reflects the most recent API
@@ -299,10 +299,10 @@ export function buildStatusLine(
   // Fixed segments (dials) are measured first and never elided; the worktree
   // label takes whatever width remains so the dial stays visible at any width.
   let fixedWidth = 0;
-  segments.forEach((s, i) => {
+  for (const [i, s] of segments.entries()) {
     if (i > 0) fixedWidth += SEP.length;
     fixedWidth += Bun.stringWidth(s);
-  });
+  }
 
   const worktreeBudget = columns - fixedWidth - SEP.length - 1;
   if (worktree) segments.push(...formatWorktree(worktree, worktreeBudget));

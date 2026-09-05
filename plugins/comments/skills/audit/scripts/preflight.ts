@@ -116,7 +116,10 @@ export async function preflight(
   // verdicts use. Each run leaves a (features, verdict) pair in its job dir,
   // the training data for routing obvious comments away from the judge later.
   const features = Object.fromEntries(
-    limited.map((c) => [c.id, { path: c.path, startLine: c.startLine, ...c.features }]),
+    limited.map((c) => [
+      c.id,
+      { path: c.path, startLine: c.startLine, provenance: c.provenance ?? null, ...c.features },
+    ]),
   );
   await Bun.write(join(written.jobDir, "features.json"), JSON.stringify(features, null, 2));
 

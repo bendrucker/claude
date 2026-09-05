@@ -5,6 +5,7 @@ import { Glob } from "bun";
 import { cli } from "cleye";
 import { table } from "table";
 import { z } from "zod";
+import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
 import { loadPrompt } from "../judge/judge";
 import {
@@ -42,6 +43,8 @@ export interface Fixture {
   /** For a partial `trim`: the owner's gold kept-comment text, for hand spot-checks. */
   trimTo?: string;
   trimToLines?: number[];
+  /** Absent fixtures are judged as agent-written, the rubric's default. */
+  provenance?: Provenance;
   source?: string;
   note?: string;
 }
@@ -86,6 +89,7 @@ const FixtureInput = z
       rewrite: z.string().nullish(),
       trimTo: z.string().nullish(),
       trimToLines: z.array(z.number()).nullish(),
+      provenance: ProvenanceSchema.nullish(),
       source: z.string().nullish(),
       note: z.string().nullish(),
     },
@@ -129,6 +133,7 @@ function validateFixture(value: unknown, file: string): Fixture {
   if (decoded.trimTo != null) fixture.trimTo = decoded.trimTo;
   if (decoded.rewrite != null) fixture.rewrite = decoded.rewrite;
   if (decoded.trimToLines != null) fixture.trimToLines = decoded.trimToLines;
+  if (decoded.provenance != null) fixture.provenance = decoded.provenance;
   if (decoded.source != null) fixture.source = decoded.source;
   if (decoded.note != null) fixture.note = decoded.note;
   return fixture;
@@ -141,6 +146,7 @@ export function fixtureToInput(fixture: Fixture): CommentJudgeInput {
     kind: fixture.kind,
     text: fixture.comment,
     context: fixture.context,
+    provenance: fixture.provenance,
   };
 }
 

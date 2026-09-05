@@ -7,6 +7,7 @@ import { isExemptComment } from "./exempt";
 import { extractComments, languageForPath } from "./extract";
 import { type CommentFeatures, commentFeatures } from "./features";
 import { commentId } from "./identity";
+import { type Provenance, ProvenanceIndex } from "./provenance";
 import { type CommentScore, scoreComment } from "./rank";
 import { scopeIntroduced } from "./scope";
 import type { Comment, FileDiff, IntroducedComment, Language } from "./types";
@@ -22,6 +23,8 @@ export interface CollectedComment extends IntroducedComment {
   context: string;
   score: CommentScore;
   features: CommentFeatures;
+  /** Who last touched the comment's lines. Absent when the content came from a remote MR ref. */
+  provenance?: Provenance | undefined;
 }
 
 /** A header marker that announces a file is machine-written. */
@@ -86,6 +89,7 @@ function toCollected(
   language: Language,
   comment: Comment,
   lines: string[],
+  provenance?: Provenance,
 ): CollectedComment {
   return {
     ...comment,
@@ -95,13 +99,30 @@ function toCollected(
     context: contextWindow(lines, comment),
     score: scoreComment(comment),
     features: commentFeatures(comment, lines),
+    provenance,
   };
+}
+
+/**
+ * Attach provenance to each comment of one local file. A remote MR file is
+ * skipped: its content is not what the local blame describes.
+ */
+async function withProvenance(
+  path: string,
+  language: Language,
+  comments: Comment[],
+  lines: string[],
+  index: ProvenanceIndex | null,
+): Promise<CollectedComment[]> {
+  const provenance = index ? await index.forFile(path, comments) : [];
+  return comments.map((comment, i) => toCollected(path, language, comment, lines, provenance[i]));
 }
 
 async function collectDiffFile(
   file: FileDiff,
   options: DiffOptions,
   mrSource: MrSource | null,
+  index: ProvenanceIndex | null,
   onDensity?: (file: ScoredFile) => void,
 ): Promise<CollectedComment[]> {
   const language = languageForPath(file.path);
@@ -125,9 +146,10 @@ async function collectDiffFile(
       stats: await measureAddedLines(source, added, language, comments),
     });
   }
-  return scopeIntroduced(comments, file.added)
-    .filter((comment) => !isExemptComment(comment))
-    .map((comment) => toCollected(file.path, language, comment, lines));
+  const introduced = scopeIntroduced(comments, file.added).filter(
+    (comment) => !isExemptComment(comment),
+  );
+  return withProvenance(file.path, language, introduced, lines, index);
 }
 
 export interface CollectOptions {
@@ -151,14 +173,16 @@ export async function collectDiff(
   const diffs = resolved.filter(
     (file) => matches(file.path) && !isVendoredPath(file.path, vendoredRoots),
   );
+  const index = mrSource ? null : new ProvenanceIndex();
   const perFile = await Promise.all(
-    diffs.map((file) => collectDiffFile(file, options, mrSource, collect.onFileDensity)),
+    diffs.map((file) => collectDiffFile(file, options, mrSource, index, collect.onFileDensity)),
   );
   return perFile.flat();
 }
 
 async function collectRepoFile(
   path: string,
+  index: ProvenanceIndex,
   onDensity?: (file: ScoredFile) => void,
 ): Promise<CollectedComment[]> {
   const language = languageForPath(path);
@@ -177,16 +201,16 @@ async function collectRepoFile(
       stats: await measureAddedLines(source, added, language, comments),
     });
   }
-  return comments
-    .filter((comment) => !isExemptComment(comment))
-    .map((comment) => toCollected(path, language, comment, lines));
+  const judged = comments.filter((comment) => !isExemptComment(comment));
+  return withProvenance(path, language, judged, lines, index);
 }
 
 /** Every comment in every tracked code file, narrowed by `--path` globs. The `--all` scope. */
 export async function collectRepo(collect: CollectOptions = {}): Promise<CollectedComment[]> {
   const files = await listTrackedCodeFiles(collect);
+  const index = new ProvenanceIndex();
   const perFile = await Promise.all(
-    files.map((path) => collectRepoFile(path, collect.onFileDensity)),
+    files.map((path) => collectRepoFile(path, index, collect.onFileDensity)),
   );
   return perFile.flat();
 }

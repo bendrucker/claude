@@ -24,11 +24,17 @@ deterministic applier writes the changes to a branch. The judge returns one of
 three actions per comment: `keep` (it earns its place), `trim` (it carries no
 fact, delete or shorten it), or `rewrite` (it carries a real fact under AI voice,
 strip the voice and keep the fact). A comment earns its place when it adds
-information not readily available in the adjacent code. See
-[`judge/prompt.md`](../../judge/prompt.md) for the full model and carve-outs.
+information not readily available in the adjacent code. Nearly every comment
+the audit sees was written by a coding agent, so the judge defaults to `trim`
+and slims what it keeps. Each comment carries its `git blame` provenance
+(uncommitted lines, committing authors, and agent trailers such as
+`Co-Authored-By` or `Claude-Session`), which the judge reads as evidence of
+authorship. See [`judge/prompt.md`](../../judge/prompt.md) for the full model
+and carve-outs.
 
-Model-invocable so `ship` can run it as its comment pass. The consent gate at
-[Preflight](#preflight) caps the cost of a misfire at one cheap extraction.
+Model-invocable so `ship` can run it as its comment pass. A misfire costs one
+cheap extraction plus a fan-out of a few agents. The consent gate at
+[Preflight](#preflight) caps a repo-scale run.
 
 The pipeline is three steps: `preflight` (extract, rank, build the job), the
 Workflow tool (judge), and `apply` (write the trims or report them).
@@ -76,17 +82,18 @@ machine block:
 </preflight>
 ```
 
-Read the `<preflight>` block. Present the count, file count, and rough token
-estimate to the user. **Wait for the user to confirm before fanning out.** Nothing
-runs until they do. A 5,000-comment repo is roughly 250 agents; `--path` and
-`--limit` cap that.
+Read the `<preflight>` block. At ten shards or fewer, state the count, file
+count, and token estimate in one line and fan out at once. That covers every
+diff-scope run and a small repo. Above ten shards, present those numbers and
+**wait for the user to confirm before fanning out**. A 5,000-comment repo is
+roughly 250 agents; `--path` and `--limit` cap that.
 
 `--all` requires a clean working tree, because it reads the working tree but
 applies from HEAD. Commit or stash first if preflight reports a dirty tree.
 
 ## Judge
 
-On confirmation, read `argsPath` (it is JSON) and call the Workflow tool with the
+Read `argsPath` (it is JSON) and call the Workflow tool with the
 `scriptPath` from the preflight block and `args` set to the parsed contents of
 `argsPath`:
 

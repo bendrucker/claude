@@ -1,0 +1,258 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { $ } from "bun";
+import {
+  authorSignal,
+  type BlamedLine,
+  commitSignals,
+  type GitRunner,
+  parseLinePorcelain,
+  ProvenanceIndex,
+  provenanceOf,
+} from "./provenance";
+import type { Comment } from "./types";
+
+const SHA_A = "a".repeat(40);
+const SHA_B = "b".repeat(40);
+const ZERO = "0".repeat(40);
+
+const porcelain = [
+  `${SHA_A} 1 1 2`,
+  "author Ada",
+  "author-mail <ada@example.com>",
+  "author-time 1700000000",
+  "summary first",
+  "\t// one",
+  `${SHA_A} 2 2`,
+  "author Ada",
+  "author-mail <ada@example.com>",
+  "author-time 1700000000",
+  "\t// two",
+  `${ZERO} 3 3 1`,
+  "author Not Committed Yet",
+  "author-mail <not.committed.yet>",
+  "author-time 1750000000",
+  "\t// three",
+  `${SHA_B} 1 4 1`,
+  "author Claude",
+  "author-mail <noreply@anthropic.com>",
+  "author-time 1760000000",
+  "\t// four",
+  "",
+].join("\n");
+
+const comment = (startLine: number, endLine = startLine): Comment => ({
+  kind: "line",
+  text: "// c",
+  startLine,
+  endLine,
+  startColumn: 0,
+  endColumn: 4,
+});
+
+describe("parseLinePorcelain", () => {
+  test.each<[string, string]>([
+    ["a SHA-256 id", `${"c".repeat(64)} 1 1 1`],
+    ["a boundary commit", `^${SHA_A} 1 1 1`],
+  ])("reads %s as a header", (_, header) => {
+    const blame = parseLinePorcelain(`${header}\nauthor Ada\n\t// one\n`);
+    expect(blame.get(1)?.author).toBe("Ada");
+    expect(blame.get(1)?.sha).toMatch(/^[a-f0-9]+$/);
+  });
+
+  test("maps each final line to its commit and author", () => {
+    const blame = parseLinePorcelain(porcelain);
+    expect([...blame.keys()]).toEqual([1, 2, 3, 4]);
+    expect(blame.get(1)).toEqual({
+      sha: SHA_A,
+      author: "Ada",
+      mail: "ada@example.com",
+      time: 1700000000,
+    });
+    expect(blame.get(3)?.sha).toBe(ZERO);
+    expect(blame.get(4)?.mail).toBe("noreply@anthropic.com");
+  });
+});
+
+describe("commitSignals", () => {
+  test.each<[string, string[]]>([
+    ["plain subject\n\nbody", []],
+    ["subject\n\nCo-authored-by: Ada <ada@example.com>", []],
+    [
+      "subject\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+      ["Co-Authored-By: Claude <noreply@anthropic.com>"],
+    ],
+    [
+      "subject\n\nClaude-Session: https://claude.ai/code/session_01ABC",
+      ["Claude-Session: https://claude.ai/code/session_01ABC"],
+    ],
+    [
+      "subject\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+      ["🤖 Generated with [Claude Code](https://claude.com/claude-code)"],
+    ],
+    [
+      "subject\n\nCo-authored-by: renovate[bot] <1+renovate[bot]@users.noreply.github.com>",
+      ["Co-authored-by: renovate[bot] <1+renovate[bot]@users.noreply.github.com>"],
+    ],
+  ])("%j", (message, expected) => {
+    expect(commitSignals(message)).toEqual(expected);
+  });
+});
+
+describe("authorSignal", () => {
+  const line = (author: string, mail: string): BlamedLine => ({
+    sha: SHA_A,
+    author,
+    mail,
+    time: 0,
+  });
+  test.each<[string, string, string | null]>([
+    ["Ada", "ada@example.com", null],
+    ["Claude", "noreply@anthropic.com", "author: Claude <noreply@anthropic.com>"],
+    [
+      "dependabot[bot]",
+      "x@users.noreply.github.com",
+      "author: dependabot[bot] <x@users.noreply.github.com>",
+    ],
+  ])("%s <%s>", (author, mail, expected) => {
+    expect(authorSignal(line(author, mail))).toBe(expected);
+  });
+});
+
+describe("provenanceOf", () => {
+  const blame = parseLinePorcelain(porcelain);
+  const signals = new Map([[SHA_A, ["Claude-Session: https://claude.ai/code/session_01ABC"]]]);
+
+  test.each<[string, Comment, ReturnType<typeof provenanceOf>]>([
+    [
+      "committed lines carry their authors, date, and commit signals",
+      comment(1, 2),
+      {
+        uncommitted: false,
+        authors: ["Ada"],
+        latest: "2023-11-14",
+        signals: ["Claude-Session: https://claude.ai/code/session_01ABC"],
+      },
+    ],
+    [
+      "an uncommitted line marks the comment uncommitted",
+      comment(2, 3),
+      {
+        uncommitted: true,
+        authors: ["Ada"],
+        latest: "2023-11-14",
+        signals: ["Claude-Session: https://claude.ai/code/session_01ABC"],
+      },
+    ],
+    [
+      "an agent author is a signal of its own",
+      comment(4),
+      {
+        uncommitted: false,
+        authors: ["Claude"],
+        latest: "2025-10-09",
+        signals: ["author: Claude <noreply@anthropic.com>"],
+      },
+    ],
+    [
+      "a line the blame lacks counts as uncommitted",
+      comment(9),
+      { uncommitted: true, authors: [], latest: null, signals: [] },
+    ],
+  ])("%s", (_, target, expected) => {
+    expect(provenanceOf(target, blame, signals)).toEqual(expected);
+  });
+});
+
+describe("ProvenanceIndex", () => {
+  let dir: string;
+  let prevCwd: string;
+
+  const git = (...args: string[]) =>
+    $`git ${args}`
+      .cwd(dir)
+      .env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" })
+      .quiet();
+
+  beforeEach(async () => {
+    prevCwd = process.cwd();
+    dir = await mkdtemp(join(tmpdir(), "comments-provenance-"));
+    await git("init", "-q", "-b", "main");
+    await git("config", "user.email", "ada@example.com");
+    await git("config", "user.name", "Ada");
+    await Bun.write(join(dir, "a.ts"), "// one\n// two\n");
+    await git("add", "-A");
+    await git("commit", "-q", "-m", "first\n\nCo-Authored-By: Claude <noreply@anthropic.com>");
+    await Bun.write(join(dir, "a.ts"), "// one\n// two\n// three\n");
+    process.chdir(dir);
+  });
+
+  afterEach(async () => {
+    process.chdir(prevCwd);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("blames a tracked file and reads the signals off its commits", async () => {
+    const index = new ProvenanceIndex();
+    const [committed, pending] = await index.forFile("a.ts", [comment(1, 2), comment(3)]);
+    expect(committed).toMatchObject({
+      uncommitted: false,
+      authors: ["Ada"],
+      signals: ["Co-Authored-By: Claude <noreply@anthropic.com>"],
+    });
+    expect(committed?.latest).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(pending).toEqual({ uncommitted: true, authors: [], latest: null, signals: [] });
+  });
+
+  test.each<[string, string, () => Promise<void>]>([
+    ["a staged file", "b.ts", async () => void (await git("add", "b.ts"))],
+    ["an untracked file", "new.ts", async () => {}],
+  ])("%s blames as wholly uncommitted", async (_, path, stage) => {
+    await Bun.write(join(dir, path), "// fresh\n");
+    await stage();
+    const index = new ProvenanceIndex();
+    expect(await index.forFile(path, [comment(1)])).toEqual([
+      { uncommitted: true, authors: [], latest: null, signals: [] },
+    ]);
+  });
+
+  test("reports nothing for a tracked file whose blame fails", async () => {
+    const failing: GitRunner = (args) =>
+      Promise.resolve(
+        args[0] === "blame"
+          ? { exitCode: 128, text: "" }
+          : { exitCode: 0, text: `${args.at(-1)}\n` },
+      );
+    const index = new ProvenanceIndex(failing);
+    expect(await index.forFile("a.ts", [comment(1)])).toEqual([]);
+  });
+
+  test("a commit message cannot forge another commit's signals", async () => {
+    const forged = [
+      `${SHA_A}\x00subject\n\n${SHA_B}\x00Claude-Session: forged\x00`,
+      `${SHA_B}\x00plain\x00`,
+    ].join("");
+    const runner: GitRunner = (args) =>
+      Promise.resolve({ exitCode: 0, text: args[0] === "show" ? forged : "" });
+    const signals = await new ProvenanceIndex(runner).signalsFor([SHA_A, SHA_B]);
+    expect(signals.get(SHA_B)).toEqual([]);
+  });
+
+  test("concurrent lookups of one commit share a single git show", async () => {
+    let shows = 0;
+    const runner: GitRunner = (args) => {
+      if (args[0] === "show") shows++;
+      return Promise.resolve({ exitCode: 0, text: `${SHA_A}\x00Claude-Session: abc\x00` });
+    };
+    const index = new ProvenanceIndex(runner);
+    const [first, second] = await Promise.all([
+      index.signalsFor([SHA_A]),
+      index.signalsFor([SHA_A]),
+    ]);
+    expect(shows).toBe(1);
+    expect(first.get(SHA_A)).toEqual(["Claude-Session: abc"]);
+    expect(second.get(SHA_A)).toEqual(["Claude-Session: abc"]);
+  });
+});

@@ -23,10 +23,15 @@ export interface BlamedLine {
   time: number;
 }
 
-const UNCOMMITTED_SHA = "0".repeat(40);
+/** The all-zero object id blame assigns to lines the working tree has not committed. */
+const UNCOMMITTED = /^0+$/;
 
-/** `<sha> <source line> <final line> [<group size>]`, the record opener in porcelain output. */
-const HEADER = /^([0-9a-f]{40}) \d+ (\d+)(?: \d+)?$/;
+/**
+ * `<sha> <source line> <final line> [<group size>]`, the record opener in
+ * porcelain output. The id is 40 hex in a SHA-1 repo and 64 in a SHA-256 one,
+ * and a boundary commit's id carries a `^` prefix.
+ */
+const HEADER = /^\^?([0-9a-f]{40}|[0-9a-f]{64}) \d+ (\d+)(?: \d+)?$/;
 
 /** Parse `git blame --line-porcelain` output into a map from final line number to its blame. */
 export function parseLinePorcelain(text: string): Map<number, BlamedLine> {
@@ -103,7 +108,7 @@ export function provenanceOf(
   let latest = 0;
   for (let n = comment.startLine; n <= comment.endLine; n++) {
     const line = blame.get(n);
-    if (line == null || line.sha === UNCOMMITTED_SHA) {
+    if (line == null || UNCOMMITTED.test(line.sha)) {
       uncommitted = true;
       continue;
     }
@@ -139,48 +144,71 @@ function limiter(max: number): <T>(task: () => Promise<T>) => Promise<T> {
 
 const GIT_CONCURRENCY = 8;
 
-/** Record separator between commits in the `git show` batch. */
-const RS = "\x1e";
-/** Field separator between a commit's sha and its message. */
-const FS = "\x1f";
+/** Frames the `git show` batch, as git's own escape: a commit message cannot contain NUL. */
+const NUL = "%x00";
+const NUL_CHAR = "\x00";
+
+export interface GitResult {
+  exitCode: number;
+  text: string;
+}
+
+/** Runs one git command from the current directory. */
+export type GitRunner = (args: string[]) => Promise<GitResult>;
+
+export async function runGit(args: string[]): Promise<GitResult> {
+  const result = await $`git ${args}`.quiet().nothrow();
+  return { exitCode: result.exitCode, text: result.text() };
+}
 
 /** Blames files and resolves the agent signals of the commits they name, caching commit lookups across files so a run pays one `git show` per commit. */
 export class ProvenanceIndex {
   private readonly signals = new Map<string, string[]>();
   private readonly limit = limiter(GIT_CONCURRENCY);
+  private readonly git: GitRunner;
 
-  async blame(path: string): Promise<Map<number, BlamedLine>> {
-    const result = await this.limit(() =>
-      $`git blame --line-porcelain -- ${path}`.quiet().nothrow(),
-    );
-    return result.exitCode === 0 ? parseLinePorcelain(result.text()) : new Map();
+  constructor(git: GitRunner = runGit) {
+    this.git = git;
+  }
+
+  /**
+   * The blame of a file, empty for an untracked file, and null when blame
+   * fails on a tracked one (a partial clone missing the history, say), so the
+   * caller reports nothing rather than a false "uncommitted".
+   */
+  async blame(path: string): Promise<Map<number, BlamedLine> | null> {
+    const result = await this.limit(() => this.git(["blame", "--line-porcelain", "--", path]));
+    if (result.exitCode === 0) return parseLinePorcelain(result.text);
+    const tracked = await this.limit(() => this.git(["ls-files", "--error-unmatch", "--", path]));
+    return tracked.exitCode === 0 ? null : new Map();
   }
 
   async signalsFor(shas: Iterable<string>): Promise<Map<string, string[]>> {
     const unresolved = [...new Set(shas)].filter(
-      (sha) => sha !== UNCOMMITTED_SHA && !this.signals.has(sha),
+      (sha) => !UNCOMMITTED.test(sha) && !this.signals.has(sha),
     );
     if (unresolved.length > 0) {
-      const format = `%H${FS}%B${RS}`;
+      const format = `%H${NUL}%B${NUL}`;
       const result = await this.limit(() =>
-        $`git show -s --format=${format} ${unresolved}`.quiet().nothrow(),
+        this.git(["show", "-s", `--format=${format}`, ...unresolved]),
       );
       for (const sha of unresolved) this.signals.set(sha, []);
       if (result.exitCode === 0) {
-        for (const record of result.text().split(RS)) {
-          const cut = record.indexOf(FS);
-          if (cut === -1) continue;
-          this.signals.set(record.slice(0, cut).trim(), commitSignals(record.slice(cut + 1)));
+        const fields = result.text.split(NUL_CHAR);
+        for (let i = 0; i + 1 < fields.length; i += 2) {
+          const sha = fields[i]?.trim() ?? "";
+          if (this.signals.has(sha)) this.signals.set(sha, commitSignals(fields[i + 1] ?? ""));
         }
       }
     }
     return this.signals;
   }
 
-  /** Provenance for each comment of one file, in the order given. */
+  /** Provenance for each comment of one file, in the order given. Empty when blame failed. */
   async forFile(path: string, comments: Comment[]): Promise<Provenance[]> {
     if (comments.length === 0) return [];
     const blame = await this.blame(path);
+    if (blame == null) return [];
     const shas = new Set<string>();
     for (const comment of comments) {
       for (let n = comment.startLine; n <= comment.endLine; n++) {

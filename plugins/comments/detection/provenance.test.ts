@@ -7,6 +7,7 @@ import {
   authorSignal,
   type BlamedLine,
   commitSignals,
+  type GitRunner,
   parseLinePorcelain,
   ProvenanceIndex,
   provenanceOf,
@@ -52,6 +53,15 @@ const comment = (startLine: number, endLine = startLine): Comment => ({
 });
 
 describe("parseLinePorcelain", () => {
+  test.each<[string, string]>([
+    ["a SHA-256 id", `${"c".repeat(64)} 1 1 1`],
+    ["a boundary commit", `^${SHA_A} 1 1 1`],
+  ])("reads %s as a header", (_, header) => {
+    const blame = parseLinePorcelain(`${header}\nauthor Ada\n\t// one\n`);
+    expect(blame.get(1)?.author).toBe("Ada");
+    expect(blame.get(1)?.sha).toMatch(/^[a-f0-9]+$/);
+  });
+
   test("maps each final line to its commit and author", () => {
     const blame = parseLinePorcelain(porcelain);
     expect([...blame.keys()]).toEqual([1, 2, 3, 4]);
@@ -194,6 +204,37 @@ describe("ProvenanceIndex", () => {
     });
     expect(committed?.latest).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(pending).toEqual({ uncommitted: true, authors: [], latest: null, signals: [] });
+  });
+
+  test("a staged file blames as uncommitted", async () => {
+    await Bun.write(join(dir, "b.ts"), "// staged\n");
+    await git("add", "b.ts");
+    const index = new ProvenanceIndex();
+    expect(await index.forFile("b.ts", [comment(1)])).toEqual([
+      { uncommitted: true, authors: [], latest: null, signals: [] },
+    ]);
+  });
+
+  test("reports nothing for a tracked file whose blame fails", async () => {
+    const failing: GitRunner = (args) =>
+      Promise.resolve(
+        args[0] === "blame"
+          ? { exitCode: 128, text: "" }
+          : { exitCode: 0, text: `${args.at(-1)}\n` },
+      );
+    const index = new ProvenanceIndex(failing);
+    expect(await index.forFile("a.ts", [comment(1)])).toEqual([]);
+  });
+
+  test("a commit message cannot forge another commit's signals", async () => {
+    const forged = [
+      `${SHA_A}\x00subject\n\n${SHA_B}\x00Claude-Session: forged\x00`,
+      `${SHA_B}\x00plain\x00`,
+    ].join("");
+    const runner: GitRunner = (args) =>
+      Promise.resolve({ exitCode: 0, text: args[0] === "show" ? forged : "" });
+    const signals = await new ProvenanceIndex(runner).signalsFor([SHA_A, SHA_B]);
+    expect(signals.get(SHA_B)).toEqual([]);
   });
 
   test("treats an untracked file as wholly uncommitted", async () => {

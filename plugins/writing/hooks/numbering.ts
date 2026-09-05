@@ -21,11 +21,11 @@ export function hasNumberingHint(content: string): boolean {
   return NUMBER_HINT.test(content);
 }
 
-type MarkdownMatch = {
+interface MarkdownMatch {
   text: string;
   line: number;
   column: number;
-};
+}
 
 const AstGrepMatches = z.array(z.looseObject({ message: z.string() }));
 

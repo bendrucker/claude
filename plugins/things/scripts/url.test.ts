@@ -326,7 +326,7 @@ describe("findXcallRunner", () => {
 describe("resolveTagParams", () => {
   /** Stands in for the real requirer, recording what each write asked for. */
   function stubRequirer(known: string[]) {
-    const calls: Array<{ requested: string[]; createMissing: boolean }> = [];
+    const calls: { requested: string[]; createMissing: boolean }[] = [];
     const requirer = (requested: string[], createMissing: boolean) => {
       calls.push({ requested, createMissing });
       const unknown = requested.filter((tag) => !known.includes(tag.toLowerCase()));
@@ -387,7 +387,7 @@ describe("resolveTagParams", () => {
   test.each([
     ["a write carrying no tag params", [["title", "Buy milk"]]],
     ["an empty tags= that clears the todo's tags", [["tags", ""]]],
-  ] as Array<[string, Array<[string, string]>]>)("never fetches for %s", async (_, entries) => {
+  ] as [string, [string, string][]][])("never fetches for %s", async (_, entries) => {
     const { calls, requirer } = stubRequirer(["claude"]);
     const params = new Map(entries);
     const before = new Map(params);

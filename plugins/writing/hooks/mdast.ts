@@ -1,9 +1,9 @@
 import type { Root } from "mdast";
 
-type Markdown = {
+interface Markdown {
   fromMarkdown: (value: string) => Root;
   visit: typeof import("unist-util-visit").visit;
-};
+}
 
 let pending: Promise<Markdown> | undefined;
 

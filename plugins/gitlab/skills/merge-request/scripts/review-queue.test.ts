@@ -3,7 +3,7 @@ import { type CurrentUser, filterReviewQueue, type ReviewState } from "./review-
 
 function mrNode(
   reference: string,
-  reviewers: Array<{ username: string; reviewState: ReviewState | null }>,
+  reviewers: { username: string; reviewState: ReviewState | null }[],
 ) {
   return {
     reference,

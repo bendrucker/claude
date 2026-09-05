@@ -20,12 +20,12 @@ export async function getDiffRefs(iid: number | string): Promise<DiffRefs> {
   );
 }
 
-export type Hunk = {
+export interface Hunk {
   oldStart: number;
   oldCount: number;
   newStart: number;
   newCount: number;
-};
+}
 
 export function parseDiffHunks(diff: string): Hunk[] {
   const hunks: Hunk[] = [];
@@ -94,7 +94,7 @@ export function validateLineInDiff(
   }
 }
 
-export type Position = {
+export interface Position {
   base_sha: string;
   head_sha: string;
   start_sha: string;
@@ -103,7 +103,7 @@ export type Position = {
   position_type: "text";
   old_line?: number;
   new_line?: number;
-};
+}
 
 export function buildPosition(
   refs: DiffRefs,

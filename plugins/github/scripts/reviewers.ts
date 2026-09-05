@@ -37,7 +37,7 @@ export function parseReviewers(contents: string): Set<string> {
 
 export function isReviewTarget(
   author: Author | null | undefined,
-  extra: Set<string> = new Set(),
+  extra = new Set<string>(),
 ): boolean {
   if (!author) return false;
   if (isBot(author)) return true;

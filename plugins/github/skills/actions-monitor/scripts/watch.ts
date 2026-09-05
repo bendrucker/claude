@@ -28,14 +28,14 @@ export type MergeStateStatus =
   | "UNKNOWN"
   | "UNSTABLE";
 
-export type Probe = {
+export interface Probe {
   sha: string;
   state: InternalState;
   runId: string | null;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
   mergeStateStatus: MergeStateStatus;
   prState: "OPEN" | "CLOSED" | "MERGED";
-};
+}
 
 // url-pattern's match() returns `any`.
 const PrUrlParams = z.object({ owner: z.string(), repo: z.string(), number: z.string() });
@@ -104,7 +104,7 @@ export function probeIsUndetermined(probe: Probe): boolean {
   return probe.mergeable === "UNKNOWN" || probe.mergeStateStatus === "UNKNOWN";
 }
 
-export type WatcherState = {
+export interface WatcherState {
   lastSha: string | null;
   lastState: StatusState | null;
   queuedSince: number | null;
@@ -113,7 +113,7 @@ export type WatcherState = {
   apiErrorEmittedAt: number | null;
   emittedConflictsForSha: string | null;
   mergeableUnknownEmittedForSha: string | null;
-};
+}
 
 export function initialState(): WatcherState {
   return {
@@ -322,10 +322,10 @@ function emit(event: Event): void {
   console.log(JSON.stringify(event));
 }
 
-export type Mergeability = {
+export interface Mergeability {
   mergeable: Probe["mergeable"];
   mergeStateStatus: MergeStateStatus;
-};
+}
 
 function parseMergeability(stdout: string): Mergeability | null {
   try {

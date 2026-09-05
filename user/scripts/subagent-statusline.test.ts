@@ -64,7 +64,7 @@ describe("formatDescription", () => {
 });
 
 describe("humanizeTool", () => {
-  const cases: Array<[string, Record<string, unknown>, string]> = [
+  const cases: [string, Record<string, unknown>, string][] = [
     ["Read", { file_path: "/a/b/extract.ts" }, "Reading extract.ts"],
     ["Edit", { file_path: "/a/b/diff.ts" }, "Editing diff.ts"],
     ["MultiEdit", { file_path: "/a/b/diff.ts" }, "Editing diff.ts"],
@@ -341,12 +341,12 @@ describe("renderTask", () => {
 describe("rendered content", () => {
   const now = 65_000;
 
-  const cases: Array<{
+  const cases: {
     name: string;
     task: Task;
     columns: number | null;
     agentType: string | null;
-  }> = [
+  }[] = [
     {
       name: "running",
       task: { id: "a", name: "builder", status: "running" },

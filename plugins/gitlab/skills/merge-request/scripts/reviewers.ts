@@ -33,6 +33,6 @@ export function parseReviewers(contents: string): Set<string> {
   );
 }
 
-export function isReviewTarget(username: string, extra: Set<string> = new Set()): boolean {
+export function isReviewTarget(username: string, extra = new Set<string>()): boolean {
   return isBotUsername(username) || extra.has(username.toLowerCase());
 }

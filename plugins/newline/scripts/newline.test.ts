@@ -223,7 +223,10 @@ describe("preserve.ts", () => {
   });
 });
 
-type FileContent = { body: string; newline: boolean };
+interface FileContent {
+  body: string;
+  newline: boolean;
+}
 
 const fileContent = fc.record<FileContent>({
   body: fc.string({ minLength: 1 }),

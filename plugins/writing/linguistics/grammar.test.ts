@@ -69,7 +69,7 @@ describe("finiteVerbWithSubject", () => {
 });
 
 describe("isNounPhrase", () => {
-  const cases: Array<{ description: string; tokens: TaggedToken[]; want: boolean }> = [
+  const cases: { description: string; tokens: TaggedToken[]; want: boolean }[] = [
     {
       description: "simple compound",
       tokens: [tok("cache", "NOUN"), tok("layer", "NOUN")],

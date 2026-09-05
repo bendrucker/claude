@@ -56,13 +56,13 @@ export const ModelSummaryRow = z.object({
 });
 export type ModelSummaryRow = z.infer<typeof ModelSummaryRow>;
 
-export function serializeCorpus(rows: Array<{ text?: string }>): string {
+export function serializeCorpus(rows: { text?: string }[]): string {
   return rows
     .map((r) => r.text)
     .filter(Boolean)
     .join("\n\n\f\n\n");
 }
 
-export function totalChars(rows: Array<{ text?: string }>): number {
+export function totalChars(rows: { text?: string }[]): number {
   return rows.reduce((sum, r) => sum + (r.text?.length ?? 0), 0);
 }

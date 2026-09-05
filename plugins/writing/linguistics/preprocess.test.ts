@@ -2,13 +2,13 @@ import { describe, expect, it } from "bun:test";
 import { preprocessHeading } from "./preprocess";
 import { CODE_SENTINEL } from "./tags";
 
-const cases: Array<{
+const cases: {
   description: string;
   input: string;
   text: string;
   codeSpans?: number;
   enumerator?: boolean;
-}> = [
+}[] = [
   {
     description: "lowercases title-cased words",
     input: "Latency Is the Main Bottleneck",

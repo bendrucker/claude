@@ -26,13 +26,13 @@ export function validateInDiff(comment: TuicrComment, parsed: ParsedDiff): Valid
   return { ok: true };
 }
 
-export type GitHubComment = {
+export interface GitHubComment {
   path: string;
   line: number;
   side: "RIGHT" | "LEFT";
   commit_id: string;
   body: string;
-};
+}
 
 /** Map a comment to a GitHub review-comment payload. new-side -> RIGHT, old-side -> LEFT. */
 export function toGitHubComment(comment: TuicrComment, opts: { commitId: string }): GitHubComment {
@@ -46,13 +46,13 @@ export function toGitHubComment(comment: TuicrComment, opts: { commitId: string 
   };
 }
 
-export type GitLabRefs = {
+export interface GitLabRefs {
   base_sha: string;
   head_sha: string;
   start_sha: string;
-};
+}
 
-export type GitLabPosition = {
+export interface GitLabPosition {
   position_type: "text";
   base_sha: string;
   head_sha: string;
@@ -61,7 +61,7 @@ export type GitLabPosition = {
   old_path: string;
   new_line?: number;
   old_line?: number;
-};
+}
 
 /**
  * Map a comment to a GitLab discussion `position`. Sets `new_line` for new-side

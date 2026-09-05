@@ -4,14 +4,14 @@ import { cli } from "cleye";
 import { table } from "table";
 import { RunLogEntry, type RunOutcome, resolveLogPath } from "../../../hooks/run-log";
 
-export type CategoryHealth = {
+export interface CategoryHealth {
   category: string;
   fired: number;
   suppressed: number;
   share: number;
-};
+}
 
-export type HookHealth = {
+export interface HookHealth {
   total: number;
   spanDays: number;
   runsPerDay: number;
@@ -20,7 +20,7 @@ export type HookHealth = {
   injections: number;
   categories: CategoryHealth[];
   latency: { p50: number; p95: number; max: number; silentP95: number };
-};
+}
 
 export function parseLog(text: string): RunLogEntry[] {
   const entries: RunLogEntry[] = [];

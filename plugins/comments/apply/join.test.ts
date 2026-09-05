@@ -27,7 +27,7 @@ function comment(over: Partial<Comment> = {}): Comment {
   };
 }
 
-function shard(entries: Array<{ id: string; verdict: Verdict }>) {
+function shard(entries: { id: string; verdict: Verdict }[]) {
   return { verdicts: entries };
 }
 

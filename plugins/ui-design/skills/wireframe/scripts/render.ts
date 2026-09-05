@@ -47,7 +47,7 @@ export async function renderFile(
 }
 
 export async function renderFiles(
-  files: Array<{ input: string; output?: string }>,
+  files: { input: string; output?: string }[],
   options: RenderOptions = {},
 ): Promise<RenderResult[]> {
   return Promise.all(files.map(({ input, output }) => renderFile(input, output, options)));
@@ -75,7 +75,7 @@ async function main() {
   const svgFiles = args.filter((f) => f.endsWith(".svg"));
   const nonSvgArgs = args.filter((f) => !f.endsWith(".svg"));
 
-  const files: Array<{ input: string; output?: string }> = [];
+  const files: { input: string; output?: string }[] = [];
 
   const [svg] = svgFiles;
   const [firstArg, secondArg] = args;

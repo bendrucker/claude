@@ -109,7 +109,7 @@ export async function measureAddedLines(
     return stats;
   }
   const lines = fragment.split("\n");
-  const intervals = new Map<number, Array<[number, number]>>();
+  const intervals = new Map<number, [number, number][]>();
   for (const c of comments) {
     for (let ln = c.startLine; ln <= c.endLine; ln++) {
       const text = lines[ln - 1] ?? "";
@@ -251,7 +251,7 @@ export interface SessionScore {
   /** Sum of per-file excess chars, each against its own language baseline. */
   excessChars: number;
   tier: Tier;
-  worstFiles: Array<ScoredFile & { share: number; excessChars: number }>;
+  worstFiles: (ScoredFile & { share: number; excessChars: number })[];
 }
 
 /** Machine-written files: their comments are generator output, not authorship. */

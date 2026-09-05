@@ -25,13 +25,13 @@ const argv = cli({
 const SEVERITY_WEIGHT = { critical: 3, minor: 1 } as const;
 type Severity = keyof typeof SEVERITY_WEIGHT;
 
-type Violation = {
+interface Violation {
   finding: number;
   severity: Severity;
   line: number;
   excerpt: string;
   message: string;
-};
+}
 
 // Tunable word lists. These came out of the labeling and are meant to grow.
 const JARGON = [

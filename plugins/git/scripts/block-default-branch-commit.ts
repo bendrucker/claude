@@ -68,7 +68,7 @@ function withoutComment(line: string): string {
 // order. An unterminated heredoc owns the rest of the command.
 function stripHeredocs(command: string): string {
   const kept: string[] = [];
-  const pending: Array<{ delimiter: string; stripTabs: boolean }> = [];
+  const pending: { delimiter: string; stripTabs: boolean }[] = [];
   for (const raw of command.split("\n")) {
     const open = pending[0];
     if (open !== undefined) {

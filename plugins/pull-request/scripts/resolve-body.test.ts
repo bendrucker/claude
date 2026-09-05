@@ -278,7 +278,7 @@ function codeSnippets(markdown: string): string[] {
   return snippets;
 }
 
-const DOCUMENTED_FORMS: Array<[string, string]> = (
+const DOCUMENTED_FORMS: [string, string][] = (
   await Promise.all(
     SKILL_DOCS.map(async (doc) => {
       const markdown = await Bun.file(path.join(REPO_ROOT, doc)).text();

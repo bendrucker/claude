@@ -3,7 +3,10 @@ import { join } from "node:path";
 import type { RunResult } from "./jxa";
 import { isRetriableAppleEventsError, parseArgv, runWithRetry, validateAppScope } from "./jxa";
 
-type ScopeResult = { valid: boolean; violations: string[] };
+interface ScopeResult {
+  valid: boolean;
+  violations: string[];
+}
 const valid: ScopeResult = { valid: true, violations: [] };
 const commentedOutSource = [
   "// Application('Mail')",

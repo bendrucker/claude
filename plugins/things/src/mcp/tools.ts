@@ -145,6 +145,7 @@ function writeResult(result: DispatchResult, action: string) {
 // Explicit `| undefined` on every property: under exactOptionalPropertyTypes an
 // optional property rejects an explicit undefined, and the tool handler spreads
 // its unset zod-optional arguments in as exactly that.
+// oxlint-disable-next-line typescript/consistent-type-definitions -- an interface drops the implicit index signature Object.entries needs below.
 export type WriteArgs = {
   title?: string | undefined;
   titles?: string[] | undefined;

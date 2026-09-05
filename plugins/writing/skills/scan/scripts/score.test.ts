@@ -115,7 +115,7 @@ const inRegisterText =
   "This fixes the loader race. I noticed it while testing retries. The fix holds the lock across the read.";
 
 describe("renderVoiceDeltaTable", () => {
-  const cases: Array<{ name: string; text: string; profile: VoiceProfile | null }> = [
+  const cases: { name: string; text: string; profile: VoiceProfile | null }[] = [
     {
       name: "rate, baseline, and delta columns for in-register text",
       text: inRegisterText,

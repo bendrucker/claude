@@ -277,7 +277,7 @@ export function parseGrid(text: string): GridCell[] {
   const scope = text.slice(start);
 
   const cells: GridCell[] = [];
-  const positional: Array<Pick<GridCell, "price" | "tier">> = [];
+  const positional: Pick<GridCell, "price" | "tier">[] = [];
 
   for (const match of scope.matchAll(GRID_CELL)) {
     const price = amount(match[1]);

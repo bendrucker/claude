@@ -65,7 +65,10 @@ function scanInput(text: string, filePath: string | undefined): number {
   return 1;
 }
 
-export type FileViolations = { path: string; violations: ScanResult[] };
+export interface FileViolations {
+  path: string;
+  violations: ScanResult[];
+}
 
 export async function scanFiles(files: string[]): Promise<FileViolations[]> {
   const results: FileViolations[] = [];

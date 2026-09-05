@@ -55,7 +55,7 @@ const MrView = z.looseObject({
     .catch("opened") satisfies z.ZodType<MrState>,
 });
 
-export type Probe = {
+export interface Probe {
   sha: string;
   state: InternalState;
   runId: string | null;
@@ -63,7 +63,7 @@ export type Probe = {
   mergeStatus: string;
   detailedMergeStatus: string;
   mrState: MrState;
-};
+}
 
 export type Event =
   | { type: "status"; state: StatusState; sha: string; run_id: string | null }
@@ -98,7 +98,7 @@ export function probeIsUndetermined(probe: Probe): boolean {
   return isUndeterminedMergeStatus(probe.mergeStatus, probe.detailedMergeStatus);
 }
 
-export type WatcherState = {
+export interface WatcherState {
   lastSha: string | null;
   lastState: StatusState | null;
   queuedSince: number | null;
@@ -107,7 +107,7 @@ export type WatcherState = {
   apiErrorEmittedAt: number | null;
   emittedConflictsForSha: string | null;
   mergeableUnknownEmittedForSha: string | null;
-};
+}
 
 export function initialState(): WatcherState {
   return {
@@ -295,12 +295,12 @@ export function normalizePipelineStatus(status: string): InternalState {
   }
 }
 
-export type PipelineRecord = {
+export interface PipelineRecord {
   id: number;
   status: InternalState;
   sha: string;
   source: string;
-};
+}
 
 // `external` pipelines are commit-status reports posted by other tools: they
 // carry no CI jobs and go green the moment they are created. `parent_pipeline`
@@ -356,7 +356,11 @@ export function selectPipeline(
   );
 }
 
-export type JobRecord = { name: string; status: string; allowFailure: boolean };
+export interface JobRecord {
+  name: string;
+  status: string;
+  allowFailure: boolean;
+}
 
 // Job data can only ever downgrade a claimed success, never confirm one: the
 // jobs endpoint omits bridge (trigger) jobs, so a pipeline whose work lives in
@@ -433,14 +437,14 @@ function emit(event: Event): void {
   console.log(JSON.stringify(event));
 }
 
-type MrMetadata = {
+interface MrMetadata {
   sha: string;
   sourceBranch: string;
   hasConflicts: boolean;
   mergeStatus: string;
   detailedMergeStatus: string;
   state: MrState;
-};
+}
 
 type MrMetadataResult =
   | { ok: true; metadata: MrMetadata }
@@ -476,11 +480,11 @@ function fetchMrMetadata(
   }
 }
 
-export type MergeStatus = {
+export interface MergeStatus {
   hasConflicts: boolean;
   mergeStatus: string;
   detailedMergeStatus: string;
-};
+}
 
 // Re-poll the MR until GitLab settles its merge status or the retry budget runs
 // out. The act of querying nudges GitLab's background computation, so repeated
@@ -839,13 +843,13 @@ type RunTarget =
   | { mode: "branch"; project: string; branch: string }
   | { mode: "pipeline-id"; project: string; pipelineId: string };
 
-type RunOptions = {
+interface RunOptions {
   target: RunTarget;
   intervalSeconds: number | null;
   maxMinutes: number;
   queuedTimeoutMinutes: number;
   apiErrorThreshold: number;
-};
+}
 
 type ProbeOutcome =
   | { ok: true; probe: Probe }

@@ -12,17 +12,17 @@ export type PatternTier = "deny" | "context";
 
 export type ScanContext = "file" | "sideEffect";
 
-export type PatternMatch = {
+export interface PatternMatch {
   tier: PatternTier;
   category: string;
   matched: string;
   message: string;
   structural: boolean;
-};
+}
 
 export type DetectorLayer = "vocabulary" | "grammar" | "cross-sentence" | "meaning";
 
-export type PatternDef = {
+export interface PatternDef {
   tier: PatternTier;
   layer: DetectorLayer;
   category: string;
@@ -44,9 +44,9 @@ export type PatternDef = {
   evidence: string;
   /** Corpus condition under which this pattern should be retired. */
   retire: string;
-};
+}
 
-export type WeightedPatternGroup = {
+export interface WeightedPatternGroup {
   tier: PatternTier;
   layer: DetectorLayer;
   category: string;
@@ -56,7 +56,7 @@ export type WeightedPatternGroup = {
   fileOnly?: boolean;
   evidence: string;
   retire: string;
-};
+}
 
 const FENCED_CODE_BLOCK = /```[\s\S]*?```/g;
 const INLINE_CODE = /`[^`]+`/g;
@@ -1202,7 +1202,7 @@ function countNewlines(text: string): number {
   return count;
 }
 
-export type RegexCatalogEntry = {
+export interface RegexCatalogEntry {
   category: string;
   layer: DetectorLayer;
   pattern: RegExp;
@@ -1210,7 +1210,7 @@ export type RegexCatalogEntry = {
   sideEffectOnly?: boolean;
   skillOnly?: boolean;
   retire: string;
-};
+}
 
 function globalize(pattern: RegExp): RegExp {
   return new RegExp(

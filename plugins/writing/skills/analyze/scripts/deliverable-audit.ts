@@ -50,7 +50,7 @@ export interface DeliverableAudit {
 // loudly").
 export function auditDeliverableCorpus(
   entries: WordlistEntry[],
-  rows: Array<{ text?: string }>,
+  rows: { text?: string }[],
 ): DeliverableAudit {
   const needles = entries.map((e) => ({
     phrase: e.phrase,

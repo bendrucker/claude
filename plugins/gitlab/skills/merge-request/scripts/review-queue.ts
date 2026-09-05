@@ -35,7 +35,11 @@ const ReviewQueueResponse = z.looseObject({
   errors: z.array(z.looseObject({ message: z.string() })).nullish(),
 });
 
-export type ReviewQueueEntry = { url: string; reference: string; title: string };
+export interface ReviewQueueEntry {
+  url: string;
+  reference: string;
+  title: string;
+}
 
 const QUERY = `{
   currentUser {

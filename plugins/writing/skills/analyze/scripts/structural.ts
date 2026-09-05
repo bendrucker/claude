@@ -35,8 +35,8 @@ export interface StructuralAuditRow {
 }
 
 export function auditStructuralPatterns(
-  assistantRows: Array<{ session_id: string; text?: string }>,
-  userRows: Array<{ text?: string }>,
+  assistantRows: { session_id: string; text?: string }[],
+  userRows: { text?: string }[],
 ): StructuralAuditRow[] {
   return STRUCTURAL_PATTERNS.map((sp) => {
     let assistantHits = 0;
@@ -94,5 +94,5 @@ export function auditStructuralPatterns(
 // and cross-sentence detectors may follow as they graduate from the hook.
 export interface DetectorModule<TFinding> {
   layer: DetectorLayer;
-  detect(rows: Array<{ session_id: string; text?: string }>): Promise<TFinding[]>;
+  detect(rows: { session_id: string; text?: string }[]): Promise<TFinding[]>;
 }

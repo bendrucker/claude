@@ -6,12 +6,12 @@ import { classifyHeadingBaseline, type HeadingKind } from "./heading";
  * including its documented misses. classifyHeadingBaseline must match
  * checkSentenceHeading exactly.
  */
-export const seedCases: Array<{
+export const seedCases: {
   description: string;
   heading: string;
   flagged: boolean;
   kind?: HeadingKind;
-}> = [
+}[] = [
   {
     description: "subject plus linking verb",
     heading: "Latency Is the Main Bottleneck",

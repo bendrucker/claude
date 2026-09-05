@@ -83,8 +83,8 @@ interface PendingHeredoc {
 // Spans of a line covered by a quoted string, so a `<<` inside an argument
 // (`grep "<<EOF" f`) is not read as an operator. Backslash escapes a quote
 // outside single quotes, where the shell treats it literally.
-function quotedSpans(line: string): Array<[number, number]> {
-  const spans: Array<[number, number]> = [];
+function quotedSpans(line: string): [number, number][] {
+  const spans: [number, number][] = [];
   let open: string | null = null;
   let start = 0;
   for (let i = 0; i < line.length; i++) {
@@ -109,8 +109,8 @@ function quotedSpans(line: string): Array<[number, number]> {
 
 // Quoted spans across the whole (stripped) text, line by line, so flag
 // matching can skip a flag word sitting inside another flag's quoted value.
-function quotedSpansAll(text: string): Array<[number, number]> {
-  const spans: Array<[number, number]> = [];
+function quotedSpansAll(text: string): [number, number][] {
+  const spans: [number, number][] = [];
   let offset = 0;
   for (const line of text.split("\n")) {
     for (const [start, end] of quotedSpans(line)) spans.push([offset + start, offset + end]);
@@ -125,7 +125,7 @@ function quotedSpansAll(text: string): Array<[number, number]> {
 function firstUnquotedMatch(
   text: string,
   pattern: RegExp,
-  spans: Array<[number, number]>,
+  spans: [number, number][],
 ): RegExpExecArray | null {
   for (const match of text.matchAll(pattern)) {
     if (!spans.some(([start, end]) => match.index > start && match.index <= end)) return match;
@@ -133,7 +133,7 @@ function firstUnquotedMatch(
   return null;
 }
 
-function segmentAt(line: string, index: number, spans: Array<[number, number]>): string {
+function segmentAt(line: string, index: number, spans: [number, number][]): string {
   let start = 0;
   let end = line.length;
   for (const sep of line.matchAll(SEGMENT_SEPARATOR)) {
@@ -216,7 +216,7 @@ const VALUE_PATTERN = String.raw`("(?:[^"\\]|\\.)*"|'[^']*'|\$\((?:[^()]|\([^()]
 
 type PrCli = "gh" | "glab";
 
-const CLI_PATTERNS: ReadonlyArray<readonly [PrCli, RegExp]> = [
+const CLI_PATTERNS: readonly (readonly [PrCli, RegExp])[] = [
   ["gh", /\bgh pr (?:create|edit)\b/],
   ["glab", /\bglab mr (?:create|update)\b/],
 ];

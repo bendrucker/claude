@@ -132,7 +132,10 @@ async function isIgnored(filePath: string): Promise<boolean> {
 // An argv array rather than a shell string, so a file path is never spliced
 // into anything `/bin/sh` would parse. `prefix` carries the script argument
 // when the binary runs through `bun`.
-type OxCommand = { bin: string; prefix: string[] };
+interface OxCommand {
+  bin: string;
+  prefix: string[];
+}
 
 // oxlint and oxfmt ship as devDependencies, so their binaries live in the
 // module graph rather than on PATH (`bun run` adds node_modules/.bin, but
@@ -417,7 +420,10 @@ async function installed(cwd: string | undefined): Promise<boolean> {
   }
 }
 
-type TypeCheckResult = { output: string | null; needsInstall: boolean };
+interface TypeCheckResult {
+  output: string | null;
+  needsInstall: boolean;
+}
 
 // There is no useful per-file mode, so this runs whole-tree, once per working
 // tree the gated files resolve to. --quiet drops warnings: whole-tree they run
@@ -619,7 +625,10 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
   };
 }
 
-type StagedOxFiles = { paths: string[]; diverged: string[] };
+interface StagedOxFiles {
+  paths: string[];
+  diverged: string[];
+}
 
 // The gate checks and reformats working-tree files while the commit records the
 // index. A staged file carrying further unstaged edits makes those two

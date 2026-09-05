@@ -8,13 +8,13 @@ const Fields = z.record(z.string(), z.unknown());
 export const HookInput = z.looseObject({ tool_input: z.unknown() });
 export type HookInput = z.infer<typeof HookInput>;
 
-export type CreateIssueInput = {
+export interface CreateIssueInput {
   id?: string;
   title?: string;
   team?: string;
   state?: string;
   assignee?: string;
-};
+}
 
 export function getDefaultState(assignee: string | undefined): string {
   return assignee != null && assignee !== "" ? "Todo" : "Backlog";
@@ -28,10 +28,10 @@ function isFieldObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export type NormalizeResult = {
+export interface NormalizeResult {
   input: CreateIssueInput & Record<string, unknown>;
   mutated: boolean;
-};
+}
 
 // Mechanical, recoverable shape fixes: unwrap a single recognized wrapper and
 // alias issueId to id. Unknown fields are left untouched; an allow/deny-list of

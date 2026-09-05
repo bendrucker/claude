@@ -2,7 +2,6 @@ import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import type { CollectedComment } from "../detection/collect";
 import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
 import { BATCH_SIZE, loadPrompt, sha256 } from "./judge";
@@ -59,7 +58,7 @@ export interface BuildJobOptions {
 const FIX_INSTRUCTION =
   "For this run, populate suggestedFix for every flagged comment with a concrete rewrite, trim, or delete.";
 
-function toShardComment(comment: CollectedComment): ShardComment {
+function toShardComment(comment: ShardComment): ShardComment {
   return {
     id: comment.id,
     path: comment.path,
@@ -75,9 +74,12 @@ function toShardComment(comment: CollectedComment): ShardComment {
  * Partition ranked comments into shards, preserving rank order so the biggest
  * wins judge and stream first, and pin the prompt. The Bun side shards once. The
  * sandboxed Workflow cannot re-shard, so one shard maps 1:1 to one agent.
+ *
+ * Takes the shard fields alone, so the audit passes `CollectedComment`s and the
+ * eval passes fixtures, and both reach the agents through the same writer.
  */
 export async function buildJob(
-  comments: CollectedComment[],
+  comments: ShardComment[],
   options: BuildJobOptions,
 ): Promise<JobDescriptor> {
   const shardSize = options.shardSize ?? BATCH_SIZE;

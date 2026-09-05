@@ -62,10 +62,18 @@ judge the comment as agent-written.
 
 Most comments that earn `keep` are one sentence. Length is a signal on its own:
 a comment longer than the code it describes is carrying something other than
-facts. For every comment over one sentence, find the sentence that carries the
-fact and trim to it. Keep multiple lines only when each line carries its own
-fact, such as a regex broken down clause by clause or a numbered invariant list
-where each entry constrains the code.
+facts. For every comment over one sentence, test each sentence on its own:
+cut the ones that restate the adjacent code or narrate the change, and keep the
+ones that each carry a fact. A why comment that walks the reader through a
+failure mode (what the guard prevents, what a wrong value would mean, which of
+two sources is trusted and why) carries a fact in every sentence and stays
+whole, and a pointer such as `(see _duckdb_type)` beside those facts is no
+reason to trim. A sentence that frames the fact ("Null out legacy values so
+the constraint can be added") is part of the explanation. A human why comment
+loses a sentence only when that sentence repeats the code token for token.
+`trimTo` is for a fact that sits beside filler, and a comment that comes out
+of this test as several fact-bearing sentences is `keep` at its current
+length.
 
 A docstring opens with the contract in one line. Each sentence after it
 stands on its own: it stays when it states a fact the signature and body
@@ -91,10 +99,14 @@ in AI writing tells. Treat these as voice to strip:
 - **Contrastive framing.** "X rather than Y", "instead of Y", "not Y", "A, not
   B", "without Y-ing". Defining the behavior by contrast with a path the code
   does not take pads a restatement with an extra clause. The fact is what the
-  code does. State that plainly. Reserve `keep` for a contrast that is itself
-  the fact, a documented invariant the reader must respect. A comment that
-  explains a stateful effect by contrasting it with the prior state is a
-  `rewrite`: keep the effect, drop the "rather than the old way" tail.
+  code does. State that plainly. A contrast whose other side names a concrete
+  failure the code prevents ("skip rather than iterate a string into character
+  targets and mis-classify it", "rather than a blanket TIMESTAMP hint") is the
+  fact, the failure mode the reader must respect, and is `keep`. Only a
+  contrast with an unnamed or abstract alternative ("rather than the old way",
+  "instead of a naive approach") is scaffolding. A comment that explains a
+  stateful effect by contrasting it with the prior state is a `rewrite`: keep
+  the effect, drop the "rather than the old way" tail.
 - **Pseudo-rationale and marketing vocabulary.** Abstract, impressive words
   that name no concrete mechanism: "review surface", "the product path",
   "surfaces", "spans", "concentrates", "seamless", "robust", "survives". If

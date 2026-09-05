@@ -20,6 +20,8 @@ A comment earns its place when it tells the reader something the adjacent code d
 
 Delete a **what-on-simple** comment, where the code is simple and the comment only says what it does.
 
+Default to no comment. Most comments an agent writes fail the test above, and every one that survives review taxes each future reader. A comment that earns its place is one sentence carrying the fact. A docstring states the contract in one line. Typed signatures already document parameters and return values.
+
 ## Avoid
 
 - **Restatement.** A comment paraphrasing the line below it: `# increment i` over `i += 1`.

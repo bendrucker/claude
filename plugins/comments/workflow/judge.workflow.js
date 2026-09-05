@@ -34,7 +34,8 @@ function judgeShard(shard) {
   const prompt = [
     `Read the comment-slop rubric at this exact path: ${job.promptPath}`,
     `Read the JSON file at this exact path: ${shard.path}`,
-    'It contains { "id": <shard id>, "comments": [{ "id", "path", "language", "kind", "text", "context" }] }.',
+    'It contains { "id": <shard id>, "comments": [{ "id", "path", "language", "kind", "text", "context", "provenance"? }] }.',
+    "provenance, when present, is the git blame of the comment's lines; the rubric says how to weigh it.",
     'Judge every comment in the shard against the rubric. Produce exactly one verdict per comment, keyed by its "id".',
     `Write the object { "verdicts": [{ "id": <comment id>, "verdict": { ... } }] } to this exact path with the Write tool: ${job.verdictsDir}/verdict-${shard.id}.json`,
     "Use the Write tool, not a Bash heredoc.",

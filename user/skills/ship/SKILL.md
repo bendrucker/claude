@@ -58,7 +58,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 
 Serialized before create: `review:code --fix`, `simplify`, and comment trims all write to the branch. `plan:review`, when gated in, is read-only, so it runs as a background dispatch alongside these and joins before create rather than gating them. [`references/passes.md`](references/passes.md) has the DAG.
 
-1. **`comments:audit`**: needs a clean tree (the fix passes dirty it), lands trims via fast-forward (see [Comment Trims](#comment-trims)). Pauses at preflight for an agent-count approval.
+1. **`comments:audit`**: needs a clean tree (the fix passes dirty it), lands trims via fast-forward (see [Comment Trims](#comment-trims)). Its preflight fans out on its own at diff scale and asks only past ten agents.
 2. **`pull-request:follow-up --local`**: reviews committed work only and commits its own fixes, so it runs while the tree is still clean, before the fix passes. Pass the resolved base.
 3. **`github:copilot`**: the cross-model pass, in the same slot and for the same reason. Findings triage and fix in-branch. It spends a metered credit allotment. [`references/passes.md`](references/passes.md) gates it.
 4. **Correctness and quality**: `review:code <effort> --fix` or `simplify`.

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import Builder from "fast-xml-builder";
 import { z } from "zod";
+import type { Provenance } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
 import { type JudgeAdapter, shardJudge } from "../judge/adapter";
 import { BATCH_SIZE, parseVerdict } from "../judge/judge";
@@ -23,6 +24,8 @@ export interface CommentJudgeInput {
   text: string;
   /** Surrounding source lines, numbered, for the what-on-dense call. */
   context: string;
+  /** Who last touched the comment's lines, when known. */
+  provenance?: Provenance | undefined;
 }
 
 /** Judges a batch of comments. The eval tests mock this. The SDK call implements it. */
@@ -44,14 +47,18 @@ const xml = new Builder({
 export function formatBatch(inputs: CommentJudgeInput[]): string {
   return xml.build({
     comments: {
-      comment: inputs.map((input, index) => ({
-        "@_index": index,
-        path: input.path,
-        language: input.language,
-        kind: input.kind,
-        text: input.text,
-        context: input.context,
-      })),
+      comment: inputs.map((input, index) => {
+        const element: Record<string, unknown> = {
+          "@_index": index,
+          path: input.path,
+          language: input.language,
+          kind: input.kind,
+          text: input.text,
+          context: input.context,
+        };
+        if (input.provenance) element.provenance = input.provenance;
+        return element;
+      }),
     },
   });
 }

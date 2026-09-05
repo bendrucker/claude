@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import type { CollectedComment } from "../detection/collect";
+import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
 import { BATCH_SIZE, loadPrompt, sha256 } from "./judge";
 
@@ -14,6 +15,8 @@ export interface ShardComment {
   kind: CommentKind;
   text: string;
   context: string;
+  /** Who last touched the comment's lines, when the local blame describes them. */
+  provenance?: Provenance | undefined;
 }
 
 export interface JobShard {
@@ -31,6 +34,7 @@ const ShardFile = z.object({
       kind: z.enum(["line", "block", "docstring"]),
       text: z.string(),
       context: z.string(),
+      provenance: ProvenanceSchema.optional(),
     }),
   ),
 }) satisfies z.ZodType<JobShard>;
@@ -56,7 +60,7 @@ const FIX_INSTRUCTION =
   "For this run, populate suggestedFix for every flagged comment with a concrete rewrite, trim, or delete.";
 
 function toShardComment(comment: CollectedComment): ShardComment {
-  return {
+  const shard: ShardComment = {
     id: comment.id,
     path: comment.path,
     language: comment.language,
@@ -64,6 +68,8 @@ function toShardComment(comment: CollectedComment): ShardComment {
     text: comment.text,
     context: comment.context,
   };
+  if (comment.provenance) shard.provenance = comment.provenance;
+  return shard;
 }
 
 /**

@@ -19,7 +19,6 @@ export function scanImports(source: string): string[] {
   return transpiler.scanImports(values).map(({ path }) => path);
 }
 
-/** Whether a specifier resolves to a Node or Bun builtin rather than a package. */
 export function isBuiltin(specifier: string): boolean {
   return specifier.startsWith("node:") || specifier === "bun" || specifier.startsWith("bun:");
 }

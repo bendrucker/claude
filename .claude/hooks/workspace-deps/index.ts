@@ -13,11 +13,9 @@ const StopInput = z.looseObject({
 
 type StopInput = z.infer<typeof StopInput>;
 
-// Mirrors VIOLATION_EXIT in scripts/check-workspace-deps.ts. Deliberately a
-// literal rather than an import: importing the checker would pull its module
-// graph into the hook, so a checker that cannot load would crash the hook
-// instead of reaching the non-blocking "checker could not run" path below.
-// The hook's test imports both to keep the values in sync.
+// Deliberately a literal rather than an import: importing the checker would
+// pull its module graph into the hook, so a checker that cannot load would
+// crash the hook. The hook's test imports both to keep the values in sync.
 const VIOLATION_EXIT = 2;
 
 const CHECKER_PATH = join(

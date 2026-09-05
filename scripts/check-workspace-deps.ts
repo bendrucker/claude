@@ -50,9 +50,9 @@ export function owningWorkspace(file: string, dirs: string[]): string {
 /**
  * Directories holding a package.json that the root does not list as a workspace.
  *
- * Such a directory resolves through the root's hoisted node_modules instead of
- * its own manifest, so every import under it would be checked against the
- * root's declarations and an undeclared one would pass.
+ * Such a directory resolves through the root's hoisted node_modules, so every
+ * import under it would be checked against the root's declarations and an
+ * undeclared one would pass.
  */
 export function unlistedWorkspaces(manifests: string[], dirs: string[]): string[] {
   return manifests.map((file) => dirname(file)).filter((dir) => !dirs.includes(dir));

@@ -10,6 +10,7 @@ set -uo pipefail
 
 LABEL=flock
 DEFERRED="${XDG_CACHE_HOME:-$HOME/.cache}/claude/flock/deferred.json"
+NOW=$(date +%s)
 
 if [ -z "${HERDR_PANE_ID:-}" ]; then
   echo "NO HERDR (HERDR_PANE_ID unset). flock coordinates a herdr server and there is none here. Stop and say so."
@@ -104,11 +105,21 @@ done < "$tmp/seeds" | sort -u > "$tmp/repos"
 
 scan_repo() {
   local root=$1 slug=$2 out=$3
-  local default candidate merged prs wt branch flags ahead pr none="-"
+  local default candidate merged dates prs wt branch flags ahead pr ts age none="-"
 
+  # --author @me draws the trust boundary. The rows here drive merges, so the
+  # board carries only pull requests the user wrote.
+  #
+  # Merged pull requests are asked for separately because a squash merge writes
+  # a new commit, so the branch never becomes an ancestor of the default and
+  # `git branch --merged` cannot see it. A finished worktree reads as clean and
+  # undecidable without this.
   gh pr list --repo "$slug" --author @me --state open --limit 60 \
     --json number,headRefName,isDraft > "$out.gh" 2>/dev/null &
   local gh_pid=$!
+  gh pr list --repo "$slug" --author @me --state merged --limit 100 \
+    --json number,headRefName > "$out.merged" 2>/dev/null &
+  local merged_pid=$!
 
   default=$(git -C "$root" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)
   default=${default#origin/}
@@ -126,6 +137,11 @@ scan_repo() {
     merged=$(git -C "$root" branch --format='%(refname:short)' --merged "origin/$default" 2>/dev/null)
   fi
 
+  # Every branch's commit date in one call. Asking per worktree instead cost
+  # three times the wall clock on a repo carrying twenty of them.
+  dates=$(git -C "$root" for-each-ref --format='%(refname:short)	%(committerdate:unix)' \
+    refs/heads/ 2>/dev/null)
+
   # An unreachable forge and a repo with no open PRs both leave jq nothing to
   # read, and the board must not present the first as the second.
   if wait "$gh_pid" 2>/dev/null; then
@@ -136,7 +152,14 @@ scan_repo() {
     none="?"
     echo "$slug: open pull requests could not be listed, so its PR column reads ?" >> "$tmp/warnings"
   fi
-  rm -f "$out.gh"
+  # Open rows come first, so a branch reused after its merge still reads open.
+  if wait "$merged_pid" 2>/dev/null; then
+    prs="$prs
+$(jq -r '.[]? | [.headRefName, "merged#" + (.number|tostring)] | @tsv' "$out.merged" 2>/dev/null)"
+  else
+    echo "$slug: merged pull requests could not be listed, so finished worktrees go unflagged" >> "$tmp/warnings"
+  fi
+  rm -f "$out.gh" "$out.merged"
 
   git -C "$root" worktree list --porcelain > "$out.wt" 2>/dev/null ||
     echo "$slug: worktrees could not be listed, so none of its rows appear below" >> "$tmp/warnings"
@@ -151,7 +174,13 @@ scan_repo() {
       [ "${ahead:-0}" -gt 0 ] 2>/dev/null && flags="${flags:+$flags,}unpushed:$ahead"
       printf '%s\n' "$merged" | grep -qx -- "$branch" && flags="${flags:+$flags,}merged"
       pr=$(printf '%s\n' "$prs" | awk -F'\t' -v b="$branch" '$1==b {print $2; exit}')
-      printf 'wt\t%s\t%s\t%s\t%s\t%s\n' "${slug##*/}" "$branch" "${pr:-$none}" "${flags:-clean}" "$wt"
+      # Days since the last commit. Local flags alone leave a quiet row
+      # ambiguous between paused between runs and abandoned. Age separates them.
+      ts=$(printf '%s\n' "$dates" | awk -F'\t' -v b="$branch" '$1==b {print $2; exit}')
+      age="?"
+      [ -n "$ts" ] && age=$(((NOW - ts) / 86400))
+      printf 'wt\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "${slug##*/}" "$branch" "${pr:-$none}" "${flags:-clean}" "$age" "$wt"
     done > "$out"
   rm -f "$out.wt"
 }
@@ -172,7 +201,7 @@ fi
 
 claimed=" "
 : > "$tmp/board"
-while IFS=$'\t' read -r _kind repo branch pr flags wt; do
+while IFS=$'\t' read -r _kind repo branch pr flags age wt; do
   pane="-" agent="-"
   while IFS=$'\t' read -r pid _label ast cwd; do
     case "$cwd" in "$wt" | "$wt"/*)
@@ -182,7 +211,8 @@ while IFS=$'\t' read -r _kind repo branch pr flags wt; do
       ;;
     esac
   done < "$tmp/panes"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$pane" "$agent" "$repo" "$branch" "$pr" "$flags" >> "$tmp/board"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$pane" "$agent" "$repo" "$branch" "$pr" "$age" "$flags" >> "$tmp/board"
 done < "$tmp/rows"
 
 # Agent panes on no worktree of their own: idle sessions, main checkouts, shells.
@@ -190,14 +220,16 @@ while IFS=$'\t' read -r pid label ast cwd; do
   case "$ast" in shell/*) continue ;; esac
   [ "$pid" = "$HERDR_PANE_ID" ] && continue
   case "$claimed" in *" $pid "*) continue ;; esac
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$pid" "$ast" "${label:--}" "-" "-" "no worktree" >> "$tmp/board"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$pid" "$ast" "${label:--}" "-" "-" "-" "no worktree" >> "$tmp/board"
 done < "$tmp/panes"
 
 awk -F'\t' '
   function fit(s, w) { return length(s) > w ? substr(s, 1, w - 1) "…" : s }
-  BEGIN { printf "%-9s %-14s %-18s %-30s %-11s %s\n", "PANE", "AGENT", "REPO", "BRANCH", "PR", "FLAGS" }
-  { printf "%-9s %-14s %-18s %-30s %-11s %s\n",
-      fit($1, 9), fit($2, 14), fit($3, 18), fit($4, 30), fit($5, 11), $6 }
+  BEGIN { printf "%-9s %-14s %-16s %-26s %-11s %-4s %s\n",
+      "PANE", "AGENT", "REPO", "BRANCH", "PR", "AGE", "FLAGS" }
+  { printf "%-9s %-14s %-16s %-26s %-11s %-4s %s\n",
+      fit($1, 9), fit($2, 14), fit($3, 16), fit($4, 26), fit($5, 11), fit($6, 4), $7 }
 ' "$tmp/board"
 
 if [ -s "$DEFERRED" ]; then

@@ -69,7 +69,7 @@ hooks:
 - `argument-hint`: Arguments the skill accepts, shown in the slash menu after the skill name. See [Argument Hints](#argument-hints).
 - `allowed-tools`: Tools Claude can use without permission when skill is active
 - `model`: Override the conversation's model. Prefer a tier alias (`haiku`, `sonnet`, `opus`, `fable`) or `inherit` over a dated model ID.
-- `effort`: Reasoning effort while the skill is active. Pin `low` on mechanical skills such as monitoring, execution, and formatting. Defaults to the conversation's effort.
+- `effort`: Reasoning effort while the skill is active. Pin it only under `context: fork`. See [Reasoning Effort](references/patterns.md#reasoning-effort) for why. Defaults to the conversation's effort.
 - `context`: Set to `fork` to run in isolated subagent context
 - `agent`: Agent type when `context: fork` (`Explore`, `Plan`, `general-purpose`, or custom)
 - `background`: Only with `context: fork`. `false` waits for the fork's result in the invoking turn instead of backgrounding it. Default `true`.
@@ -189,7 +189,7 @@ Load detailed guides as needed:
 
 - **[references/information-hierarchy.md](references/information-hierarchy.md)** - What body, reference, and pointer cost, pointer wording, splitting
 - **[references/levers.md](references/levers.md)** - Completion criteria, leading words, positive form, pruning
-- **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, skill-scoped hooks, anti-patterns
+- **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, reasoning effort, skill-scoped hooks, anti-patterns
 - **[references/plain-language.md](references/plain-language.md)** - Plain-language rules for skill prose and the conversion procedure
 - **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache
 

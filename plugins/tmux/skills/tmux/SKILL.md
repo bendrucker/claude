@@ -2,7 +2,6 @@
 name: tmux
 description: Tmux session, window, and pane management. Use when capturing output, sending keys, opening processes in panes, or checking notifications.
 argument-hint: "[capture | send | split | notify | list] [target ...]"
-effort: low
 allowed-tools:
   - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/pane.sh:*)"
   - "Bash(bash ${CLAUDE_SKILL_DIR}/scripts/window.sh:*)"

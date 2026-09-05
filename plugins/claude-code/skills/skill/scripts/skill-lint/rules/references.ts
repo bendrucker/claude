@@ -11,7 +11,7 @@ export function findReferences(body: string): string[] {
   const refs = new Set<string>();
 
   for (const match of matches) {
-    const ref = match[1];
+    const ref = match[1]?.split("#")[0];
     if (ref != null && ref !== "") refs.add(ref);
   }
 

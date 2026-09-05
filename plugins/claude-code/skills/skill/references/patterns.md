@@ -61,6 +61,18 @@ A forked skill is a regular subagent. It never receives `AskUserQuestion`. `back
 
 `context: fork` loses all conversation history. If the skill needs awareness of what the user has been working on, run it inline and use `Agent` subagents to offload verbose work. The inline skill retains full context while keeping the heavy lifting out of the main conversation.
 
+## Reasoning Effort
+
+Pinning `effort` in frontmatter switches reasoning effort for the skill's duration and reverts when it finishes. On a deployment that applies effort as a top-level request parameter, entering the pinned level invalidates the conversation's cached prefix: everything before that turn is rewritten at cache-creation rates instead of read from cache. Reverting is cheap, because the pre-switch cache entry is usually still live.
+
+A separate mid-conversation mechanism changes effort without a cache reset. As of the current beta it covers Claude Opus 5, Claude Fable 5.1, and Claude Mythos 5.1 through the Claude API. Support on Bedrock, Vertex, and Foundry is unspecified. Assume the rewrite cost applies unless the running model and harness are both confirmed to take that path.
+
+A skill running under `context: fork` starts a subagent with no inherited conversation, so its effort switch has no cached prefix to rewrite. Pin `effort` there freely.
+
+An inline skill pays the rewrite on entry, every time it fires. Low effort saves output tokens during the run by consolidating tool calls and cutting preamble. Once a conversation carries more than a few thousand tokens of prefix, one rewrite costs more than a run of the skill saves. A skill that polls in a loop is worse still: each cycle that alternates effort pays the rewrite again.
+
+A skill cannot detect its model or platform at author time, so the rule stays blanket: do not pin `effort` on an inline skill.
+
 ## Skill-Scoped Hooks
 
 Hooks in frontmatter run during the skill's lifecycle and are cleaned up when the skill finishes. `once: true` runs a hook only once per session, then removes it, useful for one-time validation or setup.

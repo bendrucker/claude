@@ -2,7 +2,7 @@
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join } from "node:path";
 import { cli } from "cleye";
 import { decodeFile } from "../../packages/decode/index";
 import { expectSuccess, type RunCommand, runCommand } from "./command";
@@ -53,8 +53,8 @@ export function assertSuiteMatch(payload: ExportPayload, suite: string): void {
 }
 
 export async function exportRun(options: ExportRunOptions): Promise<ExportedRun> {
-  const staging = await mkdtemp(path.join(tmpdir(), "eval-export-"));
-  const staged = path.join(staging, "export.json");
+  const staging = await mkdtemp(join(tmpdir(), "eval-export-"));
+  const staged = join(staging, "export.json");
   try {
     await exportEval(options.evalId, staged, { run: options.run, bin: options.bin });
 

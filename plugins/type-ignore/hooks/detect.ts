@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 
 import { mkdirSync } from "node:fs";
-import * as path from "node:path";
+import { join } from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { EXTENSION_MAP, LANGUAGES, TARGET_EXTENSIONS } from "./languages";
@@ -88,7 +88,7 @@ export function findLineNumber(content: string, pattern: string): number {
 }
 
 function getMarkerPath(sessionId: string): string {
-  return path.join(MARKER_DIR, sessionId !== "" ? sessionId : "unknown");
+  return join(MARKER_DIR, sessionId !== "" ? sessionId : "unknown");
 }
 
 export async function isCleanupAgentActive(sessionId: string): Promise<boolean> {

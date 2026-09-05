@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import * as path from "node:path";
+import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { DeliverableRow } from "./dump";
@@ -20,8 +20,8 @@ export const JUDGE_MODEL = "claude-haiku-4-5";
 export const CHUNK_WORD_LIMIT = 1500;
 export const MAX_SAMPLE_SPANS = 5;
 
-export const PROMPT_PATH = path.join(import.meta.dirname, "..", "resources", "judge", "prompt.md");
-export const HEADING_PROMPT_PATH = path.join(
+export const PROMPT_PATH = join(import.meta.dirname, "..", "resources", "judge", "prompt.md");
+export const HEADING_PROMPT_PATH = join(
   import.meta.dirname,
   "..",
   "resources",

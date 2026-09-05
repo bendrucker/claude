@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { readdirSync } from "node:fs";
-import * as path from "node:path";
+import { join } from "node:path";
 import { cli } from "cleye";
 import { getBorderCharacters, table } from "table";
 import { z } from "zod";
@@ -59,7 +59,7 @@ export interface Summary {
  * `metadata.billing: "api"` in its export.
  */
 export function runsView(dir: string): string {
-  const glob = literal(path.join(dir, "**", "*.json"));
+  const glob = literal(join(dir, "**", "*.json"));
   const prefix = literal(`${dir}/`);
   return `
 CREATE OR REPLACE VIEW runs AS

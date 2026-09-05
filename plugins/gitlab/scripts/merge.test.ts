@@ -1,6 +1,14 @@
 import { describe, expect, mock, test } from "bun:test";
-import type { MergeActions, MergeRequestDetail } from "./merge";
-import { arm, errorText, merge, mergeArgs, status, streamText } from "./merge";
+import {
+  type MergeActions,
+  type MergeRequestDetail,
+  arm,
+  errorText,
+  merge,
+  mergeArgs,
+  status,
+  streamText,
+} from "./merge";
 
 function shellError(streams: { stdout?: string; stderr?: string }): Error {
   return Object.assign(new Error("glab exited non-zero"), {

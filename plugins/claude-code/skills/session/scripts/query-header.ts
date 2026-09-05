@@ -1,8 +1,8 @@
 import { readdirSync } from "node:fs";
-import * as path from "node:path";
+import { basename, join } from "node:path";
 import { z } from "zod";
 
-export const QUERIES_DIR = path.join(import.meta.dirname, "..", "resources", "queries");
+export const QUERIES_DIR = join(import.meta.dirname, "..", "resources", "queries");
 
 // A `-- ---` fence in line comments: DuckDB sees comments, the parser sees YAML, and the
 // file stays uniformly `--` commented so the free prose below reads as one block with it.
@@ -61,9 +61,9 @@ export async function loadQueryHeaders(dir: string = QUERIES_DIR): Promise<Query
     .toSorted();
   return Promise.all(
     files.map(async (file) => {
-      const name = path.basename(file, ".sql");
+      const name = basename(file, ".sql");
       try {
-        const header = parseQueryHeader(await Bun.file(path.join(dir, file)).text());
+        const header = parseQueryHeader(await Bun.file(join(dir, file)).text());
         if (header.name !== name) throw new Error(`header names "${header.name}"`);
         return header;
       } catch (error) {

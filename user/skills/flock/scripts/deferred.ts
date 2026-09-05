@@ -1,8 +1,8 @@
-import { mkdir, rm } from "node:fs/promises";
 // A durable swap needs rename(2), and a stale-lock check needs a directory's
-// mtime. Bun's file API exposes neither.
+// mtime. Bun's file API exposes neither. mkdir and rm are allowed outright, so
+// sharing the statement grants them nothing.
 // oxlint-disable-next-line no-restricted-imports
-import { rename, stat } from "node:fs/promises";
+import { mkdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { decodeJson } from "../../../../packages/decode/index";

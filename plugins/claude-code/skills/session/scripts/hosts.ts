@@ -2,7 +2,7 @@
 // claude:dangerouslyDisableSandbox: temporary. Opens the DuckDB index read-write in
 // the plugin data dir, which an upstream sandbox defect makes unwritable. Remove this
 // when the probe in docs/settings.md succeeds.
-import * as path from "node:path";
+import { join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
 import { z } from "zod";
@@ -50,6 +50,6 @@ if (imported.length > 0) {
   for (const { label, root, manifest } of imported) {
     const source = manifest.source !== "" ? manifest.source : "<source>";
     console.log(`  ${label}:`);
-    console.log(`    rsync -av --update ${source} ${path.join(root, "projects")}/`);
+    console.log(`    rsync -av --update ${source} ${join(root, "projects")}/`);
   }
 }

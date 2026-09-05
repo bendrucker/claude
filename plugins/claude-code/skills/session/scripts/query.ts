@@ -1,8 +1,8 @@
-import * as path from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 import type { Database } from "./db";
 
-const QUERIES_DIR = path.join(import.meta.dirname, "..", "resources", "queries");
+const QUERIES_DIR = join(import.meta.dirname, "..", "resources", "queries");
 
 export type QueryValue = string | number | null | undefined;
 
@@ -133,9 +133,7 @@ export async function runQuery<T>(
   params: QueryParams = {},
 ): Promise<T[]> {
   const sql =
-    "name" in source
-      ? await Bun.file(path.join(QUERIES_DIR, `${source.name}.sql`)).text()
-      : source.sql;
+    "name" in source ? await Bun.file(join(QUERIES_DIR, `${source.name}.sql`)).text() : source.sql;
   const prefix = await adapter.bind(params);
   return adapter.execute(prefix + sql, schema);
 }

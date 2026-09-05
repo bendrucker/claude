@@ -1,4 +1,4 @@
-import * as path from "node:path";
+import { join } from "node:path";
 import { expectSuccess, type RunCommand, runCommand } from "./command";
 
 export const CONFIG_DIR_VAR = "PROMPTFOO_CONFIG_DIR";
@@ -19,7 +19,7 @@ export function promptfooConfigDir(env: Record<string, string | undefined> = pro
   if (home == null || home === "") {
     throw new Error(`Cannot locate the promptfoo database: set ${CONFIG_DIR_VAR} or HOME`);
   }
-  return path.join(home, ".cache", "promptfoo");
+  return join(home, ".cache", "promptfoo");
 }
 
 export function promptfooEnv(

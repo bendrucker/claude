@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import * as path from "node:path";
+import { join } from "node:path";
 import { decodeFile } from "../../../packages/decode/index";
 import {
   destination,
@@ -14,11 +14,11 @@ import {
 
 const described = await decodeFile(
   ExportPayload,
-  path.join(import.meta.dirname, "exports", "described.json"),
+  join(import.meta.dirname, "exports", "described.json"),
 );
 const undated = await decodeFile(
   ExportPayload,
-  path.join(import.meta.dirname, "exports", "undated.json"),
+  join(import.meta.dirname, "exports", "undated.json"),
 );
 const metadataOnly: ExportPayload = {
   evalId: "eval-mdo-2026-07-04T10:00:00",

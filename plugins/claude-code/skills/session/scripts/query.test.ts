@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 import { type Database, ensureIndex, getDb } from "./db";
 import {
@@ -53,12 +53,12 @@ describe("node adapter", () => {
   let tmpDir: string;
 
   beforeAll(async () => {
-    tmpDir = mkdtempSync(path.join(tmpdir(), "session-query-"));
-    const importsDir = path.join(tmpDir, "imports");
+    tmpDir = mkdtempSync(join(tmpdir(), "session-query-"));
+    const importsDir = join(tmpDir, "imports");
     mkdirSync(importsDir, { recursive: true });
     db = await getDb(tmpDir);
     await ensureIndex(db, {
-      projectsDir: path.join(import.meta.dirname, "..", "fixtures", "sessions"),
+      projectsDir: join(import.meta.dirname, "..", "fixtures", "sessions"),
       importsDir,
     });
   }, 60_000);

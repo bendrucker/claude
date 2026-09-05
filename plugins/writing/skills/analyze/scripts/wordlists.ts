@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs";
-import * as path from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 
 export interface WordlistEntry {
@@ -19,7 +19,7 @@ export async function loadWordlists(dir: string): Promise<WordlistEntry[]> {
   }
   const perFile = await Promise.all(
     files.toSorted().map(async (file) => {
-      const text = await Bun.file(path.join(dir, file)).text();
+      const text = await Bun.file(join(dir, file)).text();
       const entries: WordlistEntry[] = [];
       for (const rawLine of text.split("\n")) {
         const line = rawLine.replace(/#.*$/, "").trim();

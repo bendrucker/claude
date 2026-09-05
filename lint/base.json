@@ -12,6 +12,8 @@
     "eqeqeq": ["error", "always", { "null": "ignore" }],
     "max-depth": "error",
     "no-await-in-loop": "error",
+    // splitting imports of the same module hides that they're related and invites drift
+    "no-duplicate-imports": "error",
     // An empty block silently swallows whatever it should have handled, hiding bugs.
     "no-empty": "error",
     // Nesting an if inside an else block obscures control flow that else if states directly.
@@ -37,6 +39,8 @@
     "prefer-object-spread": "error",
     "prefer-template": "error",
     "import/no-named-as-default-member": "error",
+    // a namespace binding hides which members a file uses from both readers and unused-import checks
+    "import/no-namespace": ["error", { "ignore": ["fast-check"] }],
     "oxc/no-map-spread": "error",
     // A `new Promise` executor that only wraps an existing async API duplicates
     // logic the platform already exposes, and drops its built-in error handling.
@@ -54,6 +58,8 @@
     // does not need.
     "unicorn/no-array-for-each": "error",
     "unicorn/prefer-array-find": "error",
+    // a split re-export keeps a name in local scope only to hand it back out, saying nothing about the module's own logic
+    "unicorn/prefer-export-from": "error",
     // A hand-written a > b ? a : b comparison mishandles NaN silently,
     // does not extend past two values without nesting, and hides a named
     // operation behind inline conditional logic.

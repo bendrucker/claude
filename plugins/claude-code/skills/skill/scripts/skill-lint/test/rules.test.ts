@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from "bun:test";
-import * as path from "node:path";
+import { join } from "node:path";
 import { lintSkill } from "../index";
 import { parseSkill } from "../parse";
 import { bangExecutionMatcher } from "../rules/bang-execution";
@@ -18,7 +18,7 @@ import { namespaceMismatch, namespaceStutter } from "../rules/namespace";
 import { findReferences, substitutionResults } from "../rules/references";
 import type { RuleResult, Severity } from "../types";
 
-const fixturesDir = path.join(import.meta.dirname, "fixtures");
+const fixturesDir = join(import.meta.dirname, "fixtures");
 
 function single(result: RuleResult | RuleResult[]): RuleResult {
   if (Array.isArray(result)) {
@@ -446,14 +446,14 @@ describe("substitutionResults", () => {
 
   // These repo files describe the substitution syntax in prose. The rule must
   // not fire on any of them.
-  const repoRoot = path.join(import.meta.dirname, "../../../../../../..");
+  const repoRoot = join(import.meta.dirname, "../../../../../../..");
 
   test.each([
     "plugins/claude-code/skills/skill/references/patterns.md",
     "plugins/writing/skills/analyze/references/methodology.md",
     "plugins/claude-code/skills/hook/references/debugging.md",
   ])("passes prose in %s", async (relative) => {
-    const content = await Bun.file(path.join(repoRoot, relative)).text();
+    const content = await Bun.file(join(repoRoot, relative)).text();
     expect(failing(content, relative)).toEqual([]);
   });
 });
@@ -533,27 +533,27 @@ describe("namespace rules", () => {
 
 describe("lintSkill", () => {
   it("passes valid skill", async () => {
-    const result = await lintSkill(path.join(fixturesDir, "valid"));
+    const result = await lintSkill(join(fixturesDir, "valid"));
     expect(result.errors).toBe(0);
     expect(result.warnings).toBe(0);
   });
 
   it("reports invalid name format", async () => {
-    const result = await lintSkill(path.join(fixturesDir, "invalid-name"));
+    const result = await lintSkill(join(fixturesDir, "invalid-name"));
     expect(result.errors).toBeGreaterThan(0);
     const nameError = result.results.find((r) => r.rule === "name-format");
     expect(nameError?.passed).toBe(false);
   });
 
   it("reports missing description", async () => {
-    const result = await lintSkill(path.join(fixturesDir, "missing-description"));
+    const result = await lintSkill(join(fixturesDir, "missing-description"));
     expect(result.errors).toBeGreaterThan(0);
     const descError = result.results.find((r) => r.rule === "description-required");
     expect(descError?.passed).toBe(false);
   });
 
   it("warns on line-start bold labels without failing", async () => {
-    const result = await lintSkill(path.join(fixturesDir, "prefer-headers"));
+    const result = await lintSkill(join(fixturesDir, "prefer-headers"));
     expect(result.errors).toBe(0);
     const offenders = result.results.filter((r) => r.rule === "prefer-headers" && !r.passed);
     expect(offenders).toHaveLength(1);
@@ -561,13 +561,13 @@ describe("lintSkill", () => {
   });
 
   it("detects references", async () => {
-    const result = await lintSkill(path.join(fixturesDir, "with-references"));
+    const result = await lintSkill(join(fixturesDir, "with-references"));
     expect(result.references).toHaveLength(1);
     expect(result.references[0]?.path).toBe("references/language.md");
   });
 
   it("calculates token counts", async () => {
-    const result = await lintSkill(path.join(fixturesDir, "valid"));
+    const result = await lintSkill(join(fixturesDir, "valid"));
     expect(result.tokens.skill).toBeGreaterThan(0);
     expect(result.tokens.total).toBeGreaterThanOrEqual(result.tokens.skill);
   });

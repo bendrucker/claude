@@ -4,8 +4,7 @@
 // Detection is unmodified. The message names the form that typechecks under
 // this repo's `exactOptionalPropertyTypes`.
 
-import { defineRule } from "@oxlint/plugins";
-import type { ESTree } from "@oxlint/plugins";
+import { defineRule, type ESTree } from "@oxlint/plugins";
 
 function unwrapParentheses(node: ESTree.Expression): ESTree.Expression {
   let current = node;

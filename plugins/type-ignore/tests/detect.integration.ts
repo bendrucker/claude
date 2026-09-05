@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import * as path from "node:path";
+import { join } from "node:path";
 import type { PostToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { formatOutput, isCleanupAgentActive, processInput } from "../hooks/detect";
 
@@ -39,7 +39,7 @@ describe("type-ignore detection hook", () => {
 
     it("returns true when recent marker exists", async () => {
       const sessionId = "test-session";
-      const markerPath = path.join(MARKER_DIR, sessionId);
+      const markerPath = join(MARKER_DIR, sessionId);
 
       mkdirSync(MARKER_DIR, { recursive: true });
       await Bun.write(markerPath, String(Date.now()));
@@ -48,7 +48,7 @@ describe("type-ignore detection hook", () => {
     });
 
     it("keeps markers independent across session ids", async () => {
-      const markerPath = path.join(MARKER_DIR, "session-a");
+      const markerPath = join(MARKER_DIR, "session-a");
 
       mkdirSync(MARKER_DIR, { recursive: true });
       await Bun.write(markerPath, String(Date.now()));
@@ -116,7 +116,7 @@ describe("type-ignore detection hook", () => {
     });
 
     it("suppresses when cleanup agent is active for the same session", async () => {
-      const markerPath = path.join(MARKER_DIR, "test-session");
+      const markerPath = join(MARKER_DIR, "test-session");
 
       mkdirSync(MARKER_DIR, { recursive: true });
       await Bun.write(markerPath, String(Date.now()));
@@ -132,7 +132,7 @@ describe("type-ignore detection hook", () => {
     });
 
     it("does not suppress when cleanup agent is active for a different session", async () => {
-      const markerPath = path.join(MARKER_DIR, "other-session");
+      const markerPath = join(MARKER_DIR, "other-session");
 
       mkdirSync(MARKER_DIR, { recursive: true });
       await Bun.write(markerPath, String(Date.now()));

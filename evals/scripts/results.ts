@@ -1,4 +1,4 @@
-import * as path from "node:path";
+import { join, resolve } from "node:path";
 import { z } from "zod";
 
 /** The shape `promptfoo export eval <id> -o <file>` writes. Only the fields read here. */
@@ -24,11 +24,11 @@ export type ExportPayload = z.infer<typeof ExportPayload>;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function repoRoot(): string {
-  return path.join(import.meta.dirname, "..", "..");
+  return join(import.meta.dirname, "..", "..");
 }
 
 export function resultsDir(override?: string): string {
-  return path.resolve(override ?? path.join(repoRoot(), "evals", "results"));
+  return resolve(override ?? join(repoRoot(), "evals", "results"));
 }
 
 function utcDate(stamp: string): string | undefined {
@@ -87,7 +87,7 @@ export function destination(
   options: { suite?: string | undefined; date?: string | undefined } = {},
 ): string {
   const date = runDate(payload, options.date);
-  return path.join(dir, suiteName(payload, options.suite), exportFilename(payload, date));
+  return join(dir, suiteName(payload, options.suite), exportFilename(payload, date));
 }
 
 export function runCost(payload: ExportPayload): number {

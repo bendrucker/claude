@@ -3,7 +3,7 @@
 import { readdirSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
 import { decodeJson } from "../../packages/decode/index";
@@ -86,7 +86,7 @@ export async function discoverExports(dir: string): Promise<DiscoveredExport[]> 
   const found: DiscoveredExport[] = [];
   for (const entry of entries.toSorted()) {
     if (!entry.endsWith(".json")) continue;
-    const full = path.join(dir, entry);
+    const full = join(dir, entry);
     // oxlint-disable-next-line no-await-in-loop -- artifact trees are small; sequential reads keep the order deterministic.
     const text = await Bun.file(full).text();
     const discovered = readExport(full, text);
@@ -114,7 +114,7 @@ export interface CollectOptions extends GhOptions {
 
 export async function collectRun(runId: number, options: CollectOptions): Promise<string[]> {
   const run = options.run ?? runCommand;
-  const staging = await mkdtemp(path.join(tmpdir(), `eval-ci-${runId}-`));
+  const staging = await mkdtemp(join(tmpdir(), `eval-ci-${runId}-`));
   try {
     const command = downloadCommand(runId, staging, options.repo);
     expectSuccess(command, await run(command));

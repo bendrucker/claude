@@ -7,15 +7,17 @@ const SPEC_URL = "https://agentskills.io/specification";
 
 const REFERENCE_LINK_PATTERN = /\[.*?\]\((?!https?:\/\/)(references\/[^)]+)\)/g;
 
-// Substituted only in the SKILL.md body and allowed-tools, and exported only to
-// hook and MCP subprocesses, so each expands to nothing in a copied command.
-const SUBSTITUTION_PATTERN = /\$\{?(CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT|CLAUDE_PLUGIN_DATA)\}?/g;
+const PLACEHOLDERS = new Map([
+  ["CLAUDE_SKILL_DIR", "<skill-dir>"],
+  ["CLAUDE_PLUGIN_ROOT", "<plugin-root>"],
+  ["CLAUDE_PLUGIN_DATA", "<plugin-data>"],
+]);
 
-const PLACEHOLDERS: Record<string, string> = {
-  CLAUDE_SKILL_DIR: "<skill-dir>",
-  CLAUDE_PLUGIN_ROOT: "<plugin-root>",
-  CLAUDE_PLUGIN_DATA: "<plugin-data>",
-};
+// \b after the name keeps $CLAUDE_SKILL_DIRECTORY from matching CLAUDE_SKILL_DIR.
+const SUBSTITUTION_PATTERN = new RegExp(
+  `\\$\\{?(${Array.from(PLACEHOLDERS.keys()).join("|")})\\b\\}?`,
+  "g",
+);
 
 export function findReferences(body: string): string[] {
   const matches = body.matchAll(REFERENCE_LINK_PATTERN);
@@ -41,13 +43,16 @@ export function substitutionResults(content: string, refPath: string): RuleResul
     if (!line.fenced) continue;
 
     for (const match of line.text.matchAll(SUBSTITUTION_PATTERN)) {
-      const variable = match[1] ?? "";
+      const placeholder = PLACEHOLDERS.get(match[1] ?? "");
+      if (placeholder == null) continue;
+
       results.push({
         rule: "reference-substitution",
         severity: "warn",
         passed: false,
-        message: `\${${variable}} in a fenced block in ${refPath}. Substitution reaches SKILL.md and allowed-tools only, so this expands to nothing when the command runs. State the path in SKILL.md and write ${PLACEHOLDERS[variable] ?? "a placeholder"} here.`,
+        message: `\${${match[1]}} in a fenced block. Substitution reaches SKILL.md and allowed-tools only, so this expands to nothing when the command runs. State the path in SKILL.md and write a placeholder here, e.g. ${placeholder}.`,
         line: line.index + 1,
+        reference: refPath,
       });
     }
   }
@@ -59,6 +64,7 @@ export function substitutionResults(content: string, refPath: string): RuleResul
         severity: "warn",
         passed: true,
         message: "no substitution variables in code blocks",
+        reference: refPath,
       },
     ];
   }
@@ -83,6 +89,7 @@ export async function lintReference(skillDir: string, refPath: string): Promise<
         severity: "warn",
         passed: false,
         message: `depth ${depth} (max 1)\n  > "Keep file references one level deep from SKILL.md. Avoid deeply nested reference chains."\n  ${SPEC_URL}#file-references`,
+        reference: refPath,
       });
     } else {
       results.push({
@@ -90,6 +97,7 @@ export async function lintReference(skillDir: string, refPath: string): Promise<
         severity: "warn",
         passed: true,
         message: `depth ${depth}`,
+        reference: refPath,
       });
     }
 
@@ -100,6 +108,7 @@ export async function lintReference(skillDir: string, refPath: string): Promise<
       severity: "error",
       passed: false,
       message: `file not found: ${refPath}`,
+      reference: refPath,
     });
   }
 

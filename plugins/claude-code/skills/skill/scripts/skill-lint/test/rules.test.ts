@@ -376,6 +376,11 @@ describe("substitutionResults", () => {
       flagged: false,
     },
     {
+      name: "passes a longer name that merely starts with a watched one",
+      content: "```bash\nbun $CLAUDE_SKILL_DIRECTORY/scripts/x.ts\n```",
+      flagged: false,
+    },
+    {
       name: "passes prose after a fenced block closes",
       content: `\`\`\`bash\nbun scripts/x.ts\n\`\`\`\n\nSet \`${v("CLAUDE_SKILL_DIR")}\` in SKILL.md.`,
       flagged: false,
@@ -384,11 +389,29 @@ describe("substitutionResults", () => {
     expect(failing(content).length > 0).toBe(flagged);
   });
 
-  it("reports the offending line number and warn severity", () => {
-    const [offender] = failing(`intro\n\n\`\`\`bash\nbun ${v("CLAUDE_SKILL_DIR")}/x.ts\n\`\`\``);
-    expect(offender?.severity).toBe("warn");
-    expect(offender?.line).toBe(4);
-    expect(offender?.message).toContain("<skill-dir>");
+  it("reports the whole finding", () => {
+    expect(failing(`intro\n\n\`\`\`bash\nbun ${v("CLAUDE_SKILL_DIR")}/x.ts\n\`\`\``))
+      .toMatchInlineSnapshot(`
+      [
+        {
+          "line": 4,
+          "message": "\${CLAUDE_SKILL_DIR} in a fenced block. Substitution reaches SKILL.md and allowed-tools only, so this expands to nothing when the command runs. State the path in SKILL.md and write a placeholder here, e.g. <skill-dir>.",
+          "passed": false,
+          "reference": "references/example.md",
+          "rule": "reference-substitution",
+          "severity": "warn",
+        },
+      ]
+    `);
+  });
+
+  test.each<{ variable: string; placeholder: string }>([
+    { variable: "CLAUDE_SKILL_DIR", placeholder: "<skill-dir>" },
+    { variable: "CLAUDE_PLUGIN_ROOT", placeholder: "<plugin-root>" },
+    { variable: "CLAUDE_PLUGIN_DATA", placeholder: "<plugin-data>" },
+  ])("suggests $placeholder for $variable", ({ variable, placeholder }) => {
+    const [offender] = failing(`\`\`\`bash\nbun ${v(variable)}/x.ts\n\`\`\``);
+    expect(offender?.message).toContain(placeholder);
   });
 
   it("flags every occurrence on a line", () => {
@@ -396,8 +419,8 @@ describe("substitutionResults", () => {
     expect(failing(content)).toHaveLength(2);
   });
 
-  // The repo files that document the substitution mechanism rather than invoking
-  // it. A rule that fires on either of these is wrong.
+  // These repo files describe the substitution syntax in prose. The rule must
+  // not fire on any of them.
   const repoRoot = path.join(import.meta.dirname, "../../../../../../..");
 
   test.each([

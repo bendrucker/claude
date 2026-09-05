@@ -4,7 +4,7 @@ Worked pattern for fan-out investigations of the session corpus: breadth search 
 
 ## Scoping Params From the CLI
 
-`getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare read-only run of a query file runs unfiltered. Prepend `SET VARIABLE` lines to scope it. The DB path and the skill directory are both stable (stated in `SKILL.md`), so substitute them for the placeholders:
+`getvariable` returns NULL for an unset variable and every named query null-guards its params, so a bare read-only run of a query file runs unfiltered. Prepend `SET VARIABLE` lines to scope it. Substitute `<db-path>` with the database path and `<skill-dir>` with the skill directory path, both from `SKILL.md`:
 
 ```bash
 duckdb -readonly -json <db-path> <<'SQL'

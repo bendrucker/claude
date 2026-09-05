@@ -1,6 +1,6 @@
 # Cross-Machine Import
 
-Procedures for listing, importing, re-syncing, and forgetting another machine's session history. Host semantics and the egress policy live in [`SKILL.md`](../SKILL.md) "Cross-Machine History". Read that first. The skill directory is stable (stated in `SKILL.md`), so substitute it for the `<skill-dir>` placeholder below.
+Procedures for listing, importing, re-syncing, and forgetting another machine's session history. Host semantics and the egress policy live in [`SKILL.md`](../SKILL.md) "Cross-Machine History". Read that first. Substitute every `<skill-dir>` below with the skill directory path from `SKILL.md`.
 
 ## Listing Hosts
 

@@ -34,7 +34,8 @@ export function formatText(results: SkillLintResult[]): string {
     output.push(`Errors: ${skill.errors} | Warnings: ${skill.warnings}`);
     output.push("");
 
-    for (const result of skill.results) {
+    // Reference results are rendered under references/ with their file attached.
+    for (const result of skill.results.filter((r) => r.reference === undefined)) {
       output.push(formatResult(result));
     }
 

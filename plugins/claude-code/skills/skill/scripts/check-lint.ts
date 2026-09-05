@@ -8,14 +8,30 @@ import type { SkillLintResult } from "./skill-lint/types";
 
 type LintSkillFn = (dir: string) => SkillLintResult | Promise<SkillLintResult>;
 
+// A references/*.md edit lints the skill that owns it, so reference-scoped rules
+// reach the author at the edit rather than waiting for CI.
+function skillDirOf(filePath: string): string | null {
+  if (basename(filePath) === "SKILL.md") return dirname(filePath);
+
+  const parent = dirname(filePath);
+  return basename(parent) === "references" ? dirname(parent) : null;
+}
+
 async function lintMessages(skillDir: string, lintSkill: LintSkillFn): Promise<string[]> {
-  const result = await lintSkill(skillDir);
+  let result: SkillLintResult;
+  try {
+    result = await lintSkill(skillDir);
+  } catch {
+    // A references/ directory outside a skill has no SKILL.md to lint.
+    return [];
+  }
   if (result.errors === 0 && result.warnings === 0) return [];
 
   const messages: string[] = [];
   for (const r of result.results) {
     if (r.passed) continue;
-    messages.push(`[${r.severity}] ${r.rule}: ${r.message}`);
+    const where = r.reference === undefined ? "" : ` (${r.reference})`;
+    messages.push(`[${r.severity}] ${r.rule}${where}: ${r.message}`);
   }
   return messages;
 }
@@ -25,9 +41,12 @@ export async function processPostToolUse(
   lintSkill: LintSkillFn = defaultLintSkill,
 ): Promise<SyncHookJSONOutput | null> {
   const filePath = filePathOf(input.tool_input);
-  if (filePath == null || filePath === "" || basename(filePath) !== "SKILL.md") return null;
+  if (filePath == null || filePath === "") return null;
 
-  const messages = await lintMessages(dirname(filePath), lintSkill);
+  const skillDir = skillDirOf(filePath);
+  if (skillDir == null) return null;
+
+  const messages = await lintMessages(skillDir, lintSkill);
   if (messages.length === 0) return null;
 
   return {

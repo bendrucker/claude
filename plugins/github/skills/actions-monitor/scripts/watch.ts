@@ -391,8 +391,13 @@ export function deriveChecksState(checks: Check[]): InternalState {
     return "running";
   }
   const decisive = checks.filter((c) => (c.bucket ?? "").toLowerCase() !== SKIPPED_BUCKET);
+  // Skips settle first, so for a few seconds after a push every registered
+  // check can be a skip while the real jobs are still being created. That is
+  // indistinguishable from a PR whose checks are all genuinely skipped, and
+  // calling it success ends a babysit before CI has run. Holding at queued
+  // reports the genuinely-skipped PR through the queued timeout instead.
   if (decisive.length === 0) {
-    return "success";
+    return "queued";
   }
   const buckets = decisive.map((c) => (c.bucket ?? "").toLowerCase());
   if (buckets.some((b) => b === "fail")) {

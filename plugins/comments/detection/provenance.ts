@@ -2,15 +2,10 @@ import { $ } from "bun";
 import { z } from "zod";
 import type { Comment } from "./types";
 
-/**
- * Who last touched a comment's lines, from `git blame`. Git records committers,
- * so this is evidence about authorship rather than proof of it: agent-written
- * code is routinely committed under a human name.
- */
+/** Git records committers, so this is evidence about authorship rather than proof of it: agent-written code is routinely committed under a human name. */
 export const ProvenanceSchema = z.object({
   /** Some line of the comment is not yet committed. */
   uncommitted: z.boolean(),
-  /** Author names of the commits that last touched the comment's lines. */
   authors: z.array(z.string()),
   /** Date (YYYY-MM-DD) of the newest of those commits. */
   latest: z.string().nullable(),
@@ -87,7 +82,6 @@ export function commitSignals(message: string): string[] {
   return signals;
 }
 
-/** The author line, when the author itself is an agent or bot. */
 export function authorSignal(line: BlamedLine): string | null {
   const identity = `${line.author} <${line.mail}>`;
   return AGENT_NAME.test(identity) ? `author: ${identity}` : null;
@@ -97,10 +91,7 @@ function isoDate(seconds: number): string {
   return new Date(seconds * 1000).toISOString().slice(0, 10);
 }
 
-/**
- * Fold the blame of a comment's lines into its provenance. A line the blame map
- * lacks (an untracked file, a failed blame) counts as uncommitted.
- */
+/** A line the blame map lacks (an untracked file, a failed blame) counts as uncommitted. */
 export function provenanceOf(
   comment: Comment,
   blame: Map<number, BlamedLine>,
@@ -153,11 +144,7 @@ const RS = "\x1e";
 /** Field separator between a commit's sha and its message. */
 const FS = "\x1f";
 
-/**
- * Blames files and resolves the agent signals of the commits they name, caching
- * commit lookups across files so a run pays one `git show` per commit. Runs
- * from the repo root, like the collectors.
- */
+/** Blames files and resolves the agent signals of the commits they name, caching commit lookups across files so a run pays one `git show` per commit. */
 export class ProvenanceIndex {
   private readonly signals = new Map<string, string[]>();
   private readonly limit = limiter(GIT_CONCURRENCY);

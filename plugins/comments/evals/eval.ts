@@ -43,7 +43,7 @@ export interface Fixture {
   /** For a partial `trim`: the owner's gold kept-comment text, for hand spot-checks. */
   trimTo?: string;
   trimToLines?: number[];
-  /** The blame the judge sees. Absent fixtures are judged as agent-written, the rubric's default. */
+  /** Absent fixtures are judged as agent-written, the rubric's default. */
   provenance?: Provenance;
   source?: string;
   note?: string;

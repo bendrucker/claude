@@ -205,8 +205,18 @@ describe("preflight", () => {
       (job?.shards ?? []).map(async (ref) => {
         const shard = await readJson(
           ref.path,
-          z.object({ comments: z.array(z.object({ id: z.string() })) }),
+          z.object({
+            comments: z.array(
+              z.object({
+                id: z.string(),
+                provenance: z.object({ uncommitted: z.boolean(), authors: z.array(z.string()) }),
+              }),
+            ),
+          }),
         );
+        for (const c of shard.comments) {
+          expect(c.provenance).toEqual({ uncommitted: false, authors: ["Test"] });
+        }
         const verdicts = await readJson(
           join(job?.verdictsDir ?? "", `verdict-${ref.id}.json`),
           VerdictFile,

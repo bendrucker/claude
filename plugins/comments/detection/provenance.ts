@@ -132,12 +132,13 @@ function limiter(max: number): <T>(task: () => Promise<T>) => Promise<T> {
   const waiting: (() => void)[] = [];
   return async (task) => {
     if (active >= max) await new Promise<void>((resolve) => waiting.push(resolve));
-    active++;
+    else active++;
     try {
       return await task();
     } finally {
-      active--;
-      waiting.shift()?.();
+      const next = waiting.shift();
+      if (next) next();
+      else active--;
     }
   };
 }
@@ -163,7 +164,7 @@ export async function runGit(args: string[]): Promise<GitResult> {
 
 /** Blames files and resolves the agent signals of the commits they name, caching commit lookups across files so a run pays one `git show` per commit. */
 export class ProvenanceIndex {
-  private readonly signals = new Map<string, string[]>();
+  private readonly signals = new Map<string, Promise<string[]>>();
   private readonly limit = limiter(GIT_CONCURRENCY);
   private readonly git: GitRunner;
 
@@ -183,25 +184,40 @@ export class ProvenanceIndex {
     return tracked.exitCode === 0 ? null : new Map();
   }
 
+  /** The agent signals of each commit, keyed by sha. Concurrent callers share one `git show` per commit. */
   async signalsFor(shas: Iterable<string>): Promise<Map<string, string[]>> {
-    const unresolved = [...new Set(shas)].filter(
-      (sha) => !UNCOMMITTED.test(sha) && !this.signals.has(sha),
-    );
+    const wanted = [...new Set(shas)].filter((sha) => !UNCOMMITTED.test(sha));
+    const unresolved = wanted.filter((sha) => !this.signals.has(sha));
     if (unresolved.length > 0) {
-      const format = `%H${NUL}%B${NUL}`;
-      const result = await this.limit(() =>
-        this.git(["show", "-s", `--format=${format}`, ...unresolved]),
-      );
-      for (const sha of unresolved) this.signals.set(sha, []);
-      if (result.exitCode === 0) {
-        const fields = result.text.split(NUL_CHAR);
-        for (let i = 0; i + 1 < fields.length; i += 2) {
-          const sha = fields[i]?.trim() ?? "";
-          if (this.signals.has(sha)) this.signals.set(sha, commitSignals(fields[i + 1] ?? ""));
-        }
-      }
+      const batch = this.show(unresolved);
+      for (const sha of unresolved)
+        this.signals.set(
+          sha,
+          batch.then((found) => found.get(sha) ?? []),
+        );
     }
-    return this.signals;
+    const entries = await Promise.all(
+      wanted.map(async (sha): Promise<[string, string[]]> => [
+        sha,
+        await (this.signals.get(sha) ?? []),
+      ]),
+    );
+    return new Map(entries);
+  }
+
+  private async show(shas: string[]): Promise<Map<string, string[]>> {
+    const found = new Map<string, string[]>();
+    const result = await this.limit(() =>
+      this.git(["show", "-s", `--format=%H${NUL}%B${NUL}`, ...shas]),
+    );
+    if (result.exitCode !== 0) return found;
+    const wanted = new Set(shas);
+    const fields = result.text.split(NUL_CHAR);
+    for (let i = 0; i + 1 < fields.length; i += 2) {
+      const sha = fields[i]?.trim() ?? "";
+      if (wanted.has(sha)) found.set(sha, commitSignals(fields[i + 1] ?? ""));
+    }
+    return found;
   }
 
   /** Provenance for each comment of one file, in the order given. Empty when blame failed. */

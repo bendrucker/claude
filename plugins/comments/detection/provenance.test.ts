@@ -237,6 +237,22 @@ describe("ProvenanceIndex", () => {
     expect(signals.get(SHA_B)).toEqual([]);
   });
 
+  test("concurrent lookups of one commit share a single git show", async () => {
+    let shows = 0;
+    const runner: GitRunner = (args) => {
+      if (args[0] === "show") shows++;
+      return Promise.resolve({ exitCode: 0, text: `${SHA_A}\x00Claude-Session: abc\x00` });
+    };
+    const index = new ProvenanceIndex(runner);
+    const [first, second] = await Promise.all([
+      index.signalsFor([SHA_A]),
+      index.signalsFor([SHA_A]),
+    ]);
+    expect(shows).toBe(1);
+    expect(first.get(SHA_A)).toEqual(["Claude-Session: abc"]);
+    expect(second.get(SHA_A)).toEqual(["Claude-Session: abc"]);
+  });
+
   test("treats an untracked file as wholly uncommitted", async () => {
     await Bun.write(join(dir, "new.ts"), "// fresh\n");
     const index = new ProvenanceIndex();

@@ -168,13 +168,16 @@ describe("deriveChecksState", () => {
       ],
       "running",
     ],
+    // Reached both by a PR whose every check really is skipped and by one
+    // polled in the seconds after a push, before its real jobs register. A
+    // single probe cannot separate the two, so neither resolves to success.
     [
       "every check skipped",
       [
         { state: "SKIPPED", bucket: "skipping", name: "a" },
         { state: "SKIPPED", bucket: "skipping", name: "b" },
       ],
-      "success",
+      "queued",
     ],
     // Shape captured from a green PR whose automerge and claude workflows are
     // skipped on every push. Skipped workflows are routine, so a skip that

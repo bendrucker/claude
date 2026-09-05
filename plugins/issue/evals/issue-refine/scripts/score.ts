@@ -105,7 +105,8 @@ const add = (finding: number, severity: Severity, line: number, excerpt: string,
 
 // Finding 1: title-case noun-phrase headings. A body H1 is a defect on its own:
 // the title lives in the frontmatter, so the body should never open one.
-const stripCode = (s: string) => s.replace(/`[^`]*`/g, "").replace(/\[[^\]]*\]\([^)]*\)/g, "$&");
+const stripCode = (s: string) =>
+  s.replaceAll(/`[^`]*`/g, "").replaceAll(/\[[^\]]*\]\([^)]*\)/g, "$&");
 for (const h of headings) {
   if (h.level === 1) {
     add(
@@ -150,7 +151,7 @@ for (const h of headings) {
 // Finding 2: native links for issue/PR references; no bare numbers or raw URLs.
 const linkTargets = new Set([...body.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1]));
 lines.forEach((l, i) => {
-  const noLinks = l.replace(/\[[^\]]*\]\([^)]*\)/g, "").replace(/`[^`]*`/g, "");
+  const noLinks = l.replaceAll(/\[[^\]]*\]\([^)]*\)/g, "").replaceAll(/`[^`]*`/g, "");
   for (const m of noLinks.matchAll(/\b[A-Z]{2,}-\d+\b/g))
     add(2, "critical", i + 1, m[0], "Bare tracker reference. Use a link that expands inline.");
   for (const m of noLinks.matchAll(/(?:^|\s)(#\d+|MR\s*!\d+|!\d+)\b/g))

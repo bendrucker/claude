@@ -8,7 +8,7 @@ export async function getDefaultBranch(cwd?: string, repoRoot?: string): Promise
 
     const root =
       repoRoot ?? (await $`git rev-parse --show-toplevel`.cwd(dir).quiet()).text().trim();
-    const safePath = root.replace(/\//g, "_");
+    const safePath = root.replaceAll("/", "_");
     const cacheFile = join(tmpdir(), `claude-default-branch${safePath}`);
 
     if (await Bun.file(cacheFile).exists()) {

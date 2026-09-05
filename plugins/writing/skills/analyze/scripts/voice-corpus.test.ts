@@ -8,12 +8,12 @@ import { mergeDocuments, parseCorpus, serializeCorpus, type VoiceDocument } from
 // open with "=" so none masquerade as a delimiter after trimming.
 const voiceDocument = fc.record<VoiceDocument>({
   source: fc.string({ minLength: 1 }).map((s) => {
-    const stripped = s.replace(/\s/g, "");
+    const stripped = s.replaceAll(/\s/g, "");
     return stripped !== "" ? stripped : "x";
   }),
-  meta: fc.string().map((s) => s.replace(/[)\r\n]/g, "")),
+  meta: fc.string().map((s) => s.replaceAll(/[)\r\n]/g, "")),
   body: fc
-    .array(fc.string().map((s) => s.replace(/[\r\n]/g, " ").replace(/^[\s=]+/, "")))
+    .array(fc.string().map((s) => s.replaceAll(/[\r\n]/g, " ").replace(/^[\s=]+/, "")))
     .map((lines) => lines.join("\n").trim()),
 });
 

@@ -30,7 +30,7 @@ function parseLines(content: string): string[] {
 }
 
 function escapeRegex(literal: string): string {
-  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return literal.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 export function compilePlainWordlist(
@@ -40,8 +40,8 @@ export function compilePlainWordlist(
   const entries = parseLines(content);
   if (entries.length === 0) return null;
   const fragments = Array.from(new Set(entries.map(escapeRegex)));
-  const prefix = options.prefix ?? "\\b";
-  const suffix = options.suffix ?? "\\b";
+  const prefix = options.prefix ?? String.raw`\b`;
+  const suffix = options.suffix ?? String.raw`\b`;
   const flags = options.flags ?? "gi";
   return new RegExp(`${prefix}(?:${fragments.join("|")})${suffix}`, flags);
 }

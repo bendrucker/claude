@@ -12,7 +12,7 @@ const SessionState = z.record(z.string(), z.number());
 export type SessionState = z.infer<typeof SessionState>;
 
 function statePath(sessionId: string): string {
-  const safe = sessionId.replace(/[^\w-]/g, "");
+  const safe = sessionId.replaceAll(/[^\w-]/g, "");
   return join(process.env.TMPDIR ?? tmpdir(), `writing-hooks-${safe}.json`);
 }
 

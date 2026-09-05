@@ -11,7 +11,7 @@ export function stringify(value: unknown): string {
   return String(value);
 }
 
-const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, "-");
+const normalize = (s: string) => s.toLowerCase().replaceAll(/\s+/g, "-");
 
 export function selectColumns(
   headers: string[],

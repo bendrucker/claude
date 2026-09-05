@@ -76,7 +76,7 @@ function makeContext(row: SourceRow, start: number, end: number, radius: number)
   const to = Math.min(row.text?.length ?? 0, end + radius);
   const prefix = from > 0 ? "..." : "";
   const suffix = to < (row.text?.length ?? 0) ? "..." : "";
-  const window = `${prefix}${(row.text ?? "").slice(from, to).replace(/\s+/g, " ").trim()}${suffix}`;
+  const window = `${prefix}${(row.text ?? "").slice(from, to).replaceAll(/\s+/g, " ").trim()}${suffix}`;
   return {
     window,
     sourceFile: row.source_file ?? null,

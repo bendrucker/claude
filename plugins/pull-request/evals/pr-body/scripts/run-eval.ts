@@ -280,7 +280,7 @@ async function readRecorded(runDir: string): Promise<GenerationRow[]> {
 }
 
 function defaultRunId(): string {
-  return new Date().toISOString().replace(/[:.]/g, "-").replace("Z", "");
+  return new Date().toISOString().replaceAll(/[:.]/g, "-").replace("Z", "");
 }
 
 async function main(): Promise<void> {

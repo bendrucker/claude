@@ -42,7 +42,7 @@ export function buildDispatchArgs({
 // match skips. Returns null when the line is absent (an older claude, or a
 // launch failure that still exited zero).
 export function parseBackgroundedId(stdout: string): string | null {
-  const clean = stdout.replace(/\[[0-9;]*m/g, "");
+  const clean = stdout.replaceAll(/\[[0-9;]*m/g, "");
   const match = clean.match(/backgrounded[^0-9a-f]*([0-9a-f]{6,})/i);
   return match?.[1] ?? null;
 }

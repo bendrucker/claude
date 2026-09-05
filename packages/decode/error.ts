@@ -3,7 +3,7 @@ import type { z } from "zod";
 const PREVIEW_LIMIT = 120;
 
 function preview(text: string): string {
-  const collapsed = text.replace(/\s+/g, " ").trim();
+  const collapsed = text.replaceAll(/\s+/g, " ").trim();
   if (collapsed === "") return "(empty)";
   if (collapsed.length <= PREVIEW_LIMIT) return collapsed;
   return `${collapsed.slice(0, PREVIEW_LIMIT)}…`;

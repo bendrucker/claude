@@ -70,26 +70,26 @@ function firstText(...values: unknown[]): string {
 
 function decodeEntities(input: string): string {
   return input
-    .replace(/&nbsp;/g, " ")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#0*39;|&apos;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x([0-9a-fA-F]+);/g, (_: string, hex: string) =>
+    .replaceAll("&nbsp;", " ")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll(/&#0*39;|&apos;/g, "'")
+    .replaceAll("&quot;", '"')
+    .replaceAll(/&#x([0-9a-fA-F]+);/g, (_: string, hex: string) =>
       String.fromCodePoint(Number.parseInt(hex, 16)),
     )
-    .replace(/&#(\d+);/g, (_: string, dec: string) =>
+    .replaceAll(/&#(\d+);/g, (_: string, dec: string) =>
       String.fromCodePoint(Number.parseInt(dec, 10)),
     )
-    .replace(/&amp;/g, "&");
+    .replaceAll("&amp;", "&");
 }
 
 function stripHtml(html: string): string {
   // Decode entities before stripping tags so escaped markup (e.g. &lt;b&gt;)
   // becomes real tags and gets removed rather than leaking into the excerpt.
   return decodeEntities(html)
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+    .replaceAll(/<[^>]+>/g, " ")
+    .replaceAll(/\s+/g, " ")
     .trim();
 }
 

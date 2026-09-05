@@ -35,7 +35,7 @@ export function parseGhLogin(hostsYaml: string): string | null {
     }
     if (!inGitHub) continue;
     const user = line.match(/^\s+user:\s*(.+?)\s*$/)?.[1];
-    if (user != null && user !== "") return user.replace(/^["']|["']$/g, "");
+    if (user != null && user !== "") return user.replaceAll(/^["']|["']$/g, "");
   }
   return null;
 }

@@ -204,7 +204,7 @@ const mineContrastCommand = command(
         // One file is written and edited many times across a session, so the
         // path alone is not a unique pointer. Whitespace would break the
         // corpus delimiter line, which drops the document on the way back in.
-        source: `${(row.file_path ?? row.session_id).replace(/\s+/g, "_")}#${index}`,
+        source: `${(row.file_path ?? row.session_id).replaceAll(/\s+/g, "_")}#${index}`,
         meta: row.session_id,
         body: row.text,
       }));

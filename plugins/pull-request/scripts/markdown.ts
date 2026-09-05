@@ -34,11 +34,11 @@ export function linesOutsideFences(body: string): string[] {
 
 export function stripEmphasis(text: string): string {
   return text
-    .replace(/\*\*\*(.+?)\*\*\*/g, "$1")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\*(.+?)\*/g, "$1")
-    .replace(/(?<![\w`])__(.+?)__(?![\w`])/g, "$1")
-    .replace(/(?<![\w`])_(.+?)_(?![\w`])/g, "$1");
+    .replaceAll(/\*\*\*(.+?)\*\*\*/g, "$1")
+    .replaceAll(/\*\*(.+?)\*\*/g, "$1")
+    .replaceAll(/\*(.+?)\*/g, "$1")
+    .replaceAll(/(?<![\w`])__(.+?)__(?![\w`])/g, "$1")
+    .replaceAll(/(?<![\w`])_(.+?)_(?![\w`])/g, "$1");
 }
 
 /**

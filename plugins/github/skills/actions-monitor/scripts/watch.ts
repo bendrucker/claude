@@ -229,7 +229,7 @@ export function parsePrUrl(url: string): {
   repo: string;
   number: number;
 } {
-  const pattern = new UrlPattern("https\\://github.com/:owner/:repo/pull/:number(/*)", {
+  const pattern = new UrlPattern(String.raw`https\://github.com/:owner/:repo/pull/:number(/*)`, {
     segmentValueCharset: "a-zA-Z0-9-_.~%",
   });
   const match = PrUrlParams.safeParse(pattern.match(url));
@@ -257,8 +257,8 @@ export function parseRepo(remoteUrl: string): { owner: string; repo: string } | 
   };
 
   const urlMatch =
-    tryPattern("https\\://github.com/:owner/:repo(/*)") ??
-    tryPattern("ssh\\://git@github.com/:owner/:repo(/*)");
+    tryPattern(String.raw`https\://github.com/:owner/:repo(/*)`) ??
+    tryPattern(String.raw`ssh\://git@github.com/:owner/:repo(/*)`);
   if (urlMatch) return urlMatch;
 
   // scp-like: git@github.com:owner/repo(.git)

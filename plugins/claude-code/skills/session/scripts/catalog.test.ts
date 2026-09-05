@@ -138,8 +138,8 @@ describe("query header", () => {
   it("documents every default its SQL falls back to", async () => {
     const queries = await loadQueries();
     const used = queries.map(([header, sql]) => {
-      const pairs = [...sql.replace(/\s+/g, " ").matchAll(DEFAULT_FALLBACK)].map(
-        ([, name, value]) => `${name}=${(value ?? "").replace(/^'|'$/g, "")}`,
+      const pairs = [...sql.replaceAll(/\s+/g, " ").matchAll(DEFAULT_FALLBACK)].map(
+        ([, name, value]) => `${name}=${(value ?? "").replaceAll(/^'|'$/g, "")}`,
       );
       return [header.name, alphabetical([...new Set(pairs)])] as const;
     });

@@ -229,7 +229,7 @@ function showRepo(repo: string, sanitizedBranch: string): boolean {
 }
 
 export function formatWorktree(data: WorktreeData, budget: number): string[] {
-  const sanitizedBranch = data.branch.replace(/[/\\]/g, "-");
+  const sanitizedBranch = data.branch.replaceAll(/[/\\]/g, "-");
   let repo = basename(data.path);
   const repoSuffix = `.${sanitizedBranch}`;
   if (repo.endsWith(repoSuffix)) repo = repo.slice(0, -repoSuffix.length);

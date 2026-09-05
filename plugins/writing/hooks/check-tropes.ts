@@ -36,7 +36,7 @@ const GIT_MESSAGE_FILE_PATTERN = /\bgit\s+(?:commit|tag)\b[^|;&]*?\s(?:-F|--file
 // Shell quoting survives into the raw command string, so a path captured from
 // `-F 'body=@tmp/x.md'` carries the closing quote.
 function stripQuotes(token: string): string {
-  return token.replace(/^['"]+|['"]+$/g, "");
+  return token.replaceAll(/^['"]+|['"]+$/g, "");
 }
 
 function extractBodyFilePath(command: string): string | null {

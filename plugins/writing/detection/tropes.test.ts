@@ -46,12 +46,12 @@ describe("stripCode", () => {
   // fenced blocks. That is stripCode's intended domain: inline code that spans
   // a newline is replaced by equal-width spaces, which drops the newline and
   // collapses the line count.
-  const plainSegment = fc.string().map((s) => s.replace(/[`\n]/g, ""));
+  const plainSegment = fc.string().map((s) => s.replaceAll(/[`\n]/g, ""));
   const inlineCodeLine = fc
     .tuple(
       plainSegment,
       fc.string().map((s) => {
-        const stripped = s.replace(/[`\n]/g, "");
+        const stripped = s.replaceAll(/[`\n]/g, "");
         return stripped !== "" ? stripped : "x";
       }),
       plainSegment,

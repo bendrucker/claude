@@ -60,7 +60,7 @@ export function getPointer(value: unknown, pointer: string): unknown {
   const tokens = pointer
     .slice(1)
     .split("/")
-    .map((token) => token.replace(/~1/g, "/").replace(/~0/g, "~"));
+    .map((token) => token.replaceAll("~1", "/").replaceAll("~0", "~"));
   let current: unknown = value;
   for (const token of tokens) {
     const container = Indexable.safeParse(current).data;

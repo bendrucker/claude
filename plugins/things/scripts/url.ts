@@ -394,8 +394,8 @@ if (import.meta.main) {
   for (const arg of argv._.params) {
     const eqIndex = arg.indexOf("=");
     if (eqIndex === -1) continue;
-    const key = arg.substring(0, eqIndex);
-    const value = arg.substring(eqIndex + 1);
+    const key = arg.slice(0, eqIndex);
+    const value = arg.slice(eqIndex + 1);
     if (key === "id") {
       ids.push(value);
     } else {

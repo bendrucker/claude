@@ -30,7 +30,13 @@
     "import/no-named-as-default-member": "error",
     "oxc/no-map-spread": "error",
     "unicorn/prefer-array-find": "error",
-    "unicorn/prefer-set-has": "error"
+    "unicorn/prefer-set-has": "error",
+    // `String.raw` keeps a backslash-heavy literal (a path, a regex) readable as written, instead of forcing a manual escape count that's easy to get wrong.
+    "unicorn/prefer-string-raw": "error",
+    // `replace()` needs a global regex to hit every match, and a dropped `g` flag silently replaces only the first one. `replaceAll()` makes the intent explicit and takes a plain string when there's no pattern to match.
+    "unicorn/prefer-string-replace-all": "error",
+    // `substring()` swaps out-of-order arguments and clamps negatives instead of indexing from the end. `substr()` is deprecated and its second argument is a length. `slice()` is the one method with consistent, current semantics.
+    "unicorn/prefer-string-slice": "error"
   },
   "overrides": [
     {

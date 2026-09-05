@@ -54,7 +54,7 @@ describe("buildAttribution", () => {
     "/repos/ben's thing",
     "/repos/a; rm -rf b",
     "/repos/$(whoami)",
-    "/repos/back\\slash",
+    String.raw`/repos/back\slash`,
     '/repos/"quoted"',
   ])("survives a shell round trip: %s", async (directory) => {
     const { stdout } = await $`sh -c ${`printf %s ${shellQuote(directory)}`}`.quiet();

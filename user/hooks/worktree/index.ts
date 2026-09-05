@@ -33,7 +33,7 @@ function stripQuoted(command: string): string {
 
 // Quote characters delimit the token, they are not part of the path.
 function unquote(token: string): string {
-  return token.replace(/['"]/g, "");
+  return token.replaceAll(/['"]/g, "");
 }
 
 function tokensAfter(command: string, invocation: RegExp): string[] {

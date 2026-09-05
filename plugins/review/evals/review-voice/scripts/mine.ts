@@ -165,7 +165,7 @@ function idFor(host: string, session: string, fp: string, index: number): string
 }
 
 function normalize(body: string): string {
-  return body.replace(/\s+/g, " ").trim().toLowerCase();
+  return body.replaceAll(/\s+/g, " ").trim().toLowerCase();
 }
 
 async function main() {

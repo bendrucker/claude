@@ -84,7 +84,7 @@ describe("validateFile", () => {
 
   for (const fixture of fixtures) {
     it(fixture.name, async () => {
-      const file = join(tempDir, `${fixture.name.replace(/\s+/g, "-")}.json`);
+      const file = join(tempDir, `${fixture.name.replaceAll(/\s+/g, "-")}.json`);
       await Bun.write(file, JSON.stringify(fixture.data));
 
       const result = await validateFile(

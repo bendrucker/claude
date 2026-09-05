@@ -6,7 +6,7 @@ describe("renderTemplate", () => {
     ["cat", "src/a.ts", "cat"],
     ["prettier --stdin-filepath {}", "src/a.ts", "prettier --stdin-filepath 'src/a.ts'"],
     ["fmt {} {}", "a b.py", "fmt 'a b.py' 'a b.py'"],
-    ["fmt {}", "it's.py", "fmt 'it'\\''s.py'"],
+    ["fmt {}", "it's.py", String.raw`fmt 'it'\''s.py'`],
   ])("%p with %p renders %p", (template, path, expected) => {
     expect(renderTemplate(template, path)).toBe(expected);
   });

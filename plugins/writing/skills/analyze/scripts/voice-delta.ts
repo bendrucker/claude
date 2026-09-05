@@ -56,15 +56,15 @@ function nonEmptyLines(text: string): string[] {
 // denominators. stripCode flattens whitespace, which would destroy line-based
 // rates.
 function stripFencedBlocks(text: string): string {
-  return text.replace(/```[\s\S]*?```/g, "");
+  return text.replaceAll(/```[\s\S]*?```/g, "");
 }
 
 // Strip fenced and inline code blocks before rate counting.
 function stripCode(text: string): string {
   return text
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`[^`]+`/g, " ")
-    .replace(/https?:\/\/\S+/g, " URL ");
+    .replaceAll(/```[\s\S]*?```/g, " ")
+    .replaceAll(/`[^`]+`/g, " ")
+    .replaceAll(/https?:\/\/\S+/g, " URL ");
 }
 
 // Count total words in stripped text. Avoids counting code tokens.
@@ -74,7 +74,7 @@ function strippedWordCount(text: string): number {
 
 function countBackticks(text: string): number {
   // Remove fenced blocks first to avoid double-counting their delimiters.
-  const nofence = text.replace(/```[\s\S]*?```/g, "");
+  const nofence = text.replaceAll(/```[\s\S]*?```/g, "");
   return (nofence.match(/`/g) ?? []).length;
 }
 

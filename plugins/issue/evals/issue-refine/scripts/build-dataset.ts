@@ -101,7 +101,7 @@ for (const [session_id, refined] of refinedBySession) {
 const norm = (t: string) =>
   t
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
+    .replaceAll(/[^a-z0-9]+/g, " ")
     .trim();
 const seen = new Set<string>();
 const unique = candidates.filter((c) => {

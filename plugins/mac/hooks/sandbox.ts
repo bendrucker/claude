@@ -29,7 +29,7 @@ export function extractCommands(command: string): Invocation[] {
   const result: Invocation[] = [];
 
   for (const segment of segments) {
-    const trimmed = segment.trim().replace(/^[()]+|[()]+$/g, "");
+    const trimmed = segment.trim().replaceAll(/^[()]+|[()]+$/g, "");
     if (trimmed === "") continue;
 
     const tokens = trimmed.split(/\s+/);

@@ -66,7 +66,7 @@ function wrapDocument(doc: string, column: number): string {
 function renderedShape(body: string): string {
   return JSON.stringify(fromMarkdown(body), (key: string, value: unknown) => {
     if (key === "position") return undefined;
-    if (key === "value" && typeof value === "string") return value.replace(/\s+/g, " ");
+    if (key === "value" && typeof value === "string") return value.replaceAll(/\s+/g, " ");
     return value;
   });
 }

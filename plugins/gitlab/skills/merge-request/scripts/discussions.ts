@@ -97,7 +97,7 @@ function summarize(d: Discussion): DiscussionSummary | null {
 }
 
 export function truncateBody(body: string, max: number): string {
-  const collapsed = body.replace(/\s+/g, " ").trim();
+  const collapsed = body.replaceAll(/\s+/g, " ").trim();
   if (max <= 0 || collapsed.length <= max) return collapsed;
   return `${collapsed.slice(0, max - 1)}…`;
 }

@@ -29,7 +29,7 @@ export async function getResourceName(filePath: string, type: string): Promise<s
 }
 
 export function checkStuttering(name: string, pluginName: string): string | null {
-  const pluginPattern = pluginName.replace(/-/g, "[-_]");
+  const pluginPattern = pluginName.replaceAll("-", "[-_]");
   const regex = new RegExp(`^${pluginPattern}[-_]|[-_]${pluginPattern}$|^${pluginPattern}$`, "i");
 
   if (regex.test(name)) {

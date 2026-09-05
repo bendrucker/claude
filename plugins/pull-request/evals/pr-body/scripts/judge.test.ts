@@ -10,7 +10,7 @@ function rubricAxes(markdown: string): string[] {
   const axes: string[] = [];
   for (const line of markdown.split("\n")) {
     const match = line.match(/^###\s+(.+)$/);
-    if (match?.[1] != null && match[1] !== "") axes.push(match[1].trim().replace(/^`|`$/g, ""));
+    if (match?.[1] != null && match[1] !== "") axes.push(match[1].trim().replaceAll(/^`|`$/g, ""));
   }
   return axes;
 }

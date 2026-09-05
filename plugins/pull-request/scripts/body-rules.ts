@@ -125,7 +125,7 @@ const FILE_EXTENSION_PATTERN =
 function looksLikeFilePath(label: string): boolean {
   const trimmed = label
     .trim()
-    .replace(/^`+|`+$/g, "")
+    .replaceAll(/^`+|`+$/g, "")
     .trim();
   if (trimmed.length === 0) return false;
   if (trimmed.includes("/")) return true;

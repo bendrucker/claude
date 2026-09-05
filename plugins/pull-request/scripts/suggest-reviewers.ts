@@ -73,7 +73,7 @@ export function blameOwners(files: string[], self: Set<string>, cwd?: string): O
       if (line.startsWith("author ")) {
         name = line.slice("author ".length).trim();
       } else if (line.startsWith("author-mail ")) {
-        const email = line.slice("author-mail ".length).trim().replace(/^<|>$/g, "");
+        const email = line.slice("author-mail ".length).trim().replaceAll(/^<|>$/g, "");
         const key = email.toLowerCase();
         if (self.has(key) || self.has(name.toLowerCase())) continue;
         const owner = byEmail.get(key) ?? { name, email, lines: 0 };

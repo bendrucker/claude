@@ -5,8 +5,8 @@ description: >-
 argument-hint: "[focus hint]"
 disable-model-invocation: true
 allowed-tools:
-  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/claim.sh)
-  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/defer.sh:*)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/claim.ts)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/defer.ts:*)
   - AskUserQuestion
   - Bash(herdr agent get:*)
   - Bash(herdr agent read:*)
@@ -26,7 +26,7 @@ allowed-tools:
 
 ## State
 
-!`bash ${CLAUDE_SKILL_DIR}/scripts/claim.sh`
+!`bun ${CLAUDE_SKILL_DIR}/scripts/claim.ts`
 
 `NO HERDR` means there is no server to coordinate. Say so and stop.
 
@@ -36,7 +36,11 @@ One flock runs per server, and the `FLOCK` line settles which:
 - `ELSEWHERE`: `herdr workspace focus` that ID, say where it went, stop.
 - `UNCLAIMED`: rename this workspace to `flock` if it holds nothing else, then sweep. Otherwise create one, tell the user to run `/flock` there, and stop. A pane keeps the workspace it launched in, so moving this one reads `ELSEWHERE` on the next load.
 
-The PR column reads `#N`, `draft#N`, `merged#N`, or `-`. A `merged#N` row is a checkout whose work has landed. The board carries no CI state and no review scores, so fetch those only for a row you are about to merge.
+The PR column reads `#N`, `draft#N`, `merged#N`, `-`, or `?`. A `merged#N` row is a checkout whose work has landed. The board carries no CI state and no review scores, so fetch those only for a row you are about to merge.
+
+The REPO column reads a bare name for a repository you own, and `owner/repo` for anything else, including a checkout whose pull requests target an upstream you forked. An owner in that column means the row is not yours to merge.
+
+FLAGS reads `clean` or a comma-joined list. Only `merged` clears a row for cleanup. Every other flag holds it: `dirty` and `unpushed:N` mark work in the tree, `carries:N` counts gitignored files that a recursive removal would take with it, `unreadable` and `unpushed:?` mark a state git would not report, `detached` marks a worktree on no branch, and `reused` marks a branch whose commits postdate the merge its name matched, so the `merged#N` beside it belongs to different work.
 
 An `incomplete:` line names a repo whose lookup failed. Retry it: `gh pr list` for a `?` PR column, `git worktree list` for absent rows. Dispose of nothing in a repo whose retry also fails.
 
@@ -58,7 +62,7 @@ The board is a snapshot, and herdr reuses pane IDs. Confirm a pane still holds t
 
 ## Merge Bar
 
-A PR merges only when all of these hold: required checks green, `mergeStateStatus` is `CLEAN`, no unresolved review threads, not a draft, and every bot reviewer that posted has cleared its bar (Greptile at 5/5, CodeRabbit with no blocking comments). A repo where no bot ran has no bot gate. A repo owned by anyone other than `bendrucker` is never merged.
+A PR merges only when all of these hold: required checks green, `mergeStateStatus` is `CLEAN`, no unresolved review threads, not a draft, and every bot reviewer that posted has cleared its bar (Greptile at 5/5, CodeRabbit with no blocking comments). A repo where no bot ran has no bot gate. A row whose REPO column carries an owner is never merged.
 
 Below the bar, the row is a report. Name the failing job, the reviewer's finding, or the conflicting file.
 
@@ -68,7 +72,7 @@ Check every row against the deferred keys first. A deferred row is held unless t
 
 Resolve the rest to one of three dispositions.
 
-**Clean up.** `merged#N` or the `merged` flag, tree clean, nothing unpushed. Remove the worktree, close its workspace and panes, prune the branch. Read `open_workspace_id` out of `herdr worktree list --json` before removing the path, because herdr loses the mapping once the worktree is gone.
+**Clean up.** `merged#N` or the `merged` flag, and no other flag on the row. Remove the worktree, close its workspace and panes, prune the branch. Read `open_workspace_id` out of `herdr worktree list --json` before removing the path, because herdr loses the mapping once the worktree is gone.
 
 **Merge.** Bar met, your repo. `gh pr merge --squash --delete-branch`, then clean up its worktree and workspace.
 
@@ -99,8 +103,8 @@ Between prompts, do nothing. `/loop 20m /flock` is how the user makes this proac
 A row the user says to leave alone is recorded by key, a worktree or a branch:
 
 ```bash
-bash ${CLAUDE_SKILL_DIR}/scripts/defer.sh redesign "still working it"
-bash ${CLAUDE_SKILL_DIR}/scripts/defer.sh --drop redesign
+bun ${CLAUDE_SKILL_DIR}/scripts/defer.ts redesign "still working it"
+bun ${CLAUDE_SKILL_DIR}/scripts/defer.ts --drop redesign
 ```
 
 The state block lists the keys and re-raises every entry older than 14 days. Record the reason in the user's own words. Drop the entry once the work lands.

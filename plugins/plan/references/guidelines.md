@@ -49,16 +49,9 @@ Defer naming to implementation when the deliverable is not the code itself (an i
 The implementing session reads the plan and nothing else. Write it accordingly:
 
 - Open with the non-negotiable conventions and a stop condition (implement, ship, end). Without one, the implementing session keeps working past the intended end.
-- Stamp the plan with the commit it was written against (`**Planned at**: commit <short SHA>, <date>`) and make the executor's first instruction a drift check: `git diff --stat <SHA>..HEAD -- <the plan's in-scope paths>`. The repo may have moved by the time the plan runs. When a listed path has changed, compare the plan's excerpts against the live code before executing, and treat a mismatch as an assumption stop.
 - Deferred design goes to a separate linked file the implementer is told not to open, with one pointer line in the plan.
 - Move supporting detail to `<plan>-<topic>.md` sidecar files the plan links. `decisions` is the common topic, for resolved decisions and research. Add topics (`research`, `api-notes`) as needed.
 - Plans over 10k characters are denied at presentation. Keep the plan file under that limit: move detail to sidecar files or split the scope.
-
-## Assumption Stops
-
-List the assumptions that, if wrong, mean the plan no longer describes the repo. An implementer that hits one reports back instead of improvising a change nobody approved.
-
-Each entry names something this plan's own reading could have gotten wrong: an excerpt that no longer matches, a call-site count that has changed, a fix that turns out to need a file the plan never listed, a decision resting on a premise the code could contradict. Each ends in a stop instruction. A condition that would read identically in any other plan ("if tests fail", "if something is unclear") does not belong in the list. Where a repeated verification failure is the risk here, name the verification and the attempt count that ends it. When nothing in the plan rests on an assumption that could be wrong, omit the section.
 
 ## Verification
 

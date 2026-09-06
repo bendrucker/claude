@@ -11,10 +11,6 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `docs/`: Reference material too long to auto-inject, linked from the rule that needs it
 - `.claude/`: Project-level configuration for this repository
 
-## Inventory
-
-Answer any repo-wide "which X exists" question with `bun run inventory [kind]` before globbing or grepping `plugins/`, `skills/`, `hooks/`, or `agents/`. Rows carry each asset's path and scope, so the listing is where a `Read` or a narrowed `grep` starts. `bun run inventory --help` covers the kinds and flags.
-
 ## User
 
 The [`user/`](user/) directory contains user-level Claude Code configuration that gets symlinked to `~/.claude`. This includes global instructions (`CLAUDE.md`), settings (plugins, permissions, sandbox), and hooks that apply across all projects. Symlinks and other system setup are managed by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles.

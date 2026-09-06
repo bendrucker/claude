@@ -4,7 +4,7 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR, including after committing changes.
 
-argument-hint: "[--draft] [--no-auto] [--base <ref>] [--label <name>]"
+argument-hint: "[--draft] [--no-auto] [--base <ref>] [--label <name>] [--no-review]"
 allowed-tools:
   - mcp__github
   - Agent
@@ -69,7 +69,8 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 - `--draft`: open the PR/MR as a draft. Default: ready for review.
 - `--no-auto`: skip auto-merge. Default: auto-merge on a repo you own, off on a third-party repo and off under `--draft`. See [`references/merge.md`](references/merge.md).
 - `--base <ref>`: parent branch to target. A branch whose parent is another topic branch is a stack layer. Only this flag or the user identifies one. The upstream ref tracks the branch's own remote copy, so it can't identify the parent. Default: the repo's default branch.
-- `--label <name>`: apply a label, repeatable. On a repo that gates its hosted review bot on a label, apply the label to request the review (see follow-up's `reviewers.md`). Confirm each label exists first, per [`references/labels.md`](references/labels.md). Default: none.
+- `--label <name>`: apply a label, repeatable. Confirm each label exists first, per [`references/labels.md`](references/labels.md). Default: none.
+- `--no-review`: don't request the hosted review. Default: on a repo that gates its hosted bot on a label, request it when the diff clears the metered-review gate and no local pass ran. See [`references/labels.md`](references/labels.md).
 
 ## Workflow
 
@@ -78,7 +79,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 1. Commit if there are no commits yet on the branch, using the same format as the PR title.
 1. Local bot review, gated: the Review bot line above reports repo config, CLI presence, and any cooldown. On a config hit with no cooldown, apply the gate in follow-up's SKILL.md to decide whether the diff needs a metered review. If it does, run `pull-request:follow-up --local` before pushing. With no config, decide from the hosted signals in follow-up's `local.md`. Skip when a local bot pass already ran on this branch this session (`/ship` runs one), the gate says skip, the provider is paused, detection finds nothing, or the user declines.
 1. Push the branch to remote: `git push -u origin HEAD`
-1. Resolve any `--label` values against the repo before creating (see [`references/labels.md`](references/labels.md)).
+1. Resolve the label set against the repo before creating: any `--label` values, plus the review label when the local bot review step's gate said the diff warrants a metered review and that pass didn't already spend the credit. See [`references/labels.md`](references/labels.md).
 1. Draft the body. Past a single paragraph, read [`references/sections.md`](references/sections.md) first: audience tiers, session content, density and heading rules, evidence, optional sections, slop to cut.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`

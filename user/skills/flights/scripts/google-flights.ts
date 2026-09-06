@@ -448,11 +448,13 @@ function renderGrid(cells: GridCell[]): string {
   const backs = [...new Set(cells.map((cell) => cell.back))];
   return table([
     [String.raw`out \ back`, ...backs.map((back) => back ?? "?")],
-    ...outs.map((out) =>
-      [out].concat(
-        backs.map((back) => money(cells.find((cell) => cell.out === out && cell.back === back))),
-      ),
-    ),
+    ...outs.map((out) => {
+      const row: string[] = [out];
+      row.push(
+        ...backs.map((back) => money(cells.find((cell) => cell.out === out && cell.back === back))),
+      );
+      return row;
+    }),
   ]);
 }
 

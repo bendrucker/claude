@@ -43,7 +43,7 @@ Keep each meaning in one place. A leading word is the deliberate exception: it r
 
 #### Cache
 
-The environment is a source of truth: `package.json` scripts, config files, the directory layout, `--help` output. A document restating it is a cache, and earns its place only when the lookup is expensive. The `herdr` skill states that `--help` enumerates every enum flag, which retires the flag tables that would otherwise sit beside it.
+The environment is a source of truth: `package.json` scripts, config files, the directory layout, `--help` output. A document restating it is a cache, and earns its place only when the lookup is expensive. The `herdr:herdr` skill states that `--help` enumerates every enum flag, which retires the flag tables that would otherwise sit beside it.
 
 Cache what the agent cannot find by looking: the unwritten convention, the reason behind a choice, the gotcha no config records. Leave one-file and one-command lookups to the environment.
 

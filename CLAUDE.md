@@ -57,12 +57,13 @@ Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/ev
 - `bun plugins/issue/evals/issue-refine/scripts/build-dataset.ts`, then `label/server.ts`, then `scripts/ab-report.ts` and `scripts/judge.ts`
 - `bun plugins/review/evals/review-voice/scripts/mine.ts`, then `label/server.ts`, then `scripts/report.ts`
 - `bun plugins/writing/evals/writing/scripts/mine.ts`, then `label/server.ts` (scorer and judge are not built yet)
+- `bun plugins/comments/evals/eval.ts build`, hand the printed `<preflight>` block to the Workflow tool, then `score --job <dir> --gate`. This is the comments judge's ship gate: it scores the labeled corpus through the workflow that ships, on subscription auth. `eval.ts --gate` scores the same corpus through the SDK oracle as a keyed cross-check
 
 `pull-request:create`, `pull-request:follow-up`, `review:follow-up`, and `writing:no-diary` each carry a `promptfooconfig.yaml` under their `evals/` dir: an in-repo promptfoo suite that loads the plugin and grades cases with `llm-rubric` asserts. Those four run manually; `eval.yml` wires only the pr-body suite into CI. [`evals/scripts/`](evals/scripts/) files promptfoo runs into the durable corpus and reports what they cost.
 
 Every promptfoo suite runs unkeyed against the logged-in Claude Code CLI, so leave `ANTHROPIC_API_KEY` unset for a local run. The provider hands its whole environment to the spawned CLI, where an API key overrides the subscription login and bills the run. `ANTHROPIC_GRADER_API_KEY` is the optional override that grades through the API instead. CI spends subscription credits too, via a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`.
 
-The older runners still read `ANTHROPIC_API_KEY` from the environment: the pr-body harness's `scripts/run-eval.ts` and `scripts/judge.ts`, `plugins/comments/evals/eval.ts --gate`, and `plugins/writing/skills/analyze` with `--judge`. [`evals/op.env`](evals/op.env) holds the 1Password secret reference, which `op run` resolves at run time, so no secret rests on disk. Reserve it for those runners, since injecting a key into a promptfoo run bills it:
+The older runners still read `ANTHROPIC_API_KEY` from the environment: the pr-body harness's `scripts/run-eval.ts` and `scripts/judge.ts`, `plugins/comments/evals/eval.ts --gate` (the oracle cross-check, not the gate itself), and `plugins/writing/skills/analyze` with `--judge`. [`evals/op.env`](evals/op.env) holds the 1Password secret reference, which `op run` resolves at run time, so no secret rests on disk. Reserve it for those runners, since injecting a key into a promptfoo run bills it:
 
 ```bash
 op run --env-file=evals/op.env -- bun plugins/pull-request/evals/pr-body/scripts/judge.ts <run-dir>

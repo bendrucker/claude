@@ -55,6 +55,20 @@ describe("store", () => {
       expect(readState(tmpDir)).rejects.toThrow("Invalid state file");
     });
 
+    test("keeps the parse failure as the cause when the file is not JSON", async () => {
+      const dir = join(tmpDir, "review-inbox");
+      mkdirSync(dir, { recursive: true });
+      await Bun.write(join(dir, "state.json"), "{ not json");
+
+      const thrown = await readState(tmpDir).catch((error: unknown) => error);
+
+      expect(thrown).toHaveProperty(
+        "message",
+        expect.stringContaining("Failed to parse state file"),
+      );
+      expect(thrown).toHaveProperty("cause", expect.any(SyntaxError));
+    });
+
     test("migrates the pre-background { reviews } schema to an empty dedup set", async () => {
       const dir = join(tmpDir, "review-inbox");
       mkdirSync(dir, { recursive: true });

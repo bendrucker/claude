@@ -9,7 +9,7 @@ Never query or poll reviewr. When the user hits Send, it injects the comment bat
 Each block takes this shape, ordered by file then line:
 
 ```fragment
-user/skills/herdr/SKILL.md:41-43
+plugins/herdr/skills/herdr/SKILL.md:41-43
 -old line
 +new line
 the reviewer's text, which may run to several lines

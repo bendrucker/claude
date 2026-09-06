@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join, relative } from "node:path";
 import type { CommandOptions, RunCommand } from "../command";
 import {
   collectRun,
@@ -12,7 +12,7 @@ import {
   type WorkflowRun,
 } from "../collect-ci-runs";
 
-const ARTIFACTS = path.join(import.meta.dirname, "artifacts");
+const ARTIFACTS = join(import.meta.dirname, "artifacts");
 
 function makeRun(overrides: Partial<WorkflowRun> = {}): WorkflowRun {
   return {
@@ -77,14 +77,14 @@ test("listCommand asks gh for the fields the selection reads", () => {
 test("discoverExports keeps promptfoo exports and skips other artifact files", async () => {
   const found = await discoverExports(ARTIFACTS);
 
-  expect(found.map((entry) => path.relative(ARTIFACTS, entry.path))).toEqual([
-    path.join("eval-output", "output.json"),
+  expect(found.map((entry) => relative(ARTIFACTS, entry.path))).toEqual([
+    join("eval-output", "output.json"),
   ]);
   expect(found[0]?.payload.evalId).toBe("eval-ci1-2026-08-27T06:15:00");
 });
 
 test("discoverExports tolerates a run that downloaded nothing", async () => {
-  expect(await discoverExports(path.join(ARTIFACTS, "missing"))).toEqual([]);
+  expect(await discoverExports(join(ARTIFACTS, "missing"))).toEqual([]);
 });
 
 interface Call {
@@ -93,9 +93,9 @@ interface Call {
 }
 
 const ARTIFACT_FILES = [
-  path.join("eval-output", "output.json"),
-  path.join("eval-output", "summary.txt"),
-  path.join("notes", "metadata.json"),
+  join("eval-output", "output.json"),
+  join("eval-output", "summary.txt"),
+  join("notes", "metadata.json"),
 ];
 
 /** Stands in for gh and promptfoo: unpacks the artifact tree where `--dir` points. */
@@ -106,7 +106,7 @@ function ciRunner(calls: Call[]): RunCommand {
     if (command[1] === "run" && target !== undefined) {
       await Promise.all(
         ARTIFACT_FILES.map((file) =>
-          Bun.write(path.join(target, file), Bun.file(path.join(ARTIFACTS, file))),
+          Bun.write(join(target, file), Bun.file(join(ARTIFACTS, file))),
         ),
       );
     }
@@ -116,15 +116,15 @@ function ciRunner(calls: Call[]): RunCommand {
 
 test("collectRun imports each downloaded export and files a copy", async () => {
   const calls: Call[] = [];
-  const dir = await mkdtemp(path.join(tmpdir(), "eval-ci-results-"));
+  const dir = await mkdtemp(join(tmpdir(), "eval-ci-results-"));
   try {
     const collected = await collectRun(42, { dir, suite: "pr-body", run: ciRunner(calls) });
 
-    expect(collected.map((file) => path.relative(dir, file))).toEqual([
-      path.join("pr-body", "2026-08-27-eval-ci1-2026-08-27T06-15-00.json"),
+    expect(collected.map((file) => relative(dir, file))).toEqual([
+      join("pr-body", "2026-08-27-eval-ci1-2026-08-27T06-15-00.json"),
     ]);
     expect(await Bun.file(collected[0] ?? "").json()).toEqual(
-      await Bun.file(path.join(ARTIFACTS, "eval-output", "output.json")).json(),
+      await Bun.file(join(ARTIFACTS, "eval-output", "output.json")).json(),
     );
   } finally {
     await rm(dir, { recursive: true, force: true });

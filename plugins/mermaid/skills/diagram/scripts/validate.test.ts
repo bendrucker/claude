@@ -56,9 +56,9 @@ flowchart LR
   ])("$name", ({ content, length, contains, line }) => {
     const blocks = extractMermaidBlocks(content);
     expect(blocks).toHaveLength(length);
-    contains?.forEach((substring, index) => {
+    for (const [index, substring] of contains?.entries() ?? []) {
       expect(blocks[index]?.content).toContain(substring);
-    });
+    }
     if (line !== undefined) expect(blocks[0]?.line).toBe(line);
   });
 });

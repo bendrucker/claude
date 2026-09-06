@@ -10,4 +10,6 @@ export const consoleIo: AuditIo = {
 };
 
 /** A failure the user can act on. The CLI prints the message alone and exits 1. */
-export class AuditError extends Error {}
+export class AuditError extends Error {
+  override readonly name = "AuditError";
+}

@@ -75,17 +75,21 @@ function* settingsEntries(file: string, hooks: HooksFile["hooks"]): Generator<Ma
  * repo's hook entries live in settings rather than a plugin, and a matcher
  * defect is equally silent in either.
  */
+function toArray<T>(items: Iterable<T>): T[] {
+  return [...items];
+}
+
 export async function allMatcherEntries(): Promise<MatcherEntryContext[]> {
   const [plugins, settings] = await Promise.all([
     loadPlugins(),
     Promise.all(
       SOURCES.map(async ({ file }) => {
         const parsed = await decodeFile(SettingsHooks, join(root, file));
-        return Array.from(settingsEntries(file, parsed.hooks ?? {}));
+        return toArray(settingsEntries(file, parsed.hooks ?? {}));
       }),
     ),
   ]);
-  return [...plugins.flatMap((plugin) => Array.from(matcherEntries(plugin))), ...settings.flat()];
+  return [...plugins.flatMap((plugin) => toArray(matcherEntries(plugin))), ...settings.flat()];
 }
 
 if (import.meta.main) {

@@ -4,9 +4,7 @@
 // Detection is unmodified. The message names the generic form that lets a
 // caller declare the shape at the call site instead of asserting after it.
 
-import { defineRule } from "@oxlint/plugins";
-
-import type { ESTree } from "@oxlint/plugins";
+import { defineRule, type ESTree } from "@oxlint/plugins";
 
 import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts";
 

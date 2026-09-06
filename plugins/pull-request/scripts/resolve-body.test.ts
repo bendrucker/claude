@@ -1,7 +1,7 @@
 import { describe, expect, it, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   type BodyPart,
   type BodySpec,
@@ -247,7 +247,7 @@ describe("extractBodySpec", () => {
   });
 });
 
-const REPO_ROOT = path.join(import.meta.dir, "..", "..", "..");
+const REPO_ROOT = join(import.meta.dir, "..", "..", "..");
 
 const SKILL_DOCS = [
   "plugins/pull-request/skills/create/SKILL.md",
@@ -281,7 +281,7 @@ function codeSnippets(markdown: string): string[] {
 const DOCUMENTED_FORMS: [string, string][] = (
   await Promise.all(
     SKILL_DOCS.map(async (doc) => {
-      const markdown = await Bun.file(path.join(REPO_ROOT, doc)).text();
+      const markdown = await Bun.file(join(REPO_ROOT, doc)).text();
       return codeSnippets(markdown)
         .filter((snippet) => DOCUMENTED_BODY_ARG.test(snippet))
         .map((snippet): [string, string] => [doc, snippet]);
@@ -299,7 +299,7 @@ describe("command forms the skills document", () => {
   });
 
   test.each(DOCUMENTED_FORMS)("%s: %s reaches the body", async (_doc, snippet) => {
-    const bodyPath = path.join(mkdtempSync(path.join(os.tmpdir(), "doc-form-")), "body.md");
+    const bodyPath = join(mkdtempSync(join(tmpdir(), "doc-form-")), "body.md");
     const body = "## Summary\n\nResolved through the form the skill documents.\n";
     await Bun.write(bodyPath, body);
     // Doc paths are placeholders (`tmp/pr-body-<branch>.md`, `file.md`).
@@ -333,14 +333,14 @@ describe("extractTitle", () => {
 describe("effectiveCwd", () => {
   test.each<[string, string]>([
     ["gh pr create --body-file body.md", "/repo"],
-    ["cd sub && gh pr create --body-file body.md", path.join("/repo", "sub")],
+    ["cd sub && gh pr create --body-file body.md", join("/repo", "sub")],
     ["cd /abs && gh pr create --body-file body.md", "/abs"],
-    ["cd a && cd b && gh pr create --body-file body.md", path.join("/repo", "a", "b")],
+    ["cd a && cd b && gh pr create --body-file body.md", join("/repo", "a", "b")],
     ["gh pr create --body-file body.md && cd sub", "/repo"],
     ['cd "$DIR" && gh pr create --body-file body.md', "/repo"],
     ["cd - && gh pr create --body-file body.md", "/repo"],
     // The || fallback only runs when the first cd failed.
-    ["cd a || cd b && gh pr create --body-file body.md", path.join("/repo", "a")],
+    ["cd a || cd b && gh pr create --body-file body.md", join("/repo", "a")],
     // `~user` needs a passwd lookup the hook does not do.
     ["cd ~nobody && gh pr create --body-file body.md", "/repo"],
   ])("effectiveCwd(%p) -> %p", (command, expected) => {

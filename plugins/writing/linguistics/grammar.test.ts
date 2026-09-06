@@ -152,9 +152,7 @@ describe("isNounPhrase", () => {
     },
   ];
 
-  for (const { description, tokens, want } of cases) {
-    it(description, () => {
-      expect(isNounPhrase(tokens)).toBe(want);
-    });
-  }
+  it.each(cases)("$description", ({ tokens, want }) => {
+    expect(isNounPhrase(tokens)).toBe(want);
+  });
 });

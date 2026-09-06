@@ -2,22 +2,22 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join } from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
 import { getDb } from "./db";
 
-const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
-const refreshScript = path.join(import.meta.dirname, "refresh.ts");
+const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
+const refreshScript = join(import.meta.dirname, "refresh.ts");
 
 let tmpDir: string;
 let dataDir: string;
 let corpusDir: string;
 
 beforeEach(async () => {
-  tmpDir = mkdtempSync(path.join(tmpdir(), "refresh-integration-"));
-  dataDir = path.join(tmpDir, "data");
-  corpusDir = path.join(tmpDir, "projects");
+  tmpDir = mkdtempSync(join(tmpdir(), "refresh-integration-"));
+  dataDir = join(tmpDir, "data");
+  corpusDir = join(tmpDir, "projects");
   mkdirSync(corpusDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
   await $`cp -R ${fixturesDir}/. ${corpusDir}`.quiet();
@@ -32,7 +32,7 @@ function env() {
     ...process.env,
     CLAUDE_PLUGIN_DATA: dataDir,
     CLAUDE_PROJECTS_DIR: corpusDir,
-    CLAUDE_SESSION_IMPORTS_DIR: path.join(tmpDir, "imports"),
+    CLAUDE_SESSION_IMPORTS_DIR: join(tmpDir, "imports"),
   };
 }
 
@@ -61,15 +61,15 @@ async function countRows(): Promise<number> {
 }
 
 async function touchCorpusFile(rel: string): Promise<void> {
-  await $`touch ${path.join(corpusDir, rel)}`.quiet();
+  await $`touch ${join(corpusDir, rel)}`.quiet();
 }
 
 describe("refresh.ts", () => {
   it("prints the database path to stdout and writes a freshness stamp", async () => {
     const { stdout, exitCode } = await run();
     expect(exitCode).toBe(0);
-    expect(stdout.trim()).toBe(path.join(dataDir, "session.duckdb"));
-    expect(await Bun.file(path.join(dataDir, "last-refresh")).exists()).toBe(true);
+    expect(stdout.trim()).toBe(join(dataDir, "session.duckdb"));
+    expect(await Bun.file(join(dataDir, "last-refresh")).exists()).toBe(true);
   });
 
   it("is idempotent across repeated runs", async () => {
@@ -84,7 +84,7 @@ describe("refresh.ts", () => {
     const before = await countRows();
 
     await Bun.write(
-      path.join(corpusDir, "-Users-test-project", "extra.jsonl"),
+      join(corpusDir, "-Users-test-project", "extra.jsonl"),
       `${JSON.stringify({
         type: "user",
         sessionId: "extra-session",
@@ -107,7 +107,7 @@ describe("refresh.ts", () => {
     await run();
     const before = await countRows();
     await Bun.write(
-      path.join(corpusDir, "-Users-test-project", "extra.jsonl"),
+      join(corpusDir, "-Users-test-project", "extra.jsonl"),
       `${JSON.stringify({
         type: "user",
         sessionId: "extra-session",
@@ -122,12 +122,12 @@ describe("refresh.ts", () => {
 
   it("bounds file growth across repeated reimports of the same corpus", async () => {
     await run();
-    const dbPath = path.join(dataDir, "session.duckdb");
+    const dbPath = join(dataDir, "session.duckdb");
     const initial = Bun.file(dbPath).size;
 
     for (let i = 0; i < 5; i++) {
       // oxlint-disable-next-line no-await-in-loop -- the test measures growth across repeated reimports, so each cycle must follow the last.
-      await touchCorpusFile(path.join("-Users-test-project", "basic.jsonl"));
+      await touchCorpusFile(join("-Users-test-project", "basic.jsonl"));
       // oxlint-disable-next-line no-await-in-loop -- the test measures growth across repeated reimports, so each cycle must follow the last.
       const { exitCode } = await run("--refresh");
       expect(exitCode).toBe(0);

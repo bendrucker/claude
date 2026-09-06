@@ -17,7 +17,7 @@
  * be quoted freely.
  */
 import { mkdirSync, readdirSync } from "node:fs";
-import * as path from "node:path";
+import { join, resolve } from "node:path";
 import { cli } from "cleye";
 import type { Heading, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
@@ -116,7 +116,7 @@ export function evaluateClassifiers(
     }
     verdicts.set(heading, row);
     const base = row.get(baseline.name);
-    if (Array.from(row.values()).some((flagged) => flagged !== base)) {
+    if ([...row.values()].some((flagged) => flagged !== base)) {
       disagreements.push(heading);
     }
   }
@@ -300,7 +300,7 @@ async function corpusFromDocs(dir: string): Promise<{ session_id: string; text: 
   return Promise.all(
     files.map(async (name) => ({
       session_id: name,
-      text: await Bun.file(path.join(dir, name)).text(),
+      text: await Bun.file(join(dir, name)).text(),
     })),
   );
 }
@@ -311,7 +311,7 @@ async function corpusFromSessionDb(
 ): Promise<DeliverableRow[]> {
   const sessionId = process.env.CLAUDE_SESSION_ID ?? "anonymous";
   const tmp = process.env.TMPDIR;
-  const isolatedPath = path.join(
+  const isolatedPath = join(
     tmp != null && tmp !== "" ? tmp : "/tmp",
     `headings-eval-${sessionId}.duckdb`,
   );
@@ -384,11 +384,11 @@ async function main(): Promise<void> {
   let rows: { session_id: string; text?: string }[];
   let source: string;
   if (argv.flags.docs != null && argv.flags.docs !== "") {
-    const dir = path.resolve(argv.flags.docs);
+    const dir = resolve(argv.flags.docs);
     rows = await corpusFromDocs(dir);
     source = dir;
   } else if (argv.flags.sessionDb != null && argv.flags.sessionDb !== "") {
-    rows = await corpusFromSessionDb(path.resolve(argv.flags.sessionDb), {
+    rows = await corpusFromSessionDb(resolve(argv.flags.sessionDb), {
       after_date: since,
       before_date: until,
       project: argv.flags.project ?? null,
@@ -403,7 +403,7 @@ async function main(): Promise<void> {
   console.error(`${rows.length} corpus rows, ${headings.length} unique headings`);
 
   mkdirSync(argv.flags.out, { recursive: true });
-  const corpusPath = path.join(argv.flags.out, "headings-corpus.tsv");
+  const corpusPath = join(argv.flags.out, "headings-corpus.tsv");
   await Bun.write(
     corpusPath,
     `# heading\toccurrences\tsessions\n${headings
@@ -435,7 +435,7 @@ async function main(): Promise<void> {
       argv.flags.sample,
       argv.flags.disagreementCap,
     );
-    const labelsPath = path.join(argv.flags.out, "heading-labels.tsv");
+    const labelsPath = join(argv.flags.out, "heading-labels.tsv");
     await Bun.write(
       labelsPath,
       `# heading\tlabel\tsource\n# label one of: ${LABELS.join(", ")}\n${sample

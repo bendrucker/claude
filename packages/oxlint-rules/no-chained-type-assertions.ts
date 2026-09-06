@@ -4,8 +4,7 @@
 // Detection is unmodified. The message points at the guidance in
 // user/rules/typescript.md rather than anti-slop's phrasing.
 
-import { defineRule } from "@oxlint/plugins";
-import type { ESTree } from "@oxlint/plugins";
+import { defineRule, type ESTree } from "@oxlint/plugins";
 
 type TypeAssertionExpression = ESTree.TSAsExpression | ESTree.TSTypeAssertion;
 

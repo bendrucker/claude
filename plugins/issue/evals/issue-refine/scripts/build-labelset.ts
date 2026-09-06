@@ -75,4 +75,4 @@ const missing: string[] = loaded.filter((entry) => !entry.sample).map((entry) =>
 
 await Bun.write(argv.flags.output, JSON.stringify(samples, null, 2));
 console.log(`wrote ${samples.length} samples to ${argv.flags.output}`);
-if (missing.length !== 0) console.log(`missing output for: ${missing.join(", ")}`);
+if (missing.length > 0) console.log(`missing output for: ${missing.join(", ")}`);

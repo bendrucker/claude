@@ -94,7 +94,7 @@ function applyTransform(parent: Transform, child: Transform): Transform {
 }
 
 function getElementChildren(el: XmlElement): XmlElement[] {
-  return Array.from(el.childNodes).filter((n): n is XmlElement => n.nodeType === 1);
+  return [...el.childNodes].filter((n): n is XmlElement => n.nodeType === 1);
 }
 
 function getElementId(el: XmlElement, index: number): string {

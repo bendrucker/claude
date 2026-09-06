@@ -5,7 +5,7 @@
 import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join, resolve } from "node:path";
 import { cli } from "cleye";
 import {
   compactDatabase,
@@ -37,7 +37,7 @@ const argv = cli({
 
 const dataDir = getDataDir();
 const dbPath = sessionDbPath(dataDir);
-const stampPath = path.join(dataDir, "last-refresh");
+const stampPath = join(dataDir, "last-refresh");
 
 // Earlier versions kept the index in TMPDIR. Those copies are stale derived
 // caches that silently diverge from the real one. Swept only when running
@@ -45,18 +45,18 @@ const stampPath = path.join(dataDir, "last-refresh");
 // test or dev run, which must not delete machine-wide state.
 async function cleanupStrayDatabases(): Promise<void> {
   if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "") return;
-  const strayDirs = new Set([path.join(tmpdir(), "claude-session"), "/tmp/claude-session"]);
+  const strayDirs = new Set([join(tmpdir(), "claude-session"), "/tmp/claude-session"]);
   for (const dir of strayDirs) {
-    if (path.resolve(dir) === path.resolve(dataDir)) continue;
+    if (resolve(dir) === resolve(dataDir)) continue;
     // oxlint-disable-next-line no-await-in-loop -- two known stray directories; concurrency buys nothing.
     if (!(await Bun.file(sessionDbPath(dir)).exists())) continue;
     try {
       // oxlint-disable-next-line no-await-in-loop -- two known stray directories; concurrency buys nothing.
       await rm(dir, { recursive: true, force: true });
       console.error(`refresh: removed stale index at ${dir}`);
-    } catch (err) {
+    } catch (error) {
       console.error(
-        `refresh: could not remove stale index at ${dir}: ${err instanceof Error ? err.message : String(err)}`,
+        `refresh: could not remove stale index at ${dir}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -76,11 +76,11 @@ async function openWithRetry(): Promise<Database | null> {
     try {
       // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one hit the write lock.
       return await getDb(dataDir);
-    } catch (err) {
-      if (!/lock/i.test(String(err)) || attempt >= 3) {
+    } catch (error) {
+      if (!/lock/i.test(String(error)) || attempt >= 3) {
         // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one hit the write lock.
-        if ((await Bun.file(dbPath).exists()) && /lock/i.test(String(err))) return null;
-        throw err;
+        if ((await Bun.file(dbPath).exists()) && /lock/i.test(String(error))) return null;
+        throw error;
       }
     }
     // oxlint-disable-next-line no-await-in-loop -- backoff between lock retries.

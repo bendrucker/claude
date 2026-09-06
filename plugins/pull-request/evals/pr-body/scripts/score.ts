@@ -13,21 +13,19 @@ import {
   hasClauseStacking,
   MAX_SENTENCES_PER_PARAGRAPH,
   NARRATION_TELLS,
-  type NarrationTell,
   narrationTellSource,
   proseParagraphs,
   RUN_ON_CHARS,
   splitSentences,
   TITLE_LENGTH_LIMIT,
 } from "../../../scripts/prose";
+export { type NarrationTell } from "../../../scripts/prose";
 import { classifyPrHeading } from "../classifier";
 
 // Deterministic metrics for one generated PR body. Everything here is
 // mechanical: the LLM judge scores the rest. The thresholds, splitters, and
 // wordlists come from the hook that enforces them, so the scorer and the hook
 // measure the same thing.
-
-export type { NarrationTell };
 
 export interface SentenceHeading {
   text: string;

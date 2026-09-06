@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import * as path from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 import { getDataDir, sessionDbPath } from "./db";
 import { cliAdapter, runQuery } from "./query";
@@ -19,7 +19,7 @@ export const SURFACES = [
   "tool_errors",
 ] as const;
 
-export const FALLBACK_PATH = path.join(import.meta.dirname, "..", "resources", "schema-map.txt");
+export const FALLBACK_PATH = join(import.meta.dirname, "..", "resources", "schema-map.txt");
 
 const COLUMN_QUERY = `
 SELECT table_name, list(column_name ORDER BY ordinal_position) AS cols

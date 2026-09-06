@@ -69,7 +69,9 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
           existChecks.push(fileExists(filePath).then((exists) => ({ path: filePath, exists })));
         }
       }
-    } catch {}
+    } catch {
+      // must never break the hook: skip a transcript line that fails to decode
+    }
   }
 
   const results = await Promise.all(existChecks);

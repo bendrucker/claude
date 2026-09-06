@@ -54,5 +54,5 @@ export function mergeDocuments(
   for (const doc of incoming) {
     if (!bySource.has(doc.source)) bySource.set(doc.source, doc);
   }
-  return Array.from(bySource.values());
+  return [...bySource.values()];
 }

@@ -36,7 +36,7 @@ export function terminalReport(reports: FileCoverage[]): string {
     details.push(`${color(31, fc.file)}: ${uncovered.join(", ")}`);
   }
 
-  return details.length !== 0
+  return details.length > 0
     ? `${summary}\nUncovered lines:\n${details.join("\n")}`
     : summary.trimEnd();
 }
@@ -55,7 +55,7 @@ function markdownTable(reports: FileCoverage[]): string {
 // per-line annotations, which read as defect-grade warnings and hit GitHub's
 // ~10-per-level render cap. Per-line detail lives in the local hook and skill.
 export function githubReport(reports: FileCoverage[]): string {
-  return reports.length !== 0
+  return reports.length > 0
     ? `## Coverage\n\n${markdownTable(reports)}`
     : "## Coverage\n\nNo coverage data.";
 }

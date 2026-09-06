@@ -151,9 +151,9 @@ while (added && selected.length < argv.flags.limit) {
   }
 }
 
-selected.forEach((s, i) => {
+for (const [i, s] of selected.entries()) {
   s.id = `sample-${String(i + 1).padStart(2, "0")}`;
-});
+}
 
 await Bun.write(argv.flags.out, JSON.stringify(selected, null, 2));
 

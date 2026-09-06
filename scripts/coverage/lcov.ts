@@ -125,7 +125,7 @@ export function formatLcov(reports: FileCoverage[]): string {
     lines.push(`LF:${fc.lineHits.size}`, `LH:${covered}`, "end_of_record");
     blocks.push(lines.join("\n"));
   }
-  return blocks.length !== 0 ? `${blocks.join("\n")}\n` : "";
+  return blocks.length > 0 ? `${blocks.join("\n")}\n` : "";
 }
 
 // Collapse sorted line numbers into human-readable ranges: [1,2,3,5,8,9] -> "1-3, 5, 8-9".

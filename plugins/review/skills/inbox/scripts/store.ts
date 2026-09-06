@@ -46,8 +46,8 @@ export async function readState(dataDir?: string): Promise<InboxState> {
   let data: unknown;
   try {
     data = await file.json();
-  } catch (cause) {
-    throw new Error(`Failed to parse state file: ${file.name}`, { cause });
+  } catch (error) {
+    throw new Error(`Failed to parse state file: ${file.name}`, { cause: error });
   }
   const state = InboxState.safeParse(data);
   if (state.success) return state.data;

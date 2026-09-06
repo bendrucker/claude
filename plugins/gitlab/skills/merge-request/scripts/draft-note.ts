@@ -248,9 +248,9 @@ const reviewCmd = command(
         // oxlint-disable-next-line no-await-in-loop -- one API POST per note; the created/failed tally and its error lines follow entry order.
         await glabApiPost(apiPath(mr), payload);
         created++;
-      } catch (err) {
+      } catch (error) {
         console.error(
-          `Failed: ${entry.file ?? "general"}: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed: ${entry.file ?? "general"}: ${error instanceof Error ? error.message : String(error)}`,
         );
         failed++;
       }

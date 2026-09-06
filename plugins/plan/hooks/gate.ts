@@ -188,7 +188,7 @@ export async function processInput(
 
   const currentLines = normalizeLines(plan);
   const previousLinesRaw = await readState(linesPath);
-  await writeState(linesPath, JSON.stringify(Array.from(currentLines)));
+  await writeState(linesPath, JSON.stringify([...currentLines]));
 
   if (previous !== null && previous === hash) {
     return formatDecision(DENY_REASON);

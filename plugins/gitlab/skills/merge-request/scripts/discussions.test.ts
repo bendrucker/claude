@@ -1,8 +1,9 @@
 import { describe, expect, it, test } from "bun:test";
-import type { DiscussionSummary, FilterOptions } from "./discussions";
 import {
-  deduplicateDiscussions,
   Discussion,
+  type DiscussionSummary,
+  type FilterOptions,
+  deduplicateDiscussions,
   filterDiscussions,
   formatDigest,
   formatLocation,

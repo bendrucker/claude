@@ -19,7 +19,7 @@ export interface ValidationTarget {
 
 export async function runValidation(target: ValidationTarget): Promise<void> {
   let ajv: Ajv | undefined;
-  if (target.extraSchemas != null && target.extraSchemas.length !== 0) {
+  if (target.extraSchemas != null && target.extraSchemas.length > 0) {
     ajv = createValidator();
     const extras = await Promise.all(
       target.extraSchemas.map(async (extra) => ({
@@ -65,8 +65,8 @@ export function pluginDirFile(usage: string, file: string): string {
 }
 
 export function runEntry(run: () => Promise<void>): void {
-  run().catch((err) => {
-    console.error(err);
+  run().catch((error) => {
+    console.error(error);
     process.exit(1);
   });
 }

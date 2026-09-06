@@ -1,4 +1,4 @@
-import * as path from "node:path";
+import { join } from "node:path";
 import { countLines } from "../parse";
 import type { ReferenceResult, RuleResult } from "../types";
 import { codeSpans, lineAt } from "./markdown";
@@ -15,7 +15,7 @@ const PLACEHOLDERS = new Map([
 
 // \b after the name keeps $CLAUDE_SKILL_DIRECTORY from matching CLAUDE_SKILL_DIR.
 const SUBSTITUTION_PATTERN = new RegExp(
-  `\\$\\{?(${Array.from(PLACEHOLDERS.keys()).join("|")})\\b\\}?`,
+  `\\$\\{?(${[...PLACEHOLDERS.keys()].join("|")})\\b\\}?`,
   "g",
 );
 
@@ -28,7 +28,7 @@ export function findReferences(body: string): string[] {
     if (ref != null && ref !== "") refs.add(ref);
   }
 
-  return Array.from(refs);
+  return [...refs];
 }
 
 export function getDepth(refPath: string): number {
@@ -73,7 +73,7 @@ export function substitutionResults(content: string, refPath: string): RuleResul
 }
 
 export async function lintReference(skillDir: string, refPath: string): Promise<ReferenceResult> {
-  const fullPath = path.join(skillDir, refPath);
+  const fullPath = join(skillDir, refPath);
   const results: RuleResult[] = [];
   let lines = 0;
   const depth = getDepth(refPath);

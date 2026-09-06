@@ -1,8 +1,8 @@
-import * as path from "node:path";
+import { join } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { z } from "zod";
 
-const QUERIES_DIR = path.join(import.meta.dirname, "..", "resources", "queries");
+const QUERIES_DIR = join(import.meta.dirname, "..", "resources", "queries");
 
 export interface Database {
   run(sql: string): Promise<void>;
@@ -70,15 +70,15 @@ export async function openSessionDb(dbPath: string): Promise<Database> {
     close() {
       try {
         connection.closeSync();
-      } catch (err) {
-        console.error("Failed to close DuckDB connection:", err);
+      } catch (error) {
+        console.error("Failed to close DuckDB connection:", error);
       }
     },
   };
 }
 
 async function readSql(name: string): Promise<string> {
-  return Bun.file(path.join(QUERIES_DIR, `${name}.sql`)).text();
+  return Bun.file(join(QUERIES_DIR, `${name}.sql`)).text();
 }
 
 function narrowBigints(row: Record<string, unknown>): Record<string, unknown> {

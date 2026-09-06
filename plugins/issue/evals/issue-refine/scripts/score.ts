@@ -138,7 +138,7 @@ for (const h of headings) {
   const lowerMajor = major
     .filter((w, i) => !SMALL_WORDS.has(w.toLowerCase()) || i === 0)
     .filter((w) => /^[a-z]/.test(w));
-  if (lowerMajor.length !== 0)
+  if (lowerMajor.length > 0)
     add(
       1,
       "minor",
@@ -150,7 +150,7 @@ for (const h of headings) {
 
 // Finding 2: native links for issue/PR references; no bare numbers or raw URLs.
 const linkTargets = new Set([...body.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1]));
-lines.forEach((l, i) => {
+for (const [i, l] of lines.entries()) {
   const noLinks = l.replaceAll(/\[[^\]]*\]\([^)]*\)/g, "").replaceAll(/`[^`]*`/g, "");
   for (const m of noLinks.matchAll(/\b[A-Z]{2,}-\d+\b/g))
     add(2, "critical", i + 1, m[0], "Bare tracker reference. Use a link that expands inline.");
@@ -166,7 +166,7 @@ lines.forEach((l, i) => {
     if (!linkTargets.has(m[0]))
       add(2, "minor", i + 1, m[0], "Raw URL pasted as text. Use a titled link or native relation.");
   }
-});
+}
 const relatedHeading = headings.find((h) => /related issues/i.test(h.text));
 if (relatedHeading)
   add(
@@ -178,7 +178,7 @@ if (relatedHeading)
   );
 
 // Finding 3: no volatile line-number citations.
-lines.forEach((l, i) => {
+for (const [i, l] of lines.entries()) {
   for (const m of l.matchAll(/#L\d+(?:-L?\d+)?/g))
     add(
       3,
@@ -195,17 +195,17 @@ lines.forEach((l, i) => {
       m[0],
       "Volatile file:line citation. Cite the symbol and quote the lines inline.",
     );
-});
+}
 
 // Finding 4: jargon and marketing words.
-lines.forEach((l, i) => {
+for (const [i, l] of lines.entries()) {
   const lower = l.toLowerCase();
   for (const w of [...JARGON, ...MARKETING]) {
     const re = new RegExp(`\\b${w}\\b`, "i");
     if (re.test(lower))
       add(4, "minor", i + 1, w, `Jargon/marketing word "${w}". Use a plainer word.`);
   }
-});
+}
 
 // Finding 5: over-structuring (heading density, thin option menus, filler heads).
 const bodyWords = body.split(/\s+/).filter(Boolean).length;

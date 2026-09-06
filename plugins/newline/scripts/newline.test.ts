@@ -54,7 +54,9 @@ beforeEach(async () => {
 afterEach(async () => {
   try {
     await rm(testDir, { recursive: true, force: true });
-  } catch {}
+  } catch {
+    // test cleanup: a failed removal shouldn't fail the test
+  }
   await clearAllState();
 });
 

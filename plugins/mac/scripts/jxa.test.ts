@@ -1,7 +1,12 @@
 import { describe, expect, it, test } from "bun:test";
 import { join } from "node:path";
-import type { RunResult } from "./jxa";
-import { isRetriableAppleEventsError, parseArgv, runWithRetry, validateAppScope } from "./jxa";
+import {
+  type RunResult,
+  isRetriableAppleEventsError,
+  parseArgv,
+  runWithRetry,
+  validateAppScope,
+} from "./jxa";
 
 interface ScopeResult {
   valid: boolean;

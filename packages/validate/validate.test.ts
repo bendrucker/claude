@@ -82,28 +82,26 @@ describe("validateFile", () => {
     },
   ];
 
-  for (const fixture of fixtures) {
-    it(fixture.name, async () => {
-      const file = join(tempDir, `${fixture.name.replaceAll(/\s+/g, "-")}.json`);
-      await Bun.write(file, JSON.stringify(fixture.data));
+  it.each(fixtures)("$name", async (fixture) => {
+    const file = join(tempDir, `${fixture.name.replaceAll(/\s+/g, "-")}.json`);
+    await Bun.write(file, JSON.stringify(fixture.data));
 
-      const result = await validateFile(
-        file,
-        schemaPath,
-        fixture.warnAdditional ? { warnAdditional: true } : undefined,
-      );
+    const result = await validateFile(
+      file,
+      schemaPath,
+      fixture.warnAdditional ? { warnAdditional: true } : undefined,
+    );
 
-      expect(result.errors).toHaveLength(fixture.errors.length);
-      for (const [i, pattern] of fixture.errors.entries()) {
-        expect(result.errors[i]).toContain(pattern);
-      }
+    expect(result.errors).toHaveLength(fixture.errors.length);
+    for (const [i, pattern] of fixture.errors.entries()) {
+      expect(result.errors[i]).toContain(pattern);
+    }
 
-      expect(result.warnings).toHaveLength(fixture.warnings.length);
-      for (const [i, pattern] of fixture.warnings.entries()) {
-        expect(result.warnings[i]).toContain(pattern);
-      }
-    });
-  }
+    expect(result.warnings).toHaveLength(fixture.warnings.length);
+    for (const [i, pattern] of fixture.warnings.entries()) {
+      expect(result.warnings[i]).toContain(pattern);
+    }
+  });
 });
 
 describe("formatError", () => {
@@ -137,24 +135,22 @@ describe("formatError", () => {
     },
   ];
 
-  for (const fixture of fixtures) {
-    it(fixture.name, () => {
-      // isCI() reads both CI and GITHUB_ACTIONS; control both so the ambient
-      // CI environment (GITHUB_ACTIONS=true on Actions) cannot leak in.
-      const original = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
-      process.env.CI = fixture.ci ? "true" : "";
-      process.env.GITHUB_ACTIONS = fixture.ci ? "true" : "";
+  it.each(fixtures)("$name", (fixture) => {
+    // isCI() reads both CI and GITHUB_ACTIONS; control both so the ambient
+    // CI environment (GITHUB_ACTIONS=true on Actions) cannot leak in.
+    const original = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
+    process.env.CI = fixture.ci ? "true" : "";
+    process.env.GITHUB_ACTIONS = fixture.ci ? "true" : "";
 
-      try {
-        const result = formatError(fixture.file, fixture.error);
-        expect(result).toBe(fixture.expected);
-      } finally {
-        for (const key of ["CI", "GITHUB_ACTIONS"] as const) {
-          const value = original[key];
-          if (value === undefined) delete process.env[key];
-          else process.env[key] = value;
-        }
+    try {
+      const result = formatError(fixture.file, fixture.error);
+      expect(result).toBe(fixture.expected);
+    } finally {
+      for (const key of ["CI", "GITHUB_ACTIONS"] as const) {
+        const value = original[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
       }
-    });
-  }
+    }
+  });
 });

@@ -1,13 +1,13 @@
 import { readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import * as path from "node:path";
+import { join, sep } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
 import { nodeAdapter, runQuery as runOnAdapter } from "./query";
 
-const RESOURCES_DIR = path.join(import.meta.dirname, "..", "resources");
-const SCHEMA_DIR = path.join(RESOURCES_DIR, "schema");
+const RESOURCES_DIR = join(import.meta.dirname, "..", "resources");
+const SCHEMA_DIR = join(RESOURCES_DIR, "schema");
 
 export const LOCAL_HOST = "local";
 
@@ -67,20 +67,20 @@ async function createDatabase(dbPath: string): Promise<Database> {
     close() {
       try {
         connection.closeSync();
-      } catch (err) {
-        console.error("Failed to close DuckDB connection:", err);
+      } catch (error) {
+        console.error("Failed to close DuckDB connection:", error);
       }
       try {
         instance.closeSync();
-      } catch (err) {
-        console.error("Failed to close DuckDB instance:", err);
+      } catch (error) {
+        console.error("Failed to close DuckDB instance:", error);
       }
     },
   };
 }
 
 async function readSql(dir: string, name: string): Promise<string> {
-  return Bun.file(path.join(dir, `${name}.sql`)).text();
+  return Bun.file(join(dir, `${name}.sql`)).text();
 }
 
 function getLocalRoot(projectsDir?: string): string {
@@ -90,7 +90,7 @@ function getLocalRoot(projectsDir?: string): string {
   if (process.env.HOME == null || process.env.HOME === "") {
     throw new Error("Cannot locate projects directory: set CLAUDE_PROJECTS_DIR or HOME");
   }
-  return path.join(process.env.HOME, ".claude", "projects");
+  return join(process.env.HOME, ".claude", "projects");
 }
 
 export function getImportsDir(importsDir?: string): string {
@@ -100,11 +100,11 @@ export function getImportsDir(importsDir?: string): string {
   if (process.env.HOME == null || process.env.HOME === "") {
     throw new Error("Cannot locate imports directory: set CLAUDE_SESSION_IMPORTS_DIR or HOME");
   }
-  return path.join(process.env.HOME, ".claude", "session-imports");
+  return join(process.env.HOME, ".claude", "session-imports");
 }
 
 export function importRoot(label: string, importsDir?: string): string {
-  return path.join(getImportsDir(importsDir), label);
+  return join(getImportsDir(importsDir), label);
 }
 
 // The ${CLAUDE_PLUGIN_DATA} template expands only in skill text and hook/MCP
@@ -116,13 +116,13 @@ export function getDataDir(): string {
   if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "")
     return process.env.CLAUDE_PLUGIN_DATA;
 
-  const segments = import.meta.dirname.split(path.sep);
+  const segments = import.meta.dirname.split(sep);
   const cacheIdx = segments.lastIndexOf("cache");
   if (cacheIdx > 0 && segments[cacheIdx - 1] === "plugins" && segments.length > cacheIdx + 2) {
     const marketplace = segments[cacheIdx + 1];
     const plugin = segments[cacheIdx + 2];
-    const pluginsDir = segments.slice(0, cacheIdx).join(path.sep);
-    return path.join(pluginsDir, "data", `${plugin}-${marketplace}`);
+    const pluginsDir = segments.slice(0, cacheIdx).join(sep);
+    return join(pluginsDir, "data", `${plugin}-${marketplace}`);
   }
 
   throw new Error(
@@ -131,7 +131,7 @@ export function getDataDir(): string {
 }
 
 export function sessionDbPath(dataDir: string): string {
-  return path.join(dataDir, "session.duckdb");
+  return join(dataDir, "session.duckdb");
 }
 
 export function dirExists(target: string): boolean {
@@ -164,8 +164,8 @@ export async function listImportedHosts(importsDir?: string): Promise<ImportedHo
     readDirEntries(root)
       .filter((entry) => entry.isDirectory())
       .map(async (entry) => {
-        const hostRoot = path.join(root, entry.name);
-        const manifestPath = path.join(hostRoot, "manifest.json");
+        const hostRoot = join(root, entry.name);
+        const manifestPath = join(hostRoot, "manifest.json");
         try {
           return {
             label: entry.name,
@@ -194,7 +194,7 @@ export async function enumerateHosts(
     // key on it); the manifest's host field is informational and may be hand-edited.
     hosts.push({
       host: imported.label,
-      root: path.join(imported.root, "projects"),
+      root: join(imported.root, "projects"),
       policy: imported.manifest.policy,
     });
   }
@@ -216,7 +216,7 @@ export function scanJsonlFiles(root: string): ScannedFile[] {
   const files: ScannedFile[] = [];
   for (const entry of readdirSync(root, { withFileTypes: true, recursive: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
-    const full = path.join(entry.parentPath, entry.name);
+    const full = join(entry.parentPath, entry.name);
     const file = Bun.file(full);
     files.push({ path: full, mtime: Math.trunc(file.lastModified), size: file.size });
   }
@@ -229,7 +229,7 @@ async function applySchema(db: Database): Promise<void> {
     .toSorted();
   for (const file of files) {
     // oxlint-disable-next-line no-await-in-loop -- schema files apply in sorted order; later DDL depends on tables earlier DDL created.
-    const sql = await Bun.file(path.join(SCHEMA_DIR, file)).text();
+    const sql = await Bun.file(join(SCHEMA_DIR, file)).text();
     // oxlint-disable-next-line no-await-in-loop -- schema files apply in sorted order; later DDL depends on tables earlier DDL created.
     await db.run(sql);
   }

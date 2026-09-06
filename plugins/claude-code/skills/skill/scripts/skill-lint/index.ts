@@ -1,10 +1,10 @@
-import * as path from "node:path";
+import { join } from "node:path";
 import { estimateTokens, parseSkill } from "./parse";
 import { allRules, findReferences, lintReference } from "./rules";
 import type { RuleResult, SkillLintResult } from "./types";
 
 export async function lintSkill(skillDir: string): Promise<SkillLintResult> {
-  const skillPath = path.join(skillDir, "SKILL.md");
+  const skillPath = join(skillDir, "SKILL.md");
   const raw = await Bun.file(skillPath).text();
   const content = parseSkill(raw);
 
@@ -24,7 +24,7 @@ export async function lintSkill(skillDir: string): Promise<SkillLintResult> {
 
   const refTokens = await Promise.all(
     referenceResults.map(async (ref) => {
-      const refFile = Bun.file(path.join(skillDir, ref.path));
+      const refFile = Bun.file(join(skillDir, ref.path));
       if (!(await refFile.exists())) return 0;
       return estimateTokens(await refFile.text());
     }),

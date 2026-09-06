@@ -113,9 +113,9 @@ export function selectSample(candidates: Item[], limit: number): Item[] {
       }
     }
   }
-  selected.forEach((s, i) => {
+  for (const [i, s] of selected.entries()) {
     s.id = `rw-${String(i + 1).padStart(3, "0")}`;
-  });
+  }
   return selected;
 }
 

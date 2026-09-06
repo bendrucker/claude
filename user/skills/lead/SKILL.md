@@ -27,7 +27,7 @@ Grill me on any ambiguous requirements before dispatching. Load `grilling` for t
 
 ## Dispatch
 
-Per PR: one worktree, one agent. Load `herdr` for the mechanics. Open worktrees as tabs in this workspace.
+Per PR: one worktree, one agent. Load `herdr:herdr` for the mechanics. Open worktrees as tabs in this workspace.
 
 Write the brief to `tmp/BRIEF.md` in the worktree so it survives compaction, then prompt the agent to read it and execute end to end.
 

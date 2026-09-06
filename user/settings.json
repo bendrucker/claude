@@ -438,7 +438,8 @@
     "atuin@bendrucker": true,
     "comments@bendrucker": true,
     "agent-browser@agent-browser": true,
-    "plannotator@plannotator": true
+    "plannotator@plannotator": true,
+    "herdr@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

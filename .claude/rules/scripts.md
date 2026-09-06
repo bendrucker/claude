@@ -50,7 +50,7 @@ A regex is fine inside a single node's text, where the grammar is already resolv
 
 # Sandbox and Nested Commands
 
-`excludedCommands` matches only the top-level command of a Bash invocation. Nested commands (`open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so an `open:*` entry does not exempt them.
+`excludedCommands` matches commands in a Bash invocation's own top-level chain. Nested commands (`open` spawned from a `bun scripts/foo.ts` wrapper) inherit the parent's sandbox profile, so an `open:*` entry does not exempt them.
 
 Go CLIs (`gh`, `glab`, `terraform`, `kubectl`, `go`) run fine sandboxed. `sandbox.network.allowMachLookup: ["com.apple.trustd.agent"]` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification profile-wide.
 

@@ -86,12 +86,10 @@ const cases: Array<{
 ];
 
 describe("preprocessHeading", () => {
-  for (const { description, input, text, codeSpans, enumerator } of cases) {
-    it(description, () => {
-      const result = preprocessHeading(input);
-      expect(result.text).toBe(text);
-      expect(result.codeSpans).toBe(codeSpans ?? 0);
-      expect(result.enumerator).toBe(enumerator ?? false);
-    });
-  }
+  it.each(cases)("$description", ({ input, text, codeSpans, enumerator }) => {
+    const result = preprocessHeading(input);
+    expect(result.text).toBe(text);
+    expect(result.codeSpans).toBe(codeSpans ?? 0);
+    expect(result.enumerator).toBe(enumerator ?? false);
+  });
 });

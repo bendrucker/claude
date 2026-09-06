@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "promise", "node", "import"],
+  "plugins": ["typescript", "unicorn", "oxc", "promise", "node", "import", "vitest"],
   "categories": {
     "correctness": "error",
     "suspicious": "error"
@@ -60,13 +60,25 @@
     // `replace()` needs a global regex to hit every match, and a dropped `g` flag silently replaces only the first one. `replaceAll()` makes the intent explicit and takes a plain string when there's no pattern to match.
     "unicorn/prefer-string-replace-all": "error",
     // `substring()` swaps out-of-order arguments and clamps negatives instead of indexing from the end. `substr()` is deprecated and its second argument is a length. `slice()` is the one method with consistent, current semantics.
-    "unicorn/prefer-string-slice": "error"
+    "unicorn/prefer-string-slice": "error",
+    // vitest/no-commented-out-tests only means something in test files.
+    // Enabled repo-wide via the plugin's categories, it runs over source
+    // prose too and produces false positives like db.ts's
+    // "... it (00_pinned.sql), so ...", which reads like a commented-out
+    // `it(...)` call but isn't one. Off here. Enabled only under
+    // **/*.test.ts below, where a commented-out test can actually occur.
+    "vitest/no-commented-out-tests": "off",
+    // This repo tests with bun:test, not vitest. The vitest plugin matches
+    // on the Jest-style API shape rather than the import, so it still
+    // applies correctly here.
+    "vitest/prefer-each": "error"
   },
   "overrides": [
     {
       "files": ["**/*.test.ts"],
       "rules": {
-        "unicorn/consistent-function-scoping": "off"
+        "unicorn/consistent-function-scoping": "off",
+        "vitest/no-commented-out-tests": "error"
       }
     }
   ]
